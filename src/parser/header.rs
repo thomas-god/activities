@@ -49,7 +49,7 @@ impl FileHeader {
             .to_vec(),
         )
         .map_err(|_| FileHeaderError::InvalidHeaderType)?;
-        if data_type != String::from(".FIT") {
+        if data_type != ".FIT" {
             return Err(FileHeaderError::InvalidHeaderType);
         }
         let crc = u16::from_le_bytes([

@@ -9,6 +9,7 @@ use crate::parser::{
 
 mod header;
 mod records;
+mod types;
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -29,11 +30,14 @@ pub fn parse_file(file: &str) -> Result<usize, ParseError> {
 
     loop {
         match Record::parse(&mut content, &mut definitions) {
-            Some(record) => {
+            Ok(record) => {
                 println!("{record:?}");
                 messages.push(record);
             }
-            None => break,
+            Err(err) => {
+                println!("error: {err:?}");
+                break;
+            }
         }
     }
 
