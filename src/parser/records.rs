@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::parser::types::RecordField;
+use crate::parser::types::{DataTypeError, RecordDataType, RecordDataValue, RecordField};
 
 #[derive(Error, Debug)]
 pub enum RecordError {
@@ -10,6 +10,8 @@ pub enum RecordError {
     InvalidRecord,
     #[error("No DefinitionMessage found for local id {0}")]
     NoDefinitionMessageFound(u8),
+    #[error("Invalid DataType")]
+    DataTypeError(#[from] DataTypeError),
 }
 
 #[derive(Debug)]
@@ -51,6 +53,7 @@ pub struct RecordDefinition {
 #[derive(Debug, Clone)]
 pub struct RecordDefinitionField {
     field: RecordField,
+    field_type: RecordDataType,
     size: u8,
 }
 
@@ -59,9 +62,6 @@ pub struct UnsupportedDefinition {
     pub local_message_type: u8,
     pub fields_size: u8,
 }
-
-#[derive(Debug, Clone)]
-pub struct DefinitionField {}
 
 #[derive(Debug)]
 pub enum DataMessage {
@@ -72,7 +72,13 @@ pub enum DataMessage {
 #[derive(Debug)]
 pub struct RecordDataMessage {
     pub local_message_type: u8,
-    pub values: Vec<u8>,
+    pub values: Vec<RecordDataMessageField>,
+}
+
+#[derive(Debug)]
+pub struct RecordDataMessageField {
+    pub field: RecordField,
+    pub values: Vec<RecordDataValue>,
 }
 
 #[derive(Debug)]
@@ -216,8 +222,13 @@ where
     let definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
     let field = RecordField::from(definition_number);
     let size = content.next().ok_or(RecordError::InvalidRecord)?;
-    let _base_type = content.next().ok_or(RecordError::InvalidRecord)?;
-    Ok(RecordDefinitionField { field, size })
+    let field_type =
+        RecordDataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;
+    Ok(RecordDefinitionField {
+        field,
+        size,
+        field_type,
+    })
 }
 
 fn parse_definition_field_size<I>(content: &mut I) -> Result<u8, RecordError>
@@ -240,12 +251,17 @@ where
 {
     match definitions.get(&header.local_message_type) {
         Some(DefinitionMessage::RecordDefinition(definition)) => {
-            let mut values: Vec<u8> = Vec::new();
-            for _ in 0..definition.fields_size {
-                values.push(content.next().ok_or(RecordError::InvalidRecord)?);
+            let mut values = Vec::new();
+            for field in definition.fields.iter() {
+                values.push(RecordDataMessageField {
+                    field: field.field,
+                    values: field.field_type.parse_values(content, field.size)?,
+                })
             }
+
             Ok(DataMessage::Record(RecordDataMessage {
                 local_message_type: header.local_message_type,
+
                 values,
             }))
         }
