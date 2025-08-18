@@ -64,7 +64,19 @@ pub struct UnsupportedDefinition {
 pub struct DefinitionField {}
 
 #[derive(Debug)]
-pub struct DataMessage {
+pub enum DataMessage {
+    Record(RecordDataMessage),
+    Raw(RawDataMessage),
+}
+
+#[derive(Debug)]
+pub struct RecordDataMessage {
+    pub local_message_type: u8,
+    pub values: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct RawDataMessage {
     pub local_message_type: u8,
     pub values: Vec<u8>,
 }
@@ -226,22 +238,33 @@ fn parse_data_message<I>(
 where
     I: Iterator<Item = u8>,
 {
-    let fields_size = match definitions.get(&header.local_message_type) {
-        Some(definition) => definition.total_size(),
+    match definitions.get(&header.local_message_type) {
+        Some(DefinitionMessage::RecordDefinition(definition)) => {
+            let mut values: Vec<u8> = Vec::new();
+            for _ in 0..definition.fields_size {
+                values.push(content.next().ok_or(RecordError::InvalidRecord)?);
+            }
+            Ok(DataMessage::Record(RecordDataMessage {
+                local_message_type: header.local_message_type,
+                values,
+            }))
+        }
+        Some(DefinitionMessage::UnsupportedDefinition(definition)) => {
+            let mut values: Vec<u8> = Vec::new();
+            for _ in 0..definition.fields_size {
+                values.push(content.next().ok_or(RecordError::InvalidRecord)?);
+            }
+            Ok(DataMessage::Raw(RawDataMessage {
+                local_message_type: header.local_message_type,
+                values,
+            }))
+        }
         None => {
             return Err(RecordError::NoDefinitionMessageFound(
                 header.local_message_type,
             ));
         }
-    };
-    let mut values: Vec<u8> = Vec::new();
-    for _ in 0..fields_size {
-        values.push(content.next().ok_or(RecordError::InvalidRecord)?);
     }
-    Ok(DataMessage {
-        local_message_type: header.local_message_type,
-        values,
-    })
 }
 
 fn parse_compressed_message<I>(
