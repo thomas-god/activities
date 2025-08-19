@@ -1,6 +1,6 @@
 use crate::parser::{
     records::{NormalRecordHeader, RecordError},
-    types::{DataField, DataType, record::RecordField},
+    types::{DataField, DataType, file_id::FileIdField, record::RecordField},
 };
 
 #[derive(Debug, Clone)]
@@ -88,6 +88,7 @@ where
     let definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
     let field = match message_type {
         GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
+        GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
         _ => DataField::Unknown,
     };
     let size = content.next().ok_or(RecordError::InvalidRecord)?;
