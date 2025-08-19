@@ -1,14 +1,21 @@
 use thiserror::Error;
 
-use crate::parser::types::{file_id::FileIdField, record::RecordField};
+use crate::parser::types::{
+    developer::DeveloperDataIdField, field_description::FieldDescriptionField,
+    file_id::FileIdField, record::RecordField,
+};
 
+pub mod developer;
+pub mod field_description;
 pub mod file_id;
 pub mod record;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum DataField {
     FileId(FileIdField),
     Record(RecordField),
+    FieldDescription(FieldDescriptionField),
+    DeveloperDataId(DeveloperDataIdField),
     Unknown,
 }
 

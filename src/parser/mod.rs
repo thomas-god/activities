@@ -4,7 +4,7 @@ use thiserror::Error;
 
 pub use crate::parser::records::Record;
 use crate::parser::{
-    definition::RecordDefinition,
+    definition::Definition,
     header::{FileHeader, FileHeaderError},
     records::DataMessage,
 };
@@ -28,7 +28,7 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
 
     let _header = FileHeader::from_bytes(&mut content);
 
-    let mut definitions: HashMap<u8, RecordDefinition> = HashMap::new();
+    let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut messages = Vec::new();
 
     loop {

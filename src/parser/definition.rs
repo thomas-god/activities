@@ -1,17 +1,20 @@
 use crate::parser::{
     records::{NormalRecordHeader, RecordError},
-    types::{DataField, DataType, file_id::FileIdField, record::RecordField},
+    types::{
+        DataField, DataType, developer::DeveloperDataIdField,
+        field_description::FieldDescriptionField, file_id::FileIdField, record::RecordField,
+    },
 };
 
 #[derive(Debug, Clone)]
-pub struct RecordDefinition {
+pub struct Definition {
     pub message_type: GlobalMessage,
     pub local_message_type: u8,
     pub fields: Vec<DefinitionField>,
     pub fields_size: u8,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct DefinitionField {
     pub field: DataField,
     pub field_type: DataType,
@@ -22,6 +25,8 @@ pub struct DefinitionField {
 pub enum GlobalMessage {
     FileId,
     Record,
+    FieldDescription,
+    DeveloperDataId,
     Unsupported(u16),
 }
 
@@ -30,6 +35,12 @@ impl GlobalMessage {
         match self {
             GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
             GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
+            GlobalMessage::FieldDescription => {
+                DataField::FieldDescription(FieldDescriptionField::from(definition_number))
+            }
+            GlobalMessage::DeveloperDataId => {
+                DataField::DeveloperDataId(DeveloperDataIdField::from(definition_number))
+            }
             _ => DataField::Unknown,
         }
     }
@@ -40,6 +51,7 @@ impl From<u16> for GlobalMessage {
         match value {
             0 => Self::FileId,
             20 => Self::Record,
+            207 => Self::DeveloperDataId,
             val => Self::Unsupported(val),
         }
     }
@@ -48,7 +60,7 @@ impl From<u16> for GlobalMessage {
 pub fn parse_definition_message<I>(
     header: NormalRecordHeader,
     content: &mut I,
-) -> Result<RecordDefinition, RecordError>
+) -> Result<Definition, RecordError>
 where
     I: Iterator<Item = u8>,
 {
@@ -80,7 +92,7 @@ where
         }
     }
 
-    Ok(RecordDefinition {
+    Ok(Definition {
         message_type,
         local_message_type: header.local_message_type,
         fields,

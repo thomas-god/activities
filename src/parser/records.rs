@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::parser::{
-    definition::{RecordDefinition, parse_definition_message},
+    definition::{Definition, parse_definition_message},
     types::{DataField, DataTypeError, DataValue},
 };
 
@@ -19,7 +19,7 @@ pub enum RecordError {
 
 #[derive(Debug)]
 pub enum Record {
-    Definition(RecordDefinition),
+    Definition(Definition),
     Data(DataMessage),
     CompressedTimestamp(CompressedTimestampMessage),
 }
@@ -27,11 +27,11 @@ pub enum Record {
 #[derive(Debug)]
 pub struct DataMessage {
     pub local_message_type: u8,
-    pub values: Vec<RecordDataMessageField>,
+    pub values: Vec<DataMessageField>,
 }
 
 #[derive(Debug)]
-pub struct RecordDataMessageField {
+pub struct DataMessageField {
     pub field: DataField,
     pub values: Vec<DataValue>,
 }
@@ -45,7 +45,7 @@ pub struct CompressedTimestampMessage {
 impl Record {
     pub fn parse<I>(
         content: &mut I,
-        definitions: &mut HashMap<u8, RecordDefinition>,
+        definitions: &mut HashMap<u8, Definition>,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
@@ -68,7 +68,7 @@ impl Record {
 
 fn parse_normal_message<I>(
     header: NormalRecordHeader,
-    definitions: &HashMap<u8, RecordDefinition>,
+    definitions: &HashMap<u8, Definition>,
     content: &mut I,
 ) -> Result<Record, RecordError>
 where
@@ -84,7 +84,7 @@ where
 
 fn parse_data_message<I>(
     header: NormalRecordHeader,
-    definitions: &HashMap<u8, RecordDefinition>,
+    definitions: &HashMap<u8, Definition>,
     content: &mut I,
 ) -> Result<DataMessage, RecordError>
 where
@@ -94,8 +94,8 @@ where
         Some(definition) => {
             let mut values = Vec::new();
             for field in definition.fields.iter() {
-                values.push(RecordDataMessageField {
-                    field: field.field,
+                values.push(DataMessageField {
+                    field: field.field.clone(),
                     values: field.field_type.parse_values(content, field.size)?,
                 })
             }
@@ -114,7 +114,7 @@ where
 
 fn parse_compressed_message<I>(
     header: CompressedRecordHeader,
-    definitions: &HashMap<u8, RecordDefinition>,
+    definitions: &HashMap<u8, Definition>,
     content: &mut I,
 ) -> Result<Record, RecordError>
 where
