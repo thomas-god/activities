@@ -1,8 +1,11 @@
 use thiserror::Error;
 
-use crate::parser::types::{
-    developer::DeveloperDataIdField, field_description::FieldDescriptionField,
-    file_id::FileIdField, record::RecordField,
+use crate::parser::{
+    definition::Endianness,
+    types::{
+        developer::DeveloperDataIdField, field_description::FieldDescriptionField,
+        file_id::FileIdField, record::RecordField,
+    },
 };
 
 pub mod developer;
@@ -123,6 +126,7 @@ impl DataType {
     pub fn parse_values<I>(
         &self,
         content: &mut I,
+        endianness: &Endianness,
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError>
     where
@@ -169,132 +173,230 @@ impl DataType {
 
             DataType::Sint16 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Sint16(i16::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Sint16(match endianness {
+                        Endianness::Little => i16::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => i16::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint16 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint16(u16::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint16(match endianness {
+                        Endianness::Little => u16::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u16::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint16z => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint16z(u16::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint16z(match endianness {
+                        Endianness::Little => u16::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u16::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Sint32 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Sint32(i32::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Sint32(match endianness {
+                        Endianness::Little => i32::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => i32::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint32 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint32(u32::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint32(match endianness {
+                        Endianness::Little => u32::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u32::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint32z => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint32z(u32::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint32z(match endianness {
+                        Endianness::Little => u32::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u32::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Sint64 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Sint64(i64::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Sint64(match endianness {
+                        Endianness::Little => i64::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => i64::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint64 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint64(u64::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint64(match endianness {
+                        Endianness::Little => u64::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u64::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Uint64z => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Uint64z(u64::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ])));
+                    values.push(DataValue::Uint64z(match endianness {
+                        Endianness::Little => u64::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u64::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    }));
                 }
             }
 
             DataType::Float32 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Float32(f32::from_bits(u32::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ]))));
+                    values.push(DataValue::Float32(f32::from_bits(match endianness {
+                        Endianness::Little => u32::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u32::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    })));
                 }
             }
 
             DataType::Float64 => {
                 for _ in 0..number_of_values {
-                    values.push(DataValue::Float64(f64::from_bits(u64::from_le_bytes([
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                        content.next().ok_or(DataTypeError::InsufficientData)?,
-                    ]))));
+                    values.push(DataValue::Float64(f64::from_bits(match endianness {
+                        Endianness::Little => u64::from_le_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                        Endianness::Big => u64::from_be_bytes([
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                            content.next().ok_or(DataTypeError::InsufficientData)?,
+                        ]),
+                    })));
                 }
             }
 

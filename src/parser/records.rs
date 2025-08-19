@@ -96,7 +96,11 @@ where
             for field in definition.fields.iter() {
                 values.push(DataMessageField {
                     field: field.field.clone(),
-                    values: field.field_type.parse_values(content, field.size)?,
+                    values: field.field_type.parse_values(
+                        content,
+                        &field.endianness,
+                        field.size,
+                    )?,
                 })
             }
 

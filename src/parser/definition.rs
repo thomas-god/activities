@@ -6,6 +6,21 @@ use crate::parser::{
     },
 };
 
+#[derive(Debug, Clone, Copy)]
+pub enum Endianness {
+    Little,
+    Big,
+}
+
+impl From<u8> for Endianness {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Little,
+            _ => Self::Big,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Definition {
     pub message_type: GlobalMessage,
@@ -16,6 +31,7 @@ pub struct Definition {
 
 #[derive(Debug, Clone)]
 pub struct DefinitionField {
+    pub endianness: Endianness,
     pub field: DataField,
     pub field_type: DataType,
     pub size: u8,
@@ -65,11 +81,17 @@ where
     I: Iterator<Item = u8>,
 {
     let _reserved = content.next().ok_or(RecordError::InvalidRecord)?;
-    let _endianes = content.next().ok_or(RecordError::InvalidRecord)?;
-    let global_message_number = u16::from_le_bytes([
-        content.next().ok_or(RecordError::InvalidRecord)?,
-        content.next().ok_or(RecordError::InvalidRecord)?,
-    ]);
+    let endianness = Endianness::from(content.next().ok_or(RecordError::InvalidRecord)?);
+    let global_message_number = match endianness {
+        Endianness::Little => u16::from_le_bytes([
+            content.next().ok_or(RecordError::InvalidRecord)?,
+            content.next().ok_or(RecordError::InvalidRecord)?,
+        ]),
+        Endianness::Big => u16::from_be_bytes([
+            content.next().ok_or(RecordError::InvalidRecord)?,
+            content.next().ok_or(RecordError::InvalidRecord)?,
+        ]),
+    };
     let message_type = GlobalMessage::from(global_message_number);
 
     let number_of_fields = content.next().ok_or(RecordError::InvalidRecord)?;
@@ -77,7 +99,7 @@ where
     let mut fields: Vec<DefinitionField> = vec![];
 
     for _ in 0..number_of_fields {
-        let field = parse_definition_field(&message_type, content)?;
+        let field = parse_definition_field(&message_type, &endianness, content)?;
         fields_size += field.size;
         fields.push(field);
     }
@@ -86,7 +108,7 @@ where
     if header.message_type_specific {
         let number_developer_fields = content.next().ok_or(RecordError::InvalidRecord)?;
         for _ in 0..number_developer_fields {
-            let field = parse_definition_field(&message_type, content)?;
+            let field = parse_definition_field(&message_type, &endianness, content)?;
             fields_size += field.size;
             fields.push(field);
         }
@@ -102,6 +124,7 @@ where
 
 fn parse_definition_field<I>(
     message_type: &GlobalMessage,
+    endianness: &Endianness,
     content: &mut I,
 ) -> Result<DefinitionField, RecordError>
 where
@@ -112,7 +135,9 @@ where
     let size = content.next().ok_or(RecordError::InvalidRecord)?;
     let field_type =
         DataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;
+
     Ok(DefinitionField {
+        endianness: *endianness,
         field,
         size,
         field_type,
