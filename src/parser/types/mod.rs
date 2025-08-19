@@ -58,8 +58,6 @@ pub enum DataValue {
 
 #[derive(Debug, Error)]
 pub enum DataTypeError {
-    #[error("Base type {0} is unknown")]
-    UnknownBaseType(u8),
     #[error("Not enough bytes to parse data")]
     InsufficientData,
     #[error("Unable to parse Utf-8 String from bytes")]

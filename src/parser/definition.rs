@@ -25,6 +25,16 @@ pub enum GlobalMessage {
     Unsupported(u16),
 }
 
+impl GlobalMessage {
+    pub fn parse_field(&self, definition_number: u8) -> DataField {
+        match self {
+            GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
+            GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
+            _ => DataField::Unknown,
+        }
+    }
+}
+
 impl From<u16> for GlobalMessage {
     fn from(value: u16) -> Self {
         match value {
@@ -86,11 +96,7 @@ where
     I: Iterator<Item = u8>,
 {
     let definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
-    let field = match message_type {
-        GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
-        GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
-        _ => DataField::Unknown,
-    };
+    let field = message_type.parse_field(definition_number);
     let size = content.next().ok_or(RecordError::InvalidRecord)?;
     let field_type =
         DataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;

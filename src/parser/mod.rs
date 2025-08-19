@@ -2,16 +2,17 @@ use std::{collections::HashMap, fs};
 
 use thiserror::Error;
 
+pub use crate::parser::records::Record;
 use crate::parser::{
     definition::RecordDefinition,
     header::{FileHeader, FileHeaderError},
-    records::Record,
+    records::DataMessage,
 };
 
 mod definition;
 mod header;
 mod records;
-mod types;
+pub mod types;
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -22,19 +23,25 @@ pub enum ParseError {
     Io(#[from] std::io::Error),
 }
 
-pub fn parse_file(file: &str) -> Result<usize, ParseError> {
+pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
     let mut content = fs::read(file)?.into_iter();
 
     let _header = FileHeader::from_bytes(&mut content);
 
     let mut definitions: HashMap<u8, RecordDefinition> = HashMap::new();
-    let mut messages: Vec<Record> = Vec::new();
+    let mut messages = Vec::new();
 
     loop {
         match Record::parse(&mut content, &mut definitions) {
-            Ok(record) => {
-                println!("{record:?}");
-                messages.push(record);
+            Ok(Record::Definition(definition)) => {
+                println!("{:?}", definition);
+            }
+            Ok(Record::Data(data)) => {
+                println!("{:?}", data);
+                messages.push(data);
+            }
+            Ok(Record::CompressedTimestamp(data)) => {
+                println!("{:?}", data)
             }
             Err(err) => {
                 println!("error: {err:?}");
@@ -45,7 +52,7 @@ pub fn parse_file(file: &str) -> Result<usize, ParseError> {
 
     println!("Parsed {:?} messages", messages.len());
 
-    Ok(0)
+    Ok(messages)
 }
 
 #[cfg(test)]

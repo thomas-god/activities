@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::parser::{
     definition::{RecordDefinition, parse_definition_message},
-    types::{DataField, DataType, DataTypeError, DataValue, record::RecordField},
+    types::{DataField, DataTypeError, DataValue},
 };
 
 #[derive(Error, Debug)]
@@ -25,13 +25,7 @@ pub enum Record {
 }
 
 #[derive(Debug)]
-pub enum DataMessage {
-    Record(RecordDataMessage),
-    Raw(RawDataMessage),
-}
-
-#[derive(Debug)]
-pub struct RecordDataMessage {
+pub struct DataMessage {
     pub local_message_type: u8,
     pub values: Vec<RecordDataMessageField>,
 }
@@ -42,11 +36,6 @@ pub struct RecordDataMessageField {
     pub values: Vec<DataValue>,
 }
 
-#[derive(Debug)]
-pub struct RawDataMessage {
-    pub local_message_type: u8,
-    pub values: Vec<u8>,
-}
 #[derive(Debug)]
 pub struct CompressedTimestampMessage {
     pub local_message_type: u8,
@@ -111,18 +100,15 @@ where
                 })
             }
 
-            Ok(DataMessage::Record(RecordDataMessage {
+            Ok(DataMessage {
                 local_message_type: header.local_message_type,
-
                 values,
-            }))
+            })
         }
 
-        None => {
-            return Err(RecordError::NoDefinitionMessageFound(
-                header.local_message_type,
-            ));
-        }
+        None => Err(RecordError::NoDefinitionMessageFound(
+            header.local_message_type,
+        )),
     }
 }
 
@@ -182,7 +168,7 @@ pub struct NormalRecordHeader {
     pub local_message_type: u8,
 }
 
-enum MessageType {
+pub enum MessageType {
     Definition,
     Data,
 }

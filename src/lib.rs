@@ -1,6 +1,7 @@
 mod parser;
 
-pub use crate::parser::{ParseError, parse_file};
+pub use crate::parser::types::{DataField, DataType, DataValue};
+pub use crate::parser::{ParseError, Record, parse_file};
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
