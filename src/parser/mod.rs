@@ -3,10 +3,12 @@ use std::{collections::HashMap, fs};
 use thiserror::Error;
 
 use crate::parser::{
+    definition::RecordDefinition,
     header::{FileHeader, FileHeaderError},
-    records::{DefinitionMessage, Record},
+    records::Record,
 };
 
+mod definition;
 mod header;
 mod records;
 mod types;
@@ -25,7 +27,7 @@ pub fn parse_file(file: &str) -> Result<usize, ParseError> {
 
     let _header = FileHeader::from_bytes(&mut content);
 
-    let mut definitions: HashMap<u8, DefinitionMessage> = HashMap::new();
+    let mut definitions: HashMap<u8, RecordDefinition> = HashMap::new();
     let mut messages: Vec<Record> = Vec::new();
 
     loop {

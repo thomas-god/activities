@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::parser::types::{DataTypeError, RecordDataType, RecordDataValue, RecordField};
+use crate::parser::{
+    definition::{RecordDefinition, parse_definition_message},
+    types::{DataField, DataType, DataTypeError, DataValue, record::RecordField},
+};
 
 #[derive(Error, Debug)]
 pub enum RecordError {
@@ -16,51 +19,9 @@ pub enum RecordError {
 
 #[derive(Debug)]
 pub enum Record {
-    Definition(DefinitionMessage),
+    Definition(RecordDefinition),
     Data(DataMessage),
     CompressedTimestamp(CompressedTimestampMessage),
-}
-
-#[derive(Debug, Clone)]
-pub enum DefinitionMessage {
-    RecordDefinition(RecordDefinition),
-    UnsupportedDefinition(UnsupportedDefinition),
-}
-
-impl DefinitionMessage {
-    fn local_message_type(&self) -> u8 {
-        match self {
-            Self::UnsupportedDefinition(definition) => definition.local_message_type,
-            Self::RecordDefinition(definition) => definition.local_message_type,
-        }
-    }
-
-    fn total_size(&self) -> u8 {
-        match self {
-            Self::UnsupportedDefinition(definition) => definition.fields_size,
-            Self::RecordDefinition(defintion) => defintion.fields_size,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RecordDefinition {
-    pub local_message_type: u8,
-    pub fields: Vec<RecordDefinitionField>,
-    pub fields_size: u8,
-}
-
-#[derive(Debug, Clone)]
-pub struct RecordDefinitionField {
-    field: RecordField,
-    field_type: RecordDataType,
-    size: u8,
-}
-
-#[derive(Debug, Clone)]
-pub struct UnsupportedDefinition {
-    pub local_message_type: u8,
-    pub fields_size: u8,
 }
 
 #[derive(Debug)]
@@ -77,8 +38,8 @@ pub struct RecordDataMessage {
 
 #[derive(Debug)]
 pub struct RecordDataMessageField {
-    pub field: RecordField,
-    pub values: Vec<RecordDataValue>,
+    pub field: DataField,
+    pub values: Vec<DataValue>,
 }
 
 #[derive(Debug)]
@@ -95,7 +56,7 @@ pub struct CompressedTimestampMessage {
 impl Record {
     pub fn parse<I>(
         content: &mut I,
-        definitions: &mut HashMap<u8, DefinitionMessage>,
+        definitions: &mut HashMap<u8, RecordDefinition>,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
@@ -109,7 +70,7 @@ impl Record {
             };
 
         if let Ok(Record::Definition(ref definition)) = record {
-            definitions.insert(definition.local_message_type(), definition.clone());
+            definitions.insert(definition.local_message_type, definition.clone());
         }
 
         record
@@ -118,7 +79,7 @@ impl Record {
 
 fn parse_normal_message<I>(
     header: NormalRecordHeader,
-    definitions: &HashMap<u8, DefinitionMessage>,
+    definitions: &HashMap<u8, RecordDefinition>,
     content: &mut I,
 ) -> Result<Record, RecordError>
 where
@@ -132,125 +93,16 @@ where
     }
 }
 
-fn parse_definition_message<I>(
-    header: NormalRecordHeader,
-    content: &mut I,
-) -> Result<DefinitionMessage, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    let _reserved = content.next().ok_or(RecordError::InvalidRecord)?;
-    let _endianes = content.next().ok_or(RecordError::InvalidRecord)?;
-    let global_message_number = u16::from_le_bytes([
-        content.next().ok_or(RecordError::InvalidRecord)?,
-        content.next().ok_or(RecordError::InvalidRecord)?,
-    ]);
-
-    match global_message_number {
-        20 => parse_record_definition(header, content).map(DefinitionMessage::RecordDefinition),
-        _ => parse_unsupported_definition(header, content)
-            .map(DefinitionMessage::UnsupportedDefinition),
-    }
-}
-
-fn parse_record_definition<I>(
-    header: NormalRecordHeader,
-    content: &mut I,
-) -> Result<RecordDefinition, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    let number_of_fields = content.next().ok_or(RecordError::InvalidRecord)?;
-    let mut fields_size = 0;
-    let mut fields: Vec<RecordDefinitionField> = vec![];
-
-    for _ in 0..number_of_fields {
-        let field = parse_definition_field(content)?;
-        fields_size += field.size;
-        fields.push(field);
-    }
-
-    // Parse size of optionnal developer fields
-    if header.message_type_specific {
-        let number_developer_fields = content.next().ok_or(RecordError::InvalidRecord)?;
-        for _ in 0..number_developer_fields {
-            let field = parse_definition_field(content)?;
-            fields_size += field.size;
-            fields.push(field);
-        }
-    }
-
-    Ok(RecordDefinition {
-        local_message_type: header.local_message_type,
-        fields_size,
-        fields,
-    })
-}
-
-fn parse_unsupported_definition<I>(
-    header: NormalRecordHeader,
-    content: &mut I,
-) -> Result<UnsupportedDefinition, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    let number_of_fields = content.next().ok_or(RecordError::InvalidRecord)?;
-    let mut fields_size = 0;
-
-    for _ in 0..number_of_fields {
-        fields_size += parse_definition_field_size(content)?;
-    }
-
-    // Parse size of optionnal developer fields
-    if header.message_type_specific {
-        let number_developer_fields = content.next().ok_or(RecordError::InvalidRecord)?;
-        for _ in 0..number_developer_fields {
-            fields_size += parse_definition_field_size(content)?;
-        }
-    }
-
-    Ok(UnsupportedDefinition {
-        local_message_type: header.local_message_type,
-        fields_size,
-    })
-}
-
-fn parse_definition_field<I>(content: &mut I) -> Result<RecordDefinitionField, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    let definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
-    let field = RecordField::from(definition_number);
-    let size = content.next().ok_or(RecordError::InvalidRecord)?;
-    let field_type =
-        RecordDataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;
-    Ok(RecordDefinitionField {
-        field,
-        size,
-        field_type,
-    })
-}
-
-fn parse_definition_field_size<I>(content: &mut I) -> Result<u8, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    let _definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
-    let field_size = content.next().ok_or(RecordError::InvalidRecord)?;
-    let _base_type = content.next().ok_or(RecordError::InvalidRecord)?;
-    Ok(field_size)
-}
-
 fn parse_data_message<I>(
     header: NormalRecordHeader,
-    definitions: &HashMap<u8, DefinitionMessage>,
+    definitions: &HashMap<u8, RecordDefinition>,
     content: &mut I,
 ) -> Result<DataMessage, RecordError>
 where
     I: Iterator<Item = u8>,
 {
     match definitions.get(&header.local_message_type) {
-        Some(DefinitionMessage::RecordDefinition(definition)) => {
+        Some(definition) => {
             let mut values = Vec::new();
             for field in definition.fields.iter() {
                 values.push(RecordDataMessageField {
@@ -265,16 +117,7 @@ where
                 values,
             }))
         }
-        Some(DefinitionMessage::UnsupportedDefinition(definition)) => {
-            let mut values: Vec<u8> = Vec::new();
-            for _ in 0..definition.fields_size {
-                values.push(content.next().ok_or(RecordError::InvalidRecord)?);
-            }
-            Ok(DataMessage::Raw(RawDataMessage {
-                local_message_type: header.local_message_type,
-                values,
-            }))
-        }
+
         None => {
             return Err(RecordError::NoDefinitionMessageFound(
                 header.local_message_type,
@@ -285,14 +128,14 @@ where
 
 fn parse_compressed_message<I>(
     header: CompressedRecordHeader,
-    definitions: &HashMap<u8, DefinitionMessage>,
+    definitions: &HashMap<u8, RecordDefinition>,
     content: &mut I,
 ) -> Result<Record, RecordError>
 where
     I: Iterator<Item = u8>,
 {
     let fields_size = match definitions.get(&header.local_message_type) {
-        Some(definition) => definition.total_size(),
+        Some(definition) => definition.fields_size,
         None => {
             return Err(RecordError::NoDefinitionMessageFound(
                 header.local_message_type,
@@ -333,10 +176,10 @@ impl RecordHeader {
         }
     }
 }
-struct NormalRecordHeader {
-    message_type: MessageType,
-    message_type_specific: bool,
-    local_message_type: u8,
+pub struct NormalRecordHeader {
+    pub message_type: MessageType,
+    pub message_type_specific: bool,
+    pub local_message_type: u8,
 }
 
 enum MessageType {
