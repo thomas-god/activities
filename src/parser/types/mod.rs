@@ -319,3 +319,128 @@ impl DataType {
         Ok(values)
     }
 }
+
+impl DataValue {
+    /// Check if a value should be considered invalid as per the .FIT protocol. Notable exceptions
+    /// are:
+    ///
+    /// - [DataValue::String] are always considered valid, event if empty,
+    /// - [DataValue::Unknown] are always considerred invalid.
+    pub fn is_invalid(&self) -> bool {
+        match self {
+            Self::Enum(val) => *val == 0xFF,
+            Self::Sint8(val) => *val == 0x7F,
+            Self::Sint16(val) => *val == 0x7FFF,
+            Self::Sint32(val) => *val == 0x7FFFFFFF,
+            Self::Sint64(val) => *val == 0x7FFFFFFFFFFFFFFF,
+            Self::Uint8(val) => *val == 0xFF,
+            Self::Uint16(val) => *val == 0xFFFF,
+            Self::Uint32(val) => *val == 0xFFFFFFFF,
+            Self::Uint64(val) => *val == 0xFFFFFFFFFFFFFFFF,
+            Self::Uint8z(val) => *val == 0x00,
+            Self::Uint16z(val) => *val == 0x0000,
+            Self::Uint32z(val) => *val == 0x00000000,
+            Self::Uint64z(val) => *val == 0x0000000000000000,
+            Self::Float32(val) => val.to_le_bytes() == [0xFF, 0xFF, 0xFF, 0xFF],
+            Self::Float64(val) => {
+                val.to_le_bytes() == [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+            }
+            Self::Byte(val) => val.iter().all(|b| *b == 0xFF),
+            Self::String(_) => false,
+            Self::Unknown => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::DataValue;
+
+    #[test]
+    fn test_data_value_enum_invalid() {
+        assert!(!DataValue::Enum(0).is_invalid());
+        assert!(DataValue::Enum(0xFF).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_sint_invalid() {
+        assert!(!DataValue::Sint8(0).is_invalid());
+        assert!(DataValue::Sint8(0x7F).is_invalid());
+
+        assert!(!DataValue::Sint16(0).is_invalid());
+        assert!(DataValue::Sint16(0x7FFF).is_invalid());
+
+        assert!(!DataValue::Sint32(0).is_invalid());
+        assert!(DataValue::Sint32(0x7FFFFFFF).is_invalid());
+
+        assert!(!DataValue::Sint64(0).is_invalid());
+        assert!(DataValue::Sint64(0x7FFFFFFFFFFFFFFF).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_uint_invalid() {
+        assert!(!DataValue::Uint8(0).is_invalid());
+        assert!(DataValue::Uint8(0xFF).is_invalid());
+
+        assert!(!DataValue::Uint16(0).is_invalid());
+        assert!(DataValue::Uint16(0xFFFF).is_invalid());
+
+        assert!(!DataValue::Uint32(0).is_invalid());
+        assert!(DataValue::Uint32(0xFFFFFFFF).is_invalid());
+
+        assert!(!DataValue::Uint64(0).is_invalid());
+        assert!(DataValue::Uint64(0xFFFFFFFFFFFFFFFF).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_uintz_invalid() {
+        assert!(!DataValue::Uint8z(0xFF).is_invalid());
+        assert!(DataValue::Uint8z(0).is_invalid());
+
+        assert!(!DataValue::Uint16z(0xFFFF).is_invalid());
+        assert!(DataValue::Uint16z(0).is_invalid());
+
+        assert!(!DataValue::Uint32z(0xFFFFFFFF).is_invalid());
+        assert!(DataValue::Uint32z(0).is_invalid());
+
+        assert!(!DataValue::Uint64z(0xFFFFFFFFFFFFFFFF).is_invalid());
+        assert!(DataValue::Uint64z(0).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_float_invalid() {
+        assert!(!DataValue::Float32(f32::from_le_bytes([0x00, 0x00, 0x00, 0x00])).is_invalid());
+        assert!(DataValue::Float32(f32::from_le_bytes([0xFF, 0xFF, 0xFF, 0xFF])).is_invalid());
+
+        assert!(
+            !DataValue::Float64(f64::from_le_bytes([
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]))
+            .is_invalid()
+        );
+        assert!(
+            DataValue::Float64(f64::from_le_bytes([
+                0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+            ]))
+            .is_invalid()
+        );
+    }
+
+    #[test]
+    fn test_data_value_byte_invalid() {
+        assert!(!DataValue::Byte(vec![0x00, 0x00]).is_invalid());
+        assert!(DataValue::Byte(vec![0xFF, 0xFF]).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_string_always_valid() {
+        assert!(!DataValue::String(String::from_utf8(vec![]).unwrap()).is_invalid());
+        assert!(!DataValue::String(String::from_utf8(vec![0x00]).unwrap()).is_invalid());
+        assert!(!DataValue::String(String::from_utf8(vec![0x01, 0x00]).unwrap()).is_invalid());
+    }
+
+    #[test]
+    fn test_data_value_unknown_always_invalid() {
+        assert!(DataValue::Unknown.is_invalid());
+    }
+}
