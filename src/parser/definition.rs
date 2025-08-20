@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::parser::{
     records::{DefinitionMessageHeader, RecordError},
     types::{
-        DataField, DataType, developer::DeveloperDataIdField,
+        CustomField, DataField, DataType, developer::DeveloperDataIdField,
         field_description::FieldDescriptionField, file_id::FileIdField, record::RecordField,
     },
 };
@@ -84,6 +86,7 @@ impl From<u16> for GlobalMessage {
 
 pub fn parse_definition_message<I>(
     header: DefinitionMessageHeader,
+    custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
     content: &mut I,
 ) -> Result<Definition, RecordError>
 where
@@ -108,7 +111,7 @@ where
     let mut fields: Vec<DefinitionField> = vec![];
 
     for _ in 0..number_of_fields {
-        let field = parse_definition_field(&message_type, &endianness, content)?;
+        let field = parse_definition_field(&message_type, endianness, content)?;
         fields_size += field.size;
         fields.push(field);
     }
@@ -117,7 +120,7 @@ where
     if header.message_type_specific {
         let number_developer_fields = content.next().ok_or(RecordError::InvalidRecord)?;
         for _ in 0..number_developer_fields {
-            let field = parse_definition_field(&message_type, &endianness, content)?;
+            let field = parse_developer_field(custom_descriptions, endianness, content)?;
             fields_size += field.size;
             fields.push(field);
         }
@@ -131,9 +134,39 @@ where
     })
 }
 
+fn parse_developer_field<I>(
+    custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
+    endianness: Endianness,
+    content: &mut I,
+) -> Result<DefinitionField, RecordError>
+where
+    I: Iterator<Item = u8>,
+{
+    let field_number = content.next().ok_or(RecordError::InvalidRecord)?;
+    let size = content.next().ok_or(RecordError::InvalidRecord)?;
+    let developer_data_index = content.next().ok_or(RecordError::InvalidRecord)?;
+    let description = custom_descriptions
+        .get(&developer_data_index)
+        .and_then(|des| des.get(&field_number))
+        .ok_or(RecordError::NoDescriptionFound(
+            developer_data_index,
+            field_number,
+        ))?;
+    let field = DefinitionField {
+        endianness,
+        field: DataField::Custom(CustomField {
+            name: description.name.clone(),
+            units: description.units.clone(),
+        }),
+        field_type: description.base_type,
+        size,
+    };
+    Ok(field)
+}
+
 fn parse_definition_field<I>(
     message_type: &GlobalMessage,
-    endianness: &Endianness,
+    endianness: Endianness,
     content: &mut I,
 ) -> Result<DefinitionField, RecordError>
 where
@@ -146,7 +179,7 @@ where
         DataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;
 
     Ok(DefinitionField {
-        endianness: *endianness,
+        endianness,
         field,
         size,
         field_type,

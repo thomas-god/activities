@@ -19,7 +19,14 @@ pub enum DataField {
     Record(RecordField),
     FieldDescription(FieldDescriptionField),
     DeveloperDataId(DeveloperDataIdField),
+    Custom(CustomField),
     Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct CustomField {
+    pub name: Option<String>,
+    pub units: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

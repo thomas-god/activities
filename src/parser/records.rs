@@ -13,6 +13,8 @@ pub enum RecordError {
     InvalidRecord,
     #[error("No DefinitionMessage found for local id {0}")]
     NoDefinitionMessageFound(u8),
+    #[error("No description found for developer data index {0} and field number {1}")]
+    NoDescriptionFound(u8, u8),
     #[error("Invalid DataType")]
     DataTypeError(#[from] DataTypeError),
 }
@@ -46,7 +48,7 @@ impl Record {
     pub fn parse<I>(
         content: &mut I,
         definitions: &HashMap<u8, Definition>,
-        custom_descriptions: &HashMap<u8, HashMap<u8, Vec<CustomDescription>>>,
+        custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
@@ -55,12 +57,12 @@ impl Record {
 
         match header {
             RecordHeader::Data(header) => {
-                parse_data_message(header, definitions, custom_descriptions, content)
-                    .map(Record::Data)
+                parse_data_message(header, definitions, content).map(Record::Data)
             }
 
             RecordHeader::Definition(header) => {
-                parse_definition_message(header, content).map(Record::Definition)
+                parse_definition_message(header, custom_descriptions, content)
+                    .map(Record::Definition)
             }
 
             RecordHeader::Compressed(header) => {
@@ -73,7 +75,6 @@ impl Record {
 fn parse_data_message<I>(
     header: DataMessageHeader,
     definitions: &HashMap<u8, Definition>,
-    custom_descriptions: &HashMap<u8, HashMap<u8, Vec<CustomDescription>>>,
     content: &mut I,
 ) -> Result<DataMessage, RecordError>
 where

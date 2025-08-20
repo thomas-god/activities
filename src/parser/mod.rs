@@ -33,7 +33,7 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
     let _header = FileHeader::from_bytes(&mut content);
 
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
-    let mut custom_descriptions: HashMap<u8, HashMap<u8, Vec<CustomDescription>>> = HashMap::new();
+    let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();
     let mut messages = Vec::new();
 
     loop {
@@ -65,7 +65,7 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
 fn parse_custom_definition_description(
     message: &DataMessage,
     definitions: &HashMap<u8, Definition>,
-    custom_descriptions: &mut HashMap<u8, HashMap<u8, Vec<CustomDescription>>>,
+    custom_descriptions: &mut HashMap<u8, HashMap<u8, CustomDescription>>,
 ) {
     let Some(definition) = definitions.get(&message.local_message_type) else {
         // No matching definition, should not be possible if message has been parsed (?)
@@ -112,8 +112,7 @@ fn parse_custom_definition_description(
     custom_descriptions
         .entry(developer_data_index)
         .or_default()
-        .entry(field_number)
-        .and_modify(|fields| fields.push(description));
+        .insert(field_number, description);
 }
 
 fn find_field(
