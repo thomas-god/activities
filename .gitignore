@@ -213,3 +213,5 @@ __marimo__/
 
 /target
 
+
+*.csv
