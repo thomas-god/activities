@@ -32,8 +32,9 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
     let mut messages = Vec::new();
 
     loop {
-        match Record::parse(&mut content, &mut definitions) {
+        match Record::parse(&mut content, &definitions) {
             Ok(Record::Definition(definition)) => {
+                definitions.insert(definition.local_message_type, definition.clone());
                 println!("{:?}", definition);
             }
             Ok(Record::Data(data)) => {

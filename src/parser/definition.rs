@@ -1,5 +1,5 @@
 use crate::parser::{
-    records::{NormalRecordHeader, RecordError},
+    records::{DefinitionMessageHeader, RecordError},
     types::{
         DataField, DataType, developer::DeveloperDataIdField,
         field_description::FieldDescriptionField, file_id::FileIdField, record::RecordField,
@@ -74,7 +74,7 @@ impl From<u16> for GlobalMessage {
 }
 
 pub fn parse_definition_message<I>(
-    header: NormalRecordHeader,
+    header: DefinitionMessageHeader,
     content: &mut I,
 ) -> Result<Definition, RecordError>
 where

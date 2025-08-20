@@ -45,45 +45,31 @@ pub struct CompressedTimestampMessage {
 impl Record {
     pub fn parse<I>(
         content: &mut I,
-        definitions: &mut HashMap<u8, Definition>,
+        definitions: &HashMap<u8, Definition>,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
     {
-        let record =
-            match RecordHeader::from_byte(content.next().ok_or(RecordError::InvalidRecord)?) {
-                RecordHeader::Normal(header) => parse_normal_message(header, definitions, content),
-                RecordHeader::Compressed(header) => {
-                    parse_compressed_message(header, definitions, content)
-                }
-            };
+        let header = RecordHeader::from_byte(content.next().ok_or(RecordError::InvalidRecord)?);
 
-        if let Ok(Record::Definition(ref definition)) = record {
-            definitions.insert(definition.local_message_type, definition.clone());
+        match header {
+            RecordHeader::Data(header) => {
+                parse_data_message(header, definitions, content).map(Record::Data)
+            }
+
+            RecordHeader::Definition(header) => {
+                parse_definition_message(header, content).map(Record::Definition)
+            }
+
+            RecordHeader::Compressed(header) => {
+                parse_compressed_message(header, definitions, content)
+            }
         }
-
-        record
-    }
-}
-
-fn parse_normal_message<I>(
-    header: NormalRecordHeader,
-    definitions: &HashMap<u8, Definition>,
-    content: &mut I,
-) -> Result<Record, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
-    match header.message_type {
-        MessageType::Definition => {
-            parse_definition_message(header, content).map(Record::Definition)
-        }
-        MessageType::Data => parse_data_message(header, definitions, content).map(Record::Data),
     }
 }
 
 fn parse_data_message<I>(
-    header: NormalRecordHeader,
+    header: DataMessageHeader,
     definitions: &HashMap<u8, Definition>,
     content: &mut I,
 ) -> Result<DataMessage, RecordError>
@@ -117,7 +103,7 @@ where
 }
 
 fn parse_compressed_message<I>(
-    header: CompressedRecordHeader,
+    header: CompressedMessageHeader,
     definitions: &HashMap<u8, Definition>,
     content: &mut I,
 ) -> Result<Record, RecordError>
@@ -143,41 +129,50 @@ where
 }
 
 enum RecordHeader {
-    Normal(NormalRecordHeader),
-    Compressed(CompressedRecordHeader),
+    Definition(DefinitionMessageHeader),
+    Data(DataMessageHeader),
+    Compressed(CompressedMessageHeader),
 }
 
 impl RecordHeader {
     fn from_byte(byte: u8) -> RecordHeader {
-        match (byte >> 7) & 1 == 1 {
-            false => Self::Normal(NormalRecordHeader {
-                message_type: if ((byte >> 6) & 1) == 1 {
-                    MessageType::Definition
-                } else {
-                    MessageType::Data
-                },
-                message_type_specific: ((byte >> 5) & 1) == 1,
-                local_message_type: (byte & 0b1111),
-            }),
-            true => Self::Compressed(CompressedRecordHeader {
+        let normal = (byte >> 7) & 1 == 0;
+        let data = (byte >> 6) & 1 == 0;
+        match (normal, data) {
+            (true, false) => {
+                let message_type_specific = ((byte >> 5) & 1) == 1;
+                let local_message_type = byte & 0b1111;
+                RecordHeader::Definition(DefinitionMessageHeader {
+                    message_type_specific,
+                    local_message_type,
+                })
+            }
+            (true, true) => {
+                let message_type_specific = ((byte >> 5) & 1) == 1;
+                let local_message_type = byte & 0b1111;
+                RecordHeader::Data(DataMessageHeader {
+                    message_type_specific,
+                    local_message_type,
+                })
+            }
+            (false, _) => RecordHeader::Compressed(CompressedMessageHeader {
                 local_message_type: (byte & 0b1111),
                 time_offset: 0,
             }),
         }
     }
 }
-pub struct NormalRecordHeader {
-    pub message_type: MessageType,
+pub struct DefinitionMessageHeader {
     pub message_type_specific: bool,
     pub local_message_type: u8,
 }
 
-pub enum MessageType {
-    Definition,
-    Data,
+pub struct DataMessageHeader {
+    pub message_type_specific: bool,
+    pub local_message_type: u8,
 }
 
-struct CompressedRecordHeader {
+struct CompressedMessageHeader {
     local_message_type: u8,
     time_offset: u8,
 }
