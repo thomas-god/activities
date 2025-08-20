@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::parser::{
-    definition::{Definition, parse_definition_message},
+    definition::{CustomDescription, Definition, parse_definition_message},
     types::{DataField, DataTypeError, DataValue},
 };
 
@@ -46,6 +46,7 @@ impl Record {
     pub fn parse<I>(
         content: &mut I,
         definitions: &HashMap<u8, Definition>,
+        custom_descriptions: &HashMap<u8, HashMap<u8, Vec<CustomDescription>>>,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
@@ -54,7 +55,8 @@ impl Record {
 
         match header {
             RecordHeader::Data(header) => {
-                parse_data_message(header, definitions, content).map(Record::Data)
+                parse_data_message(header, definitions, custom_descriptions, content)
+                    .map(Record::Data)
             }
 
             RecordHeader::Definition(header) => {
@@ -71,6 +73,7 @@ impl Record {
 fn parse_data_message<I>(
     header: DataMessageHeader,
     definitions: &HashMap<u8, Definition>,
+    custom_descriptions: &HashMap<u8, HashMap<u8, Vec<CustomDescription>>>,
     content: &mut I,
 ) -> Result<DataMessage, RecordError>
 where

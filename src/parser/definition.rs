@@ -38,6 +38,14 @@ pub struct DefinitionField {
 }
 
 #[derive(Debug, Clone)]
+pub struct CustomDescription {
+    pub endianness: Endianness,
+    pub base_type: DataType,
+    pub name: Option<String>,
+    pub units: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub enum GlobalMessage {
     FileId,
     Record,
@@ -67,6 +75,7 @@ impl From<u16> for GlobalMessage {
         match value {
             0 => Self::FileId,
             20 => Self::Record,
+            206 => Self::FieldDescription,
             207 => Self::DeveloperDataId,
             val => Self::Unsupported(val),
         }
