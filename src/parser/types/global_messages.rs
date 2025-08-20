@@ -10,6 +10,7 @@ pub enum GlobalMessage {
     Lap,
     DeviceInfo,
     Activity,
+    Event,
     FieldDescription,
     DeveloperDataId,
     Unsupported(u16),
@@ -22,6 +23,7 @@ impl From<u16> for GlobalMessage {
             18 => Self::Session,
             19 => Self::Lap,
             20 => Self::Record,
+            21 => Self::Event,
             23 => Self::DeviceInfo,
             34 => Self::Activity,
             206 => Self::FieldDescription,
@@ -44,6 +46,7 @@ impl GlobalMessage {
             }
             GlobalMessage::Session => DataField::Session(SessionField::from(definition_number)),
             GlobalMessage::Lap => DataField::Lap(LapField::from(definition_number)),
+            GlobalMessage::Event => DataField::Event(EventField::from(definition_number)),
             GlobalMessage::DeviceInfo => {
                 DataField::DeviceInfo(DeviceInfoField::from(definition_number))
             }
@@ -58,6 +61,7 @@ pub enum DataField {
     FileId(FileIdField),
     Session(SessionField),
     Lap(LapField),
+    Event(EventField),
     DeviceInfo(DeviceInfoField),
     Activity(ActivityField),
     Record(RecordField),
@@ -1004,6 +1008,57 @@ impl From<u8> for ActivityField {
             4 => Self::EventType,
             5 => Self::LocalTimestamp,
             6 => Self::EventGroup,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventField {
+    Timestamp,
+    Event,
+    EventType,
+    Data16,
+    Data,
+    EventGroup,
+    Score,
+    OpponentScore,
+    FrontGearNum,
+    FrontGear,
+    RearGearNum,
+    RearGear,
+    DeviceIndex,
+    ActivityType,
+    StartTimestamp,
+    RadarThreatLevelMax,
+    RadarThreatCount,
+    RadarThreatAvgApproachSpeed,
+    RadarThreatMaxApproachSpeed,
+    Unknown(u8),
+}
+
+impl From<u8> for EventField {
+    fn from(value: u8) -> Self {
+        match value {
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::Data16,
+            3 => Self::Data,
+            4 => Self::EventGroup,
+            7 => Self::Score,
+            8 => Self::OpponentScore,
+            9 => Self::FrontGearNum,
+            10 => Self::FrontGear,
+            11 => Self::RearGearNum,
+            12 => Self::RearGear,
+            13 => Self::DeviceIndex,
+            14 => Self::ActivityType,
+            15 => Self::StartTimestamp,
+            21 => Self::RadarThreatLevelMax,
+            22 => Self::RadarThreatCount,
+            23 => Self::RadarThreatAvgApproachSpeed,
+            24 => Self::RadarThreatMaxApproachSpeed,
             _ => Self::Unknown(value),
         }
     }
