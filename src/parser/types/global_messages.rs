@@ -1,3 +1,153 @@
+#[cfg(test)]
+use strum::{EnumIter, IntoEnumIterator};
+
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(EnumIter))]
+pub enum GlobalMessage {
+    FileId,
+    Record,
+    FieldDescription,
+    DeveloperDataId,
+    Unsupported(u16),
+}
+
+impl From<u16> for GlobalMessage {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => Self::FileId,
+            20 => Self::Record,
+            206 => Self::FieldDescription,
+            207 => Self::DeveloperDataId,
+            val => Self::Unsupported(val),
+        }
+    }
+}
+
+impl GlobalMessage {
+    pub fn parse_field(&self, definition_number: u8) -> DataField {
+        match self {
+            GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
+            GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
+            GlobalMessage::FieldDescription => {
+                DataField::FieldDescription(FieldDescriptionField::from(definition_number))
+            }
+            GlobalMessage::DeveloperDataId => {
+                DataField::DeveloperDataId(DeveloperDataIdField::from(definition_number))
+            }
+            GlobalMessage::Unsupported(_) => DataField::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DataField {
+    FileId(FileIdField),
+    Record(RecordField),
+    FieldDescription(FieldDescriptionField),
+    DeveloperDataId(DeveloperDataIdField),
+    Custom(CustomField),
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct CustomField {
+    pub name: Option<String>,
+    pub units: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FileIdField {
+    Type,
+    Manufacturer,
+    Product,
+    SerialNumber,
+    TimeCreated,
+    Number,
+    ProductName,
+    Unknown(u8),
+}
+
+impl From<u8> for FileIdField {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Type,
+            1 => Self::Manufacturer,
+            2 => Self::Product,
+            3 => Self::ProductName,
+            4 => Self::SerialNumber,
+            5 => Self::TimeCreated,
+            6 => Self::Number,
+            7 => Self::ProductName,
+            val => Self::Unknown(val),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FieldDescriptionField {
+    DeveloperDataIndex,
+    FieldDefinitionNumber,
+    FitBaseTypeId,
+    FieldName,
+    Array,
+    Components,
+    Scale,
+    Offset,
+    Units,
+    Bits,
+    Accumulate,
+    FitBaseUnitId,
+    NativeMesgNum,
+    NativeFieldNum,
+
+    Unknown(u8),
+}
+
+impl From<u8> for FieldDescriptionField {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::DeveloperDataIndex,
+            1 => Self::FieldDefinitionNumber,
+            2 => Self::FitBaseTypeId,
+            3 => Self::FieldName,
+            4 => Self::Array,
+            5 => Self::Components,
+            6 => Self::Scale,
+            7 => Self::Offset,
+            8 => Self::Units,
+            9 => Self::Bits,
+            10 => Self::Accumulate,
+            13 => Self::FitBaseUnitId,
+            14 => Self::NativeMesgNum,
+            15 => Self::NativeFieldNum,
+            val => Self::Unknown(val),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DeveloperDataIdField {
+    DeveloperId,
+    ApplicationId,
+    ManufacturerId,
+    DeveloperDataIndex,
+    ApplicationVersion,
+    Unknown(u8),
+}
+
+impl From<u8> for DeveloperDataIdField {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::DeveloperId,
+            1 => Self::ApplicationId,
+            2 => Self::ManufacturerId,
+            3 => Self::DeveloperDataIndex,
+            4 => Self::ApplicationVersion,
+            val => Self::Unknown(val),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RecordField {
     PositionLat,
@@ -176,5 +326,35 @@ impl From<u8> for RecordField {
             253 => Self::Timestamp,
             val => Self::Unknown(val),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::discriminant;
+
+    use super::*;
+
+    #[test]
+    fn test_global_message_from_u16_is_explicit() {
+        let mut missing_variants = Vec::new();
+        for variant in GlobalMessage::iter() {
+            let mut found = false;
+            for value in 0..u16::MAX {
+                if discriminant(&GlobalMessage::from(value)) == discriminant(&variant) {
+                    found = true;
+                    break;
+                }
+            }
+            if found == false {
+                missing_variants.push(variant);
+            }
+        }
+
+        assert!(
+            missing_variants.is_empty(),
+            "Variants missing in GlobalMessage::from<u16>: {:?}",
+            missing_variants
+        );
     }
 }

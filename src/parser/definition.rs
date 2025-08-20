@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::parser::{
-    records::{DefinitionMessageHeader, RecordError},
-    types::{
-        CustomField, DataField, DataType, developer::DeveloperDataIdField,
-        field_description::FieldDescriptionField, file_id::FileIdField, record::RecordField,
+use crate::{
+    DataType,
+    parser::{
+        records::{DefinitionMessageHeader, RecordError},
+        types::global_messages::{CustomField, DataField, GlobalMessage},
     },
 };
 
@@ -45,43 +45,6 @@ pub struct CustomDescription {
     pub base_type: DataType,
     pub name: Option<String>,
     pub units: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub enum GlobalMessage {
-    FileId,
-    Record,
-    FieldDescription,
-    DeveloperDataId,
-    Unsupported(u16),
-}
-
-impl GlobalMessage {
-    pub fn parse_field(&self, definition_number: u8) -> DataField {
-        match self {
-            GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
-            GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
-            GlobalMessage::FieldDescription => {
-                DataField::FieldDescription(FieldDescriptionField::from(definition_number))
-            }
-            GlobalMessage::DeveloperDataId => {
-                DataField::DeveloperDataId(DeveloperDataIdField::from(definition_number))
-            }
-            _ => DataField::Unknown,
-        }
-    }
-}
-
-impl From<u16> for GlobalMessage {
-    fn from(value: u16) -> Self {
-        match value {
-            0 => Self::FileId,
-            20 => Self::Record,
-            206 => Self::FieldDescription,
-            207 => Self::DeveloperDataId,
-            val => Self::Unsupported(val),
-        }
-    }
 }
 
 pub fn parse_definition_message<I>(

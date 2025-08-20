@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::parser::{
     definition::{CustomDescription, Definition, parse_definition_message},
-    types::{DataField, DataTypeError, DataValue},
+    types::{DataTypeError, DataValue, global_messages::DataField},
 };
 
 #[derive(Error, Debug)]

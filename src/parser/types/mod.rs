@@ -1,33 +1,9 @@
 use thiserror::Error;
 
-use crate::parser::{
-    definition::Endianness,
-    types::{
-        developer::DeveloperDataIdField, field_description::FieldDescriptionField,
-        file_id::FileIdField, record::RecordField,
-    },
-};
+use crate::parser::definition::Endianness;
+pub use crate::parser::types::global_messages::DataField;
 
-pub mod developer;
-pub mod field_description;
-pub mod file_id;
-pub mod record;
-
-#[derive(Debug, Clone)]
-pub enum DataField {
-    FileId(FileIdField),
-    Record(RecordField),
-    FieldDescription(FieldDescriptionField),
-    DeveloperDataId(DeveloperDataIdField),
-    Custom(CustomField),
-    Unknown,
-}
-
-#[derive(Debug, Clone)]
-pub struct CustomField {
-    pub name: Option<String>,
-    pub units: Option<String>,
-}
+pub mod global_messages;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DataType {

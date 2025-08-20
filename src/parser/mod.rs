@@ -4,12 +4,12 @@ use thiserror::Error;
 
 pub use crate::parser::records::Record;
 use crate::{
-    DataField, DataType, DataValue,
+    DataType, DataValue,
     parser::{
-        definition::{CustomDescription, Definition, GlobalMessage},
+        definition::{CustomDescription, Definition},
         header::{FileHeader, FileHeaderError},
         records::DataMessage,
-        types::field_description::FieldDescriptionField,
+        types::global_messages::{DataField, FieldDescriptionField, GlobalMessage},
     },
 };
 
