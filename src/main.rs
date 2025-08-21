@@ -1,5 +1,8 @@
-use activities::parse_file;
+use activities::parse_records;
 
 fn main() {
-    let _ = parse_file("test.fit");
+    let records = parse_records("dev_data.fit").unwrap();
+    for record in records.iter() {
+        println!("{record:?}");
+    }
 }

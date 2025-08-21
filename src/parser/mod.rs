@@ -27,7 +27,7 @@ pub enum ParseError {
     Io(#[from] std::io::Error),
 }
 
-pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
+pub fn parse_records(file: &str) -> Result<Vec<Record>, ParseError> {
     let mut content = fs::read(file)?.into_iter();
 
     let _header = FileHeader::from_bytes(&mut content);
@@ -35,38 +35,35 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();
     let mut compressed_timestamp = CompressedTimestamp::default();
-    let mut messages = Vec::new();
+    let mut records = Vec::new();
 
     loop {
-        match Record::parse(
+        let record = match Record::parse(
             &mut content,
             &definitions,
             &custom_descriptions,
             &mut compressed_timestamp,
         ) {
-            Ok(Record::Definition(definition)) => {
-                definitions.insert(definition.local_message_type, definition.clone());
-                println!("{:?}", definition);
-            }
-            Ok(Record::Data(data)) => {
-                parse_custom_definition_description(&data, &definitions, &mut custom_descriptions);
-                compressed_timestamp.set_last_timestamp(data.last_timestamp());
-                println!("{:?}", data);
-                messages.push(data);
-            }
-            Ok(Record::CompressedTimestamp(data)) => {
-                println!("{:?}", data)
-            }
+            Ok(record) => record,
             Err(err) => {
-                println!("error: {err:?}");
+                println!("error: {:?}", err);
                 break;
             }
+        };
+        match record {
+            Record::Definition(ref definition) => {
+                definitions.insert(definition.local_message_type, definition.clone());
+            }
+            Record::Data(ref data) => {
+                parse_custom_definition_description(data, &definitions, &mut custom_descriptions);
+                compressed_timestamp.set_last_timestamp(data.last_timestamp());
+            }
+            Record::CompressedTimestamp(_) => {}
         }
+        records.push(record);
     }
 
-    println!("Parsed {:?} messages", messages.len());
-
-    Ok(messages)
+    Ok(records)
 }
 
 fn parse_custom_definition_description(
@@ -182,10 +179,10 @@ fn find_field_as_u8(
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_file;
+    use crate::parser::parse_records;
 
     #[test]
     fn test_no_error() {
-        let _ = parse_file("test.fit");
+        let _ = parse_records("test.fit");
     }
 }
