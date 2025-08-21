@@ -1086,7 +1086,7 @@ mod tests {
                     break;
                 }
             }
-            if found == false {
+            if !found {
                 missing_variants.push(variant);
             }
         }

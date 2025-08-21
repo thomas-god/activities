@@ -7,6 +7,50 @@ use crate::parser::{
     types::{DataTypeError, DataValue, global_messages::DataField},
 };
 
+enum RecordHeader {
+    Definition(DefinitionMessageHeader),
+    Data(DataMessageHeader),
+    Compressed(CompressedMessageHeader),
+}
+
+impl RecordHeader {
+    fn from_byte(byte: u8) -> RecordHeader {
+        let normal = (byte >> 7) & 1 == 0;
+        let data = (byte >> 6) & 1 == 0;
+        match (normal, data) {
+            (true, false) => {
+                let message_type_specific = ((byte >> 5) & 1) == 1;
+                let local_message_type = byte & 0b1111;
+                RecordHeader::Definition(DefinitionMessageHeader {
+                    message_type_specific,
+                    local_message_type,
+                })
+            }
+            (true, true) => {
+                let local_message_type = byte & 0b1111;
+                RecordHeader::Data(DataMessageHeader { local_message_type })
+            }
+            (false, _) => RecordHeader::Compressed(CompressedMessageHeader {
+                local_message_type: (byte >> 5 & 0b11),
+                time_offset: (byte & 0b11111),
+            }),
+        }
+    }
+}
+pub struct DefinitionMessageHeader {
+    pub message_type_specific: bool,
+    pub local_message_type: u8,
+}
+
+struct DataMessageHeader {
+    local_message_type: u8,
+}
+
+struct CompressedMessageHeader {
+    local_message_type: u8,
+    time_offset: u8,
+}
+
 #[derive(Error, Debug)]
 pub enum RecordError {
     #[error("Record cannot be parsed")]
@@ -17,13 +61,8 @@ pub enum RecordError {
     NoDescriptionFound(u8, u8),
     #[error("Invalid DataType")]
     DataTypeError(#[from] DataTypeError),
-}
-
-#[derive(Debug)]
-pub enum Record {
-    Definition(Definition),
-    Data(DataMessage),
-    CompressedTimestamp(CompressedTimestampMessage),
+    #[error("No timestamp to rebuild compressed timestamp")]
+    TimestampMissingForCompressedTimestamp,
 }
 
 #[derive(Debug)]
@@ -33,7 +72,8 @@ pub struct DataMessage {
 }
 
 impl DataMessage {
-    /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fiels and values of a [DataMessage].
+    /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fiels and values of
+    /// a [DataMessage].
     pub fn last_timestamp(&self) -> Option<u32> {
         let mut last_timestamp: Option<u32> = None;
         for value in self.values.iter() {
@@ -62,8 +102,16 @@ pub struct DataMessageField {
 
 #[derive(Debug)]
 pub struct CompressedTimestampMessage {
+    pub timestamp: u32,
     pub local_message_type: u8,
     pub values: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum Record {
+    Definition(Definition),
+    Data(DataMessage),
+    CompressedTimestamp(CompressedTimestampMessage),
 }
 
 impl Record {
@@ -71,6 +119,7 @@ impl Record {
         content: &mut I,
         definitions: &HashMap<u8, Definition>,
         custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
+        compressed_timestamp: &mut CompressedTimestamp,
     ) -> Result<Self, RecordError>
     where
         I: Iterator<Item = u8>,
@@ -88,7 +137,7 @@ impl Record {
             }
 
             RecordHeader::Compressed(header) => {
-                parse_compressed_message(header, definitions, content)
+                parse_compressed_message(header, definitions, compressed_timestamp, content)
             }
         }
     }
@@ -131,11 +180,15 @@ where
 fn parse_compressed_message<I>(
     header: CompressedMessageHeader,
     definitions: &HashMap<u8, Definition>,
+    compressed_timestamp: &mut CompressedTimestamp,
     content: &mut I,
 ) -> Result<Record, RecordError>
 where
     I: Iterator<Item = u8>,
 {
+    let timestamp = compressed_timestamp
+        .parse_offset(header.time_offset)
+        .ok_or(RecordError::TimestampMissingForCompressedTimestamp)?;
     let fields_size = match definitions.get(&header.local_message_type) {
         Some(definition) => definition.fields_size,
         None => {
@@ -149,58 +202,44 @@ where
         values.push(content.next().ok_or(RecordError::InvalidRecord)?);
     }
     Ok(Record::CompressedTimestamp(CompressedTimestampMessage {
+        timestamp,
         local_message_type: header.local_message_type,
         values,
     }))
 }
 
-enum RecordHeader {
-    Definition(DefinitionMessageHeader),
-    Data(DataMessageHeader),
-    Compressed(CompressedMessageHeader),
+#[derive(Debug, Default)]
+pub struct CompressedTimestamp {
+    last_timestamp: Option<u32>,
 }
 
-impl RecordHeader {
-    fn from_byte(byte: u8) -> RecordHeader {
-        let normal = (byte >> 7) & 1 == 0;
-        let data = (byte >> 6) & 1 == 0;
-        match (normal, data) {
-            (true, false) => {
-                let message_type_specific = ((byte >> 5) & 1) == 1;
-                let local_message_type = byte & 0b1111;
-                RecordHeader::Definition(DefinitionMessageHeader {
-                    message_type_specific,
-                    local_message_type,
-                })
+impl CompressedTimestamp {
+    pub fn set_last_timestamp(&mut self, new_timestamp: Option<u32>) {
+        match (self.last_timestamp, new_timestamp) {
+            (Some(last), Some(new)) if new > last => {
+                self.last_timestamp = new_timestamp;
             }
-            (true, true) => {
-                let message_type_specific = ((byte >> 5) & 1) == 1;
-                let local_message_type = byte & 0b1111;
-                RecordHeader::Data(DataMessageHeader {
-                    message_type_specific,
-                    local_message_type,
-                })
+            (None, Some(_)) => {
+                self.last_timestamp = new_timestamp;
             }
-            (false, _) => RecordHeader::Compressed(CompressedMessageHeader {
-                local_message_type: (byte & 0b1111),
-                time_offset: 0,
-            }),
+            _ => {}
         }
     }
-}
-pub struct DefinitionMessageHeader {
-    pub message_type_specific: bool,
-    pub local_message_type: u8,
-}
+    pub fn parse_offset(&mut self, time_offset: u8) -> Option<u32> {
+        // We compare the time_offset (5bits) to the 5 least significants bits of the last_timestamp
+        // known. If they are lower then a rollover has happened and we add 0x20 to represent that.
+        // In both cases we replace the 5 least significants bits of the last_timestamp with those of
+        // the time_offset.
+        let last_timestamp = self.last_timestamp?;
+        let offset = time_offset as u32;
+        let mut new_timestamp = (last_timestamp & 0xFFFFFFE0) + offset;
+        if offset < (last_timestamp & 0x0000001F) {
+            new_timestamp += 0x20;
+        }
 
-pub struct DataMessageHeader {
-    pub message_type_specific: bool,
-    pub local_message_type: u8,
-}
-
-struct CompressedMessageHeader {
-    local_message_type: u8,
-    time_offset: u8,
+        self.last_timestamp = Some(new_timestamp);
+        Some(new_timestamp)
+    }
 }
 
 #[cfg(test)]
@@ -280,5 +319,30 @@ mod tests {
         };
 
         assert!(message_w_timestamp.last_timestamp().is_none());
+    }
+}
+
+#[cfg(test)]
+mod tests_compressed_timestamp {
+
+    use super::*;
+
+    #[test]
+    fn test_offset_greater_than_previous_timestamp_part() {
+        let mut compressed = CompressedTimestamp::default();
+
+        assert!(compressed.parse_offset(0b11011).is_none());
+
+        compressed.set_last_timestamp(Some(0x1111113B));
+
+        assert_eq!(compressed.parse_offset(0b11011), Some(0x1111113B));
+        assert_eq!(compressed.parse_offset(0b11101), Some(0x1111113D));
+        assert_eq!(compressed.parse_offset(0b00010), Some(0x11111142));
+        assert_eq!(compressed.parse_offset(0b00101), Some(0x11111145));
+        assert_eq!(compressed.parse_offset(0b00001), Some(0x11111161));
+
+        compressed.set_last_timestamp(Some(0x11111163));
+        assert_eq!(compressed.parse_offset(0b10010), Some(0x11111172));
+        assert_eq!(compressed.parse_offset(0b00001), Some(0x11111181));
     }
 }

@@ -8,7 +8,7 @@ use crate::{
     parser::{
         definition::{CustomDescription, Definition},
         header::{FileHeader, FileHeaderError},
-        records::DataMessage,
+        records::{CompressedTimestamp, DataMessage},
         types::global_messages::{DataField, FieldDescriptionField, GlobalMessage},
     },
 };
@@ -34,16 +34,23 @@ pub fn parse_file(file: &str) -> Result<Vec<DataMessage>, ParseError> {
 
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();
+    let mut compressed_timestamp = CompressedTimestamp::default();
     let mut messages = Vec::new();
 
     loop {
-        match Record::parse(&mut content, &definitions, &custom_descriptions) {
+        match Record::parse(
+            &mut content,
+            &definitions,
+            &custom_descriptions,
+            &mut compressed_timestamp,
+        ) {
             Ok(Record::Definition(definition)) => {
                 definitions.insert(definition.local_message_type, definition.clone());
                 println!("{:?}", definition);
             }
             Ok(Record::Data(data)) => {
                 parse_custom_definition_description(&data, &definitions, &mut custom_descriptions);
+                compressed_timestamp.set_last_timestamp(data.last_timestamp());
                 println!("{:?}", data);
                 messages.push(data);
             }
