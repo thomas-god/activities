@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     DataType,
     parser::{
+        reader::Reader,
         records::{DefinitionMessageHeader, RecordError},
         types::global_messages::{CustomField, DataField, GlobalMessage},
     },
@@ -50,26 +51,17 @@ pub struct CustomDescription {
 pub fn parse_definition_message<I>(
     header: DefinitionMessageHeader,
     custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
-    content: &mut I,
+    content: &mut Reader<I>,
 ) -> Result<Definition, RecordError>
 where
     I: Iterator<Item = u8>,
 {
-    let _reserved = content.next().ok_or(RecordError::InvalidRecord)?;
-    let endianness = Endianness::from(content.next().ok_or(RecordError::InvalidRecord)?);
-    let global_message_number = match endianness {
-        Endianness::Little => u16::from_le_bytes([
-            content.next().ok_or(RecordError::InvalidRecord)?,
-            content.next().ok_or(RecordError::InvalidRecord)?,
-        ]),
-        Endianness::Big => u16::from_be_bytes([
-            content.next().ok_or(RecordError::InvalidRecord)?,
-            content.next().ok_or(RecordError::InvalidRecord)?,
-        ]),
-    };
+    let _reserved = content.next_u8()?;
+    let endianness = Endianness::from(content.next_u8()?);
+    let global_message_number = content.next_u16(&endianness)?;
     let message_type = GlobalMessage::from(global_message_number);
 
-    let number_of_fields = content.next().ok_or(RecordError::InvalidRecord)?;
+    let number_of_fields = content.next_u8()?;
     let mut fields_size = 0;
     let mut fields: Vec<DefinitionField> = vec![];
 
@@ -81,7 +73,7 @@ where
 
     // Parse size of optionnal developer fields
     if header.message_type_specific {
-        let number_developer_fields = content.next().ok_or(RecordError::InvalidRecord)?;
+        let number_developer_fields = content.next_u8()?;
         for _ in 0..number_developer_fields {
             let field = parse_developer_field(custom_descriptions, endianness, content)?;
             fields_size += field.size;
@@ -100,14 +92,14 @@ where
 fn parse_developer_field<I>(
     custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
     endianness: Endianness,
-    content: &mut I,
+    content: &mut Reader<I>,
 ) -> Result<DefinitionField, RecordError>
 where
     I: Iterator<Item = u8>,
 {
-    let field_number = content.next().ok_or(RecordError::InvalidRecord)?;
-    let size = content.next().ok_or(RecordError::InvalidRecord)?;
-    let developer_data_index = content.next().ok_or(RecordError::InvalidRecord)?;
+    let field_number = content.next_u8()?;
+    let size = content.next_u8()?;
+    let developer_data_index = content.next_u8()?;
     let description = custom_descriptions
         .get(&developer_data_index)
         .and_then(|des| des.get(&field_number))
@@ -130,16 +122,15 @@ where
 fn parse_definition_field<I>(
     message_type: &GlobalMessage,
     endianness: Endianness,
-    content: &mut I,
+    content: &mut Reader<I>,
 ) -> Result<DefinitionField, RecordError>
 where
     I: Iterator<Item = u8>,
 {
-    let definition_number = content.next().ok_or(RecordError::InvalidRecord)?;
+    let definition_number = content.next_u8()?;
     let field = message_type.parse_field(definition_number);
-    let size = content.next().ok_or(RecordError::InvalidRecord)?;
-    let field_type =
-        DataType::from_base_type_field(content.next().ok_or(RecordError::InvalidRecord)?)?;
+    let size = content.next_u8()?;
+    let field_type = DataType::from_base_type_field(content.next_u8()?)?;
 
     Ok(DefinitionField {
         endianness,

@@ -10,6 +10,7 @@ pub enum FileHeaderError {
     HeaderMalformed,
 }
 
+#[derive(Debug)]
 pub struct FileHeader {
     pub protocol: u8,
     pub profile_version: u16,

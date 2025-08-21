@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use crate::parser::{
     definition::{CustomDescription, Definition, parse_definition_message},
+    reader::{Reader, ReaderError},
     types::{DataTypeError, DataValue, global_messages::DataField},
 };
 
@@ -53,6 +54,8 @@ struct CompressedMessageHeader {
 
 #[derive(Error, Debug)]
 pub enum RecordError {
+    #[error("Error while trying to read bytes from content")]
+    ReaderError(#[from] ReaderError),
     #[error("Record cannot be parsed")]
     InvalidRecord,
     #[error("No DefinitionMessage found for local id {0}")]
@@ -116,7 +119,7 @@ pub enum Record {
 
 impl Record {
     pub fn parse<I>(
-        content: &mut I,
+        content: &mut Reader<I>,
         definitions: &HashMap<u8, Definition>,
         custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
         compressed_timestamp: &mut CompressedTimestamp,
@@ -124,7 +127,7 @@ impl Record {
     where
         I: Iterator<Item = u8>,
     {
-        let header = RecordHeader::from_byte(content.next().ok_or(RecordError::InvalidRecord)?);
+        let header = RecordHeader::from_byte(content.next_u8()?);
 
         match header {
             RecordHeader::Data(header) => {
@@ -146,7 +149,7 @@ impl Record {
 fn parse_data_message<I>(
     header: DataMessageHeader,
     definitions: &HashMap<u8, Definition>,
-    content: &mut I,
+    content: &mut Reader<I>,
 ) -> Result<DataMessage, RecordError>
 where
     I: Iterator<Item = u8>,
@@ -181,7 +184,7 @@ fn parse_compressed_message<I>(
     header: CompressedMessageHeader,
     definitions: &HashMap<u8, Definition>,
     compressed_timestamp: &mut CompressedTimestamp,
-    content: &mut I,
+    content: &mut Reader<I>,
 ) -> Result<Record, RecordError>
 where
     I: Iterator<Item = u8>,
@@ -199,7 +202,7 @@ where
     };
     let mut values: Vec<u8> = Vec::new();
     for _ in 0..fields_size {
-        values.push(content.next().ok_or(RecordError::InvalidRecord)?);
+        values.push(content.next_u8()?);
     }
     Ok(Record::CompressedTimestamp(CompressedTimestampMessage {
         timestamp,

@@ -8,6 +8,7 @@ use crate::{
     parser::{
         definition::{CustomDescription, Definition},
         header::{FileHeader, FileHeaderError},
+        reader::Reader,
         records::{CompressedTimestamp, DataMessage},
         types::global_messages::{DataField, FieldDescriptionField, GlobalMessage},
     },
@@ -15,6 +16,7 @@ use crate::{
 
 mod definition;
 mod header;
+mod reader;
 mod records;
 pub mod types;
 
@@ -30,7 +32,8 @@ pub enum ParseError {
 pub fn parse_records(file: &str) -> Result<Vec<Record>, ParseError> {
     let mut content = fs::read(file)?.into_iter();
 
-    let _header = FileHeader::from_bytes(&mut content);
+    let header = FileHeader::from_bytes(&mut content)?;
+    let mut reader = Reader::new(header.data_size, header.crc, content);
 
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();
@@ -39,7 +42,7 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, ParseError> {
 
     loop {
         let record = match Record::parse(
-            &mut content,
+            &mut reader,
             &definitions,
             &custom_descriptions,
             &mut compressed_timestamp,
@@ -61,6 +64,10 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, ParseError> {
             Record::CompressedTimestamp(_) => {}
         }
         records.push(record);
+
+        if reader.is_empty() {
+            break;
+        }
     }
 
     Ok(records)
