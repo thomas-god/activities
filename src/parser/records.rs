@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, mem::discriminant};
 
 use thiserror::Error;
 
@@ -30,6 +30,28 @@ pub enum Record {
 pub struct DataMessage {
     pub local_message_type: u8,
     pub values: Vec<DataMessageField>,
+}
+
+impl DataMessage {
+    /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fiels and values of a [DataMessage].
+    pub fn last_timestamp(&self) -> Option<u32> {
+        let mut last_timestamp: Option<u32> = None;
+        for value in self.values.iter() {
+            if discriminant(&value.field) == discriminant(&DataField::Timestamp) {
+                last_timestamp =
+                    value
+                        .values
+                        .iter()
+                        .fold(last_timestamp, |last, value| match value {
+                            DataValue::Uint32(val) if *val >= last_timestamp.unwrap_or(0) => {
+                                Some(*val)
+                            }
+                            _ => last,
+                        });
+            }
+        }
+        last_timestamp
+    }
 }
 
 #[derive(Debug)]
@@ -179,4 +201,84 @@ pub struct DataMessageHeader {
 struct CompressedMessageHeader {
     local_message_type: u8,
     time_offset: u8,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_data_message_contains_u32_timestamp() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            values: vec![DataMessageField {
+                field: DataField::Timestamp,
+                values: vec![DataValue::Uint32(0)],
+            }],
+        };
+
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_data_message_contains_multiple_u32_timestamps() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            values: vec![DataMessageField {
+                field: DataField::Timestamp,
+                values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
+            }],
+        };
+
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_data_message_contains_multiple_fields_with_u32_timestamps() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            values: vec![
+                DataMessageField {
+                    field: DataField::Timestamp,
+                    values: vec![DataValue::Uint32(16)],
+                },
+                DataMessageField {
+                    field: DataField::Timestamp,
+                    values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
+                },
+            ],
+        };
+
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 16);
+    }
+
+    #[test]
+    fn test_data_message_contains_timestamp_but_not_u32() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            values: vec![DataMessageField {
+                field: DataField::Timestamp,
+                values: vec![DataValue::String("toto".to_string())],
+            }],
+        };
+
+        assert!(message_w_timestamp.last_timestamp().is_none());
+    }
+
+    #[test]
+    fn test_data_message_contains_no_timestamp() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            values: vec![DataMessageField {
+                field: DataField::Unknown,
+                values: vec![DataValue::String("toto".to_string())],
+            }],
+        };
+
+        assert!(message_w_timestamp.last_timestamp().is_none());
+    }
 }
