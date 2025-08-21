@@ -35,6 +35,10 @@ impl From<u16> for GlobalMessage {
 
 impl GlobalMessage {
     pub fn parse_field(&self, definition_number: u8) -> DataField {
+        // Field number 253 is a special case for timestamps
+        if definition_number == 253 {
+            return DataField::Timestamp;
+        }
         match self {
             GlobalMessage::Record => DataField::Record(RecordField::from(definition_number)),
             GlobalMessage::FileId => DataField::FileId(FileIdField::from(definition_number)),
@@ -58,6 +62,7 @@ impl GlobalMessage {
 
 #[derive(Debug, Clone)]
 pub enum DataField {
+    Timestamp,
     FileId(FileIdField),
     Session(SessionField),
     Lap(LapField),
@@ -1090,6 +1095,22 @@ mod tests {
             missing_variants.is_empty(),
             "Variants missing in GlobalMessage::from<u16>: {:?}",
             missing_variants
+        );
+    }
+
+    #[test]
+    fn test_parse_field_253_as_timestamp_regardless_of_message_type() {
+        let mut wrong_variants = Vec::new();
+        for variant in GlobalMessage::iter() {
+            if discriminant(&variant.parse_field(253)) != discriminant(&DataField::Timestamp) {
+                wrong_variants.push(variant);
+            }
+        }
+
+        assert!(
+            wrong_variants.is_empty(),
+            "GlobalMessage::parse_field does not parse 253 as DataField::Timestamp for variants: {:?}",
+            wrong_variants
         );
     }
 }
