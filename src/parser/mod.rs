@@ -21,7 +21,7 @@ mod records;
 pub mod types;
 
 #[derive(Error, Debug)]
-pub enum ParseError {
+pub enum FitParserError {
     #[error("Header parsing failed: {0}")]
     Header(#[from] FileHeaderError),
 
@@ -29,7 +29,7 @@ pub enum ParseError {
     Io(#[from] std::io::Error),
 }
 
-pub fn parse_records(file: &str) -> Result<Vec<Record>, ParseError> {
+pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
     let mut content = fs::read(file)?.into_iter();
 
     let header = FileHeader::from_bytes(&mut content)?;
@@ -88,19 +88,19 @@ fn parse_custom_definition_description(
         _ => return,
     };
 
-    assert_eq!(message.values.len(), definition.fields.len());
+    assert_eq!(message.fields.len(), definition.fields.len());
 
     let Some(base_type) = find_base_type(message, definition) else {
         return;
     };
-    let Some(developer_data_index) = find_field_as_u8(
+    let Some(developer_data_index) = find_value_of_field_as_u8(
         message,
         definition,
         FieldDescriptionField::DeveloperDataIndex,
     ) else {
         return;
     };
-    let Some(field_number) = find_field_as_u8(
+    let Some(field_number) = find_value_of_field_as_u8(
         message,
         definition,
         FieldDescriptionField::FieldDefinitionNumber,
@@ -110,8 +110,8 @@ fn parse_custom_definition_description(
     let Some(endianness) = definition.fields.first().map(|f| f.endianness) else {
         return;
     };
-    let name = find_field_as_string(message, definition, FieldDescriptionField::FieldName);
-    let units = find_field_as_string(message, definition, FieldDescriptionField::Units);
+    let name = find_value_of_field_as_string(message, definition, FieldDescriptionField::FieldName);
+    let units = find_value_of_field_as_string(message, definition, FieldDescriptionField::Units);
 
     let description = CustomDescription {
         base_type,
@@ -126,7 +126,7 @@ fn parse_custom_definition_description(
         .insert(field_number, description);
 }
 
-fn find_field(
+fn find_value_of_field(
     message: &DataMessage,
     definition: &Definition,
     variant: FieldDescriptionField,
@@ -134,14 +134,14 @@ fn find_field(
     let index = definition
         .fields
         .iter()
-        .position(|field| match field.field {
+        .position(|field| match field.kind {
             DataField::FieldDescription(field) => discriminant(&field) == discriminant(&variant),
             _ => false,
         })?;
 
-    let value = message.values.get(index)?;
+    let field = message.fields.get(index)?;
 
-    match value.field {
+    match field.kind {
         DataField::FieldDescription(field) => {
             if discriminant(&field) != discriminant(&variant) {
                 return None;
@@ -150,11 +150,11 @@ fn find_field(
         _ => return None,
     };
 
-    value.values.first().cloned()
+    field.values.first().cloned()
 }
 
 fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<DataType> {
-    let val = match find_field(message, definition, FieldDescriptionField::FitBaseTypeId) {
+    let val = match find_value_of_field(message, definition, FieldDescriptionField::FitBaseTypeId) {
         Some(types::DataValue::Uint8(val)) => val,
         _ => return None,
     };
@@ -162,23 +162,22 @@ fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<Data
     DataType::from_base_type_field(val).ok()
 }
 
-fn find_field_as_string(
+fn find_value_of_field_as_string(
     message: &DataMessage,
     definition: &Definition,
     variant: FieldDescriptionField,
 ) -> Option<String> {
-    match find_field(message, definition, variant) {
+    match find_value_of_field(message, definition, variant) {
         Some(types::DataValue::String(val)) => Some(val.clone()),
         _ => None,
     }
 }
-fn find_field_as_u8(
+fn find_value_of_field_as_u8(
     message: &DataMessage,
     definition: &Definition,
-
     variant: FieldDescriptionField,
 ) -> Option<u8> {
-    match find_field(message, definition, variant) {
+    match find_value_of_field(message, definition, variant) {
         Some(types::DataValue::Uint8(val)) => Some(val),
         _ => None,
     }

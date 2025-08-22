@@ -35,7 +35,7 @@ pub struct Definition {
 #[derive(Debug, Clone)]
 pub struct DefinitionField {
     pub endianness: Endianness,
-    pub field: DataField,
+    pub kind: DataField,
     pub field_type: DataType,
     pub size: u8,
 }
@@ -109,7 +109,7 @@ where
         ))?;
     let field = DefinitionField {
         endianness,
-        field: DataField::Custom(CustomField {
+        kind: DataField::Custom(CustomField {
             name: description.name.clone(),
             units: description.units.clone(),
         }),
@@ -128,13 +128,13 @@ where
     I: Iterator<Item = u8>,
 {
     let definition_number = content.next_u8()?;
-    let field = message_type.parse_field(definition_number);
+    let kind = message_type.parse_field_kind(definition_number);
     let size = content.next_u8()?;
     let field_type = DataType::from_base_type_field(content.next_u8()?)?;
 
     Ok(DefinitionField {
         endianness,
-        field,
+        kind,
         size,
         field_type,
     })

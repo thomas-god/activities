@@ -71,18 +71,18 @@ pub enum RecordError {
 #[derive(Debug)]
 pub struct DataMessage {
     pub local_message_type: u8,
-    pub values: Vec<DataMessageField>,
+    pub fields: Vec<DataMessageField>,
 }
 
 impl DataMessage {
-    /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fiels and values of
+    /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fields and values of
     /// a [DataMessage].
     pub fn last_timestamp(&self) -> Option<u32> {
         let mut last_timestamp: Option<u32> = None;
-        for value in self.values.iter() {
-            if discriminant(&value.field) == discriminant(&DataField::Timestamp) {
+        for field in self.fields.iter() {
+            if discriminant(&field.kind) == discriminant(&DataField::Timestamp) {
                 last_timestamp =
-                    value
+                    field
                         .values
                         .iter()
                         .fold(last_timestamp, |last, value| match value {
@@ -99,7 +99,7 @@ impl DataMessage {
 
 #[derive(Debug)]
 pub struct DataMessageField {
-    pub field: DataField,
+    pub kind: DataField,
     pub values: Vec<DataValue>,
 }
 
@@ -156,10 +156,10 @@ where
 {
     match definitions.get(&header.local_message_type) {
         Some(definition) => {
-            let mut values = Vec::new();
+            let mut fields = Vec::new();
             for field in definition.fields.iter() {
-                values.push(DataMessageField {
-                    field: field.field.clone(),
+                fields.push(DataMessageField {
+                    kind: field.kind.clone(),
                     values: field.field_type.parse_values(
                         content,
                         &field.endianness,
@@ -170,7 +170,7 @@ where
 
             Ok(DataMessage {
                 local_message_type: header.local_message_type,
-                values,
+                fields,
             })
         }
 
@@ -254,8 +254,8 @@ mod tests {
     fn test_data_message_contains_u32_timestamp() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
-            values: vec![DataMessageField {
-                field: DataField::Timestamp,
+            fields: vec![DataMessageField {
+                kind: DataField::Timestamp,
                 values: vec![DataValue::Uint32(0)],
             }],
         };
@@ -268,8 +268,8 @@ mod tests {
     fn test_data_message_contains_multiple_u32_timestamps() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
-            values: vec![DataMessageField {
-                field: DataField::Timestamp,
+            fields: vec![DataMessageField {
+                kind: DataField::Timestamp,
                 values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
             }],
         };
@@ -282,13 +282,13 @@ mod tests {
     fn test_data_message_contains_multiple_fields_with_u32_timestamps() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
-            values: vec![
+            fields: vec![
                 DataMessageField {
-                    field: DataField::Timestamp,
+                    kind: DataField::Timestamp,
                     values: vec![DataValue::Uint32(16)],
                 },
                 DataMessageField {
-                    field: DataField::Timestamp,
+                    kind: DataField::Timestamp,
                     values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
                 },
             ],
@@ -302,8 +302,8 @@ mod tests {
     fn test_data_message_contains_timestamp_but_not_u32() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
-            values: vec![DataMessageField {
-                field: DataField::Timestamp,
+            fields: vec![DataMessageField {
+                kind: DataField::Timestamp,
                 values: vec![DataValue::String("toto".to_string())],
             }],
         };
@@ -315,8 +315,8 @@ mod tests {
     fn test_data_message_contains_no_timestamp() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
-            values: vec![DataMessageField {
-                field: DataField::Unknown,
+            fields: vec![DataMessageField {
+                kind: DataField::Unknown,
                 values: vec![DataValue::String("toto".to_string())],
             }],
         };

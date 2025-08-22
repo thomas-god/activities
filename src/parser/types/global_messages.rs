@@ -34,7 +34,7 @@ impl From<u16> for GlobalMessage {
 }
 
 impl GlobalMessage {
-    pub fn parse_field(&self, definition_number: u8) -> DataField {
+    pub fn parse_field_kind(&self, definition_number: u8) -> DataField {
         // Field number 253 is a special case for timestamps
         if definition_number == 253 {
             return DataField::Timestamp;
@@ -1102,7 +1102,7 @@ mod tests {
     fn test_parse_field_253_as_timestamp_regardless_of_message_type() {
         let mut wrong_variants = Vec::new();
         for variant in GlobalMessage::iter() {
-            if discriminant(&variant.parse_field(253)) != discriminant(&DataField::Timestamp) {
+            if discriminant(&variant.parse_field_kind(253)) != discriminant(&DataField::Timestamp) {
                 wrong_variants.push(variant);
             }
         }
