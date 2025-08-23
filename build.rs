@@ -6,25 +6,31 @@ use std::{
     process::{Command, Stdio},
 };
 
-use calamine::Data;
+use calamine::{Data, Reader, Xlsx, open_workbook};
 
-const ENUMS_TO_IMPORT: &'static [&'static str] = &[];
+const MESSAGES_TO_IMPORT: &'static [&'static str] = &["Record", "FieldDescription"];
 
 fn main() {
-    if Path::new("src/parser/types/generated.rs").exists() {
-        return;
-    }
+    // if Path::new("src/parser/types/generated.rs").exists() {
+    //     return;
+    // }
 
-    let (enums, enums_code) = generate_enums();
-    let enums_code = format_code(&enums_code);
+    let mut enums = generate_enums();
+    let (messages, enums_used) = generate_messages_definitions();
 
-    std::fs::write("src/parser/types/generated.rs", enums_code)
-        .expect("Could not wirte to ouptut file");
+    enums = enums
+        .into_iter()
+        .filter(|(name, _, __)| enums_used.contains(name))
+        .collect();
+
+    let mut code = generate_enums_code(&enums);
+    code.push_str(&generate_messages_code(messages));
+    code = format_code(&code);
+
+    std::fs::write("src/parser/types/generated.rs", code).expect("Could not wirte to ouptut file");
 }
 
-fn generate_enums() -> (Vec<(String, String, HashMap<usize, String>)>, String) {
-    use calamine::{Reader, Xlsx, open_workbook};
-
+fn generate_enums() -> Vec<(String, String, HashMap<usize, String>)> {
     let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Types")
@@ -54,18 +60,7 @@ fn generate_enums() -> (Vec<(String, String, HashMap<usize, String>)>, String) {
         enum_type = next_base_type;
     }
 
-    if ENUMS_TO_IMPORT.len() > 0 {
-        enums = enums
-            .into_iter()
-            .filter(|(name, _, __)| {
-                ENUMS_TO_IMPORT.contains(&snake_to_camel_case(name.as_str()).as_str())
-            })
-            .collect();
-    }
-
-    let enums_code = generate_enums_code(&enums);
-
-    (enums, enums_code)
+    enums
 }
 
 #[derive(Debug)]
@@ -93,6 +88,14 @@ fn parse_enum_row(row: &[Data]) -> EnumRow {
         value: match row.get(3) {
             Some(Data::Int(variant)) => Some(*variant as usize),
             Some(Data::Float(variant)) => Some(*variant as usize),
+            Some(Data::String(variant)) => {
+                if variant.starts_with("0x") {
+                    usize::from_str_radix(&variant[2..], 16).ok()
+                } else {
+                    None
+                }
+            }
+
             _ => None,
         },
     }
@@ -141,9 +144,15 @@ fn generate_enums_code(enums: &Vec<(String, String, HashMap<usize, String>)>) ->
     let mut code = String::new();
     code.push_str("#![allow(dead_code)]\n");
     code.push_str("#![allow(clippy::enum_variant_names)]\n");
-    code.push_str("#![allow(clippy::upper_case_acronyms)]\n");
+    code.push_str("#![allow(clippy::upper_case_acronyms)]\n\n");
+    code.push_str("use crate::{DataType as BaseDataType, DataValue as BaseDataValue, parser::reader::Reader}; \n");
 
-    let main_enum = join(enums.iter().map(|(e, _, __)| snake_to_camel_case(e)), ",\n");
+    let main_enum = join(
+        enums
+            .iter()
+            .map(|(e, _, __)| format!("{}({})", snake_to_camel_case(e), snake_to_camel_case(e))),
+        ",\n",
+    );
 
     code.push_str(&format!(
         r#"
@@ -155,25 +164,30 @@ pub enum FitEnum {{
     ));
 
     for (name, base_type, mapping) in enums.iter() {
-        if mapping.is_empty() {
-            continue;
+        let name = snake_to_camel_case(name);
+
+        let mut variants = join(mapping.values().map(|v| snake_to_camel_case(v)), ",\n");
+        if !variants.is_empty() {
+            variants.push_str(",");
         }
 
-        let name = snake_to_camel_case(name);
-        let variants = join(mapping.values().map(|v| snake_to_camel_case(v)), ",\n");
-        let enum_mapping = join(
+        let mut enum_mapping = join(
             mapping
                 .iter()
                 .map(|(k, v)| format!("{k} => {name}::{}", snake_to_camel_case(v))),
             ",\n",
         );
+        if !enum_mapping.is_empty() {
+            enum_mapping.push_str(",");
+        }
+
         let enum_type = map_type(base_type).expect("Expected not None enum type");
 
         code.push_str(&format!(
             "
 #[derive(Debug, PartialEq)]
 pub enum {name} {{
-    {variants},
+    {variants}
     UnknownVariant
 }}"
         ));
@@ -183,7 +197,7 @@ pub enum {name} {{
 impl {name} {{
     pub fn from(content: {enum_type}) -> {name} {{
         match content {{
-            {enum_mapping},
+            {enum_mapping}
             _ => {name}::UnknownVariant
         }}
     }}
@@ -240,4 +254,186 @@ fn format_code(code: &str) -> String {
         println!("cargo:warning=rustfmt failed, using unformatted code");
         code.to_string()
     }
+}
+
+#[derive(Debug)]
+struct Message {
+    field_def: u8,
+    name: String,
+    base_type: String,
+    array: Option<usize>,
+    scale: Option<usize>,
+    offset: Option<usize>,
+}
+
+fn generate_messages_definitions() -> (Vec<(String, Vec<Message>)>, Vec<String>) {
+    let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
+    let range = workbook
+        .worksheet_range("Messages")
+        .expect("The profile file does not contain a Types sheet");
+
+    let mut iterator = range.rows();
+    let _ = iterator.next(); // Skip header
+
+    let mut messages = Vec::new();
+
+    let mut message_name = match iterator.next().and_then(|r| r.first()) {
+        Some(Data::String(name)) => name.to_string(),
+        _ => return (messages, Vec::new()),
+    };
+
+    loop {
+        let (next_message_name, defintions) = parse_definitions(&mut iterator);
+
+        messages.push((message_name, defintions));
+
+        if next_message_name.is_none() {
+            break;
+        }
+
+        message_name = next_message_name.unwrap();
+    }
+
+    if MESSAGES_TO_IMPORT.len() > 0 {
+        messages = messages
+            .into_iter()
+            .filter(|(msg, _)| {
+                MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(&msg.as_str()).as_str())
+            })
+            .collect()
+    }
+
+    let enums_used = messages
+        .iter()
+        .flat_map(|(_, definitions)| {
+            definitions
+                .iter()
+                .filter_map(|def| is_fit_enum(&def.base_type))
+        })
+        .collect();
+
+    (messages, enums_used)
+}
+
+fn is_fit_enum(type_name: &str) -> Option<String> {
+    match type_name {
+        "sint8" | "uint8" | "uintz8" | "sint16" | "uint16" | "uintz16" | "sint32" | "uint32"
+        | "uintz32" | "sint64" | "uint64" | "uintz64" | "string" | "float32" | "float64"
+        | "byte" => None,
+        val => Some(val.to_string()),
+    }
+}
+
+fn parse_definitions<'a, I>(iter: &mut I) -> (Option<String>, Vec<Message>)
+where
+    I: Iterator<Item = &'a [Data]>,
+{
+    let mut messages = Vec::new();
+    let mut next_message_name: Option<String> = None;
+
+    for row in iter {
+        match row.first() {
+            Some(Data::String(name)) => {
+                next_message_name = Some(name.to_string());
+                break;
+            }
+            _ => {}
+        }
+
+        let field_def = match row.get(1) {
+            Some(Data::Int(field_def)) => *field_def as u8,
+            Some(Data::Float(field_def)) => *field_def as u8,
+            _ => {
+                continue;
+            }
+        };
+
+        let name = match row.get(2) {
+            Some(Data::String(name)) => name.clone(),
+            _ => {
+                continue;
+            }
+        };
+
+        let base_type = match row.get(3) {
+            Some(Data::String(enum_type)) => enum_type.clone(),
+            _ => {
+                continue;
+            }
+        };
+
+        messages.push(Message {
+            field_def,
+            name,
+            base_type,
+            array: match row.get(4) {
+                Some(Data::Int(field_def)) => Some(*field_def as usize),
+                Some(Data::Float(field_def)) => Some(*field_def as usize),
+                _ => None,
+            },
+            scale: match row.get(6) {
+                Some(Data::Int(field_def)) => Some(*field_def as usize),
+                Some(Data::Float(field_def)) => Some(*field_def as usize),
+                _ => None,
+            },
+            offset: match row.get(7) {
+                Some(Data::Int(field_def)) => Some(*field_def as usize),
+                Some(Data::Float(field_def)) => Some(*field_def as usize),
+                _ => None,
+            },
+        });
+    }
+
+    (next_message_name, messages)
+}
+
+fn generate_messages_code(messages: Vec<(String, Vec<Message>)>) -> String {
+    let mut code = String::new();
+
+    let messages_enum = join(
+        messages
+            .iter()
+            .map(|(msg, _)| format!("{}({})", snake_to_camel_case(msg), snake_to_camel_case(msg))),
+        ",\n",
+    );
+
+    code.push_str(&format!(
+        r#"
+#[derive(Debug, PartialEq)]
+pub enum FitMessage {{
+    {messages_enum}
+}}
+"#
+    ));
+
+    for (msg, definitions) in messages.iter() {
+        let message = snake_to_camel_case(msg);
+        let variants = join(
+            definitions
+                .iter()
+                .map(|def| format!("{}", snake_to_camel_case(&def.name))),
+            ",\n",
+        );
+
+        code.push_str(&format!(
+            r#"
+#[derive(Debug, PartialEq)]
+pub enum {message} {{
+    {variants}
+}}"#
+        ));
+
+        //         code.push_str(&format!(
+        //             r#"
+        // impl {message} {{
+        //     fn get_parse_function(def_number: u8) -> fn(&mut Reader<std::vec::IntoIter<u8>>) -> DataValue {{
+        //         match def_number {{
+
+        //         }}
+        //     }}
+        // }}"#
+        //         ));
+    }
+
+    code
 }
