@@ -1,5 +1,6 @@
 use itertools::join;
 use std::io::Write;
+use std::path::Path;
 use std::{
     collections::HashMap,
     process::{Command, Stdio},
@@ -7,19 +8,27 @@ use std::{
 
 use calamine::Data;
 
+const ENUMS_TO_IMPORT: &'static [&'static str] = &[];
+
 fn main() {
-    let enums = generate_enums();
-    let code = format_code(&enums);
-    std::fs::write("src/parser/types/generated.rs", code).expect("Could not wirte to ouptut file");
+    if Path::new("src/parser/types/generated.rs").exists() {
+        return;
+    }
+
+    let (enums, enums_code) = generate_enums();
+    let enums_code = format_code(&enums_code);
+
+    std::fs::write("src/parser/types/generated.rs", enums_code)
+        .expect("Could not wirte to ouptut file");
 }
 
-fn generate_enums() -> String {
+fn generate_enums() -> (Vec<(String, String, HashMap<usize, String>)>, String) {
     use calamine::{Reader, Xlsx, open_workbook};
 
     let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Types")
-        .expect("Profile file does not contain a Types sheet");
+        .expect("The profile file does not contain a Types sheet");
 
     let mut iterator = range.rows();
     let _ = iterator.next(); // Skip header
@@ -45,7 +54,18 @@ fn generate_enums() -> String {
         enum_type = next_base_type;
     }
 
-    generate_enums_code(enums)
+    if ENUMS_TO_IMPORT.len() > 0 {
+        enums = enums
+            .into_iter()
+            .filter(|(name, _, __)| {
+                ENUMS_TO_IMPORT.contains(&snake_to_camel_case(name.as_str()).as_str())
+            })
+            .collect();
+    }
+
+    let enums_code = generate_enums_code(&enums);
+
+    (enums, enums_code)
 }
 
 #[derive(Debug)]
@@ -117,7 +137,7 @@ fn map_type(val: &str) -> Option<String> {
     }
 }
 
-fn generate_enums_code(enums: Vec<(String, String, HashMap<usize, String>)>) -> String {
+fn generate_enums_code(enums: &Vec<(String, String, HashMap<usize, String>)>) -> String {
     let mut code = String::new();
     code.push_str("#![allow(dead_code)]\n");
     code.push_str("#![allow(clippy::enum_variant_names)]\n");
