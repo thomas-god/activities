@@ -6,6 +6,7 @@ use crate::parser::{
     reader::{Reader, ReaderError},
 };
 
+pub mod generated;
 pub mod global_messages;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
