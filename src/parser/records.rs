@@ -5,10 +5,7 @@ use thiserror::Error;
 use crate::parser::{
     definition::{Definition, custom::CustomDescription, parse_definition_message},
     reader::{Reader, ReaderError},
-    types::{
-        DataTypeError,
-        generated::{DataValue, FitMessage},
-    },
+    types::{DataTypeError, DataValue, generated::FitMessage},
 };
 
 #[derive(Debug)]

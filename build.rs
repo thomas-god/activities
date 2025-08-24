@@ -167,7 +167,7 @@ fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> Stri
     code.push_str("#![allow(clippy::identity_op)]\n\n");
     code.push_str("#![allow(clippy::match_single_binding)]\n\n");
     code.push_str("#![allow(clippy::match_overlapping_arm)]\n\n");
-    code.push_str("use crate::{BaseDataValue, parser::reader::Reader};\n");
+    code.push_str("use crate::{parser::reader::Reader};\n");
     code.push_str(
         "use crate::parser::types::{parse_uint8, parse_uint8z, parse_sint8,
         parse_uint16, parse_uint16z, parse_sint16,
@@ -175,19 +175,9 @@ fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> Stri
         parse_uint64, parse_uint64z, parse_sint64,
         parse_float32, parse_float64, parse_string,
         parse_unknown, parse_byte_array as parse_byte,
-        DataTypeError};",
+        DataValue, DataTypeError};",
     );
     code.push_str("use crate::parser::definition::{Endianness};\n\n");
-
-    code.push_str(
-        "
-#[derive(Debug, PartialEq, Clone)]
-pub enum DataValue {
-    Base(BaseDataValue),
-    Enum(FitEnum),
-    DateTime(u32)
-}\n",
-    );
 
     let enum_names: Vec<String> = enums.iter().map(|(name, _, __)| name.to_string()).collect();
 

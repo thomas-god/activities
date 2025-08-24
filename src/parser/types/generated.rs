@@ -10,20 +10,13 @@
 #![allow(clippy::match_overlapping_arm)]
 
 use crate::parser::definition::Endianness;
+use crate::parser::reader::Reader;
 use crate::parser::types::{
     parse_byte_array as parse_byte, parse_float32, parse_float64, parse_sint16, parse_sint32,
     parse_sint64, parse_sint8, parse_string, parse_uint16, parse_uint16z, parse_uint32,
     parse_uint32z, parse_uint64, parse_uint64z, parse_uint8, parse_uint8z, parse_unknown,
-    DataTypeError,
+    DataTypeError, DataValue,
 };
-use crate::{parser::reader::Reader, BaseDataValue};
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum DataValue {
-    Base(BaseDataValue),
-    Enum(FitEnum),
-    DateTime(u32),
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum FitEnum {

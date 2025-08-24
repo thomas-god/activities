@@ -3,14 +3,14 @@ use thiserror::Error;
 use crate::parser::{
     definition::Endianness,
     reader::{Reader, ReaderError},
-    types::generated::DataValue,
+    types::generated::FitEnum,
 };
 
 pub mod generated;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BaseDataValue {
-    Enum(u8),
+pub enum DataValue {
+    Enum(FitEnum),
     Sint8(i8),
     Uint8(u8),
     Sint16(i16),
@@ -27,6 +27,7 @@ pub enum BaseDataValue {
     Sint64(i64),
     Uint64(u64),
     Uint64z(u64),
+    DateTime(u32),
     Unknown,
 }
 
@@ -57,7 +58,7 @@ pub fn parse_uint8(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint8(content.next_u8()?)));
+        values.push(DataValue::Uint8(content.next_u8()?));
     }
 
     Ok(values)
@@ -72,9 +73,7 @@ pub fn parse_uint16(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint16(
-            content.next_u16(endianness)?,
-        )));
+        values.push(DataValue::Uint16(content.next_u16(endianness)?));
     }
 
     Ok(values)
@@ -89,9 +88,7 @@ pub fn parse_uint32(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint32(
-            content.next_u32(endianness)?,
-        )));
+        values.push(DataValue::Uint32(content.next_u32(endianness)?));
     }
 
     Ok(values)
@@ -106,9 +103,7 @@ pub fn parse_uint64(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint64(
-            content.next_u64(endianness)?,
-        )));
+        values.push(DataValue::Uint64(content.next_u64(endianness)?));
     }
 
     Ok(values)
@@ -123,7 +118,7 @@ pub fn parse_uint8z(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint8z(content.next_u8()?)));
+        values.push(DataValue::Uint8z(content.next_u8()?));
     }
 
     Ok(values)
@@ -138,9 +133,7 @@ pub fn parse_uint16z(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint16z(
-            content.next_u16(endianness)?,
-        )));
+        values.push(DataValue::Uint16z(content.next_u16(endianness)?));
     }
 
     Ok(values)
@@ -155,9 +148,7 @@ pub fn parse_uint32z(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint32z(
-            content.next_u32(endianness)?,
-        )));
+        values.push(DataValue::Uint32z(content.next_u32(endianness)?));
     }
 
     Ok(values)
@@ -172,9 +163,7 @@ pub fn parse_uint64z(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Uint64z(
-            content.next_u64(endianness)?,
-        )));
+        values.push(DataValue::Uint64z(content.next_u64(endianness)?));
     }
 
     Ok(values)
@@ -189,9 +178,7 @@ pub fn parse_sint8(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Sint8(
-            content.next_u8()? as i8
-        )));
+        values.push(DataValue::Sint8(content.next_u8()? as i8));
     }
 
     Ok(values)
@@ -206,10 +193,10 @@ pub fn parse_sint16(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Sint16(match endianness {
+        values.push(DataValue::Sint16(match endianness {
             Endianness::Little => i16::from_le_bytes([content.next_u8()?, content.next_u8()?]),
             Endianness::Big => i16::from_be_bytes([content.next_u8()?, content.next_u8()?]),
-        })));
+        }));
     }
 
     Ok(values)
@@ -224,7 +211,7 @@ pub fn parse_sint32(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Sint32(match endianness {
+        values.push(DataValue::Sint32(match endianness {
             Endianness::Little => i32::from_le_bytes([
                 content.next_u8()?,
                 content.next_u8()?,
@@ -237,7 +224,7 @@ pub fn parse_sint32(
                 content.next_u8()?,
                 content.next_u8()?,
             ]),
-        })));
+        }));
     }
 
     Ok(values)
@@ -252,7 +239,7 @@ pub fn parse_sint64(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Sint64(match endianness {
+        values.push(DataValue::Sint64(match endianness {
             Endianness::Little => i64::from_le_bytes([
                 content.next_u8()?,
                 content.next_u8()?,
@@ -273,7 +260,7 @@ pub fn parse_sint64(
                 content.next_u8()?,
                 content.next_u8()?,
             ]),
-        })));
+        }));
     }
 
     Ok(values)
@@ -288,9 +275,9 @@ pub fn parse_float32(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Float32(f32::from_bits(
+        values.push(DataValue::Float32(f32::from_bits(
             content.next_u32(endianness)?,
-        ))));
+        )));
     }
 
     Ok(values)
@@ -305,9 +292,9 @@ pub fn parse_float64(
     let mut values = Vec::new();
 
     for _ in 0..number_of_values {
-        values.push(DataValue::Base(BaseDataValue::Float64(f64::from_bits(
+        values.push(DataValue::Float64(f64::from_bits(
             content.next_u64(endianness)?,
-        ))));
+        )));
     }
 
     Ok(values)
@@ -323,9 +310,9 @@ pub fn parse_string(
         bytes.push(content.next_u8()?)
     }
 
-    Ok(vec![DataValue::Base(BaseDataValue::String(
+    Ok(vec![DataValue::String(
         String::from_utf8(bytes).map_err(|_| DataTypeError::InvalidUtf8)?,
-    ))])
+    )])
 }
 
 pub fn parse_byte_array(
@@ -338,7 +325,7 @@ pub fn parse_byte_array(
         bytes.push(content.next_u8()?);
     }
 
-    Ok(vec![DataValue::Base(BaseDataValue::Byte(bytes))])
+    Ok(vec![DataValue::Byte(bytes)])
 }
 
 pub fn parse_unknown(
@@ -353,7 +340,7 @@ pub fn parse_unknown(
     Ok(Vec::new())
 }
 
-impl BaseDataValue {
+impl DataValue {
     /// Check if a value should be considered invalid as per the .FIT protocol. Notable exceptions
     /// are:
     ///
@@ -361,7 +348,6 @@ impl BaseDataValue {
     /// - [DataValue::Unknown] are always considerred invalid.
     pub fn is_invalid(&self) -> bool {
         match self {
-            Self::Enum(val) => *val == 0xFF,
             Self::Sint8(val) => *val == 0x7F,
             Self::Sint16(val) => *val == 0x7FFF,
             Self::Sint32(val) => *val == 0x7FFFFFFF,
@@ -380,6 +366,8 @@ impl BaseDataValue {
             }
             Self::Byte(val) => val.iter().all(|b| *b == 0xFF),
             Self::String(_) => false,
+            Self::DateTime(_) => false,
+            Self::Enum(_) => false,
             Self::Unknown => true,
         }
     }
@@ -387,72 +375,73 @@ impl BaseDataValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::BaseDataValue;
+    use crate::parser::types::generated::Activity;
+
+    use super::*;
 
     #[test]
     fn test_data_value_enum_invalid() {
-        assert!(!BaseDataValue::Enum(0).is_invalid());
-        assert!(BaseDataValue::Enum(0xFF).is_invalid());
+        assert!(!DataValue::Enum(FitEnum::Activity(Activity::AutoMultiSport)).is_invalid());
     }
 
     #[test]
     fn test_data_value_sint_invalid() {
-        assert!(!BaseDataValue::Sint8(0).is_invalid());
-        assert!(BaseDataValue::Sint8(0x7F).is_invalid());
+        assert!(!DataValue::Sint8(0).is_invalid());
+        assert!(DataValue::Sint8(0x7F).is_invalid());
 
-        assert!(!BaseDataValue::Sint16(0).is_invalid());
-        assert!(BaseDataValue::Sint16(0x7FFF).is_invalid());
+        assert!(!DataValue::Sint16(0).is_invalid());
+        assert!(DataValue::Sint16(0x7FFF).is_invalid());
 
-        assert!(!BaseDataValue::Sint32(0).is_invalid());
-        assert!(BaseDataValue::Sint32(0x7FFFFFFF).is_invalid());
+        assert!(!DataValue::Sint32(0).is_invalid());
+        assert!(DataValue::Sint32(0x7FFFFFFF).is_invalid());
 
-        assert!(!BaseDataValue::Sint64(0).is_invalid());
-        assert!(BaseDataValue::Sint64(0x7FFFFFFFFFFFFFFF).is_invalid());
+        assert!(!DataValue::Sint64(0).is_invalid());
+        assert!(DataValue::Sint64(0x7FFFFFFFFFFFFFFF).is_invalid());
     }
 
     #[test]
     fn test_data_value_uint_invalid() {
-        assert!(!BaseDataValue::Uint8(0).is_invalid());
-        assert!(BaseDataValue::Uint8(0xFF).is_invalid());
+        assert!(!DataValue::Uint8(0).is_invalid());
+        assert!(DataValue::Uint8(0xFF).is_invalid());
 
-        assert!(!BaseDataValue::Uint16(0).is_invalid());
-        assert!(BaseDataValue::Uint16(0xFFFF).is_invalid());
+        assert!(!DataValue::Uint16(0).is_invalid());
+        assert!(DataValue::Uint16(0xFFFF).is_invalid());
 
-        assert!(!BaseDataValue::Uint32(0).is_invalid());
-        assert!(BaseDataValue::Uint32(0xFFFFFFFF).is_invalid());
+        assert!(!DataValue::Uint32(0).is_invalid());
+        assert!(DataValue::Uint32(0xFFFFFFFF).is_invalid());
 
-        assert!(!BaseDataValue::Uint64(0).is_invalid());
-        assert!(BaseDataValue::Uint64(0xFFFFFFFFFFFFFFFF).is_invalid());
+        assert!(!DataValue::Uint64(0).is_invalid());
+        assert!(DataValue::Uint64(0xFFFFFFFFFFFFFFFF).is_invalid());
     }
 
     #[test]
     fn test_data_value_uintz_invalid() {
-        assert!(!BaseDataValue::Uint8z(0xFF).is_invalid());
-        assert!(BaseDataValue::Uint8z(0).is_invalid());
+        assert!(!DataValue::Uint8z(0xFF).is_invalid());
+        assert!(DataValue::Uint8z(0).is_invalid());
 
-        assert!(!BaseDataValue::Uint16z(0xFFFF).is_invalid());
-        assert!(BaseDataValue::Uint16z(0).is_invalid());
+        assert!(!DataValue::Uint16z(0xFFFF).is_invalid());
+        assert!(DataValue::Uint16z(0).is_invalid());
 
-        assert!(!BaseDataValue::Uint32z(0xFFFFFFFF).is_invalid());
-        assert!(BaseDataValue::Uint32z(0).is_invalid());
+        assert!(!DataValue::Uint32z(0xFFFFFFFF).is_invalid());
+        assert!(DataValue::Uint32z(0).is_invalid());
 
-        assert!(!BaseDataValue::Uint64z(0xFFFFFFFFFFFFFFFF).is_invalid());
-        assert!(BaseDataValue::Uint64z(0).is_invalid());
+        assert!(!DataValue::Uint64z(0xFFFFFFFFFFFFFFFF).is_invalid());
+        assert!(DataValue::Uint64z(0).is_invalid());
     }
 
     #[test]
     fn test_data_value_float_invalid() {
-        assert!(!BaseDataValue::Float32(f32::from_le_bytes([0x00, 0x00, 0x00, 0x00])).is_invalid());
-        assert!(BaseDataValue::Float32(f32::from_le_bytes([0xFF, 0xFF, 0xFF, 0xFF])).is_invalid());
+        assert!(!DataValue::Float32(f32::from_le_bytes([0x00, 0x00, 0x00, 0x00])).is_invalid());
+        assert!(DataValue::Float32(f32::from_le_bytes([0xFF, 0xFF, 0xFF, 0xFF])).is_invalid());
 
         assert!(
-            !BaseDataValue::Float64(f64::from_le_bytes([
+            !DataValue::Float64(f64::from_le_bytes([
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]))
             .is_invalid()
         );
         assert!(
-            BaseDataValue::Float64(f64::from_le_bytes([
+            DataValue::Float64(f64::from_le_bytes([
                 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
             ]))
             .is_invalid()
@@ -461,19 +450,19 @@ mod tests {
 
     #[test]
     fn test_data_value_byte_invalid() {
-        assert!(!BaseDataValue::Byte(vec![0x00, 0x00]).is_invalid());
-        assert!(BaseDataValue::Byte(vec![0xFF, 0xFF]).is_invalid());
+        assert!(!DataValue::Byte(vec![0x00, 0x00]).is_invalid());
+        assert!(DataValue::Byte(vec![0xFF, 0xFF]).is_invalid());
     }
 
     #[test]
     fn test_data_value_string_always_valid() {
-        assert!(!BaseDataValue::String(String::from_utf8(vec![]).unwrap()).is_invalid());
-        assert!(!BaseDataValue::String(String::from_utf8(vec![0x00]).unwrap()).is_invalid());
-        assert!(!BaseDataValue::String(String::from_utf8(vec![0x01, 0x00]).unwrap()).is_invalid());
+        assert!(!DataValue::String(String::from_utf8(vec![]).unwrap()).is_invalid());
+        assert!(!DataValue::String(String::from_utf8(vec![0x00]).unwrap()).is_invalid());
+        assert!(!DataValue::String(String::from_utf8(vec![0x01, 0x00]).unwrap()).is_invalid());
     }
 
     #[test]
     fn test_data_value_unknown_always_invalid() {
-        assert!(BaseDataValue::Unknown.is_invalid());
+        assert!(DataValue::Unknown.is_invalid());
     }
 }

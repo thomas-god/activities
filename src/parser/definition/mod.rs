@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
-use crate::parser::{
-    definition::custom::CustomDescription,
-    reader::Reader,
-    records::{DefinitionMessageHeader, RecordError},
-    types::{
-        DataTypeError,
-        generated::{CustomField, DataValue, FitMessage, MesgNum},
+use crate::{
+    DataValue,
+    parser::{
+        definition::custom::CustomDescription,
+        reader::Reader,
+        records::{DefinitionMessageHeader, RecordError},
+        types::{
+            DataTypeError,
+            generated::{CustomField, FitMessage, MesgNum},
+        },
     },
 };
 
@@ -128,10 +131,7 @@ fn parse_definition_field(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        BaseDataValue,
-        parser::types::generated::{DataValue, FitMessage, MesgNum, RecordField},
-    };
+    use crate::parser::types::generated::{FitMessage, MesgNum, RecordField};
 
     use super::*;
 
@@ -160,7 +160,7 @@ mod tests {
         let mut content = Reader::new(1, 0, vec![12].into_iter());
         assert_eq!(
             (field.parse)(&mut content, &Endianness::Little, 1).unwrap(),
-            vec![DataValue::Base(BaseDataValue::Uint8(12))]
+            vec![DataValue::Uint8(12)]
         );
     }
 }

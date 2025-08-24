@@ -1,11 +1,11 @@
 use std::{collections::HashMap, mem::discriminant};
 
-use crate::parser::{
-    definition::{Definition, Endianness},
-    records::DataMessage,
-    types::{
-        self,
-        generated::{DataValue, FieldDescriptionField, FitBaseType, FitEnum, FitMessage, MesgNum},
+use crate::{
+    DataValue,
+    parser::{
+        definition::{Definition, Endianness},
+        records::DataMessage,
+        types::generated::{FieldDescriptionField, FitBaseType, FitEnum, FitMessage, MesgNum},
     },
 };
 
@@ -117,7 +117,7 @@ fn find_value_of_field_as_string(
     variant: &FieldDescriptionField,
 ) -> Option<String> {
     match find_value_of_field(message, definition, variant) {
-        Some(DataValue::Base(types::BaseDataValue::String(val))) => Some(val.clone()),
+        Some(DataValue::String(val)) => Some(val.clone()),
         _ => None,
     }
 }
@@ -127,7 +127,7 @@ fn find_value_of_field_as_u8(
     variant: &FieldDescriptionField,
 ) -> Option<u8> {
     match find_value_of_field(message, definition, variant) {
-        Some(DataValue::Base(types::BaseDataValue::Uint8(val))) => Some(val),
+        Some(DataValue::Uint8(val)) => Some(val),
         _ => None,
     }
 }
@@ -135,7 +135,7 @@ fn find_value_of_field_as_u8(
 #[cfg(test)]
 mod test {
     use crate::{
-        BaseDataValue,
+        DataValue,
         parser::{
             definition::DefinitionField,
             records::DataMessageField,
@@ -202,13 +202,13 @@ mod test {
             fields: vec![
                 DataMessageField {
                     kind: FitMessage::FieldDescription(FieldDescriptionField::DeveloperDataIndex),
-                    values: vec![DataValue::Base(BaseDataValue::Uint8(0))],
+                    values: vec![DataValue::Uint8(0)],
                 },
                 DataMessageField {
                     kind: FitMessage::FieldDescription(
                         FieldDescriptionField::FieldDefinitionNumber,
                     ),
-                    values: vec![DataValue::Base(BaseDataValue::Uint8(0))],
+                    values: vec![DataValue::Uint8(0)],
                 },
                 DataMessageField {
                     kind: FitMessage::FieldDescription(FieldDescriptionField::FitBaseTypeId),
@@ -216,13 +216,11 @@ mod test {
                 },
                 DataMessageField {
                     kind: FitMessage::FieldDescription(FieldDescriptionField::FieldName),
-                    values: vec![DataValue::Base(BaseDataValue::String(
-                        "new field".to_string(),
-                    ))],
+                    values: vec![DataValue::String("new field".to_string())],
                 },
                 DataMessageField {
                     kind: FitMessage::FieldDescription(FieldDescriptionField::Units),
-                    values: vec![DataValue::Base(BaseDataValue::String("km/h".to_string()))],
+                    values: vec![DataValue::String("km/h".to_string())],
                 },
             ],
         };
