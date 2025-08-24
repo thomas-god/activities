@@ -1,8 +1,12 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+#![allow(unreachable_patterns)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::identity_op)]
+#![allow(clippy::match_single_binding)]
+#![allow(clippy::match_overlapping_arm)]
 
 use crate::parser::definition::Endianness;
 use crate::parser::types::{
@@ -13,13 +17,14 @@ use crate::parser::types::{
 };
 use crate::{parser::reader::Reader, BaseDataType, BaseDataValue};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DataValue {
     Base(BaseDataValue),
     Enum(FitEnum),
+    DateTime(u32),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitEnum {
     File(File),
     MesgNum(MesgNum),
@@ -154,8 +159,6 @@ pub enum File {
     Segment,
     SegmentList,
     ExdConfiguration,
-    MfgRangeMin,
-    MfgRangeMax,
     UnknownVariant,
 }
 impl File {
@@ -179,8 +182,6 @@ impl File {
             34 => File::Segment,
             35 => File::SegmentList,
             40 => File::ExdConfiguration,
-            247 => File::MfgRangeMin,
-            254 => File::MfgRangeMax,
             _ => File::UnknownVariant,
         }
     }
@@ -191,7 +192,7 @@ impl File {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::File(Self::from(
                 reader.next_u8()?,
             ))));
@@ -244,7 +245,6 @@ pub enum MesgNum {
     AntChannelId,
     Length,
     MonitoringInfo,
-    Pad,
     SlaveDevice,
     Connectivity,
     WeatherConditions,
@@ -323,8 +323,6 @@ pub enum MesgNum {
     DiveApneaAlarm,
     SkinTempOvernight,
     HsaWristTemperatureData,
-    MfgRangeMin,
-    MfgRangeMax,
     UnknownVariant,
 }
 impl MesgNum {
@@ -372,7 +370,6 @@ impl MesgNum {
             82 => MesgNum::AntChannelId,
             101 => MesgNum::Length,
             103 => MesgNum::MonitoringInfo,
-            105 => MesgNum::Pad,
             106 => MesgNum::SlaveDevice,
             127 => MesgNum::Connectivity,
             128 => MesgNum::WeatherConditions,
@@ -451,8 +448,6 @@ impl MesgNum {
             393 => MesgNum::DiveApneaAlarm,
             398 => MesgNum::SkinTempOvernight,
             409 => MesgNum::HsaWristTemperatureData,
-            65280 => MesgNum::MfgRangeMin,
-            65534 => MesgNum::MfgRangeMax,
             _ => MesgNum::UnknownVariant,
         }
     }
@@ -463,12 +458,358 @@ impl MesgNum {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::MesgNum(Self::from(
                 reader.next_u16(endianness)?,
             ))));
         }
         Ok(values)
+    }
+    pub fn message_field(&self, def_number: u8) -> FitMessage {
+        match self {
+            Self::FileId => FitMessage::FileId(FileIdField::from(def_number)),
+            Self::Capabilities => FitMessage::Capabilities(CapabilitiesField::from(def_number)),
+            Self::DeviceSettings => {
+                FitMessage::DeviceSettings(DeviceSettingsField::from(def_number))
+            }
+            Self::UserProfile => FitMessage::UserProfile(UserProfileField::from(def_number)),
+            Self::HrmProfile => FitMessage::HrmProfile(HrmProfileField::from(def_number)),
+            Self::SdmProfile => FitMessage::SdmProfile(SdmProfileField::from(def_number)),
+            Self::BikeProfile => FitMessage::BikeProfile(BikeProfileField::from(def_number)),
+            Self::ZonesTarget => FitMessage::ZonesTarget(ZonesTargetField::from(def_number)),
+            Self::HrZone => FitMessage::HrZone(HrZoneField::from(def_number)),
+            Self::PowerZone => FitMessage::PowerZone(PowerZoneField::from(def_number)),
+            Self::MetZone => FitMessage::MetZone(MetZoneField::from(def_number)),
+            Self::Sport => FitMessage::Sport(SportField::from(def_number)),
+            Self::TrainingSettings => {
+                FitMessage::TrainingSettings(TrainingSettingsField::from(def_number))
+            }
+            Self::Goal => FitMessage::Goal(GoalField::from(def_number)),
+            Self::Session => FitMessage::Session(SessionField::from(def_number)),
+            Self::Lap => FitMessage::Lap(LapField::from(def_number)),
+            Self::Record => FitMessage::Record(RecordField::from(def_number)),
+            Self::Event => FitMessage::Event(EventField::from(def_number)),
+            Self::DeviceInfo => FitMessage::DeviceInfo(DeviceInfoField::from(def_number)),
+            Self::Workout => FitMessage::Workout(WorkoutField::from(def_number)),
+            Self::WorkoutStep => FitMessage::WorkoutStep(WorkoutStepField::from(def_number)),
+            Self::Schedule => FitMessage::Schedule(ScheduleField::from(def_number)),
+            Self::WeightScale => FitMessage::WeightScale(WeightScaleField::from(def_number)),
+            Self::Course => FitMessage::Course(CourseField::from(def_number)),
+            Self::CoursePoint => FitMessage::CoursePoint(CoursePointField::from(def_number)),
+            Self::Totals => FitMessage::Totals(TotalsField::from(def_number)),
+            Self::Activity => FitMessage::Activity(ActivityField::from(def_number)),
+            Self::Software => FitMessage::Software(SoftwareField::from(def_number)),
+            Self::FileCapabilities => {
+                FitMessage::FileCapabilities(FileCapabilitiesField::from(def_number))
+            }
+            Self::MesgCapabilities => {
+                FitMessage::MesgCapabilities(MesgCapabilitiesField::from(def_number))
+            }
+            Self::FieldCapabilities => {
+                FitMessage::FieldCapabilities(FieldCapabilitiesField::from(def_number))
+            }
+            Self::FileCreator => FitMessage::FileCreator(FileCreatorField::from(def_number)),
+            Self::BloodPressure => FitMessage::BloodPressure(BloodPressureField::from(def_number)),
+            Self::SpeedZone => FitMessage::SpeedZone(SpeedZoneField::from(def_number)),
+            Self::Monitoring => FitMessage::Monitoring(MonitoringField::from(def_number)),
+            Self::TrainingFile => FitMessage::TrainingFile(TrainingFileField::from(def_number)),
+            Self::Hrv => FitMessage::Hrv(HrvField::from(def_number)),
+            Self::AntRx => FitMessage::AntRx(AntRxField::from(def_number)),
+            Self::AntTx => FitMessage::AntTx(AntTxField::from(def_number)),
+            Self::AntChannelId => FitMessage::AntChannelId(AntChannelIdField::from(def_number)),
+            Self::Length => FitMessage::Length(LengthField::from(def_number)),
+            Self::MonitoringInfo => {
+                FitMessage::MonitoringInfo(MonitoringInfoField::from(def_number))
+            }
+            Self::SlaveDevice => FitMessage::SlaveDevice(SlaveDeviceField::from(def_number)),
+            Self::Connectivity => FitMessage::Connectivity(ConnectivityField::from(def_number)),
+            Self::WeatherConditions => {
+                FitMessage::WeatherConditions(WeatherConditionsField::from(def_number))
+            }
+            Self::WeatherAlert => FitMessage::WeatherAlert(WeatherAlertField::from(def_number)),
+            Self::CadenceZone => FitMessage::CadenceZone(CadenceZoneField::from(def_number)),
+            Self::Hr => FitMessage::Hr(HrField::from(def_number)),
+            Self::SegmentLap => FitMessage::SegmentLap(SegmentLapField::from(def_number)),
+            Self::MemoGlob => FitMessage::MemoGlob(MemoGlobField::from(def_number)),
+            Self::SegmentId => FitMessage::SegmentId(SegmentIdField::from(def_number)),
+            Self::SegmentLeaderboardEntry => {
+                FitMessage::SegmentLeaderboardEntry(SegmentLeaderboardEntryField::from(def_number))
+            }
+            Self::SegmentPoint => FitMessage::SegmentPoint(SegmentPointField::from(def_number)),
+            Self::SegmentFile => FitMessage::SegmentFile(SegmentFileField::from(def_number)),
+            Self::WorkoutSession => {
+                FitMessage::WorkoutSession(WorkoutSessionField::from(def_number))
+            }
+            Self::WatchfaceSettings => {
+                FitMessage::WatchfaceSettings(WatchfaceSettingsField::from(def_number))
+            }
+            Self::GpsMetadata => FitMessage::GpsMetadata(GpsMetadataField::from(def_number)),
+            Self::CameraEvent => FitMessage::CameraEvent(CameraEventField::from(def_number)),
+            Self::TimestampCorrelation => {
+                FitMessage::TimestampCorrelation(TimestampCorrelationField::from(def_number))
+            }
+            Self::GyroscopeData => FitMessage::GyroscopeData(GyroscopeDataField::from(def_number)),
+            Self::AccelerometerData => {
+                FitMessage::AccelerometerData(AccelerometerDataField::from(def_number))
+            }
+            Self::ThreeDSensorCalibration => {
+                FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::from(def_number))
+            }
+            Self::VideoFrame => FitMessage::VideoFrame(VideoFrameField::from(def_number)),
+            Self::ObdiiData => FitMessage::ObdiiData(ObdiiDataField::from(def_number)),
+            Self::NmeaSentence => FitMessage::NmeaSentence(NmeaSentenceField::from(def_number)),
+            Self::AviationAttitude => {
+                FitMessage::AviationAttitude(AviationAttitudeField::from(def_number))
+            }
+            Self::Video => FitMessage::Video(VideoField::from(def_number)),
+            Self::VideoTitle => FitMessage::VideoTitle(VideoTitleField::from(def_number)),
+            Self::VideoDescription => {
+                FitMessage::VideoDescription(VideoDescriptionField::from(def_number))
+            }
+            Self::VideoClip => FitMessage::VideoClip(VideoClipField::from(def_number)),
+            Self::OhrSettings => FitMessage::OhrSettings(OhrSettingsField::from(def_number)),
+            Self::ExdScreenConfiguration => {
+                FitMessage::ExdScreenConfiguration(ExdScreenConfigurationField::from(def_number))
+            }
+            Self::ExdDataFieldConfiguration => FitMessage::ExdDataFieldConfiguration(
+                ExdDataFieldConfigurationField::from(def_number),
+            ),
+            Self::ExdDataConceptConfiguration => FitMessage::ExdDataConceptConfiguration(
+                ExdDataConceptConfigurationField::from(def_number),
+            ),
+            Self::FieldDescription => {
+                FitMessage::FieldDescription(FieldDescriptionField::from(def_number))
+            }
+            Self::DeveloperDataId => {
+                FitMessage::DeveloperDataId(DeveloperDataIdField::from(def_number))
+            }
+            Self::MagnetometerData => {
+                FitMessage::MagnetometerData(MagnetometerDataField::from(def_number))
+            }
+            Self::BarometerData => FitMessage::BarometerData(BarometerDataField::from(def_number)),
+            Self::OneDSensorCalibration => {
+                FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::from(def_number))
+            }
+            Self::MonitoringHrData => {
+                FitMessage::MonitoringHrData(MonitoringHrDataField::from(def_number))
+            }
+            Self::TimeInZone => FitMessage::TimeInZone(TimeInZoneField::from(def_number)),
+            Self::Set => FitMessage::Set(SetField::from(def_number)),
+            Self::StressLevel => FitMessage::StressLevel(StressLevelField::from(def_number)),
+            Self::MaxMetData => FitMessage::MaxMetData(MaxMetDataField::from(def_number)),
+            Self::DiveSettings => FitMessage::DiveSettings(DiveSettingsField::from(def_number)),
+            Self::DiveGas => FitMessage::DiveGas(DiveGasField::from(def_number)),
+            Self::DiveAlarm => FitMessage::DiveAlarm(DiveAlarmField::from(def_number)),
+            Self::ExerciseTitle => FitMessage::ExerciseTitle(ExerciseTitleField::from(def_number)),
+            Self::DiveSummary => FitMessage::DiveSummary(DiveSummaryField::from(def_number)),
+            Self::Spo2Data => FitMessage::Spo2Data(Spo2DataField::from(def_number)),
+            Self::SleepLevel => FitMessage::SleepLevel(SleepLevelField::from(def_number)),
+            Self::Jump => FitMessage::Jump(JumpField::from(def_number)),
+            Self::AadAccelFeatures => {
+                FitMessage::AadAccelFeatures(AadAccelFeaturesField::from(def_number))
+            }
+            Self::BeatIntervals => FitMessage::BeatIntervals(BeatIntervalsField::from(def_number)),
+            Self::RespirationRate => {
+                FitMessage::RespirationRate(RespirationRateField::from(def_number))
+            }
+            Self::HsaAccelerometerData => {
+                FitMessage::HsaAccelerometerData(HsaAccelerometerDataField::from(def_number))
+            }
+            Self::HsaStepData => FitMessage::HsaStepData(HsaStepDataField::from(def_number)),
+            Self::HsaSpo2Data => FitMessage::HsaSpo2Data(HsaSpo2DataField::from(def_number)),
+            Self::HsaStressData => FitMessage::HsaStressData(HsaStressDataField::from(def_number)),
+            Self::HsaRespirationData => {
+                FitMessage::HsaRespirationData(HsaRespirationDataField::from(def_number))
+            }
+            Self::HsaHeartRateData => {
+                FitMessage::HsaHeartRateData(HsaHeartRateDataField::from(def_number))
+            }
+            Self::Split => FitMessage::Split(SplitField::from(def_number)),
+            Self::SplitSummary => FitMessage::SplitSummary(SplitSummaryField::from(def_number)),
+            Self::HsaBodyBatteryData => {
+                FitMessage::HsaBodyBatteryData(HsaBodyBatteryDataField::from(def_number))
+            }
+            Self::HsaEvent => FitMessage::HsaEvent(HsaEventField::from(def_number)),
+            Self::ClimbPro => FitMessage::ClimbPro(ClimbProField::from(def_number)),
+            Self::TankUpdate => FitMessage::TankUpdate(TankUpdateField::from(def_number)),
+            Self::TankSummary => FitMessage::TankSummary(TankSummaryField::from(def_number)),
+            Self::SleepAssessment => {
+                FitMessage::SleepAssessment(SleepAssessmentField::from(def_number))
+            }
+            Self::HrvStatusSummary => {
+                FitMessage::HrvStatusSummary(HrvStatusSummaryField::from(def_number))
+            }
+            Self::HrvValue => FitMessage::HrvValue(HrvValueField::from(def_number)),
+            Self::RawBbi => FitMessage::RawBbi(RawBbiField::from(def_number)),
+            Self::DeviceAuxBatteryInfo => {
+                FitMessage::DeviceAuxBatteryInfo(DeviceAuxBatteryInfoField::from(def_number))
+            }
+            Self::HsaGyroscopeData => {
+                FitMessage::HsaGyroscopeData(HsaGyroscopeDataField::from(def_number))
+            }
+            Self::ChronoShotSession => {
+                FitMessage::ChronoShotSession(ChronoShotSessionField::from(def_number))
+            }
+            Self::ChronoShotData => {
+                FitMessage::ChronoShotData(ChronoShotDataField::from(def_number))
+            }
+            Self::HsaConfigurationData => {
+                FitMessage::HsaConfigurationData(HsaConfigurationDataField::from(def_number))
+            }
+            Self::DiveApneaAlarm => {
+                FitMessage::DiveApneaAlarm(DiveApneaAlarmField::from(def_number))
+            }
+            Self::SkinTempOvernight => {
+                FitMessage::SkinTempOvernight(SkinTempOvernightField::from(def_number))
+            }
+            Self::HsaWristTemperatureData => {
+                FitMessage::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
+            }
+            Self::UnknownVariant => FitMessage::UnknownVariant,
+        }
+    }
+
+    pub fn field_parse(
+        &self,
+        def_number: u8,
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+        match self {
+            Self::FileId => FileIdField::get_parse_function(def_number),
+            Self::Capabilities => CapabilitiesField::get_parse_function(def_number),
+            Self::DeviceSettings => DeviceSettingsField::get_parse_function(def_number),
+            Self::UserProfile => UserProfileField::get_parse_function(def_number),
+            Self::HrmProfile => HrmProfileField::get_parse_function(def_number),
+            Self::SdmProfile => SdmProfileField::get_parse_function(def_number),
+            Self::BikeProfile => BikeProfileField::get_parse_function(def_number),
+            Self::ZonesTarget => ZonesTargetField::get_parse_function(def_number),
+            Self::HrZone => HrZoneField::get_parse_function(def_number),
+            Self::PowerZone => PowerZoneField::get_parse_function(def_number),
+            Self::MetZone => MetZoneField::get_parse_function(def_number),
+            Self::Sport => SportField::get_parse_function(def_number),
+            Self::TrainingSettings => TrainingSettingsField::get_parse_function(def_number),
+            Self::Goal => GoalField::get_parse_function(def_number),
+            Self::Session => SessionField::get_parse_function(def_number),
+            Self::Lap => LapField::get_parse_function(def_number),
+            Self::Record => RecordField::get_parse_function(def_number),
+            Self::Event => EventField::get_parse_function(def_number),
+            Self::DeviceInfo => DeviceInfoField::get_parse_function(def_number),
+            Self::Workout => WorkoutField::get_parse_function(def_number),
+            Self::WorkoutStep => WorkoutStepField::get_parse_function(def_number),
+            Self::Schedule => ScheduleField::get_parse_function(def_number),
+            Self::WeightScale => WeightScaleField::get_parse_function(def_number),
+            Self::Course => CourseField::get_parse_function(def_number),
+            Self::CoursePoint => CoursePointField::get_parse_function(def_number),
+            Self::Totals => TotalsField::get_parse_function(def_number),
+            Self::Activity => ActivityField::get_parse_function(def_number),
+            Self::Software => SoftwareField::get_parse_function(def_number),
+            Self::FileCapabilities => FileCapabilitiesField::get_parse_function(def_number),
+            Self::MesgCapabilities => MesgCapabilitiesField::get_parse_function(def_number),
+            Self::FieldCapabilities => FieldCapabilitiesField::get_parse_function(def_number),
+            Self::FileCreator => FileCreatorField::get_parse_function(def_number),
+            Self::BloodPressure => BloodPressureField::get_parse_function(def_number),
+            Self::SpeedZone => SpeedZoneField::get_parse_function(def_number),
+            Self::Monitoring => MonitoringField::get_parse_function(def_number),
+            Self::TrainingFile => TrainingFileField::get_parse_function(def_number),
+            Self::Hrv => HrvField::get_parse_function(def_number),
+            Self::AntRx => AntRxField::get_parse_function(def_number),
+            Self::AntTx => AntTxField::get_parse_function(def_number),
+            Self::AntChannelId => AntChannelIdField::get_parse_function(def_number),
+            Self::Length => LengthField::get_parse_function(def_number),
+            Self::MonitoringInfo => MonitoringInfoField::get_parse_function(def_number),
+            Self::SlaveDevice => SlaveDeviceField::get_parse_function(def_number),
+            Self::Connectivity => ConnectivityField::get_parse_function(def_number),
+            Self::WeatherConditions => WeatherConditionsField::get_parse_function(def_number),
+            Self::WeatherAlert => WeatherAlertField::get_parse_function(def_number),
+            Self::CadenceZone => CadenceZoneField::get_parse_function(def_number),
+            Self::Hr => HrField::get_parse_function(def_number),
+            Self::SegmentLap => SegmentLapField::get_parse_function(def_number),
+            Self::MemoGlob => MemoGlobField::get_parse_function(def_number),
+            Self::SegmentId => SegmentIdField::get_parse_function(def_number),
+            Self::SegmentLeaderboardEntry => {
+                SegmentLeaderboardEntryField::get_parse_function(def_number)
+            }
+            Self::SegmentPoint => SegmentPointField::get_parse_function(def_number),
+            Self::SegmentFile => SegmentFileField::get_parse_function(def_number),
+            Self::WorkoutSession => WorkoutSessionField::get_parse_function(def_number),
+            Self::WatchfaceSettings => WatchfaceSettingsField::get_parse_function(def_number),
+            Self::GpsMetadata => GpsMetadataField::get_parse_function(def_number),
+            Self::CameraEvent => CameraEventField::get_parse_function(def_number),
+            Self::TimestampCorrelation => TimestampCorrelationField::get_parse_function(def_number),
+            Self::GyroscopeData => GyroscopeDataField::get_parse_function(def_number),
+            Self::AccelerometerData => AccelerometerDataField::get_parse_function(def_number),
+            Self::ThreeDSensorCalibration => {
+                ThreeDSensorCalibrationField::get_parse_function(def_number)
+            }
+            Self::VideoFrame => VideoFrameField::get_parse_function(def_number),
+            Self::ObdiiData => ObdiiDataField::get_parse_function(def_number),
+            Self::NmeaSentence => NmeaSentenceField::get_parse_function(def_number),
+            Self::AviationAttitude => AviationAttitudeField::get_parse_function(def_number),
+            Self::Video => VideoField::get_parse_function(def_number),
+            Self::VideoTitle => VideoTitleField::get_parse_function(def_number),
+            Self::VideoDescription => VideoDescriptionField::get_parse_function(def_number),
+            Self::VideoClip => VideoClipField::get_parse_function(def_number),
+            Self::OhrSettings => OhrSettingsField::get_parse_function(def_number),
+            Self::ExdScreenConfiguration => {
+                ExdScreenConfigurationField::get_parse_function(def_number)
+            }
+            Self::ExdDataFieldConfiguration => {
+                ExdDataFieldConfigurationField::get_parse_function(def_number)
+            }
+            Self::ExdDataConceptConfiguration => {
+                ExdDataConceptConfigurationField::get_parse_function(def_number)
+            }
+            Self::FieldDescription => FieldDescriptionField::get_parse_function(def_number),
+            Self::DeveloperDataId => DeveloperDataIdField::get_parse_function(def_number),
+            Self::MagnetometerData => MagnetometerDataField::get_parse_function(def_number),
+            Self::BarometerData => BarometerDataField::get_parse_function(def_number),
+            Self::OneDSensorCalibration => {
+                OneDSensorCalibrationField::get_parse_function(def_number)
+            }
+            Self::MonitoringHrData => MonitoringHrDataField::get_parse_function(def_number),
+            Self::TimeInZone => TimeInZoneField::get_parse_function(def_number),
+            Self::Set => SetField::get_parse_function(def_number),
+            Self::StressLevel => StressLevelField::get_parse_function(def_number),
+            Self::MaxMetData => MaxMetDataField::get_parse_function(def_number),
+            Self::DiveSettings => DiveSettingsField::get_parse_function(def_number),
+            Self::DiveGas => DiveGasField::get_parse_function(def_number),
+            Self::DiveAlarm => DiveAlarmField::get_parse_function(def_number),
+            Self::ExerciseTitle => ExerciseTitleField::get_parse_function(def_number),
+            Self::DiveSummary => DiveSummaryField::get_parse_function(def_number),
+            Self::Spo2Data => Spo2DataField::get_parse_function(def_number),
+            Self::SleepLevel => SleepLevelField::get_parse_function(def_number),
+            Self::Jump => JumpField::get_parse_function(def_number),
+            Self::AadAccelFeatures => AadAccelFeaturesField::get_parse_function(def_number),
+            Self::BeatIntervals => BeatIntervalsField::get_parse_function(def_number),
+            Self::RespirationRate => RespirationRateField::get_parse_function(def_number),
+            Self::HsaAccelerometerData => HsaAccelerometerDataField::get_parse_function(def_number),
+            Self::HsaStepData => HsaStepDataField::get_parse_function(def_number),
+            Self::HsaSpo2Data => HsaSpo2DataField::get_parse_function(def_number),
+            Self::HsaStressData => HsaStressDataField::get_parse_function(def_number),
+            Self::HsaRespirationData => HsaRespirationDataField::get_parse_function(def_number),
+            Self::HsaHeartRateData => HsaHeartRateDataField::get_parse_function(def_number),
+            Self::Split => SplitField::get_parse_function(def_number),
+            Self::SplitSummary => SplitSummaryField::get_parse_function(def_number),
+            Self::HsaBodyBatteryData => HsaBodyBatteryDataField::get_parse_function(def_number),
+            Self::HsaEvent => HsaEventField::get_parse_function(def_number),
+            Self::ClimbPro => ClimbProField::get_parse_function(def_number),
+            Self::TankUpdate => TankUpdateField::get_parse_function(def_number),
+            Self::TankSummary => TankSummaryField::get_parse_function(def_number),
+            Self::SleepAssessment => SleepAssessmentField::get_parse_function(def_number),
+            Self::HrvStatusSummary => HrvStatusSummaryField::get_parse_function(def_number),
+            Self::HrvValue => HrvValueField::get_parse_function(def_number),
+            Self::RawBbi => RawBbiField::get_parse_function(def_number),
+            Self::DeviceAuxBatteryInfo => DeviceAuxBatteryInfoField::get_parse_function(def_number),
+            Self::HsaGyroscopeData => HsaGyroscopeDataField::get_parse_function(def_number),
+            Self::ChronoShotSession => ChronoShotSessionField::get_parse_function(def_number),
+            Self::ChronoShotData => ChronoShotDataField::get_parse_function(def_number),
+            Self::HsaConfigurationData => HsaConfigurationDataField::get_parse_function(def_number),
+            Self::DiveApneaAlarm => DiveApneaAlarmField::get_parse_function(def_number),
+            Self::SkinTempOvernight => SkinTempOvernightField::get_parse_function(def_number),
+            Self::HsaWristTemperatureData => {
+                HsaWristTemperatureDataField::get_parse_function(def_number)
+            }
+            Self::UnknownVariant => parse_unknown,
+        }
     }
 }
 
@@ -495,7 +836,7 @@ impl FileFlags {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::FileFlags(Self::from(
                 reader.next_u8()?,
             ))));
@@ -527,7 +868,7 @@ impl MesgCount {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::MesgCount(Self::from(
                 reader.next_u8()?,
             ))));
@@ -550,10 +891,11 @@ impl DateTime {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
-            values.push(DataValue::Enum(FitEnum::DateTime(Self::from(
-                reader.next_u32(endianness)?,
-            ))));
+
+        for _ in 0..number_of_bytes / 4 {
+            {
+                values.push(DataValue::DateTime(reader.next_u32(endianness)?));
+            }
         }
         Ok(values)
     }
@@ -573,10 +915,11 @@ impl LocalDateTime {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
-            values.push(DataValue::Enum(FitEnum::LocalDateTime(Self::from(
-                reader.next_u32(endianness)?,
-            ))));
+
+        for _ in 0..number_of_bytes / 4 {
+            {
+                values.push(DataValue::DateTime(reader.next_u32(endianness)?));
+            }
         }
         Ok(values)
     }
@@ -605,7 +948,7 @@ impl MessageIndex {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::MessageIndex(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -633,7 +976,7 @@ impl DeviceIndex {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DeviceIndex(Self::from(
                 reader.next_u8()?,
             ))));
@@ -663,7 +1006,7 @@ impl Gender {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Gender(Self::from(
                 reader.next_u8()?,
             ))));
@@ -767,7 +1110,7 @@ impl Language {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Language(Self::from(
                 reader.next_u8()?,
             ))));
@@ -799,7 +1142,7 @@ impl DisplayMeasure {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DisplayMeasure(Self::from(
                 reader.next_u8()?,
             ))));
@@ -831,7 +1174,7 @@ impl DisplayHeart {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DisplayHeart(Self::from(
                 reader.next_u8()?,
             ))));
@@ -861,7 +1204,7 @@ impl DisplayPower {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DisplayPower(Self::from(
                 reader.next_u8()?,
             ))));
@@ -971,7 +1314,7 @@ impl DisplayPosition {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DisplayPosition(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1003,7 +1346,7 @@ impl Switch {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Switch(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1167,7 +1510,7 @@ impl Sport {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Sport(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1209,7 +1552,7 @@ impl SportBits0 {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SportBits0(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1413,7 +1756,7 @@ impl SubSport {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SubSport(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1457,7 +1800,7 @@ impl SportEvent {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SportEvent(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1487,7 +1830,7 @@ impl Activity {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Activity(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1527,7 +1870,7 @@ impl Intensity {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Intensity(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1561,7 +1904,7 @@ impl SessionTrigger {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SessionTrigger(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1605,7 +1948,7 @@ impl LapTrigger {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::LapTrigger(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1643,7 +1986,7 @@ impl TimeMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::TimeMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1683,7 +2026,7 @@ impl BacklightMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::BacklightMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1713,7 +2056,7 @@ impl DateMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DateMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1741,7 +2084,7 @@ impl BacklightTimeout {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::BacklightTimeout(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1859,7 +2202,7 @@ impl Event {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Event(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1905,7 +2248,7 @@ impl EventType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::EventType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1939,7 +2282,7 @@ impl Tone {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Tone(Self::from(
                 reader.next_u8()?,
             ))));
@@ -1971,7 +2314,7 @@ impl ActivityClass {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ActivityClass(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2005,7 +2348,7 @@ impl HrZoneCalc {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::HrZoneCalc(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2035,7 +2378,7 @@ impl PwrZoneCalc {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::PwrZoneCalc(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2123,7 +2466,7 @@ impl WktStepDuration {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WktStepDuration(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2177,7 +2520,7 @@ impl WktStepTarget {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WktStepTarget(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2217,7 +2560,7 @@ impl Goal {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Goal(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2255,7 +2598,7 @@ impl GoalRecurrence {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::GoalRecurrence(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2287,7 +2630,7 @@ impl GoalSource {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::GoalSource(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2317,7 +2660,7 @@ impl Schedule {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Schedule(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2449,7 +2792,7 @@ impl CoursePoint {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::CoursePoint(Self::from(
                 reader.next_u8()?,
             ))));
@@ -2939,7 +3282,7 @@ impl Manufacturer {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::Manufacturer(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -2973,7 +3316,7 @@ impl AntNetwork {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::AntNetwork(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3027,7 +3370,7 @@ impl WorkoutCapabilities {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::WorkoutCapabilities(Self::from(
                 reader.next_u32(endianness)?,
             ))));
@@ -3067,7 +3410,7 @@ impl BatteryStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::BatteryStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3097,7 +3440,7 @@ impl HrType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::HrType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3147,7 +3490,7 @@ impl CourseCapabilities {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::CourseCapabilities(Self::from(
                 reader.next_u32(endianness)?,
             ))));
@@ -3175,7 +3518,7 @@ impl Weight {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::Weight(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -3211,7 +3554,7 @@ impl BpStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::BpStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3249,7 +3592,7 @@ impl UserLocalId {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::UserLocalId(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -3293,7 +3636,7 @@ impl SwimStroke {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SwimStroke(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3337,7 +3680,7 @@ impl ActivityType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ActivityType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3403,7 +3746,7 @@ impl ActivitySubtype {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ActivitySubtype(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3435,7 +3778,7 @@ impl ActivityLevel {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ActivityLevel(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3465,7 +3808,7 @@ impl Side {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Side(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3495,7 +3838,7 @@ impl LeftRightBalance {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::LeftRightBalance(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3525,7 +3868,7 @@ impl LeftRightBalance100 {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::LeftRightBalance100(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -3555,7 +3898,7 @@ impl LengthType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::LengthType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3595,7 +3938,7 @@ impl DayOfWeek {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DayOfWeek(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3685,7 +4028,7 @@ impl ConnectivityCapabilities {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::ConnectivityCapabilities(
                 Self::from(reader.next_u32(endianness)?),
             )));
@@ -3719,7 +4062,7 @@ impl WeatherReport {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WeatherReport(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3787,7 +4130,7 @@ impl WeatherStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WeatherStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -3823,7 +4166,7 @@ impl WeatherSeverity {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WeatherSeverity(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4019,7 +4362,7 @@ impl WeatherSevereType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WeatherSevereType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4045,7 +4388,7 @@ impl LocaltimeIntoDay {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::LocaltimeIntoDay(Self::from(
                 reader.next_u32(endianness)?,
             ))));
@@ -4083,7 +4426,7 @@ impl StrokeType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::StrokeType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4189,7 +4532,7 @@ impl BodyLocation {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::BodyLocation(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4219,7 +4562,7 @@ impl SegmentLapStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SegmentLapStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4275,7 +4618,7 @@ impl SegmentLeaderboardType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SegmentLeaderboardType(
                 Self::from(reader.next_u8()?),
             )));
@@ -4307,7 +4650,7 @@ impl SegmentDeleteStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SegmentDeleteStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4337,7 +4680,7 @@ impl SegmentSelectionType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SegmentSelectionType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4375,7 +4718,7 @@ impl SourceType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SourceType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4409,7 +4752,7 @@ impl AntChannelId {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::AntChannelId(Self::from(
                 reader.next_u32(endianness)?,
             ))));
@@ -4445,7 +4788,7 @@ impl DisplayOrientation {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DisplayOrientation(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4483,7 +4826,7 @@ impl WorkoutEquipment {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WorkoutEquipment(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4517,7 +4860,7 @@ impl WatchfaceMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WatchfaceMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4569,7 +4912,7 @@ impl CameraEventType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::CameraEventType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4603,7 +4946,7 @@ impl SensorType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SensorType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4637,7 +4980,7 @@ impl CameraOrientationType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::CameraOrientationType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4671,7 +5014,7 @@ impl AttitudeStage {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::AttitudeStage(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4723,7 +5066,7 @@ impl AttitudeValidity {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::AttitudeValidity(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -4759,7 +5102,7 @@ impl AutoSyncFrequency {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::AutoSyncFrequency(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4803,7 +5146,7 @@ impl ExdLayout {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ExdLayout(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4851,7 +5194,7 @@ impl ExdDisplayType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ExdDisplayType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -4977,7 +5320,7 @@ impl ExdDataUnits {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ExdDataUnits(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5091,7 +5434,7 @@ impl ExdQualifiers {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ExdQualifiers(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5311,7 +5654,7 @@ impl ExdDescriptors {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ExdDescriptors(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5351,7 +5694,7 @@ impl AutoActivityDetect {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 4 {
             values.push(DataValue::Enum(FitEnum::AutoActivityDetect(Self::from(
                 reader.next_u32(endianness)?,
             ))));
@@ -5411,7 +5754,7 @@ impl FitBaseType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::FitBaseType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5443,7 +5786,7 @@ impl FitBaseUnit {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::FitBaseUnit(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -5473,7 +5816,7 @@ impl SetType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SetType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5503,7 +5846,7 @@ impl MaxMetCategory {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::MaxMetCategory(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5635,7 +5978,7 @@ impl ExerciseCategory {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::ExerciseCategory(Self::from(
                 reader.next_u16(endianness)?,
             ))));
@@ -5669,7 +6012,7 @@ impl WaterType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::WaterType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5697,7 +6040,7 @@ impl TissueModelType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::TissueModelType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5729,7 +6072,7 @@ impl DiveGasStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DiveGasStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5761,7 +6104,7 @@ impl DiveAlarmType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DiveAlarmType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5791,7 +6134,7 @@ impl DiveBacklightMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DiveBacklightMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5827,7 +6170,7 @@ impl SleepLevel {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SleepLevel(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5861,7 +6204,7 @@ impl Spo2MeasurementType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::Spo2MeasurementType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5891,7 +6234,7 @@ impl CcrSetpointSwitchMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::CcrSetpointSwitchMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5921,7 +6264,7 @@ impl DiveGasMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::DiveGasMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -5959,7 +6302,7 @@ impl ProjectileType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ProjectileType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6027,7 +6370,7 @@ impl SplitType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SplitType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6059,7 +6402,7 @@ impl ClimbProEvent {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ClimbProEvent(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6091,7 +6434,7 @@ impl GasConsumptionRateType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::GasConsumptionRateType(
                 Self::from(reader.next_u8()?),
             )));
@@ -6123,7 +6466,7 @@ impl TapSensitivity {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::TapSensitivity(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6157,7 +6500,7 @@ impl RadarThreatLevelType {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::RadarThreatLevelType(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6189,7 +6532,7 @@ impl MaxMetSpeedSource {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::MaxMetSpeedSource(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6219,7 +6562,7 @@ impl MaxMetHeartRateSource {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::MaxMetHeartRateSource(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6255,7 +6598,7 @@ impl HrvStatus {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::HrvStatus(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6285,7 +6628,7 @@ impl NoFlyTimeMode {
         number_of_bytes: u8,
     ) -> Result<Vec<DataValue>, DataTypeError> {
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {
+        for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::NoFlyTimeMode(Self::from(
                 reader.next_u8()?,
             ))));
@@ -6294,132 +6637,140 @@ impl NoFlyTimeMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitMessage {
-    FileId(FileIdMesg),
-    FileCreator(FileCreatorMesg),
-    TimestampCorrelation(TimestampCorrelationMesg),
-    Software(SoftwareMesg),
-    SlaveDevice(SlaveDeviceMesg),
-    Capabilities(CapabilitiesMesg),
-    FileCapabilities(FileCapabilitiesMesg),
-    MesgCapabilities(MesgCapabilitiesMesg),
-    FieldCapabilities(FieldCapabilitiesMesg),
-    DeviceSettings(DeviceSettingsMesg),
-    UserProfile(UserProfileMesg),
-    HrmProfile(HrmProfileMesg),
-    SdmProfile(SdmProfileMesg),
-    BikeProfile(BikeProfileMesg),
-    Connectivity(ConnectivityMesg),
-    WatchfaceSettings(WatchfaceSettingsMesg),
-    OhrSettings(OhrSettingsMesg),
-    TimeInZone(TimeInZoneMesg),
-    ZonesTarget(ZonesTargetMesg),
-    Sport(SportMesg),
-    HrZone(HrZoneMesg),
-    SpeedZone(SpeedZoneMesg),
-    CadenceZone(CadenceZoneMesg),
-    PowerZone(PowerZoneMesg),
-    MetZone(MetZoneMesg),
-    TrainingSettings(TrainingSettingsMesg),
-    DiveSettings(DiveSettingsMesg),
-    DiveAlarm(DiveAlarmMesg),
-    DiveApneaAlarm(DiveApneaAlarmMesg),
-    DiveGas(DiveGasMesg),
-    Goal(GoalMesg),
-    Activity(ActivityMesg),
-    Session(SessionMesg),
-    Lap(LapMesg),
-    Length(LengthMesg),
-    Record(RecordMesg),
-    Event(EventMesg),
-    DeviceInfo(DeviceInfoMesg),
-    DeviceAuxBatteryInfo(DeviceAuxBatteryInfoMesg),
-    TrainingFile(TrainingFileMesg),
-    WeatherConditions(WeatherConditionsMesg),
-    WeatherAlert(WeatherAlertMesg),
-    GpsMetadata(GpsMetadataMesg),
-    CameraEvent(CameraEventMesg),
-    GyroscopeData(GyroscopeDataMesg),
-    AccelerometerData(AccelerometerDataMesg),
-    MagnetometerData(MagnetometerDataMesg),
-    BarometerData(BarometerDataMesg),
-    ThreeDSensorCalibration(ThreeDSensorCalibrationMesg),
-    OneDSensorCalibration(OneDSensorCalibrationMesg),
-    VideoFrame(VideoFrameMesg),
-    ObdiiData(ObdiiDataMesg),
-    NmeaSentence(NmeaSentenceMesg),
-    AviationAttitude(AviationAttitudeMesg),
-    Video(VideoMesg),
-    VideoTitle(VideoTitleMesg),
-    VideoDescription(VideoDescriptionMesg),
-    VideoClip(VideoClipMesg),
-    Set(SetMesg),
-    Jump(JumpMesg),
-    Split(SplitMesg),
-    SplitSummary(SplitSummaryMesg),
-    ClimbPro(ClimbProMesg),
-    FieldDescription(FieldDescriptionMesg),
-    DeveloperDataId(DeveloperDataIdMesg),
-    Course(CourseMesg),
-    CoursePoint(CoursePointMesg),
-    SegmentId(SegmentIdMesg),
-    SegmentLeaderboardEntry(SegmentLeaderboardEntryMesg),
-    SegmentPoint(SegmentPointMesg),
-    SegmentLap(SegmentLapMesg),
-    SegmentFile(SegmentFileMesg),
-    Workout(WorkoutMesg),
-    WorkoutSession(WorkoutSessionMesg),
-    WorkoutStep(WorkoutStepMesg),
-    ExerciseTitle(ExerciseTitleMesg),
-    Schedule(ScheduleMesg),
-    Totals(TotalsMesg),
-    WeightScale(WeightScaleMesg),
-    BloodPressure(BloodPressureMesg),
-    MonitoringInfo(MonitoringInfoMesg),
-    Monitoring(MonitoringMesg),
-    MonitoringHrData(MonitoringHrDataMesg),
-    Spo2Data(Spo2DataMesg),
-    Hr(HrMesg),
-    StressLevel(StressLevelMesg),
-    MaxMetData(MaxMetDataMesg),
-    HsaBodyBatteryData(HsaBodyBatteryDataMesg),
-    HsaEvent(HsaEventMesg),
-    HsaAccelerometerData(HsaAccelerometerDataMesg),
-    HsaGyroscopeData(HsaGyroscopeDataMesg),
-    HsaStepData(HsaStepDataMesg),
-    HsaSpo2Data(HsaSpo2DataMesg),
-    HsaStressData(HsaStressDataMesg),
-    HsaRespirationData(HsaRespirationDataMesg),
-    HsaHeartRateData(HsaHeartRateDataMesg),
-    HsaConfigurationData(HsaConfigurationDataMesg),
-    HsaWristTemperatureData(HsaWristTemperatureDataMesg),
-    MemoGlob(MemoGlobMesg),
-    SleepLevel(SleepLevelMesg),
-    AntChannelId(AntChannelIdMesg),
-    AntRx(AntRxMesg),
-    AntTx(AntTxMesg),
-    ExdScreenConfiguration(ExdScreenConfigurationMesg),
-    ExdDataFieldConfiguration(ExdDataFieldConfigurationMesg),
-    ExdDataConceptConfiguration(ExdDataConceptConfigurationMesg),
-    DiveSummary(DiveSummaryMesg),
-    AadAccelFeatures(AadAccelFeaturesMesg),
-    Hrv(HrvMesg),
-    BeatIntervals(BeatIntervalsMesg),
-    HrvStatusSummary(HrvStatusSummaryMesg),
-    HrvValue(HrvValueMesg),
-    RawBbi(RawBbiMesg),
-    RespirationRate(RespirationRateMesg),
-    ChronoShotSession(ChronoShotSessionMesg),
-    ChronoShotData(ChronoShotDataMesg),
-    TankUpdate(TankUpdateMesg),
-    TankSummary(TankSummaryMesg),
-    SleepAssessment(SleepAssessmentMesg),
-    SkinTempOvernight(SkinTempOvernightMesg),
+    FileId(FileIdField),
+    FileCreator(FileCreatorField),
+    TimestampCorrelation(TimestampCorrelationField),
+    Software(SoftwareField),
+    SlaveDevice(SlaveDeviceField),
+    Capabilities(CapabilitiesField),
+    FileCapabilities(FileCapabilitiesField),
+    MesgCapabilities(MesgCapabilitiesField),
+    FieldCapabilities(FieldCapabilitiesField),
+    DeviceSettings(DeviceSettingsField),
+    UserProfile(UserProfileField),
+    HrmProfile(HrmProfileField),
+    SdmProfile(SdmProfileField),
+    BikeProfile(BikeProfileField),
+    Connectivity(ConnectivityField),
+    WatchfaceSettings(WatchfaceSettingsField),
+    OhrSettings(OhrSettingsField),
+    TimeInZone(TimeInZoneField),
+    ZonesTarget(ZonesTargetField),
+    Sport(SportField),
+    HrZone(HrZoneField),
+    SpeedZone(SpeedZoneField),
+    CadenceZone(CadenceZoneField),
+    PowerZone(PowerZoneField),
+    MetZone(MetZoneField),
+    TrainingSettings(TrainingSettingsField),
+    DiveSettings(DiveSettingsField),
+    DiveAlarm(DiveAlarmField),
+    DiveApneaAlarm(DiveApneaAlarmField),
+    DiveGas(DiveGasField),
+    Goal(GoalField),
+    Activity(ActivityField),
+    Session(SessionField),
+    Lap(LapField),
+    Length(LengthField),
+    Record(RecordField),
+    Event(EventField),
+    DeviceInfo(DeviceInfoField),
+    DeviceAuxBatteryInfo(DeviceAuxBatteryInfoField),
+    TrainingFile(TrainingFileField),
+    WeatherConditions(WeatherConditionsField),
+    WeatherAlert(WeatherAlertField),
+    GpsMetadata(GpsMetadataField),
+    CameraEvent(CameraEventField),
+    GyroscopeData(GyroscopeDataField),
+    AccelerometerData(AccelerometerDataField),
+    MagnetometerData(MagnetometerDataField),
+    BarometerData(BarometerDataField),
+    ThreeDSensorCalibration(ThreeDSensorCalibrationField),
+    OneDSensorCalibration(OneDSensorCalibrationField),
+    VideoFrame(VideoFrameField),
+    ObdiiData(ObdiiDataField),
+    NmeaSentence(NmeaSentenceField),
+    AviationAttitude(AviationAttitudeField),
+    Video(VideoField),
+    VideoTitle(VideoTitleField),
+    VideoDescription(VideoDescriptionField),
+    VideoClip(VideoClipField),
+    Set(SetField),
+    Jump(JumpField),
+    Split(SplitField),
+    SplitSummary(SplitSummaryField),
+    ClimbPro(ClimbProField),
+    FieldDescription(FieldDescriptionField),
+    DeveloperDataId(DeveloperDataIdField),
+    Course(CourseField),
+    CoursePoint(CoursePointField),
+    SegmentId(SegmentIdField),
+    SegmentLeaderboardEntry(SegmentLeaderboardEntryField),
+    SegmentPoint(SegmentPointField),
+    SegmentLap(SegmentLapField),
+    SegmentFile(SegmentFileField),
+    Workout(WorkoutField),
+    WorkoutSession(WorkoutSessionField),
+    WorkoutStep(WorkoutStepField),
+    ExerciseTitle(ExerciseTitleField),
+    Schedule(ScheduleField),
+    Totals(TotalsField),
+    WeightScale(WeightScaleField),
+    BloodPressure(BloodPressureField),
+    MonitoringInfo(MonitoringInfoField),
+    Monitoring(MonitoringField),
+    MonitoringHrData(MonitoringHrDataField),
+    Spo2Data(Spo2DataField),
+    Hr(HrField),
+    StressLevel(StressLevelField),
+    MaxMetData(MaxMetDataField),
+    HsaBodyBatteryData(HsaBodyBatteryDataField),
+    HsaEvent(HsaEventField),
+    HsaAccelerometerData(HsaAccelerometerDataField),
+    HsaGyroscopeData(HsaGyroscopeDataField),
+    HsaStepData(HsaStepDataField),
+    HsaSpo2Data(HsaSpo2DataField),
+    HsaStressData(HsaStressDataField),
+    HsaRespirationData(HsaRespirationDataField),
+    HsaHeartRateData(HsaHeartRateDataField),
+    HsaConfigurationData(HsaConfigurationDataField),
+    HsaWristTemperatureData(HsaWristTemperatureDataField),
+    MemoGlob(MemoGlobField),
+    SleepLevel(SleepLevelField),
+    AntChannelId(AntChannelIdField),
+    AntRx(AntRxField),
+    AntTx(AntTxField),
+    ExdScreenConfiguration(ExdScreenConfigurationField),
+    ExdDataFieldConfiguration(ExdDataFieldConfigurationField),
+    ExdDataConceptConfiguration(ExdDataConceptConfigurationField),
+    DiveSummary(DiveSummaryField),
+    AadAccelFeatures(AadAccelFeaturesField),
+    Hrv(HrvField),
+    BeatIntervals(BeatIntervalsField),
+    HrvStatusSummary(HrvStatusSummaryField),
+    HrvValue(HrvValueField),
+    RawBbi(RawBbiField),
+    RespirationRate(RespirationRateField),
+    ChronoShotSession(ChronoShotSessionField),
+    ChronoShotData(ChronoShotDataField),
+    TankUpdate(TankUpdateField),
+    TankSummary(TankSummaryField),
+    SleepAssessment(SleepAssessmentField),
+    SkinTempOvernight(SkinTempOvernightField),
+    Custom(CustomField),
+    UnknownVariant,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum FileIdMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub struct CustomField {
+    pub name: Option<String>,
+    pub units: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FileIdField {
     Type,
     Manufacturer,
     Product,
@@ -6427,8 +6778,22 @@ pub enum FileIdMesg {
     TimeCreated,
     Number,
     ProductName,
+    Unknown,
 }
-impl FileIdMesg {
+impl FileIdField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Type,
+            1 => Self::Manufacturer,
+            2 => Self::Product,
+            3 => Self::SerialNumber,
+            4 => Self::TimeCreated,
+            5 => Self::Number,
+            8 => Self::ProductName,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6444,12 +6809,21 @@ impl FileIdMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum FileCreatorMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum FileCreatorField {
     SoftwareVersion,
     HardwareVersion,
+    Unknown,
 }
-impl FileCreatorMesg {
+impl FileCreatorField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::SoftwareVersion,
+            1 => Self::HardwareVersion,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6460,8 +6834,8 @@ impl FileCreatorMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TimestampCorrelationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TimestampCorrelationField {
     Timestamp,
     FractionalTimestamp,
     SystemTimestamp,
@@ -6469,8 +6843,22 @@ pub enum TimestampCorrelationMesg {
     LocalTimestamp,
     TimestampMs,
     SystemTimestampMs,
+    Unknown,
 }
-impl TimestampCorrelationMesg {
+impl TimestampCorrelationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::FractionalTimestamp,
+            1 => Self::SystemTimestamp,
+            2 => Self::FractionalSystemTimestamp,
+            3 => Self::LocalTimestamp,
+            4 => Self::TimestampMs,
+            5 => Self::SystemTimestampMs,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6486,13 +6874,23 @@ impl TimestampCorrelationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SoftwareMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SoftwareField {
     MessageIndex,
     Version,
     PartNumber,
+    Unknown,
 }
-impl SoftwareMesg {
+impl SoftwareField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            3 => Self::Version,
+            5 => Self::PartNumber,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6504,12 +6902,21 @@ impl SoftwareMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SlaveDeviceMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SlaveDeviceField {
     Manufacturer,
     Product,
+    Unknown,
 }
-impl SlaveDeviceMesg {
+impl SlaveDeviceField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Manufacturer,
+            1 => Self::Product,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6520,14 +6927,25 @@ impl SlaveDeviceMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum CapabilitiesMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum CapabilitiesField {
     Languages,
     Sports,
     WorkoutsSupported,
     ConnectivitySupported,
+    Unknown,
 }
-impl CapabilitiesMesg {
+impl CapabilitiesField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Languages,
+            1 => Self::Sports,
+            21 => Self::WorkoutsSupported,
+            23 => Self::ConnectivitySupported,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6540,16 +6958,29 @@ impl CapabilitiesMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum FileCapabilitiesMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum FileCapabilitiesField {
     MessageIndex,
     Type,
     Flags,
     Directory,
     MaxCount,
     MaxSize,
+    Unknown,
 }
-impl FileCapabilitiesMesg {
+impl FileCapabilitiesField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Type,
+            1 => Self::Flags,
+            2 => Self::Directory,
+            3 => Self::MaxCount,
+            4 => Self::MaxSize,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6564,15 +6995,27 @@ impl FileCapabilitiesMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MesgCapabilitiesMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MesgCapabilitiesField {
     MessageIndex,
     File,
     MesgNum,
     CountType,
     Count,
+    Unknown,
 }
-impl MesgCapabilitiesMesg {
+impl MesgCapabilitiesField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::File,
+            1 => Self::MesgNum,
+            2 => Self::CountType,
+            3 => Self::Count,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6586,15 +7029,27 @@ impl MesgCapabilitiesMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum FieldCapabilitiesMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum FieldCapabilitiesField {
     MessageIndex,
     File,
     MesgNum,
     FieldNum,
     Count,
+    Unknown,
 }
-impl FieldCapabilitiesMesg {
+impl FieldCapabilitiesField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::File,
+            1 => Self::MesgNum,
+            2 => Self::FieldNum,
+            3 => Self::Count,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6608,8 +7063,8 @@ impl FieldCapabilitiesMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DeviceSettingsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeviceSettingsField {
     ActiveTimeZone,
     UtcOffset,
     TimeOffset,
@@ -6634,8 +7089,39 @@ pub enum DeviceSettingsMesg {
     SmartNotificationDisplayOrientation,
     TapInterface,
     TapSensitivity,
+    Unknown,
 }
-impl DeviceSettingsMesg {
+impl DeviceSettingsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ActiveTimeZone,
+            1 => Self::UtcOffset,
+            2 => Self::TimeOffset,
+            4 => Self::TimeMode,
+            5 => Self::TimeZoneOffset,
+            12 => Self::BacklightMode,
+            36 => Self::ActivityTrackerEnabled,
+            39 => Self::ClockTime,
+            40 => Self::PagesEnabled,
+            46 => Self::MoveAlertEnabled,
+            47 => Self::DateMode,
+            55 => Self::DisplayOrientation,
+            56 => Self::MountingSide,
+            57 => Self::DefaultPage,
+            58 => Self::AutosyncMinSteps,
+            59 => Self::AutosyncMinTime,
+            80 => Self::LactateThresholdAutodetectEnabled,
+            86 => Self::BleAutoUploadEnabled,
+            89 => Self::AutoSyncFrequency,
+            90 => Self::AutoActivityDetect,
+            94 => Self::NumberOfScreens,
+            95 => Self::SmartNotificationDisplayOrientation,
+            134 => Self::TapInterface,
+            174 => Self::TapSensitivity,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6668,8 +7154,8 @@ impl DeviceSettingsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum UserProfileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum UserProfileField {
     MessageIndex,
     FriendlyName,
     Gender,
@@ -6699,8 +7185,44 @@ pub enum UserProfileMesg {
     UserWalkingStepLength,
     DepthSetting,
     DiveCount,
+    Unknown,
 }
-impl UserProfileMesg {
+impl UserProfileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::FriendlyName,
+            1 => Self::Gender,
+            2 => Self::Age,
+            3 => Self::Height,
+            4 => Self::Weight,
+            5 => Self::Language,
+            6 => Self::ElevSetting,
+            7 => Self::WeightSetting,
+            8 => Self::RestingHeartRate,
+            9 => Self::DefaultMaxRunningHeartRate,
+            10 => Self::DefaultMaxBikingHeartRate,
+            11 => Self::DefaultMaxHeartRate,
+            12 => Self::HrSetting,
+            13 => Self::SpeedSetting,
+            14 => Self::DistSetting,
+            16 => Self::PowerSetting,
+            17 => Self::ActivityClass,
+            18 => Self::PositionSetting,
+            21 => Self::TemperatureSetting,
+            22 => Self::LocalId,
+            23 => Self::GlobalId,
+            28 => Self::WakeTime,
+            29 => Self::SleepTime,
+            30 => Self::HeightSetting,
+            31 => Self::UserRunningStepLength,
+            32 => Self::UserWalkingStepLength,
+            47 => Self::DepthSetting,
+            49 => Self::DiveCount,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6738,15 +7260,27 @@ impl UserProfileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrmProfileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrmProfileField {
     MessageIndex,
     Enabled,
     HrmAntId,
     LogHrv,
     HrmAntIdTransType,
+    Unknown,
 }
-impl HrmProfileMesg {
+impl HrmProfileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Enabled,
+            1 => Self::HrmAntId,
+            2 => Self::LogHrv,
+            3 => Self::HrmAntIdTransType,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6760,8 +7294,8 @@ impl HrmProfileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SdmProfileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SdmProfileField {
     MessageIndex,
     Enabled,
     SdmAntId,
@@ -6770,8 +7304,23 @@ pub enum SdmProfileMesg {
     SpeedSource,
     SdmAntIdTransType,
     OdometerRollover,
+    Unknown,
 }
-impl SdmProfileMesg {
+impl SdmProfileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Enabled,
+            1 => Self::SdmAntId,
+            2 => Self::SdmCalFactor,
+            3 => Self::Odometer,
+            4 => Self::SpeedSource,
+            5 => Self::SdmAntIdTransType,
+            7 => Self::OdometerRollover,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6788,8 +7337,8 @@ impl SdmProfileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum BikeProfileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum BikeProfileField {
     MessageIndex,
     Name,
     Sport,
@@ -6822,8 +7371,47 @@ pub enum BikeProfileMesg {
     RearGearNum,
     RearGear,
     ShimanoDi2Enabled,
+    Unknown,
 }
-impl BikeProfileMesg {
+impl BikeProfileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Name,
+            1 => Self::Sport,
+            2 => Self::SubSport,
+            3 => Self::Odometer,
+            4 => Self::BikeSpdAntId,
+            5 => Self::BikeCadAntId,
+            6 => Self::BikeSpdcadAntId,
+            7 => Self::BikePowerAntId,
+            8 => Self::CustomWheelsize,
+            9 => Self::AutoWheelsize,
+            10 => Self::BikeWeight,
+            11 => Self::PowerCalFactor,
+            12 => Self::AutoWheelCal,
+            13 => Self::AutoPowerZero,
+            14 => Self::Id,
+            15 => Self::SpdEnabled,
+            16 => Self::CadEnabled,
+            17 => Self::SpdcadEnabled,
+            18 => Self::PowerEnabled,
+            19 => Self::CrankLength,
+            20 => Self::Enabled,
+            21 => Self::BikeSpdAntIdTransType,
+            22 => Self::BikeCadAntIdTransType,
+            23 => Self::BikeSpdcadAntIdTransType,
+            24 => Self::BikePowerAntIdTransType,
+            37 => Self::OdometerRollover,
+            38 => Self::FrontGearNum,
+            39 => Self::FrontGear,
+            40 => Self::RearGearNum,
+            41 => Self::RearGear,
+            44 => Self::ShimanoDi2Enabled,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6864,8 +7452,8 @@ impl BikeProfileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ConnectivityMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectivityField {
     BluetoothEnabled,
     BluetoothLeEnabled,
     AntEnabled,
@@ -6879,8 +7467,28 @@ pub enum ConnectivityMesg {
     GpsEphemerisDownloadEnabled,
     IncidentDetectionEnabled,
     GrouptrackEnabled,
+    Unknown,
 }
-impl ConnectivityMesg {
+impl ConnectivityField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::BluetoothEnabled,
+            1 => Self::BluetoothLeEnabled,
+            2 => Self::AntEnabled,
+            3 => Self::Name,
+            4 => Self::LiveTrackingEnabled,
+            5 => Self::WeatherConditionsEnabled,
+            6 => Self::WeatherAlertsEnabled,
+            7 => Self::AutoActivityUploadEnabled,
+            8 => Self::CourseDownloadEnabled,
+            9 => Self::WorkoutDownloadEnabled,
+            10 => Self::GpsEphemerisDownloadEnabled,
+            11 => Self::IncidentDetectionEnabled,
+            12 => Self::GrouptrackEnabled,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6902,13 +7510,23 @@ impl ConnectivityMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WatchfaceSettingsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WatchfaceSettingsField {
     MessageIndex,
     Mode,
     Layout,
+    Unknown,
 }
-impl WatchfaceSettingsMesg {
+impl WatchfaceSettingsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Mode,
+            1 => Self::Layout,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6920,12 +7538,21 @@ impl WatchfaceSettingsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum OhrSettingsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum OhrSettingsField {
     Timestamp,
     Enabled,
+    Unknown,
 }
-impl OhrSettingsMesg {
+impl OhrSettingsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Enabled,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6936,8 +7563,8 @@ impl OhrSettingsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TimeInZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TimeInZoneField {
     Timestamp,
     ReferenceMesg,
     ReferenceIndex,
@@ -6955,8 +7582,32 @@ pub enum TimeInZoneMesg {
     ThresholdHeartRate,
     PwrCalcType,
     FunctionalThresholdPower,
+    Unknown,
 }
-impl TimeInZoneMesg {
+impl TimeInZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ReferenceMesg,
+            1 => Self::ReferenceIndex,
+            2 => Self::TimeInHrZone,
+            3 => Self::TimeInSpeedZone,
+            4 => Self::TimeInCadenceZone,
+            5 => Self::TimeInPowerZone,
+            6 => Self::HrZoneHighBoundary,
+            7 => Self::SpeedZoneHighBoundary,
+            8 => Self::CadenceZoneHighBondary,
+            9 => Self::PowerZoneHighBoundary,
+            10 => Self::HrCalcType,
+            11 => Self::MaxHeartRate,
+            12 => Self::RestingHeartRate,
+            13 => Self::ThresholdHeartRate,
+            14 => Self::PwrCalcType,
+            15 => Self::FunctionalThresholdPower,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -6982,15 +7633,27 @@ impl TimeInZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ZonesTargetMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ZonesTargetField {
     MaxHeartRate,
     ThresholdHeartRate,
     FunctionalThresholdPower,
     HrCalcType,
     PwrCalcType,
+    Unknown,
 }
-impl ZonesTargetMesg {
+impl ZonesTargetField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            1 => Self::MaxHeartRate,
+            2 => Self::ThresholdHeartRate,
+            3 => Self::FunctionalThresholdPower,
+            5 => Self::HrCalcType,
+            7 => Self::PwrCalcType,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7004,13 +7667,23 @@ impl ZonesTargetMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SportMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SportField {
     Sport,
     SubSport,
     Name,
+    Unknown,
 }
-impl SportMesg {
+impl SportField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Sport,
+            1 => Self::SubSport,
+            3 => Self::Name,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7022,13 +7695,23 @@ impl SportMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrZoneField {
     MessageIndex,
     HighBpm,
     Name,
+    Unknown,
 }
-impl HrZoneMesg {
+impl HrZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::HighBpm,
+            2 => Self::Name,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7040,13 +7723,23 @@ impl HrZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SpeedZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SpeedZoneField {
     MessageIndex,
     HighValue,
     Name,
+    Unknown,
 }
-impl SpeedZoneMesg {
+impl SpeedZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::HighValue,
+            1 => Self::Name,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7058,13 +7751,23 @@ impl SpeedZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum CadenceZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum CadenceZoneField {
     MessageIndex,
     HighValue,
     Name,
+    Unknown,
 }
-impl CadenceZoneMesg {
+impl CadenceZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::HighValue,
+            1 => Self::Name,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7076,13 +7779,23 @@ impl CadenceZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum PowerZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum PowerZoneField {
     MessageIndex,
     HighValue,
     Name,
+    Unknown,
 }
-impl PowerZoneMesg {
+impl PowerZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::HighValue,
+            2 => Self::Name,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7094,14 +7807,25 @@ impl PowerZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MetZoneMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MetZoneField {
     MessageIndex,
     HighBpm,
     Calories,
     FatCalories,
+    Unknown,
 }
-impl MetZoneMesg {
+impl MetZoneField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::HighBpm,
+            2 => Self::Calories,
+            3 => Self::FatCalories,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7114,14 +7838,25 @@ impl MetZoneMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TrainingSettingsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TrainingSettingsField {
     TargetDistance,
     TargetSpeed,
     TargetTime,
     PreciseTargetSpeed,
+    Unknown,
 }
-impl TrainingSettingsMesg {
+impl TrainingSettingsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            31 => Self::TargetDistance,
+            32 => Self::TargetSpeed,
+            33 => Self::TargetTime,
+            153 => Self::PreciseTargetSpeed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7134,8 +7869,8 @@ impl TrainingSettingsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DiveSettingsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveSettingsField {
     Timestamp,
     MessageIndex,
     Name,
@@ -7171,8 +7906,50 @@ pub enum DiveSettingsMesg {
     DiveSounds,
     LastStopMultiple,
     NoFlyTimeMode,
+    Unknown,
 }
-impl DiveSettingsMesg {
+impl DiveSettingsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            254 => Self::MessageIndex,
+            0 => Self::Name,
+            1 => Self::Model,
+            2 => Self::GfLow,
+            3 => Self::GfHigh,
+            4 => Self::WaterType,
+            5 => Self::WaterDensity,
+            6 => Self::Po2Warn,
+            7 => Self::Po2Critical,
+            8 => Self::Po2Deco,
+            9 => Self::SafetyStopEnabled,
+            10 => Self::BottomDepth,
+            11 => Self::BottomTime,
+            12 => Self::ApneaCountdownEnabled,
+            13 => Self::ApneaCountdownTime,
+            14 => Self::BacklightMode,
+            15 => Self::BacklightBrightness,
+            16 => Self::BacklightTimeout,
+            17 => Self::RepeatDiveInterval,
+            18 => Self::SafetyStopTime,
+            19 => Self::HeartRateSourceType,
+            20 => Self::HeartRateSource,
+            21 => Self::TravelGas,
+            22 => Self::CcrLowSetpointSwitchMode,
+            23 => Self::CcrLowSetpoint,
+            24 => Self::CcrLowSetpointDepth,
+            25 => Self::CcrHighSetpointSwitchMode,
+            26 => Self::CcrHighSetpoint,
+            27 => Self::CcrHighSetpointDepth,
+            29 => Self::GasConsumptionDisplay,
+            30 => Self::UpKeyEnabled,
+            35 => Self::DiveSounds,
+            36 => Self::LastStopMultiple,
+            37 => Self::NoFlyTimeMode,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7216,8 +7993,8 @@ impl DiveSettingsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DiveAlarmMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveAlarmField {
     MessageIndex,
     Depth,
     Time,
@@ -7231,8 +8008,28 @@ pub enum DiveAlarmMesg {
     TriggerOnAscent,
     Repeating,
     Speed,
+    Unknown,
 }
-impl DiveAlarmMesg {
+impl DiveAlarmField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Depth,
+            1 => Self::Time,
+            2 => Self::Enabled,
+            3 => Self::AlarmType,
+            4 => Self::Sound,
+            5 => Self::DiveTypes,
+            6 => Self::Id,
+            7 => Self::PopupEnabled,
+            8 => Self::TriggerOnDescent,
+            9 => Self::TriggerOnAscent,
+            10 => Self::Repeating,
+            11 => Self::Speed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7254,8 +8051,8 @@ impl DiveAlarmMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DiveApneaAlarmMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveApneaAlarmField {
     MessageIndex,
     Depth,
     Time,
@@ -7269,8 +8066,28 @@ pub enum DiveApneaAlarmMesg {
     TriggerOnAscent,
     Repeating,
     Speed,
+    Unknown,
 }
-impl DiveApneaAlarmMesg {
+impl DiveApneaAlarmField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Depth,
+            1 => Self::Time,
+            2 => Self::Enabled,
+            3 => Self::AlarmType,
+            4 => Self::Sound,
+            5 => Self::DiveTypes,
+            6 => Self::Id,
+            7 => Self::PopupEnabled,
+            8 => Self::TriggerOnDescent,
+            9 => Self::TriggerOnAscent,
+            10 => Self::Repeating,
+            11 => Self::Speed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7292,15 +8109,27 @@ impl DiveApneaAlarmMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DiveGasMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveGasField {
     MessageIndex,
     HeliumContent,
     OxygenContent,
     Status,
     Mode,
+    Unknown,
 }
-impl DiveGasMesg {
+impl DiveGasField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::HeliumContent,
+            1 => Self::OxygenContent,
+            2 => Self::Status,
+            3 => Self::Mode,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7314,8 +8143,8 @@ impl DiveGasMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum GoalMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum GoalField {
     MessageIndex,
     Sport,
     SubSport,
@@ -7329,8 +8158,28 @@ pub enum GoalMesg {
     RecurrenceValue,
     Enabled,
     Source,
+    Unknown,
 }
-impl GoalMesg {
+impl GoalField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Sport,
+            1 => Self::SubSport,
+            2 => Self::StartDate,
+            3 => Self::EndDate,
+            4 => Self::Type,
+            5 => Self::Value,
+            6 => Self::Repeat,
+            7 => Self::TargetValue,
+            8 => Self::Recurrence,
+            9 => Self::RecurrenceValue,
+            10 => Self::Enabled,
+            11 => Self::Source,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7352,8 +8201,8 @@ impl GoalMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ActivityMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ActivityField {
     Timestamp,
     TotalTimerTime,
     NumSessions,
@@ -7362,8 +8211,23 @@ pub enum ActivityMesg {
     EventType,
     LocalTimestamp,
     EventGroup,
+    Unknown,
 }
-impl ActivityMesg {
+impl ActivityField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TotalTimerTime,
+            1 => Self::NumSessions,
+            2 => Self::Type,
+            3 => Self::Event,
+            4 => Self::EventType,
+            5 => Self::LocalTimestamp,
+            6 => Self::EventGroup,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7380,8 +8244,8 @@ impl ActivityMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SessionMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SessionField {
     MessageIndex,
     Timestamp,
     Event,
@@ -7538,8 +8402,171 @@ pub enum SessionMesg {
     AvgCoreTemperature,
     MinCoreTemperature,
     MaxCoreTemperature,
+    Unknown,
 }
-impl SessionMesg {
+impl SessionField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::StartTime,
+            3 => Self::StartPositionLat,
+            4 => Self::StartPositionLong,
+            5 => Self::Sport,
+            6 => Self::SubSport,
+            7 => Self::TotalElapsedTime,
+            8 => Self::TotalTimerTime,
+            9 => Self::TotalDistance,
+            10 => Self::TotalCycles,
+            11 => Self::TotalCalories,
+            13 => Self::TotalFatCalories,
+            14 => Self::AvgSpeed,
+            15 => Self::MaxSpeed,
+            16 => Self::AvgHeartRate,
+            17 => Self::MaxHeartRate,
+            18 => Self::AvgCadence,
+            19 => Self::MaxCadence,
+            20 => Self::AvgPower,
+            21 => Self::MaxPower,
+            22 => Self::TotalAscent,
+            23 => Self::TotalDescent,
+            24 => Self::TotalTrainingEffect,
+            25 => Self::FirstLapIndex,
+            26 => Self::NumLaps,
+            27 => Self::EventGroup,
+            28 => Self::Trigger,
+            29 => Self::NecLat,
+            30 => Self::NecLong,
+            31 => Self::SwcLat,
+            32 => Self::SwcLong,
+            33 => Self::NumLengths,
+            34 => Self::NormalizedPower,
+            35 => Self::TrainingStressScore,
+            36 => Self::IntensityFactor,
+            37 => Self::LeftRightBalance,
+            38 => Self::EndPositionLat,
+            39 => Self::EndPositionLong,
+            41 => Self::AvgStrokeCount,
+            42 => Self::AvgStrokeDistance,
+            43 => Self::SwimStroke,
+            44 => Self::PoolLength,
+            45 => Self::ThresholdPower,
+            46 => Self::PoolLengthUnit,
+            47 => Self::NumActiveLengths,
+            48 => Self::TotalWork,
+            49 => Self::AvgAltitude,
+            50 => Self::MaxAltitude,
+            51 => Self::GpsAccuracy,
+            52 => Self::AvgGrade,
+            53 => Self::AvgPosGrade,
+            54 => Self::AvgNegGrade,
+            55 => Self::MaxPosGrade,
+            56 => Self::MaxNegGrade,
+            57 => Self::AvgTemperature,
+            58 => Self::MaxTemperature,
+            59 => Self::TotalMovingTime,
+            60 => Self::AvgPosVerticalSpeed,
+            61 => Self::AvgNegVerticalSpeed,
+            62 => Self::MaxPosVerticalSpeed,
+            63 => Self::MaxNegVerticalSpeed,
+            64 => Self::MinHeartRate,
+            65 => Self::TimeInHrZone,
+            66 => Self::TimeInSpeedZone,
+            67 => Self::TimeInCadenceZone,
+            68 => Self::TimeInPowerZone,
+            69 => Self::AvgLapTime,
+            70 => Self::BestLapIndex,
+            71 => Self::MinAltitude,
+            82 => Self::PlayerScore,
+            83 => Self::OpponentScore,
+            84 => Self::OpponentName,
+            85 => Self::StrokeCount,
+            86 => Self::ZoneCount,
+            87 => Self::MaxBallSpeed,
+            88 => Self::AvgBallSpeed,
+            89 => Self::AvgVerticalOscillation,
+            90 => Self::AvgStanceTimePercent,
+            91 => Self::AvgStanceTime,
+            92 => Self::AvgFractionalCadence,
+            93 => Self::MaxFractionalCadence,
+            94 => Self::TotalFractionalCycles,
+            95 => Self::AvgTotalHemoglobinConc,
+            96 => Self::MinTotalHemoglobinConc,
+            97 => Self::MaxTotalHemoglobinConc,
+            98 => Self::AvgSaturatedHemoglobinPercent,
+            99 => Self::MinSaturatedHemoglobinPercent,
+            100 => Self::MaxSaturatedHemoglobinPercent,
+            101 => Self::AvgLeftTorqueEffectiveness,
+            102 => Self::AvgRightTorqueEffectiveness,
+            103 => Self::AvgLeftPedalSmoothness,
+            104 => Self::AvgRightPedalSmoothness,
+            105 => Self::AvgCombinedPedalSmoothness,
+            110 => Self::SportProfileName,
+            111 => Self::SportIndex,
+            112 => Self::TimeStanding,
+            113 => Self::StandCount,
+            114 => Self::AvgLeftPco,
+            115 => Self::AvgRightPco,
+            116 => Self::AvgLeftPowerPhase,
+            117 => Self::AvgLeftPowerPhasePeak,
+            118 => Self::AvgRightPowerPhase,
+            119 => Self::AvgRightPowerPhasePeak,
+            120 => Self::AvgPowerPosition,
+            121 => Self::MaxPowerPosition,
+            122 => Self::AvgCadencePosition,
+            123 => Self::MaxCadencePosition,
+            124 => Self::EnhancedAvgSpeed,
+            125 => Self::EnhancedMaxSpeed,
+            126 => Self::EnhancedAvgAltitude,
+            127 => Self::EnhancedMinAltitude,
+            128 => Self::EnhancedMaxAltitude,
+            129 => Self::AvgLevMotorPower,
+            130 => Self::MaxLevMotorPower,
+            131 => Self::LevBatteryConsumption,
+            132 => Self::AvgVerticalRatio,
+            133 => Self::AvgStanceTimeBalance,
+            134 => Self::AvgStepLength,
+            137 => Self::TotalAnaerobicTrainingEffect,
+            139 => Self::AvgVam,
+            140 => Self::AvgDepth,
+            141 => Self::MaxDepth,
+            142 => Self::SurfaceInterval,
+            143 => Self::StartCns,
+            144 => Self::EndCns,
+            145 => Self::StartN2,
+            146 => Self::EndN2,
+            147 => Self::AvgRespirationRate,
+            148 => Self::MaxRespirationRate,
+            149 => Self::MinRespirationRate,
+            150 => Self::MinTemperature,
+            155 => Self::O2Toxicity,
+            156 => Self::DiveNumber,
+            168 => Self::TrainingLoadPeak,
+            169 => Self::EnhancedAvgRespirationRate,
+            170 => Self::EnhancedMaxRespirationRate,
+            180 => Self::EnhancedMinRespirationRate,
+            181 => Self::TotalGrit,
+            182 => Self::TotalFlow,
+            183 => Self::JumpCount,
+            186 => Self::AvgGrit,
+            187 => Self::AvgFlow,
+            192 => Self::WorkoutFeel,
+            193 => Self::WorkoutRpe,
+            194 => Self::AvgSpo2,
+            195 => Self::AvgStress,
+            197 => Self::SdrrHrv,
+            198 => Self::RmssdHrv,
+            199 => Self::TotalFractionalAscent,
+            200 => Self::TotalFractionalDescent,
+            208 => Self::AvgCoreTemperature,
+            209 => Self::MinCoreTemperature,
+            210 => Self::MaxCoreTemperature,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7704,8 +8731,8 @@ impl SessionMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum LapMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum LapField {
     MessageIndex,
     Timestamp,
     Event,
@@ -7829,8 +8856,138 @@ pub enum LapMesg {
     AvgCoreTemperature,
     MinCoreTemperature,
     MaxCoreTemperature,
+    Unknown,
 }
-impl LapMesg {
+impl LapField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::StartTime,
+            3 => Self::StartPositionLat,
+            4 => Self::StartPositionLong,
+            5 => Self::EndPositionLat,
+            6 => Self::EndPositionLong,
+            7 => Self::TotalElapsedTime,
+            8 => Self::TotalTimerTime,
+            9 => Self::TotalDistance,
+            10 => Self::TotalCycles,
+            11 => Self::TotalCalories,
+            12 => Self::TotalFatCalories,
+            13 => Self::AvgSpeed,
+            14 => Self::MaxSpeed,
+            15 => Self::AvgHeartRate,
+            16 => Self::MaxHeartRate,
+            17 => Self::AvgCadence,
+            18 => Self::MaxCadence,
+            19 => Self::AvgPower,
+            20 => Self::MaxPower,
+            21 => Self::TotalAscent,
+            22 => Self::TotalDescent,
+            23 => Self::Intensity,
+            24 => Self::LapTrigger,
+            25 => Self::Sport,
+            26 => Self::EventGroup,
+            32 => Self::NumLengths,
+            33 => Self::NormalizedPower,
+            34 => Self::LeftRightBalance,
+            35 => Self::FirstLengthIndex,
+            37 => Self::AvgStrokeDistance,
+            38 => Self::SwimStroke,
+            39 => Self::SubSport,
+            40 => Self::NumActiveLengths,
+            41 => Self::TotalWork,
+            42 => Self::AvgAltitude,
+            43 => Self::MaxAltitude,
+            44 => Self::GpsAccuracy,
+            45 => Self::AvgGrade,
+            46 => Self::AvgPosGrade,
+            47 => Self::AvgNegGrade,
+            48 => Self::MaxPosGrade,
+            49 => Self::MaxNegGrade,
+            50 => Self::AvgTemperature,
+            51 => Self::MaxTemperature,
+            52 => Self::TotalMovingTime,
+            53 => Self::AvgPosVerticalSpeed,
+            54 => Self::AvgNegVerticalSpeed,
+            55 => Self::MaxPosVerticalSpeed,
+            56 => Self::MaxNegVerticalSpeed,
+            57 => Self::TimeInHrZone,
+            58 => Self::TimeInSpeedZone,
+            59 => Self::TimeInCadenceZone,
+            60 => Self::TimeInPowerZone,
+            61 => Self::RepetitionNum,
+            62 => Self::MinAltitude,
+            63 => Self::MinHeartRate,
+            71 => Self::WktStepIndex,
+            74 => Self::OpponentScore,
+            75 => Self::StrokeCount,
+            76 => Self::ZoneCount,
+            77 => Self::AvgVerticalOscillation,
+            78 => Self::AvgStanceTimePercent,
+            79 => Self::AvgStanceTime,
+            80 => Self::AvgFractionalCadence,
+            81 => Self::MaxFractionalCadence,
+            82 => Self::TotalFractionalCycles,
+            83 => Self::PlayerScore,
+            84 => Self::AvgTotalHemoglobinConc,
+            85 => Self::MinTotalHemoglobinConc,
+            86 => Self::MaxTotalHemoglobinConc,
+            87 => Self::AvgSaturatedHemoglobinPercent,
+            88 => Self::MinSaturatedHemoglobinPercent,
+            89 => Self::MaxSaturatedHemoglobinPercent,
+            91 => Self::AvgLeftTorqueEffectiveness,
+            92 => Self::AvgRightTorqueEffectiveness,
+            93 => Self::AvgLeftPedalSmoothness,
+            94 => Self::AvgRightPedalSmoothness,
+            95 => Self::AvgCombinedPedalSmoothness,
+            98 => Self::TimeStanding,
+            99 => Self::StandCount,
+            100 => Self::AvgLeftPco,
+            101 => Self::AvgRightPco,
+            102 => Self::AvgLeftPowerPhase,
+            103 => Self::AvgLeftPowerPhasePeak,
+            104 => Self::AvgRightPowerPhase,
+            105 => Self::AvgRightPowerPhasePeak,
+            106 => Self::AvgPowerPosition,
+            107 => Self::MaxPowerPosition,
+            108 => Self::AvgCadencePosition,
+            109 => Self::MaxCadencePosition,
+            110 => Self::EnhancedAvgSpeed,
+            111 => Self::EnhancedMaxSpeed,
+            112 => Self::EnhancedAvgAltitude,
+            113 => Self::EnhancedMinAltitude,
+            114 => Self::EnhancedMaxAltitude,
+            115 => Self::AvgLevMotorPower,
+            116 => Self::MaxLevMotorPower,
+            117 => Self::LevBatteryConsumption,
+            118 => Self::AvgVerticalRatio,
+            119 => Self::AvgStanceTimeBalance,
+            120 => Self::AvgStepLength,
+            121 => Self::AvgVam,
+            122 => Self::AvgDepth,
+            123 => Self::MaxDepth,
+            124 => Self::MinTemperature,
+            136 => Self::EnhancedAvgRespirationRate,
+            137 => Self::EnhancedMaxRespirationRate,
+            147 => Self::AvgRespirationRate,
+            148 => Self::MaxRespirationRate,
+            149 => Self::TotalGrit,
+            150 => Self::TotalFlow,
+            151 => Self::JumpCount,
+            153 => Self::AvgGrit,
+            154 => Self::AvgFlow,
+            156 => Self::TotalFractionalAscent,
+            157 => Self::TotalFractionalDescent,
+            158 => Self::AvgCoreTemperature,
+            159 => Self::MinCoreTemperature,
+            160 => Self::MaxCoreTemperature,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -7962,8 +9119,8 @@ impl LapMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum LengthMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum LengthField {
     MessageIndex,
     Timestamp,
     Event,
@@ -7986,8 +9143,37 @@ pub enum LengthMesg {
     EnhancedMaxRespirationRate,
     AvgRespirationRate,
     MaxRespirationRate,
+    Unknown,
 }
-impl LengthMesg {
+impl LengthField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::StartTime,
+            3 => Self::TotalElapsedTime,
+            4 => Self::TotalTimerTime,
+            5 => Self::TotalStrokes,
+            6 => Self::AvgSpeed,
+            7 => Self::SwimStroke,
+            9 => Self::AvgSwimmingCadence,
+            10 => Self::EventGroup,
+            11 => Self::TotalCalories,
+            12 => Self::LengthType,
+            18 => Self::PlayerScore,
+            19 => Self::OpponentScore,
+            20 => Self::StrokeCount,
+            21 => Self::ZoneCount,
+            22 => Self::EnhancedAvgRespirationRate,
+            23 => Self::EnhancedMaxRespirationRate,
+            24 => Self::AvgRespirationRate,
+            25 => Self::MaxRespirationRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8018,8 +9204,8 @@ impl LengthMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum RecordMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum RecordField {
     Timestamp,
     PositionLat,
     PositionLong,
@@ -8104,8 +9290,99 @@ pub enum RecordMesg {
     AscentRate,
     Po2,
     CoreTemperature,
+    Unknown,
 }
-impl RecordMesg {
+impl RecordField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::PositionLat,
+            1 => Self::PositionLong,
+            2 => Self::Altitude,
+            3 => Self::HeartRate,
+            4 => Self::Cadence,
+            5 => Self::Distance,
+            6 => Self::Speed,
+            7 => Self::Power,
+            8 => Self::CompressedSpeedDistance,
+            9 => Self::Grade,
+            10 => Self::Resistance,
+            11 => Self::TimeFromCourse,
+            12 => Self::CycleLength,
+            13 => Self::Temperature,
+            17 => Self::Speed1s,
+            18 => Self::Cycles,
+            19 => Self::TotalCycles,
+            28 => Self::CompressedAccumulatedPower,
+            29 => Self::AccumulatedPower,
+            30 => Self::LeftRightBalance,
+            31 => Self::GpsAccuracy,
+            32 => Self::VerticalSpeed,
+            33 => Self::Calories,
+            39 => Self::VerticalOscillation,
+            40 => Self::StanceTimePercent,
+            41 => Self::StanceTime,
+            42 => Self::ActivityType,
+            43 => Self::LeftTorqueEffectiveness,
+            44 => Self::RightTorqueEffectiveness,
+            45 => Self::LeftPedalSmoothness,
+            46 => Self::RightPedalSmoothness,
+            47 => Self::CombinedPedalSmoothness,
+            48 => Self::Time128,
+            49 => Self::StrokeType,
+            50 => Self::Zone,
+            51 => Self::BallSpeed,
+            52 => Self::Cadence256,
+            53 => Self::FractionalCadence,
+            54 => Self::TotalHemoglobinConc,
+            55 => Self::TotalHemoglobinConcMin,
+            56 => Self::TotalHemoglobinConcMax,
+            57 => Self::SaturatedHemoglobinPercent,
+            58 => Self::SaturatedHemoglobinPercentMin,
+            59 => Self::SaturatedHemoglobinPercentMax,
+            62 => Self::DeviceIndex,
+            67 => Self::LeftPco,
+            68 => Self::RightPco,
+            69 => Self::LeftPowerPhase,
+            70 => Self::LeftPowerPhasePeak,
+            71 => Self::RightPowerPhase,
+            72 => Self::RightPowerPhasePeak,
+            73 => Self::EnhancedSpeed,
+            78 => Self::EnhancedAltitude,
+            81 => Self::BatterySoc,
+            82 => Self::MotorPower,
+            83 => Self::VerticalRatio,
+            84 => Self::StanceTimeBalance,
+            85 => Self::StepLength,
+            87 => Self::CycleLength16,
+            91 => Self::AbsolutePressure,
+            92 => Self::Depth,
+            93 => Self::NextStopDepth,
+            94 => Self::NextStopTime,
+            95 => Self::TimeToSurface,
+            96 => Self::NdlTime,
+            97 => Self::CnsLoad,
+            98 => Self::N2Load,
+            99 => Self::RespirationRate,
+            108 => Self::EnhancedRespirationRate,
+            114 => Self::Grit,
+            115 => Self::Flow,
+            116 => Self::CurrentStress,
+            117 => Self::EbikeTravelRange,
+            118 => Self::EbikeBatteryLevel,
+            119 => Self::EbikeAssistMode,
+            120 => Self::EbikeAssistLevelPercent,
+            123 => Self::AirTimeRemaining,
+            124 => Self::PressureSac,
+            125 => Self::VolumeSac,
+            126 => Self::Rmv,
+            127 => Self::AscentRate,
+            129 => Self::Po2,
+            139 => Self::CoreTemperature,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8198,8 +9475,8 @@ impl RecordMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum EventMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum EventField {
     Timestamp,
     Event,
     EventType,
@@ -8219,8 +9496,34 @@ pub enum EventMesg {
     RadarThreatCount,
     RadarThreatAvgApproachSpeed,
     RadarThreatMaxApproachSpeed,
+    Unknown,
 }
-impl EventMesg {
+impl EventField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::Data16,
+            3 => Self::Data,
+            4 => Self::EventGroup,
+            7 => Self::Score,
+            8 => Self::OpponentScore,
+            9 => Self::FrontGearNum,
+            10 => Self::FrontGear,
+            11 => Self::RearGearNum,
+            12 => Self::RearGear,
+            13 => Self::DeviceIndex,
+            14 => Self::ActivityType,
+            15 => Self::StartTimestamp,
+            21 => Self::RadarThreatLevelMax,
+            22 => Self::RadarThreatCount,
+            23 => Self::RadarThreatAvgApproachSpeed,
+            24 => Self::RadarThreatMaxApproachSpeed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8248,8 +9551,8 @@ impl EventMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DeviceInfoMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeviceInfoField {
     Timestamp,
     DeviceIndex,
     DeviceType,
@@ -8269,8 +9572,34 @@ pub enum DeviceInfoMesg {
     SourceType,
     ProductName,
     BatteryLevel,
+    Unknown,
 }
-impl DeviceInfoMesg {
+impl DeviceInfoField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::DeviceIndex,
+            1 => Self::DeviceType,
+            2 => Self::Manufacturer,
+            3 => Self::SerialNumber,
+            4 => Self::Product,
+            5 => Self::SoftwareVersion,
+            6 => Self::HardwareVersion,
+            7 => Self::CumOperatingTime,
+            10 => Self::BatteryVoltage,
+            11 => Self::BatteryStatus,
+            18 => Self::SensorPosition,
+            19 => Self::Descriptor,
+            20 => Self::AntTransmissionType,
+            21 => Self::AntDeviceNumber,
+            22 => Self::AntNetwork,
+            25 => Self::SourceType,
+            27 => Self::ProductName,
+            32 => Self::BatteryLevel,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8298,15 +9627,27 @@ impl DeviceInfoMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DeviceAuxBatteryInfoMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeviceAuxBatteryInfoField {
     Timestamp,
     DeviceIndex,
     BatteryVoltage,
     BatteryStatus,
     BatteryIdentifier,
+    Unknown,
 }
-impl DeviceAuxBatteryInfoMesg {
+impl DeviceAuxBatteryInfoField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::DeviceIndex,
+            1 => Self::BatteryVoltage,
+            2 => Self::BatteryStatus,
+            3 => Self::BatteryIdentifier,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8320,16 +9661,29 @@ impl DeviceAuxBatteryInfoMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TrainingFileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TrainingFileField {
     Timestamp,
     Type,
     Manufacturer,
     Product,
     SerialNumber,
     TimeCreated,
+    Unknown,
 }
-impl TrainingFileMesg {
+impl TrainingFileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Type,
+            1 => Self::Manufacturer,
+            2 => Self::Product,
+            3 => Self::SerialNumber,
+            4 => Self::TimeCreated,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8344,8 +9698,8 @@ impl TrainingFileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WeatherConditionsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WeatherConditionsField {
     Timestamp,
     WeatherReport,
     Temperature,
@@ -8362,8 +9716,31 @@ pub enum WeatherConditionsMesg {
     DayOfWeek,
     HighTemperature,
     LowTemperature,
+    Unknown,
 }
-impl WeatherConditionsMesg {
+impl WeatherConditionsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::WeatherReport,
+            1 => Self::Temperature,
+            2 => Self::Condition,
+            3 => Self::WindDirection,
+            4 => Self::WindSpeed,
+            5 => Self::PrecipitationProbability,
+            6 => Self::TemperatureFeelsLike,
+            7 => Self::RelativeHumidity,
+            8 => Self::Location,
+            9 => Self::ObservedAtTime,
+            10 => Self::ObservedLocationLat,
+            11 => Self::ObservedLocationLong,
+            12 => Self::DayOfWeek,
+            13 => Self::HighTemperature,
+            14 => Self::LowTemperature,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8388,16 +9765,29 @@ impl WeatherConditionsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WeatherAlertMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WeatherAlertField {
     Timestamp,
     ReportId,
     IssueTime,
     ExpireTime,
     Severity,
     Type,
+    Unknown,
 }
-impl WeatherAlertMesg {
+impl WeatherAlertField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ReportId,
+            1 => Self::IssueTime,
+            2 => Self::ExpireTime,
+            3 => Self::Severity,
+            4 => Self::Type,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8412,8 +9802,8 @@ impl WeatherAlertMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum GpsMetadataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum GpsMetadataField {
     Timestamp,
     TimestampMs,
     PositionLat,
@@ -8423,8 +9813,24 @@ pub enum GpsMetadataMesg {
     Heading,
     UtcTimestamp,
     Velocity,
+    Unknown,
 }
-impl GpsMetadataMesg {
+impl GpsMetadataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::PositionLat,
+            2 => Self::PositionLong,
+            3 => Self::EnhancedAltitude,
+            4 => Self::EnhancedSpeed,
+            5 => Self::Heading,
+            6 => Self::UtcTimestamp,
+            7 => Self::Velocity,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8442,15 +9848,27 @@ impl GpsMetadataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum CameraEventMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum CameraEventField {
     Timestamp,
     TimestampMs,
     CameraEventType,
     CameraFileUuid,
     CameraOrientation,
+    Unknown,
 }
-impl CameraEventMesg {
+impl CameraEventField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::CameraEventType,
+            2 => Self::CameraFileUuid,
+            3 => Self::CameraOrientation,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8464,8 +9882,8 @@ impl CameraEventMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum GyroscopeDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum GyroscopeDataField {
     Timestamp,
     TimestampMs,
     SampleTimeOffset,
@@ -8475,8 +9893,24 @@ pub enum GyroscopeDataMesg {
     CalibratedGyroX,
     CalibratedGyroY,
     CalibratedGyroZ,
+    Unknown,
 }
-impl GyroscopeDataMesg {
+impl GyroscopeDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SampleTimeOffset,
+            2 => Self::GyroX,
+            3 => Self::GyroY,
+            4 => Self::GyroZ,
+            5 => Self::CalibratedGyroX,
+            6 => Self::CalibratedGyroY,
+            7 => Self::CalibratedGyroZ,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8494,8 +9928,8 @@ impl GyroscopeDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AccelerometerDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AccelerometerDataField {
     Timestamp,
     TimestampMs,
     SampleTimeOffset,
@@ -8508,8 +9942,27 @@ pub enum AccelerometerDataMesg {
     CompressedCalibratedAccelX,
     CompressedCalibratedAccelY,
     CompressedCalibratedAccelZ,
+    Unknown,
 }
-impl AccelerometerDataMesg {
+impl AccelerometerDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SampleTimeOffset,
+            2 => Self::AccelX,
+            3 => Self::AccelY,
+            4 => Self::AccelZ,
+            5 => Self::CalibratedAccelX,
+            6 => Self::CalibratedAccelY,
+            7 => Self::CalibratedAccelZ,
+            8 => Self::CompressedCalibratedAccelX,
+            9 => Self::CompressedCalibratedAccelY,
+            10 => Self::CompressedCalibratedAccelZ,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8530,8 +9983,8 @@ impl AccelerometerDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MagnetometerDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MagnetometerDataField {
     Timestamp,
     TimestampMs,
     SampleTimeOffset,
@@ -8541,8 +9994,24 @@ pub enum MagnetometerDataMesg {
     CalibratedMagX,
     CalibratedMagY,
     CalibratedMagZ,
+    Unknown,
 }
-impl MagnetometerDataMesg {
+impl MagnetometerDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SampleTimeOffset,
+            2 => Self::MagX,
+            3 => Self::MagY,
+            4 => Self::MagZ,
+            5 => Self::CalibratedMagX,
+            6 => Self::CalibratedMagY,
+            7 => Self::CalibratedMagZ,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8560,14 +10029,25 @@ impl MagnetometerDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum BarometerDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum BarometerDataField {
     Timestamp,
     TimestampMs,
     SampleTimeOffset,
     BaroPres,
+    Unknown,
 }
-impl BarometerDataMesg {
+impl BarometerDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SampleTimeOffset,
+            2 => Self::BaroPres,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8580,8 +10060,8 @@ impl BarometerDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ThreeDSensorCalibrationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ThreeDSensorCalibrationField {
     Timestamp,
     SensorType,
     CalibrationFactor,
@@ -8589,8 +10069,22 @@ pub enum ThreeDSensorCalibrationMesg {
     LevelShift,
     OffsetCal,
     OrientationMatrix,
+    Unknown,
 }
-impl ThreeDSensorCalibrationMesg {
+impl ThreeDSensorCalibrationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::SensorType,
+            1 => Self::CalibrationFactor,
+            2 => Self::CalibrationDivisor,
+            3 => Self::LevelShift,
+            4 => Self::OffsetCal,
+            5 => Self::OrientationMatrix,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8606,16 +10100,29 @@ impl ThreeDSensorCalibrationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum OneDSensorCalibrationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum OneDSensorCalibrationField {
     Timestamp,
     SensorType,
     CalibrationFactor,
     CalibrationDivisor,
     LevelShift,
     OffsetCal,
+    Unknown,
 }
-impl OneDSensorCalibrationMesg {
+impl OneDSensorCalibrationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::SensorType,
+            1 => Self::CalibrationFactor,
+            2 => Self::CalibrationDivisor,
+            3 => Self::LevelShift,
+            4 => Self::OffsetCal,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8630,13 +10137,23 @@ impl OneDSensorCalibrationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum VideoFrameMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VideoFrameField {
     Timestamp,
     TimestampMs,
     FrameNumber,
+    Unknown,
 }
-impl VideoFrameMesg {
+impl VideoFrameField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::FrameNumber,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8648,8 +10165,8 @@ impl VideoFrameMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ObdiiDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ObdiiDataField {
     Timestamp,
     TimestampMs,
     TimeOffset,
@@ -8659,8 +10176,24 @@ pub enum ObdiiDataMesg {
     SystemTime,
     StartTimestamp,
     StartTimestampMs,
+    Unknown,
 }
-impl ObdiiDataMesg {
+impl ObdiiDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::TimeOffset,
+            2 => Self::Pid,
+            3 => Self::RawData,
+            4 => Self::PidDataSize,
+            5 => Self::SystemTime,
+            6 => Self::StartTimestamp,
+            7 => Self::StartTimestampMs,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8678,13 +10211,23 @@ impl ObdiiDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum NmeaSentenceMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum NmeaSentenceField {
     Timestamp,
     TimestampMs,
     Sentence,
+    Unknown,
 }
-impl NmeaSentenceMesg {
+impl NmeaSentenceField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::Sentence,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8696,8 +10239,8 @@ impl NmeaSentenceMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AviationAttitudeMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AviationAttitudeField {
     Timestamp,
     TimestampMs,
     SystemTime,
@@ -8710,8 +10253,27 @@ pub enum AviationAttitudeMesg {
     AttitudeStageComplete,
     Track,
     Validity,
+    Unknown,
 }
-impl AviationAttitudeMesg {
+impl AviationAttitudeField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SystemTime,
+            2 => Self::Pitch,
+            3 => Self::Roll,
+            4 => Self::AccelLateral,
+            5 => Self::AccelNormal,
+            6 => Self::TurnRate,
+            7 => Self::Stage,
+            8 => Self::AttitudeStageComplete,
+            9 => Self::Track,
+            10 => Self::Validity,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8732,13 +10294,23 @@ impl AviationAttitudeMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum VideoMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VideoField {
     Url,
     HostingProvider,
     Duration,
+    Unknown,
 }
-impl VideoMesg {
+impl VideoField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Url,
+            1 => Self::HostingProvider,
+            2 => Self::Duration,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8750,13 +10322,23 @@ impl VideoMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum VideoTitleMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VideoTitleField {
     MessageIndex,
     MessageCount,
     Text,
+    Unknown,
 }
-impl VideoTitleMesg {
+impl VideoTitleField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::MessageCount,
+            1 => Self::Text,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8768,13 +10350,23 @@ impl VideoTitleMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum VideoDescriptionMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VideoDescriptionField {
     MessageIndex,
     MessageCount,
     Text,
+    Unknown,
 }
-impl VideoDescriptionMesg {
+impl VideoDescriptionField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::MessageCount,
+            1 => Self::Text,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8786,8 +10378,8 @@ impl VideoDescriptionMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum VideoClipMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum VideoClipField {
     ClipNumber,
     StartTimestamp,
     StartTimestampMs,
@@ -8795,8 +10387,22 @@ pub enum VideoClipMesg {
     EndTimestampMs,
     ClipStart,
     ClipEnd,
+    Unknown,
 }
-impl VideoClipMesg {
+impl VideoClipField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ClipNumber,
+            1 => Self::StartTimestamp,
+            2 => Self::StartTimestampMs,
+            3 => Self::EndTimestamp,
+            4 => Self::EndTimestampMs,
+            6 => Self::ClipStart,
+            7 => Self::ClipEnd,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8812,8 +10418,8 @@ impl VideoClipMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SetMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SetField {
     Timestamp,
     Duration,
     Repetitions,
@@ -8825,8 +10431,26 @@ pub enum SetMesg {
     WeightDisplayUnit,
     MessageIndex,
     WktStepIndex,
+    Unknown,
 }
-impl SetMesg {
+impl SetField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::Timestamp,
+            0 => Self::Duration,
+            3 => Self::Repetitions,
+            4 => Self::Weight,
+            5 => Self::SetType,
+            6 => Self::StartTime,
+            7 => Self::Category,
+            8 => Self::CategorySubtype,
+            9 => Self::WeightDisplayUnit,
+            10 => Self::MessageIndex,
+            11 => Self::WktStepIndex,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8846,8 +10470,8 @@ impl SetMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum JumpMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum JumpField {
     Timestamp,
     Distance,
     Height,
@@ -8858,8 +10482,25 @@ pub enum JumpMesg {
     PositionLong,
     Speed,
     EnhancedSpeed,
+    Unknown,
 }
-impl JumpMesg {
+impl JumpField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Distance,
+            1 => Self::Height,
+            2 => Self::Rotations,
+            3 => Self::HangTime,
+            4 => Self::Score,
+            5 => Self::PositionLat,
+            6 => Self::PositionLong,
+            7 => Self::Speed,
+            8 => Self::EnhancedSpeed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8878,8 +10519,8 @@ impl JumpMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SplitMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SplitField {
     MessageIndex,
     SplitType,
     TotalElapsedTime,
@@ -8899,8 +10540,34 @@ pub enum SplitMesg {
     TotalCalories,
     StartElevation,
     TotalMovingTime,
+    Unknown,
 }
-impl SplitMesg {
+impl SplitField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::SplitType,
+            1 => Self::TotalElapsedTime,
+            2 => Self::TotalTimerTime,
+            3 => Self::TotalDistance,
+            4 => Self::AvgSpeed,
+            9 => Self::StartTime,
+            13 => Self::TotalAscent,
+            14 => Self::TotalDescent,
+            21 => Self::StartPositionLat,
+            22 => Self::StartPositionLong,
+            23 => Self::EndPositionLat,
+            24 => Self::EndPositionLong,
+            25 => Self::MaxSpeed,
+            26 => Self::AvgVertSpeed,
+            27 => Self::EndTime,
+            28 => Self::TotalCalories,
+            74 => Self::StartElevation,
+            110 => Self::TotalMovingTime,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8928,8 +10595,8 @@ impl SplitMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SplitSummaryMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SplitSummaryField {
     MessageIndex,
     SplitType,
     NumSplits,
@@ -8944,8 +10611,29 @@ pub enum SplitSummaryMesg {
     AvgVertSpeed,
     TotalCalories,
     TotalMovingTime,
+    Unknown,
 }
-impl SplitSummaryMesg {
+impl SplitSummaryField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::SplitType,
+            3 => Self::NumSplits,
+            4 => Self::TotalTimerTime,
+            5 => Self::TotalDistance,
+            6 => Self::AvgSpeed,
+            7 => Self::MaxSpeed,
+            8 => Self::TotalAscent,
+            9 => Self::TotalDescent,
+            10 => Self::AvgHeartRate,
+            11 => Self::MaxHeartRate,
+            12 => Self::AvgVertSpeed,
+            13 => Self::TotalCalories,
+            77 => Self::TotalMovingTime,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8968,8 +10656,8 @@ impl SplitSummaryMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ClimbProMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ClimbProField {
     Timestamp,
     PositionLat,
     PositionLong,
@@ -8977,8 +10665,22 @@ pub enum ClimbProMesg {
     ClimbNumber,
     ClimbCategory,
     CurrentDist,
+    Unknown,
 }
-impl ClimbProMesg {
+impl ClimbProField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::PositionLat,
+            1 => Self::PositionLong,
+            2 => Self::ClimbProEvent,
+            3 => Self::ClimbNumber,
+            4 => Self::ClimbCategory,
+            5 => Self::CurrentDist,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -8994,8 +10696,8 @@ impl ClimbProMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum FieldDescriptionMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum FieldDescriptionField {
     DeveloperDataIndex,
     FieldDefinitionNumber,
     FitBaseTypeId,
@@ -9010,8 +10712,29 @@ pub enum FieldDescriptionMesg {
     FitBaseUnitId,
     NativeMesgNum,
     NativeFieldNum,
+    Unknown,
 }
-impl FieldDescriptionMesg {
+impl FieldDescriptionField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::DeveloperDataIndex,
+            1 => Self::FieldDefinitionNumber,
+            2 => Self::FitBaseTypeId,
+            3 => Self::FieldName,
+            4 => Self::Array,
+            5 => Self::Components,
+            6 => Self::Scale,
+            7 => Self::Offset,
+            8 => Self::Units,
+            9 => Self::Bits,
+            10 => Self::Accumulate,
+            13 => Self::FitBaseUnitId,
+            14 => Self::NativeMesgNum,
+            15 => Self::NativeFieldNum,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9034,15 +10757,27 @@ impl FieldDescriptionMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DeveloperDataIdMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeveloperDataIdField {
     DeveloperId,
     ApplicationId,
     ManufacturerId,
     DeveloperDataIndex,
     ApplicationVersion,
+    Unknown,
 }
-impl DeveloperDataIdMesg {
+impl DeveloperDataIdField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::DeveloperId,
+            1 => Self::ApplicationId,
+            2 => Self::ManufacturerId,
+            3 => Self::DeveloperDataIndex,
+            4 => Self::ApplicationVersion,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9056,14 +10791,25 @@ impl DeveloperDataIdMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum CourseMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum CourseField {
     Sport,
     Name,
     Capabilities,
     SubSport,
+    Unknown,
 }
-impl CourseMesg {
+impl CourseField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            4 => Self::Sport,
+            5 => Self::Name,
+            6 => Self::Capabilities,
+            7 => Self::SubSport,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9076,8 +10822,8 @@ impl CourseMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum CoursePointMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum CoursePointField {
     MessageIndex,
     Timestamp,
     PositionLat,
@@ -9086,8 +10832,23 @@ pub enum CoursePointMesg {
     Type,
     Name,
     Favorite,
+    Unknown,
 }
-impl CoursePointMesg {
+impl CoursePointField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::Timestamp,
+            2 => Self::PositionLat,
+            3 => Self::PositionLong,
+            4 => Self::Distance,
+            5 => Self::Type,
+            6 => Self::Name,
+            8 => Self::Favorite,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9104,8 +10865,8 @@ impl CoursePointMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SegmentIdMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentIdField {
     Name,
     Uuid,
     Sport,
@@ -9115,8 +10876,24 @@ pub enum SegmentIdMesg {
     DefaultRaceLeader,
     DeleteStatus,
     SelectionType,
+    Unknown,
 }
-impl SegmentIdMesg {
+impl SegmentIdField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Name,
+            1 => Self::Uuid,
+            2 => Self::Sport,
+            3 => Self::Enabled,
+            4 => Self::UserProfilePrimaryKey,
+            5 => Self::DeviceId,
+            6 => Self::DefaultRaceLeader,
+            7 => Self::DeleteStatus,
+            8 => Self::SelectionType,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9134,8 +10911,8 @@ impl SegmentIdMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SegmentLeaderboardEntryMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentLeaderboardEntryField {
     MessageIndex,
     Name,
     Type,
@@ -9143,8 +10920,22 @@ pub enum SegmentLeaderboardEntryMesg {
     ActivityId,
     SegmentTime,
     ActivityIdString,
+    Unknown,
 }
-impl SegmentLeaderboardEntryMesg {
+impl SegmentLeaderboardEntryField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Name,
+            1 => Self::Type,
+            2 => Self::GroupPrimaryKey,
+            3 => Self::ActivityId,
+            4 => Self::SegmentTime,
+            5 => Self::ActivityIdString,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9160,8 +10951,8 @@ impl SegmentLeaderboardEntryMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SegmentPointMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentPointField {
     MessageIndex,
     PositionLat,
     PositionLong,
@@ -9169,8 +10960,22 @@ pub enum SegmentPointMesg {
     Altitude,
     LeaderTime,
     EnhancedAltitude,
+    Unknown,
 }
-impl SegmentPointMesg {
+impl SegmentPointField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::PositionLat,
+            2 => Self::PositionLong,
+            3 => Self::Distance,
+            4 => Self::Altitude,
+            5 => Self::LeaderTime,
+            6 => Self::EnhancedAltitude,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9186,8 +10991,8 @@ impl SegmentPointMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SegmentLapMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentLapField {
     MessageIndex,
     Timestamp,
     Event,
@@ -9283,8 +11088,110 @@ pub enum SegmentLapMesg {
     EnhancedAvgAltitude,
     EnhancedMaxAltitude,
     EnhancedMinAltitude,
+    Unknown,
 }
-impl SegmentLapMesg {
+impl SegmentLapField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            253 => Self::Timestamp,
+            0 => Self::Event,
+            1 => Self::EventType,
+            2 => Self::StartTime,
+            3 => Self::StartPositionLat,
+            4 => Self::StartPositionLong,
+            5 => Self::EndPositionLat,
+            6 => Self::EndPositionLong,
+            7 => Self::TotalElapsedTime,
+            8 => Self::TotalTimerTime,
+            9 => Self::TotalDistance,
+            10 => Self::TotalCycles,
+            11 => Self::TotalCalories,
+            12 => Self::TotalFatCalories,
+            13 => Self::AvgSpeed,
+            14 => Self::MaxSpeed,
+            15 => Self::AvgHeartRate,
+            16 => Self::MaxHeartRate,
+            17 => Self::AvgCadence,
+            18 => Self::MaxCadence,
+            19 => Self::AvgPower,
+            20 => Self::MaxPower,
+            21 => Self::TotalAscent,
+            22 => Self::TotalDescent,
+            23 => Self::Sport,
+            24 => Self::EventGroup,
+            25 => Self::NecLat,
+            26 => Self::NecLong,
+            27 => Self::SwcLat,
+            28 => Self::SwcLong,
+            29 => Self::Name,
+            30 => Self::NormalizedPower,
+            31 => Self::LeftRightBalance,
+            32 => Self::SubSport,
+            33 => Self::TotalWork,
+            34 => Self::AvgAltitude,
+            35 => Self::MaxAltitude,
+            36 => Self::GpsAccuracy,
+            37 => Self::AvgGrade,
+            38 => Self::AvgPosGrade,
+            39 => Self::AvgNegGrade,
+            40 => Self::MaxPosGrade,
+            41 => Self::MaxNegGrade,
+            42 => Self::AvgTemperature,
+            43 => Self::MaxTemperature,
+            44 => Self::TotalMovingTime,
+            45 => Self::AvgPosVerticalSpeed,
+            46 => Self::AvgNegVerticalSpeed,
+            47 => Self::MaxPosVerticalSpeed,
+            48 => Self::MaxNegVerticalSpeed,
+            49 => Self::TimeInHrZone,
+            50 => Self::TimeInSpeedZone,
+            51 => Self::TimeInCadenceZone,
+            52 => Self::TimeInPowerZone,
+            53 => Self::RepetitionNum,
+            54 => Self::MinAltitude,
+            55 => Self::MinHeartRate,
+            56 => Self::ActiveTime,
+            57 => Self::WktStepIndex,
+            58 => Self::SportEvent,
+            59 => Self::AvgLeftTorqueEffectiveness,
+            60 => Self::AvgRightTorqueEffectiveness,
+            61 => Self::AvgLeftPedalSmoothness,
+            62 => Self::AvgRightPedalSmoothness,
+            63 => Self::AvgCombinedPedalSmoothness,
+            64 => Self::Status,
+            65 => Self::Uuid,
+            66 => Self::AvgFractionalCadence,
+            67 => Self::MaxFractionalCadence,
+            68 => Self::TotalFractionalCycles,
+            69 => Self::FrontGearShiftCount,
+            70 => Self::RearGearShiftCount,
+            71 => Self::TimeStanding,
+            72 => Self::StandCount,
+            73 => Self::AvgLeftPco,
+            74 => Self::AvgRightPco,
+            75 => Self::AvgLeftPowerPhase,
+            76 => Self::AvgLeftPowerPhasePeak,
+            77 => Self::AvgRightPowerPhase,
+            78 => Self::AvgRightPowerPhasePeak,
+            79 => Self::AvgPowerPosition,
+            80 => Self::MaxPowerPosition,
+            81 => Self::AvgCadencePosition,
+            82 => Self::MaxCadencePosition,
+            83 => Self::Manufacturer,
+            84 => Self::TotalGrit,
+            85 => Self::TotalFlow,
+            86 => Self::AvgGrit,
+            87 => Self::AvgFlow,
+            89 => Self::TotalFractionalAscent,
+            90 => Self::TotalFractionalDescent,
+            91 => Self::EnhancedAvgAltitude,
+            92 => Self::EnhancedMaxAltitude,
+            93 => Self::EnhancedMinAltitude,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9388,8 +11295,8 @@ impl SegmentLapMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SegmentFileMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentFileField {
     MessageIndex,
     FileUuid,
     Enabled,
@@ -9399,8 +11306,24 @@ pub enum SegmentFileMesg {
     LeaderActivityId,
     LeaderActivityIdString,
     DefaultRaceLeader,
+    Unknown,
 }
-impl SegmentFileMesg {
+impl SegmentFileField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            1 => Self::FileUuid,
+            3 => Self::Enabled,
+            4 => Self::UserProfilePrimaryKey,
+            7 => Self::LeaderType,
+            8 => Self::LeaderGroupPrimaryKey,
+            9 => Self::LeaderActivityId,
+            10 => Self::LeaderActivityIdString,
+            11 => Self::DefaultRaceLeader,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9418,8 +11341,8 @@ impl SegmentFileMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WorkoutMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutField {
     MessageIndex,
     Sport,
     Capabilities,
@@ -9429,8 +11352,24 @@ pub enum WorkoutMesg {
     PoolLength,
     PoolLengthUnit,
     WktDescription,
+    Unknown,
 }
-impl WorkoutMesg {
+impl WorkoutField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            4 => Self::Sport,
+            5 => Self::Capabilities,
+            6 => Self::NumValidSteps,
+            8 => Self::WktName,
+            11 => Self::SubSport,
+            14 => Self::PoolLength,
+            15 => Self::PoolLengthUnit,
+            17 => Self::WktDescription,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9448,8 +11387,8 @@ impl WorkoutMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WorkoutSessionMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutSessionField {
     MessageIndex,
     Sport,
     SubSport,
@@ -9457,8 +11396,22 @@ pub enum WorkoutSessionMesg {
     FirstStepIndex,
     PoolLength,
     PoolLengthUnit,
+    Unknown,
 }
-impl WorkoutSessionMesg {
+impl WorkoutSessionField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::Sport,
+            1 => Self::SubSport,
+            2 => Self::NumValidSteps,
+            3 => Self::FirstStepIndex,
+            4 => Self::PoolLength,
+            5 => Self::PoolLengthUnit,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9474,8 +11427,8 @@ impl WorkoutSessionMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WorkoutStepMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepField {
     MessageIndex,
     WktStepName,
     DurationType,
@@ -9495,8 +11448,34 @@ pub enum WorkoutStepMesg {
     SecondaryTargetValue,
     SecondaryCustomTargetValueLow,
     SecondaryCustomTargetValueHigh,
+    Unknown,
 }
-impl WorkoutStepMesg {
+impl WorkoutStepField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::WktStepName,
+            1 => Self::DurationType,
+            2 => Self::DurationValue,
+            3 => Self::TargetType,
+            4 => Self::TargetValue,
+            5 => Self::CustomTargetValueLow,
+            6 => Self::CustomTargetValueHigh,
+            7 => Self::Intensity,
+            8 => Self::Notes,
+            9 => Self::Equipment,
+            10 => Self::ExerciseCategory,
+            11 => Self::ExerciseName,
+            12 => Self::ExerciseWeight,
+            13 => Self::WeightDisplayUnit,
+            19 => Self::SecondaryTargetType,
+            20 => Self::SecondaryTargetValue,
+            21 => Self::SecondaryCustomTargetValueLow,
+            22 => Self::SecondaryCustomTargetValueHigh,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9524,14 +11503,25 @@ impl WorkoutStepMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ExerciseTitleMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ExerciseTitleField {
     MessageIndex,
     ExerciseCategory,
     ExerciseName,
     WktStepName,
+    Unknown,
 }
-impl ExerciseTitleMesg {
+impl ExerciseTitleField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            0 => Self::ExerciseCategory,
+            1 => Self::ExerciseName,
+            2 => Self::WktStepName,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9544,8 +11534,8 @@ impl ExerciseTitleMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ScheduleMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ScheduleField {
     Manufacturer,
     Product,
     SerialNumber,
@@ -9553,8 +11543,22 @@ pub enum ScheduleMesg {
     Completed,
     Type,
     ScheduledTime,
+    Unknown,
 }
-impl ScheduleMesg {
+impl ScheduleField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Manufacturer,
+            1 => Self::Product,
+            2 => Self::SerialNumber,
+            3 => Self::TimeCreated,
+            4 => Self::Completed,
+            5 => Self::Type,
+            6 => Self::ScheduledTime,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9570,8 +11574,8 @@ impl ScheduleMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TotalsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TotalsField {
     MessageIndex,
     Timestamp,
     TimerTime,
@@ -9582,8 +11586,25 @@ pub enum TotalsMesg {
     Sessions,
     ActiveTime,
     SportIndex,
+    Unknown,
 }
-impl TotalsMesg {
+impl TotalsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            254 => Self::MessageIndex,
+            253 => Self::Timestamp,
+            0 => Self::TimerTime,
+            1 => Self::Distance,
+            2 => Self::Calories,
+            3 => Self::Sport,
+            4 => Self::ElapsedTime,
+            5 => Self::Sessions,
+            6 => Self::ActiveTime,
+            9 => Self::SportIndex,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9602,8 +11623,8 @@ impl TotalsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum WeightScaleMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum WeightScaleField {
     Timestamp,
     Weight,
     PercentFat,
@@ -9618,8 +11639,29 @@ pub enum WeightScaleMesg {
     VisceralFatRating,
     UserProfileIndex,
     Bmi,
+    Unknown,
 }
-impl WeightScaleMesg {
+impl WeightScaleField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Weight,
+            1 => Self::PercentFat,
+            2 => Self::PercentHydration,
+            3 => Self::VisceralFatMass,
+            4 => Self::BoneMass,
+            5 => Self::MuscleMass,
+            7 => Self::BasalMet,
+            8 => Self::PhysiqueRating,
+            9 => Self::ActiveMet,
+            10 => Self::MetabolicAge,
+            11 => Self::VisceralFatRating,
+            12 => Self::UserProfileIndex,
+            13 => Self::Bmi,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9642,8 +11684,8 @@ impl WeightScaleMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum BloodPressureMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum BloodPressureField {
     Timestamp,
     SystolicPressure,
     DiastolicPressure,
@@ -9655,8 +11697,26 @@ pub enum BloodPressureMesg {
     HeartRateType,
     Status,
     UserProfileIndex,
+    Unknown,
 }
-impl BloodPressureMesg {
+impl BloodPressureField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::SystolicPressure,
+            1 => Self::DiastolicPressure,
+            2 => Self::MeanArterialPressure,
+            3 => Self::Map3SampleMean,
+            4 => Self::MapMorningValues,
+            5 => Self::MapEveningValues,
+            6 => Self::HeartRate,
+            7 => Self::HeartRateType,
+            8 => Self::Status,
+            9 => Self::UserProfileIndex,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9676,16 +11736,29 @@ impl BloodPressureMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MonitoringInfoMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MonitoringInfoField {
     Timestamp,
     LocalTimestamp,
     ActivityType,
     CyclesToDistance,
     CyclesToCalories,
     RestingMetabolicRate,
+    Unknown,
 }
-impl MonitoringInfoMesg {
+impl MonitoringInfoField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::LocalTimestamp,
+            1 => Self::ActivityType,
+            3 => Self::CyclesToDistance,
+            4 => Self::CyclesToCalories,
+            5 => Self::RestingMetabolicRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9700,8 +11773,8 @@ impl MonitoringInfoMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MonitoringMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MonitoringField {
     Timestamp,
     DeviceIndex,
     Calories,
@@ -9731,8 +11804,44 @@ pub enum MonitoringMesg {
     Descent,
     ModerateActivityMinutes,
     VigorousActivityMinutes,
+    Unknown,
 }
-impl MonitoringMesg {
+impl MonitoringField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::DeviceIndex,
+            1 => Self::Calories,
+            2 => Self::Distance,
+            3 => Self::Cycles,
+            4 => Self::ActiveTime,
+            5 => Self::ActivityType,
+            6 => Self::ActivitySubtype,
+            7 => Self::ActivityLevel,
+            8 => Self::Distance16,
+            9 => Self::Cycles16,
+            10 => Self::ActiveTime16,
+            11 => Self::LocalTimestamp,
+            12 => Self::Temperature,
+            14 => Self::TemperatureMin,
+            15 => Self::TemperatureMax,
+            16 => Self::ActivityTime,
+            19 => Self::ActiveCalories,
+            24 => Self::CurrentActivityTypeIntensity,
+            25 => Self::TimestampMin8,
+            26 => Self::Timestamp16,
+            27 => Self::HeartRate,
+            28 => Self::Intensity,
+            29 => Self::DurationMin,
+            30 => Self::Duration,
+            31 => Self::Ascent,
+            32 => Self::Descent,
+            33 => Self::ModerateActivityMinutes,
+            34 => Self::VigorousActivityMinutes,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9770,13 +11879,23 @@ impl MonitoringMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MonitoringHrDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MonitoringHrDataField {
     Timestamp,
     RestingHeartRate,
     CurrentDayRestingHeartRate,
+    Unknown,
 }
-impl MonitoringHrDataMesg {
+impl MonitoringHrDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::RestingHeartRate,
+            1 => Self::CurrentDayRestingHeartRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9788,14 +11907,25 @@ impl MonitoringHrDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum Spo2DataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum Spo2DataField {
     Timestamp,
     ReadingSpo2,
     ReadingConfidence,
     Mode,
+    Unknown,
 }
-impl Spo2DataMesg {
+impl Spo2DataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ReadingSpo2,
+            1 => Self::ReadingConfidence,
+            2 => Self::Mode,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9808,16 +11938,29 @@ impl Spo2DataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrField {
     Timestamp,
     FractionalTimestamp,
     Time256,
     FilteredBpm,
     EventTimestamp,
     EventTimestamp12,
+    Unknown,
 }
-impl HrMesg {
+impl HrField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::FractionalTimestamp,
+            1 => Self::Time256,
+            6 => Self::FilteredBpm,
+            9 => Self::EventTimestamp,
+            10 => Self::EventTimestamp12,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9832,12 +11975,21 @@ impl HrMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum StressLevelMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum StressLevelField {
     StressLevelValue,
     StressLevelTime,
+    Unknown,
 }
-impl StressLevelMesg {
+impl StressLevelField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::StressLevelValue,
+            1 => Self::StressLevelTime,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9848,8 +12000,8 @@ impl StressLevelMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MaxMetDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MaxMetDataField {
     UpdateTime,
     Vo2Max,
     Sport,
@@ -9858,8 +12010,23 @@ pub enum MaxMetDataMesg {
     CalibratedData,
     HrSource,
     SpeedSource,
+    Unknown,
 }
-impl MaxMetDataMesg {
+impl MaxMetDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::UpdateTime,
+            2 => Self::Vo2Max,
+            5 => Self::Sport,
+            6 => Self::SubSport,
+            8 => Self::MaxMetCategory,
+            9 => Self::CalibratedData,
+            12 => Self::HrSource,
+            13 => Self::SpeedSource,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9876,15 +12043,27 @@ impl MaxMetDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaBodyBatteryDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaBodyBatteryDataField {
     Timestamp,
     ProcessingInterval,
     Level,
     Charged,
     Uncharged,
+    Unknown,
 }
-impl HsaBodyBatteryDataMesg {
+impl HsaBodyBatteryDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::Level,
+            2 => Self::Charged,
+            3 => Self::Uncharged,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9898,12 +12077,21 @@ impl HsaBodyBatteryDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaEventMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaEventField {
     Timestamp,
     EventId,
+    Unknown,
 }
-impl HsaEventMesg {
+impl HsaEventField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::EventId,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9914,8 +12102,8 @@ impl HsaEventMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaAccelerometerDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaAccelerometerDataField {
     Timestamp,
     TimestampMs,
     SamplingInterval,
@@ -9923,8 +12111,22 @@ pub enum HsaAccelerometerDataMesg {
     AccelY,
     AccelZ,
     Timestamp32k,
+    Unknown,
 }
-impl HsaAccelerometerDataMesg {
+impl HsaAccelerometerDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SamplingInterval,
+            2 => Self::AccelX,
+            3 => Self::AccelY,
+            4 => Self::AccelZ,
+            5 => Self::Timestamp32k,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9940,8 +12142,8 @@ impl HsaAccelerometerDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaGyroscopeDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaGyroscopeDataField {
     Timestamp,
     TimestampMs,
     SamplingInterval,
@@ -9949,8 +12151,22 @@ pub enum HsaGyroscopeDataMesg {
     GyroY,
     GyroZ,
     Timestamp32k,
+    Unknown,
 }
-impl HsaGyroscopeDataMesg {
+impl HsaGyroscopeDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::SamplingInterval,
+            2 => Self::GyroX,
+            3 => Self::GyroY,
+            4 => Self::GyroZ,
+            5 => Self::Timestamp32k,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9966,13 +12182,23 @@ impl HsaGyroscopeDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaStepDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaStepDataField {
     Timestamp,
     ProcessingInterval,
     Steps,
+    Unknown,
 }
-impl HsaStepDataMesg {
+impl HsaStepDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::Steps,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -9984,14 +12210,25 @@ impl HsaStepDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaSpo2DataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaSpo2DataField {
     Timestamp,
     ProcessingInterval,
     ReadingSpo2,
     Confidence,
+    Unknown,
 }
-impl HsaSpo2DataMesg {
+impl HsaSpo2DataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::ReadingSpo2,
+            2 => Self::Confidence,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10004,13 +12241,23 @@ impl HsaSpo2DataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaStressDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaStressDataField {
     Timestamp,
     ProcessingInterval,
     StressLevel,
+    Unknown,
 }
-impl HsaStressDataMesg {
+impl HsaStressDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::StressLevel,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10022,13 +12269,23 @@ impl HsaStressDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaRespirationDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaRespirationDataField {
     Timestamp,
     ProcessingInterval,
     RespirationRate,
+    Unknown,
 }
-impl HsaRespirationDataMesg {
+impl HsaRespirationDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::RespirationRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10040,14 +12297,25 @@ impl HsaRespirationDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaHeartRateDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaHeartRateDataField {
     Timestamp,
     ProcessingInterval,
     Status,
     HeartRate,
+    Unknown,
 }
-impl HsaHeartRateDataMesg {
+impl HsaHeartRateDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::Status,
+            2 => Self::HeartRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10060,13 +12328,23 @@ impl HsaHeartRateDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaConfigurationDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaConfigurationDataField {
     Timestamp,
     Data,
     DataSize,
+    Unknown,
 }
-impl HsaConfigurationDataMesg {
+impl HsaConfigurationDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Data,
+            1 => Self::DataSize,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10078,13 +12356,23 @@ impl HsaConfigurationDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HsaWristTemperatureDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HsaWristTemperatureDataField {
     Timestamp,
     ProcessingInterval,
     Value,
+    Unknown,
 }
-impl HsaWristTemperatureDataMesg {
+impl HsaWristTemperatureDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ProcessingInterval,
+            1 => Self::Value,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10096,16 +12384,29 @@ impl HsaWristTemperatureDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum MemoGlobMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum MemoGlobField {
     PartIndex,
     Memo,
     MesgNum,
     ParentIndex,
     FieldNum,
     Data,
+    Unknown,
 }
-impl MemoGlobMesg {
+impl MemoGlobField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            250 => Self::PartIndex,
+            0 => Self::Memo,
+            1 => Self::MesgNum,
+            2 => Self::ParentIndex,
+            3 => Self::FieldNum,
+            4 => Self::Data,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10120,12 +12421,21 @@ impl MemoGlobMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SleepLevelMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SleepLevelField {
     Timestamp,
     SleepLevel,
+    Unknown,
 }
-impl SleepLevelMesg {
+impl SleepLevelField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::SleepLevel,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10136,15 +12446,27 @@ impl SleepLevelMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AntChannelIdMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AntChannelIdField {
     ChannelNumber,
     DeviceType,
     DeviceNumber,
     TransmissionType,
     DeviceIndex,
+    Unknown,
 }
-impl AntChannelIdMesg {
+impl AntChannelIdField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ChannelNumber,
+            1 => Self::DeviceType,
+            2 => Self::DeviceNumber,
+            3 => Self::TransmissionType,
+            4 => Self::DeviceIndex,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10158,16 +12480,29 @@ impl AntChannelIdMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AntRxMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AntRxField {
     Timestamp,
     FractionalTimestamp,
     MesgId,
     MesgData,
     ChannelNumber,
     Data,
+    Unknown,
 }
-impl AntRxMesg {
+impl AntRxField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::FractionalTimestamp,
+            1 => Self::MesgId,
+            2 => Self::MesgData,
+            3 => Self::ChannelNumber,
+            4 => Self::Data,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10182,16 +12517,29 @@ impl AntRxMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AntTxMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AntTxField {
     Timestamp,
     FractionalTimestamp,
     MesgId,
     MesgData,
     ChannelNumber,
     Data,
+    Unknown,
 }
-impl AntTxMesg {
+impl AntTxField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::FractionalTimestamp,
+            1 => Self::MesgId,
+            2 => Self::MesgData,
+            3 => Self::ChannelNumber,
+            4 => Self::Data,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10206,14 +12554,25 @@ impl AntTxMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ExdScreenConfigurationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ExdScreenConfigurationField {
     ScreenIndex,
     FieldCount,
     Layout,
     ScreenEnabled,
+    Unknown,
 }
-impl ExdScreenConfigurationMesg {
+impl ExdScreenConfigurationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ScreenIndex,
+            1 => Self::FieldCount,
+            2 => Self::Layout,
+            3 => Self::ScreenEnabled,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10226,16 +12585,29 @@ impl ExdScreenConfigurationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ExdDataFieldConfigurationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ExdDataFieldConfigurationField {
     ScreenIndex,
     ConceptField,
     FieldId,
     ConceptCount,
     DisplayType,
     Title,
+    Unknown,
 }
-impl ExdDataFieldConfigurationMesg {
+impl ExdDataFieldConfigurationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ScreenIndex,
+            1 => Self::ConceptField,
+            2 => Self::FieldId,
+            3 => Self::ConceptCount,
+            4 => Self::DisplayType,
+            5 => Self::Title,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10250,8 +12622,8 @@ impl ExdDataFieldConfigurationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ExdDataConceptConfigurationMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ExdDataConceptConfigurationField {
     ScreenIndex,
     ConceptField,
     FieldId,
@@ -10263,8 +12635,26 @@ pub enum ExdDataConceptConfigurationMesg {
     Qualifier,
     Descriptor,
     IsSigned,
+    Unknown,
 }
-impl ExdDataConceptConfigurationMesg {
+impl ExdDataConceptConfigurationField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::ScreenIndex,
+            1 => Self::ConceptField,
+            2 => Self::FieldId,
+            3 => Self::ConceptIndex,
+            4 => Self::DataPage,
+            5 => Self::ConceptKey,
+            6 => Self::Scaling,
+            8 => Self::DataUnits,
+            9 => Self::Qualifier,
+            10 => Self::Descriptor,
+            11 => Self::IsSigned,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10284,8 +12674,8 @@ impl ExdDataConceptConfigurationMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum DiveSummaryMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveSummaryField {
     Timestamp,
     ReferenceMesg,
     ReferenceIndex,
@@ -10309,8 +12699,38 @@ pub enum DiveSummaryMesg {
     MaxAscentRate,
     MaxDescentRate,
     HangTime,
+    Unknown,
 }
-impl DiveSummaryMesg {
+impl DiveSummaryField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ReferenceMesg,
+            1 => Self::ReferenceIndex,
+            2 => Self::AvgDepth,
+            3 => Self::MaxDepth,
+            4 => Self::SurfaceInterval,
+            5 => Self::StartCns,
+            6 => Self::EndCns,
+            7 => Self::StartN2,
+            8 => Self::EndN2,
+            9 => Self::O2Toxicity,
+            10 => Self::DiveNumber,
+            11 => Self::BottomTime,
+            12 => Self::AvgPressureSac,
+            13 => Self::AvgVolumeSac,
+            14 => Self::AvgRmv,
+            15 => Self::DescentTime,
+            16 => Self::AscentTime,
+            17 => Self::AvgAscentRate,
+            22 => Self::AvgDescentRate,
+            23 => Self::MaxAscentRate,
+            24 => Self::MaxDescentRate,
+            25 => Self::HangTime,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10342,16 +12762,29 @@ impl DiveSummaryMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum AadAccelFeaturesMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum AadAccelFeaturesField {
     Timestamp,
     Time,
     EnergyTotal,
     ZeroCrossCnt,
     Instance,
     TimeAboveThreshold,
+    Unknown,
 }
-impl AadAccelFeaturesMesg {
+impl AadAccelFeaturesField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Time,
+            1 => Self::EnergyTotal,
+            2 => Self::ZeroCrossCnt,
+            3 => Self::Instance,
+            4 => Self::TimeAboveThreshold,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10366,11 +12799,19 @@ impl AadAccelFeaturesMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrvMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrvField {
     Time,
+    Unknown,
 }
-impl HrvMesg {
+impl HrvField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::Time,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10380,13 +12821,23 @@ impl HrvMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum BeatIntervalsMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum BeatIntervalsField {
     Timestamp,
     TimestampMs,
     Time,
+    Unknown,
 }
-impl BeatIntervalsMesg {
+impl BeatIntervalsField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::Time,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10398,8 +12849,8 @@ impl BeatIntervalsMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrvStatusSummaryMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrvStatusSummaryField {
     Timestamp,
     WeeklyAverage,
     LastNightAverage,
@@ -10408,8 +12859,23 @@ pub enum HrvStatusSummaryMesg {
     BaselineBalancedLower,
     BaselineBalancedUpper,
     Status,
+    Unknown,
 }
-impl HrvStatusSummaryMesg {
+impl HrvStatusSummaryField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::WeeklyAverage,
+            1 => Self::LastNightAverage,
+            2 => Self::LastNight5MinHigh,
+            3 => Self::BaselineLowUpper,
+            4 => Self::BaselineBalancedLower,
+            5 => Self::BaselineBalancedUpper,
+            6 => Self::Status,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10426,12 +12892,21 @@ impl HrvStatusSummaryMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum HrvValueMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum HrvValueField {
     Timestamp,
     Value,
+    Unknown,
 }
-impl HrvValueMesg {
+impl HrvValueField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Value,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10442,16 +12917,29 @@ impl HrvValueMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum RawBbiMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum RawBbiField {
     Timestamp,
     TimestampMs,
     Data,
     Time,
     Quality,
     Gap,
+    Unknown,
 }
-impl RawBbiMesg {
+impl RawBbiField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::TimestampMs,
+            1 => Self::Data,
+            2 => Self::Time,
+            3 => Self::Quality,
+            4 => Self::Gap,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10466,12 +12954,21 @@ impl RawBbiMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum RespirationRateMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum RespirationRateField {
     Timestamp,
     RespirationRate,
+    Unknown,
 }
-impl RespirationRateMesg {
+impl RespirationRateField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::RespirationRate,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10482,8 +12979,8 @@ impl RespirationRateMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ChronoShotSessionMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ChronoShotSessionField {
     Timestamp,
     MinSpeed,
     MaxSpeed,
@@ -10492,8 +12989,23 @@ pub enum ChronoShotSessionMesg {
     ProjectileType,
     GrainWeight,
     StandardDeviation,
+    Unknown,
 }
-impl ChronoShotSessionMesg {
+impl ChronoShotSessionField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::MinSpeed,
+            1 => Self::MaxSpeed,
+            2 => Self::AvgSpeed,
+            3 => Self::ShotCount,
+            4 => Self::ProjectileType,
+            5 => Self::GrainWeight,
+            6 => Self::StandardDeviation,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10510,13 +13022,23 @@ impl ChronoShotSessionMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum ChronoShotDataMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum ChronoShotDataField {
     Timestamp,
     ShotSpeed,
     ShotNum,
+    Unknown,
 }
-impl ChronoShotDataMesg {
+impl ChronoShotDataField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::ShotSpeed,
+            1 => Self::ShotNum,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10528,13 +13050,23 @@ impl ChronoShotDataMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TankUpdateMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TankUpdateField {
     Timestamp,
     Sensor,
     Pressure,
+    Unknown,
 }
-impl TankUpdateMesg {
+impl TankUpdateField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Sensor,
+            1 => Self::Pressure,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10546,15 +13078,27 @@ impl TankUpdateMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum TankSummaryMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TankSummaryField {
     Timestamp,
     Sensor,
     StartPressure,
     EndPressure,
     VolumeUsed,
+    Unknown,
 }
-impl TankSummaryMesg {
+impl TankSummaryField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::Sensor,
+            1 => Self::StartPressure,
+            2 => Self::EndPressure,
+            3 => Self::VolumeUsed,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10568,8 +13112,8 @@ impl TankSummaryMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SleepAssessmentMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SleepAssessmentField {
     CombinedAwakeScore,
     AwakeTimeScore,
     AwakeningsCountScore,
@@ -10584,8 +13128,29 @@ pub enum SleepAssessmentMesg {
     AwakeningsCount,
     InterruptionsScore,
     AverageStressDuringSleep,
+    Unknown,
 }
-impl SleepAssessmentMesg {
+impl SleepAssessmentField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            0 => Self::CombinedAwakeScore,
+            1 => Self::AwakeTimeScore,
+            2 => Self::AwakeningsCountScore,
+            3 => Self::DeepSleepScore,
+            4 => Self::SleepDurationScore,
+            5 => Self::LightSleepScore,
+            6 => Self::OverallSleepScore,
+            7 => Self::SleepQualityScore,
+            8 => Self::SleepRecoveryScore,
+            9 => Self::RemSleepScore,
+            10 => Self::SleepRestlessnessScore,
+            11 => Self::AwakeningsCount,
+            14 => Self::InterruptionsScore,
+            15 => Self::AverageStressDuringSleep,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
@@ -10608,15 +13173,27 @@ impl SleepAssessmentMesg {
         }
     }
 }
-#[derive(Debug, PartialEq)]
-pub enum SkinTempOvernightMesg {
+#[derive(Debug, PartialEq, Clone)]
+pub enum SkinTempOvernightField {
     Timestamp,
     LocalTimestamp,
     AverageDeviation,
     Average7DayDeviation,
     NightlyValue,
+    Unknown,
 }
-impl SkinTempOvernightMesg {
+impl SkinTempOvernightField {
+    fn from(definition_field: u8) -> Self {
+        match definition_field {
+            253 => Self::Timestamp,
+            0 => Self::LocalTimestamp,
+            1 => Self::AverageDeviation,
+            2 => Self::Average7DayDeviation,
+            4 => Self::NightlyValue,
+            _ => Self::Unknown,
+        }
+    }
+
     fn get_parse_function(
         def_number: u8,
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {

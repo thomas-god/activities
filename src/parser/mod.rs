@@ -4,13 +4,13 @@ use thiserror::Error;
 
 pub use crate::parser::records::Record;
 use crate::{
-    BaseDataType, BaseDataValue,
+    BaseDataType,
     parser::{
         definition::{CustomDescription, Definition},
         header::{FileHeader, FileHeaderError},
         reader::Reader,
         records::{CompressedTimestamp, DataMessage},
-        types::global_messages::{DataField, FieldDescriptionField, GlobalMessage},
+        types::generated::{DataValue, FieldDescriptionField, FitMessage, MesgNum},
     },
 };
 
@@ -84,7 +84,7 @@ fn parse_custom_definition_description(
     };
 
     match definition.message_type {
-        GlobalMessage::FieldDescription => {}
+        MesgNum::FieldDescription => {}
         _ => return,
     };
 
@@ -96,22 +96,23 @@ fn parse_custom_definition_description(
     let Some(developer_data_index) = find_value_of_field_as_u8(
         message,
         definition,
-        FieldDescriptionField::DeveloperDataIndex,
+        &FieldDescriptionField::DeveloperDataIndex,
     ) else {
         return;
     };
     let Some(field_number) = find_value_of_field_as_u8(
         message,
         definition,
-        FieldDescriptionField::FieldDefinitionNumber,
+        &FieldDescriptionField::FieldDefinitionNumber,
     ) else {
         return;
     };
     let Some(endianness) = definition.fields.first().map(|f| f.endianness) else {
         return;
     };
-    let name = find_value_of_field_as_string(message, definition, FieldDescriptionField::FieldName);
-    let units = find_value_of_field_as_string(message, definition, FieldDescriptionField::Units);
+    let name =
+        find_value_of_field_as_string(message, definition, &FieldDescriptionField::FieldName);
+    let units = find_value_of_field_as_string(message, definition, &FieldDescriptionField::Units);
 
     let description = CustomDescription {
         base_type,
@@ -129,21 +130,21 @@ fn parse_custom_definition_description(
 fn find_value_of_field(
     message: &DataMessage,
     definition: &Definition,
-    variant: FieldDescriptionField,
-) -> Option<BaseDataValue> {
+    variant: &FieldDescriptionField,
+) -> Option<DataValue> {
     let index = definition
         .fields
         .iter()
-        .position(|field| match field.kind {
-            DataField::FieldDescription(field) => discriminant(&field) == discriminant(&variant),
+        .position(|field| match &field.kind {
+            FitMessage::FieldDescription(field) => discriminant(field) == discriminant(variant),
             _ => false,
         })?;
 
     let field = message.fields.get(index)?;
 
-    match field.kind {
-        DataField::FieldDescription(field) => {
-            if discriminant(&field) != discriminant(&variant) {
+    match &field.kind {
+        FitMessage::FieldDescription(field) => {
+            if discriminant(field) != discriminant(variant) {
                 return None;
             }
         }
@@ -154,8 +155,9 @@ fn find_value_of_field(
 }
 
 fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<BaseDataType> {
-    let val = match find_value_of_field(message, definition, FieldDescriptionField::FitBaseTypeId) {
-        Some(types::BaseDataValue::Uint8(val)) => val,
+    let val = match find_value_of_field(message, definition, &FieldDescriptionField::FitBaseTypeId)
+    {
+        Some(DataValue::Base(types::BaseDataValue::Uint8(val))) => val,
         _ => return None,
     };
 
@@ -165,20 +167,20 @@ fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<Base
 fn find_value_of_field_as_string(
     message: &DataMessage,
     definition: &Definition,
-    variant: FieldDescriptionField,
+    variant: &FieldDescriptionField,
 ) -> Option<String> {
     match find_value_of_field(message, definition, variant) {
-        Some(types::BaseDataValue::String(val)) => Some(val.clone()),
+        Some(DataValue::Base(types::BaseDataValue::String(val))) => Some(val.clone()),
         _ => None,
     }
 }
 fn find_value_of_field_as_u8(
     message: &DataMessage,
     definition: &Definition,
-    variant: FieldDescriptionField,
+    variant: &FieldDescriptionField,
 ) -> Option<u8> {
     match find_value_of_field(message, definition, variant) {
-        Some(types::BaseDataValue::Uint8(val)) => Some(val),
+        Some(DataValue::Base(types::BaseDataValue::Uint8(val))) => Some(val),
         _ => None,
     }
 }

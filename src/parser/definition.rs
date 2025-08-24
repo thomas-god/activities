@@ -5,7 +5,10 @@ use crate::{
     parser::{
         reader::Reader,
         records::{DefinitionMessageHeader, RecordError},
-        types::global_messages::{CustomField, DataField, GlobalMessage},
+        types::{
+            DataTypeError,
+            generated::{CustomField, DataValue, FitMessage, MesgNum},
+        },
     },
 };
 
@@ -26,7 +29,7 @@ impl From<u8> for Endianness {
 
 #[derive(Debug, Clone)]
 pub struct Definition {
-    pub message_type: GlobalMessage,
+    pub message_type: MesgNum,
     pub local_message_type: u8,
     pub fields: Vec<DefinitionField>,
     pub fields_size: u8,
@@ -35,8 +38,8 @@ pub struct Definition {
 #[derive(Debug, Clone)]
 pub struct DefinitionField {
     pub endianness: Endianness,
-    pub kind: DataField,
-    pub field_type: BaseDataType,
+    pub kind: FitMessage,
+    pub parse: fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>,
     pub size: u8,
 }
 
@@ -55,23 +58,17 @@ pub fn parse_definition_message(
 ) -> Result<Definition, RecordError> {
     let _reserved = content.next_u8()?;
     let endianness = Endianness::from(content.next_u8()?);
-    let global_message_number = content.next_u16(&endianness)?;
-    let message_type = GlobalMessage::from(global_message_number);
+    let message_type = MesgNum::from(content.next_u16(&endianness)?);
 
     let number_of_fields = content.next_u8()?;
     let mut fields_size = 0;
     let mut fields: Vec<DefinitionField> = vec![];
 
-    println!("first 4 bytes read");
-
     for _ in 0..number_of_fields {
-        println!("reading field");
         let field = parse_definition_field(&message_type, endianness, content)?;
         fields_size += field.size;
         fields.push(field);
     }
-
-    println!("fields done");
 
     // Parse size of optionnal developer fields
     if header.message_type_specific {
@@ -108,40 +105,41 @@ fn parse_developer_field(
         ))?;
     let field = DefinitionField {
         endianness,
-        kind: DataField::Custom(CustomField {
+        kind: FitMessage::Custom(CustomField {
             name: description.name.clone(),
             units: description.units.clone(),
         }),
-        field_type: description.base_type,
+        parse: BaseDataType::get_parse(&description.base_type),
         size,
     };
     Ok(field)
 }
 
 fn parse_definition_field(
-    message_type: &GlobalMessage,
+    message_type: &MesgNum,
     endianness: Endianness,
     content: &mut Reader,
 ) -> Result<DefinitionField, RecordError> {
     let definition_number = content.next_u8()?;
-    println!("definition");
-    let kind = message_type.parse_field_kind(definition_number);
+    let kind = message_type.message_field(definition_number);
+    let parse = message_type.field_parse(definition_number);
     let size = content.next_u8()?;
-    println!("size");
-    let field_type = BaseDataType::from_base_type_field(content.next_u8()?)?;
+    let _ = content.next_u8()?; // Byte for type is not used, but must still be used
 
-    println!("tyupe");
     Ok(DefinitionField {
         endianness,
         kind,
+        parse,
         size,
-        field_type,
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::types::global_messages::RecordField;
+    use crate::{
+        BaseDataValue,
+        parser::types::generated::{DataValue, FitMessage, MesgNum, RecordField},
+    };
 
     use super::*;
 
@@ -159,13 +157,18 @@ mod tests {
         .unwrap();
 
         assert_eq!(definition.local_message_type, 0);
-        assert_eq!(definition.message_type, GlobalMessage::Record);
+        assert_eq!(definition.message_type, MesgNum::Record);
         assert_eq!(definition.fields_size, 1);
         assert_eq!(definition.fields.len(), 1);
 
         let field = definition.fields.first().unwrap();
         assert_eq!(field.endianness, Endianness::Little);
-        assert_eq!(field.field_type, BaseDataType::Uint8);
-        assert_eq!(field.kind, DataField::Record(RecordField::HeartRate));
+        assert_eq!(field.kind, FitMessage::Record(RecordField::HeartRate));
+
+        let mut content = Reader::new(1, 0, vec![12].into_iter());
+        assert_eq!(
+            (field.parse)(&mut content, &Endianness::Little, 1).unwrap(),
+            vec![DataValue::Base(BaseDataValue::Uint8(12))]
+        );
     }
 }

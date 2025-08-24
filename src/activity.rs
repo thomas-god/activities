@@ -1,9 +1,6 @@
 use thiserror::Error;
 
-use crate::{
-    BaseDataValue, DataField, FitParserError, Record, parse_records,
-    parser::types::global_messages::DeviceInfoField,
-};
+use crate::{FitParserError, Record, parse_records};
 
 #[derive(Debug, Default)]
 pub struct Activity {
@@ -42,20 +39,20 @@ fn find_product_name(record: &Record) -> Option<String> {
         return None;
     };
 
-    for field in data.fields.iter() {
-        if let DataField::DeviceInfo(DeviceInfoField::ProductName) = field.kind {
-            return field
-                .values
-                .iter()
-                .filter_map(|val| match val {
-                    BaseDataValue::String(s) => Some(s.clone()),
-                    _ => None,
-                })
-                .collect::<Vec<String>>()
-                .first()
-                .cloned();
-        }
-    }
+    // for field in data.fields.iter() {
+    //     if let DataField::DeviceInfo(DeviceInfoField::ProductName) = field.kind {
+    //         return field
+    //             .values
+    //             .iter()
+    //             .filter_map(|val| match val {
+    //                 BaseDataValue::String(s) => Some(s.clone()),
+    //                 _ => None,
+    //             })
+    //             .collect::<Vec<String>>()
+    //             .first()
+    //             .cloned();
+    //     }
+    // }
 
     None
 }

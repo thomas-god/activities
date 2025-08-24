@@ -113,6 +113,31 @@ impl BaseDataType {
         }
     }
 
+    pub fn get_parse(
+        data_type: &Self,
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+        match data_type {
+            BaseDataType::Byte => parse_byte_array,
+            BaseDataType::Enum => parse_unknown,
+            BaseDataType::Float32 => parse_float32,
+            BaseDataType::Float64 => parse_float64,
+            BaseDataType::Sint8 => parse_sint8,
+            BaseDataType::Sint16 => parse_sint16,
+            BaseDataType::Sint32 => parse_sint32,
+            BaseDataType::Sint64 => parse_sint64,
+            BaseDataType::String => parse_string,
+            BaseDataType::Uint8 => parse_uint8,
+            BaseDataType::Uint8z => parse_uint8z,
+            BaseDataType::Uint16 => parse_uint16,
+            BaseDataType::Uint16z => parse_uint16z,
+            BaseDataType::Uint32 => parse_uint32,
+            BaseDataType::Uint32z => parse_uint32z,
+            BaseDataType::Uint64 => parse_uint64,
+            BaseDataType::Uint64z => parse_uint64z,
+            BaseDataType::Unknown => parse_unknown,
+        }
+    }
+
     pub fn parse_values(
         &self,
         content: &mut Reader,

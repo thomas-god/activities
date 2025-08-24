@@ -1,3 +1,5 @@
+#![allow(clippy::const_is_empty)]
+
 use itertools::join;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -9,6 +11,7 @@ const BASE_TYPES: &[&str] = &[
     "sint8", "uint8", "uintz8", "sint16", "uint16", "uintz16", "sint32", "uint32", "uintz32",
     "sint64", "uint64", "uintz64", "string", "float32", "float64", "byte",
 ];
+const ENUMS_SKIPPED_VARIANTS: &[&str] = &["mfg_range_min", "mfg_range_max", "pad"];
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -117,7 +120,10 @@ where
             break;
         }
 
-        if row.variant_name.is_some() && row.value.is_some() {
+        if row.variant_name.is_some()
+            && row.value.is_some()
+            && !ENUMS_SKIPPED_VARIANTS.contains(&row.variant_name.clone().unwrap().as_str())
+        {
             mapping.push((row.value.unwrap(), row.variant_name.unwrap()));
         }
     }
@@ -137,13 +143,29 @@ fn map_type(val: &str) -> Option<String> {
     }
 }
 
+fn map_type_size(val: &str) -> Option<u8> {
+    match val {
+        "enum" => Some(1),
+        "uint8" => Some(1),
+        "uint8z" => Some(1),
+        "uint16" => Some(2),
+        "uint32" => Some(4),
+        "uint32z" => Some(4),
+        _ => None,
+    }
+}
+
 fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> String {
     let mut code = String::new();
     code.push_str("#![allow(dead_code)]\n");
     code.push_str("#![allow(unused_imports)]\n");
     code.push_str("#![allow(unused_variables)]\n");
+    code.push_str("#![allow(unreachable_patterns)]\n\n");
     code.push_str("#![allow(clippy::enum_variant_names)]\n");
     code.push_str("#![allow(clippy::upper_case_acronyms)]\n\n");
+    code.push_str("#![allow(clippy::identity_op)]\n\n");
+    code.push_str("#![allow(clippy::match_single_binding)]\n\n");
+    code.push_str("#![allow(clippy::match_overlapping_arm)]\n\n");
     code.push_str("use crate::{BaseDataType, BaseDataValue, parser::reader::Reader};\n");
     code.push_str(
         "use crate::parser::types::{parse_uint8, parse_uint8z, parse_sint8,
@@ -158,10 +180,11 @@ fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> Stri
 
     code.push_str(
         "
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DataValue {
     Base(BaseDataValue),
-    Enum(FitEnum)
+    Enum(FitEnum),
+    DateTime(u32)
 }\n",
     );
 
@@ -224,7 +247,7 @@ fn template_main_enum(enum_names: &[String]) -> String {
 
     format!(
         r#"
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitEnum {{
     {variants}
 }}
@@ -234,6 +257,7 @@ pub enum FitEnum {{
 
 fn template_enum_impl(name: &str, base_type: &str, mapping: &[(usize, String)]) -> String {
     let enum_type = map_type(base_type).expect("Expected not None enum type");
+    let enum_type_size = map_type_size(base_type).expect("Expected not None enum type");
     let mut enum_mapping = join(
         mapping
             .iter()
@@ -250,6 +274,7 @@ fn template_enum_impl(name: &str, base_type: &str, mapping: &[(usize, String)]) 
         "endianness"
     };
 
+    // DateTime like are directly parsed as u32
     let from_code = if name.contains("DateTime") {
         "Self(content)".to_string()
     } else {
@@ -261,8 +286,24 @@ fn template_enum_impl(name: &str, base_type: &str, mapping: &[(usize, String)]) 
         )
     };
 
-    format!(
+    let parse_code = if name.contains("DateTime") {
         "
+        for _ in 0..number_of_bytes/4 {{
+            values.push(DataValue::DateTime(reader.next_u32(endianness)?));
+        }}"
+        .to_string()
+    } else {
+        format!(
+            "for _ in 0..number_of_bytes/{enum_type_size} {{
+            values.push(DataValue::Enum(FitEnum::{name}(
+                Self::from(reader.next_{enum_type}({parse_arguments})?)
+            )));
+        }}"
+        )
+    };
+
+    let mut code = format!(
+        r#"
 impl {name} {{
     pub fn from(content: {enum_type}) -> {name} {{
         {from_code}
@@ -274,16 +315,66 @@ impl {name} {{
         number_of_bytes: u8
     ) -> Result<Vec<DataValue>, DataTypeError> {{
         let mut values = Vec::new();
-        for _ in 0..number_of_bytes {{
-            values.push(DataValue::Enum(FitEnum::{name}(
-                Self::from(reader.next_{enum_type}({parse_arguments})?)
-            )));
-        }}
+        {parse_code}
         Ok(values)
+    }}"#,
+    );
+
+    // MesgNum need special treatment to be able to link to a FitMessage
+    if name == "MesgNum" {
+        let mut mapping_field = join(
+            mapping.iter().map(|(_, v)| {
+                format!(
+                    "Self::{} => FitMessage::{}({}Field::from(def_number))",
+                    snake_to_camel_case(v),
+                    snake_to_camel_case(v),
+                    snake_to_camel_case(v)
+                )
+            }),
+            ",\n",
+        );
+        if !mapping_field.is_empty() {
+            mapping_field.push(',');
+        }
+
+        let mut mapping_parse = join(
+            mapping.iter().map(|(_, v)| {
+                format!(
+                    "Self::{} => {}Field::get_parse_function(def_number)",
+                    snake_to_camel_case(v),
+                    snake_to_camel_case(v)
+                )
+            }),
+            ",\n",
+        );
+        if !mapping_parse.is_empty() {
+            mapping_parse.push(',');
+        }
+
+        code.push_str(&format!(
+            "
+    pub fn message_field(&self, def_number: u8) -> FitMessage {{
+        match self {{
+            {mapping_field}
+            Self::UnknownVariant => FitMessage::UnknownVariant
+        }}
     }}
-}}
-        ",
-    )
+
+     pub fn field_parse(
+        &self, def_number: u8
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
+        match self {{
+            {mapping_parse}
+            Self::UnknownVariant => parse_unknown
+        }}
+    }}
+        "
+        ));
+    }
+
+    code.push_str("}\n");
+
+    code
 }
 
 fn snake_to_camel_case(input: &str) -> String {
@@ -473,44 +564,74 @@ where
 fn generate_messages_code(messages: Vec<(String, Vec<Message>)>, enums: Vec<String>) -> String {
     let mut code = String::new();
 
-    let messages_enum = join(
+    let mut messages_enum = join(
         messages.iter().map(|(msg, _)| {
             format!(
-                "{}({}Mesg)",
+                "{}({}Field)",
                 snake_to_camel_case(msg),
                 snake_to_camel_case(msg)
             )
         }),
         ",\n",
     );
+    if !messages_enum.is_empty() {
+        messages_enum.push(',');
+    }
 
     code.push_str(&format!(
         r#"
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitMessage {{
     {messages_enum}
+    Custom(CustomField),
+    UnknownVariant
 }}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CustomField {{
+    pub name: Option<String>,
+    pub units: Option<String>,
+}}
+
 "#
     ));
 
     for (msg, definitions) in messages.iter() {
         let message = snake_to_camel_case(msg);
-        let variants = join(
+        let mut variants = join(
             definitions
                 .iter()
                 .map(|def| snake_to_camel_case(&def.name).to_string()),
             ",\n",
         );
+        if !variants.is_empty() {
+            variants.push(',');
+        }
 
         code.push_str(&format!(
             r#"
-#[derive(Debug, PartialEq)]
-pub enum {message}Mesg {{
+#[derive(Debug, PartialEq, Clone)]
+pub enum {message}Field {{
     {variants}
+    Unknown
 }}"#
         ));
 
-        let mut mappings = join(
+        let mut from_definition_field_mappings = join(
+            definitions.iter().map(|def| {
+                format!(
+                    "{} => Self::{}",
+                    def.field_def,
+                    snake_to_camel_case(&def.name)
+                )
+            }),
+            ",\n",
+        );
+        if !from_definition_field_mappings.is_empty() {
+            from_definition_field_mappings.push(',');
+        }
+
+        let mut parse_mappings = join(
             definitions.iter().map(|def| {
                 format!(
                     "{} => {}",
@@ -520,22 +641,32 @@ pub enum {message}Mesg {{
             }),
             ",\n",
         );
-        if !mappings.is_empty() {
-            mappings.push(',');
+        if !parse_mappings.is_empty() {
+            parse_mappings.push(',');
         }
 
         code.push_str(&format!(
-                    r#"
-        impl {message}Mesg {{
-            fn get_parse_function(def_number: u8) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
-                match def_number {{
-                {mappings}
-                _ => parse_uint8
+            r#"
+impl {message}Field {{
 
-                }}
-            }}
-        }}"#
-                ));
+    fn from(definition_field: u8) -> Self {{
+        match definition_field {{
+            {from_definition_field_mappings}
+            _ => Self::Unknown
+        }}
+    }}
+
+    fn get_parse_function(
+        def_number: u8
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
+        match def_number {{
+        {parse_mappings}
+        _ => parse_uint8
+
+        }}
+    }}
+}}"#
+        ));
     }
 
     code
