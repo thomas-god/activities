@@ -1,10 +1,7 @@
 use itertools::join;
 use std::io::Write;
 use std::path::Path;
-use std::{
-    collections::HashMap,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
 
@@ -193,14 +190,23 @@ pub enum DataValue {
             enum_mapping.push(',');
         }
 
-        code.push_str(&format!(
-            "
+        if name.contains("DateTime") {
+            code.push_str(&format!(
+                "
+#[derive(Debug, PartialEq)]
+pub struct {name}(u32);
+            ",
+            ));
+        } else {
+            code.push_str(&format!(
+                "
 #[derive(Debug, PartialEq)]
 pub enum {name} {{
     {variants}
     UnknownVariant
 }}"
-        ));
+            ));
+        }
         code.push_str(&template_enum_impl(&name, base_type, mapping));
     }
 
@@ -229,7 +235,7 @@ pub enum FitEnum {{
     )
 }
 
-fn template_enum_impl(name: &str, base_type: &str, mapping: &Vec<(usize, String)>) -> String {
+fn template_enum_impl(name: &str, base_type: &str, mapping: &[(usize, String)]) -> String {
     let enum_type = map_type(base_type).expect("Expected not None enum type");
     let mut enum_mapping = join(
         mapping
@@ -247,14 +253,22 @@ fn template_enum_impl(name: &str, base_type: &str, mapping: &Vec<(usize, String)
         "endianness"
     };
 
+    let from_code = if name.contains("DateTime") {
+        "Self(content)".to_string()
+    } else {
+        format!(
+            "match content {{
+            {enum_mapping}
+            _ => {name}::UnknownVariant
+        }}"
+        )
+    };
+
     format!(
         "
 impl {name} {{
     pub fn from(content: {enum_type}) -> {name} {{
-        match content {{
-            {enum_mapping}
-            _ => {name}::UnknownVariant
-        }}
+        {from_code}
     }}
 
     pub fn parse(

@@ -537,16 +537,11 @@ impl MesgCount {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum DateTime {
-    Min,
-    UnknownVariant,
-}
+pub struct DateTime(u32);
+
 impl DateTime {
     pub fn from(content: u32) -> DateTime {
-        match content {
-            268435456 => DateTime::Min,
-            _ => DateTime::UnknownVariant,
-        }
+        Self(content)
     }
 
     pub fn parse(
@@ -565,16 +560,11 @@ impl DateTime {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum LocalDateTime {
-    Min,
-    UnknownVariant,
-}
+pub struct LocalDateTime(u32);
+
 impl LocalDateTime {
     pub fn from(content: u32) -> LocalDateTime {
-        match content {
-            268435456 => LocalDateTime::Min,
-            _ => LocalDateTime::UnknownVariant,
-        }
+        Self(content)
     }
 
     pub fn parse(
