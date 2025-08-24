@@ -82,23 +82,18 @@ impl DataMessage {
     /// Extract the last (i.e. most recent) [u32] timestamp contains in all the fields and values of
     /// a [DataMessage].
     pub fn last_timestamp(&self) -> Option<u32> {
-        Some(0)
-        // let mut last_timestamp: Option<u32> = None;
-        // for field in self.fields.iter() {
-        //     if discriminant(&field.kind) == discriminant(&DataField::Timestamp) {
-        //         last_timestamp =
-        //             field
-        //                 .values
-        //                 .iter()
-        //                 .fold(last_timestamp, |last, value| match value {
-        //                     BaseDataValue::Uint32(val) if *val >= last_timestamp.unwrap_or(0) => {
-        //                         Some(*val)
-        //                     }
-        //                     _ => last,
-        //                 });
-        //     }
-        // }
-        // last_timestamp
+        let mut last_timestamp: Option<u32> = None;
+        for field in self.fields.iter() {
+            last_timestamp = field
+                .values
+                .iter()
+                .fold(last_timestamp, |last, value| match value {
+                    DataValue::DateTime(val) if *val >= last_timestamp.unwrap_or(0) => Some(*val),
+
+                    _ => last,
+                });
+        }
+        last_timestamp
     }
 }
 
@@ -238,85 +233,74 @@ impl CompressedTimestamp {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use super::*;
+    use crate::parser::types::generated::RecordField;
 
-//     #[test]
-//     fn test_data_message_contains_u32_timestamp() {
-//         let message_w_timestamp = DataMessage {
-//             local_message_type: 0,
-//             fields: vec![DataMessageField {
-//                 kind: DataField::Timestamp,
-//                 values: vec![BaseDataValue::Uint32(0)],
-//             }],
-//         };
+    use super::*;
 
-//         assert!(message_w_timestamp.last_timestamp().is_some());
-//         assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 0);
-//     }
+    #[test]
+    fn test_data_message_contains_datetime() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            fields: vec![DataMessageField {
+                kind: FitMessage::Record(RecordField::Timestamp),
+                values: vec![DataValue::DateTime(0)],
+            }],
+        };
 
-//     #[test]
-//     fn test_data_message_contains_multiple_u32_timestamps() {
-//         let message_w_timestamp = DataMessage {
-//             local_message_type: 0,
-//             fields: vec![DataMessageField {
-//                 kind: DataField::Timestamp,
-//                 values: vec![BaseDataValue::Uint32(0), BaseDataValue::Uint32(3)],
-//             }],
-//         };
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 0);
+    }
 
-//         assert!(message_w_timestamp.last_timestamp().is_some());
-//         assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 3);
-//     }
+    #[test]
+    fn test_data_message_contains_multiple_datetimes() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            fields: vec![DataMessageField {
+                kind: FitMessage::Record(RecordField::Timestamp),
+                values: vec![DataValue::DateTime(0), DataValue::DateTime(3)],
+            }],
+        };
 
-//     #[test]
-//     fn test_data_message_contains_multiple_fields_with_u32_timestamps() {
-//         let message_w_timestamp = DataMessage {
-//             local_message_type: 0,
-//             fields: vec![
-//                 DataMessageField {
-//                     kind: DataField::Timestamp,
-//                     values: vec![BaseDataValue::Uint32(16)],
-//                 },
-//                 DataMessageField {
-//                     kind: DataField::Timestamp,
-//                     values: vec![BaseDataValue::Uint32(0), BaseDataValue::Uint32(3)],
-//                 },
-//             ],
-//         };
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 3);
+    }
 
-//         assert!(message_w_timestamp.last_timestamp().is_some());
-//         assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 16);
-//     }
+    #[test]
+    fn test_data_message_contains_multiple_fields_with_datetime() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            fields: vec![
+                DataMessageField {
+                    kind: FitMessage::Record(RecordField::Timestamp),
+                    values: vec![DataValue::DateTime(16)],
+                },
+                DataMessageField {
+                    kind: FitMessage::Record(RecordField::Timestamp),
+                    values: vec![DataValue::DateTime(0), DataValue::DateTime(3)],
+                },
+            ],
+        };
 
-//     #[test]
-//     fn test_data_message_contains_timestamp_but_not_u32() {
-//         let message_w_timestamp = DataMessage {
-//             local_message_type: 0,
-//             fields: vec![DataMessageField {
-//                 kind: DataField::Timestamp,
-//                 values: vec![BaseDataValue::String("toto".to_string())],
-//             }],
-//         };
+        assert!(message_w_timestamp.last_timestamp().is_some());
+        assert_eq!(message_w_timestamp.last_timestamp().unwrap(), 16);
+    }
 
-//         assert!(message_w_timestamp.last_timestamp().is_none());
-//     }
+    #[test]
+    fn test_data_message_contains_no_timestamp() {
+        let message_w_timestamp = DataMessage {
+            local_message_type: 0,
+            fields: vec![DataMessageField {
+                kind: FitMessage::Record(RecordField::Timestamp),
+                values: vec![DataValue::String("toto".to_string())],
+            }],
+        };
 
-//     #[test]
-//     fn test_data_message_contains_no_timestamp() {
-//         let message_w_timestamp = DataMessage {
-//             local_message_type: 0,
-//             fields: vec![DataMessageField {
-//                 kind: DataField::Unknown,
-//                 values: vec![BaseDataValue::String("toto".to_string())],
-//             }],
-//         };
-
-//         assert!(message_w_timestamp.last_timestamp().is_none());
-//     }
-// }
+        assert!(message_w_timestamp.last_timestamp().is_none());
+    }
+}
 
 #[cfg(test)]
 mod tests_compressed_timestamp {
