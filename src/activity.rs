@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    DataField, DataValue, FitParserError, Record, parse_records,
+    DataField, BaseDataValue, FitParserError, Record, parse_records,
     parser::types::global_messages::DeviceInfoField,
 };
 
@@ -48,7 +48,7 @@ fn find_product_name(record: &Record) -> Option<String> {
                 .values
                 .iter()
                 .filter_map(|val| match val {
-                    DataValue::String(s) => Some(s.clone()),
+                    BaseDataValue::String(s) => Some(s.clone()),
                     _ => None,
                 })
                 .collect::<Vec<String>>()

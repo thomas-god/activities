@@ -3,10 +3,10 @@ use thiserror::Error;
 use crate::parser::definition::Endianness;
 
 #[derive(Debug)]
-pub struct Reader<I> {
+pub struct Reader {
     bytes_left_to_read: u32,
     crc: u16,
-    content: I,
+    content: std::vec::IntoIter<u8>,
 }
 
 #[derive(Debug, Error)]
@@ -17,17 +17,12 @@ pub enum ReaderError {
     ContentPrematurelyEmpty,
 }
 
-impl<I> Reader<I> {
+impl Reader {
     pub fn is_empty(&self) -> bool {
         self.bytes_left_to_read == 0
     }
-}
 
-impl<I> Reader<I>
-where
-    I: Iterator<Item = u8>,
-{
-    pub fn new(bytes_to_read: u32, crc: u16, content: I) -> Self {
+    pub fn new(bytes_to_read: u32, crc: u16, content: std::vec::IntoIter<u8>) -> Self {
         Self {
             bytes_left_to_read: bytes_to_read,
             crc,

@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::parser::{
     definition::{CustomDescription, Definition, parse_definition_message},
     reader::{Reader, ReaderError},
-    types::{DataTypeError, DataValue, global_messages::DataField},
+    types::{DataTypeError, BaseDataValue, global_messages::DataField},
 };
 
 enum RecordHeader {
@@ -86,7 +86,7 @@ impl DataMessage {
                         .values
                         .iter()
                         .fold(last_timestamp, |last, value| match value {
-                            DataValue::Uint32(val) if *val >= last_timestamp.unwrap_or(0) => {
+                            BaseDataValue::Uint32(val) if *val >= last_timestamp.unwrap_or(0) => {
                                 Some(*val)
                             }
                             _ => last,
@@ -100,7 +100,7 @@ impl DataMessage {
 #[derive(Debug)]
 pub struct DataMessageField {
     pub kind: DataField,
-    pub values: Vec<DataValue>,
+    pub values: Vec<BaseDataValue>,
 }
 
 #[derive(Debug)]
@@ -118,15 +118,12 @@ pub enum Record {
 }
 
 impl Record {
-    pub fn parse<I>(
-        content: &mut Reader<I>,
+    pub fn parse(
+        content: &mut Reader,
         definitions: &HashMap<u8, Definition>,
         custom_descriptions: &HashMap<u8, HashMap<u8, CustomDescription>>,
         compressed_timestamp: &mut CompressedTimestamp,
-    ) -> Result<Self, RecordError>
-    where
-        I: Iterator<Item = u8>,
-    {
+    ) -> Result<Self, RecordError> {
         let header = RecordHeader::from_byte(content.next_u8()?);
 
         match header {
@@ -146,14 +143,11 @@ impl Record {
     }
 }
 
-fn parse_data_message<I>(
+fn parse_data_message(
     header: DataMessageHeader,
     definitions: &HashMap<u8, Definition>,
-    content: &mut Reader<I>,
-) -> Result<DataMessage, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
+    content: &mut Reader,
+) -> Result<DataMessage, RecordError> {
     match definitions.get(&header.local_message_type) {
         Some(definition) => {
             let mut fields = Vec::new();
@@ -180,15 +174,12 @@ where
     }
 }
 
-fn parse_compressed_message<I>(
+fn parse_compressed_message(
     header: CompressedMessageHeader,
     definitions: &HashMap<u8, Definition>,
     compressed_timestamp: &mut CompressedTimestamp,
-    content: &mut Reader<I>,
-) -> Result<Record, RecordError>
-where
-    I: Iterator<Item = u8>,
-{
+    content: &mut Reader,
+) -> Result<Record, RecordError> {
     let timestamp = compressed_timestamp
         .parse_offset(header.time_offset)
         .ok_or(RecordError::TimestampMissingForCompressedTimestamp)?;
@@ -256,7 +247,7 @@ mod tests {
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: DataField::Timestamp,
-                values: vec![DataValue::Uint32(0)],
+                values: vec![BaseDataValue::Uint32(0)],
             }],
         };
 
@@ -270,7 +261,7 @@ mod tests {
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: DataField::Timestamp,
-                values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
+                values: vec![BaseDataValue::Uint32(0), BaseDataValue::Uint32(3)],
             }],
         };
 
@@ -285,11 +276,11 @@ mod tests {
             fields: vec![
                 DataMessageField {
                     kind: DataField::Timestamp,
-                    values: vec![DataValue::Uint32(16)],
+                    values: vec![BaseDataValue::Uint32(16)],
                 },
                 DataMessageField {
                     kind: DataField::Timestamp,
-                    values: vec![DataValue::Uint32(0), DataValue::Uint32(3)],
+                    values: vec![BaseDataValue::Uint32(0), BaseDataValue::Uint32(3)],
                 },
             ],
         };
@@ -304,7 +295,7 @@ mod tests {
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: DataField::Timestamp,
-                values: vec![DataValue::String("toto".to_string())],
+                values: vec![BaseDataValue::String("toto".to_string())],
             }],
         };
 
@@ -317,7 +308,7 @@ mod tests {
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: DataField::Unknown,
-                values: vec![DataValue::String("toto".to_string())],
+                values: vec![BaseDataValue::String("toto".to_string())],
             }],
         };
 

@@ -8,23 +8,26 @@ use std::{
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
 
-const MESSAGES_TO_IMPORT: &'static [&'static str] = &["Record", "FieldDescription"];
+const MESSAGES_TO_IMPORT: &[&str] = &["Record", "FieldDescription"];
+const BASE_TYPES: &[&str] = &[
+    "sint8", "uint8", "uintz8", "sint16", "uint16", "uintz16", "sint32", "uint32", "uintz32",
+    "sint64", "uint64", "uintz64", "string", "float32", "float64", "byte",
+];
 
 fn main() {
-    // if Path::new("src/parser/types/generated.rs").exists() {
-    //     return;
-    // }
+    if Path::new("src/parser/types/generated.rs").exists() {
+        return;
+    }
 
     let mut enums = generate_enums();
     let (messages, enums_used) = generate_messages_definitions();
 
-    enums = enums
-        .into_iter()
-        .filter(|(name, _, __)| enums_used.contains(name))
-        .collect();
+    enums.retain(|(name, _, __)| enums_used.contains(name));
+
+    let enums_names = enums.iter().map(|(name, _, __)| name.clone()).collect();
 
     let mut code = generate_enums_code(&enums);
-    code.push_str(&generate_messages_code(messages));
+    code.push_str(&generate_messages_code(messages, enums_names));
     code = format_code(&code);
 
     std::fs::write("src/parser/types/generated.rs", code).expect("Could not wirte to ouptut file");
@@ -89,8 +92,8 @@ fn parse_enum_row(row: &[Data]) -> EnumRow {
             Some(Data::Int(variant)) => Some(*variant as usize),
             Some(Data::Float(variant)) => Some(*variant as usize),
             Some(Data::String(variant)) => {
-                if variant.starts_with("0x") {
-                    usize::from_str_radix(&variant[2..], 16).ok()
+                if let Some(stripped) = variant.strip_prefix("0x") {
+                    usize::from_str_radix(stripped, 16).ok()
                 } else {
                     None
                 }
@@ -140,35 +143,44 @@ fn map_type(val: &str) -> Option<String> {
     }
 }
 
-fn generate_enums_code(enums: &Vec<(String, String, HashMap<usize, String>)>) -> String {
+fn generate_enums_code(enums: &[(String, String, HashMap<usize, String>)]) -> String {
     let mut code = String::new();
     code.push_str("#![allow(dead_code)]\n");
+    code.push_str("#![allow(unused_imports)]\n");
+    code.push_str("#![allow(unused_variables)]\n");
     code.push_str("#![allow(clippy::enum_variant_names)]\n");
     code.push_str("#![allow(clippy::upper_case_acronyms)]\n\n");
-    code.push_str("use crate::{DataType as BaseDataType, DataValue as BaseDataValue, parser::reader::Reader}; \n");
+    code.push_str("use crate::{BaseDataType, BaseDataValue, parser::reader::Reader};\n");
+    code.push_str(
+        "use crate::parser::types::{parse_uint8, parse_uint8z, parse_sint8,
+        parse_uint16, parse_uint16z, parse_sint16,
+        parse_uint32, parse_uint32z, parse_sint32,
+        parse_uint64, parse_uint64z, parse_sint64,
+        parse_float32, parse_float64, parse_string,
+        parse_unknown, parse_byte_array as parse_byte,
+        DataTypeError};",
+    );
+    code.push_str("use crate::parser::definition::{Endianness};\n\n");
 
-    let main_enum = join(
-        enums
-            .iter()
-            .map(|(e, _, __)| format!("{}({})", snake_to_camel_case(e), snake_to_camel_case(e))),
-        ",\n",
+    code.push_str(
+        "
+#[derive(Debug, PartialEq)]
+pub enum DataValue {
+    Base(BaseDataValue),
+    Enum(FitEnum)
+}\n",
     );
 
-    code.push_str(&format!(
-        r#"
-#[derive(Debug, PartialEq)]
-pub enum FitEnum {{
-    {main_enum}
-}}
-"#
-    ));
+    let enum_names: Vec<String> = enums.iter().map(|(name, _, __)| name.to_string()).collect();
+
+    code.push_str(&template_main_enum(&enum_names));
 
     for (name, base_type, mapping) in enums.iter() {
         let name = snake_to_camel_case(name);
 
         let mut variants = join(mapping.values().map(|v| snake_to_camel_case(v)), ",\n");
         if !variants.is_empty() {
-            variants.push_str(",");
+            variants.push(',');
         }
 
         let mut enum_mapping = join(
@@ -178,10 +190,8 @@ pub enum FitEnum {{
             ",\n",
         );
         if !enum_mapping.is_empty() {
-            enum_mapping.push_str(",");
+            enum_mapping.push(',');
         }
-
-        let enum_type = map_type(base_type).expect("Expected not None enum type");
 
         code.push_str(&format!(
             "
@@ -191,9 +201,54 @@ pub enum {name} {{
     UnknownVariant
 }}"
         ));
+        code.push_str(&template_enum_impl(&name, base_type, mapping));
+    }
 
-        code.push_str(&format!(
-            "
+    code
+}
+
+fn template_main_enum(enum_names: &[String]) -> String {
+    let variants = join(
+        enum_names.iter().map(|name| {
+            format!(
+                "{}({})",
+                snake_to_camel_case(name),
+                snake_to_camel_case(name)
+            )
+        }),
+        ",\n",
+    );
+
+    format!(
+        r#"
+#[derive(Debug, PartialEq)]
+pub enum FitEnum {{
+    {variants}
+}}
+"#
+    )
+}
+
+fn template_enum_impl(name: &str, base_type: &str, mapping: &HashMap<usize, String>) -> String {
+    let enum_type = map_type(base_type).expect("Expected not None enum type");
+    let mut enum_mapping = join(
+        mapping
+            .iter()
+            .map(|(k, v)| format!("{k} => {name}::{}", snake_to_camel_case(v))),
+        ",\n",
+    );
+    if !enum_mapping.is_empty() {
+        enum_mapping.push(',');
+    }
+
+    let parse_arguments = if enum_type.contains("8") {
+        ""
+    } else {
+        "endianness"
+    };
+
+    format!(
+        "
 impl {name} {{
     pub fn from(content: {enum_type}) -> {name} {{
         match content {{
@@ -201,12 +256,23 @@ impl {name} {{
             _ => {name}::UnknownVariant
         }}
     }}
-}}
-        "
-        ));
-    }
 
-    code
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8
+    ) -> Result<Vec<DataValue>, DataTypeError> {{
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes {{
+            values.push(DataValue::Enum(FitEnum::{name}(
+                Self::from(reader.next_{enum_type}({parse_arguments})?)
+            )));
+        }}
+        Ok(values)
+    }}
+}}
+        ",
+    )
 }
 
 fn snake_to_camel_case(input: &str) -> String {
@@ -294,13 +360,10 @@ fn generate_messages_definitions() -> (Vec<(String, Vec<Message>)>, Vec<String>)
         message_name = next_message_name.unwrap();
     }
 
-    if MESSAGES_TO_IMPORT.len() > 0 {
-        messages = messages
-            .into_iter()
-            .filter(|(msg, _)| {
-                MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(&msg.as_str()).as_str())
-            })
-            .collect()
+    if MESSAGES_TO_IMPORT.is_empty() {
+        messages.retain(|(msg, _)| {
+            MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(msg.as_str()).as_str())
+        })
     }
 
     let enums_used = messages
@@ -324,6 +387,18 @@ fn is_fit_enum(type_name: &str) -> Option<String> {
     }
 }
 
+fn get_parse_function(enums: &[String], type_name: &str) -> String {
+    if BASE_TYPES.contains(&type_name) {
+        return format!("parse_{}", type_name).to_string();
+    }
+
+    if enums.contains(&type_name.to_string()) {
+        return format!("{}::parse", snake_to_camel_case(type_name)).to_string();
+    }
+
+    "parse_unknown".to_string()
+}
+
 fn parse_definitions<'a, I>(iter: &mut I) -> (Option<String>, Vec<Message>)
 where
     I: Iterator<Item = &'a [Data]>,
@@ -332,12 +407,9 @@ where
     let mut next_message_name: Option<String> = None;
 
     for row in iter {
-        match row.first() {
-            Some(Data::String(name)) => {
-                next_message_name = Some(name.to_string());
-                break;
-            }
-            _ => {}
+        if let Some(Data::String(name)) = row.first() {
+            next_message_name = Some(name.to_string());
+            break;
         }
 
         let field_def = match row.get(1) {
@@ -387,13 +459,17 @@ where
     (next_message_name, messages)
 }
 
-fn generate_messages_code(messages: Vec<(String, Vec<Message>)>) -> String {
+fn generate_messages_code(messages: Vec<(String, Vec<Message>)>, enums: Vec<String>) -> String {
     let mut code = String::new();
 
     let messages_enum = join(
-        messages
-            .iter()
-            .map(|(msg, _)| format!("{}({})", snake_to_camel_case(msg), snake_to_camel_case(msg))),
+        messages.iter().map(|(msg, _)| {
+            format!(
+                "{}({}Mesg)",
+                snake_to_camel_case(msg),
+                snake_to_camel_case(msg)
+            )
+        }),
         ",\n",
     );
 
@@ -411,28 +487,44 @@ pub enum FitMessage {{
         let variants = join(
             definitions
                 .iter()
-                .map(|def| format!("{}", snake_to_camel_case(&def.name))),
+                .map(|def| snake_to_camel_case(&def.name).to_string()),
             ",\n",
         );
 
         code.push_str(&format!(
             r#"
 #[derive(Debug, PartialEq)]
-pub enum {message} {{
+pub enum {message}Mesg {{
     {variants}
 }}"#
         ));
 
-        //         code.push_str(&format!(
-        //             r#"
-        // impl {message} {{
-        //     fn get_parse_function(def_number: u8) -> fn(&mut Reader<std::vec::IntoIter<u8>>) -> DataValue {{
-        //         match def_number {{
+        let mut mappings = join(
+            definitions.iter().map(|def| {
+                format!(
+                    "{} => {}",
+                    def.field_def,
+                    get_parse_function(&enums, &def.base_type)
+                )
+            }),
+            ",\n",
+        );
+        if !mappings.is_empty() {
+            mappings.push(',');
+        }
 
-        //         }}
-        //     }}
-        // }}"#
-        //         ));
+        code.push_str(&format!(
+                    r#"
+        impl {message}Mesg {{
+            fn get_parse_function(def_number: u8) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
+                match def_number {{
+                {mappings}
+                _ => parse_uint8
+
+                }}
+            }}
+        }}"#
+                ));
     }
 
     code

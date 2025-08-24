@@ -4,7 +4,7 @@ use thiserror::Error;
 
 pub use crate::parser::records::Record;
 use crate::{
-    DataType, DataValue,
+    BaseDataType, BaseDataValue,
     parser::{
         definition::{CustomDescription, Definition},
         header::{FileHeader, FileHeaderError},
@@ -130,7 +130,7 @@ fn find_value_of_field(
     message: &DataMessage,
     definition: &Definition,
     variant: FieldDescriptionField,
-) -> Option<DataValue> {
+) -> Option<BaseDataValue> {
     let index = definition
         .fields
         .iter()
@@ -153,13 +153,13 @@ fn find_value_of_field(
     field.values.first().cloned()
 }
 
-fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<DataType> {
+fn find_base_type(message: &DataMessage, definition: &Definition) -> Option<BaseDataType> {
     let val = match find_value_of_field(message, definition, FieldDescriptionField::FitBaseTypeId) {
-        Some(types::DataValue::Uint8(val)) => val,
+        Some(types::BaseDataValue::Uint8(val)) => val,
         _ => return None,
     };
 
-    DataType::from_base_type_field(val).ok()
+    BaseDataType::from_base_type_field(val).ok()
 }
 
 fn find_value_of_field_as_string(
@@ -168,7 +168,7 @@ fn find_value_of_field_as_string(
     variant: FieldDescriptionField,
 ) -> Option<String> {
     match find_value_of_field(message, definition, variant) {
-        Some(types::DataValue::String(val)) => Some(val.clone()),
+        Some(types::BaseDataValue::String(val)) => Some(val.clone()),
         _ => None,
     }
 }
@@ -178,7 +178,7 @@ fn find_value_of_field_as_u8(
     variant: FieldDescriptionField,
 ) -> Option<u8> {
     match find_value_of_field(message, definition, variant) {
-        Some(types::DataValue::Uint8(val)) => Some(val),
+        Some(types::BaseDataValue::Uint8(val)) => Some(val),
         _ => None,
     }
 }
