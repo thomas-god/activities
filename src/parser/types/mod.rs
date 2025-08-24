@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-pub use crate::parser::types::global_messages::DataField;
 use crate::parser::{
     definition::Endianness,
     reader::{Reader, ReaderError},
@@ -8,7 +7,6 @@ use crate::parser::{
 };
 
 pub mod generated;
-pub mod global_messages;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BaseDataType {
