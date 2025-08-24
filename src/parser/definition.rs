@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Endianness {
     Little,
     Big,
@@ -62,11 +62,16 @@ pub fn parse_definition_message(
     let mut fields_size = 0;
     let mut fields: Vec<DefinitionField> = vec![];
 
+    println!("first 4 bytes read");
+
     for _ in 0..number_of_fields {
+        println!("reading field");
         let field = parse_definition_field(&message_type, endianness, content)?;
         fields_size += field.size;
         fields.push(field);
     }
+
+    println!("fields done");
 
     // Parse size of optionnal developer fields
     if header.message_type_specific {
@@ -119,14 +124,48 @@ fn parse_definition_field(
     content: &mut Reader,
 ) -> Result<DefinitionField, RecordError> {
     let definition_number = content.next_u8()?;
+    println!("definition");
     let kind = message_type.parse_field_kind(definition_number);
     let size = content.next_u8()?;
+    println!("size");
     let field_type = BaseDataType::from_base_type_field(content.next_u8()?)?;
 
+    println!("tyupe");
     Ok(DefinitionField {
         endianness,
         kind,
         size,
         field_type,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::types::global_messages::RecordField;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_definition() {
+        let mut content = Reader::new(8, 0, vec![0, 0, 20, 0, 1, 3, 1, 2].into_iter());
+        let definition = parse_definition_message(
+            DefinitionMessageHeader {
+                message_type_specific: false,
+                local_message_type: 0,
+            },
+            &HashMap::new(),
+            &mut content,
+        )
+        .unwrap();
+
+        assert_eq!(definition.local_message_type, 0);
+        assert_eq!(definition.message_type, GlobalMessage::Record);
+        assert_eq!(definition.fields_size, 1);
+        assert_eq!(definition.fields.len(), 1);
+
+        let field = definition.fields.first().unwrap();
+        assert_eq!(field.endianness, Endianness::Little);
+        assert_eq!(field.field_type, BaseDataType::Uint8);
+        assert_eq!(field.kind, DataField::Record(RecordField::HeartRate));
+    }
 }

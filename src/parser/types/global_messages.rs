@@ -1,7 +1,7 @@
 #[cfg(test)]
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(EnumIter))]
 pub enum GlobalMessage {
     FileId,
@@ -60,7 +60,7 @@ impl GlobalMessage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DataField {
     Timestamp,
     FileId(FileIdField),
@@ -76,13 +76,13 @@ pub enum DataField {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CustomField {
     pub name: Option<String>,
     pub units: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FileIdField {
     Type,
     Manufacturer,
@@ -110,7 +110,7 @@ impl From<u8> for FileIdField {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FieldDescriptionField {
     DeveloperDataIndex,
     FieldDefinitionNumber,
@@ -152,7 +152,7 @@ impl From<u8> for FieldDescriptionField {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DeveloperDataIdField {
     DeveloperId,
     ApplicationId,

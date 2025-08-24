@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::parser::{
     definition::{CustomDescription, Definition, parse_definition_message},
     reader::{Reader, ReaderError},
-    types::{DataTypeError, BaseDataValue, global_messages::DataField},
+    types::{BaseDataValue, DataTypeError, global_messages::DataField},
 };
 
 enum RecordHeader {

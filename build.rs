@@ -1,6 +1,5 @@
 use itertools::join;
 use std::io::Write;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
@@ -12,9 +11,7 @@ const BASE_TYPES: &[&str] = &[
 ];
 
 fn main() {
-    if Path::new("src/parser/types/generated.rs").exists() {
-        return;
-    }
+    println!("cargo:rerun-if-changed=build.rs");
 
     let mut enums = generate_enums();
     let (messages, enums_used) = generate_messages_definitions();
@@ -193,14 +190,14 @@ pub enum DataValue {
         if name.contains("DateTime") {
             code.push_str(&format!(
                 "
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct {name}(u32);
             ",
             ));
         } else {
             code.push_str(&format!(
                 "
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum {name} {{
     {variants}
     UnknownVariant

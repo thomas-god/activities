@@ -637,7 +637,7 @@ impl BaseDataValue {
 
 #[cfg(test)]
 mod tests {
-    use crate::{BaseDataType, BaseDataValue};
+    use crate::BaseDataValue;
 
     #[test]
     fn test_data_value_enum_invalid() {

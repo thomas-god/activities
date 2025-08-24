@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    DataField, BaseDataValue, FitParserError, Record, parse_records,
+    BaseDataValue, DataField, FitParserError, Record, parse_records,
     parser::types::global_messages::DeviceInfoField,
 };
 

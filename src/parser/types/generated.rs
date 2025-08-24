@@ -134,7 +134,7 @@ pub enum FitEnum {
     NoFlyTimeMode(NoFlyTimeMode),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum File {
     Device,
     Settings,
@@ -200,7 +200,7 @@ impl File {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MesgNum {
     FileId,
     Capabilities,
@@ -472,7 +472,7 @@ impl MesgNum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FileFlags {
     Read,
     Write,
@@ -504,7 +504,7 @@ impl FileFlags {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MesgCount {
     NumPerFile,
     MaxPerFile,
@@ -536,7 +536,7 @@ impl MesgCount {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DateTime(u32);
 
 impl DateTime {
@@ -559,7 +559,7 @@ impl DateTime {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LocalDateTime(u32);
 
 impl LocalDateTime {
@@ -582,7 +582,7 @@ impl LocalDateTime {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MessageIndex {
     Selected,
     Reserved,
@@ -614,7 +614,7 @@ impl MessageIndex {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DeviceIndex {
     Creator,
     UnknownVariant,
@@ -642,7 +642,7 @@ impl DeviceIndex {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Gender {
     Female,
     Male,
@@ -672,7 +672,7 @@ impl Gender {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Language {
     English,
     French,
@@ -776,7 +776,7 @@ impl Language {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DisplayMeasure {
     Metric,
     Statute,
@@ -808,7 +808,7 @@ impl DisplayMeasure {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DisplayHeart {
     Bpm,
     Max,
@@ -840,7 +840,7 @@ impl DisplayHeart {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DisplayPower {
     Watts,
     PercentFtp,
@@ -870,7 +870,7 @@ impl DisplayPower {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DisplayPosition {
     Degree,
     DegreeMinute,
@@ -980,7 +980,7 @@ impl DisplayPosition {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Switch {
     Off,
     On,
@@ -1012,7 +1012,7 @@ impl Switch {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Sport {
     Generic,
     Running,
@@ -1176,7 +1176,7 @@ impl Sport {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SportBits0 {
     Generic,
     Running,
@@ -1218,7 +1218,7 @@ impl SportBits0 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SubSport {
     Generic,
     Treadmill,
@@ -1422,7 +1422,7 @@ impl SubSport {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SportEvent {
     Uncategorized,
     Geocaching,
@@ -1466,7 +1466,7 @@ impl SportEvent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Activity {
     Manual,
     AutoMultiSport,
@@ -1496,7 +1496,7 @@ impl Activity {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Intensity {
     Active,
     Rest,
@@ -1536,7 +1536,7 @@ impl Intensity {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SessionTrigger {
     ActivityEnd,
     Manual,
@@ -1570,7 +1570,7 @@ impl SessionTrigger {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LapTrigger {
     Manual,
     Time,
@@ -1614,7 +1614,7 @@ impl LapTrigger {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TimeMode {
     Hour12,
     Hour24,
@@ -1652,7 +1652,7 @@ impl TimeMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BacklightMode {
     Off,
     Manual,
@@ -1692,7 +1692,7 @@ impl BacklightMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DateMode {
     DayMonth,
     MonthDay,
@@ -1722,7 +1722,7 @@ impl DateMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BacklightTimeout {
     Infinite,
     UnknownVariant,
@@ -1750,7 +1750,7 @@ impl BacklightTimeout {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Event {
     Timer,
     Workout,
@@ -1868,7 +1868,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum EventType {
     Start,
     Stop,
@@ -1914,7 +1914,7 @@ impl EventType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Tone {
     Off,
     Tone,
@@ -1948,7 +1948,7 @@ impl Tone {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ActivityClass {
     Level,
     LevelMax,
@@ -1980,7 +1980,7 @@ impl ActivityClass {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum HrZoneCalc {
     Custom,
     PercentMaxHr,
@@ -2014,7 +2014,7 @@ impl HrZoneCalc {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PwrZoneCalc {
     Custom,
     PercentFtp,
@@ -2044,7 +2044,7 @@ impl PwrZoneCalc {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WktStepDuration {
     Time,
     Distance,
@@ -2132,7 +2132,7 @@ impl WktStepDuration {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WktStepTarget {
     Speed,
     HeartRate,
@@ -2186,7 +2186,7 @@ impl WktStepTarget {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Goal {
     Time,
     Distance,
@@ -2226,7 +2226,7 @@ impl Goal {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum GoalRecurrence {
     Off,
     Daily,
@@ -2264,7 +2264,7 @@ impl GoalRecurrence {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum GoalSource {
     Auto,
     Community,
@@ -2296,7 +2296,7 @@ impl GoalSource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Schedule {
     Workout,
     Course,
@@ -2326,7 +2326,7 @@ impl Schedule {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CoursePoint {
     Generic,
     Summit,
@@ -2458,7 +2458,7 @@ impl CoursePoint {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Manufacturer {
     Garmin,
     GarminFr405Antfs,
@@ -2948,7 +2948,7 @@ impl Manufacturer {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AntNetwork {
     Public,
     Antplus,
@@ -2982,7 +2982,7 @@ impl AntNetwork {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WorkoutCapabilities {
     Interval,
     Custom,
@@ -3036,7 +3036,7 @@ impl WorkoutCapabilities {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BatteryStatus {
     New,
     Good,
@@ -3076,7 +3076,7 @@ impl BatteryStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum HrType {
     Normal,
     Irregular,
@@ -3106,7 +3106,7 @@ impl HrType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CourseCapabilities {
     Processed,
     Valid,
@@ -3156,7 +3156,7 @@ impl CourseCapabilities {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Weight {
     Calculating,
     UnknownVariant,
@@ -3184,7 +3184,7 @@ impl Weight {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BpStatus {
     NoError,
     ErrorIncompleteData,
@@ -3220,7 +3220,7 @@ impl BpStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum UserLocalId {
     LocalMin,
     LocalMax,
@@ -3258,7 +3258,7 @@ impl UserLocalId {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SwimStroke {
     Freestyle,
     Backstroke,
@@ -3302,7 +3302,7 @@ impl SwimStroke {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ActivityType {
     Generic,
     Running,
@@ -3346,7 +3346,7 @@ impl ActivityType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ActivitySubtype {
     Generic,
     Treadmill,
@@ -3412,7 +3412,7 @@ impl ActivitySubtype {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ActivityLevel {
     Low,
     Medium,
@@ -3444,7 +3444,7 @@ impl ActivityLevel {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Side {
     Right,
     Left,
@@ -3474,7 +3474,7 @@ impl Side {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LeftRightBalance {
     Mask,
     Right,
@@ -3504,7 +3504,7 @@ impl LeftRightBalance {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LeftRightBalance100 {
     Mask,
     Right,
@@ -3534,7 +3534,7 @@ impl LeftRightBalance100 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LengthType {
     Idle,
     Active,
@@ -3564,7 +3564,7 @@ impl LengthType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DayOfWeek {
     Sunday,
     Monday,
@@ -3604,7 +3604,7 @@ impl DayOfWeek {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ConnectivityCapabilities {
     Bluetooth,
     BluetoothLe,
@@ -3694,7 +3694,7 @@ impl ConnectivityCapabilities {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WeatherReport {
     Current,
     Forecast,
@@ -3728,7 +3728,7 @@ impl WeatherReport {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WeatherStatus {
     Clear,
     PartlyCloudy,
@@ -3796,7 +3796,7 @@ impl WeatherStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WeatherSeverity {
     Unknown,
     Warning,
@@ -3832,7 +3832,7 @@ impl WeatherSeverity {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WeatherSevereType {
     Unspecified,
     Tornado,
@@ -4028,7 +4028,7 @@ impl WeatherSevereType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LocaltimeIntoDay {
     UnknownVariant,
 }
@@ -4054,7 +4054,7 @@ impl LocaltimeIntoDay {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StrokeType {
     NoEvent,
     Other,
@@ -4092,7 +4092,7 @@ impl StrokeType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BodyLocation {
     LeftLeg,
     LeftCalf,
@@ -4198,7 +4198,7 @@ impl BodyLocation {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SegmentLapStatus {
     End,
     Fail,
@@ -4228,7 +4228,7 @@ impl SegmentLapStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SegmentLeaderboardType {
     Overall,
     PersonalBest,
@@ -4284,7 +4284,7 @@ impl SegmentLeaderboardType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SegmentDeleteStatus {
     DoNotDelete,
     DeleteOne,
@@ -4316,7 +4316,7 @@ impl SegmentDeleteStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SegmentSelectionType {
     Starred,
     Suggested,
@@ -4346,7 +4346,7 @@ impl SegmentSelectionType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SourceType {
     Ant,
     Antplus,
@@ -4384,7 +4384,7 @@ impl SourceType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AntChannelId {
     AntExtendedDeviceNumberUpperNibble,
     AntTransmissionTypeLowerNibble,
@@ -4418,7 +4418,7 @@ impl AntChannelId {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DisplayOrientation {
     Auto,
     Portrait,
@@ -4454,7 +4454,7 @@ impl DisplayOrientation {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WorkoutEquipment {
     None,
     SwimFins,
@@ -4492,7 +4492,7 @@ impl WorkoutEquipment {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WatchfaceMode {
     Digital,
     Analog,
@@ -4526,7 +4526,7 @@ impl WatchfaceMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CameraEventType {
     VideoStart,
     VideoSplit,
@@ -4578,7 +4578,7 @@ impl CameraEventType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SensorType {
     Accelerometer,
     Gyroscope,
@@ -4612,7 +4612,7 @@ impl SensorType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CameraOrientationType {
     CameraOrientation0,
     CameraOrientation90,
@@ -4646,7 +4646,7 @@ impl CameraOrientationType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AttitudeStage {
     Failed,
     Aligning,
@@ -4680,7 +4680,7 @@ impl AttitudeStage {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AttitudeValidity {
     TrackAngleHeadingValid,
     PitchValid,
@@ -4732,7 +4732,7 @@ impl AttitudeValidity {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AutoSyncFrequency {
     Never,
     Occasionally,
@@ -4768,7 +4768,7 @@ impl AutoSyncFrequency {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExdLayout {
     FullScreen,
     HalfVertical,
@@ -4812,7 +4812,7 @@ impl ExdLayout {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExdDisplayType {
     Numerical,
     Simple,
@@ -4860,7 +4860,7 @@ impl ExdDisplayType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExdDataUnits {
     NoUnits,
     Laps,
@@ -4986,7 +4986,7 @@ impl ExdDataUnits {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExdQualifiers {
     NoQualifier,
     Instantaneous,
@@ -5100,7 +5100,7 @@ impl ExdQualifiers {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExdDescriptors {
     BikeLightBatteryStatus,
     BeamAngleStatus,
@@ -5320,7 +5320,7 @@ impl ExdDescriptors {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AutoActivityDetect {
     None,
     Running,
@@ -5360,7 +5360,7 @@ impl AutoActivityDetect {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitBaseType {
     Enum,
     Sint8,
@@ -5420,7 +5420,7 @@ impl FitBaseType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum FitBaseUnit {
     Other,
     Kilogram,
@@ -5452,7 +5452,7 @@ impl FitBaseUnit {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SetType {
     Rest,
     Active,
@@ -5482,7 +5482,7 @@ impl SetType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MaxMetCategory {
     Generic,
     Cycling,
@@ -5512,7 +5512,7 @@ impl MaxMetCategory {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExerciseCategory {
     BenchPress,
     CalfRaise,
@@ -5644,7 +5644,7 @@ impl ExerciseCategory {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum WaterType {
     Fresh,
     Salt,
@@ -5678,7 +5678,7 @@ impl WaterType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TissueModelType {
     Zhl16c,
     UnknownVariant,
@@ -5706,7 +5706,7 @@ impl TissueModelType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DiveGasStatus {
     Disabled,
     Enabled,
@@ -5738,7 +5738,7 @@ impl DiveGasStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DiveAlarmType {
     Depth,
     Time,
@@ -5770,7 +5770,7 @@ impl DiveAlarmType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DiveBacklightMode {
     AtDepth,
     AlwaysOn,
@@ -5800,7 +5800,7 @@ impl DiveBacklightMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SleepLevel {
     Unmeasurable,
     Awake,
@@ -5836,7 +5836,7 @@ impl SleepLevel {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Spo2MeasurementType {
     OffWrist,
     SpotCheck,
@@ -5870,7 +5870,7 @@ impl Spo2MeasurementType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CcrSetpointSwitchMode {
     Manual,
     Automatic,
@@ -5900,7 +5900,7 @@ impl CcrSetpointSwitchMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DiveGasMode {
     OpenCircuit,
     ClosedCircuitDiluent,
@@ -5930,7 +5930,7 @@ impl DiveGasMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ProjectileType {
     Arrow,
     RifleCartridge,
@@ -5968,7 +5968,7 @@ impl ProjectileType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SplitType {
     AscentSplit,
     DescentSplit,
@@ -6036,7 +6036,7 @@ impl SplitType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ClimbProEvent {
     Approach,
     Start,
@@ -6068,7 +6068,7 @@ impl ClimbProEvent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum GasConsumptionRateType {
     PressureSac,
     VolumeSac,
@@ -6100,7 +6100,7 @@ impl GasConsumptionRateType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TapSensitivity {
     High,
     Medium,
@@ -6132,7 +6132,7 @@ impl TapSensitivity {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum RadarThreatLevelType {
     ThreatUnknown,
     ThreatNone,
@@ -6166,7 +6166,7 @@ impl RadarThreatLevelType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MaxMetSpeedSource {
     OnboardGps,
     ConnectedGps,
@@ -6198,7 +6198,7 @@ impl MaxMetSpeedSource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MaxMetHeartRateSource {
     Whr,
     Hrm,
@@ -6228,7 +6228,7 @@ impl MaxMetHeartRateSource {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum HrvStatus {
     None,
     Poor,
@@ -6264,7 +6264,7 @@ impl HrvStatus {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NoFlyTimeMode {
     Standard,
     Flat24Hours,
