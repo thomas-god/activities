@@ -6638,6 +6638,33 @@ impl NoFlyTimeMode {
     }
 }
 
+impl FitBaseType {
+    pub fn get_parse_fn(
+        &self,
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+        match self {
+            Self::Byte => parse_byte,
+            Self::Enum => parse_unknown,
+            Self::Float32 => parse_float32,
+            Self::Float64 => parse_float64,
+            Self::Sint8 => parse_sint8,
+            Self::Sint16 => parse_sint16,
+            Self::Sint32 => parse_sint32,
+            Self::Sint64 => parse_sint64,
+            Self::String => parse_string,
+            Self::Uint8 => parse_uint8,
+            Self::Uint8z => parse_uint8z,
+            Self::Uint16 => parse_uint16,
+            Self::Uint16z => parse_uint16z,
+            Self::Uint32 => parse_uint32,
+            Self::Uint32z => parse_uint32z,
+            Self::Uint64 => parse_uint64,
+            Self::Uint64z => parse_uint64z,
+            Self::UnknownVariant => parse_unknown,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FitMessage {
     FileId(FileIdField),
