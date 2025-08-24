@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 
-use crate::{
-    BaseDataType,
-    parser::{
-        reader::Reader,
-        records::{DefinitionMessageHeader, RecordError},
-        types::{
-            DataTypeError,
-            generated::{CustomField, DataValue, FitMessage, MesgNum},
-        },
+use crate::parser::{
+    definition::custom::CustomDescription,
+    reader::Reader,
+    records::{DefinitionMessageHeader, RecordError},
+    types::{
+        DataTypeError,
+        generated::{CustomField, DataValue, FitMessage, MesgNum},
+        parse_byte_array, parse_float32, parse_float64, parse_sint8, parse_sint16, parse_sint32,
+        parse_sint64, parse_string, parse_uint8, parse_uint8z, parse_uint16, parse_uint16z,
+        parse_uint32, parse_uint32z, parse_uint64, parse_uint64z, parse_unknown,
     },
 };
+
+pub mod custom;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Endianness {
@@ -43,12 +46,77 @@ pub struct DefinitionField {
     pub size: u8,
 }
 
-#[derive(Debug, Clone)]
-pub struct CustomDescription {
-    pub endianness: Endianness,
-    pub base_type: BaseDataType,
-    pub name: Option<String>,
-    pub units: Option<String>,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BaseDataType {
+    Enum,
+    Sint8,
+    Uint8,
+    Sint16,
+    Uint16,
+    Sint32,
+    Uint32,
+    String,
+    Float32,
+    Float64,
+    Uint8z,
+    Uint16z,
+    Uint32z,
+    Byte,
+    Sint64,
+    Uint64,
+    Uint64z,
+    Unknown,
+}
+
+impl BaseDataType {
+    /// Parse the enum variant from the base type field value
+    pub fn from_base_type_field(base_type_field: u8) -> Result<Self, DataTypeError> {
+        match base_type_field {
+            0x00 => Ok(BaseDataType::Enum),
+            0x01 => Ok(BaseDataType::Sint8),
+            0x02 => Ok(BaseDataType::Uint8),
+            0x83 => Ok(BaseDataType::Sint16),
+            0x84 => Ok(BaseDataType::Uint16),
+            0x85 => Ok(BaseDataType::Sint32),
+            0x86 => Ok(BaseDataType::Uint32),
+            0x07 => Ok(BaseDataType::String),
+            0x88 => Ok(BaseDataType::Float32),
+            0x89 => Ok(BaseDataType::Float64),
+            0x0A => Ok(BaseDataType::Uint8z),
+            0x8B => Ok(BaseDataType::Uint16z),
+            0x8C => Ok(BaseDataType::Uint32z),
+            0x0D => Ok(BaseDataType::Byte),
+            0x8E => Ok(BaseDataType::Sint64),
+            0x8F => Ok(BaseDataType::Uint64),
+            0x90 => Ok(BaseDataType::Uint64z),
+            _ => Ok(BaseDataType::Unknown),
+        }
+    }
+
+    pub fn get_parse(
+        data_type: &Self,
+    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+        match data_type {
+            BaseDataType::Byte => parse_byte_array,
+            BaseDataType::Enum => parse_unknown,
+            BaseDataType::Float32 => parse_float32,
+            BaseDataType::Float64 => parse_float64,
+            BaseDataType::Sint8 => parse_sint8,
+            BaseDataType::Sint16 => parse_sint16,
+            BaseDataType::Sint32 => parse_sint32,
+            BaseDataType::Sint64 => parse_sint64,
+            BaseDataType::String => parse_string,
+            BaseDataType::Uint8 => parse_uint8,
+            BaseDataType::Uint8z => parse_uint8z,
+            BaseDataType::Uint16 => parse_uint16,
+            BaseDataType::Uint16z => parse_uint16z,
+            BaseDataType::Uint32 => parse_uint32,
+            BaseDataType::Uint32z => parse_uint32z,
+            BaseDataType::Uint64 => parse_uint64,
+            BaseDataType::Uint64z => parse_uint64z,
+            BaseDataType::Unknown => parse_unknown,
+        }
+    }
 }
 
 pub fn parse_definition_message(

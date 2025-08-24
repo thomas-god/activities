@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::parser::{
-    definition::{CustomDescription, Definition, parse_definition_message},
+    definition::{Definition, custom::CustomDescription, parse_definition_message},
     reader::{Reader, ReaderError},
     types::{
         DataTypeError,
