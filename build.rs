@@ -33,7 +33,7 @@ fn main() {
     std::fs::write("src/parser/types/generated.rs", code).expect("Could not wirte to ouptut file");
 }
 
-fn generate_enums() -> Vec<(String, String, HashMap<usize, String>)> {
+fn generate_enums() -> Vec<(String, String, Vec<(usize, String)>)> {
     let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Types")
@@ -42,7 +42,7 @@ fn generate_enums() -> Vec<(String, String, HashMap<usize, String>)> {
     let mut iterator = range.rows();
     let _ = iterator.next(); // Skip header
 
-    let mut enums: Vec<(String, String, HashMap<usize, String>)> = Vec::new();
+    let mut enums = Vec::new();
 
     let EnumRow {
         name: mut type_name,
@@ -106,11 +106,11 @@ fn parse_enum_row(row: &[Data]) -> EnumRow {
 
 fn parse_enum_variants<'a, I>(
     iterator: &mut I,
-) -> (HashMap<usize, String>, Option<String>, Option<String>)
+) -> (Vec<(usize, String)>, Option<String>, Option<String>)
 where
     I: Iterator<Item = &'a [Data]>,
 {
-    let mut mapping = HashMap::new();
+    let mut mapping = Vec::new();
     let mut next_type_name = None;
     let mut next_base_type = None;
 
@@ -124,7 +124,7 @@ where
         }
 
         if row.variant_name.is_some() && row.value.is_some() {
-            mapping.insert(row.value.unwrap(), row.variant_name.unwrap());
+            mapping.push((row.value.unwrap(), row.variant_name.unwrap()));
         }
     }
 
@@ -143,7 +143,7 @@ fn map_type(val: &str) -> Option<String> {
     }
 }
 
-fn generate_enums_code(enums: &[(String, String, HashMap<usize, String>)]) -> String {
+fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> String {
     let mut code = String::new();
     code.push_str("#![allow(dead_code)]\n");
     code.push_str("#![allow(unused_imports)]\n");
@@ -178,7 +178,7 @@ pub enum DataValue {
     for (name, base_type, mapping) in enums.iter() {
         let name = snake_to_camel_case(name);
 
-        let mut variants = join(mapping.values().map(|v| snake_to_camel_case(v)), ",\n");
+        let mut variants = join(mapping.iter().map(|(_, v)| snake_to_camel_case(v)), ",\n");
         if !variants.is_empty() {
             variants.push(',');
         }
@@ -229,7 +229,7 @@ pub enum FitEnum {{
     )
 }
 
-fn template_enum_impl(name: &str, base_type: &str, mapping: &HashMap<usize, String>) -> String {
+fn template_enum_impl(name: &str, base_type: &str, mapping: &Vec<(usize, String)>) -> String {
     let enum_type = map_type(base_type).expect("Expected not None enum type");
     let mut enum_mapping = join(
         mapping
