@@ -15,7 +15,7 @@ use crate::parser::types::{
     parse_byte_array as parse_byte, parse_float32, parse_float64, parse_sint16, parse_sint32,
     parse_sint64, parse_sint8, parse_string, parse_uint16, parse_uint16z, parse_uint32,
     parse_uint32z, parse_uint64, parse_uint64z, parse_uint8, parse_uint8z, parse_unknown,
-    DataTypeError, DataValue,
+    DataTypeError, DataValue, ScaleOffset,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -6927,13 +6927,6 @@ pub struct CustomField {
     pub name: Option<String>,
     pub units: Option<String>,
 }
-
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct ScaleOffset {
-    pub scale: usize,
-    pub offset: usize,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum FileIdField {
     Type,
@@ -7054,12 +7047,12 @@ impl TimestampCorrelationField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 32768,
-                offset: 0,
+                scale: 32768_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 32768,
-                offset: 0,
+                scale: 32768_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7096,8 +7089,8 @@ impl SoftwareField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7388,8 +7381,8 @@ impl DeviceSettingsField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             5 => Some(ScaleOffset {
-                scale: 4,
-                offset: 0,
+                scale: 4_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7504,20 +7497,20 @@ impl UserProfileField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             31 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             32 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7609,12 +7602,12 @@ impl SdmProfileField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7738,28 +7731,28 @@ impl BikeProfileField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             10 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             11 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             19 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -7967,24 +7960,24 @@ impl TimeInZoneField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8129,8 +8122,8 @@ impl SpeedZoneField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8238,12 +8231,12 @@ impl MetZoneField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8283,16 +8276,16 @@ impl TrainingSettingsField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             31 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             32 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             153 => Some(ScaleOffset {
-                scale: 1000000,
-                offset: 0,
+                scale: 1000000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8425,44 +8418,44 @@ impl DiveSettingsField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             6 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             17 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             18 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             23 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             24 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             26 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             27 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             36 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8529,16 +8522,16 @@ impl DiveAlarmField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             11 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8605,16 +8598,16 @@ impl DiveApneaAlarmField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             11 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -8770,8 +8763,8 @@ impl ActivityField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -9267,324 +9260,324 @@ impl SessionField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             14 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             15 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             24 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             35 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             36 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             41 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             42 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             44 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             49 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             50 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             52 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             53 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             54 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             55 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             56 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             59 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             60 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             61 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             62 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             63 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             65 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             66 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             67 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             68 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             69 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             71 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             87 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             88 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             89 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             90 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             91 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             92 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             93 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             94 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             95 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             96 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             97 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             98 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             99 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             100 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             101 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             102 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             103 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             104 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             105 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             112 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             116 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             117 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             118 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             119 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             124 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             125 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             126 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             127 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             128 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             131 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             132 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             133 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             134 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             137 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             139 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             140 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             141 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             142 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             143 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             144 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             145 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             146 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             168 => Some(ScaleOffset {
-                scale: 65536,
-                offset: 0,
+                scale: 65536_f32,
+                offset: 0_f32,
             }),
             169 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             170 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             180 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             199 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             200 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             208 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             209 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             210 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -9981,260 +9974,260 @@ impl LapField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             13 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             14 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             37 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             42 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             43 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             45 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             46 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             47 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             48 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             49 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             52 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             53 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             54 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             55 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             56 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             57 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             58 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             59 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             60 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             62 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             77 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             78 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             79 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             80 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             81 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             82 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             84 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             85 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             86 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             87 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             88 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             89 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             91 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             92 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             93 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             94 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             95 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             98 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             102 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             103 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             104 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             105 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             110 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             111 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             112 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             113 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             114 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             117 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             118 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             119 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             120 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             121 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             122 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             123 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             136 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             137 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             156 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             157 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             158 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             159 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             160 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -10328,24 +10321,24 @@ impl LengthField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             22 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             23 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -10625,212 +10618,212 @@ impl RecordField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             11 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             12 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             17 => Some(ScaleOffset {
-                scale: 16,
-                offset: 0,
+                scale: 16_f32,
+                offset: 0_f32,
             }),
             32 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             39 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             40 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             41 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             43 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             44 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             45 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             46 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             47 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             48 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             51 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             52 => Some(ScaleOffset {
-                scale: 256,
-                offset: 0,
+                scale: 256_f32,
+                offset: 0_f32,
             }),
             53 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             54 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             55 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             56 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             57 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             58 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             59 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             69 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             70 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             71 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             72 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             73 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             78 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             81 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             83 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             84 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             85 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             87 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             92 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             93 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             94 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             95 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             96 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             98 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             99 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             108 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             116 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             124 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             125 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             126 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             127 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             129 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             139 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -10915,12 +10908,12 @@ impl EventField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             23 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             24 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11005,12 +10998,12 @@ impl DeviceInfoField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             10 => Some(ScaleOffset {
-                scale: 256,
-                offset: 0,
+                scale: 256_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11053,8 +11046,8 @@ impl DeviceAuxBatteryInfoField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 256,
-                offset: 0,
+                scale: 256_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11173,8 +11166,8 @@ impl WeatherConditionsField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11272,20 +11265,20 @@ impl GpsMetadataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11576,8 +11569,8 @@ impl ThreeDSensorCalibrationField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             5 => Some(ScaleOffset {
-                scale: 65535,
-                offset: 0,
+                scale: 65535_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -11804,28 +11797,28 @@ impl AviationAttitudeField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 10430,
-                offset: 0,
+                scale: 10430_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 10430,
-                offset: 0,
+                scale: 10430_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1024,
-                offset: 0,
+                scale: 1024_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 10430,
-                offset: 0,
+                scale: 10430_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12034,12 +12027,12 @@ impl SetField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 16,
-                offset: 0,
+                scale: 16_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12097,12 +12090,12 @@ impl JumpField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12187,36 +12180,36 @@ impl SplitField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             25 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             26 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             74 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             110 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12286,28 +12279,28 @@ impl SplitSummaryField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             12 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             77 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12549,8 +12542,8 @@ impl CoursePointField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12651,8 +12644,8 @@ impl SegmentLeaderboardEntryField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -12701,20 +12694,20 @@ impl SegmentPointField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             _ => None,
         }
@@ -13027,168 +13020,168 @@ impl SegmentLapField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             7 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             13 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             14 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             34 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             35 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             37 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             38 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             39 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             40 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             41 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             44 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             45 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             46 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             47 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             48 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             49 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             50 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             51 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             52 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             54 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             56 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             59 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             60 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             61 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             62 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             63 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             66 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             67 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             68 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             71 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             75 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             76 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             77 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             78 => Some(ScaleOffset {
-                scale: 0,
-                offset: 0,
+                scale: 0_f32,
+                offset: 0_f32,
             }),
             89 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             90 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             91 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             92 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             93 => Some(ScaleOffset {
-                scale: 5,
-                offset: 500,
+                scale: 5_f32,
+                offset: 500_f32,
             }),
             _ => None,
         }
@@ -13295,8 +13288,8 @@ impl WorkoutField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             14 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -13345,8 +13338,8 @@ impl WorkoutSessionField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -13431,8 +13424,8 @@ impl WorkoutStepField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             12 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -13640,40 +13633,40 @@ impl WeightScaleField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 4,
-                offset: 0,
+                scale: 4_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 4,
-                offset: 0,
+                scale: 4_f32,
+                offset: 0_f32,
             }),
             13 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -13777,12 +13770,12 @@ impl MonitoringInfoField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             3 => Some(ScaleOffset {
-                scale: 5000,
-                offset: 0,
+                scale: 5000_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 5000,
-                offset: 0,
+                scale: 5000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -13897,40 +13890,40 @@ impl MonitoringField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 2,
-                offset: 0,
+                scale: 2_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             12 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             14 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             15 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             28 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             31 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             32 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14004,12 +13997,12 @@ impl Spo2DataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14055,16 +14048,16 @@ impl HrField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 32768,
-                offset: 0,
+                scale: 32768_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 256,
-                offset: 0,
+                scale: 256_f32,
+                offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 1024,
-                offset: 0,
+                scale: 1024_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14147,8 +14140,8 @@ impl MaxMetDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14268,16 +14261,16 @@ impl HsaAccelerometerDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14326,16 +14319,16 @@ impl HsaGyroscopeDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 28,
-                offset: 0,
+                scale: 28_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 28,
-                offset: 0,
+                scale: 28_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 28,
-                offset: 0,
+                scale: 28_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14372,8 +14365,8 @@ impl HsaStepDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14447,8 +14440,8 @@ impl HsaStressDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14485,8 +14478,8 @@ impl HsaRespirationDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14526,8 +14519,8 @@ impl HsaHeartRateDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14598,8 +14591,8 @@ impl HsaWristTemperatureDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14759,8 +14752,8 @@ impl AntRxField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 32768,
-                offset: 0,
+                scale: 32768_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -14806,8 +14799,8 @@ impl AntTxField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 32768,
-                offset: 0,
+                scale: 32768_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15042,76 +15035,76 @@ impl DiveSummaryField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             7 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             8 => Some(ScaleOffset {
-                scale: 1,
-                offset: 0,
+                scale: 1_f32,
+                offset: 0_f32,
             }),
             11 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             12 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             13 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             14 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             15 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             16 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             17 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             22 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             23 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             24 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             25 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15157,8 +15150,8 @@ impl AadAccelFeaturesField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             4 => Some(ScaleOffset {
-                scale: 25,
-                offset: 0,
+                scale: 25_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15189,8 +15182,8 @@ impl HrvField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15276,28 +15269,28 @@ impl HrvStatusSummaryField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15331,8 +15324,8 @@ impl HrvValueField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 128,
-                offset: 0,
+                scale: 128_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15409,8 +15402,8 @@ impl RespirationRateField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15462,24 +15455,24 @@ impl ChronoShotSessionField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             1 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             5 => Some(ScaleOffset {
-                scale: 10,
-                offset: 0,
+                scale: 10_f32,
+                offset: 0_f32,
             }),
             6 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15516,8 +15509,8 @@ impl ChronoShotDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             0 => Some(ScaleOffset {
-                scale: 1000,
-                offset: 0,
+                scale: 1000_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15554,8 +15547,8 @@ impl TankUpdateField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15598,16 +15591,16 @@ impl TankSummaryField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             1 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             2 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }
@@ -15677,8 +15670,8 @@ impl SleepAssessmentField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             15 => Some(ScaleOffset {
-                scale: 100,
-                offset: 0,
+                scale: 100_f32,
+                offset: 0_f32,
             }),
             _ => None,
         }

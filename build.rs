@@ -174,7 +174,7 @@ fn generate_enums_code(enums: &[(String, String, Vec<(usize, String)>)]) -> Stri
         parse_uint32, parse_uint32z, parse_sint32,
         parse_uint64, parse_uint64z, parse_sint64,
         parse_float32, parse_float64, parse_string,
-        parse_unknown, parse_byte_array as parse_byte,
+        parse_unknown, parse_byte_array as parse_byte, ScaleOffset,
         DataValue, DataTypeError};",
     );
     code.push_str("use crate::parser::definition::{Endianness};\n\n");
@@ -636,15 +636,7 @@ pub enum FitMessage {{
 pub struct CustomField {{
     pub name: Option<String>,
     pub units: Option<String>,
-}}
-
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct ScaleOffset {{
-    pub scale: usize,
-    pub offset: usize
-}}
-
-"#
+}}"#
     ));
 
     for (msg, definitions) in messages.iter() {
@@ -700,8 +692,8 @@ pub enum {message}Field {{
                     if def.offset.is_some() || def.scale.is_some() {
                         Some(format!(
                             "{} => Some(ScaleOffset {{
-                                scale: {},
-                                offset: {}
+                                scale: {}_f32,
+                                offset: {}_f32
                             }})",
                             def.field_def,
                             def.scale.unwrap_or(1),

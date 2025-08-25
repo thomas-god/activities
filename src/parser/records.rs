@@ -70,6 +70,8 @@ pub enum RecordError {
     DataTypeError(#[from] DataTypeError),
     #[error("No timestamp to rebuild compressed timestamp")]
     TimestampMissingForCompressedTimestamp,
+    #[error("Trying to scale a value by")]
+    ScaleByZeroError,
 }
 
 #[derive(Debug)]
@@ -152,7 +154,10 @@ fn parse_data_message(
         Some(definition) => {
             let mut fields = Vec::new();
             for field in definition.fields.iter() {
-                let values = (field.parse)(content, &field.endianness, field.size)?;
+                let values = (field.parse)(content, &field.endianness, field.size)?
+                    .iter()
+                    .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+                    .collect();
                 fields.push(DataMessageField {
                     kind: field.kind.clone(),
                     values,

@@ -7,7 +7,7 @@ use crate::{
         reader::Reader,
         records::{DefinitionMessageHeader, RecordError},
         types::{
-            DataTypeError,
+            DataTypeError, ScaleOffset,
             generated::{CustomField, FitMessage, MesgNum},
         },
     },
@@ -43,6 +43,7 @@ pub struct DefinitionField {
     pub endianness: Endianness,
     pub kind: FitMessage,
     pub parse: fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>,
+    pub scale_offset: Option<ScaleOffset>,
     pub size: u8,
 }
 
@@ -105,6 +106,7 @@ fn parse_developer_field(
             units: description.units.clone(),
         }),
         parse: description.base_type.get_parse_fn(),
+        scale_offset: None,
         size,
     };
     Ok(field)
@@ -118,13 +120,15 @@ fn parse_definition_field(
     let definition_number = content.next_u8()?;
     let kind = message_type.message_field(definition_number);
     let parse = message_type.field_parse(definition_number);
+    let scale_offset = message_type.scale_offset(definition_number);
     let size = content.next_u8()?;
-    let _ = content.next_u8()?; // Byte for type is not used, but must still be used
+    let _ = content.next_u8()?; // Byte for type is not used, but must still be consumed
 
     Ok(DefinitionField {
         endianness,
         kind,
         parse,
+        scale_offset,
         size,
     })
 }

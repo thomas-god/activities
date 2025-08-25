@@ -3,6 +3,7 @@ use thiserror::Error;
 use crate::parser::{
     definition::Endianness,
     reader::{Reader, ReaderError},
+    records::RecordError,
     types::generated::FitEnum,
 };
 
@@ -371,6 +372,62 @@ impl DataValue {
             Self::Unknown => true,
         }
     }
+
+    pub fn apply_scale_offset(
+        &self,
+        scale_offset: &Option<ScaleOffset>,
+    ) -> Result<DataValue, RecordError> {
+        let Some(ScaleOffset { scale, offset }) = scale_offset else {
+            return Ok(self.clone());
+        };
+
+        if *scale == 0. {
+            return Err(RecordError::ScaleByZeroError);
+        }
+
+        match self {
+            Self::Sint8(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Sint16(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Sint32(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Sint64(val) => {
+                let scale = *scale as f64;
+                let offset = *offset as f64;
+                Ok(Self::Float64((*val as f64) / scale - offset))
+            }
+            Self::Uint8(val) => Ok(Self::Float32((*val as f32) / scale - offset)),
+            Self::Uint16(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Uint32(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Uint64(val) => {
+                let scale = *scale as f64;
+                let offset = *offset as f64;
+                Ok(Self::Float64((*val as f64) / scale - offset))
+            }
+            Self::Uint8z(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Uint16z(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Uint32z(val) => Ok(Self::Float32((*val as f32) / *scale - *offset)),
+            Self::Uint64z(val) => {
+                let scale = *scale as f64;
+                let offset = *offset as f64;
+
+                Ok(Self::Float64((*val as f64) / scale - offset))
+            }
+            Self::Float32(val) => Ok(Self::Float32(*val / scale - offset)),
+            Self::Float64(val) => {
+                let scale = *scale as f64;
+                let offset = *offset as f64;
+
+                Ok(Self::Float64(*val / scale - offset))
+            }
+            Self::DateTime(val) => Ok(Self::DateTime(((*val as f32) / scale - offset) as u32)),
+            val => Ok(val.clone()),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct ScaleOffset {
+    pub scale: f32,
+    pub offset: f32,
 }
 
 #[cfg(test)]
@@ -464,5 +521,73 @@ mod tests {
     #[test]
     fn test_data_value_unknown_always_invalid() {
         assert!(DataValue::Unknown.is_invalid());
+    }
+
+    #[test]
+    fn test_apply_scale_offset_is_none() {
+        let value = DataValue::Sint32(100);
+        let result = value.apply_scale_offset(&None);
+
+        assert_eq!(result.unwrap(), DataValue::Sint32(100));
+    }
+
+    #[test]
+    fn test_apply_scale_offset_as_f32() {
+        let value = DataValue::Uint8(135);
+        let scale = Some(ScaleOffset {
+            scale: 2.,
+            offset: 50.,
+        });
+        let result = value.apply_scale_offset(&scale);
+
+        assert_eq!(result.unwrap(), DataValue::Float32(17.5));
+    }
+
+    #[test]
+    fn test_apply_scale_offset_as_f64() {
+        let value = DataValue::Uint64(135);
+        let scale = Some(ScaleOffset {
+            scale: 2.,
+            offset: 50.,
+        });
+        let result = value.apply_scale_offset(&scale);
+
+        assert_eq!(result.unwrap(), DataValue::Float64(17.5));
+    }
+
+    #[test]
+    fn test_apply_scale_offset_datetime() {
+        let value = DataValue::DateTime(135);
+        let scale = Some(ScaleOffset {
+            scale: 2.,
+            offset: 50.,
+        });
+        let result = value.apply_scale_offset(&scale);
+
+        assert_eq!(result.unwrap(), DataValue::DateTime(17));
+    }
+
+    #[test]
+    fn test_apply_scale_offset_no_effect_on_string() {
+        let value = DataValue::String("toto".to_string());
+        let scale = Some(ScaleOffset {
+            scale: 2.,
+            offset: 50.,
+        });
+        let result = value.apply_scale_offset(&scale);
+
+        assert_eq!(result.unwrap(), DataValue::String("toto".to_string()));
+    }
+
+    #[test]
+    fn test_scale_is_equals_to_zero() {
+        let value = DataValue::String("toto".to_string());
+        let scale = Some(ScaleOffset {
+            scale: 0.,
+            offset: 50.,
+        });
+        let result = value.apply_scale_offset(&scale);
+
+        assert!(result.is_err());
     }
 }
