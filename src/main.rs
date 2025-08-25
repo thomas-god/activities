@@ -1,6 +1,6 @@
 use std::env;
 
-use activities::{parse_activity, parse_records};
+use activities::{Activity, parse_records};
 
 enum Mode {
     Raw,
@@ -58,7 +58,7 @@ fn main() {
             }
         }
         Mode::Activity => {
-            let activity = parse_activity(&file).unwrap();
+            let activity = Activity::from_file(&file).unwrap();
             println!("{activity:?}");
         }
     }

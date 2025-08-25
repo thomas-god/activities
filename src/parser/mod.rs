@@ -2,16 +2,16 @@ use std::{collections::HashMap, fs};
 
 use thiserror::Error;
 
-pub use crate::parser::records::Record;
 use crate::parser::{
-    definition::{
-        Definition,
-        custom::{CustomDescription, parse_custom_definition_description},
-    },
+    definition::custom::{CustomDescription, parse_custom_definition_description},
     header::{FileHeader, FileHeaderError},
     reader::Reader,
     records::CompressedTimestamp,
 };
+
+pub use crate::parser::definition::{Definition, DefinitionField, Endianness};
+pub use crate::parser::records::Record;
+pub use crate::parser::records::{DataMessage, DataMessageField};
 
 mod definition;
 mod header;
