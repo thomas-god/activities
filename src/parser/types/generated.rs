@@ -805,6 +805,144 @@ impl MesgNum {
             Self::UnknownVariant => parse_unknown,
         }
     }
+
+    pub fn scale_offset(&self, def_number: u8) -> Option<ScaleOffset> {
+        match self {
+            Self::FileId => FileIdField::get_scale_offset(def_number),
+            Self::Capabilities => CapabilitiesField::get_scale_offset(def_number),
+            Self::DeviceSettings => DeviceSettingsField::get_scale_offset(def_number),
+            Self::UserProfile => UserProfileField::get_scale_offset(def_number),
+            Self::HrmProfile => HrmProfileField::get_scale_offset(def_number),
+            Self::SdmProfile => SdmProfileField::get_scale_offset(def_number),
+            Self::BikeProfile => BikeProfileField::get_scale_offset(def_number),
+            Self::ZonesTarget => ZonesTargetField::get_scale_offset(def_number),
+            Self::HrZone => HrZoneField::get_scale_offset(def_number),
+            Self::PowerZone => PowerZoneField::get_scale_offset(def_number),
+            Self::MetZone => MetZoneField::get_scale_offset(def_number),
+            Self::Sport => SportField::get_scale_offset(def_number),
+            Self::TrainingSettings => TrainingSettingsField::get_scale_offset(def_number),
+            Self::Goal => GoalField::get_scale_offset(def_number),
+            Self::Session => SessionField::get_scale_offset(def_number),
+            Self::Lap => LapField::get_scale_offset(def_number),
+            Self::Record => RecordField::get_scale_offset(def_number),
+            Self::Event => EventField::get_scale_offset(def_number),
+            Self::DeviceInfo => DeviceInfoField::get_scale_offset(def_number),
+            Self::Workout => WorkoutField::get_scale_offset(def_number),
+            Self::WorkoutStep => WorkoutStepField::get_scale_offset(def_number),
+            Self::Schedule => ScheduleField::get_scale_offset(def_number),
+            Self::WeightScale => WeightScaleField::get_scale_offset(def_number),
+            Self::Course => CourseField::get_scale_offset(def_number),
+            Self::CoursePoint => CoursePointField::get_scale_offset(def_number),
+            Self::Totals => TotalsField::get_scale_offset(def_number),
+            Self::Activity => ActivityField::get_scale_offset(def_number),
+            Self::Software => SoftwareField::get_scale_offset(def_number),
+            Self::FileCapabilities => FileCapabilitiesField::get_scale_offset(def_number),
+            Self::MesgCapabilities => MesgCapabilitiesField::get_scale_offset(def_number),
+            Self::FieldCapabilities => FieldCapabilitiesField::get_scale_offset(def_number),
+            Self::FileCreator => FileCreatorField::get_scale_offset(def_number),
+            Self::BloodPressure => BloodPressureField::get_scale_offset(def_number),
+            Self::SpeedZone => SpeedZoneField::get_scale_offset(def_number),
+            Self::Monitoring => MonitoringField::get_scale_offset(def_number),
+            Self::TrainingFile => TrainingFileField::get_scale_offset(def_number),
+            Self::Hrv => HrvField::get_scale_offset(def_number),
+            Self::AntRx => AntRxField::get_scale_offset(def_number),
+            Self::AntTx => AntTxField::get_scale_offset(def_number),
+            Self::AntChannelId => AntChannelIdField::get_scale_offset(def_number),
+            Self::Length => LengthField::get_scale_offset(def_number),
+            Self::MonitoringInfo => MonitoringInfoField::get_scale_offset(def_number),
+            Self::SlaveDevice => SlaveDeviceField::get_scale_offset(def_number),
+            Self::Connectivity => ConnectivityField::get_scale_offset(def_number),
+            Self::WeatherConditions => WeatherConditionsField::get_scale_offset(def_number),
+            Self::WeatherAlert => WeatherAlertField::get_scale_offset(def_number),
+            Self::CadenceZone => CadenceZoneField::get_scale_offset(def_number),
+            Self::Hr => HrField::get_scale_offset(def_number),
+            Self::SegmentLap => SegmentLapField::get_scale_offset(def_number),
+            Self::MemoGlob => MemoGlobField::get_scale_offset(def_number),
+            Self::SegmentId => SegmentIdField::get_scale_offset(def_number),
+            Self::SegmentLeaderboardEntry => {
+                SegmentLeaderboardEntryField::get_scale_offset(def_number)
+            }
+            Self::SegmentPoint => SegmentPointField::get_scale_offset(def_number),
+            Self::SegmentFile => SegmentFileField::get_scale_offset(def_number),
+            Self::WorkoutSession => WorkoutSessionField::get_scale_offset(def_number),
+            Self::WatchfaceSettings => WatchfaceSettingsField::get_scale_offset(def_number),
+            Self::GpsMetadata => GpsMetadataField::get_scale_offset(def_number),
+            Self::CameraEvent => CameraEventField::get_scale_offset(def_number),
+            Self::TimestampCorrelation => TimestampCorrelationField::get_scale_offset(def_number),
+            Self::GyroscopeData => GyroscopeDataField::get_scale_offset(def_number),
+            Self::AccelerometerData => AccelerometerDataField::get_scale_offset(def_number),
+            Self::ThreeDSensorCalibration => {
+                ThreeDSensorCalibrationField::get_scale_offset(def_number)
+            }
+            Self::VideoFrame => VideoFrameField::get_scale_offset(def_number),
+            Self::ObdiiData => ObdiiDataField::get_scale_offset(def_number),
+            Self::NmeaSentence => NmeaSentenceField::get_scale_offset(def_number),
+            Self::AviationAttitude => AviationAttitudeField::get_scale_offset(def_number),
+            Self::Video => VideoField::get_scale_offset(def_number),
+            Self::VideoTitle => VideoTitleField::get_scale_offset(def_number),
+            Self::VideoDescription => VideoDescriptionField::get_scale_offset(def_number),
+            Self::VideoClip => VideoClipField::get_scale_offset(def_number),
+            Self::OhrSettings => OhrSettingsField::get_scale_offset(def_number),
+            Self::ExdScreenConfiguration => {
+                ExdScreenConfigurationField::get_scale_offset(def_number)
+            }
+            Self::ExdDataFieldConfiguration => {
+                ExdDataFieldConfigurationField::get_scale_offset(def_number)
+            }
+            Self::ExdDataConceptConfiguration => {
+                ExdDataConceptConfigurationField::get_scale_offset(def_number)
+            }
+            Self::FieldDescription => FieldDescriptionField::get_scale_offset(def_number),
+            Self::DeveloperDataId => DeveloperDataIdField::get_scale_offset(def_number),
+            Self::MagnetometerData => MagnetometerDataField::get_scale_offset(def_number),
+            Self::BarometerData => BarometerDataField::get_scale_offset(def_number),
+            Self::OneDSensorCalibration => OneDSensorCalibrationField::get_scale_offset(def_number),
+            Self::MonitoringHrData => MonitoringHrDataField::get_scale_offset(def_number),
+            Self::TimeInZone => TimeInZoneField::get_scale_offset(def_number),
+            Self::Set => SetField::get_scale_offset(def_number),
+            Self::StressLevel => StressLevelField::get_scale_offset(def_number),
+            Self::MaxMetData => MaxMetDataField::get_scale_offset(def_number),
+            Self::DiveSettings => DiveSettingsField::get_scale_offset(def_number),
+            Self::DiveGas => DiveGasField::get_scale_offset(def_number),
+            Self::DiveAlarm => DiveAlarmField::get_scale_offset(def_number),
+            Self::ExerciseTitle => ExerciseTitleField::get_scale_offset(def_number),
+            Self::DiveSummary => DiveSummaryField::get_scale_offset(def_number),
+            Self::Spo2Data => Spo2DataField::get_scale_offset(def_number),
+            Self::SleepLevel => SleepLevelField::get_scale_offset(def_number),
+            Self::Jump => JumpField::get_scale_offset(def_number),
+            Self::AadAccelFeatures => AadAccelFeaturesField::get_scale_offset(def_number),
+            Self::BeatIntervals => BeatIntervalsField::get_scale_offset(def_number),
+            Self::RespirationRate => RespirationRateField::get_scale_offset(def_number),
+            Self::HsaAccelerometerData => HsaAccelerometerDataField::get_scale_offset(def_number),
+            Self::HsaStepData => HsaStepDataField::get_scale_offset(def_number),
+            Self::HsaSpo2Data => HsaSpo2DataField::get_scale_offset(def_number),
+            Self::HsaStressData => HsaStressDataField::get_scale_offset(def_number),
+            Self::HsaRespirationData => HsaRespirationDataField::get_scale_offset(def_number),
+            Self::HsaHeartRateData => HsaHeartRateDataField::get_scale_offset(def_number),
+            Self::Split => SplitField::get_scale_offset(def_number),
+            Self::SplitSummary => SplitSummaryField::get_scale_offset(def_number),
+            Self::HsaBodyBatteryData => HsaBodyBatteryDataField::get_scale_offset(def_number),
+            Self::HsaEvent => HsaEventField::get_scale_offset(def_number),
+            Self::ClimbPro => ClimbProField::get_scale_offset(def_number),
+            Self::TankUpdate => TankUpdateField::get_scale_offset(def_number),
+            Self::TankSummary => TankSummaryField::get_scale_offset(def_number),
+            Self::SleepAssessment => SleepAssessmentField::get_scale_offset(def_number),
+            Self::HrvStatusSummary => HrvStatusSummaryField::get_scale_offset(def_number),
+            Self::HrvValue => HrvValueField::get_scale_offset(def_number),
+            Self::RawBbi => RawBbiField::get_scale_offset(def_number),
+            Self::DeviceAuxBatteryInfo => DeviceAuxBatteryInfoField::get_scale_offset(def_number),
+            Self::HsaGyroscopeData => HsaGyroscopeDataField::get_scale_offset(def_number),
+            Self::ChronoShotSession => ChronoShotSessionField::get_scale_offset(def_number),
+            Self::ChronoShotData => ChronoShotDataField::get_scale_offset(def_number),
+            Self::HsaConfigurationData => HsaConfigurationDataField::get_scale_offset(def_number),
+            Self::DiveApneaAlarm => DiveApneaAlarmField::get_scale_offset(def_number),
+            Self::SkinTempOvernight => SkinTempOvernightField::get_scale_offset(def_number),
+            Self::HsaWristTemperatureData => {
+                HsaWristTemperatureDataField::get_scale_offset(def_number)
+            }
+            Self::UnknownVariant => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -6790,6 +6928,12 @@ pub struct CustomField {
     pub units: Option<String>,
 }
 
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct ScaleOffset {
+    pub scale: usize,
+    pub offset: usize,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FileIdField {
     Type,
@@ -6829,6 +6973,12 @@ impl FileIdField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum FileCreatorField {
@@ -6852,6 +7002,12 @@ impl FileCreatorField {
             0 => parse_uint16,
             1 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -6894,6 +7050,20 @@ impl TimestampCorrelationField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 32768,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 32768,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SoftwareField {
@@ -6922,6 +7092,16 @@ impl SoftwareField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SlaveDeviceField {
@@ -6945,6 +7125,12 @@ impl SlaveDeviceField {
             0 => Manufacturer::parse,
             1 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -6976,6 +7162,12 @@ impl CapabilitiesField {
             21 => WorkoutCapabilities::parse,
             23 => ConnectivityCapabilities::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7015,6 +7207,12 @@ impl FileCapabilitiesField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MesgCapabilitiesField {
@@ -7049,6 +7247,12 @@ impl MesgCapabilitiesField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum FieldCapabilitiesField {
@@ -7081,6 +7285,12 @@ impl FieldCapabilitiesField {
             2 => parse_uint8,
             3 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7172,6 +7382,16 @@ impl DeviceSettingsField {
             134 => Switch::parse,
             174 => TapSensitivity::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            5 => Some(ScaleOffset {
+                scale: 4,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -7280,6 +7500,28 @@ impl UserProfileField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            31 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            32 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrmProfileField {
@@ -7312,6 +7554,12 @@ impl HrmProfileField {
             2 => parse_unknown,
             3 => parse_unknown,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7355,6 +7603,20 @@ impl SdmProfileField {
             5 => parse_unknown,
             7 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -7472,6 +7734,36 @@ impl BikeProfileField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            10 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            11 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            19 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnectivityField {
@@ -7530,6 +7822,12 @@ impl ConnectivityField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WatchfaceSettingsField {
@@ -7558,6 +7856,12 @@ impl WatchfaceSettingsField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum OhrSettingsField {
@@ -7581,6 +7885,12 @@ impl OhrSettingsField {
             253 => DateTime::parse,
             0 => Switch::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7653,6 +7963,32 @@ impl TimeInZoneField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ZonesTargetField {
@@ -7687,6 +8023,12 @@ impl ZonesTargetField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SportField {
@@ -7713,6 +8055,12 @@ impl SportField {
             1 => SubSport::parse,
             3 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7743,6 +8091,12 @@ impl HrZoneField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SpeedZoneField {
@@ -7769,6 +8123,16 @@ impl SpeedZoneField {
             0 => parse_uint16,
             1 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -7799,6 +8163,12 @@ impl CadenceZoneField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum PowerZoneField {
@@ -7825,6 +8195,12 @@ impl PowerZoneField {
             1 => parse_uint16,
             2 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -7858,6 +8234,20 @@ impl MetZoneField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum TrainingSettingsField {
@@ -7887,6 +8277,24 @@ impl TrainingSettingsField {
             33 => parse_uint32,
             153 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            31 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            32 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            153 => Some(ScaleOffset {
+                scale: 1000000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -8013,6 +8421,52 @@ impl DiveSettingsField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            6 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            17 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            18 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            23 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            24 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            26 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            27 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            36 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DiveAlarmField {
@@ -8069,6 +8523,24 @@ impl DiveAlarmField {
             10 => parse_unknown,
             11 => parse_sint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            11 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -8129,6 +8601,24 @@ impl DiveApneaAlarmField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            11 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DiveGasField {
@@ -8161,6 +8651,12 @@ impl DiveGasField {
             2 => DiveGasStatus::parse,
             3 => DiveGasMode::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -8221,6 +8717,12 @@ impl GoalField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ActivityField {
@@ -8262,6 +8764,16 @@ impl ActivityField {
             5 => LocalDateTime::parse,
             6 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -8751,6 +9263,332 @@ impl SessionField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            14 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            15 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            24 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            35 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            36 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            41 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            42 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            44 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            49 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            50 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            52 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            53 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            54 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            55 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            56 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            59 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            60 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            61 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            62 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            63 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            65 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            66 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            67 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            68 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            69 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            71 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            87 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            88 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            89 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            90 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            91 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            92 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            93 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            94 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            95 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            96 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            97 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            98 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            99 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            100 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            101 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            102 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            103 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            104 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            105 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            112 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            116 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            117 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            118 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            119 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            124 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            125 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            126 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            127 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            128 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            131 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            132 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            133 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            134 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            137 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            139 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            140 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            141 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            142 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            143 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            144 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            145 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            146 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            168 => Some(ScaleOffset {
+                scale: 65536,
+                offset: 0,
+            }),
+            169 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            170 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            180 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            199 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            200 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            208 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            209 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            210 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum LapField {
@@ -9139,6 +9977,268 @@ impl LapField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            13 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            14 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            37 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            42 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            43 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            45 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            46 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            47 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            48 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            49 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            52 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            53 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            54 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            55 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            56 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            57 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            58 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            59 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            60 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            62 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            77 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            78 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            79 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            80 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            81 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            82 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            84 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            85 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            86 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            87 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            88 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            89 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            91 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            92 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            93 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            94 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            95 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            98 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            102 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            103 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            104 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            105 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            110 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            111 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            112 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            113 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            114 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            117 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            118 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            119 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            120 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            121 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            122 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            123 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            136 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            137 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            156 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            157 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            158 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            159 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            160 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum LengthField {
@@ -9222,6 +10322,32 @@ impl LengthField {
             24 => parse_uint8,
             25 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            22 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            23 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -9495,6 +10621,220 @@ impl RecordField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            11 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            12 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            17 => Some(ScaleOffset {
+                scale: 16,
+                offset: 0,
+            }),
+            32 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            39 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            40 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            41 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            43 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            44 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            45 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            46 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            47 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            48 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            51 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            52 => Some(ScaleOffset {
+                scale: 256,
+                offset: 0,
+            }),
+            53 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            54 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            55 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            56 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            57 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            58 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            59 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            69 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            70 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            71 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            72 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            73 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            78 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            81 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            83 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            84 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            85 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            87 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            92 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            93 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            94 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            95 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            96 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            98 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            99 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            108 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            116 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            124 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            125 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            126 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            127 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            129 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            139 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum EventField {
@@ -9569,6 +10909,20 @@ impl EventField {
             23 => parse_uint8,
             24 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            23 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            24 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -9647,6 +11001,20 @@ impl DeviceInfoField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            10 => Some(ScaleOffset {
+                scale: 256,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DeviceAuxBatteryInfoField {
@@ -9679,6 +11047,16 @@ impl DeviceAuxBatteryInfoField {
             2 => BatteryStatus::parse,
             3 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 256,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -9716,6 +11094,12 @@ impl TrainingFileField {
             3 => parse_unknown,
             4 => DateTime::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -9785,6 +11169,16 @@ impl WeatherConditionsField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WeatherAlertField {
@@ -9820,6 +11214,12 @@ impl WeatherAlertField {
             3 => WeatherSeverity::parse,
             4 => WeatherSevereType::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -9868,6 +11268,28 @@ impl GpsMetadataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum CameraEventField {
@@ -9900,6 +11322,12 @@ impl CameraEventField {
             2 => parse_string,
             3 => CameraOrientationType::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -9946,6 +11374,12 @@ impl GyroscopeDataField {
             6 => parse_float32,
             7 => parse_float32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10003,6 +11437,12 @@ impl AccelerometerDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MagnetometerDataField {
@@ -10049,6 +11489,12 @@ impl MagnetometerDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum BarometerDataField {
@@ -10078,6 +11524,12 @@ impl BarometerDataField {
             1 => parse_uint16,
             2 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10120,6 +11572,16 @@ impl ThreeDSensorCalibrationField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            5 => Some(ScaleOffset {
+                scale: 65535,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum OneDSensorCalibrationField {
@@ -10157,6 +11619,12 @@ impl OneDSensorCalibrationField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoFrameField {
@@ -10183,6 +11651,12 @@ impl VideoFrameField {
             0 => parse_uint16,
             1 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10231,6 +11705,12 @@ impl ObdiiDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum NmeaSentenceField {
@@ -10257,6 +11737,12 @@ impl NmeaSentenceField {
             0 => parse_uint16,
             1 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10314,6 +11800,36 @@ impl AviationAttitudeField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 10430,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 10430,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1024,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 10430,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoField {
@@ -10340,6 +11856,12 @@ impl VideoField {
             1 => parse_string,
             2 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10370,6 +11892,12 @@ impl VideoTitleField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoDescriptionField {
@@ -10396,6 +11924,12 @@ impl VideoDescriptionField {
             0 => parse_uint16,
             1 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10436,6 +11970,12 @@ impl VideoClipField {
             6 => parse_uint32,
             7 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10490,6 +12030,20 @@ impl SetField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 16,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum JumpField {
@@ -10537,6 +12091,20 @@ impl JumpField {
             7 => parse_uint16,
             8 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -10615,6 +12183,44 @@ impl SplitField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            25 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            26 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            74 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            110 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SplitSummaryField {
@@ -10676,6 +12282,36 @@ impl SplitSummaryField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            12 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            77 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ClimbProField {
@@ -10714,6 +12350,12 @@ impl ClimbProField {
             4 => parse_uint8,
             5 => parse_float32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10777,6 +12419,12 @@ impl FieldDescriptionField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DeveloperDataIdField {
@@ -10811,6 +12459,12 @@ impl DeveloperDataIdField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum CourseField {
@@ -10840,6 +12494,12 @@ impl CourseField {
             6 => CourseCapabilities::parse,
             7 => SubSport::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -10883,6 +12543,16 @@ impl CoursePointField {
             6 => parse_string,
             8 => parse_unknown,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -10931,6 +12601,12 @@ impl SegmentIdField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentLeaderboardEntryField {
@@ -10971,6 +12647,16 @@ impl SegmentLeaderboardEntryField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentPointField {
@@ -11009,6 +12695,28 @@ impl SegmentPointField {
             5 => parse_uint32,
             6 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            _ => None,
         }
     }
 }
@@ -11315,6 +13023,176 @@ impl SegmentLapField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            7 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            13 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            14 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            34 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            35 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            37 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            38 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            39 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            40 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            41 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            44 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            45 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            46 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            47 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            48 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            49 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            50 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            51 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            52 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            54 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            56 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            59 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            60 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            61 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            62 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            63 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            66 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            67 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            68 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            71 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            75 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            76 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            77 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            78 => Some(ScaleOffset {
+                scale: 0,
+                offset: 0,
+            }),
+            89 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            90 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            91 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            92 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            93 => Some(ScaleOffset {
+                scale: 5,
+                offset: 500,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentFileField {
@@ -11359,6 +13237,12 @@ impl SegmentFileField {
             10 => parse_string,
             11 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -11407,6 +13291,16 @@ impl WorkoutField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            14 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WorkoutSessionField {
@@ -11445,6 +13339,16 @@ impl WorkoutSessionField {
             4 => parse_uint16,
             5 => DisplayMeasure::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -11523,6 +13427,16 @@ impl WorkoutStepField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            12 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExerciseTitleField {
@@ -11552,6 +13466,12 @@ impl ExerciseTitleField {
             1 => parse_uint16,
             2 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -11592,6 +13512,12 @@ impl ScheduleField {
             5 => Schedule::parse,
             6 => LocalDateTime::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -11641,6 +13567,12 @@ impl TotalsField {
             6 => parse_uint32,
             9 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -11704,6 +13636,48 @@ impl WeightScaleField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 4,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 4,
+                offset: 0,
+            }),
+            13 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum BloodPressureField {
@@ -11756,6 +13730,12 @@ impl BloodPressureField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MonitoringInfoField {
@@ -11791,6 +13771,20 @@ impl MonitoringInfoField {
             4 => parse_uint16,
             5 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            3 => Some(ScaleOffset {
+                scale: 5000,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 5000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -11899,6 +13893,48 @@ impl MonitoringField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 2,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            12 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            14 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            15 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            28 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            31 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            32 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MonitoringHrDataField {
@@ -11925,6 +13961,12 @@ impl MonitoringHrDataField {
             0 => parse_uint8,
             1 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -11956,6 +13998,20 @@ impl Spo2DataField {
             1 => parse_uint8,
             2 => Spo2MeasurementType::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -11995,6 +14051,24 @@ impl HrField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 32768,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 256,
+                offset: 0,
+            }),
+            9 => Some(ScaleOffset {
+                scale: 1024,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum StressLevelField {
@@ -12018,6 +14092,12 @@ impl StressLevelField {
             0 => parse_sint16,
             1 => DateTime::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12063,6 +14143,16 @@ impl MaxMetDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaBodyBatteryDataField {
@@ -12097,6 +14187,12 @@ impl HsaBodyBatteryDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaEventField {
@@ -12120,6 +14216,12 @@ impl HsaEventField {
             253 => DateTime::parse,
             0 => parse_uint8,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12162,6 +14264,24 @@ impl HsaAccelerometerDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaGyroscopeDataField {
@@ -12202,6 +14322,24 @@ impl HsaGyroscopeDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 28,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 28,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 28,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaStepDataField {
@@ -12228,6 +14366,16 @@ impl HsaStepDataField {
             0 => parse_uint16,
             1 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -12261,6 +14409,12 @@ impl HsaSpo2DataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaStressDataField {
@@ -12289,6 +14443,16 @@ impl HsaStressDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaRespirationDataField {
@@ -12315,6 +14479,16 @@ impl HsaRespirationDataField {
             0 => parse_uint16,
             1 => parse_sint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -12348,6 +14522,16 @@ impl HsaHeartRateDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaConfigurationDataField {
@@ -12376,6 +14560,12 @@ impl HsaConfigurationDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaWristTemperatureDataField {
@@ -12402,6 +14592,16 @@ impl HsaWristTemperatureDataField {
             0 => parse_uint16,
             1 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -12441,6 +14641,12 @@ impl MemoGlobField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SleepLevelField {
@@ -12464,6 +14670,12 @@ impl SleepLevelField {
             253 => DateTime::parse,
             0 => SleepLevel::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12498,6 +14710,12 @@ impl AntChannelIdField {
             3 => parse_unknown,
             4 => DeviceIndex::parse,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12537,6 +14755,16 @@ impl AntRxField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 32768,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum AntTxField {
@@ -12574,6 +14802,16 @@ impl AntTxField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 32768,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExdScreenConfigurationField {
@@ -12603,6 +14841,12 @@ impl ExdScreenConfigurationField {
             2 => ExdLayout::parse,
             3 => parse_unknown,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12640,6 +14884,12 @@ impl ExdDataFieldConfigurationField {
             4 => ExdDisplayType::parse,
             5 => parse_string,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12692,6 +14942,12 @@ impl ExdDataConceptConfigurationField {
             10 => ExdDescriptors::parse,
             11 => parse_unknown,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12782,6 +15038,84 @@ impl DiveSummaryField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            2 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            7 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            8 => Some(ScaleOffset {
+                scale: 1,
+                offset: 0,
+            }),
+            11 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            12 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            13 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            14 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            15 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            16 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            17 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            22 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            23 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            24 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            25 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum AadAccelFeaturesField {
@@ -12819,6 +15153,16 @@ impl AadAccelFeaturesField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            4 => Some(ScaleOffset {
+                scale: 25,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrvField {
@@ -12839,6 +15183,16 @@ impl HrvField {
         match def_number {
             0 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -12867,6 +15221,12 @@ impl BeatIntervalsField {
             0 => parse_uint16,
             1 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }
@@ -12912,6 +15272,36 @@ impl HrvStatusSummaryField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            4 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrvValueField {
@@ -12935,6 +15325,16 @@ impl HrvValueField {
             253 => DateTime::parse,
             0 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 128,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -12974,6 +15374,12 @@ impl RawBbiField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum RespirationRateField {
@@ -12997,6 +15403,16 @@ impl RespirationRateField {
             253 => DateTime::parse,
             0 => parse_sint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -13042,6 +15458,32 @@ impl ChronoShotSessionField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            1 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            5 => Some(ScaleOffset {
+                scale: 10,
+                offset: 0,
+            }),
+            6 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ChronoShotDataField {
@@ -13070,6 +15512,16 @@ impl ChronoShotDataField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            0 => Some(ScaleOffset {
+                scale: 1000,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum TankUpdateField {
@@ -13096,6 +15548,16 @@ impl TankUpdateField {
             0 => AntChannelId::parse,
             1 => parse_uint16,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -13130,6 +15592,24 @@ impl TankSummaryField {
             2 => parse_uint16,
             3 => parse_uint32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            1 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            2 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            3 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
         }
     }
 }
@@ -13193,6 +15673,16 @@ impl SleepAssessmentField {
             _ => parse_uint8,
         }
     }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            15 => Some(ScaleOffset {
+                scale: 100,
+                offset: 0,
+            }),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SkinTempOvernightField {
@@ -13225,6 +15715,12 @@ impl SkinTempOvernightField {
             2 => parse_float32,
             4 => parse_float32,
             _ => parse_uint8,
+        }
+    }
+
+    fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
+        match def_number {
+            _ => None,
         }
     }
 }

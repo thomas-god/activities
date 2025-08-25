@@ -345,53 +345,75 @@ impl {name} {{
 
     // MesgNum need special treatment to be able to link to a FitMessage
     if name == "MesgNum" {
-        let mut mapping_field = join(
-            mapping.iter().map(|(_, v)| {
-                format!(
-                    "Self::{} => FitMessage::{}({}Field::from(def_number))",
-                    snake_to_camel_case(v),
-                    snake_to_camel_case(v),
-                    snake_to_camel_case(v)
-                )
-            }),
+        let mapping_field = join(
+            mapping
+                .iter()
+                .map(|(_, v)| {
+                    format!(
+                        "Self::{} => FitMessage::{}({}Field::from(def_number))",
+                        snake_to_camel_case(v),
+                        snake_to_camel_case(v),
+                        snake_to_camel_case(v)
+                    )
+                })
+                .chain(vec![
+                    "Self::UnknownVariant => FitMessage::UnknownVariant".to_string(),
+                ]),
             ",\n",
         );
-        if !mapping_field.is_empty() {
-            mapping_field.push(',');
-        }
 
-        let mut mapping_parse = join(
-            mapping.iter().map(|(_, v)| {
-                format!(
-                    "Self::{} => {}Field::get_parse_function(def_number)",
-                    snake_to_camel_case(v),
-                    snake_to_camel_case(v)
-                )
-            }),
+        let mapping_parse = join(
+            mapping
+                .iter()
+                .map(|(_, v)| {
+                    format!(
+                        "Self::{} => {}Field::get_parse_function(def_number)",
+                        snake_to_camel_case(v),
+                        snake_to_camel_case(v)
+                    )
+                })
+                .chain(vec!["Self::UnknownVariant => parse_unknown".to_string()]),
             ",\n",
         );
-        if !mapping_parse.is_empty() {
-            mapping_parse.push(',');
-        }
+
+        let mapping_scale_offset = join(
+            mapping
+                .iter()
+                .map(|(_, v)| {
+                    format!(
+                        "Self::{} => {}Field::get_scale_offset(def_number)",
+                        snake_to_camel_case(v),
+                        snake_to_camel_case(v)
+                    )
+                })
+                .chain(vec!["Self::UnknownVariant => None".to_string()]),
+            ",\n",
+        );
 
         code.push_str(&format!(
             "
     pub fn message_field(&self, def_number: u8) -> FitMessage {{
         match self {{
             {mapping_field}
-            Self::UnknownVariant => FitMessage::UnknownVariant
         }}
     }}
 
-     pub fn field_parse(
+    pub fn field_parse(
         &self, def_number: u8
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
         match self {{
             {mapping_parse}
-            Self::UnknownVariant => parse_unknown
         }}
     }}
-        "
+
+    pub fn scale_offset(
+        &self,
+        def_number: u8
+    ) -> Option<ScaleOffset> {{
+        match self {{
+            {mapping_scale_offset}
+        }}
+    }}"
         ));
     }
 
@@ -452,7 +474,7 @@ struct Message {
     field_def: u8,
     name: String,
     base_type: String,
-    array: Option<usize>,
+    // array: Option<usize>,
     scale: Option<usize>,
     offset: Option<usize>,
 }
@@ -563,11 +585,11 @@ where
             field_def,
             name,
             base_type,
-            array: match row.get(4) {
-                Some(Data::Int(field_def)) => Some(*field_def as usize),
-                Some(Data::Float(field_def)) => Some(*field_def as usize),
-                _ => None,
-            },
+            // array: match row.get(4) {
+            //     Some(Data::Int(field_def)) => Some(*field_def as usize),
+            //     Some(Data::Float(field_def)) => Some(*field_def as usize),
+            //     _ => None,
+            // },
             scale: match row.get(6) {
                 Some(Data::Int(field_def)) => Some(*field_def as usize),
                 Some(Data::Float(field_def)) => Some(*field_def as usize),
@@ -616,58 +638,82 @@ pub struct CustomField {{
     pub units: Option<String>,
 }}
 
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct ScaleOffset {{
+    pub scale: usize,
+    pub offset: usize
+}}
+
 "#
     ));
 
     for (msg, definitions) in messages.iter() {
         let message = snake_to_camel_case(msg);
-        let mut variants = join(
+        let variants = join(
             definitions
                 .iter()
-                .map(|def| snake_to_camel_case(&def.name).to_string()),
+                .map(|def| snake_to_camel_case(&def.name).to_string())
+                .chain(vec!["Unknown".to_string()]),
             ",\n",
         );
-        if !variants.is_empty() {
-            variants.push(',');
-        }
 
         code.push_str(&format!(
             r#"
 #[derive(Debug, PartialEq, Clone)]
 pub enum {message}Field {{
     {variants}
-    Unknown
 }}"#
         ));
 
-        let mut from_definition_field_mappings = join(
-            definitions.iter().map(|def| {
-                format!(
-                    "{} => Self::{}",
-                    def.field_def,
-                    snake_to_camel_case(&def.name)
-                )
-            }),
+        let from_definition_field_mappings = join(
+            definitions
+                .iter()
+                .map(|def| {
+                    format!(
+                        "{} => Self::{}",
+                        def.field_def,
+                        snake_to_camel_case(&def.name)
+                    )
+                })
+                .chain(vec!["_ => Self::Unknown".to_string()]),
             ",\n",
         );
-        if !from_definition_field_mappings.is_empty() {
-            from_definition_field_mappings.push(',');
-        }
 
-        let mut parse_mappings = join(
-            definitions.iter().map(|def| {
-                format!(
-                    "{} => {}",
-                    def.field_def,
-                    get_parse_function(&enums, &def.base_type)
-                )
-            }),
+        let parse_mappings = join(
+            definitions
+                .iter()
+                .map(|def| {
+                    format!(
+                        "{} => {}",
+                        def.field_def,
+                        get_parse_function(&enums, &def.base_type)
+                    )
+                })
+                .chain(vec!["_ => parse_uint8".to_string()]),
             ",\n",
         );
-        if !parse_mappings.is_empty() {
-            parse_mappings.push(',');
-        }
 
+        let scale_offset_mapping = join(
+            definitions
+                .iter()
+                .filter_map(|def| {
+                    if def.offset.is_some() || def.scale.is_some() {
+                        Some(format!(
+                            "{} => Some(ScaleOffset {{
+                                scale: {},
+                                offset: {}
+                            }})",
+                            def.field_def,
+                            def.scale.unwrap_or(1),
+                            def.offset.unwrap_or(0)
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .chain(vec!["_ => None".to_string()]),
+            ",\n",
+        );
         code.push_str(&format!(
             r#"
 impl {message}Field {{
@@ -675,7 +721,6 @@ impl {message}Field {{
     fn from(definition_field: u8) -> Self {{
         match definition_field {{
             {from_definition_field_mappings}
-            _ => Self::Unknown
         }}
     }}
 
@@ -683,9 +728,15 @@ impl {message}Field {{
         def_number: u8
     ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
         match def_number {{
-        {parse_mappings}
-        _ => parse_uint8
+            {parse_mappings}
+        }}
+    }}
 
+    fn get_scale_offset(
+        def_number: u8
+    ) -> Option<ScaleOffset> {{
+        match def_number {{
+            {scale_offset_mapping}
         }}
     }}
 }}"#
