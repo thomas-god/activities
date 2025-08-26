@@ -943,6 +943,134 @@ impl MesgNum {
             _ => None,
         }
     }
+
+    pub fn timestamp_field(&self) -> Option<FitMessage> {
+        match self {
+            Self::FileId => FileIdField::timestamp_field(),
+            Self::Capabilities => CapabilitiesField::timestamp_field(),
+            Self::DeviceSettings => DeviceSettingsField::timestamp_field(),
+            Self::UserProfile => UserProfileField::timestamp_field(),
+            Self::HrmProfile => HrmProfileField::timestamp_field(),
+            Self::SdmProfile => SdmProfileField::timestamp_field(),
+            Self::BikeProfile => BikeProfileField::timestamp_field(),
+            Self::ZonesTarget => ZonesTargetField::timestamp_field(),
+            Self::HrZone => HrZoneField::timestamp_field(),
+            Self::PowerZone => PowerZoneField::timestamp_field(),
+            Self::MetZone => MetZoneField::timestamp_field(),
+            Self::Sport => SportField::timestamp_field(),
+            Self::TrainingSettings => TrainingSettingsField::timestamp_field(),
+            Self::Goal => GoalField::timestamp_field(),
+            Self::Session => SessionField::timestamp_field(),
+            Self::Lap => LapField::timestamp_field(),
+            Self::Record => RecordField::timestamp_field(),
+            Self::Event => EventField::timestamp_field(),
+            Self::DeviceInfo => DeviceInfoField::timestamp_field(),
+            Self::Workout => WorkoutField::timestamp_field(),
+            Self::WorkoutStep => WorkoutStepField::timestamp_field(),
+            Self::Schedule => ScheduleField::timestamp_field(),
+            Self::WeightScale => WeightScaleField::timestamp_field(),
+            Self::Course => CourseField::timestamp_field(),
+            Self::CoursePoint => CoursePointField::timestamp_field(),
+            Self::Totals => TotalsField::timestamp_field(),
+            Self::Activity => ActivityField::timestamp_field(),
+            Self::Software => SoftwareField::timestamp_field(),
+            Self::FileCapabilities => FileCapabilitiesField::timestamp_field(),
+            Self::MesgCapabilities => MesgCapabilitiesField::timestamp_field(),
+            Self::FieldCapabilities => FieldCapabilitiesField::timestamp_field(),
+            Self::FileCreator => FileCreatorField::timestamp_field(),
+            Self::BloodPressure => BloodPressureField::timestamp_field(),
+            Self::SpeedZone => SpeedZoneField::timestamp_field(),
+            Self::Monitoring => MonitoringField::timestamp_field(),
+            Self::TrainingFile => TrainingFileField::timestamp_field(),
+            Self::Hrv => HrvField::timestamp_field(),
+            Self::AntRx => AntRxField::timestamp_field(),
+            Self::AntTx => AntTxField::timestamp_field(),
+            Self::AntChannelId => AntChannelIdField::timestamp_field(),
+            Self::Length => LengthField::timestamp_field(),
+            Self::MonitoringInfo => MonitoringInfoField::timestamp_field(),
+            Self::SlaveDevice => SlaveDeviceField::timestamp_field(),
+            Self::Connectivity => ConnectivityField::timestamp_field(),
+            Self::WeatherConditions => WeatherConditionsField::timestamp_field(),
+            Self::WeatherAlert => WeatherAlertField::timestamp_field(),
+            Self::CadenceZone => CadenceZoneField::timestamp_field(),
+            Self::Hr => HrField::timestamp_field(),
+            Self::SegmentLap => SegmentLapField::timestamp_field(),
+            Self::MemoGlob => MemoGlobField::timestamp_field(),
+            Self::SegmentId => SegmentIdField::timestamp_field(),
+            Self::SegmentLeaderboardEntry => SegmentLeaderboardEntryField::timestamp_field(),
+            Self::SegmentPoint => SegmentPointField::timestamp_field(),
+            Self::SegmentFile => SegmentFileField::timestamp_field(),
+            Self::WorkoutSession => WorkoutSessionField::timestamp_field(),
+            Self::WatchfaceSettings => WatchfaceSettingsField::timestamp_field(),
+            Self::GpsMetadata => GpsMetadataField::timestamp_field(),
+            Self::CameraEvent => CameraEventField::timestamp_field(),
+            Self::TimestampCorrelation => TimestampCorrelationField::timestamp_field(),
+            Self::GyroscopeData => GyroscopeDataField::timestamp_field(),
+            Self::AccelerometerData => AccelerometerDataField::timestamp_field(),
+            Self::ThreeDSensorCalibration => ThreeDSensorCalibrationField::timestamp_field(),
+            Self::VideoFrame => VideoFrameField::timestamp_field(),
+            Self::ObdiiData => ObdiiDataField::timestamp_field(),
+            Self::NmeaSentence => NmeaSentenceField::timestamp_field(),
+            Self::AviationAttitude => AviationAttitudeField::timestamp_field(),
+            Self::Video => VideoField::timestamp_field(),
+            Self::VideoTitle => VideoTitleField::timestamp_field(),
+            Self::VideoDescription => VideoDescriptionField::timestamp_field(),
+            Self::VideoClip => VideoClipField::timestamp_field(),
+            Self::OhrSettings => OhrSettingsField::timestamp_field(),
+            Self::ExdScreenConfiguration => ExdScreenConfigurationField::timestamp_field(),
+            Self::ExdDataFieldConfiguration => ExdDataFieldConfigurationField::timestamp_field(),
+            Self::ExdDataConceptConfiguration => {
+                ExdDataConceptConfigurationField::timestamp_field()
+            }
+            Self::FieldDescription => FieldDescriptionField::timestamp_field(),
+            Self::DeveloperDataId => DeveloperDataIdField::timestamp_field(),
+            Self::MagnetometerData => MagnetometerDataField::timestamp_field(),
+            Self::BarometerData => BarometerDataField::timestamp_field(),
+            Self::OneDSensorCalibration => OneDSensorCalibrationField::timestamp_field(),
+            Self::MonitoringHrData => MonitoringHrDataField::timestamp_field(),
+            Self::TimeInZone => TimeInZoneField::timestamp_field(),
+            Self::Set => SetField::timestamp_field(),
+            Self::StressLevel => StressLevelField::timestamp_field(),
+            Self::MaxMetData => MaxMetDataField::timestamp_field(),
+            Self::DiveSettings => DiveSettingsField::timestamp_field(),
+            Self::DiveGas => DiveGasField::timestamp_field(),
+            Self::DiveAlarm => DiveAlarmField::timestamp_field(),
+            Self::ExerciseTitle => ExerciseTitleField::timestamp_field(),
+            Self::DiveSummary => DiveSummaryField::timestamp_field(),
+            Self::Spo2Data => Spo2DataField::timestamp_field(),
+            Self::SleepLevel => SleepLevelField::timestamp_field(),
+            Self::Jump => JumpField::timestamp_field(),
+            Self::AadAccelFeatures => AadAccelFeaturesField::timestamp_field(),
+            Self::BeatIntervals => BeatIntervalsField::timestamp_field(),
+            Self::RespirationRate => RespirationRateField::timestamp_field(),
+            Self::HsaAccelerometerData => HsaAccelerometerDataField::timestamp_field(),
+            Self::HsaStepData => HsaStepDataField::timestamp_field(),
+            Self::HsaSpo2Data => HsaSpo2DataField::timestamp_field(),
+            Self::HsaStressData => HsaStressDataField::timestamp_field(),
+            Self::HsaRespirationData => HsaRespirationDataField::timestamp_field(),
+            Self::HsaHeartRateData => HsaHeartRateDataField::timestamp_field(),
+            Self::Split => SplitField::timestamp_field(),
+            Self::SplitSummary => SplitSummaryField::timestamp_field(),
+            Self::HsaBodyBatteryData => HsaBodyBatteryDataField::timestamp_field(),
+            Self::HsaEvent => HsaEventField::timestamp_field(),
+            Self::ClimbPro => ClimbProField::timestamp_field(),
+            Self::TankUpdate => TankUpdateField::timestamp_field(),
+            Self::TankSummary => TankSummaryField::timestamp_field(),
+            Self::SleepAssessment => SleepAssessmentField::timestamp_field(),
+            Self::HrvStatusSummary => HrvStatusSummaryField::timestamp_field(),
+            Self::HrvValue => HrvValueField::timestamp_field(),
+            Self::RawBbi => RawBbiField::timestamp_field(),
+            Self::DeviceAuxBatteryInfo => DeviceAuxBatteryInfoField::timestamp_field(),
+            Self::HsaGyroscopeData => HsaGyroscopeDataField::timestamp_field(),
+            Self::ChronoShotSession => ChronoShotSessionField::timestamp_field(),
+            Self::ChronoShotData => ChronoShotDataField::timestamp_field(),
+            Self::HsaConfigurationData => HsaConfigurationDataField::timestamp_field(),
+            Self::DiveApneaAlarm => DiveApneaAlarmField::timestamp_field(),
+            Self::SkinTempOvernight => SkinTempOvernightField::timestamp_field(),
+            Self::HsaWristTemperatureData => HsaWristTemperatureDataField::timestamp_field(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -6972,6 +7100,10 @@ impl FileIdField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum FileCreatorField {
@@ -7002,6 +7134,10 @@ impl FileCreatorField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7057,6 +7193,12 @@ impl TimestampCorrelationField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::TimestampCorrelation(
+            TimestampCorrelationField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SoftwareField {
@@ -7095,6 +7237,10 @@ impl SoftwareField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SlaveDeviceField {
@@ -7125,6 +7271,10 @@ impl SlaveDeviceField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7162,6 +7312,10 @@ impl CapabilitiesField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7206,6 +7360,10 @@ impl FileCapabilitiesField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MesgCapabilitiesField {
@@ -7246,6 +7404,10 @@ impl MesgCapabilitiesField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum FieldCapabilitiesField {
@@ -7285,6 +7447,10 @@ impl FieldCapabilitiesField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7386,6 +7552,10 @@ impl DeviceSettingsField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7515,6 +7685,10 @@ impl UserProfileField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrmProfileField {
@@ -7554,6 +7728,10 @@ impl HrmProfileField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7611,6 +7789,10 @@ impl SdmProfileField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7757,6 +7939,10 @@ impl BikeProfileField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ConnectivityField {
@@ -7821,6 +8007,10 @@ impl ConnectivityField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WatchfaceSettingsField {
@@ -7855,6 +8045,10 @@ impl WatchfaceSettingsField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum OhrSettingsField {
@@ -7885,6 +8079,10 @@ impl OhrSettingsField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::OhrSettings(OhrSettingsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -7982,6 +8180,10 @@ impl TimeInZoneField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::TimeInZone(TimeInZoneField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ZonesTargetField {
@@ -8022,6 +8224,10 @@ impl ZonesTargetField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SportField {
@@ -8056,6 +8262,10 @@ impl SportField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrZoneField {
@@ -8089,6 +8299,10 @@ impl HrZoneField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8128,6 +8342,10 @@ impl SpeedZoneField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum CadenceZoneField {
@@ -8162,6 +8380,10 @@ impl CadenceZoneField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum PowerZoneField {
@@ -8195,6 +8417,10 @@ impl PowerZoneField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8240,6 +8466,10 @@ impl MetZoneField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8289,6 +8519,10 @@ impl TrainingSettingsField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8460,6 +8694,10 @@ impl DiveSettingsField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::DiveSettings(DiveSettingsField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DiveAlarmField {
@@ -8535,6 +8773,10 @@ impl DiveAlarmField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8612,6 +8854,10 @@ impl DiveApneaAlarmField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DiveGasField {
@@ -8651,6 +8897,10 @@ impl DiveGasField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -8716,6 +8966,10 @@ impl GoalField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ActivityField {
@@ -8768,6 +9022,10 @@ impl ActivityField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Activity(ActivityField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -9582,6 +9840,10 @@ impl SessionField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Session(SessionField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum LapField {
@@ -10232,6 +10494,10 @@ impl LapField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Lap(LapField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum LengthField {
@@ -10342,6 +10608,10 @@ impl LengthField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Length(LengthField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -10828,6 +11098,10 @@ impl RecordField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Record(RecordField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum EventField {
@@ -10917,6 +11191,10 @@ impl EventField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Event(EventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11008,6 +11286,10 @@ impl DeviceInfoField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::DeviceInfo(DeviceInfoField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DeviceAuxBatteryInfoField {
@@ -11052,6 +11334,12 @@ impl DeviceAuxBatteryInfoField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::DeviceAuxBatteryInfo(
+            DeviceAuxBatteryInfoField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum TrainingFileField {
@@ -11094,6 +11382,10 @@ impl TrainingFileField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::TrainingFile(TrainingFileField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11172,6 +11464,12 @@ impl WeatherConditionsField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::WeatherConditions(
+            WeatherConditionsField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WeatherAlertField {
@@ -11214,6 +11512,10 @@ impl WeatherAlertField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::WeatherAlert(WeatherAlertField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11283,6 +11585,10 @@ impl GpsMetadataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::GpsMetadata(GpsMetadataField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum CameraEventField {
@@ -11322,6 +11628,10 @@ impl CameraEventField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::CameraEvent(CameraEventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11374,6 +11684,10 @@ impl GyroscopeDataField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::GyroscopeData(GyroscopeDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11436,6 +11750,12 @@ impl AccelerometerDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::AccelerometerData(
+            AccelerometerDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MagnetometerDataField {
@@ -11488,6 +11808,12 @@ impl MagnetometerDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::MagnetometerData(
+            MagnetometerDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum BarometerDataField {
@@ -11524,6 +11850,10 @@ impl BarometerDataField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::BarometerData(BarometerDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11575,6 +11905,12 @@ impl ThreeDSensorCalibrationField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::ThreeDSensorCalibration(
+            ThreeDSensorCalibrationField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum OneDSensorCalibrationField {
@@ -11618,6 +11954,12 @@ impl OneDSensorCalibrationField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::OneDSensorCalibration(
+            OneDSensorCalibrationField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoFrameField {
@@ -11651,6 +11993,10 @@ impl VideoFrameField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::VideoFrame(VideoFrameField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11704,6 +12050,10 @@ impl ObdiiDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::ObdiiData(ObdiiDataField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum NmeaSentenceField {
@@ -11737,6 +12087,10 @@ impl NmeaSentenceField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::NmeaSentence(NmeaSentenceField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11823,6 +12177,12 @@ impl AviationAttitudeField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::AviationAttitude(
+            AviationAttitudeField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoField {
@@ -11856,6 +12216,10 @@ impl VideoField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11891,6 +12255,10 @@ impl VideoTitleField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum VideoDescriptionField {
@@ -11924,6 +12292,10 @@ impl VideoDescriptionField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11970,6 +12342,10 @@ impl VideoClipField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12037,6 +12413,10 @@ impl SetField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Set(SetField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum JumpField {
@@ -12099,6 +12479,10 @@ impl JumpField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Jump(JumpField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12214,6 +12598,10 @@ impl SplitField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SplitSummaryField {
@@ -12305,6 +12693,10 @@ impl SplitSummaryField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ClimbProField {
@@ -12350,6 +12742,10 @@ impl ClimbProField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::ClimbPro(ClimbProField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12418,6 +12814,10 @@ impl FieldDescriptionField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum DeveloperDataIdField {
@@ -12458,6 +12858,10 @@ impl DeveloperDataIdField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum CourseField {
@@ -12494,6 +12898,10 @@ impl CourseField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12548,6 +12956,10 @@ impl CoursePointField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::CoursePoint(CoursePointField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentIdField {
@@ -12600,6 +13012,10 @@ impl SegmentIdField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentLeaderboardEntryField {
@@ -12649,6 +13065,10 @@ impl SegmentLeaderboardEntryField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12711,6 +13131,10 @@ impl SegmentPointField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13186,6 +13610,10 @@ impl SegmentLapField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::SegmentLap(SegmentLapField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SegmentFileField {
@@ -13237,6 +13665,10 @@ impl SegmentFileField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13294,6 +13726,10 @@ impl WorkoutField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum WorkoutSessionField {
@@ -13343,6 +13779,10 @@ impl WorkoutSessionField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13430,6 +13870,10 @@ impl WorkoutStepField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExerciseTitleField {
@@ -13466,6 +13910,10 @@ impl ExerciseTitleField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13512,6 +13960,10 @@ impl ScheduleField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13567,6 +14019,10 @@ impl TotalsField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Totals(TotalsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13671,6 +14127,10 @@ impl WeightScaleField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::WeightScale(WeightScaleField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum BloodPressureField {
@@ -13729,6 +14189,10 @@ impl BloodPressureField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::BloodPressure(BloodPressureField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MonitoringInfoField {
@@ -13779,6 +14243,10 @@ impl MonitoringInfoField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::MonitoringInfo(MonitoringInfoField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13928,6 +14396,10 @@ impl MonitoringField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Monitoring(MonitoringField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum MonitoringHrDataField {
@@ -13961,6 +14433,12 @@ impl MonitoringHrDataField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::MonitoringHrData(
+            MonitoringHrDataField::Timestamp,
+        ))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14006,6 +14484,10 @@ impl Spo2DataField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Spo2Data(Spo2DataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14062,6 +14544,10 @@ impl HrField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::Hr(HrField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum StressLevelField {
@@ -14092,6 +14578,10 @@ impl StressLevelField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14146,6 +14636,10 @@ impl MaxMetDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaBodyBatteryDataField {
@@ -14186,6 +14680,12 @@ impl HsaBodyBatteryDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaBodyBatteryData(
+            HsaBodyBatteryDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaEventField {
@@ -14216,6 +14716,10 @@ impl HsaEventField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaEvent(HsaEventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14275,6 +14779,12 @@ impl HsaAccelerometerDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaAccelerometerData(
+            HsaAccelerometerDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaGyroscopeDataField {
@@ -14333,6 +14843,12 @@ impl HsaGyroscopeDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaGyroscopeData(
+            HsaGyroscopeDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaStepDataField {
@@ -14371,6 +14887,10 @@ impl HsaStepDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaStepData(HsaStepDataField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaSpo2DataField {
@@ -14407,6 +14927,10 @@ impl HsaSpo2DataField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaSpo2Data(HsaSpo2DataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14446,6 +14970,10 @@ impl HsaStressDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaStressData(HsaStressDataField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaRespirationDataField {
@@ -14483,6 +15011,12 @@ impl HsaRespirationDataField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaRespirationData(
+            HsaRespirationDataField::Timestamp,
+        ))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14525,6 +15059,12 @@ impl HsaHeartRateDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaHeartRateData(
+            HsaHeartRateDataField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HsaConfigurationDataField {
@@ -14558,6 +15098,12 @@ impl HsaConfigurationDataField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaConfigurationData(
+            HsaConfigurationDataField::Timestamp,
+        ))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14596,6 +15142,12 @@ impl HsaWristTemperatureDataField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HsaWristTemperatureData(
+            HsaWristTemperatureDataField::Timestamp,
+        ))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14640,6 +15192,10 @@ impl MemoGlobField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SleepLevelField {
@@ -14670,6 +15226,10 @@ impl SleepLevelField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::SleepLevel(SleepLevelField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14710,6 +15270,10 @@ impl AntChannelIdField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14758,6 +15322,10 @@ impl AntRxField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::AntRx(AntRxField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum AntTxField {
@@ -14805,6 +15373,10 @@ impl AntTxField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::AntTx(AntTxField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExdScreenConfigurationField {
@@ -14841,6 +15413,10 @@ impl ExdScreenConfigurationField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14884,6 +15460,10 @@ impl ExdDataFieldConfigurationField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14942,6 +15522,10 @@ impl ExdDataConceptConfigurationField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15109,6 +15693,10 @@ impl DiveSummaryField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::DiveSummary(DiveSummaryField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum AadAccelFeaturesField {
@@ -15156,6 +15744,12 @@ impl AadAccelFeaturesField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::AadAccelFeatures(
+            AadAccelFeaturesField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrvField {
@@ -15187,6 +15781,10 @@ impl HrvField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15221,6 +15819,10 @@ impl BeatIntervalsField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::BeatIntervals(BeatIntervalsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15295,6 +15897,12 @@ impl HrvStatusSummaryField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HrvStatusSummary(
+            HrvStatusSummaryField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum HrvValueField {
@@ -15329,6 +15937,10 @@ impl HrvValueField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::HrvValue(HrvValueField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15373,6 +15985,10 @@ impl RawBbiField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::RawBbi(RawBbiField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum RespirationRateField {
@@ -15407,6 +16023,10 @@ impl RespirationRateField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::RespirationRate(RespirationRateField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15477,6 +16097,12 @@ impl ChronoShotSessionField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::ChronoShotSession(
+            ChronoShotSessionField::Timestamp,
+        ))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum ChronoShotDataField {
@@ -15515,6 +16141,10 @@ impl ChronoShotDataField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::ChronoShotData(ChronoShotDataField::Timestamp))
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum TankUpdateField {
@@ -15552,6 +16182,10 @@ impl TankUpdateField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::TankUpdate(TankUpdateField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15604,6 +16238,10 @@ impl TankSummaryField {
             }),
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::TankSummary(TankSummaryField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15676,6 +16314,10 @@ impl SleepAssessmentField {
             _ => None,
         }
     }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        None
+    }
 }
 #[derive(Debug, PartialEq, Clone)]
 pub enum SkinTempOvernightField {
@@ -15715,5 +16357,11 @@ impl SkinTempOvernightField {
         match def_number {
             _ => None,
         }
+    }
+
+    fn timestamp_field() -> Option<FitMessage> {
+        Some(FitMessage::SkinTempOvernight(
+            SkinTempOvernightField::Timestamp,
+        ))
     }
 }

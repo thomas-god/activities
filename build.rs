@@ -410,6 +410,27 @@ impl {name} {{
             ",\n",
         );
 
+        let mapping_timestamp_field = join(
+            mapping
+                .iter()
+                .filter(|(_, v)| {
+                    if !MESSAGES_TO_IMPORT.is_empty() {
+                        MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(v).as_str())
+                    } else {
+                        true
+                    }
+                })
+                .map(|(_, v)| {
+                    format!(
+                        "Self::{} => {}Field::timestamp_field()",
+                        snake_to_camel_case(v),
+                        snake_to_camel_case(v)
+                    )
+                })
+                .chain(vec!["_ => None".to_string()]),
+            ",\n",
+        );
+
         code.push_str(&format!(
             "
     pub fn message_field(&self, def_number: u8) -> FitMessage {{
@@ -432,6 +453,14 @@ impl {name} {{
     ) -> Option<ScaleOffset> {{
         match self {{
             {mapping_scale_offset}
+        }}
+    }}
+
+    pub fn timestamp_field(
+        &self,
+    ) -> Option<FitMessage> {{
+        match self {{
+            {mapping_timestamp_field}
         }}
     }}"
         ));
@@ -726,6 +755,21 @@ pub enum {message}Field {{
                 .chain(vec!["_ => None".to_string()]),
             ",\n",
         );
+
+        let timestamp_field = definitions
+            .iter()
+            .filter_map(|def| {
+                if def.name == "timestamp" {
+                    Some(format!(
+                        "Some(FitMessage::{message}({message}Field::Timestamp))"
+                    ))
+                } else {
+                    None
+                }
+            })
+            .next()
+            .unwrap_or("None".to_string());
+
         code.push_str(&format!(
             r#"
 impl {message}Field {{
@@ -750,6 +794,10 @@ impl {message}Field {{
         match def_number {{
             {scale_offset_mapping}
         }}
+    }}
+
+    fn timestamp_field() -> Option<FitMessage> {{
+        {timestamp_field}
     }}
 }}"#
         ));
