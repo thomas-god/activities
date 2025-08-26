@@ -1153,10 +1153,9 @@ impl DateTime {
         let mut values = Vec::new();
 
         for _ in 0..number_of_bytes / 4 {
-            {
-                values.push(DataValue::DateTime(reader.next_u32(endianness)?));
-            }
+            values.push(DataValue::DateTime(reader.next_u32(endianness)?));
         }
+
         Ok(values)
     }
 }
@@ -1177,10 +1176,9 @@ impl LocalDateTime {
         let mut values = Vec::new();
 
         for _ in 0..number_of_bytes / 4 {
-            {
-                values.push(DataValue::DateTime(reader.next_u32(endianness)?));
-            }
+            values.push(DataValue::DateTime(reader.next_u32(endianness)?));
         }
+
         Ok(values)
     }
 }
