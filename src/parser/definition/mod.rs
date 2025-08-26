@@ -35,7 +35,6 @@ pub struct Definition {
     pub message_type: MesgNum,
     pub local_message_type: u8,
     pub fields: Vec<DefinitionField>,
-    pub fields_size: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -57,12 +56,10 @@ pub fn parse_definition_message(
     let message_type = MesgNum::from(content.next_u16(&endianness)?);
 
     let number_of_fields = content.next_u8()?;
-    let mut fields_size = 0;
     let mut fields: Vec<DefinitionField> = vec![];
 
     for _ in 0..number_of_fields {
         let field = parse_definition_field(&message_type, endianness, content)?;
-        fields_size += field.size;
         fields.push(field);
     }
 
@@ -71,7 +68,6 @@ pub fn parse_definition_message(
         let number_developer_fields = content.next_u8()?;
         for _ in 0..number_developer_fields {
             let field = parse_developer_field(custom_descriptions, endianness, content)?;
-            fields_size += field.size;
             fields.push(field);
         }
     }
@@ -80,7 +76,6 @@ pub fn parse_definition_message(
         message_type,
         local_message_type: header.local_message_type,
         fields,
-        fields_size,
     })
 }
 
@@ -154,7 +149,6 @@ mod tests {
 
         assert_eq!(definition.local_message_type, 0);
         assert_eq!(definition.message_type, MesgNum::Record);
-        assert_eq!(definition.fields_size, 1);
         assert_eq!(definition.fields.len(), 1);
 
         let field = definition.fields.first().unwrap();

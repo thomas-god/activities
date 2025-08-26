@@ -198,7 +198,6 @@ mod test {
                         size: 16,
                     },
                 ],
-                fields_size: 1 + 1 + 1 + 64 + 16,
             },
         );
 
