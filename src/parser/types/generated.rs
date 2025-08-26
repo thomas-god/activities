@@ -153,7 +153,7 @@ pub enum File {
     Segment,
     SegmentList,
     ExdConfiguration,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl File {
     pub fn from(content: u8) -> File {
@@ -176,7 +176,7 @@ impl File {
             34 => File::Segment,
             35 => File::SegmentList,
             40 => File::ExdConfiguration,
-            _ => File::UnknownVariant,
+            val => File::UnknownVariant(val),
         }
     }
 
@@ -317,7 +317,7 @@ pub enum MesgNum {
     DiveApneaAlarm,
     SkinTempOvernight,
     HsaWristTemperatureData,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl MesgNum {
     pub fn from(content: u16) -> MesgNum {
@@ -442,7 +442,7 @@ impl MesgNum {
             393 => MesgNum::DiveApneaAlarm,
             398 => MesgNum::SkinTempOvernight,
             409 => MesgNum::HsaWristTemperatureData,
-            _ => MesgNum::UnknownVariant,
+            val => MesgNum::UnknownVariant(val),
         }
     }
 
@@ -659,7 +659,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 FitMessage::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
             }
-            _ => FitMessage::UnknownVariant,
+            _ => FitMessage::UnknownVariant(0),
         }
     }
 
@@ -1078,7 +1078,7 @@ pub enum FileFlags {
     Read,
     Write,
     Erase,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl FileFlags {
     pub fn from(content: u8) -> FileFlags {
@@ -1086,7 +1086,7 @@ impl FileFlags {
             2 => FileFlags::Read,
             4 => FileFlags::Write,
             8 => FileFlags::Erase,
-            _ => FileFlags::UnknownVariant,
+            val => FileFlags::UnknownVariant(val),
         }
     }
 
@@ -1110,7 +1110,7 @@ pub enum MesgCount {
     NumPerFile,
     MaxPerFile,
     MaxPerFileType,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl MesgCount {
     pub fn from(content: u8) -> MesgCount {
@@ -1118,7 +1118,7 @@ impl MesgCount {
             0 => MesgCount::NumPerFile,
             1 => MesgCount::MaxPerFile,
             2 => MesgCount::MaxPerFileType,
-            _ => MesgCount::UnknownVariant,
+            val => MesgCount::UnknownVariant(val),
         }
     }
 
@@ -1188,7 +1188,7 @@ pub enum MessageIndex {
     Selected,
     Reserved,
     Mask,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl MessageIndex {
     pub fn from(content: u16) -> MessageIndex {
@@ -1196,7 +1196,7 @@ impl MessageIndex {
             32768 => MessageIndex::Selected,
             28672 => MessageIndex::Reserved,
             4095 => MessageIndex::Mask,
-            _ => MessageIndex::UnknownVariant,
+            val => MessageIndex::UnknownVariant(val),
         }
     }
 
@@ -1218,13 +1218,13 @@ impl MessageIndex {
 #[derive(Debug, PartialEq, Clone)]
 pub enum DeviceIndex {
     Creator,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DeviceIndex {
     pub fn from(content: u8) -> DeviceIndex {
         match content {
             0 => DeviceIndex::Creator,
-            _ => DeviceIndex::UnknownVariant,
+            val => DeviceIndex::UnknownVariant(val),
         }
     }
 
@@ -1247,14 +1247,14 @@ impl DeviceIndex {
 pub enum Gender {
     Female,
     Male,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Gender {
     pub fn from(content: u8) -> Gender {
         match content {
             0 => Gender::Female,
             1 => Gender::Male,
-            _ => Gender::UnknownVariant,
+            val => Gender::UnknownVariant(val),
         }
     }
 
@@ -1314,7 +1314,7 @@ pub enum Language {
     Burmese,
     Mongolian,
     Custom,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Language {
     pub fn from(content: u8) -> Language {
@@ -1358,7 +1358,7 @@ impl Language {
             36 => Language::Burmese,
             37 => Language::Mongolian,
             254 => Language::Custom,
-            _ => Language::UnknownVariant,
+            val => Language::UnknownVariant(val),
         }
     }
 
@@ -1382,7 +1382,7 @@ pub enum DisplayMeasure {
     Metric,
     Statute,
     Nautical,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DisplayMeasure {
     pub fn from(content: u8) -> DisplayMeasure {
@@ -1390,7 +1390,7 @@ impl DisplayMeasure {
             0 => DisplayMeasure::Metric,
             1 => DisplayMeasure::Statute,
             2 => DisplayMeasure::Nautical,
-            _ => DisplayMeasure::UnknownVariant,
+            val => DisplayMeasure::UnknownVariant(val),
         }
     }
 
@@ -1414,7 +1414,7 @@ pub enum DisplayHeart {
     Bpm,
     Max,
     Reserve,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DisplayHeart {
     pub fn from(content: u8) -> DisplayHeart {
@@ -1422,7 +1422,7 @@ impl DisplayHeart {
             0 => DisplayHeart::Bpm,
             1 => DisplayHeart::Max,
             2 => DisplayHeart::Reserve,
-            _ => DisplayHeart::UnknownVariant,
+            val => DisplayHeart::UnknownVariant(val),
         }
     }
 
@@ -1445,14 +1445,14 @@ impl DisplayHeart {
 pub enum DisplayPower {
     Watts,
     PercentFtp,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DisplayPower {
     pub fn from(content: u8) -> DisplayPower {
         match content {
             0 => DisplayPower::Watts,
             1 => DisplayPower::PercentFtp,
-            _ => DisplayPower::UnknownVariant,
+            val => DisplayPower::UnknownVariant(val),
         }
     }
 
@@ -1515,7 +1515,7 @@ pub enum DisplayPosition {
     EstonianGrid,
     LatvianGrid,
     SwedishRef99Grid,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DisplayPosition {
     pub fn from(content: u8) -> DisplayPosition {
@@ -1562,7 +1562,7 @@ impl DisplayPosition {
             39 => DisplayPosition::EstonianGrid,
             40 => DisplayPosition::LatvianGrid,
             41 => DisplayPosition::SwedishRef99Grid,
-            _ => DisplayPosition::UnknownVariant,
+            val => DisplayPosition::UnknownVariant(val),
         }
     }
 
@@ -1586,7 +1586,7 @@ pub enum Switch {
     Off,
     On,
     Auto,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Switch {
     pub fn from(content: u8) -> Switch {
@@ -1594,7 +1594,7 @@ impl Switch {
             0 => Switch::Off,
             1 => Switch::On,
             2 => Switch::Auto,
-            _ => Switch::UnknownVariant,
+            val => Switch::UnknownVariant(val),
         }
     }
 
@@ -1684,7 +1684,7 @@ pub enum Sport {
     Dance,
     JumpRope,
     All,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Sport {
     pub fn from(content: u8) -> Sport {
@@ -1758,7 +1758,7 @@ impl Sport {
             83 => Sport::Dance,
             84 => Sport::JumpRope,
             254 => Sport::All,
-            _ => Sport::UnknownVariant,
+            val => Sport::UnknownVariant(val),
         }
     }
 
@@ -1787,7 +1787,7 @@ pub enum SportBits0 {
     Swimming,
     Basketball,
     Soccer,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SportBits0 {
     pub fn from(content: u8) -> SportBits0 {
@@ -1800,7 +1800,7 @@ impl SportBits0 {
             32 => SportBits0::Swimming,
             64 => SportBits0::Basketball,
             128 => SportBits0::Soccer,
-            _ => SportBits0::UnknownVariant,
+            val => SportBits0::UnknownVariant(val),
         }
     }
 
@@ -1910,7 +1910,7 @@ pub enum SubSport {
     FlyVfr,
     FlyIfr,
     All,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SubSport {
     pub fn from(content: u8) -> SubSport {
@@ -2004,7 +2004,7 @@ impl SubSport {
             118 => SubSport::FlyVfr,
             119 => SubSport::FlyIfr,
             254 => SubSport::All,
-            _ => SubSport::UnknownVariant,
+            val => SubSport::UnknownVariant(val),
         }
     }
 
@@ -2034,7 +2034,7 @@ pub enum SportEvent {
     Training,
     Transportation,
     Touring,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SportEvent {
     pub fn from(content: u8) -> SportEvent {
@@ -2048,7 +2048,7 @@ impl SportEvent {
             6 => SportEvent::Training,
             7 => SportEvent::Transportation,
             8 => SportEvent::Touring,
-            _ => SportEvent::UnknownVariant,
+            val => SportEvent::UnknownVariant(val),
         }
     }
 
@@ -2071,14 +2071,14 @@ impl SportEvent {
 pub enum Activity {
     Manual,
     AutoMultiSport,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Activity {
     pub fn from(content: u8) -> Activity {
         match content {
             0 => Activity::Manual,
             1 => Activity::AutoMultiSport,
-            _ => Activity::UnknownVariant,
+            val => Activity::UnknownVariant(val),
         }
     }
 
@@ -2106,7 +2106,7 @@ pub enum Intensity {
     Recovery,
     Interval,
     Other,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Intensity {
     pub fn from(content: u8) -> Intensity {
@@ -2118,7 +2118,7 @@ impl Intensity {
             4 => Intensity::Recovery,
             5 => Intensity::Interval,
             6 => Intensity::Other,
-            _ => Intensity::UnknownVariant,
+            val => Intensity::UnknownVariant(val),
         }
     }
 
@@ -2143,7 +2143,7 @@ pub enum SessionTrigger {
     Manual,
     AutoMultiSport,
     FitnessEquipment,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SessionTrigger {
     pub fn from(content: u8) -> SessionTrigger {
@@ -2152,7 +2152,7 @@ impl SessionTrigger {
             1 => SessionTrigger::Manual,
             2 => SessionTrigger::AutoMultiSport,
             3 => SessionTrigger::FitnessEquipment,
-            _ => SessionTrigger::UnknownVariant,
+            val => SessionTrigger::UnknownVariant(val),
         }
     }
 
@@ -2182,7 +2182,7 @@ pub enum LapTrigger {
     PositionMarked,
     SessionEnd,
     FitnessEquipment,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl LapTrigger {
     pub fn from(content: u8) -> LapTrigger {
@@ -2196,7 +2196,7 @@ impl LapTrigger {
             6 => LapTrigger::PositionMarked,
             7 => LapTrigger::SessionEnd,
             8 => LapTrigger::FitnessEquipment,
-            _ => LapTrigger::UnknownVariant,
+            val => LapTrigger::UnknownVariant(val),
         }
     }
 
@@ -2223,7 +2223,7 @@ pub enum TimeMode {
     Hour12WithSeconds,
     Hour24WithSeconds,
     Utc,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl TimeMode {
     pub fn from(content: u8) -> TimeMode {
@@ -2234,7 +2234,7 @@ impl TimeMode {
             3 => TimeMode::Hour12WithSeconds,
             4 => TimeMode::Hour24WithSeconds,
             5 => TimeMode::Utc,
-            _ => TimeMode::UnknownVariant,
+            val => TimeMode::UnknownVariant(val),
         }
     }
 
@@ -2262,7 +2262,7 @@ pub enum BacklightMode {
     SmartNotifications,
     KeyAndMessagesNight,
     KeyAndMessagesAndSmartNotifications,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl BacklightMode {
     pub fn from(content: u8) -> BacklightMode {
@@ -2274,7 +2274,7 @@ impl BacklightMode {
             4 => BacklightMode::SmartNotifications,
             5 => BacklightMode::KeyAndMessagesNight,
             6 => BacklightMode::KeyAndMessagesAndSmartNotifications,
-            _ => BacklightMode::UnknownVariant,
+            val => BacklightMode::UnknownVariant(val),
         }
     }
 
@@ -2297,14 +2297,14 @@ impl BacklightMode {
 pub enum DateMode {
     DayMonth,
     MonthDay,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DateMode {
     pub fn from(content: u8) -> DateMode {
         match content {
             0 => DateMode::DayMonth,
             1 => DateMode::MonthDay,
-            _ => DateMode::UnknownVariant,
+            val => DateMode::UnknownVariant(val),
         }
     }
 
@@ -2326,13 +2326,13 @@ impl DateMode {
 #[derive(Debug, PartialEq, Clone)]
 pub enum BacklightTimeout {
     Infinite,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl BacklightTimeout {
     pub fn from(content: u8) -> BacklightTimeout {
         match content {
             0 => BacklightTimeout::Infinite,
-            _ => BacklightTimeout::UnknownVariant,
+            val => BacklightTimeout::UnknownVariant(val),
         }
     }
 
@@ -2399,7 +2399,7 @@ pub enum Event {
     TankBatteryLow,
     TankPodConnected,
     TankPodDisconnected,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Event {
     pub fn from(content: u8) -> Event {
@@ -2450,7 +2450,7 @@ impl Event {
             76 => Event::TankBatteryLow,
             81 => Event::TankPodConnected,
             82 => Event::TankPodDisconnected,
-            _ => Event::UnknownVariant,
+            val => Event::UnknownVariant(val),
         }
     }
 
@@ -2481,7 +2481,7 @@ pub enum EventType {
     EndAllDepreciated,
     StopDisable,
     StopDisableAll,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl EventType {
     pub fn from(content: u8) -> EventType {
@@ -2496,7 +2496,7 @@ impl EventType {
             7 => EventType::EndAllDepreciated,
             8 => EventType::StopDisable,
             9 => EventType::StopDisableAll,
-            _ => EventType::UnknownVariant,
+            val => EventType::UnknownVariant(val),
         }
     }
 
@@ -2521,7 +2521,7 @@ pub enum Tone {
     Tone,
     Vibrate,
     ToneAndVibrate,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Tone {
     pub fn from(content: u8) -> Tone {
@@ -2530,7 +2530,7 @@ impl Tone {
             1 => Tone::Tone,
             2 => Tone::Vibrate,
             3 => Tone::ToneAndVibrate,
-            _ => Tone::UnknownVariant,
+            val => Tone::UnknownVariant(val),
         }
     }
 
@@ -2554,7 +2554,7 @@ pub enum ActivityClass {
     Level,
     LevelMax,
     Athlete,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ActivityClass {
     pub fn from(content: u8) -> ActivityClass {
@@ -2562,7 +2562,7 @@ impl ActivityClass {
             127 => ActivityClass::Level,
             100 => ActivityClass::LevelMax,
             128 => ActivityClass::Athlete,
-            _ => ActivityClass::UnknownVariant,
+            val => ActivityClass::UnknownVariant(val),
         }
     }
 
@@ -2587,7 +2587,7 @@ pub enum HrZoneCalc {
     PercentMaxHr,
     PercentHrr,
     PercentLthr,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl HrZoneCalc {
     pub fn from(content: u8) -> HrZoneCalc {
@@ -2596,7 +2596,7 @@ impl HrZoneCalc {
             1 => HrZoneCalc::PercentMaxHr,
             2 => HrZoneCalc::PercentHrr,
             3 => HrZoneCalc::PercentLthr,
-            _ => HrZoneCalc::UnknownVariant,
+            val => HrZoneCalc::UnknownVariant(val),
         }
     }
 
@@ -2619,14 +2619,14 @@ impl HrZoneCalc {
 pub enum PwrZoneCalc {
     Custom,
     PercentFtp,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl PwrZoneCalc {
     pub fn from(content: u8) -> PwrZoneCalc {
         match content {
             0 => PwrZoneCalc::Custom,
             1 => PwrZoneCalc::PercentFtp,
-            _ => PwrZoneCalc::UnknownVariant,
+            val => PwrZoneCalc::UnknownVariant(val),
         }
     }
 
@@ -2678,7 +2678,7 @@ pub enum WktStepDuration {
     RepetitionTime,
     Reps,
     TimeOnly,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WktStepDuration {
     pub fn from(content: u8) -> WktStepDuration {
@@ -2714,7 +2714,7 @@ impl WktStepDuration {
             28 => WktStepDuration::RepetitionTime,
             29 => WktStepDuration::Reps,
             31 => WktStepDuration::TimeOnly,
-            _ => WktStepDuration::UnknownVariant,
+            val => WktStepDuration::UnknownVariant(val),
         }
     }
 
@@ -2749,7 +2749,7 @@ pub enum WktStepTarget {
     SwimStroke,
     SpeedLap,
     HeartRateLap,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WktStepTarget {
     pub fn from(content: u8) -> WktStepTarget {
@@ -2768,7 +2768,7 @@ impl WktStepTarget {
             11 => WktStepTarget::SwimStroke,
             12 => WktStepTarget::SpeedLap,
             13 => WktStepTarget::HeartRateLap,
-            _ => WktStepTarget::UnknownVariant,
+            val => WktStepTarget::UnknownVariant(val),
         }
     }
 
@@ -2796,7 +2796,7 @@ pub enum Goal {
     Steps,
     Ascent,
     ActiveMinutes,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Goal {
     pub fn from(content: u8) -> Goal {
@@ -2808,7 +2808,7 @@ impl Goal {
             4 => Goal::Steps,
             5 => Goal::Ascent,
             6 => Goal::ActiveMinutes,
-            _ => Goal::UnknownVariant,
+            val => Goal::UnknownVariant(val),
         }
     }
 
@@ -2835,7 +2835,7 @@ pub enum GoalRecurrence {
     Monthly,
     Yearly,
     Custom,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl GoalRecurrence {
     pub fn from(content: u8) -> GoalRecurrence {
@@ -2846,7 +2846,7 @@ impl GoalRecurrence {
             3 => GoalRecurrence::Monthly,
             4 => GoalRecurrence::Yearly,
             5 => GoalRecurrence::Custom,
-            _ => GoalRecurrence::UnknownVariant,
+            val => GoalRecurrence::UnknownVariant(val),
         }
     }
 
@@ -2870,7 +2870,7 @@ pub enum GoalSource {
     Auto,
     Community,
     User,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl GoalSource {
     pub fn from(content: u8) -> GoalSource {
@@ -2878,7 +2878,7 @@ impl GoalSource {
             0 => GoalSource::Auto,
             1 => GoalSource::Community,
             2 => GoalSource::User,
-            _ => GoalSource::UnknownVariant,
+            val => GoalSource::UnknownVariant(val),
         }
     }
 
@@ -2901,14 +2901,14 @@ impl GoalSource {
 pub enum Schedule {
     Workout,
     Course,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Schedule {
     pub fn from(content: u8) -> Schedule {
         match content {
             0 => Schedule::Workout,
             1 => Schedule::Course,
-            _ => Schedule::UnknownVariant,
+            val => Schedule::UnknownVariant(val),
         }
     }
 
@@ -2982,7 +2982,7 @@ pub enum CoursePoint {
     Transport,
     Alert,
     Info,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl CoursePoint {
     pub fn from(content: u8) -> CoursePoint {
@@ -3040,7 +3040,7 @@ impl CoursePoint {
             51 => CoursePoint::Transport,
             52 => CoursePoint::Alert,
             53 => CoursePoint::Info,
-            _ => CoursePoint::UnknownVariant,
+            val => CoursePoint::UnknownVariant(val),
         }
     }
 
@@ -3293,7 +3293,7 @@ pub enum Manufacturer {
     DaradInnovationCorporation,
     Cycloptim,
     Actigraphcorp,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl Manufacturer {
     pub fn from(content: u16) -> Manufacturer {
@@ -3530,7 +3530,7 @@ impl Manufacturer {
             334 => Manufacturer::DaradInnovationCorporation,
             335 => Manufacturer::Cycloptim,
             5759 => Manufacturer::Actigraphcorp,
-            _ => Manufacturer::UnknownVariant,
+            val => Manufacturer::UnknownVariant(val),
         }
     }
 
@@ -3555,7 +3555,7 @@ pub enum AntNetwork {
     Antplus,
     Antfs,
     Private,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl AntNetwork {
     pub fn from(content: u8) -> AntNetwork {
@@ -3564,7 +3564,7 @@ impl AntNetwork {
             1 => AntNetwork::Antplus,
             2 => AntNetwork::Antfs,
             3 => AntNetwork::Private,
-            _ => AntNetwork::UnknownVariant,
+            val => AntNetwork::UnknownVariant(val),
         }
     }
 
@@ -3599,7 +3599,7 @@ pub enum WorkoutCapabilities {
     Grade,
     Resistance,
     Protected,
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl WorkoutCapabilities {
     pub fn from(content: u32) -> WorkoutCapabilities {
@@ -3618,7 +3618,7 @@ impl WorkoutCapabilities {
             4096 => WorkoutCapabilities::Grade,
             8192 => WorkoutCapabilities::Resistance,
             16384 => WorkoutCapabilities::Protected,
-            _ => WorkoutCapabilities::UnknownVariant,
+            val => WorkoutCapabilities::UnknownVariant(val),
         }
     }
 
@@ -3646,7 +3646,7 @@ pub enum BatteryStatus {
     Critical,
     Charging,
     Unknown,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl BatteryStatus {
     pub fn from(content: u8) -> BatteryStatus {
@@ -3658,7 +3658,7 @@ impl BatteryStatus {
             5 => BatteryStatus::Critical,
             6 => BatteryStatus::Charging,
             7 => BatteryStatus::Unknown,
-            _ => BatteryStatus::UnknownVariant,
+            val => BatteryStatus::UnknownVariant(val),
         }
     }
 
@@ -3681,14 +3681,14 @@ impl BatteryStatus {
 pub enum HrType {
     Normal,
     Irregular,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl HrType {
     pub fn from(content: u8) -> HrType {
         match content {
             0 => HrType::Normal,
             1 => HrType::Irregular,
-            _ => HrType::UnknownVariant,
+            val => HrType::UnknownVariant(val),
         }
     }
 
@@ -3721,7 +3721,7 @@ pub enum CourseCapabilities {
     Navigation,
     Bikeway,
     Aviation,
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl CourseCapabilities {
     pub fn from(content: u32) -> CourseCapabilities {
@@ -3738,7 +3738,7 @@ impl CourseCapabilities {
             512 => CourseCapabilities::Navigation,
             1024 => CourseCapabilities::Bikeway,
             4096 => CourseCapabilities::Aviation,
-            _ => CourseCapabilities::UnknownVariant,
+            val => CourseCapabilities::UnknownVariant(val),
         }
     }
 
@@ -3760,13 +3760,13 @@ impl CourseCapabilities {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Weight {
     Calculating,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl Weight {
     pub fn from(content: u16) -> Weight {
         match content {
             65534 => Weight::Calculating,
-            _ => Weight::UnknownVariant,
+            val => Weight::UnknownVariant(val),
         }
     }
 
@@ -3792,7 +3792,7 @@ pub enum BpStatus {
     ErrorNoMeasurement,
     ErrorDataOutOfRange,
     ErrorIrregularHeartRate,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl BpStatus {
     pub fn from(content: u8) -> BpStatus {
@@ -3802,7 +3802,7 @@ impl BpStatus {
             2 => BpStatus::ErrorNoMeasurement,
             3 => BpStatus::ErrorDataOutOfRange,
             4 => BpStatus::ErrorIrregularHeartRate,
-            _ => BpStatus::UnknownVariant,
+            val => BpStatus::UnknownVariant(val),
         }
     }
 
@@ -3829,7 +3829,7 @@ pub enum UserLocalId {
     StationaryMax,
     PortableMin,
     PortableMax,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl UserLocalId {
     pub fn from(content: u16) -> UserLocalId {
@@ -3840,7 +3840,7 @@ impl UserLocalId {
             255 => UserLocalId::StationaryMax,
             256 => UserLocalId::PortableMin,
             65534 => UserLocalId::PortableMax,
-            _ => UserLocalId::UnknownVariant,
+            val => UserLocalId::UnknownVariant(val),
         }
     }
 
@@ -3870,7 +3870,7 @@ pub enum SwimStroke {
     Im,
     ImByRound,
     Rimo,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SwimStroke {
     pub fn from(content: u8) -> SwimStroke {
@@ -3884,7 +3884,7 @@ impl SwimStroke {
             6 => SwimStroke::Im,
             7 => SwimStroke::ImByRound,
             8 => SwimStroke::Rimo,
-            _ => SwimStroke::UnknownVariant,
+            val => SwimStroke::UnknownVariant(val),
         }
     }
 
@@ -3914,7 +3914,7 @@ pub enum ActivityType {
     Walking,
     Sedentary,
     All,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ActivityType {
     pub fn from(content: u8) -> ActivityType {
@@ -3928,7 +3928,7 @@ impl ActivityType {
             6 => ActivityType::Walking,
             8 => ActivityType::Sedentary,
             254 => ActivityType::All,
-            _ => ActivityType::UnknownVariant,
+            val => ActivityType::UnknownVariant(val),
         }
     }
 
@@ -3969,7 +3969,7 @@ pub enum ActivitySubtype {
     LapSwimming,
     OpenWater,
     All,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ActivitySubtype {
     pub fn from(content: u8) -> ActivitySubtype {
@@ -3994,7 +3994,7 @@ impl ActivitySubtype {
             17 => ActivitySubtype::LapSwimming,
             18 => ActivitySubtype::OpenWater,
             254 => ActivitySubtype::All,
-            _ => ActivitySubtype::UnknownVariant,
+            val => ActivitySubtype::UnknownVariant(val),
         }
     }
 
@@ -4018,7 +4018,7 @@ pub enum ActivityLevel {
     Low,
     Medium,
     High,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ActivityLevel {
     pub fn from(content: u8) -> ActivityLevel {
@@ -4026,7 +4026,7 @@ impl ActivityLevel {
             0 => ActivityLevel::Low,
             1 => ActivityLevel::Medium,
             2 => ActivityLevel::High,
-            _ => ActivityLevel::UnknownVariant,
+            val => ActivityLevel::UnknownVariant(val),
         }
     }
 
@@ -4049,14 +4049,14 @@ impl ActivityLevel {
 pub enum Side {
     Right,
     Left,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Side {
     pub fn from(content: u8) -> Side {
         match content {
             0 => Side::Right,
             1 => Side::Left,
-            _ => Side::UnknownVariant,
+            val => Side::UnknownVariant(val),
         }
     }
 
@@ -4079,14 +4079,14 @@ impl Side {
 pub enum LeftRightBalance {
     Mask,
     Right,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl LeftRightBalance {
     pub fn from(content: u8) -> LeftRightBalance {
         match content {
             127 => LeftRightBalance::Mask,
             128 => LeftRightBalance::Right,
-            _ => LeftRightBalance::UnknownVariant,
+            val => LeftRightBalance::UnknownVariant(val),
         }
     }
 
@@ -4109,14 +4109,14 @@ impl LeftRightBalance {
 pub enum LeftRightBalance100 {
     Mask,
     Right,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl LeftRightBalance100 {
     pub fn from(content: u16) -> LeftRightBalance100 {
         match content {
             16383 => LeftRightBalance100::Mask,
             32768 => LeftRightBalance100::Right,
-            _ => LeftRightBalance100::UnknownVariant,
+            val => LeftRightBalance100::UnknownVariant(val),
         }
     }
 
@@ -4139,14 +4139,14 @@ impl LeftRightBalance100 {
 pub enum LengthType {
     Idle,
     Active,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl LengthType {
     pub fn from(content: u8) -> LengthType {
         match content {
             0 => LengthType::Idle,
             1 => LengthType::Active,
-            _ => LengthType::UnknownVariant,
+            val => LengthType::UnknownVariant(val),
         }
     }
 
@@ -4174,7 +4174,7 @@ pub enum DayOfWeek {
     Thursday,
     Friday,
     Saturday,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DayOfWeek {
     pub fn from(content: u8) -> DayOfWeek {
@@ -4186,7 +4186,7 @@ impl DayOfWeek {
             4 => DayOfWeek::Thursday,
             5 => DayOfWeek::Friday,
             6 => DayOfWeek::Saturday,
-            _ => DayOfWeek::UnknownVariant,
+            val => DayOfWeek::UnknownVariant(val),
         }
     }
 
@@ -4239,7 +4239,7 @@ pub enum ConnectivityCapabilities {
     LiveTrackAutoStart,
     LiveTrackMessaging,
     InstantInput,
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl ConnectivityCapabilities {
     pub fn from(content: u32) -> ConnectivityCapabilities {
@@ -4276,7 +4276,7 @@ impl ConnectivityCapabilities {
             536870912 => ConnectivityCapabilities::LiveTrackAutoStart,
             1073741824 => ConnectivityCapabilities::LiveTrackMessaging,
             2147483648 => ConnectivityCapabilities::InstantInput,
-            _ => ConnectivityCapabilities::UnknownVariant,
+            val => ConnectivityCapabilities::UnknownVariant(val),
         }
     }
 
@@ -4301,7 +4301,7 @@ pub enum WeatherReport {
     Forecast,
     HourlyForecast,
     DailyForecast,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WeatherReport {
     pub fn from(content: u8) -> WeatherReport {
@@ -4310,7 +4310,7 @@ impl WeatherReport {
             1 => WeatherReport::Forecast,
             1 => WeatherReport::HourlyForecast,
             2 => WeatherReport::DailyForecast,
-            _ => WeatherReport::UnknownVariant,
+            val => WeatherReport::UnknownVariant(val),
         }
     }
 
@@ -4352,7 +4352,7 @@ pub enum WeatherStatus {
     LightRainSnow,
     HeavyRainSnow,
     Cloudy,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WeatherStatus {
     pub fn from(content: u8) -> WeatherStatus {
@@ -4378,7 +4378,7 @@ impl WeatherStatus {
             20 => WeatherStatus::LightRainSnow,
             21 => WeatherStatus::HeavyRainSnow,
             22 => WeatherStatus::Cloudy,
-            _ => WeatherStatus::UnknownVariant,
+            val => WeatherStatus::UnknownVariant(val),
         }
     }
 
@@ -4404,7 +4404,7 @@ pub enum WeatherSeverity {
     Watch,
     Advisory,
     Statement,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WeatherSeverity {
     pub fn from(content: u8) -> WeatherSeverity {
@@ -4414,7 +4414,7 @@ impl WeatherSeverity {
             2 => WeatherSeverity::Watch,
             3 => WeatherSeverity::Advisory,
             4 => WeatherSeverity::Statement,
-            _ => WeatherSeverity::UnknownVariant,
+            val => WeatherSeverity::UnknownVariant(val),
         }
     }
 
@@ -4520,7 +4520,7 @@ pub enum WeatherSevereType {
     LowWater,
     Hydrological,
     SpecialWeather,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WeatherSevereType {
     pub fn from(content: u8) -> WeatherSevereType {
@@ -4610,7 +4610,7 @@ impl WeatherSevereType {
             82 => WeatherSevereType::LowWater,
             83 => WeatherSevereType::Hydrological,
             84 => WeatherSevereType::SpecialWeather,
-            _ => WeatherSevereType::UnknownVariant,
+            val => WeatherSevereType::UnknownVariant(val),
         }
     }
 
@@ -4631,12 +4631,12 @@ impl WeatherSevereType {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LocaltimeIntoDay {
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl LocaltimeIntoDay {
     pub fn from(content: u32) -> LocaltimeIntoDay {
         match content {
-            _ => LocaltimeIntoDay::UnknownVariant,
+            val => LocaltimeIntoDay::UnknownVariant(val),
         }
     }
 
@@ -4663,7 +4663,7 @@ pub enum StrokeType {
     Forehand,
     Backhand,
     Smash,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl StrokeType {
     pub fn from(content: u8) -> StrokeType {
@@ -4674,7 +4674,7 @@ impl StrokeType {
             3 => StrokeType::Forehand,
             4 => StrokeType::Backhand,
             5 => StrokeType::Smash,
-            _ => StrokeType::UnknownVariant,
+            val => StrokeType::UnknownVariant(val),
         }
     }
 
@@ -4735,7 +4735,7 @@ pub enum BodyLocation {
     WaistFront,
     WaistLeft,
     WaistRight,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl BodyLocation {
     pub fn from(content: u8) -> BodyLocation {
@@ -4780,7 +4780,7 @@ impl BodyLocation {
             37 => BodyLocation::WaistFront,
             38 => BodyLocation::WaistLeft,
             39 => BodyLocation::WaistRight,
-            _ => BodyLocation::UnknownVariant,
+            val => BodyLocation::UnknownVariant(val),
         }
     }
 
@@ -4803,14 +4803,14 @@ impl BodyLocation {
 pub enum SegmentLapStatus {
     End,
     Fail,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SegmentLapStatus {
     pub fn from(content: u8) -> SegmentLapStatus {
         match content {
             0 => SegmentLapStatus::End,
             1 => SegmentLapStatus::Fail,
-            _ => SegmentLapStatus::UnknownVariant,
+            val => SegmentLapStatus::UnknownVariant(val),
         }
     }
 
@@ -4846,7 +4846,7 @@ pub enum SegmentLeaderboardType {
     Last,
     RecentBest,
     CourseRecord,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SegmentLeaderboardType {
     pub fn from(content: u8) -> SegmentLeaderboardType {
@@ -4866,7 +4866,7 @@ impl SegmentLeaderboardType {
             12 => SegmentLeaderboardType::Last,
             13 => SegmentLeaderboardType::RecentBest,
             14 => SegmentLeaderboardType::CourseRecord,
-            _ => SegmentLeaderboardType::UnknownVariant,
+            val => SegmentLeaderboardType::UnknownVariant(val),
         }
     }
 
@@ -4890,7 +4890,7 @@ pub enum SegmentDeleteStatus {
     DoNotDelete,
     DeleteOne,
     DeleteAll,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SegmentDeleteStatus {
     pub fn from(content: u8) -> SegmentDeleteStatus {
@@ -4898,7 +4898,7 @@ impl SegmentDeleteStatus {
             0 => SegmentDeleteStatus::DoNotDelete,
             1 => SegmentDeleteStatus::DeleteOne,
             2 => SegmentDeleteStatus::DeleteAll,
-            _ => SegmentDeleteStatus::UnknownVariant,
+            val => SegmentDeleteStatus::UnknownVariant(val),
         }
     }
 
@@ -4921,14 +4921,14 @@ impl SegmentDeleteStatus {
 pub enum SegmentSelectionType {
     Starred,
     Suggested,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SegmentSelectionType {
     pub fn from(content: u8) -> SegmentSelectionType {
         match content {
             0 => SegmentSelectionType::Starred,
             1 => SegmentSelectionType::Suggested,
-            _ => SegmentSelectionType::UnknownVariant,
+            val => SegmentSelectionType::UnknownVariant(val),
         }
     }
 
@@ -4955,7 +4955,7 @@ pub enum SourceType {
     BluetoothLowEnergy,
     Wifi,
     Local,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SourceType {
     pub fn from(content: u8) -> SourceType {
@@ -4966,7 +4966,7 @@ impl SourceType {
             3 => SourceType::BluetoothLowEnergy,
             4 => SourceType::Wifi,
             5 => SourceType::Local,
-            _ => SourceType::UnknownVariant,
+            val => SourceType::UnknownVariant(val),
         }
     }
 
@@ -4991,7 +4991,7 @@ pub enum AntChannelId {
     AntTransmissionTypeLowerNibble,
     AntDeviceType,
     AntDeviceNumber,
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl AntChannelId {
     pub fn from(content: u32) -> AntChannelId {
@@ -5000,7 +5000,7 @@ impl AntChannelId {
             251658240 => AntChannelId::AntTransmissionTypeLowerNibble,
             16711680 => AntChannelId::AntDeviceType,
             65535 => AntChannelId::AntDeviceNumber,
-            _ => AntChannelId::UnknownVariant,
+            val => AntChannelId::UnknownVariant(val),
         }
     }
 
@@ -5026,7 +5026,7 @@ pub enum DisplayOrientation {
     Landscape,
     PortraitFlipped,
     LandscapeFlipped,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DisplayOrientation {
     pub fn from(content: u8) -> DisplayOrientation {
@@ -5036,7 +5036,7 @@ impl DisplayOrientation {
             2 => DisplayOrientation::Landscape,
             3 => DisplayOrientation::PortraitFlipped,
             4 => DisplayOrientation::LandscapeFlipped,
-            _ => DisplayOrientation::UnknownVariant,
+            val => DisplayOrientation::UnknownVariant(val),
         }
     }
 
@@ -5063,7 +5063,7 @@ pub enum WorkoutEquipment {
     SwimPaddles,
     SwimPullBuoy,
     SwimSnorkel,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WorkoutEquipment {
     pub fn from(content: u8) -> WorkoutEquipment {
@@ -5074,7 +5074,7 @@ impl WorkoutEquipment {
             3 => WorkoutEquipment::SwimPaddles,
             4 => WorkoutEquipment::SwimPullBuoy,
             5 => WorkoutEquipment::SwimSnorkel,
-            _ => WorkoutEquipment::UnknownVariant,
+            val => WorkoutEquipment::UnknownVariant(val),
         }
     }
 
@@ -5099,7 +5099,7 @@ pub enum WatchfaceMode {
     Analog,
     ConnectIq,
     Disabled,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WatchfaceMode {
     pub fn from(content: u8) -> WatchfaceMode {
@@ -5108,7 +5108,7 @@ impl WatchfaceMode {
             1 => WatchfaceMode::Analog,
             2 => WatchfaceMode::ConnectIq,
             3 => WatchfaceMode::Disabled,
-            _ => WatchfaceMode::UnknownVariant,
+            val => WatchfaceMode::UnknownVariant(val),
         }
     }
 
@@ -5142,7 +5142,7 @@ pub enum CameraEventType {
     VideoSecondStreamPause,
     VideoResume,
     VideoSecondStreamResume,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl CameraEventType {
     pub fn from(content: u8) -> CameraEventType {
@@ -5160,7 +5160,7 @@ impl CameraEventType {
             12 => CameraEventType::VideoSecondStreamPause,
             13 => CameraEventType::VideoResume,
             14 => CameraEventType::VideoSecondStreamResume,
-            _ => CameraEventType::UnknownVariant,
+            val => CameraEventType::UnknownVariant(val),
         }
     }
 
@@ -5185,7 +5185,7 @@ pub enum SensorType {
     Gyroscope,
     Compass,
     Barometer,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SensorType {
     pub fn from(content: u8) -> SensorType {
@@ -5194,7 +5194,7 @@ impl SensorType {
             1 => SensorType::Gyroscope,
             2 => SensorType::Compass,
             3 => SensorType::Barometer,
-            _ => SensorType::UnknownVariant,
+            val => SensorType::UnknownVariant(val),
         }
     }
 
@@ -5219,7 +5219,7 @@ pub enum CameraOrientationType {
     CameraOrientation90,
     CameraOrientation180,
     CameraOrientation270,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl CameraOrientationType {
     pub fn from(content: u8) -> CameraOrientationType {
@@ -5228,7 +5228,7 @@ impl CameraOrientationType {
             1 => CameraOrientationType::CameraOrientation90,
             2 => CameraOrientationType::CameraOrientation180,
             3 => CameraOrientationType::CameraOrientation270,
-            _ => CameraOrientationType::UnknownVariant,
+            val => CameraOrientationType::UnknownVariant(val),
         }
     }
 
@@ -5253,7 +5253,7 @@ pub enum AttitudeStage {
     Aligning,
     Degraded,
     Valid,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl AttitudeStage {
     pub fn from(content: u8) -> AttitudeStage {
@@ -5262,7 +5262,7 @@ impl AttitudeStage {
             1 => AttitudeStage::Aligning,
             2 => AttitudeStage::Degraded,
             3 => AttitudeStage::Valid,
-            _ => AttitudeStage::UnknownVariant,
+            val => AttitudeStage::UnknownVariant(val),
         }
     }
 
@@ -5296,7 +5296,7 @@ pub enum AttitudeValidity {
     SolutionCoasting,
     TrueTrackAngle,
     MagneticHeading,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl AttitudeValidity {
     pub fn from(content: u16) -> AttitudeValidity {
@@ -5314,7 +5314,7 @@ impl AttitudeValidity {
             1024 => AttitudeValidity::SolutionCoasting,
             2048 => AttitudeValidity::TrueTrackAngle,
             4096 => AttitudeValidity::MagneticHeading,
-            _ => AttitudeValidity::UnknownVariant,
+            val => AttitudeValidity::UnknownVariant(val),
         }
     }
 
@@ -5340,7 +5340,7 @@ pub enum AutoSyncFrequency {
     Frequent,
     OnceADay,
     Remote,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl AutoSyncFrequency {
     pub fn from(content: u8) -> AutoSyncFrequency {
@@ -5350,7 +5350,7 @@ impl AutoSyncFrequency {
             2 => AutoSyncFrequency::Frequent,
             3 => AutoSyncFrequency::OnceADay,
             4 => AutoSyncFrequency::Remote,
-            _ => AutoSyncFrequency::UnknownVariant,
+            val => AutoSyncFrequency::UnknownVariant(val),
         }
     }
 
@@ -5380,7 +5380,7 @@ pub enum ExdLayout {
     HalfVerticalLeftSplit,
     HalfHorizontalTopSplit,
     Dynamic,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ExdLayout {
     pub fn from(content: u8) -> ExdLayout {
@@ -5394,7 +5394,7 @@ impl ExdLayout {
             6 => ExdLayout::HalfVerticalLeftSplit,
             7 => ExdLayout::HalfHorizontalTopSplit,
             8 => ExdLayout::Dynamic,
-            _ => ExdLayout::UnknownVariant,
+            val => ExdLayout::UnknownVariant(val),
         }
     }
 
@@ -5426,7 +5426,7 @@ pub enum ExdDisplayType {
     String,
     SimpleDynamicIcon,
     Gauge,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ExdDisplayType {
     pub fn from(content: u8) -> ExdDisplayType {
@@ -5442,7 +5442,7 @@ impl ExdDisplayType {
             8 => ExdDisplayType::String,
             9 => ExdDisplayType::SimpleDynamicIcon,
             10 => ExdDisplayType::Gauge,
-            _ => ExdDisplayType::UnknownVariant,
+            val => ExdDisplayType::UnknownVariant(val),
         }
     }
 
@@ -5513,7 +5513,7 @@ pub enum ExdDataUnits {
     MetersPerMin,
     MetersPerSec,
     EightCardinal,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ExdDataUnits {
     pub fn from(content: u8) -> ExdDataUnits {
@@ -5568,7 +5568,7 @@ impl ExdDataUnits {
             47 => ExdDataUnits::MetersPerMin,
             48 => ExdDataUnits::MetersPerSec,
             49 => ExdDataUnits::EightCardinal,
-            _ => ExdDataUnits::UnknownVariant,
+            val => ExdDataUnits::UnknownVariant(val),
         }
     }
 
@@ -5633,7 +5633,7 @@ pub enum ExdQualifiers {
     Zone3,
     Zone2,
     Zone1,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ExdQualifiers {
     pub fn from(content: u8) -> ExdQualifiers {
@@ -5682,7 +5682,7 @@ impl ExdQualifiers {
             248 => ExdQualifiers::Zone3,
             249 => ExdQualifiers::Zone2,
             250 => ExdQualifiers::Zone1,
-            _ => ExdQualifiers::UnknownVariant,
+            val => ExdQualifiers::UnknownVariant(val),
         }
     }
 
@@ -5800,7 +5800,7 @@ pub enum ExdDescriptors {
     AmbientPressure,
     Pressure,
     Vam,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ExdDescriptors {
     pub fn from(content: u8) -> ExdDescriptors {
@@ -5902,7 +5902,7 @@ impl ExdDescriptors {
             94 => ExdDescriptors::AmbientPressure,
             95 => ExdDescriptors::Pressure,
             96 => ExdDescriptors::Vam,
-            _ => ExdDescriptors::UnknownVariant,
+            val => ExdDescriptors::UnknownVariant(val),
         }
     }
 
@@ -5930,7 +5930,7 @@ pub enum AutoActivityDetect {
     Walking,
     Elliptical,
     Sedentary,
-    UnknownVariant,
+    UnknownVariant(u32),
 }
 impl AutoActivityDetect {
     pub fn from(content: u32) -> AutoActivityDetect {
@@ -5942,7 +5942,7 @@ impl AutoActivityDetect {
             8 => AutoActivityDetect::Walking,
             32 => AutoActivityDetect::Elliptical,
             1024 => AutoActivityDetect::Sedentary,
-            _ => AutoActivityDetect::UnknownVariant,
+            val => AutoActivityDetect::UnknownVariant(val),
         }
     }
 
@@ -5980,7 +5980,7 @@ pub enum FitBaseType {
     Sint64,
     Uint64,
     Uint64z,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl FitBaseType {
     pub fn from(content: u8) -> FitBaseType {
@@ -6002,7 +6002,7 @@ impl FitBaseType {
             142 => FitBaseType::Sint64,
             143 => FitBaseType::Uint64,
             144 => FitBaseType::Uint64z,
-            _ => FitBaseType::UnknownVariant,
+            val => FitBaseType::UnknownVariant(val),
         }
     }
 
@@ -6026,7 +6026,7 @@ pub enum FitBaseUnit {
     Other,
     Kilogram,
     Pound,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl FitBaseUnit {
     pub fn from(content: u16) -> FitBaseUnit {
@@ -6034,7 +6034,7 @@ impl FitBaseUnit {
             0 => FitBaseUnit::Other,
             1 => FitBaseUnit::Kilogram,
             2 => FitBaseUnit::Pound,
-            _ => FitBaseUnit::UnknownVariant,
+            val => FitBaseUnit::UnknownVariant(val),
         }
     }
 
@@ -6057,14 +6057,14 @@ impl FitBaseUnit {
 pub enum SetType {
     Rest,
     Active,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SetType {
     pub fn from(content: u8) -> SetType {
         match content {
             0 => SetType::Rest,
             1 => SetType::Active,
-            _ => SetType::UnknownVariant,
+            val => SetType::UnknownVariant(val),
         }
     }
 
@@ -6087,14 +6087,14 @@ impl SetType {
 pub enum MaxMetCategory {
     Generic,
     Cycling,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl MaxMetCategory {
     pub fn from(content: u8) -> MaxMetCategory {
         match content {
             0 => MaxMetCategory::Generic,
             1 => MaxMetCategory::Cycling,
-            _ => MaxMetCategory::UnknownVariant,
+            val => MaxMetCategory::UnknownVariant(val),
         }
     }
 
@@ -6168,7 +6168,7 @@ pub enum ExerciseCategory {
     RunIndoor,
     BikeOutdoor,
     Unknown,
-    UnknownVariant,
+    UnknownVariant(u16),
 }
 impl ExerciseCategory {
     pub fn from(content: u16) -> ExerciseCategory {
@@ -6226,7 +6226,7 @@ impl ExerciseCategory {
             52 => ExerciseCategory::RunIndoor,
             53 => ExerciseCategory::BikeOutdoor,
             65534 => ExerciseCategory::Unknown,
-            _ => ExerciseCategory::UnknownVariant,
+            val => ExerciseCategory::UnknownVariant(val),
         }
     }
 
@@ -6251,7 +6251,7 @@ pub enum WaterType {
     Salt,
     En13319,
     Custom,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl WaterType {
     pub fn from(content: u8) -> WaterType {
@@ -6260,7 +6260,7 @@ impl WaterType {
             1 => WaterType::Salt,
             2 => WaterType::En13319,
             3 => WaterType::Custom,
-            _ => WaterType::UnknownVariant,
+            val => WaterType::UnknownVariant(val),
         }
     }
 
@@ -6282,13 +6282,13 @@ impl WaterType {
 #[derive(Debug, PartialEq, Clone)]
 pub enum TissueModelType {
     Zhl16c,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl TissueModelType {
     pub fn from(content: u8) -> TissueModelType {
         match content {
             0 => TissueModelType::Zhl16c,
-            _ => TissueModelType::UnknownVariant,
+            val => TissueModelType::UnknownVariant(val),
         }
     }
 
@@ -6312,7 +6312,7 @@ pub enum DiveGasStatus {
     Disabled,
     Enabled,
     BackupOnly,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DiveGasStatus {
     pub fn from(content: u8) -> DiveGasStatus {
@@ -6320,7 +6320,7 @@ impl DiveGasStatus {
             0 => DiveGasStatus::Disabled,
             1 => DiveGasStatus::Enabled,
             2 => DiveGasStatus::BackupOnly,
-            _ => DiveGasStatus::UnknownVariant,
+            val => DiveGasStatus::UnknownVariant(val),
         }
     }
 
@@ -6344,7 +6344,7 @@ pub enum DiveAlarmType {
     Depth,
     Time,
     Speed,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DiveAlarmType {
     pub fn from(content: u8) -> DiveAlarmType {
@@ -6352,7 +6352,7 @@ impl DiveAlarmType {
             0 => DiveAlarmType::Depth,
             1 => DiveAlarmType::Time,
             2 => DiveAlarmType::Speed,
-            _ => DiveAlarmType::UnknownVariant,
+            val => DiveAlarmType::UnknownVariant(val),
         }
     }
 
@@ -6375,14 +6375,14 @@ impl DiveAlarmType {
 pub enum DiveBacklightMode {
     AtDepth,
     AlwaysOn,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DiveBacklightMode {
     pub fn from(content: u8) -> DiveBacklightMode {
         match content {
             0 => DiveBacklightMode::AtDepth,
             1 => DiveBacklightMode::AlwaysOn,
-            _ => DiveBacklightMode::UnknownVariant,
+            val => DiveBacklightMode::UnknownVariant(val),
         }
     }
 
@@ -6408,7 +6408,7 @@ pub enum SleepLevel {
     Light,
     Deep,
     Rem,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SleepLevel {
     pub fn from(content: u8) -> SleepLevel {
@@ -6418,7 +6418,7 @@ impl SleepLevel {
             2 => SleepLevel::Light,
             3 => SleepLevel::Deep,
             4 => SleepLevel::Rem,
-            _ => SleepLevel::UnknownVariant,
+            val => SleepLevel::UnknownVariant(val),
         }
     }
 
@@ -6443,7 +6443,7 @@ pub enum Spo2MeasurementType {
     SpotCheck,
     ContinuousCheck,
     Periodic,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl Spo2MeasurementType {
     pub fn from(content: u8) -> Spo2MeasurementType {
@@ -6452,7 +6452,7 @@ impl Spo2MeasurementType {
             1 => Spo2MeasurementType::SpotCheck,
             2 => Spo2MeasurementType::ContinuousCheck,
             3 => Spo2MeasurementType::Periodic,
-            _ => Spo2MeasurementType::UnknownVariant,
+            val => Spo2MeasurementType::UnknownVariant(val),
         }
     }
 
@@ -6475,14 +6475,14 @@ impl Spo2MeasurementType {
 pub enum CcrSetpointSwitchMode {
     Manual,
     Automatic,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl CcrSetpointSwitchMode {
     pub fn from(content: u8) -> CcrSetpointSwitchMode {
         match content {
             0 => CcrSetpointSwitchMode::Manual,
             1 => CcrSetpointSwitchMode::Automatic,
-            _ => CcrSetpointSwitchMode::UnknownVariant,
+            val => CcrSetpointSwitchMode::UnknownVariant(val),
         }
     }
 
@@ -6505,14 +6505,14 @@ impl CcrSetpointSwitchMode {
 pub enum DiveGasMode {
     OpenCircuit,
     ClosedCircuitDiluent,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl DiveGasMode {
     pub fn from(content: u8) -> DiveGasMode {
         match content {
             0 => DiveGasMode::OpenCircuit,
             1 => DiveGasMode::ClosedCircuitDiluent,
-            _ => DiveGasMode::UnknownVariant,
+            val => DiveGasMode::UnknownVariant(val),
         }
     }
 
@@ -6539,7 +6539,7 @@ pub enum ProjectileType {
     Shotshell,
     AirRiflePellet,
     Other,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ProjectileType {
     pub fn from(content: u8) -> ProjectileType {
@@ -6550,7 +6550,7 @@ impl ProjectileType {
             3 => ProjectileType::Shotshell,
             4 => ProjectileType::AirRiflePellet,
             5 => ProjectileType::Other,
-            _ => ProjectileType::UnknownVariant,
+            val => ProjectileType::UnknownVariant(val),
         }
     }
 
@@ -6592,7 +6592,7 @@ pub enum SplitType {
     Transition,
     SkiLiftSplit,
     SkiRunSplit,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl SplitType {
     pub fn from(content: u8) -> SplitType {
@@ -6618,7 +6618,7 @@ impl SplitType {
             23 => SplitType::Transition,
             28 => SplitType::SkiLiftSplit,
             29 => SplitType::SkiRunSplit,
-            _ => SplitType::UnknownVariant,
+            val => SplitType::UnknownVariant(val),
         }
     }
 
@@ -6642,7 +6642,7 @@ pub enum ClimbProEvent {
     Approach,
     Start,
     Complete,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl ClimbProEvent {
     pub fn from(content: u8) -> ClimbProEvent {
@@ -6650,7 +6650,7 @@ impl ClimbProEvent {
             0 => ClimbProEvent::Approach,
             1 => ClimbProEvent::Start,
             2 => ClimbProEvent::Complete,
-            _ => ClimbProEvent::UnknownVariant,
+            val => ClimbProEvent::UnknownVariant(val),
         }
     }
 
@@ -6674,7 +6674,7 @@ pub enum GasConsumptionRateType {
     PressureSac,
     VolumeSac,
     Rmv,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl GasConsumptionRateType {
     pub fn from(content: u8) -> GasConsumptionRateType {
@@ -6682,7 +6682,7 @@ impl GasConsumptionRateType {
             0 => GasConsumptionRateType::PressureSac,
             1 => GasConsumptionRateType::VolumeSac,
             2 => GasConsumptionRateType::Rmv,
-            _ => GasConsumptionRateType::UnknownVariant,
+            val => GasConsumptionRateType::UnknownVariant(val),
         }
     }
 
@@ -6706,7 +6706,7 @@ pub enum TapSensitivity {
     High,
     Medium,
     Low,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl TapSensitivity {
     pub fn from(content: u8) -> TapSensitivity {
@@ -6714,7 +6714,7 @@ impl TapSensitivity {
             0 => TapSensitivity::High,
             1 => TapSensitivity::Medium,
             2 => TapSensitivity::Low,
-            _ => TapSensitivity::UnknownVariant,
+            val => TapSensitivity::UnknownVariant(val),
         }
     }
 
@@ -6739,7 +6739,7 @@ pub enum RadarThreatLevelType {
     ThreatNone,
     ThreatApproaching,
     ThreatApproachingFast,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl RadarThreatLevelType {
     pub fn from(content: u8) -> RadarThreatLevelType {
@@ -6748,7 +6748,7 @@ impl RadarThreatLevelType {
             1 => RadarThreatLevelType::ThreatNone,
             2 => RadarThreatLevelType::ThreatApproaching,
             3 => RadarThreatLevelType::ThreatApproachingFast,
-            _ => RadarThreatLevelType::UnknownVariant,
+            val => RadarThreatLevelType::UnknownVariant(val),
         }
     }
 
@@ -6772,7 +6772,7 @@ pub enum MaxMetSpeedSource {
     OnboardGps,
     ConnectedGps,
     Cadence,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl MaxMetSpeedSource {
     pub fn from(content: u8) -> MaxMetSpeedSource {
@@ -6780,7 +6780,7 @@ impl MaxMetSpeedSource {
             0 => MaxMetSpeedSource::OnboardGps,
             1 => MaxMetSpeedSource::ConnectedGps,
             2 => MaxMetSpeedSource::Cadence,
-            _ => MaxMetSpeedSource::UnknownVariant,
+            val => MaxMetSpeedSource::UnknownVariant(val),
         }
     }
 
@@ -6803,14 +6803,14 @@ impl MaxMetSpeedSource {
 pub enum MaxMetHeartRateSource {
     Whr,
     Hrm,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl MaxMetHeartRateSource {
     pub fn from(content: u8) -> MaxMetHeartRateSource {
         match content {
             0 => MaxMetHeartRateSource::Whr,
             1 => MaxMetHeartRateSource::Hrm,
-            _ => MaxMetHeartRateSource::UnknownVariant,
+            val => MaxMetHeartRateSource::UnknownVariant(val),
         }
     }
 
@@ -6836,7 +6836,7 @@ pub enum HrvStatus {
     Low,
     Unbalanced,
     Balanced,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl HrvStatus {
     pub fn from(content: u8) -> HrvStatus {
@@ -6846,7 +6846,7 @@ impl HrvStatus {
             2 => HrvStatus::Low,
             3 => HrvStatus::Unbalanced,
             4 => HrvStatus::Balanced,
-            _ => HrvStatus::UnknownVariant,
+            val => HrvStatus::UnknownVariant(val),
         }
     }
 
@@ -6869,14 +6869,14 @@ impl HrvStatus {
 pub enum NoFlyTimeMode {
     Standard,
     Flat24Hours,
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 impl NoFlyTimeMode {
     pub fn from(content: u8) -> NoFlyTimeMode {
         match content {
             0 => NoFlyTimeMode::Standard,
             1 => NoFlyTimeMode::Flat24Hours,
-            _ => NoFlyTimeMode::UnknownVariant,
+            val => NoFlyTimeMode::UnknownVariant(val),
         }
     }
 
@@ -6917,7 +6917,7 @@ impl FitBaseType {
             Self::Uint32z => parse_uint32z,
             Self::Uint64 => parse_uint64,
             Self::Uint64z => parse_uint64z,
-            Self::UnknownVariant => parse_unknown,
+            Self::UnknownVariant(_) => parse_unknown,
         }
     }
 }
@@ -7045,7 +7045,7 @@ pub enum FitMessage {
     SleepAssessment(SleepAssessmentField),
     SkinTempOvernight(SkinTempOvernightField),
     Custom(CustomField),
-    UnknownVariant,
+    UnknownVariant(u8),
 }
 
 #[derive(Debug, PartialEq, Clone)]

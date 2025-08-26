@@ -250,7 +250,7 @@ impl FitBaseType {
             Self::Uint32z => parse_uint32z,
             Self::Uint64 => parse_uint64,
             Self::Uint64z => parse_uint64z,
-            Self::UnknownVariant => parse_unknown,
+            Self::UnknownVariant(_) => parse_unknown,
         }
     }
 }
@@ -301,7 +301,7 @@ fn generate_enum_code(name: &str, base_type: &str, mapping: &[(usize, EnumVarian
         mapping
             .iter()
             .map(|(_, v)| snake_to_camel_case(v))
-            .chain(vec!["UnknownVariant".to_string()]),
+            .chain(vec![format!("UnknownVariant({enum_type})").to_string()]),
         ",\n",
     );
 
@@ -327,7 +327,7 @@ pub enum {enum_name} {{
                     snake_to_camel_case(variant)
                 )
             })
-            .chain(vec![format!("_ => {enum_name}::UnknownVariant")]),
+            .chain(vec![format!("val => {enum_name}::UnknownVariant(val)")]),
         ",\n",
     );
     code.push_str(&format!(
@@ -395,7 +395,7 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
                     snake_to_camel_case(v)
                 )
             })
-            .chain(vec!["_ => FitMessage::UnknownVariant".to_string()]),
+            .chain(vec!["_ => FitMessage::UnknownVariant(0)".to_string()]),
         ",\n",
     );
 
@@ -705,7 +705,7 @@ fn generate_messages_code(messages: Vec<(String, Vec<Message>)>, enums: Vec<Stri
 pub enum FitMessage {{
     {messages_enum}
     Custom(CustomField),
-    UnknownVariant
+    UnknownVariant(u8)
 }}
 
 #[derive(Debug, PartialEq, Clone)]
