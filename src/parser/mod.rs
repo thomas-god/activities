@@ -60,7 +60,6 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
                 parse_custom_definition_description(data, &definitions, &mut custom_descriptions);
                 compressed_timestamp.set_last_timestamp(data.last_timestamp());
             }
-            Record::CompressedTimestamp(_) => {}
         }
         records.push(record);
 

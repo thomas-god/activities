@@ -106,17 +106,9 @@ pub struct DataMessageField {
 }
 
 #[derive(Debug)]
-pub struct CompressedTimestampMessage {
-    pub timestamp: u32,
-    pub local_message_type: u8,
-    pub values: Vec<u8>,
-}
-
-#[derive(Debug)]
 pub enum Record {
     Definition(Definition),
     Data(DataMessage),
-    CompressedTimestamp(CompressedTimestampMessage),
 }
 
 impl Record {
@@ -140,6 +132,7 @@ impl Record {
 
             RecordHeader::Compressed(header) => {
                 parse_compressed_message(header, definitions, compressed_timestamp, content)
+                    .map(Record::Data)
             }
         }
     }
@@ -150,30 +143,28 @@ fn parse_data_message(
     definitions: &HashMap<u8, Definition>,
     content: &mut Reader,
 ) -> Result<DataMessage, RecordError> {
-    match definitions.get(&header.local_message_type) {
-        Some(definition) => {
-            let mut fields = Vec::new();
-            for field in definition.fields.iter() {
-                let values = (field.parse)(content, &field.endianness, field.size)?
-                    .iter()
-                    .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
-                    .collect();
-                fields.push(DataMessageField {
-                    kind: field.kind.clone(),
-                    values,
-                })
-            }
-
-            Ok(DataMessage {
-                local_message_type: header.local_message_type,
-                fields,
-            })
-        }
-
-        None => Err(RecordError::NoDefinitionMessageFound(
+    let Some(definition) = definitions.get(&header.local_message_type) else {
+        return Err(RecordError::NoDefinitionMessageFound(
             header.local_message_type,
-        )),
+        ));
+    };
+
+    let mut fields = Vec::new();
+    for field in definition.fields.iter() {
+        let values = (field.parse)(content, &field.endianness, field.size)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+            .collect();
+        fields.push(DataMessageField {
+            kind: field.kind.clone(),
+            values,
+        })
     }
+
+    Ok(DataMessage {
+        local_message_type: header.local_message_type,
+        fields,
+    })
 }
 
 fn parse_compressed_message(
@@ -181,27 +172,43 @@ fn parse_compressed_message(
     definitions: &HashMap<u8, Definition>,
     compressed_timestamp: &mut CompressedTimestamp,
     content: &mut Reader,
-) -> Result<Record, RecordError> {
+) -> Result<DataMessage, RecordError> {
     let timestamp = compressed_timestamp
         .parse_offset(header.time_offset)
         .ok_or(RecordError::TimestampMissingForCompressedTimestamp)?;
-    let fields_size = match definitions.get(&header.local_message_type) {
-        Some(definition) => definition.fields_size,
-        None => {
-            return Err(RecordError::NoDefinitionMessageFound(
-                header.local_message_type,
-            ));
-        }
+
+    let Some(definition) = definitions.get(&header.local_message_type) else {
+        return Err(RecordError::NoDefinitionMessageFound(
+            header.local_message_type,
+        ));
     };
-    let mut values: Vec<u8> = Vec::new();
-    for _ in 0..fields_size {
-        values.push(content.next_u8()?);
+
+    let mut fields = Vec::new();
+
+    // Insert reconstructed timestamp
+    if let Some(timestamp_field) = definition.message_type.timestamp_field() {
+        fields.push(DataMessageField {
+            kind: timestamp_field,
+            values: vec![DataValue::DateTime(timestamp)],
+        });
     }
-    Ok(Record::CompressedTimestamp(CompressedTimestampMessage {
-        timestamp,
+
+    // Parse remaining fields
+    for field in definition.fields.iter() {
+        let values = (field.parse)(content, &field.endianness, field.size)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+            .collect();
+        fields.push(DataMessageField {
+            kind: field.kind.clone(),
+            values,
+        })
+    }
+
+    Ok(DataMessage {
         local_message_type: header.local_message_type,
-        values,
-    }))
+        fields,
+    })
 }
 
 #[derive(Debug, Default)]
