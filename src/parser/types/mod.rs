@@ -34,20 +34,21 @@ pub enum DataValue {
 
 #[derive(Debug, Error)]
 pub enum DataTypeError {
-    #[error("Not enough bytes to parse data")]
-    InsufficientData,
+    #[error(
+        "Expected number of bytes ({0}) to read is not a multiple of the underlying type size ({1} bytes)"
+    )]
+    DataNotAligned(u8, u8),
     #[error("Unable to parse Utf-8 String from bytes")]
     InvalidUtf8,
     #[error("Error while trying to read bytes from content")]
     ReaderError(#[from] ReaderError),
 }
 
-fn number_of_values(variant_size: u8, bytes: u8) -> Result<u8, DataTypeError> {
-    let type_size = variant_size;
-    if bytes % type_size != 0 {
-        return Err(DataTypeError::InsufficientData);
+fn number_of_values(type_size: u8, bytes_to_read: u8) -> Result<u8, DataTypeError> {
+    if bytes_to_read % type_size != 0 {
+        return Err(DataTypeError::DataNotAligned(bytes_to_read, type_size));
     }
-    Ok(bytes / type_size)
+    Ok(bytes_to_read / type_size)
 }
 
 pub fn parse_uint8(
