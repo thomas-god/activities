@@ -32,7 +32,7 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
     let mut content = fs::read(file)?.into_iter();
 
     let header = FileHeader::from_bytes(&mut content)?;
-    let mut reader = Reader::new(header.data_size, header.crc, content);
+    let mut reader = Reader::new(header.data_size, content);
 
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();

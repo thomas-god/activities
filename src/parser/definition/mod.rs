@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_parse_definition() {
-        let mut content = Reader::new(8, 0, vec![0, 0, 20, 0, 1, 3, 1, 2].into_iter());
+        let mut content = Reader::new(8, vec![0, 0, 20, 0, 1, 3, 1, 2].into_iter());
         let definition = parse_definition_message(
             DefinitionMessageHeader {
                 message_type_specific: false,
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(field.endianness, Endianness::Little);
         assert_eq!(field.kind, FitMessage::Record(RecordField::HeartRate));
 
-        let mut content = Reader::new(1, 0, vec![12].into_iter());
+        let mut content = Reader::new(1, vec![12].into_iter());
         assert_eq!(
             (field.parse)(&mut content, &Endianness::Little, 1).unwrap(),
             vec![DataValue::Uint8(12)]
