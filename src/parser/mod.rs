@@ -5,8 +5,8 @@ use thiserror::Error;
 use crate::parser::{
     definition::custom::{CustomDescription, parse_custom_definition_description},
     header::{FileHeader, FileHeaderError, HEADER_SIZE},
-    reader::Reader,
-    records::CompressedTimestamp,
+    reader::{Reader, ReaderError},
+    records::{CompressedTimestamp, RecordError},
 };
 
 pub use crate::parser::definition::{Definition, DefinitionField, Endianness};
@@ -26,6 +26,15 @@ pub enum FitParserError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Invalid body CRC: expected {0} but got {1}")]
+    InvalidBodyCRC(u16, u16),
+
+    #[error("Reader error")]
+    ReaderError(#[from] ReaderError),
+
+    #[error("Body parsing error")]
+    ParserError(#[from] RecordError),
 }
 
 pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
@@ -42,18 +51,17 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
     let mut records = Vec::new();
 
     loop {
-        let record = match Record::parse(
+        if reader.is_empty() {
+            break;
+        }
+
+        let record = Record::parse(
             &mut reader,
             &definitions,
             &custom_descriptions,
             &mut compressed_timestamp,
-        ) {
-            Ok(record) => record,
-            Err(err) => {
-                println!("error: {:?}", err);
-                break;
-            }
-        };
+        )?;
+
         match record {
             Record::Definition(ref definition) => {
                 definitions.insert(definition.local_message_type, definition.clone());
@@ -68,6 +76,15 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
         if reader.is_empty() {
             break;
         }
+    }
+
+    let body_crc = reader.current_crc();
+
+    let mut crc_reader = Reader::new(2, reader.remaining_content());
+    let expected_crc = crc_reader.next_u16(&Endianness::Little)?;
+
+    if body_crc != expected_crc {
+        return Err(FitParserError::InvalidBodyCRC(expected_crc, body_crc));
     }
 
     Ok(records)
