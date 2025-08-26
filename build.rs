@@ -6,7 +6,8 @@ use std::process::{Command, Stdio};
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
 
-const MESSAGES_TO_IMPORT: &[&str] = &["Record", "FieldDescription"];
+const MESSAGES_TO_IMPORT: &[&str] = &[]; // If empty, every message type is imported
+// const MESSAGES_TO_IMPORT: &[&str] = &["Record", "FieldDescription", "DeviceInfo"];
 const BASE_TYPES: &[&str] = &[
     "sint8", "uint8", "uintz8", "sint16", "uint16", "uintz16", "sint32", "uint32", "uintz32",
     "sint64", "uint64", "uintz64", "string", "float32", "float64", "byte",
@@ -348,6 +349,13 @@ impl {name} {{
         let mapping_field = join(
             mapping
                 .iter()
+                .filter(|(_, v)| {
+                    if !MESSAGES_TO_IMPORT.is_empty() {
+                        MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(v).as_str())
+                    } else {
+                        true
+                    }
+                })
                 .map(|(_, v)| {
                     format!(
                         "Self::{} => FitMessage::{}({}Field::from(def_number))",
@@ -356,15 +364,20 @@ impl {name} {{
                         snake_to_camel_case(v)
                     )
                 })
-                .chain(vec![
-                    "Self::UnknownVariant => FitMessage::UnknownVariant".to_string(),
-                ]),
+                .chain(vec!["_ => FitMessage::UnknownVariant".to_string()]),
             ",\n",
         );
 
         let mapping_parse = join(
             mapping
                 .iter()
+                .filter(|(_, v)| {
+                    if !MESSAGES_TO_IMPORT.is_empty() {
+                        MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(v).as_str())
+                    } else {
+                        true
+                    }
+                })
                 .map(|(_, v)| {
                     format!(
                         "Self::{} => {}Field::get_parse_function(def_number)",
@@ -372,13 +385,20 @@ impl {name} {{
                         snake_to_camel_case(v)
                     )
                 })
-                .chain(vec!["Self::UnknownVariant => parse_unknown".to_string()]),
+                .chain(vec!["_ => parse_unknown".to_string()]),
             ",\n",
         );
 
         let mapping_scale_offset = join(
             mapping
                 .iter()
+                .filter(|(_, v)| {
+                    if !MESSAGES_TO_IMPORT.is_empty() {
+                        MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(v).as_str())
+                    } else {
+                        true
+                    }
+                })
                 .map(|(_, v)| {
                     format!(
                         "Self::{} => {}Field::get_scale_offset(def_number)",
@@ -386,7 +406,7 @@ impl {name} {{
                         snake_to_camel_case(v)
                     )
                 })
-                .chain(vec!["Self::UnknownVariant => None".to_string()]),
+                .chain(vec!["_ => None".to_string()]),
             ",\n",
         );
 
@@ -507,7 +527,7 @@ fn generate_messages_definitions() -> (Vec<(String, Vec<Message>)>, Vec<String>)
         message_name = next_message_name.unwrap();
     }
 
-    if MESSAGES_TO_IMPORT.is_empty() {
+    if !MESSAGES_TO_IMPORT.is_empty() {
         messages.retain(|(msg, _)| {
             MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(msg.as_str()).as_str())
         })

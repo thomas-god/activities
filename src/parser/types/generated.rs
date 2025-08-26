@@ -659,7 +659,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 FitMessage::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
             }
-            Self::UnknownVariant => FitMessage::UnknownVariant,
+            _ => FitMessage::UnknownVariant,
         }
     }
 
@@ -802,7 +802,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 HsaWristTemperatureDataField::get_parse_function(def_number)
             }
-            Self::UnknownVariant => parse_unknown,
+            _ => parse_unknown,
         }
     }
 
@@ -940,7 +940,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 HsaWristTemperatureDataField::get_scale_offset(def_number)
             }
-            Self::UnknownVariant => None,
+            _ => None,
         }
     }
 }
