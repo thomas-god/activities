@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::parser::{
     definition::custom::{CustomDescription, parse_custom_definition_description},
-    header::{FileHeader, FileHeaderError},
+    header::{FileHeader, FileHeaderError, HEADER_SIZE},
     reader::Reader,
     records::CompressedTimestamp,
 };
@@ -29,10 +29,12 @@ pub enum FitParserError {
 }
 
 pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
-    let mut content = fs::read(file)?.into_iter();
+    let content = fs::read(file)?.into_iter();
 
-    let header = FileHeader::from_bytes(&mut content)?;
-    let mut reader = Reader::new(header.data_size, content);
+    let mut header_reader = Reader::new(HEADER_SIZE as u32, content);
+    let header = FileHeader::from_bytes(&mut header_reader)?;
+
+    let mut reader = Reader::new(header.data_size, header_reader.remaining_content());
 
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();

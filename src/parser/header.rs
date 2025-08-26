@@ -1,51 +1,63 @@
 use thiserror::Error;
 
+use crate::{Endianness, parser::reader::Reader};
+
 #[derive(Error, Debug)]
 pub enum FileHeaderError {
-    #[error("File header is not exactly 14 bytes long")]
-    InvalidHeaderSize,
+    #[error("File header {0} expected 14 bytes")]
+    InvalidHeaderSize(u8),
     #[error("File header is not of type .FIT")]
     InvalidHeaderType,
     #[error("File header is malformed")]
     HeaderMalformed,
+    #[error("Invalid header CRC value: expected {0} but got {1}")]
+    InvalidCRC(u16, u16),
 }
+
+pub const HEADER_SIZE: u8 = 14;
 
 #[derive(Debug)]
 pub struct FileHeader {
     pub protocol: u8,
     pub profile_version: u16,
     pub data_size: u32,
-    pub crc: u16,
 }
 
 impl FileHeader {
-    pub fn from_bytes<I>(content: &mut I) -> Result<FileHeader, FileHeaderError>
-    where
-        I: Iterator<Item = u8>,
-    {
-        let header_size = content.next().ok_or(FileHeaderError::InvalidHeaderSize)?; // byte 0
-        if header_size != 14 {
-            return Err(FileHeaderError::InvalidHeaderSize);
+    pub fn from_bytes(reader: &mut Reader) -> Result<FileHeader, FileHeaderError> {
+        let header_size = reader
+            .next_u8()
+            .map_err(|_| FileHeaderError::HeaderMalformed)?;
+
+        if header_size != HEADER_SIZE {
+            return Err(FileHeaderError::InvalidHeaderSize(header_size));
         }
 
-        let protocol = content.next().ok_or(FileHeaderError::HeaderMalformed)?; // byte 1
-        let profile_version = u16::from_le_bytes([
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 2
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 3
-        ]);
-        let data_size = u32::from_le_bytes([
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 4
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 5
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 6
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 7
-        ]);
+        let protocol = reader
+            .next_u8()
+            .map_err(|_| FileHeaderError::HeaderMalformed)?; // byte 1
+        let profile_version = reader
+            .next_u16(&Endianness::Little)
+            .map_err(|_| FileHeaderError::HeaderMalformed)?; // bytes 2 and 3
+
+        let data_size = reader
+            .next_u32(&Endianness::Little)
+            .map_err(|_| FileHeaderError::HeaderMalformed)?; // bytes 4 to 7
 
         let data_type = String::from_utf8(
             [
-                content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 8
-                content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 9
-                content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 10
-                content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 11
+                reader
+                    .next_u8()
+                    .map_err(|_| FileHeaderError::HeaderMalformed)?, // byte 8
+                reader
+                    .next_u8()
+                    .map_err(|_| FileHeaderError::HeaderMalformed)?, // byte 9
+                reader
+                    .next_u8()
+                    .map_err(|_| FileHeaderError::HeaderMalformed)?, // byte 10
+                reader
+                    .next_u8()
+                    .map_err(|_| FileHeaderError::HeaderMalformed)?, // byte 11
             ]
             .to_vec(),
         )
@@ -53,109 +65,131 @@ impl FileHeader {
         if data_type != ".FIT" {
             return Err(FileHeaderError::InvalidHeaderType);
         }
-        let crc = u16::from_le_bytes([
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 12
-            content.next().ok_or(FileHeaderError::HeaderMalformed)?, // byte 13
-        ]);
+        let crc = reader.current_crc();
+
+        let expected_crc = reader
+            .next_u16(&Endianness::Little) // bytes 12 and 13
+            .map_err(|_| FileHeaderError::HeaderMalformed)?;
+
+        if crc != expected_crc {
+            return Err(FileHeaderError::InvalidCRC(expected_crc, crc));
+        }
 
         Ok(Self {
             protocol,
             profile_version,
             data_size,
-            crc,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::header::{FileHeader, FileHeaderError};
+    use super::*;
 
     #[test]
     fn test_parse_returns_err_if_header_size_less_than_14_bytes() {
-        let mut content = vec![13].into_iter();
+        let mut reader = Reader::new(14, vec![13].into_iter());
 
-        let Err(FileHeaderError::InvalidHeaderSize) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::InvalidHeaderSize(size)) = FileHeader::from_bytes(&mut reader)
+        else {
             unreachable!("Should have return an Err(FileHeaderError::InvalidHeaderSize)")
         };
+        assert_eq!(size, 13);
     }
 
     #[test]
     fn test_parse_returns_err_if_header_size_more_than_14_bytes() {
-        let mut content = vec![15].into_iter();
+        let mut reader = Reader::new(14, vec![15].into_iter());
 
-        let Err(FileHeaderError::InvalidHeaderSize) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::InvalidHeaderSize(size)) = FileHeader::from_bytes(&mut reader)
+        else {
             unreachable!("Should have return an Err(FileHeaderError::InvalidHeaderSize)")
         };
+        assert_eq!(size, 15);
     }
 
     #[test]
     fn test_parse_returns_err_if_no_protocol_byte_in_position_1() {
-        let mut content = vec![14].into_iter();
+        let mut reader = Reader::new(14, vec![HEADER_SIZE].into_iter());
 
-        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
         };
     }
 
     #[test]
     fn test_parse_returns_err_if_no_protocol_version_in_positions_2_3() {
-        let mut content = vec![14, 0].into_iter();
+        let mut reader = Reader::new(14, vec![HEADER_SIZE, 0].into_iter());
 
-        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
         };
     }
 
     #[test]
     fn test_parse_returns_err_if_no_data_size_in_positions_4_7() {
-        let mut content = vec![14, 0, 0, 12].into_iter();
+        let mut reader = Reader::new(14, vec![HEADER_SIZE, 0, 0, 12].into_iter());
 
-        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
         };
     }
 
     #[test]
     fn test_parse_returns_err_if_data_type_is_not_dot_fit() {
-        let mut content = vec![14, 0, 0, 12, 0, 0, 0, 1];
+        let mut content = vec![HEADER_SIZE, 0, 0, 12, 0, 0, 0, 1];
         let mut data_type = String::from("tFIT").as_bytes().to_vec();
         content.append(&mut data_type);
-        let mut content = content.into_iter();
+        let mut reader = Reader::new(14, content.into_iter());
 
-        let Err(FileHeaderError::InvalidHeaderType) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::InvalidHeaderType) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::InvalidHeaderType)")
         };
     }
 
     #[test]
     fn test_parse_returns_err_if_crc_not_2_bytes() {
-        let mut content = vec![14, 0, 0, 12, 0, 0, 0, 1];
+        let mut content = vec![HEADER_SIZE, 0, 0, 12, 0, 0, 0, 1];
         let mut data_type = String::from(".FIT").as_bytes().to_vec();
         content.append(&mut data_type);
         content.append(&mut vec![0]);
-        let mut content = content.into_iter();
+        let mut reader = Reader::new(14, content.into_iter());
 
-        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut content) else {
+        let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
+            unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
+        };
+    }
+
+    #[test]
+    fn test_parse_header_crc_is_invalid() {
+        let mut content = vec![HEADER_SIZE, 0, 13, 0, 1, 0, 0, 0];
+        let mut data_type = String::from(".FIT").as_bytes().to_vec();
+        content.append(&mut data_type);
+        content.append(&mut vec![103, 114]); // CRC value for bytes 0-11
+        let mut reader = Reader::new(14, content.into_iter());
+
+        let Err(FileHeaderError::InvalidCRC(_expected_crc, _crc)) =
+            FileHeader::from_bytes(&mut reader)
+        else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
         };
     }
 
     #[test]
     fn test_parse_returns_header() {
-        let mut content = vec![14, 0, 13, 0, 1, 0, 0, 0];
+        let mut content = vec![HEADER_SIZE, 0, 13, 0, 1, 0, 0, 0];
         let mut data_type = String::from(".FIT").as_bytes().to_vec();
         content.append(&mut data_type);
-        content.append(&mut vec![12, 0]);
-        let mut content = content.into_iter();
+        content.append(&mut vec![103, 115]); // CRC value for bytes 0-11
+        let mut reader = Reader::new(14, content.into_iter());
 
-        let Ok(header) = FileHeader::from_bytes(&mut content) else {
+        let Ok(header) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Ok(FileHeader)")
         };
 
         assert_eq!(header.protocol, 0);
         assert_eq!(header.profile_version, 13);
         assert_eq!(header.data_size, 1);
-        assert_eq!(header.crc, 12);
     }
 }
