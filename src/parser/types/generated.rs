@@ -9712,19 +9712,19 @@ impl SessionField {
                 offset: 0_f32,
             }),
             116 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             117 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             118 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             119 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             124 => Some(ScaleOffset {
@@ -10398,19 +10398,19 @@ impl LapField {
                 offset: 0_f32,
             }),
             102 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             103 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             104 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             105 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             110 => Some(ScaleOffset {
@@ -10990,19 +10990,19 @@ impl RecordField {
                 offset: 0_f32,
             }),
             69 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             70 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             71 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             72 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             73 => Some(ScaleOffset {
@@ -12149,11 +12149,11 @@ impl AviationAttitudeField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 10430_f32,
+                scale: 10430.38_f32,
                 offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 10430_f32,
+                scale: 10430.38_f32,
                 offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
@@ -12169,7 +12169,7 @@ impl AviationAttitudeField {
                 offset: 0_f32,
             }),
             9 => Some(ScaleOffset {
-                scale: 10430_f32,
+                scale: 10430.38_f32,
                 offset: 0_f32,
             }),
             _ => None,
@@ -13570,19 +13570,19 @@ impl SegmentLapField {
                 offset: 0_f32,
             }),
             75 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             76 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             77 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             78 => Some(ScaleOffset {
-                scale: 0_f32,
+                scale: 0.7111111_f32,
                 offset: 0_f32,
             }),
             89 => Some(ScaleOffset {
@@ -14763,15 +14763,15 @@ impl HsaAccelerometerDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 1_f32,
+                scale: 1.024_f32,
                 offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 1_f32,
+                scale: 1.024_f32,
                 offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 1_f32,
+                scale: 1.024_f32,
                 offset: 0_f32,
             }),
             _ => None,
@@ -14827,15 +14827,15 @@ impl HsaGyroscopeDataField {
     fn get_scale_offset(def_number: u8) -> Option<ScaleOffset> {
         match def_number {
             2 => Some(ScaleOffset {
-                scale: 28_f32,
+                scale: 28.57143_f32,
                 offset: 0_f32,
             }),
             3 => Some(ScaleOffset {
-                scale: 28_f32,
+                scale: 28.57143_f32,
                 offset: 0_f32,
             }),
             4 => Some(ScaleOffset {
-                scale: 28_f32,
+                scale: 28.57143_f32,
                 offset: 0_f32,
             }),
             _ => None,

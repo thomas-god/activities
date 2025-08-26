@@ -1,6 +1,7 @@
 #![allow(clippy::const_is_empty)]
 
 use itertools::join;
+use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -546,16 +547,16 @@ fn format_code(code: &str) -> String {
 }
 
 #[derive(Debug)]
-struct Message {
+struct Field {
     field_def: u8,
     name: String,
     base_type: String,
     // array: Option<usize>,
-    scale: Option<usize>,
-    offset: Option<usize>,
+    scale: Option<f32>,
+    offset: Option<f32>,
 }
 
-fn parse_messages_definitions() -> (Vec<(String, Vec<Message>)>, Vec<String>) {
+fn parse_messages_definitions() -> (Vec<(String, Vec<Field>)>, Vec<EnumName>) {
     let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Messages")
@@ -572,9 +573,13 @@ fn parse_messages_definitions() -> (Vec<(String, Vec<Message>)>, Vec<String>) {
     };
 
     loop {
-        let (next_message_name, defintions) = parse_definitions(&mut iterator);
+        let (next_message_name, definitions, subfields) = parse_fields_definitions(&mut iterator);
 
-        messages.push((message_name, defintions));
+        if subfields.len() > 0 {
+            dbg!(subfields);
+        }
+
+        messages.push((message_name, definitions));
 
         if next_message_name.is_none() {
             break;
@@ -622,67 +627,133 @@ fn get_parse_function(enums: &[String], type_name: &str) -> String {
     "parse_unknown".to_string()
 }
 
-fn parse_definitions<'a, I>(iter: &mut I) -> (Option<String>, Vec<Message>)
+#[derive(Debug)]
+struct Subfield {
+    name: String,
+    base_type: String,
+    reference_fields: Vec<String>,
+    reference_field_values: Vec<String>,
+}
+
+fn parse_fields_definitions<'a, I>(
+    iter: &mut I,
+) -> (Option<String>, Vec<Field>, HashMap<String, Vec<Subfield>>)
 where
     I: Iterator<Item = &'a [Data]>,
 {
-    let mut messages = Vec::new();
+    let mut fields = Vec::new();
     let mut next_message_name: Option<String> = None;
+    let mut subfields: HashMap<String, Vec<Subfield>> = HashMap::new();
 
+    let mut current_field = None;
     for row in iter {
-        if let Some(Data::String(name)) = row.first() {
-            next_message_name = Some(name.to_string());
+        let colums = parse_columns(row);
+
+        // Start of the next message, ends the loop there
+        if let Some(message_name) = colums.message_name {
+            next_message_name = Some(message_name);
             break;
         }
 
-        let field_def = match row.get(1) {
-            Some(Data::Int(field_def)) => *field_def as u8,
-            Some(Data::Float(field_def)) => *field_def as u8,
-            _ => {
-                continue;
-            }
-        };
+        // Start of a new field
+        if let (Some(field_number), Some(field_name), Some(field_type)) = (
+            colums.field_definition_number,
+            &colums.field_name,
+            &colums.field_type,
+        ) {
+            current_field = Some(field_name.to_string());
+            fields.push(Field {
+                field_def: field_number,
+                name: field_name.to_string(),
+                base_type: field_type.to_string(),
+                scale: colums.scale,
+                offset: colums.offset,
+            });
+        }
 
-        let name = match row.get(2) {
-            Some(Data::String(name)) => name.clone(),
-            _ => {
-                continue;
-            }
-        };
-
-        let base_type = match row.get(3) {
-            Some(Data::String(enum_type)) => enum_type.clone(),
-            _ => {
-                continue;
-            }
-        };
-
-        messages.push(Message {
-            field_def,
-            name,
-            base_type,
-            // array: match row.get(4) {
-            //     Some(Data::Int(field_def)) => Some(*field_def as usize),
-            //     Some(Data::Float(field_def)) => Some(*field_def as usize),
-            //     _ => None,
-            // },
-            scale: match row.get(6) {
-                Some(Data::Int(field_def)) => Some(*field_def as usize),
-                Some(Data::Float(field_def)) => Some(*field_def as usize),
-                _ => None,
-            },
-            offset: match row.get(7) {
-                Some(Data::Int(field_def)) => Some(*field_def as usize),
-                Some(Data::Float(field_def)) => Some(*field_def as usize),
-                _ => None,
-            },
-        });
+        // New subfield for the current field
+        if let (
+            Some(current_field),
+            Some(subfield_name),
+            Some(field_type),
+            Some(reference_fields),
+            Some(reference_field_values),
+        ) = (
+            &current_field,
+            &colums.field_name,
+            &colums.field_type,
+            colums.subfield_references,
+            colums.subfield_reference_values,
+        ) {
+            subfields
+                .entry(current_field.to_string())
+                .or_default()
+                .push(Subfield {
+                    name: subfield_name.to_string(),
+                    base_type: field_type.to_string(),
+                    reference_fields,
+                    reference_field_values,
+                });
+        }
     }
 
-    (next_message_name, messages)
+    (next_message_name, fields, subfields)
 }
 
-fn generate_messages_code(messages: Vec<(String, Vec<Message>)>, enums: Vec<String>) -> String {
+struct Columns {
+    message_name: Option<String>,
+    field_definition_number: Option<u8>,
+    field_name: Option<String>,
+    field_type: Option<String>,
+    scale: Option<f32>,
+    offset: Option<f32>,
+    subfield_references: Option<Vec<String>>,
+    subfield_reference_values: Option<Vec<String>>,
+}
+fn parse_columns<'a>(row: &'a [Data]) -> Columns {
+    let message_name = column_string_content(row, 0);
+    let field_definition_number = row.get(1).and_then(|data| match data {
+        Data::Int(field_def) => Some(*field_def as u8),
+        Data::Float(field_def) => Some(*field_def as u8),
+        _ => None,
+    });
+    let field_name = column_string_content(row, 2);
+    let field_type = column_string_content(row, 3);
+    let scale = row.get(6).and_then(|data| match data {
+        Data::Int(field_def) => Some(*field_def as f32),
+        Data::Float(field_def) => Some(*field_def as f32),
+        _ => None,
+    });
+    let offset = row.get(7).and_then(|data| match data {
+        Data::Int(field_def) => Some(*field_def as f32),
+        Data::Float(field_def) => Some(*field_def as f32),
+        _ => None,
+    });
+    let subfield_reference =
+        column_string_content(row, 11).map(|s| s.split(",").map(|w| w.to_string()).collect());
+    let subfield_reference_value =
+        column_string_content(row, 12).map(|s| s.split(",").map(|w| w.to_string()).collect());
+
+    Columns {
+        message_name,
+        field_definition_number,
+        field_name,
+        field_type,
+        scale,
+        offset,
+        subfield_references: subfield_reference,
+        subfield_reference_values: subfield_reference_value,
+    }
+}
+
+fn column_string_content<'a>(row: &'a [Data], index: usize) -> Option<String> {
+    row.get(index).and_then(|data| match data {
+        Data::String(name) => Some(name.to_string()),
+        _ => None,
+    })
+}
+
+fn generate_messages_code(messages: Vec<(String, Vec<Field>)>, enums: Vec<String>) -> String {
     let mut code = String::new();
 
     let mut messages_enum = join(
@@ -772,8 +843,8 @@ pub enum {message}Field {{
                                 offset: {}_f32
                             }})",
                             def.field_def,
-                            def.scale.unwrap_or(1),
-                            def.offset.unwrap_or(0)
+                            def.scale.unwrap_or(1.),
+                            def.offset.unwrap_or(0.)
                         ))
                     } else {
                         None
