@@ -654,7 +654,6 @@ fn get_parse_function(enums: &[String], type_name: &str) -> String {
 
 #[derive(Debug)]
 struct Subfield {
-    parent_field_definition_number: u8,
     name: String,
     base_type: String,
     references: Vec<SubfieldReference>,
@@ -680,7 +679,6 @@ where
     let mut subfields: HashMap<String, Vec<Subfield>> = HashMap::new();
 
     let mut current_field = None;
-    let mut current_definition_field = None;
     for row in iter {
         let colums = parse_columns(row);
 
@@ -697,7 +695,6 @@ where
             &colums.field_type,
         ) {
             current_field = Some(field_name.to_string());
-            current_definition_field = Some(field_number);
             fields.push(Field {
                 field_def: field_number,
                 name: field_name.to_string(),
@@ -710,14 +707,12 @@ where
         // New subfield for the current field
         if let (
             Some(current_field),
-            Some(parent_field_definition_number),
             Some(subfield_name),
             Some(field_type),
             Some(reference_fields),
             Some(reference_field_values),
         ) = (
             &current_field,
-            &current_definition_field,
             &colums.field_name,
             &colums.field_type,
             colums.subfield_references,
@@ -739,7 +734,6 @@ where
                 .entry(current_field.to_string())
                 .or_default()
                 .push(Subfield {
-                    parent_field_definition_number: *parent_field_definition_number,
                     name: subfield_name.to_string(),
                     base_type: field_type.to_string(),
                     references,
