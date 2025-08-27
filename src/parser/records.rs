@@ -102,7 +102,7 @@ impl DataMessage {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct DataMessageField {
     pub kind: FitMessage,
     pub values: Vec<DataValue>,
@@ -154,27 +154,21 @@ fn parse_data_message(
 
     let mut fields = Vec::new();
     for field in definition.fields.iter() {
-        let values = match field.parse {
-            ParseFunction::Simple(parse) => parse(content, &field.endianness, field.size),
-            ParseFunction::Dynamic(parse) => parse(content, &field.endianness, field.size, &fields),
-        };
+        let field = match field.parse {
+            ParseFunction::Simple(parse) => DataMessageField {
+                values: parse(content, &field.endianness, field.size)?
+                    .iter()
+                    .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+                    .collect(),
+                kind: field.kind.clone(),
+            },
 
-        let values = match values {
-            Ok(values) => values
-                .iter()
-                .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
-                .collect(),
-            Err(err) => {
-                for field in fields {
-                    println!("{field:?}");
-                }
-                return Err(RecordError::from(err));
+            ParseFunction::Dynamic(parse) => {
+                parse(content, &field.endianness, field.size, &fields)?
             }
         };
-        fields.push(DataMessageField {
-            kind: field.kind.clone(),
-            values,
-        })
+
+        fields.push(field);
     }
 
     Ok(DataMessage {
@@ -211,27 +205,21 @@ fn parse_compressed_message(
 
     // Parse remaining fields
     for field in definition.fields.iter() {
-        let values = match field.parse {
-            ParseFunction::Simple(parse) => parse(content, &field.endianness, field.size),
-            ParseFunction::Dynamic(parse) => parse(content, &field.endianness, field.size, &fields),
-        };
-        let values = match values {
-            Ok(values) => values
-                .iter()
-                .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
-                .collect(),
+        let field = match field.parse {
+            ParseFunction::Simple(parse) => DataMessageField {
+                values: parse(content, &field.endianness, field.size)?
+                    .iter()
+                    .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+                    .collect(),
+                kind: field.kind.clone(),
+            },
 
-            Err(err) => {
-                for field in fields {
-                    println!("{field:?}");
-                }
-                return Err(RecordError::from(err));
+            ParseFunction::Dynamic(parse) => {
+                parse(content, &field.endianness, field.size, &fields)?
             }
         };
-        fields.push(DataMessageField {
-            kind: field.kind.clone(),
-            values,
-        })
+
+        fields.push(field);
     }
 
     Ok(DataMessage {
@@ -277,7 +265,10 @@ impl CompressedTimestamp {
 #[cfg(test)]
 mod tests {
 
-    use crate::parser::types::generated::RecordField;
+    use crate::{
+        DefinitionField, Endianness, FitEnum, MesgNum,
+        parser::types::generated::{Event, EventField, EventFieldDataSubfield, RecordField},
+    };
 
     use super::*;
 
@@ -340,6 +331,114 @@ mod tests {
         };
 
         assert!(message_w_timestamp.last_timestamp().is_none());
+    }
+
+    #[test]
+    fn test_parse_data_message_with_dynamic_fields_same_size_than_original() {
+        let header = DataMessageHeader {
+            local_message_type: 0,
+        };
+        let mut definitions = HashMap::new();
+        definitions.insert(
+            0,
+            Definition {
+                message_type: MesgNum::Event,
+                local_message_type: 0,
+                fields: vec![
+                    DefinitionField {
+                        endianness: Endianness::Little,
+                        kind: FitMessage::Event(EventField::Event),
+                        parse: ParseFunction::Simple(Event::parse),
+                        scale_offset: None,
+                        size: 1,
+                    },
+                    DefinitionField {
+                        endianness: Endianness::Little,
+                        kind: FitMessage::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
+                        parse: ParseFunction::Dynamic(EventFieldDataSubfield::parse),
+                        scale_offset: None,
+                        size: 4,
+                    },
+                ],
+            },
+        );
+
+        let mut content = Vec::new();
+        content.push(15); // event = SpeedHighAlert
+        content.append(&mut 51_u32.to_le_bytes().to_vec()); // speed_high_alert = 51
+
+        let mut reader = Reader::new(5, content.into_iter());
+
+        let message = parse_data_message(header, &definitions, &mut reader).unwrap();
+
+        assert_eq!(
+            *message.fields.first().unwrap(),
+            DataMessageField {
+                kind: FitMessage::Event(EventField::Event),
+                values: vec![DataValue::Enum(FitEnum::Event(Event::SpeedHighAlert))]
+            }
+        );
+        assert_eq!(
+            *message.fields.get(1).unwrap(),
+            DataMessageField {
+                kind: FitMessage::Event(EventField::SpeedHighAlert),
+                values: vec![DataValue::Uint32(51)]
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_data_message_with_dynamic_fields_default_parse() {
+        let header = DataMessageHeader {
+            local_message_type: 0,
+        };
+        let mut definitions = HashMap::new();
+        definitions.insert(
+            0,
+            Definition {
+                message_type: MesgNum::Event,
+                local_message_type: 0,
+                fields: vec![
+                    DefinitionField {
+                        endianness: Endianness::Little,
+                        kind: FitMessage::Event(EventField::Event),
+                        parse: ParseFunction::Simple(Event::parse),
+                        scale_offset: None,
+                        size: 1,
+                    },
+                    DefinitionField {
+                        endianness: Endianness::Little,
+                        kind: FitMessage::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
+                        parse: ParseFunction::Dynamic(EventFieldDataSubfield::parse),
+                        scale_offset: None,
+                        size: 4,
+                    },
+                ],
+            },
+        );
+
+        let mut content = Vec::new();
+        content.push(72); // event = TankPressureCritical
+        content.append(&mut 51_u32.to_le_bytes().to_vec());
+
+        let mut reader = Reader::new(5, content.into_iter());
+
+        let message = parse_data_message(header, &definitions, &mut reader).unwrap();
+
+        assert_eq!(
+            *message.fields.first().unwrap(),
+            DataMessageField {
+                kind: FitMessage::Event(EventField::Event),
+                values: vec![DataValue::Enum(FitEnum::Event(Event::TankPressureCritical))]
+            }
+        );
+        assert_eq!(
+            *message.fields.get(1).unwrap(),
+            DataMessageField {
+                kind: FitMessage::Event(EventField::Data),
+                values: vec![DataValue::Uint32(51)]
+            }
+        );
     }
 }
 

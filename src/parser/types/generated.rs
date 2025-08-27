@@ -6,6 +6,7 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::identity_op)]
+#![allow(clippy::type_complexity)]
 #![allow(clippy::match_single_binding)]
 #![allow(clippy::match_overlapping_arm)]
 
@@ -50,6 +51,8 @@ pub enum FitEnum {
     BacklightTimeout(BacklightTimeout),
     Event(Event),
     EventType(EventType),
+    TimerTrigger(TimerTrigger),
+    FitnessEquipmentState(FitnessEquipmentState),
     Tone(Tone),
     ActivityClass(ActivityClass),
     HrZoneCalc(HrZoneCalc),
@@ -62,12 +65,16 @@ pub enum FitEnum {
     Schedule(Schedule),
     CoursePoint(CoursePoint),
     Manufacturer(Manufacturer),
+    GarminProduct(GarminProduct),
+    AntplusDeviceType(AntplusDeviceType),
     AntNetwork(AntNetwork),
     WorkoutCapabilities(WorkoutCapabilities),
     BatteryStatus(BatteryStatus),
     HrType(HrType),
     CourseCapabilities(CourseCapabilities),
     Weight(Weight),
+    WorkoutHr(WorkoutHr),
+    WorkoutPower(WorkoutPower),
     BpStatus(BpStatus),
     UserLocalId(UserLocalId),
     SwimStroke(SwimStroke),
@@ -92,12 +99,18 @@ pub enum FitEnum {
     SegmentDeleteStatus(SegmentDeleteStatus),
     SegmentSelectionType(SegmentSelectionType),
     SourceType(SourceType),
+    LocalDeviceType(LocalDeviceType),
+    BleDeviceType(BleDeviceType),
     AntChannelId(AntChannelId),
     DisplayOrientation(DisplayOrientation),
     WorkoutEquipment(WorkoutEquipment),
     WatchfaceMode(WatchfaceMode),
+    DigitalWatchfaceLayout(DigitalWatchfaceLayout),
+    AnalogWatchfaceLayout(AnalogWatchfaceLayout),
+    RiderPositionType(RiderPositionType),
     CameraEventType(CameraEventType),
     SensorType(SensorType),
+    CommTimeoutType(CommTimeoutType),
     CameraOrientationType(CameraOrientationType),
     AttitudeStage(AttitudeStage),
     AttitudeValidity(AttitudeValidity),
@@ -116,6 +129,7 @@ pub enum FitEnum {
     WaterType(WaterType),
     TissueModelType(TissueModelType),
     DiveGasStatus(DiveGasStatus),
+    DiveAlert(DiveAlert),
     DiveAlarmType(DiveAlarmType),
     DiveBacklightMode(DiveBacklightMode),
     SleepLevel(SleepLevel),
@@ -123,6 +137,7 @@ pub enum FitEnum {
     CcrSetpointSwitchMode(CcrSetpointSwitchMode),
     DiveGasMode(DiveGasMode),
     ProjectileType(ProjectileType),
+    FaveroProduct(FaveroProduct),
     SplitType(SplitType),
     ClimbProEvent(ClimbProEvent),
     GasConsumptionRateType(GasConsumptionRateType),
@@ -2514,6 +2529,72 @@ impl EventType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum TimerTrigger {
+    Manual,
+    Auto,
+    FitnessEquipment,
+    UnknownVariant(u8),
+}
+impl TimerTrigger {
+    pub fn from(content: u8) -> TimerTrigger {
+        match content {
+            0 => TimerTrigger::Manual,
+            1 => TimerTrigger::Auto,
+            2 => TimerTrigger::FitnessEquipment,
+            val => TimerTrigger::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::TimerTrigger(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FitnessEquipmentState {
+    Ready,
+    InUse,
+    Paused,
+    Unknown,
+    UnknownVariant(u8),
+}
+impl FitnessEquipmentState {
+    pub fn from(content: u8) -> FitnessEquipmentState {
+        match content {
+            0 => FitnessEquipmentState::Ready,
+            1 => FitnessEquipmentState::InUse,
+            2 => FitnessEquipmentState::Paused,
+            3 => FitnessEquipmentState::Unknown,
+            val => FitnessEquipmentState::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::FitnessEquipmentState(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Tone {
     Off,
     Tone,
@@ -3548,6 +3629,1028 @@ impl Manufacturer {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum GarminProduct {
+    Hrm1,
+    Axh01,
+    Axb01,
+    Axb02,
+    Hrm2ss,
+    DsiAlf02,
+    Hrm3ss,
+    HrmRunSingleByteProductId,
+    Bsm,
+    Bcm,
+    Axs01,
+    HrmTriSingleByteProductId,
+    Hrm4RunSingleByteProductId,
+    Fr225SingleByteProductId,
+    Gen3BsmSingleByteProductId,
+    Gen3BcmSingleByteProductId,
+    HrmFitSingleByteProductId,
+    OHR,
+    Fr301China,
+    Fr301Japan,
+    Fr301Korea,
+    Fr301Taiwan,
+    Fr405,
+    Fr50,
+    Fr405Japan,
+    Fr60,
+    DsiAlf01,
+    Fr310xt,
+    Edge500,
+    Fr110,
+    Edge800,
+    Edge500Taiwan,
+    Edge500Japan,
+    Chirp,
+    Fr110Japan,
+    Edge200,
+    Fr910xt,
+    Edge800Taiwan,
+    Edge800Japan,
+    Alf04,
+    Fr610,
+    Fr210Japan,
+    VectorSs,
+    VectorCp,
+    Edge800China,
+    Edge500China,
+    ApproachG10,
+    Fr610Japan,
+    Edge500Korea,
+    Fr70,
+    Fr310xt4t,
+    Amx,
+    Fr10,
+    Edge800Korea,
+    Swim,
+    Fr910xtChina,
+    Fenix,
+    Edge200Taiwan,
+    Edge510,
+    Edge810,
+    Tempe,
+    Fr910xtJapan,
+    Fr620,
+    Fr220,
+    Fr910xtKorea,
+    Fr10Japan,
+    Edge810Japan,
+    VirbElite,
+    EdgeTouring,
+    Edge510Japan,
+    HrmTri,
+    HrmRun,
+    Fr920xt,
+    Edge510Asia,
+    Edge810China,
+    Edge810Taiwan,
+    Edge1000,
+    VivoFit,
+    VirbRemote,
+    VivoKi,
+    Fr15,
+    VivoActive,
+    Edge510Korea,
+    Fr620Japan,
+    Fr620China,
+    Fr220Japan,
+    Fr220China,
+    ApproachS6,
+    VivoSmart,
+    Fenix2,
+    Epix,
+    Fenix3,
+    Edge1000Taiwan,
+    Edge1000Japan,
+    Fr15Japan,
+    Edge520,
+    Edge1000China,
+    Fr620Russia,
+    Fr220Russia,
+    VectorS,
+    Edge1000Korea,
+    Fr920xtTaiwan,
+    Fr920xtChina,
+    Fr920xtJapan,
+    Virbx,
+    VivoSmartApac,
+    EtrexTouch,
+    Edge25,
+    Fr25,
+    VivoFit2,
+    Fr225,
+    Fr630,
+    Fr230,
+    Fr735xt,
+    VivoActiveApac,
+    Vector2,
+    Vector2s,
+    Virbxe,
+    Fr620Taiwan,
+    Fr220Taiwan,
+    Truswing,
+    D2airvenu,
+    Fenix3China,
+    Fenix3Twn,
+    VariaHeadlight,
+    VariaTaillightOld,
+    EdgeExplore1000,
+    Fr225Asia,
+    VariaRadarTaillight,
+    VariaRadarDisplay,
+    Edge20,
+    Edge520Asia,
+    Edge520Japan,
+    D2Bravo,
+    ApproachS20,
+    VivoSmart2,
+    Edge1000Thai,
+    VariaRemote,
+    Edge25Asia,
+    Edge25Jpn,
+    Edge20Asia,
+    ApproachX40,
+    Fenix3Japan,
+    VivoSmartEmea,
+    Fr630Asia,
+    Fr630Jpn,
+    Fr230Jpn,
+    Hrm4Run,
+    EpixJapan,
+    VivoActiveHr,
+    VivoSmartGpsHr,
+    VivoSmartHr,
+    VivoSmartHrAsia,
+    VivoSmartGpsHrAsia,
+    VivoMove,
+    VariaTaillight,
+    Fr235Asia,
+    Fr235Japan,
+    VariaVision,
+    VivoFit3,
+    Fenix3Korea,
+    Fenix3Sea,
+    Fenix3Hr,
+    VirbUltra30,
+    IndexSmartScale,
+    Fr235,
+    Fenix3Chronos,
+    Oregon7xx,
+    Rino7xx,
+    EpixKorea,
+    Fenix3HrChn,
+    Fenix3HrTwn,
+    Fenix3HrJpn,
+    Fenix3HrSea,
+    Fenix3HrKor,
+    Nautix,
+    VivoActiveHrApac,
+    Fr35,
+    Oregon7xxWw,
+    Edge820,
+    EdgeExplore820,
+    Fr735xtApac,
+    Fr735xtJapan,
+    Fenix5s,
+    D2BravoTitanium,
+    VariaUt800,
+    RunningDynamicsPod,
+    Edge820China,
+    Edge820Japan,
+    Fenix5x,
+    VivoFitJr,
+    VivoSmart3,
+    VivoSport,
+    Edge820Taiwan,
+    Edge820Korea,
+    Edge820Sea,
+    Fr35Hebrew,
+    ApproachS60,
+    Fr35Apac,
+    Fr35Japan,
+    Fenix3ChronosAsia,
+    Virb360,
+    Fr935,
+    Fenix5,
+    Vivoactive3,
+    Fr235ChinaNfc,
+    Foretrex601701,
+    VivoMoveHr,
+    Edge1030,
+    Fr35Sea,
+    Vector3,
+    Fenix5Asia,
+    Fenix5sAsia,
+    Fenix5xAsia,
+    ApproachZ80,
+    Fr35Korea,
+    D2charlie,
+    VivoSmart3Apac,
+    VivoSportApac,
+    Fr935Asia,
+    Descent,
+    VivoFit4,
+    Fr645,
+    Fr645m,
+    Fr30,
+    Fenix5sPlus,
+    Edge130,
+    Edge1030Asia,
+    Vivosmart4,
+    VivoMoveHrAsia,
+    ApproachX10,
+    Fr30Asia,
+    Vivoactive3mW,
+    Fr645Asia,
+    Fr645mAsia,
+    EdgeExplore,
+    Gpsmap66,
+    ApproachS10,
+    Vivoactive3mL,
+    Fr245,
+    Fr245Music,
+    ApproachG80,
+    Edge130Asia,
+    Edge1030Bontrager,
+    Fenix5Plus,
+    Fenix5xPlus,
+    Edge520Plus,
+    Fr945,
+    Edge530,
+    Edge830,
+    InstinctEsports,
+    Fenix5sPlusApac,
+    Fenix5xPlusApac,
+    Edge520PlusApac,
+    DescentT1,
+    Fr235lAsia,
+    Fr245Asia,
+    VivoActive3mApac,
+    Gen3Bsm,
+    Gen3Bcm,
+    VivoSmart4Asia,
+    Vivoactive4Small,
+    Vivoactive4Large,
+    Venu,
+    MarqDriver,
+    MarqAviator,
+    MarqCaptain,
+    MarqCommander,
+    MarqExpedition,
+    MarqAthlete,
+    DescentMk2,
+    Fr45,
+    Gpsmap66i,
+    Fenix6SSport,
+    Fenix6S,
+    Fenix6Sport,
+    Fenix6,
+    Fenix6x,
+    HrmDual,
+    HrmPro,
+    VivoMove3Premium,
+    ApproachS40,
+    Fr245mAsia,
+    Edge530Apac,
+    Edge830Apac,
+    VivoMove3,
+    VivoActive4SmallAsia,
+    VivoActive4LargeAsia,
+    VivoActive4OledAsia,
+    Swim2,
+    MarqDriverAsia,
+    MarqAviatorAsia,
+    VivoMove3Asia,
+    Fr945Asia,
+    VivoActive3tChn,
+    MarqCaptainAsia,
+    MarqCommanderAsia,
+    MarqExpeditionAsia,
+    MarqAthleteAsia,
+    IndexSmartScale2,
+    InstinctSolar,
+    Fr45Asia,
+    Vivoactive3Daimler,
+    LegacyRey,
+    LegacyDarthVader,
+    LegacyCaptainMarvel,
+    LegacyFirstAvenger,
+    Fenix6sSportAsia,
+    Fenix6sAsia,
+    Fenix6SportAsia,
+    Fenix6Asia,
+    Fenix6xAsia,
+    LegacyCaptainMarvelAsia,
+    LegacyFirstAvengerAsia,
+    LegacyReyAsia,
+    LegacyDarthVaderAsia,
+    DescentMk2s,
+    Edge130Plus,
+    Edge1030Plus,
+    Rally200,
+    Fr745,
+    VenusqMusic,
+    VenusqMusicV2,
+    Venusq,
+    Lily,
+    MarqAdventurer,
+    Enduro,
+    Swim2Apac,
+    MarqAdventurerAsia,
+    Fr945Lte,
+    DescentMk2Asia,
+    Venu2,
+    Venu2s,
+    VenuDaimlerAsia,
+    MarqGolfer,
+    VenuDaimler,
+    Fr745Asia,
+    VariaRct715,
+    LilyAsia,
+    Edge1030PlusAsia,
+    Edge130PlusAsia,
+    ApproachS12,
+    EnduroAsia,
+    VenusqAsia,
+    Edge1040,
+    MarqGolferAsia,
+    Venu2Plus,
+    Gnss,
+    Fr55,
+    Instinct2,
+    Instinct2s,
+    Fenix7s,
+    Fenix7,
+    Fenix7x,
+    Fenix7sApac,
+    Fenix7Apac,
+    Fenix7xApac,
+    DescentMk2sAsia,
+    ApproachS42,
+    EpixGen2,
+    EpixGen2Apac,
+    Venu2sAsia,
+    Venu2Asia,
+    Fr945LteAsia,
+    VivoMoveSport,
+    VivomoveTrend,
+    ApproachS12Asia,
+    Fr255Music,
+    Fr255SmallMusic,
+    Fr255,
+    Fr255Small,
+    ApproachS42Asia,
+    DescentG1,
+    Venu2PlusAsia,
+    Fr955,
+    Fr55Asia,
+    Edge540,
+    Edge840,
+    Vivosmart5,
+    Instinct2Asia,
+    MarqGen2,
+    Venusq2,
+    Venusq2music,
+    MarqGen2Aviator,
+    D2AirX10,
+    HrmProPlus,
+    DescentG1Asia,
+    Tactix7,
+    InstinctCrossover,
+    EdgeExplore2,
+    DescentMk3,
+    DescentMk3i,
+    ApproachS70,
+    Fr265Large,
+    Fr265Small,
+    Venu3,
+    Venu3s,
+    TacxNeoSmart,
+    TacxNeo2Smart,
+    TacxNeo2TSmart,
+    TacxNeoSmartBike,
+    TacxSatoriSmart,
+    TacxFlowSmart,
+    TacxVortexSmart,
+    TacxBushidoSmart,
+    TacxGeniusSmart,
+    TacxFluxFluxSSmart,
+    TacxFlux2Smart,
+    TacxMagnum,
+    Edge1040Asia,
+    EpixGen2Pro42,
+    EpixGen2Pro47,
+    EpixGen2Pro51,
+    Fr965,
+    Enduro2,
+    Fenix7sProSolar,
+    Fenix7ProSolar,
+    Fenix7xProSolar,
+    Lily2,
+    Instinct2x,
+    Vivoactive5,
+    Fr165,
+    Fr165Music,
+    Edge1050,
+    DescentT2,
+    HrmFit,
+    MarqGen2Commander,
+    LilyAthlete,
+    Fenix8Solar,
+    Fenix8SolarLarge,
+    Fenix8Small,
+    Fenix8,
+    D2Mach1Pro,
+    Enduro3,
+    InstinctE40mm,
+    InstinctE45mm,
+    Instinct3Solar45mm,
+    Instinct3Amoled45mm,
+    Instinct3Amoled50mm,
+    DescentG2,
+    Hrm200,
+    Vivoactive6,
+    ApproachS44,
+    ApproachS50,
+    FenixE,
+    Instinct3Solar50mm,
+    Tactix8Amoled,
+    Tactix8Solar,
+    Sdm4,
+    EdgeRemote,
+    TacxTrainingAppWin,
+    TacxTrainingAppMac,
+    TacxTrainingAppMacCatalyst,
+    TrainingCenter,
+    TacxTrainingAppAndroid,
+    TacxTrainingAppIos,
+    TacxTrainingAppLegacy,
+    ConnectiqSimulator,
+    AndroidAntplusPlugin,
+    Connect,
+    UnknownVariant(u16),
+}
+impl GarminProduct {
+    pub fn from(content: u16) -> GarminProduct {
+        match content {
+            1 => GarminProduct::Hrm1,
+            2 => GarminProduct::Axh01,
+            3 => GarminProduct::Axb01,
+            4 => GarminProduct::Axb02,
+            5 => GarminProduct::Hrm2ss,
+            6 => GarminProduct::DsiAlf02,
+            7 => GarminProduct::Hrm3ss,
+            8 => GarminProduct::HrmRunSingleByteProductId,
+            9 => GarminProduct::Bsm,
+            10 => GarminProduct::Bcm,
+            11 => GarminProduct::Axs01,
+            12 => GarminProduct::HrmTriSingleByteProductId,
+            13 => GarminProduct::Hrm4RunSingleByteProductId,
+            14 => GarminProduct::Fr225SingleByteProductId,
+            15 => GarminProduct::Gen3BsmSingleByteProductId,
+            16 => GarminProduct::Gen3BcmSingleByteProductId,
+            22 => GarminProduct::HrmFitSingleByteProductId,
+            255 => GarminProduct::OHR,
+            473 => GarminProduct::Fr301China,
+            474 => GarminProduct::Fr301Japan,
+            475 => GarminProduct::Fr301Korea,
+            494 => GarminProduct::Fr301Taiwan,
+            717 => GarminProduct::Fr405,
+            782 => GarminProduct::Fr50,
+            987 => GarminProduct::Fr405Japan,
+            988 => GarminProduct::Fr60,
+            1011 => GarminProduct::DsiAlf01,
+            1018 => GarminProduct::Fr310xt,
+            1036 => GarminProduct::Edge500,
+            1124 => GarminProduct::Fr110,
+            1169 => GarminProduct::Edge800,
+            1199 => GarminProduct::Edge500Taiwan,
+            1213 => GarminProduct::Edge500Japan,
+            1253 => GarminProduct::Chirp,
+            1274 => GarminProduct::Fr110Japan,
+            1325 => GarminProduct::Edge200,
+            1328 => GarminProduct::Fr910xt,
+            1333 => GarminProduct::Edge800Taiwan,
+            1334 => GarminProduct::Edge800Japan,
+            1341 => GarminProduct::Alf04,
+            1345 => GarminProduct::Fr610,
+            1360 => GarminProduct::Fr210Japan,
+            1380 => GarminProduct::VectorSs,
+            1381 => GarminProduct::VectorCp,
+            1386 => GarminProduct::Edge800China,
+            1387 => GarminProduct::Edge500China,
+            1405 => GarminProduct::ApproachG10,
+            1410 => GarminProduct::Fr610Japan,
+            1422 => GarminProduct::Edge500Korea,
+            1436 => GarminProduct::Fr70,
+            1446 => GarminProduct::Fr310xt4t,
+            1461 => GarminProduct::Amx,
+            1482 => GarminProduct::Fr10,
+            1497 => GarminProduct::Edge800Korea,
+            1499 => GarminProduct::Swim,
+            1537 => GarminProduct::Fr910xtChina,
+            1551 => GarminProduct::Fenix,
+            1555 => GarminProduct::Edge200Taiwan,
+            1561 => GarminProduct::Edge510,
+            1567 => GarminProduct::Edge810,
+            1570 => GarminProduct::Tempe,
+            1600 => GarminProduct::Fr910xtJapan,
+            1623 => GarminProduct::Fr620,
+            1632 => GarminProduct::Fr220,
+            1664 => GarminProduct::Fr910xtKorea,
+            1688 => GarminProduct::Fr10Japan,
+            1721 => GarminProduct::Edge810Japan,
+            1735 => GarminProduct::VirbElite,
+            1736 => GarminProduct::EdgeTouring,
+            1742 => GarminProduct::Edge510Japan,
+            1743 => GarminProduct::HrmTri,
+            1752 => GarminProduct::HrmRun,
+            1765 => GarminProduct::Fr920xt,
+            1821 => GarminProduct::Edge510Asia,
+            1822 => GarminProduct::Edge810China,
+            1823 => GarminProduct::Edge810Taiwan,
+            1836 => GarminProduct::Edge1000,
+            1837 => GarminProduct::VivoFit,
+            1853 => GarminProduct::VirbRemote,
+            1885 => GarminProduct::VivoKi,
+            1903 => GarminProduct::Fr15,
+            1907 => GarminProduct::VivoActive,
+            1918 => GarminProduct::Edge510Korea,
+            1928 => GarminProduct::Fr620Japan,
+            1929 => GarminProduct::Fr620China,
+            1930 => GarminProduct::Fr220Japan,
+            1931 => GarminProduct::Fr220China,
+            1936 => GarminProduct::ApproachS6,
+            1956 => GarminProduct::VivoSmart,
+            1967 => GarminProduct::Fenix2,
+            1988 => GarminProduct::Epix,
+            2050 => GarminProduct::Fenix3,
+            2052 => GarminProduct::Edge1000Taiwan,
+            2053 => GarminProduct::Edge1000Japan,
+            2061 => GarminProduct::Fr15Japan,
+            2067 => GarminProduct::Edge520,
+            2070 => GarminProduct::Edge1000China,
+            2072 => GarminProduct::Fr620Russia,
+            2073 => GarminProduct::Fr220Russia,
+            2079 => GarminProduct::VectorS,
+            2100 => GarminProduct::Edge1000Korea,
+            2130 => GarminProduct::Fr920xtTaiwan,
+            2131 => GarminProduct::Fr920xtChina,
+            2132 => GarminProduct::Fr920xtJapan,
+            2134 => GarminProduct::Virbx,
+            2135 => GarminProduct::VivoSmartApac,
+            2140 => GarminProduct::EtrexTouch,
+            2147 => GarminProduct::Edge25,
+            2148 => GarminProduct::Fr25,
+            2150 => GarminProduct::VivoFit2,
+            2153 => GarminProduct::Fr225,
+            2156 => GarminProduct::Fr630,
+            2157 => GarminProduct::Fr230,
+            2158 => GarminProduct::Fr735xt,
+            2160 => GarminProduct::VivoActiveApac,
+            2161 => GarminProduct::Vector2,
+            2162 => GarminProduct::Vector2s,
+            2172 => GarminProduct::Virbxe,
+            2173 => GarminProduct::Fr620Taiwan,
+            2174 => GarminProduct::Fr220Taiwan,
+            2175 => GarminProduct::Truswing,
+            2187 => GarminProduct::D2airvenu,
+            2188 => GarminProduct::Fenix3China,
+            2189 => GarminProduct::Fenix3Twn,
+            2192 => GarminProduct::VariaHeadlight,
+            2193 => GarminProduct::VariaTaillightOld,
+            2204 => GarminProduct::EdgeExplore1000,
+            2219 => GarminProduct::Fr225Asia,
+            2225 => GarminProduct::VariaRadarTaillight,
+            2226 => GarminProduct::VariaRadarDisplay,
+            2238 => GarminProduct::Edge20,
+            2260 => GarminProduct::Edge520Asia,
+            2261 => GarminProduct::Edge520Japan,
+            2262 => GarminProduct::D2Bravo,
+            2266 => GarminProduct::ApproachS20,
+            2271 => GarminProduct::VivoSmart2,
+            2274 => GarminProduct::Edge1000Thai,
+            2276 => GarminProduct::VariaRemote,
+            2288 => GarminProduct::Edge25Asia,
+            2289 => GarminProduct::Edge25Jpn,
+            2290 => GarminProduct::Edge20Asia,
+            2292 => GarminProduct::ApproachX40,
+            2293 => GarminProduct::Fenix3Japan,
+            2294 => GarminProduct::VivoSmartEmea,
+            2310 => GarminProduct::Fr630Asia,
+            2311 => GarminProduct::Fr630Jpn,
+            2313 => GarminProduct::Fr230Jpn,
+            2327 => GarminProduct::Hrm4Run,
+            2332 => GarminProduct::EpixJapan,
+            2337 => GarminProduct::VivoActiveHr,
+            2347 => GarminProduct::VivoSmartGpsHr,
+            2348 => GarminProduct::VivoSmartHr,
+            2361 => GarminProduct::VivoSmartHrAsia,
+            2362 => GarminProduct::VivoSmartGpsHrAsia,
+            2368 => GarminProduct::VivoMove,
+            2379 => GarminProduct::VariaTaillight,
+            2396 => GarminProduct::Fr235Asia,
+            2397 => GarminProduct::Fr235Japan,
+            2398 => GarminProduct::VariaVision,
+            2406 => GarminProduct::VivoFit3,
+            2407 => GarminProduct::Fenix3Korea,
+            2408 => GarminProduct::Fenix3Sea,
+            2413 => GarminProduct::Fenix3Hr,
+            2417 => GarminProduct::VirbUltra30,
+            2429 => GarminProduct::IndexSmartScale,
+            2431 => GarminProduct::Fr235,
+            2432 => GarminProduct::Fenix3Chronos,
+            2441 => GarminProduct::Oregon7xx,
+            2444 => GarminProduct::Rino7xx,
+            2457 => GarminProduct::EpixKorea,
+            2473 => GarminProduct::Fenix3HrChn,
+            2474 => GarminProduct::Fenix3HrTwn,
+            2475 => GarminProduct::Fenix3HrJpn,
+            2476 => GarminProduct::Fenix3HrSea,
+            2477 => GarminProduct::Fenix3HrKor,
+            2496 => GarminProduct::Nautix,
+            2497 => GarminProduct::VivoActiveHrApac,
+            2503 => GarminProduct::Fr35,
+            2512 => GarminProduct::Oregon7xxWw,
+            2530 => GarminProduct::Edge820,
+            2531 => GarminProduct::EdgeExplore820,
+            2533 => GarminProduct::Fr735xtApac,
+            2534 => GarminProduct::Fr735xtJapan,
+            2544 => GarminProduct::Fenix5s,
+            2547 => GarminProduct::D2BravoTitanium,
+            2567 => GarminProduct::VariaUt800,
+            2593 => GarminProduct::RunningDynamicsPod,
+            2599 => GarminProduct::Edge820China,
+            2600 => GarminProduct::Edge820Japan,
+            2604 => GarminProduct::Fenix5x,
+            2606 => GarminProduct::VivoFitJr,
+            2622 => GarminProduct::VivoSmart3,
+            2623 => GarminProduct::VivoSport,
+            2628 => GarminProduct::Edge820Taiwan,
+            2629 => GarminProduct::Edge820Korea,
+            2630 => GarminProduct::Edge820Sea,
+            2650 => GarminProduct::Fr35Hebrew,
+            2656 => GarminProduct::ApproachS60,
+            2667 => GarminProduct::Fr35Apac,
+            2668 => GarminProduct::Fr35Japan,
+            2675 => GarminProduct::Fenix3ChronosAsia,
+            2687 => GarminProduct::Virb360,
+            2691 => GarminProduct::Fr935,
+            2697 => GarminProduct::Fenix5,
+            2700 => GarminProduct::Vivoactive3,
+            2733 => GarminProduct::Fr235ChinaNfc,
+            2769 => GarminProduct::Foretrex601701,
+            2772 => GarminProduct::VivoMoveHr,
+            2713 => GarminProduct::Edge1030,
+            2727 => GarminProduct::Fr35Sea,
+            2787 => GarminProduct::Vector3,
+            2796 => GarminProduct::Fenix5Asia,
+            2797 => GarminProduct::Fenix5sAsia,
+            2798 => GarminProduct::Fenix5xAsia,
+            2806 => GarminProduct::ApproachZ80,
+            2814 => GarminProduct::Fr35Korea,
+            2819 => GarminProduct::D2charlie,
+            2831 => GarminProduct::VivoSmart3Apac,
+            2832 => GarminProduct::VivoSportApac,
+            2833 => GarminProduct::Fr935Asia,
+            2859 => GarminProduct::Descent,
+            2878 => GarminProduct::VivoFit4,
+            2886 => GarminProduct::Fr645,
+            2888 => GarminProduct::Fr645m,
+            2891 => GarminProduct::Fr30,
+            2900 => GarminProduct::Fenix5sPlus,
+            2909 => GarminProduct::Edge130,
+            2924 => GarminProduct::Edge1030Asia,
+            2927 => GarminProduct::Vivosmart4,
+            2945 => GarminProduct::VivoMoveHrAsia,
+            2962 => GarminProduct::ApproachX10,
+            2977 => GarminProduct::Fr30Asia,
+            2988 => GarminProduct::Vivoactive3mW,
+            3003 => GarminProduct::Fr645Asia,
+            3004 => GarminProduct::Fr645mAsia,
+            3011 => GarminProduct::EdgeExplore,
+            3028 => GarminProduct::Gpsmap66,
+            3049 => GarminProduct::ApproachS10,
+            3066 => GarminProduct::Vivoactive3mL,
+            3076 => GarminProduct::Fr245,
+            3077 => GarminProduct::Fr245Music,
+            3085 => GarminProduct::ApproachG80,
+            3092 => GarminProduct::Edge130Asia,
+            3095 => GarminProduct::Edge1030Bontrager,
+            3110 => GarminProduct::Fenix5Plus,
+            3111 => GarminProduct::Fenix5xPlus,
+            3112 => GarminProduct::Edge520Plus,
+            3113 => GarminProduct::Fr945,
+            3121 => GarminProduct::Edge530,
+            3122 => GarminProduct::Edge830,
+            3126 => GarminProduct::InstinctEsports,
+            3134 => GarminProduct::Fenix5sPlusApac,
+            3135 => GarminProduct::Fenix5xPlusApac,
+            3142 => GarminProduct::Edge520PlusApac,
+            3143 => GarminProduct::DescentT1,
+            3144 => GarminProduct::Fr235lAsia,
+            3145 => GarminProduct::Fr245Asia,
+            3163 => GarminProduct::VivoActive3mApac,
+            3192 => GarminProduct::Gen3Bsm,
+            3193 => GarminProduct::Gen3Bcm,
+            3218 => GarminProduct::VivoSmart4Asia,
+            3224 => GarminProduct::Vivoactive4Small,
+            3225 => GarminProduct::Vivoactive4Large,
+            3226 => GarminProduct::Venu,
+            3246 => GarminProduct::MarqDriver,
+            3247 => GarminProduct::MarqAviator,
+            3248 => GarminProduct::MarqCaptain,
+            3249 => GarminProduct::MarqCommander,
+            3250 => GarminProduct::MarqExpedition,
+            3251 => GarminProduct::MarqAthlete,
+            3258 => GarminProduct::DescentMk2,
+            3282 => GarminProduct::Fr45,
+            3284 => GarminProduct::Gpsmap66i,
+            3287 => GarminProduct::Fenix6SSport,
+            3288 => GarminProduct::Fenix6S,
+            3289 => GarminProduct::Fenix6Sport,
+            3290 => GarminProduct::Fenix6,
+            3291 => GarminProduct::Fenix6x,
+            3299 => GarminProduct::HrmDual,
+            3300 => GarminProduct::HrmPro,
+            3308 => GarminProduct::VivoMove3Premium,
+            3314 => GarminProduct::ApproachS40,
+            3321 => GarminProduct::Fr245mAsia,
+            3349 => GarminProduct::Edge530Apac,
+            3350 => GarminProduct::Edge830Apac,
+            3378 => GarminProduct::VivoMove3,
+            3387 => GarminProduct::VivoActive4SmallAsia,
+            3388 => GarminProduct::VivoActive4LargeAsia,
+            3389 => GarminProduct::VivoActive4OledAsia,
+            3405 => GarminProduct::Swim2,
+            3420 => GarminProduct::MarqDriverAsia,
+            3421 => GarminProduct::MarqAviatorAsia,
+            3422 => GarminProduct::VivoMove3Asia,
+            3441 => GarminProduct::Fr945Asia,
+            3446 => GarminProduct::VivoActive3tChn,
+            3448 => GarminProduct::MarqCaptainAsia,
+            3449 => GarminProduct::MarqCommanderAsia,
+            3450 => GarminProduct::MarqExpeditionAsia,
+            3451 => GarminProduct::MarqAthleteAsia,
+            3461 => GarminProduct::IndexSmartScale2,
+            3466 => GarminProduct::InstinctSolar,
+            3469 => GarminProduct::Fr45Asia,
+            3473 => GarminProduct::Vivoactive3Daimler,
+            3498 => GarminProduct::LegacyRey,
+            3499 => GarminProduct::LegacyDarthVader,
+            3500 => GarminProduct::LegacyCaptainMarvel,
+            3501 => GarminProduct::LegacyFirstAvenger,
+            3512 => GarminProduct::Fenix6sSportAsia,
+            3513 => GarminProduct::Fenix6sAsia,
+            3514 => GarminProduct::Fenix6SportAsia,
+            3515 => GarminProduct::Fenix6Asia,
+            3516 => GarminProduct::Fenix6xAsia,
+            3535 => GarminProduct::LegacyCaptainMarvelAsia,
+            3536 => GarminProduct::LegacyFirstAvengerAsia,
+            3537 => GarminProduct::LegacyReyAsia,
+            3538 => GarminProduct::LegacyDarthVaderAsia,
+            3542 => GarminProduct::DescentMk2s,
+            3558 => GarminProduct::Edge130Plus,
+            3570 => GarminProduct::Edge1030Plus,
+            3578 => GarminProduct::Rally200,
+            3589 => GarminProduct::Fr745,
+            3596 => GarminProduct::VenusqMusic,
+            3599 => GarminProduct::VenusqMusicV2,
+            3600 => GarminProduct::Venusq,
+            3615 => GarminProduct::Lily,
+            3624 => GarminProduct::MarqAdventurer,
+            3638 => GarminProduct::Enduro,
+            3639 => GarminProduct::Swim2Apac,
+            3648 => GarminProduct::MarqAdventurerAsia,
+            3652 => GarminProduct::Fr945Lte,
+            3702 => GarminProduct::DescentMk2Asia,
+            3703 => GarminProduct::Venu2,
+            3704 => GarminProduct::Venu2s,
+            3737 => GarminProduct::VenuDaimlerAsia,
+            3739 => GarminProduct::MarqGolfer,
+            3740 => GarminProduct::VenuDaimler,
+            3794 => GarminProduct::Fr745Asia,
+            3808 => GarminProduct::VariaRct715,
+            3809 => GarminProduct::LilyAsia,
+            3812 => GarminProduct::Edge1030PlusAsia,
+            3813 => GarminProduct::Edge130PlusAsia,
+            3823 => GarminProduct::ApproachS12,
+            3872 => GarminProduct::EnduroAsia,
+            3837 => GarminProduct::VenusqAsia,
+            3843 => GarminProduct::Edge1040,
+            3850 => GarminProduct::MarqGolferAsia,
+            3851 => GarminProduct::Venu2Plus,
+            3865 => GarminProduct::Gnss,
+            3869 => GarminProduct::Fr55,
+            3888 => GarminProduct::Instinct2,
+            3889 => GarminProduct::Instinct2s,
+            3905 => GarminProduct::Fenix7s,
+            3906 => GarminProduct::Fenix7,
+            3907 => GarminProduct::Fenix7x,
+            3908 => GarminProduct::Fenix7sApac,
+            3909 => GarminProduct::Fenix7Apac,
+            3910 => GarminProduct::Fenix7xApac,
+            3930 => GarminProduct::DescentMk2sAsia,
+            3934 => GarminProduct::ApproachS42,
+            3943 => GarminProduct::EpixGen2,
+            3944 => GarminProduct::EpixGen2Apac,
+            3949 => GarminProduct::Venu2sAsia,
+            3950 => GarminProduct::Venu2Asia,
+            3978 => GarminProduct::Fr945LteAsia,
+            3982 => GarminProduct::VivoMoveSport,
+            3983 => GarminProduct::VivomoveTrend,
+            3986 => GarminProduct::ApproachS12Asia,
+            3990 => GarminProduct::Fr255Music,
+            3991 => GarminProduct::Fr255SmallMusic,
+            3992 => GarminProduct::Fr255,
+            3993 => GarminProduct::Fr255Small,
+            4002 => GarminProduct::ApproachS42Asia,
+            4005 => GarminProduct::DescentG1,
+            4017 => GarminProduct::Venu2PlusAsia,
+            4024 => GarminProduct::Fr955,
+            4033 => GarminProduct::Fr55Asia,
+            4061 => GarminProduct::Edge540,
+            4062 => GarminProduct::Edge840,
+            4063 => GarminProduct::Vivosmart5,
+            4071 => GarminProduct::Instinct2Asia,
+            4105 => GarminProduct::MarqGen2,
+            4115 => GarminProduct::Venusq2,
+            4116 => GarminProduct::Venusq2music,
+            4124 => GarminProduct::MarqGen2Aviator,
+            4125 => GarminProduct::D2AirX10,
+            4130 => GarminProduct::HrmProPlus,
+            4132 => GarminProduct::DescentG1Asia,
+            4135 => GarminProduct::Tactix7,
+            4155 => GarminProduct::InstinctCrossover,
+            4169 => GarminProduct::EdgeExplore2,
+            4222 => GarminProduct::DescentMk3,
+            4223 => GarminProduct::DescentMk3i,
+            4233 => GarminProduct::ApproachS70,
+            4257 => GarminProduct::Fr265Large,
+            4258 => GarminProduct::Fr265Small,
+            4260 => GarminProduct::Venu3,
+            4261 => GarminProduct::Venu3s,
+            4265 => GarminProduct::TacxNeoSmart,
+            4266 => GarminProduct::TacxNeo2Smart,
+            4267 => GarminProduct::TacxNeo2TSmart,
+            4268 => GarminProduct::TacxNeoSmartBike,
+            4269 => GarminProduct::TacxSatoriSmart,
+            4270 => GarminProduct::TacxFlowSmart,
+            4271 => GarminProduct::TacxVortexSmart,
+            4272 => GarminProduct::TacxBushidoSmart,
+            4273 => GarminProduct::TacxGeniusSmart,
+            4274 => GarminProduct::TacxFluxFluxSSmart,
+            4275 => GarminProduct::TacxFlux2Smart,
+            4276 => GarminProduct::TacxMagnum,
+            4305 => GarminProduct::Edge1040Asia,
+            4312 => GarminProduct::EpixGen2Pro42,
+            4313 => GarminProduct::EpixGen2Pro47,
+            4314 => GarminProduct::EpixGen2Pro51,
+            4315 => GarminProduct::Fr965,
+            4341 => GarminProduct::Enduro2,
+            4374 => GarminProduct::Fenix7sProSolar,
+            4375 => GarminProduct::Fenix7ProSolar,
+            4376 => GarminProduct::Fenix7xProSolar,
+            4380 => GarminProduct::Lily2,
+            4394 => GarminProduct::Instinct2x,
+            4426 => GarminProduct::Vivoactive5,
+            4432 => GarminProduct::Fr165,
+            4433 => GarminProduct::Fr165Music,
+            4440 => GarminProduct::Edge1050,
+            4442 => GarminProduct::DescentT2,
+            4446 => GarminProduct::HrmFit,
+            4472 => GarminProduct::MarqGen2Commander,
+            4477 => GarminProduct::LilyAthlete,
+            4532 => GarminProduct::Fenix8Solar,
+            4533 => GarminProduct::Fenix8SolarLarge,
+            4534 => GarminProduct::Fenix8Small,
+            4536 => GarminProduct::Fenix8,
+            4556 => GarminProduct::D2Mach1Pro,
+            4575 => GarminProduct::Enduro3,
+            4583 => GarminProduct::InstinctE40mm,
+            4584 => GarminProduct::InstinctE45mm,
+            4585 => GarminProduct::Instinct3Solar45mm,
+            4586 => GarminProduct::Instinct3Amoled45mm,
+            4587 => GarminProduct::Instinct3Amoled50mm,
+            4588 => GarminProduct::DescentG2,
+            4606 => GarminProduct::Hrm200,
+            4625 => GarminProduct::Vivoactive6,
+            4647 => GarminProduct::ApproachS44,
+            4656 => GarminProduct::ApproachS50,
+            4666 => GarminProduct::FenixE,
+            4759 => GarminProduct::Instinct3Solar50mm,
+            4775 => GarminProduct::Tactix8Amoled,
+            4776 => GarminProduct::Tactix8Solar,
+            10007 => GarminProduct::Sdm4,
+            10014 => GarminProduct::EdgeRemote,
+            20533 => GarminProduct::TacxTrainingAppWin,
+            20534 => GarminProduct::TacxTrainingAppMac,
+            20565 => GarminProduct::TacxTrainingAppMacCatalyst,
+            20119 => GarminProduct::TrainingCenter,
+            30045 => GarminProduct::TacxTrainingAppAndroid,
+            30046 => GarminProduct::TacxTrainingAppIos,
+            30047 => GarminProduct::TacxTrainingAppLegacy,
+            65531 => GarminProduct::ConnectiqSimulator,
+            65532 => GarminProduct::AndroidAntplusPlugin,
+            65534 => GarminProduct::Connect,
+            val => GarminProduct::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 2 {
+            values.push(DataValue::Enum(FitEnum::GarminProduct(Self::from(
+                reader.next_u16(endianness)?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum AntplusDeviceType {
+    Antfs,
+    BikePower,
+    EnvironmentSensorLegacy,
+    MultiSportSpeedDistance,
+    Control,
+    FitnessEquipment,
+    BloodPressure,
+    GeocacheNode,
+    LightElectricVehicle,
+    EnvSensor,
+    Racquet,
+    ControlHub,
+    MuscleOxygen,
+    Shifting,
+    BikeLightMain,
+    BikeLightShared,
+    Exd,
+    BikeRadar,
+    BikeAero,
+    WeightScale,
+    HeartRate,
+    BikeSpeedCadence,
+    BikeCadence,
+    BikeSpeed,
+    StrideSpeedDistance,
+    UnknownVariant(u8),
+}
+impl AntplusDeviceType {
+    pub fn from(content: u8) -> AntplusDeviceType {
+        match content {
+            1 => AntplusDeviceType::Antfs,
+            11 => AntplusDeviceType::BikePower,
+            12 => AntplusDeviceType::EnvironmentSensorLegacy,
+            15 => AntplusDeviceType::MultiSportSpeedDistance,
+            16 => AntplusDeviceType::Control,
+            17 => AntplusDeviceType::FitnessEquipment,
+            18 => AntplusDeviceType::BloodPressure,
+            19 => AntplusDeviceType::GeocacheNode,
+            20 => AntplusDeviceType::LightElectricVehicle,
+            25 => AntplusDeviceType::EnvSensor,
+            26 => AntplusDeviceType::Racquet,
+            27 => AntplusDeviceType::ControlHub,
+            31 => AntplusDeviceType::MuscleOxygen,
+            34 => AntplusDeviceType::Shifting,
+            35 => AntplusDeviceType::BikeLightMain,
+            36 => AntplusDeviceType::BikeLightShared,
+            38 => AntplusDeviceType::Exd,
+            40 => AntplusDeviceType::BikeRadar,
+            46 => AntplusDeviceType::BikeAero,
+            119 => AntplusDeviceType::WeightScale,
+            120 => AntplusDeviceType::HeartRate,
+            121 => AntplusDeviceType::BikeSpeedCadence,
+            122 => AntplusDeviceType::BikeCadence,
+            123 => AntplusDeviceType::BikeSpeed,
+            124 => AntplusDeviceType::StrideSpeedDistance,
+            val => AntplusDeviceType::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::AntplusDeviceType(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum AntNetwork {
     Public,
     Antplus,
@@ -3777,6 +4880,62 @@ impl Weight {
         for _ in 0..number_of_bytes / 2 {
             values.push(DataValue::Enum(FitEnum::Weight(Self::from(
                 reader.next_u16(endianness)?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutHr {
+    BpmOffset,
+    UnknownVariant(u32),
+}
+impl WorkoutHr {
+    pub fn from(content: u32) -> WorkoutHr {
+        match content {
+            100 => WorkoutHr::BpmOffset,
+            val => WorkoutHr::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 4 {
+            values.push(DataValue::Enum(FitEnum::WorkoutHr(Self::from(
+                reader.next_u32(endianness)?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutPower {
+    WattsOffset,
+    UnknownVariant(u32),
+}
+impl WorkoutPower {
+    pub fn from(content: u32) -> WorkoutPower {
+        match content {
+            1000 => WorkoutPower::WattsOffset,
+            val => WorkoutPower::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 4 {
+            values.push(DataValue::Enum(FitEnum::WorkoutPower(Self::from(
+                reader.next_u32(endianness)?,
             ))));
         }
         Ok(values)
@@ -4984,6 +6143,90 @@ impl SourceType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum LocalDeviceType {
+    Gps,
+    Glonass,
+    GpsGlonass,
+    Accelerometer,
+    Barometer,
+    Temperature,
+    Whr,
+    SensorHub,
+    UnknownVariant(u8),
+}
+impl LocalDeviceType {
+    pub fn from(content: u8) -> LocalDeviceType {
+        match content {
+            0 => LocalDeviceType::Gps,
+            1 => LocalDeviceType::Glonass,
+            2 => LocalDeviceType::GpsGlonass,
+            3 => LocalDeviceType::Accelerometer,
+            4 => LocalDeviceType::Barometer,
+            5 => LocalDeviceType::Temperature,
+            10 => LocalDeviceType::Whr,
+            12 => LocalDeviceType::SensorHub,
+            val => LocalDeviceType::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::LocalDeviceType(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum BleDeviceType {
+    ConnectedGps,
+    HeartRate,
+    BikePower,
+    BikeSpeedCadence,
+    BikeSpeed,
+    BikeCadence,
+    Footpod,
+    BikeTrainer,
+    UnknownVariant(u8),
+}
+impl BleDeviceType {
+    pub fn from(content: u8) -> BleDeviceType {
+        match content {
+            0 => BleDeviceType::ConnectedGps,
+            1 => BleDeviceType::HeartRate,
+            2 => BleDeviceType::BikePower,
+            3 => BleDeviceType::BikeSpeedCadence,
+            4 => BleDeviceType::BikeSpeed,
+            5 => BleDeviceType::BikeCadence,
+            6 => BleDeviceType::Footpod,
+            7 => BleDeviceType::BikeTrainer,
+            val => BleDeviceType::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::BleDeviceType(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum AntChannelId {
     AntExtendedDeviceNumberUpperNibble,
     AntTransmissionTypeLowerNibble,
@@ -5126,6 +6369,104 @@ impl WatchfaceMode {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum DigitalWatchfaceLayout {
+    Traditional,
+    Modern,
+    Bold,
+    UnknownVariant(u8),
+}
+impl DigitalWatchfaceLayout {
+    pub fn from(content: u8) -> DigitalWatchfaceLayout {
+        match content {
+            0 => DigitalWatchfaceLayout::Traditional,
+            1 => DigitalWatchfaceLayout::Modern,
+            2 => DigitalWatchfaceLayout::Bold,
+            val => DigitalWatchfaceLayout::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::DigitalWatchfaceLayout(
+                Self::from(reader.next_u8()?),
+            )));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum AnalogWatchfaceLayout {
+    Minimal,
+    Traditional,
+    Modern,
+    UnknownVariant(u8),
+}
+impl AnalogWatchfaceLayout {
+    pub fn from(content: u8) -> AnalogWatchfaceLayout {
+        match content {
+            0 => AnalogWatchfaceLayout::Minimal,
+            1 => AnalogWatchfaceLayout::Traditional,
+            2 => AnalogWatchfaceLayout::Modern,
+            val => AnalogWatchfaceLayout::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::AnalogWatchfaceLayout(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum RiderPositionType {
+    Seated,
+    Standing,
+    TransitionToSeated,
+    TransitionToStanding,
+    UnknownVariant(u8),
+}
+impl RiderPositionType {
+    pub fn from(content: u8) -> RiderPositionType {
+        match content {
+            0 => RiderPositionType::Seated,
+            1 => RiderPositionType::Standing,
+            2 => RiderPositionType::TransitionToSeated,
+            3 => RiderPositionType::TransitionToStanding,
+            val => RiderPositionType::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::RiderPositionType(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum CameraEventType {
     VideoStart,
     VideoSplit,
@@ -5205,6 +6546,40 @@ impl SensorType {
         for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::SensorType(Self::from(
                 reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CommTimeoutType {
+    WildcardPairingTimeout,
+    PairingTimeout,
+    ConnectionLost,
+    ConnectionTimeout,
+    UnknownVariant(u16),
+}
+impl CommTimeoutType {
+    pub fn from(content: u16) -> CommTimeoutType {
+        match content {
+            0 => CommTimeoutType::WildcardPairingTimeout,
+            1 => CommTimeoutType::PairingTimeout,
+            2 => CommTimeoutType::ConnectionLost,
+            3 => CommTimeoutType::ConnectionTimeout,
+            val => CommTimeoutType::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 2 {
+            values.push(DataValue::Enum(FitEnum::CommTimeoutType(Self::from(
+                reader.next_u16(endianness)?,
             ))));
         }
         Ok(values)
@@ -6338,6 +7713,110 @@ impl DiveGasStatus {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum DiveAlert {
+    NdlReached,
+    GasSwitchPrompted,
+    NearSurface,
+    ApproachingNdl,
+    Po2Warn,
+    Po2CritHigh,
+    Po2CritLow,
+    TimeAlert,
+    DepthAlert,
+    DecoCeilingBroken,
+    DecoComplete,
+    SafetyStopBroken,
+    SafetyStopComplete,
+    CnsWarning,
+    CnsCritical,
+    OtuWarning,
+    OtuCritical,
+    AscentCritical,
+    AlertDismissedByKey,
+    AlertDismissedByTimeout,
+    BatteryLow,
+    BatteryCritical,
+    SafetyStopStarted,
+    ApproachingFirstDecoStop,
+    SetpointSwitchAutoLow,
+    SetpointSwitchAutoHigh,
+    SetpointSwitchManualLow,
+    SetpointSwitchManualHigh,
+    AutoSetpointSwitchIgnored,
+    SwitchedToOpenCircuit,
+    SwitchedToClosedCircuit,
+    TankBatteryLow,
+    Po2CcrDilLow,
+    DecoStopCleared,
+    ApneaNeutralBuoyancy,
+    ApneaTargetDepth,
+    ApneaSurface,
+    ApneaHighSpeed,
+    ApneaLowSpeed,
+    UnknownVariant(u8),
+}
+impl DiveAlert {
+    pub fn from(content: u8) -> DiveAlert {
+        match content {
+            0 => DiveAlert::NdlReached,
+            1 => DiveAlert::GasSwitchPrompted,
+            2 => DiveAlert::NearSurface,
+            3 => DiveAlert::ApproachingNdl,
+            4 => DiveAlert::Po2Warn,
+            5 => DiveAlert::Po2CritHigh,
+            6 => DiveAlert::Po2CritLow,
+            7 => DiveAlert::TimeAlert,
+            8 => DiveAlert::DepthAlert,
+            9 => DiveAlert::DecoCeilingBroken,
+            10 => DiveAlert::DecoComplete,
+            11 => DiveAlert::SafetyStopBroken,
+            12 => DiveAlert::SafetyStopComplete,
+            13 => DiveAlert::CnsWarning,
+            14 => DiveAlert::CnsCritical,
+            15 => DiveAlert::OtuWarning,
+            16 => DiveAlert::OtuCritical,
+            17 => DiveAlert::AscentCritical,
+            18 => DiveAlert::AlertDismissedByKey,
+            19 => DiveAlert::AlertDismissedByTimeout,
+            20 => DiveAlert::BatteryLow,
+            21 => DiveAlert::BatteryCritical,
+            22 => DiveAlert::SafetyStopStarted,
+            23 => DiveAlert::ApproachingFirstDecoStop,
+            24 => DiveAlert::SetpointSwitchAutoLow,
+            25 => DiveAlert::SetpointSwitchAutoHigh,
+            26 => DiveAlert::SetpointSwitchManualLow,
+            27 => DiveAlert::SetpointSwitchManualHigh,
+            28 => DiveAlert::AutoSetpointSwitchIgnored,
+            29 => DiveAlert::SwitchedToOpenCircuit,
+            30 => DiveAlert::SwitchedToClosedCircuit,
+            32 => DiveAlert::TankBatteryLow,
+            33 => DiveAlert::Po2CcrDilLow,
+            34 => DiveAlert::DecoStopCleared,
+            35 => DiveAlert::ApneaNeutralBuoyancy,
+            36 => DiveAlert::ApneaTargetDepth,
+            37 => DiveAlert::ApneaSurface,
+            38 => DiveAlert::ApneaHighSpeed,
+            39 => DiveAlert::ApneaLowSpeed,
+            val => DiveAlert::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 1 {
+            values.push(DataValue::Enum(FitEnum::DiveAlert(Self::from(
+                reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum DiveAlarmType {
     Depth,
     Time,
@@ -6561,6 +8040,36 @@ impl ProjectileType {
         for _ in 0..number_of_bytes / 1 {
             values.push(DataValue::Enum(FitEnum::ProjectileType(Self::from(
                 reader.next_u8()?,
+            ))));
+        }
+        Ok(values)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FaveroProduct {
+    AssiomaUno,
+    AssiomaDuo,
+    UnknownVariant(u16),
+}
+impl FaveroProduct {
+    pub fn from(content: u16) -> FaveroProduct {
+        match content {
+            10 => FaveroProduct::AssiomaUno,
+            12 => FaveroProduct::AssiomaDuo,
+            val => FaveroProduct::UnknownVariant(val),
+        }
+    }
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        number_of_bytes: u8,
+    ) -> Result<Vec<DataValue>, DataTypeError> {
+        let mut values = Vec::new();
+        for _ in 0..number_of_bytes / 2 {
+            values.push(DataValue::Enum(FitEnum::FaveroProduct(Self::from(
+                reader.next_u16(endianness)?,
             ))));
         }
         Ok(values)
@@ -6920,17 +8429,30 @@ impl FitBaseType {
     }
 }
 
+pub type SimpleParseFunction =
+    fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>;
+pub type DynamicParseFunction = fn(
+    &mut Reader,
+    &Endianness,
+    u8,
+    &[DataMessageField],
+) -> Result<DataMessageField, DataTypeError>;
+
 #[derive(Debug, Clone)]
 pub enum ParseFunction {
-    Simple(fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>),
-    Dynamic(
-        fn(
-            &mut Reader,
-            &Endianness,
-            u8,
-            &[DataMessageField],
-        ) -> Result<Vec<DataValue>, DataTypeError>,
-    ),
+    Simple(SimpleParseFunction),
+    Dynamic(DynamicParseFunction),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct Subfield {
+    parent_field_definition_number: u8,
+    name: String,
+    base_type: String,
+    reference_fields: Vec<String>,
+    reference_field_values: Vec<String>,
+    scale: Option<f32>,
+    offset: Option<f32>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -7069,11 +8591,109 @@ pub enum FileIdField {
     Type,
     Manufacturer,
     Product,
+    FaveroProduct,
+    GarminProduct,
     SerialNumber,
     TimeCreated,
     Number,
     ProductName,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum FileIdFieldProductSubfield {
+    FaveroProduct,
+    GarminProduct,
+}
+impl FileIdFieldProductSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in FileIdFieldProductSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::FileId(FileIdField::Product),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // FaveroProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::FileId(FileIdField::Manufacturer),
+                    DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::FileId(FileIdField::FaveroProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GarminProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::FileId(FileIdField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
+                    ),
+                    (
+                        FitMessage::FileId(FileIdField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
+                    ),
+                    (
+                        FitMessage::FileId(FileIdField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
+                    ),
+                    (
+                        FitMessage::FileId(FileIdField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::FileId(FileIdField::GarminProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl FileIdField {
     fn from(definition_field: u8) -> Self {
@@ -7093,7 +8713,7 @@ impl FileIdField {
         match def_number {
             0 => ParseFunction::Simple(File::parse),
             1 => ParseFunction::Simple(Manufacturer::parse),
-            2 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Dynamic(FileIdFieldProductSubfield::parse),
             3 => ParseFunction::Simple(parse_unknown),
             4 => ParseFunction::Simple(DateTime::parse),
             5 => ParseFunction::Simple(parse_uint16),
@@ -7247,7 +8867,105 @@ impl SoftwareField {
 pub enum SlaveDeviceField {
     Manufacturer,
     Product,
+    FaveroProduct,
+    GarminProduct,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum SlaveDeviceFieldProductSubfield {
+    FaveroProduct,
+    GarminProduct,
+}
+impl SlaveDeviceFieldProductSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in SlaveDeviceFieldProductSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::SlaveDevice(SlaveDeviceField::Product),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // FaveroProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                    DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::SlaveDevice(SlaveDeviceField::FaveroProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GarminProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
+                    ),
+                    (
+                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
+                    ),
+                    (
+                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
+                    ),
+                    (
+                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::SlaveDevice(SlaveDeviceField::GarminProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl SlaveDeviceField {
     fn from(definition_field: u8) -> Self {
@@ -7261,7 +8979,7 @@ impl SlaveDeviceField {
     fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
             0 => ParseFunction::Simple(Manufacturer::parse),
-            1 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Dynamic(SlaveDeviceFieldProductSubfield::parse),
             _ => ParseFunction::Simple(parse_uint8),
         }
     }
@@ -7367,7 +9085,118 @@ pub enum MesgCapabilitiesField {
     MesgNum,
     CountType,
     Count,
+    NumPerFile,
+    MaxPerFile,
+    MaxPerFileType,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum MesgCapabilitiesFieldCountSubfield {
+    NumPerFile,
+    MaxPerFile,
+    MaxPerFileType,
+}
+impl MesgCapabilitiesFieldCountSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in MesgCapabilitiesFieldCountSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::Count),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // NumPerFile subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                    DataValue::Enum(FitEnum::MesgCount(MesgCount::NumPerFile)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::NumPerFile),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // MaxPerFile subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                    DataValue::Enum(FitEnum::MesgCount(MesgCount::MaxPerFile)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::MaxPerFile),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // MaxPerFileType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                    DataValue::Enum(FitEnum::MesgCount(MesgCount::MaxPerFileType)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::MesgCapabilities(
+                                MesgCapabilitiesField::MaxPerFileType,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl MesgCapabilitiesField {
     fn from(definition_field: u8) -> Self {
@@ -7387,7 +9216,7 @@ impl MesgCapabilitiesField {
             0 => ParseFunction::Simple(File::parse),
             1 => ParseFunction::Simple(MesgNum::parse),
             2 => ParseFunction::Simple(MesgCount::parse),
-            3 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Dynamic(MesgCapabilitiesFieldCountSubfield::parse),
             _ => ParseFunction::Simple(parse_uint8),
         }
     }
@@ -7996,7 +9825,97 @@ pub enum WatchfaceSettingsField {
     MessageIndex,
     Mode,
     Layout,
+    DigitalLayout,
+    AnalogLayout,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WatchfaceSettingsFieldLayoutSubfield {
+    DigitalLayout,
+    AnalogLayout,
+}
+impl WatchfaceSettingsFieldLayoutSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in WatchfaceSettingsFieldLayoutSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_byte(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WatchfaceSettings(WatchfaceSettingsField::Layout),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // DigitalLayout subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WatchfaceSettings(WatchfaceSettingsField::Mode),
+                    DataValue::Enum(FitEnum::WatchfaceMode(WatchfaceMode::Digital)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value =
+                            DigitalWatchfaceLayout::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WatchfaceSettings(
+                                WatchfaceSettingsField::DigitalLayout,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // AnalogLayout subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WatchfaceSettings(WatchfaceSettingsField::Mode),
+                    DataValue::Enum(FitEnum::WatchfaceMode(WatchfaceMode::Analog)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value =
+                            AnalogWatchfaceLayout::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WatchfaceSettings(
+                                WatchfaceSettingsField::AnalogLayout,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl WatchfaceSettingsField {
     fn from(definition_field: u8) -> Self {
@@ -8012,7 +9931,7 @@ impl WatchfaceSettingsField {
         match def_number {
             254 => ParseFunction::Simple(MessageIndex::parse),
             0 => ParseFunction::Simple(WatchfaceMode::parse),
-            1 => ParseFunction::Simple(parse_byte),
+            1 => ParseFunction::Dynamic(WatchfaceSettingsFieldLayoutSubfield::parse),
             _ => ParseFunction::Simple(parse_uint8),
         }
     }
@@ -8507,6 +10426,8 @@ pub enum DiveSettingsField {
     SafetyStopTime,
     HeartRateSourceType,
     HeartRateSource,
+    HeartRateAntplusDeviceType,
+    HeartRateLocalDeviceType,
     TravelGas,
     CcrLowSetpointSwitchMode,
     CcrLowSetpoint,
@@ -8520,6 +10441,93 @@ pub enum DiveSettingsField {
     LastStopMultiple,
     NoFlyTimeMode,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum DiveSettingsFieldHeartRateSourceSubfield {
+    HeartRateAntplusDeviceType,
+    HeartRateLocalDeviceType,
+}
+impl DiveSettingsFieldHeartRateSourceSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in DiveSettingsFieldHeartRateSourceSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::DiveSettings(DiveSettingsField::HeartRateSource),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // HeartRateAntplusDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DiveSettings(DiveSettingsField::HeartRateSourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::Antplus)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DiveSettings(
+                                DiveSettingsField::HeartRateAntplusDeviceType,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // HeartRateLocalDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DiveSettings(DiveSettingsField::HeartRateSourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::Local)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = LocalDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DiveSettings(
+                                DiveSettingsField::HeartRateLocalDeviceType,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl DiveSettingsField {
     fn from(definition_field: u8) -> Self {
@@ -8587,7 +10595,7 @@ impl DiveSettingsField {
             17 => ParseFunction::Simple(parse_uint16),
             18 => ParseFunction::Simple(parse_uint16),
             19 => ParseFunction::Simple(SourceType::parse),
-            20 => ParseFunction::Simple(parse_uint8),
+            20 => ParseFunction::Dynamic(DiveSettingsFieldHeartRateSourceSubfield::parse),
             21 => ParseFunction::Simple(MessageIndex::parse),
             22 => ParseFunction::Simple(CcrSetpointSwitchMode::parse),
             23 => ParseFunction::Simple(parse_uint8),
@@ -8988,6 +10996,8 @@ pub enum SessionField {
     TotalTimerTime,
     TotalDistance,
     TotalCycles,
+    TotalStrides,
+    TotalStrokes,
     TotalCalories,
     TotalFatCalories,
     AvgSpeed,
@@ -8995,7 +11005,9 @@ pub enum SessionField {
     AvgHeartRate,
     MaxHeartRate,
     AvgCadence,
+    AvgRunningCadence,
     MaxCadence,
+    MaxRunningCadence,
     AvgPower,
     MaxPower,
     TotalAscent,
@@ -9132,6 +11144,220 @@ pub enum SessionField {
     MinCoreTemperature,
     MaxCoreTemperature,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum SessionFieldTotalCyclesSubfield {
+    TotalStrides,
+    TotalStrokes,
+}
+impl SessionFieldTotalCyclesSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in SessionFieldTotalCyclesSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Session(SessionField::TotalCycles),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // TotalStrides subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Running)),
+                    ),
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Walking)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Session(SessionField::TotalStrides),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TotalStrokes subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
+                    ),
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Swimming)),
+                    ),
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Rowing)),
+                    ),
+                    (
+                        FitMessage::Session(SessionField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::StandUpPaddleboarding)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Session(SessionField::TotalStrokes),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum SessionFieldAvgCadenceSubfield {
+    AvgRunningCadence,
+}
+impl SessionFieldAvgCadenceSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in SessionFieldAvgCadenceSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Session(SessionField::AvgCadence),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // AvgRunningCadence subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::Session(SessionField::Sport),
+                DataValue::Enum(FitEnum::Sport(Sport::Running)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::Session(SessionField::AvgRunningCadence),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum SessionFieldMaxCadenceSubfield {
+    MaxRunningCadence,
+}
+impl SessionFieldMaxCadenceSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in SessionFieldMaxCadenceSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Session(SessionField::MaxCadence),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // MaxRunningCadence subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::Session(SessionField::Sport),
+                DataValue::Enum(FitEnum::Sport(Sport::Running)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::Session(SessionField::MaxRunningCadence),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
 }
 impl SessionField {
     fn from(definition_field: u8) -> Self {
@@ -9310,15 +11536,15 @@ impl SessionField {
             7 => ParseFunction::Simple(parse_uint32),
             8 => ParseFunction::Simple(parse_uint32),
             9 => ParseFunction::Simple(parse_uint32),
-            10 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Dynamic(SessionFieldTotalCyclesSubfield::parse),
             11 => ParseFunction::Simple(parse_uint16),
             13 => ParseFunction::Simple(parse_uint16),
             14 => ParseFunction::Simple(parse_uint16),
             15 => ParseFunction::Simple(parse_uint16),
             16 => ParseFunction::Simple(parse_uint8),
             17 => ParseFunction::Simple(parse_uint8),
-            18 => ParseFunction::Simple(parse_uint8),
-            19 => ParseFunction::Simple(parse_uint8),
+            18 => ParseFunction::Dynamic(SessionFieldAvgCadenceSubfield::parse),
+            19 => ParseFunction::Dynamic(SessionFieldMaxCadenceSubfield::parse),
             20 => ParseFunction::Simple(parse_uint16),
             21 => ParseFunction::Simple(parse_uint16),
             22 => ParseFunction::Simple(parse_uint16),
@@ -9803,6 +12029,8 @@ pub enum LapField {
     TotalTimerTime,
     TotalDistance,
     TotalCycles,
+    TotalStrides,
+    TotalStrokes,
     TotalCalories,
     TotalFatCalories,
     AvgSpeed,
@@ -9810,7 +12038,9 @@ pub enum LapField {
     AvgHeartRate,
     MaxHeartRate,
     AvgCadence,
+    AvgRunningCadence,
     MaxCadence,
+    MaxRunningCadence,
     AvgPower,
     MaxPower,
     TotalAscent,
@@ -9914,6 +12144,220 @@ pub enum LapField {
     MinCoreTemperature,
     MaxCoreTemperature,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum LapFieldTotalCyclesSubfield {
+    TotalStrides,
+    TotalStrokes,
+}
+impl LapFieldTotalCyclesSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in LapFieldTotalCyclesSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Lap(LapField::TotalCycles),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // TotalStrides subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Running)),
+                    ),
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Walking)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Lap(LapField::TotalStrides),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TotalStrokes subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
+                    ),
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Swimming)),
+                    ),
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::Rowing)),
+                    ),
+                    (
+                        FitMessage::Lap(LapField::Sport),
+                        DataValue::Enum(FitEnum::Sport(Sport::StandUpPaddleboarding)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Lap(LapField::TotalStrokes),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum LapFieldAvgCadenceSubfield {
+    AvgRunningCadence,
+}
+impl LapFieldAvgCadenceSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in LapFieldAvgCadenceSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Lap(LapField::AvgCadence),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // AvgRunningCadence subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::Lap(LapField::Sport),
+                DataValue::Enum(FitEnum::Sport(Sport::Running)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::Lap(LapField::AvgRunningCadence),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum LapFieldMaxCadenceSubfield {
+    MaxRunningCadence,
+}
+impl LapFieldMaxCadenceSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in LapFieldMaxCadenceSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Lap(LapField::MaxCadence),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // MaxRunningCadence subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::Lap(LapField::Sport),
+                DataValue::Enum(FitEnum::Sport(Sport::Running)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::Lap(LapField::MaxRunningCadence),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
 }
 impl LapField {
     fn from(definition_field: u8) -> Self {
@@ -10059,15 +12503,15 @@ impl LapField {
             7 => ParseFunction::Simple(parse_uint32),
             8 => ParseFunction::Simple(parse_uint32),
             9 => ParseFunction::Simple(parse_uint32),
-            10 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Dynamic(LapFieldTotalCyclesSubfield::parse),
             11 => ParseFunction::Simple(parse_uint16),
             12 => ParseFunction::Simple(parse_uint16),
             13 => ParseFunction::Simple(parse_uint16),
             14 => ParseFunction::Simple(parse_uint16),
             15 => ParseFunction::Simple(parse_uint8),
             16 => ParseFunction::Simple(parse_uint8),
-            17 => ParseFunction::Simple(parse_uint8),
-            18 => ParseFunction::Simple(parse_uint8),
+            17 => ParseFunction::Dynamic(LapFieldAvgCadenceSubfield::parse),
+            18 => ParseFunction::Dynamic(LapFieldMaxCadenceSubfield::parse),
             19 => ParseFunction::Simple(parse_uint16),
             20 => ParseFunction::Simple(parse_uint16),
             21 => ParseFunction::Simple(parse_uint16),
@@ -11047,6 +13491,29 @@ pub enum EventField {
     EventType,
     Data16,
     Data,
+    TimerTrigger,
+    CoursePointIndex,
+    BatteryLevel,
+    VirtualPartnerSpeed,
+    HrHighAlert,
+    HrLowAlert,
+    SpeedHighAlert,
+    SpeedLowAlert,
+    CadHighAlert,
+    CadLowAlert,
+    PowerHighAlert,
+    PowerLowAlert,
+    TimeDurationAlert,
+    DistanceDurationAlert,
+    CalorieDurationAlert,
+    FitnessEquipmentState,
+    SportPoint,
+    GearChangeData,
+    RiderPosition,
+    CommTimeout,
+    DiveAlert,
+    AutoActivityDetectDuration,
+    RadarThreatAlert,
     EventGroup,
     Score,
     OpponentScore,
@@ -11057,11 +13524,661 @@ pub enum EventField {
     DeviceIndex,
     ActivityType,
     StartTimestamp,
+    AutoActivityDetectStartTimestamp,
     RadarThreatLevelMax,
     RadarThreatCount,
     RadarThreatAvgApproachSpeed,
     RadarThreatMaxApproachSpeed,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum EventFieldDataSubfield {
+    TimerTrigger,
+    CoursePointIndex,
+    BatteryLevel,
+    VirtualPartnerSpeed,
+    HrHighAlert,
+    HrLowAlert,
+    SpeedHighAlert,
+    SpeedLowAlert,
+    CadHighAlert,
+    CadLowAlert,
+    PowerHighAlert,
+    PowerLowAlert,
+    TimeDurationAlert,
+    DistanceDurationAlert,
+    CalorieDurationAlert,
+    FitnessEquipmentState,
+    SportPoint,
+    GearChangeData,
+    RiderPosition,
+    CommTimeout,
+    DiveAlert,
+    AutoActivityDetectDuration,
+    RadarThreatAlert,
+}
+impl EventFieldDataSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in EventFieldDataSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Event(EventField::Data),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // TimerTrigger subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::Timer)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = TimerTrigger::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::TimerTrigger),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CoursePointIndex subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::CoursePoint)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = MessageIndex::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::CoursePointIndex),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // BatteryLevel subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::Battery)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::BatteryLevel),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // VirtualPartnerSpeed subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::VirtualPartnerPace)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::VirtualPartnerSpeed),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // HrHighAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::HrHighAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::HrHighAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // HrLowAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::HrLowAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::HrLowAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SpeedHighAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::SpeedHighAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::SpeedHighAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SpeedLowAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::SpeedLowAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::SpeedLowAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CadHighAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::CadHighAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::CadHighAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CadLowAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::CadLowAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::CadLowAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // PowerHighAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::PowerHighAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::PowerHighAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // PowerLowAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::PowerLowAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::PowerLowAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TimeDurationAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::TimeDurationAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::TimeDurationAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DistanceDurationAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::DistanceDurationAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::DistanceDurationAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CalorieDurationAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::CalorieDurationAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::CalorieDurationAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // FitnessEquipmentState subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::FitnessEquipment)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value =
+                            FitnessEquipmentState::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::FitnessEquipmentState),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SportPoint subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::SportPoint)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::SportPoint),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GearChangeData subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Event(EventField::Event),
+                        DataValue::Enum(FitEnum::Event(Event::FrontGearChange)),
+                    ),
+                    (
+                        FitMessage::Event(EventField::Event),
+                        DataValue::Enum(FitEnum::Event(Event::RearGearChange)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::GearChangeData),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RiderPosition subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::RiderPositionChange)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = RiderPositionType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::RiderPosition),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CommTimeout subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::CommTimeout)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = CommTimeoutType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::CommTimeout),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DiveAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::DiveAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = DiveAlert::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::DiveAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // AutoActivityDetectDuration subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::AutoActivityDetect)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::AutoActivityDetectDuration),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RadarThreatAlert subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Event(EventField::Event),
+                    DataValue::Enum(FitEnum::Event(Event::RadarThreatAlert)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Event(EventField::RadarThreatAlert),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum EventFieldStartTimestampSubfield {
+    AutoActivityDetectStartTimestamp,
+}
+impl EventFieldStartTimestampSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in EventFieldStartTimestampSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = DateTime::parse(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Event(EventField::StartTimestamp),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // AutoActivityDetectStartTimestamp subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::Event(EventField::Event),
+                DataValue::Enum(FitEnum::Event(Event::AutoActivityDetect)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = DateTime::parse(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::Event(EventField::AutoActivityDetectStartTimestamp),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
 }
 impl EventField {
     fn from(definition_field: u8) -> Self {
@@ -11095,7 +14212,7 @@ impl EventField {
             0 => ParseFunction::Simple(Event::parse),
             1 => ParseFunction::Simple(EventType::parse),
             2 => ParseFunction::Simple(parse_uint16),
-            3 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Dynamic(EventFieldDataSubfield::parse),
             4 => ParseFunction::Simple(parse_uint8),
             7 => ParseFunction::Simple(parse_uint16),
             8 => ParseFunction::Simple(parse_uint16),
@@ -11105,7 +14222,7 @@ impl EventField {
             12 => ParseFunction::Simple(parse_unknown),
             13 => ParseFunction::Simple(DeviceIndex::parse),
             14 => ParseFunction::Simple(ActivityType::parse),
-            15 => ParseFunction::Simple(DateTime::parse),
+            15 => ParseFunction::Dynamic(EventFieldStartTimestampSubfield::parse),
             21 => ParseFunction::Simple(RadarThreatLevelType::parse),
             22 => ParseFunction::Simple(parse_uint8),
             23 => ParseFunction::Simple(parse_uint8),
@@ -11137,9 +14254,15 @@ pub enum DeviceInfoField {
     Timestamp,
     DeviceIndex,
     DeviceType,
+    BleDeviceType,
+    AntplusDeviceType,
+    AntDeviceType,
+    LocalDeviceType,
     Manufacturer,
     SerialNumber,
     Product,
+    FaveroProduct,
+    GarminProduct,
     SoftwareVersion,
     HardwareVersion,
     CumOperatingTime,
@@ -11154,6 +14277,232 @@ pub enum DeviceInfoField {
     ProductName,
     BatteryLevel,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeviceInfoFieldDeviceTypeSubfield {
+    BleDeviceType,
+    AntplusDeviceType,
+    AntDeviceType,
+    LocalDeviceType,
+}
+impl DeviceInfoFieldDeviceTypeSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in DeviceInfoFieldDeviceTypeSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint8(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::DeviceInfo(DeviceInfoField::DeviceType),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // BleDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::BluetoothLowEnergy)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = BleDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::BleDeviceType),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // AntplusDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::Antplus)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::AntplusDeviceType),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // AntDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::Ant)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::AntDeviceType),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // LocalDeviceType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                    DataValue::Enum(FitEnum::SourceType(SourceType::Local)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = LocalDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::LocalDeviceType),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum DeviceInfoFieldProductSubfield {
+    FaveroProduct,
+    GarminProduct,
+}
+impl DeviceInfoFieldProductSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in DeviceInfoFieldProductSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::DeviceInfo(DeviceInfoField::Product),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // FaveroProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                    DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::FaveroProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GarminProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
+                    ),
+                    (
+                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
+                    ),
+                    (
+                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
+                    ),
+                    (
+                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::DeviceInfo(DeviceInfoField::GarminProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl DeviceInfoField {
     fn from(definition_field: u8) -> Self {
@@ -11185,10 +14534,10 @@ impl DeviceInfoField {
         match def_number {
             253 => ParseFunction::Simple(DateTime::parse),
             0 => ParseFunction::Simple(DeviceIndex::parse),
-            1 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Dynamic(DeviceInfoFieldDeviceTypeSubfield::parse),
             2 => ParseFunction::Simple(Manufacturer::parse),
             3 => ParseFunction::Simple(parse_unknown),
-            4 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Dynamic(DeviceInfoFieldProductSubfield::parse),
             5 => ParseFunction::Simple(parse_uint16),
             6 => ParseFunction::Simple(parse_uint8),
             7 => ParseFunction::Simple(parse_uint32),
@@ -11278,9 +14627,107 @@ pub enum TrainingFileField {
     Type,
     Manufacturer,
     Product,
+    FaveroProduct,
+    GarminProduct,
     SerialNumber,
     TimeCreated,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum TrainingFileFieldProductSubfield {
+    FaveroProduct,
+    GarminProduct,
+}
+impl TrainingFileFieldProductSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in TrainingFileFieldProductSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::TrainingFile(TrainingFileField::Product),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // FaveroProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                    DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::TrainingFile(TrainingFileField::FaveroProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GarminProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
+                    ),
+                    (
+                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
+                    ),
+                    (
+                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
+                    ),
+                    (
+                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::TrainingFile(TrainingFileField::GarminProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl TrainingFileField {
     fn from(definition_field: u8) -> Self {
@@ -11300,7 +14747,7 @@ impl TrainingFileField {
             253 => ParseFunction::Simple(DateTime::parse),
             0 => ParseFunction::Simple(File::parse),
             1 => ParseFunction::Simple(Manufacturer::parse),
-            2 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Dynamic(TrainingFileFieldProductSubfield::parse),
             3 => ParseFunction::Simple(parse_unknown),
             4 => ParseFunction::Simple(DateTime::parse),
             _ => ParseFunction::Simple(parse_uint8),
@@ -11774,11 +15221,103 @@ pub enum ThreeDSensorCalibrationField {
     Timestamp,
     SensorType,
     CalibrationFactor,
+    AccelCalFactor,
+    GyroCalFactor,
     CalibrationDivisor,
     LevelShift,
     OffsetCal,
     OrientationMatrix,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
+    AccelCalFactor,
+    GyroCalFactor,
+}
+impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            ThreeDSensorCalibrationFieldCalibrationFactorSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::ThreeDSensorCalibration(
+                ThreeDSensorCalibrationField::CalibrationFactor,
+            ),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // AccelCalFactor subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
+                    DataValue::Enum(FitEnum::SensorType(SensorType::Accelerometer)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::ThreeDSensorCalibration(
+                                ThreeDSensorCalibrationField::AccelCalFactor,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GyroCalFactor subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
+                    DataValue::Enum(FitEnum::SensorType(SensorType::Gyroscope)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::ThreeDSensorCalibration(
+                                ThreeDSensorCalibrationField::GyroCalFactor,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl ThreeDSensorCalibrationField {
     fn from(definition_field: u8) -> Self {
@@ -11798,7 +15337,9 @@ impl ThreeDSensorCalibrationField {
         match def_number {
             253 => ParseFunction::Simple(DateTime::parse),
             0 => ParseFunction::Simple(SensorType::parse),
-            1 => ParseFunction::Simple(parse_uint32),
+            1 => {
+                ParseFunction::Dynamic(ThreeDSensorCalibrationFieldCalibrationFactorSubfield::parse)
+            }
             2 => ParseFunction::Simple(parse_uint32),
             3 => ParseFunction::Simple(parse_uint32),
             4 => ParseFunction::Simple(parse_sint32),
@@ -11828,10 +15369,71 @@ pub enum OneDSensorCalibrationField {
     Timestamp,
     SensorType,
     CalibrationFactor,
+    BaroCalFactor,
     CalibrationDivisor,
     LevelShift,
     OffsetCal,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum OneDSensorCalibrationFieldCalibrationFactorSubfield {
+    BaroCalFactor,
+}
+impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            OneDSensorCalibrationFieldCalibrationFactorSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::CalibrationFactor),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // BaroCalFactor subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::SensorType),
+                DataValue::Enum(FitEnum::SensorType(SensorType::Barometer)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::OneDSensorCalibration(
+                            OneDSensorCalibrationField::BaroCalFactor,
+                        ),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
 }
 impl OneDSensorCalibrationField {
     fn from(definition_field: u8) -> Self {
@@ -11850,7 +15452,7 @@ impl OneDSensorCalibrationField {
         match def_number {
             253 => ParseFunction::Simple(DateTime::parse),
             0 => ParseFunction::Simple(SensorType::parse),
-            1 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Dynamic(OneDSensorCalibrationFieldCalibrationFactorSubfield::parse),
             2 => ParseFunction::Simple(parse_uint32),
             3 => ParseFunction::Simple(parse_uint32),
             4 => ParseFunction::Simple(parse_sint32),
@@ -13021,6 +16623,7 @@ pub enum SegmentLapField {
     TotalTimerTime,
     TotalDistance,
     TotalCycles,
+    TotalStrokes,
     TotalCalories,
     TotalFatCalories,
     AvgSpeed,
@@ -13104,6 +16707,62 @@ pub enum SegmentLapField {
     EnhancedMaxAltitude,
     EnhancedMinAltitude,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum SegmentLapFieldTotalCyclesSubfield {
+    TotalStrokes,
+}
+impl SegmentLapFieldTotalCyclesSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in SegmentLapFieldTotalCyclesSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::SegmentLap(SegmentLapField::TotalCycles),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![|fields| {
+            // TotalStrokes subfield
+            let targets: Vec<(FitMessage, DataValue)> = vec![(
+                FitMessage::SegmentLap(SegmentLapField::Sport),
+                DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
+            )];
+            let found = fields.iter().find(|field| {
+                targets
+                    .iter()
+                    .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+            });
+
+            match found {
+                Some(_) => Some(|reader, endianness, bytes_to_read| {
+                    let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                    Ok(DataMessageField {
+                        kind: FitMessage::SegmentLap(SegmentLapField::TotalStrokes),
+                        values: value,
+                    })
+                }),
+                None => None,
+            }
+        }]
+    }
 }
 impl SegmentLapField {
     fn from(definition_field: u8) -> Self {
@@ -13221,7 +16880,7 @@ impl SegmentLapField {
             7 => ParseFunction::Simple(parse_uint32),
             8 => ParseFunction::Simple(parse_uint32),
             9 => ParseFunction::Simple(parse_uint32),
-            10 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Dynamic(SegmentLapFieldTotalCyclesSubfield::parse),
             11 => ParseFunction::Simple(parse_uint16),
             12 => ParseFunction::Simple(parse_uint16),
             13 => ParseFunction::Simple(parse_uint16),
@@ -13652,10 +17311,36 @@ pub enum WorkoutStepField {
     WktStepName,
     DurationType,
     DurationValue,
+    DurationTime,
+    DurationDistance,
+    DurationHr,
+    DurationCalories,
+    DurationStep,
+    DurationPower,
+    DurationReps,
     TargetType,
     TargetValue,
+    TargetSpeedZone,
+    TargetHrZone,
+    TargetCadenceZone,
+    TargetPowerZone,
+    RepeatSteps,
+    RepeatTime,
+    RepeatDistance,
+    RepeatCalories,
+    RepeatHr,
+    RepeatPower,
+    TargetStrokeType,
     CustomTargetValueLow,
+    CustomTargetSpeedLow,
+    CustomTargetHeartRateLow,
+    CustomTargetCadenceLow,
+    CustomTargetPowerLow,
     CustomTargetValueHigh,
+    CustomTargetSpeedHigh,
+    CustomTargetHeartRateHigh,
+    CustomTargetCadenceHigh,
+    CustomTargetPowerHigh,
     Intensity,
     Notes,
     Equipment,
@@ -13665,9 +17350,1326 @@ pub enum WorkoutStepField {
     WeightDisplayUnit,
     SecondaryTargetType,
     SecondaryTargetValue,
+    SecondaryTargetSpeedZone,
+    SecondaryTargetHrZone,
+    SecondaryTargetCadenceZone,
+    SecondaryTargetPowerZone,
+    SecondaryTargetStrokeType,
     SecondaryCustomTargetValueLow,
+    SecondaryCustomTargetSpeedLow,
+    SecondaryCustomTargetHeartRateLow,
+    SecondaryCustomTargetCadenceLow,
+    SecondaryCustomTargetPowerLow,
     SecondaryCustomTargetValueHigh,
+    SecondaryCustomTargetSpeedHigh,
+    SecondaryCustomTargetHeartRateHigh,
+    SecondaryCustomTargetCadenceHigh,
+    SecondaryCustomTargetPowerHigh,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldDurationValueSubfield {
+    DurationTime,
+    DurationDistance,
+    DurationHr,
+    DurationCalories,
+    DurationStep,
+    DurationPower,
+    DurationReps,
+}
+impl WorkoutStepFieldDurationValueSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in WorkoutStepFieldDurationValueSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationValue),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // DurationTime subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Time)),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepetitionTime)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationTime),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationDistance subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Distance)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationDistance),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationHr subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::HrLessThan)),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::HrGreaterThan)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationHr),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationCalories subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Calories)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationCalories),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationStep subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilStepsCmplt,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepeatUntilTime)),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilDistance,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilCalories,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilHrLessThan,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilHrGreaterThan,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilPowerLessThan,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilPowerGreaterThan,
+                        )),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationStep),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationPower subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::PowerLessThan)),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::PowerGreaterThan,
+                        )),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationPower),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // DurationReps subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Reps)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationReps),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldTargetValueSubfield {
+    TargetSpeedZone,
+    TargetHrZone,
+    TargetCadenceZone,
+    TargetPowerZone,
+    RepeatSteps,
+    RepeatTime,
+    RepeatDistance,
+    RepeatCalories,
+    RepeatHr,
+    RepeatPower,
+    TargetStrokeType,
+}
+impl WorkoutStepFieldTargetValueSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in WorkoutStepFieldTargetValueSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetValue),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // TargetSpeedZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetSpeedZone),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TargetHrZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetHrZone),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TargetCadenceZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetCadenceZone),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TargetPowerZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetPowerZone),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatSteps subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(
+                        WktStepDuration::RepeatUntilStepsCmplt,
+                    )),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatSteps),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatTime subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepeatUntilTime)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatTime),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatDistance subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(
+                        WktStepDuration::RepeatUntilDistance,
+                    )),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatDistance),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatCalories subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                    DataValue::Enum(FitEnum::WktStepDuration(
+                        WktStepDuration::RepeatUntilCalories,
+                    )),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatCalories),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatHr subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilHrLessThan,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilHrGreaterThan,
+                        )),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatHr),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // RepeatPower subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilPowerLessThan,
+                        )),
+                    ),
+                    (
+                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        DataValue::Enum(FitEnum::WktStepDuration(
+                            WktStepDuration::RepeatUntilPowerGreaterThan,
+                        )),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatPower),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // TargetStrokeType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::SwimStroke)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = SwimStroke::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetStrokeType),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldCustomTargetValueLowSubfield {
+    CustomTargetSpeedLow,
+    CustomTargetHeartRateLow,
+    CustomTargetCadenceLow,
+    CustomTargetPowerLow,
+}
+impl WorkoutStepFieldCustomTargetValueLowSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            WorkoutStepFieldCustomTargetValueLowSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueLow),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // CustomTargetSpeedLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedLow),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetHeartRateLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::CustomTargetHeartRateLow,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetCadenceLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetCadenceLow),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetPowerLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerLow),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldCustomTargetValueHighSubfield {
+    CustomTargetSpeedHigh,
+    CustomTargetHeartRateHigh,
+    CustomTargetCadenceHigh,
+    CustomTargetPowerHigh,
+}
+impl WorkoutStepFieldCustomTargetValueHighSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            WorkoutStepFieldCustomTargetValueHighSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueHigh),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // CustomTargetSpeedHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedHigh),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetHeartRateHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::CustomTargetHeartRateHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetCadenceHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::CustomTargetCadenceHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // CustomTargetPowerHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerHigh),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldSecondaryTargetValueSubfield {
+    SecondaryTargetSpeedZone,
+    SecondaryTargetHrZone,
+    SecondaryTargetCadenceZone,
+    SecondaryTargetPowerZone,
+    SecondaryTargetStrokeType,
+}
+impl WorkoutStepFieldSecondaryTargetValueSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            WorkoutStepFieldSecondaryTargetValueSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetValue),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // SecondaryTargetSpeedZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryTargetSpeedZone,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryTargetHrZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetHrZone),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryTargetCadenceZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryTargetCadenceZone,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryTargetPowerZone subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryTargetPowerZone,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryTargetStrokeType subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::SwimStroke)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = SwimStroke::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryTargetStrokeType,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
+    SecondaryCustomTargetSpeedLow,
+    SecondaryCustomTargetHeartRateLow,
+    SecondaryCustomTargetCadenceLow,
+    SecondaryCustomTargetPowerLow,
+}
+impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            WorkoutStepFieldSecondaryCustomTargetValueLowSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueLow),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // SecondaryCustomTargetSpeedLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetSpeedLow,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetHeartRateLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetHeartRateLow,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetCadenceLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetCadenceLow,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetPowerLow subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetPowerLow,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
+    SecondaryCustomTargetSpeedHigh,
+    SecondaryCustomTargetHeartRateHigh,
+    SecondaryCustomTargetCadenceHigh,
+    SecondaryCustomTargetPowerHigh,
+}
+impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in
+            WorkoutStepFieldSecondaryCustomTargetValueHighSubfield::subfields_parse_functions()
+        {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueHigh),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // SecondaryCustomTargetSpeedHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetSpeedHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetHeartRateHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetHeartRateHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetCadenceHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetCadenceHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // SecondaryCustomTargetPowerHigh subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                    DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::WorkoutStep(
+                                WorkoutStepField::SecondaryCustomTargetPowerHigh,
+                            ),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl WorkoutStepField {
     fn from(definition_field: u8) -> Self {
@@ -13700,11 +18702,11 @@ impl WorkoutStepField {
             254 => ParseFunction::Simple(MessageIndex::parse),
             0 => ParseFunction::Simple(parse_string),
             1 => ParseFunction::Simple(WktStepDuration::parse),
-            2 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Dynamic(WorkoutStepFieldDurationValueSubfield::parse),
             3 => ParseFunction::Simple(WktStepTarget::parse),
-            4 => ParseFunction::Simple(parse_uint32),
-            5 => ParseFunction::Simple(parse_uint32),
-            6 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Dynamic(WorkoutStepFieldTargetValueSubfield::parse),
+            5 => ParseFunction::Dynamic(WorkoutStepFieldCustomTargetValueLowSubfield::parse),
+            6 => ParseFunction::Dynamic(WorkoutStepFieldCustomTargetValueHighSubfield::parse),
             7 => ParseFunction::Simple(Intensity::parse),
             8 => ParseFunction::Simple(parse_string),
             9 => ParseFunction::Simple(WorkoutEquipment::parse),
@@ -13713,9 +18715,13 @@ impl WorkoutStepField {
             12 => ParseFunction::Simple(parse_uint16),
             13 => ParseFunction::Simple(FitBaseUnit::parse),
             19 => ParseFunction::Simple(WktStepTarget::parse),
-            20 => ParseFunction::Simple(parse_uint32),
-            21 => ParseFunction::Simple(parse_uint32),
-            22 => ParseFunction::Simple(parse_uint32),
+            20 => ParseFunction::Dynamic(WorkoutStepFieldSecondaryTargetValueSubfield::parse),
+            21 => {
+                ParseFunction::Dynamic(WorkoutStepFieldSecondaryCustomTargetValueLowSubfield::parse)
+            }
+            22 => ParseFunction::Dynamic(
+                WorkoutStepFieldSecondaryCustomTargetValueHighSubfield::parse,
+            ),
             _ => ParseFunction::Simple(parse_uint8),
         }
     }
@@ -13777,12 +18783,110 @@ impl ExerciseTitleField {
 pub enum ScheduleField {
     Manufacturer,
     Product,
+    FaveroProduct,
+    GarminProduct,
     SerialNumber,
     TimeCreated,
     Completed,
     Type,
     ScheduledTime,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum ScheduleFieldProductSubfield {
+    FaveroProduct,
+    GarminProduct,
+}
+impl ScheduleFieldProductSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in ScheduleFieldProductSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint16(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Schedule(ScheduleField::Product),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // FaveroProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![(
+                    FitMessage::Schedule(ScheduleField::Manufacturer),
+                    DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
+                )];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Schedule(ScheduleField::FaveroProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // GarminProduct subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
+                    ),
+                    (
+                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
+                    ),
+                    (
+                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
+                    ),
+                    (
+                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Schedule(ScheduleField::GarminProduct),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl ScheduleField {
     fn from(definition_field: u8) -> Self {
@@ -13801,7 +18905,7 @@ impl ScheduleField {
     fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
             0 => ParseFunction::Simple(Manufacturer::parse),
-            1 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Dynamic(ScheduleFieldProductSubfield::parse),
             2 => ParseFunction::Simple(parse_unknown),
             3 => ParseFunction::Simple(DateTime::parse),
             4 => ParseFunction::Simple(parse_unknown),
@@ -14103,6 +19207,8 @@ pub enum MonitoringField {
     Calories,
     Distance,
     Cycles,
+    Steps,
+    Strokes,
     ActiveTime,
     ActivityType,
     ActivitySubtype,
@@ -14128,6 +19234,100 @@ pub enum MonitoringField {
     ModerateActivityMinutes,
     VigorousActivityMinutes,
     Unknown,
+}
+#[derive(Debug, PartialEq, Clone)]
+pub enum MonitoringFieldCyclesSubfield {
+    Steps,
+    Strokes,
+}
+impl MonitoringFieldCyclesSubfield {
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField],
+    ) -> Result<DataMessageField, DataTypeError> {
+        for match_subfield in MonitoringFieldCyclesSubfield::subfields_parse_functions() {
+            if let Some(parse) = match_subfield(fields) {
+                return parse(reader, endianness, bytes_to_read);
+            }
+        }
+
+        // Default parse
+        let values = parse_uint32(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {
+            kind: FitMessage::Monitoring(MonitoringField::Cycles),
+            values,
+        })
+    }
+    fn subfields_parse_functions() -> Vec<
+        fn(
+            &[DataMessageField],
+        )
+            -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>,
+    > {
+        vec![
+            |fields| {
+                // Steps subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        DataValue::Enum(FitEnum::ActivityType(ActivityType::Walking)),
+                    ),
+                    (
+                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        DataValue::Enum(FitEnum::ActivityType(ActivityType::Running)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Monitoring(MonitoringField::Steps),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+            |fields| {
+                // Strokes subfield
+                let targets: Vec<(FitMessage, DataValue)> = vec![
+                    (
+                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        DataValue::Enum(FitEnum::ActivityType(ActivityType::Cycling)),
+                    ),
+                    (
+                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        DataValue::Enum(FitEnum::ActivityType(ActivityType::Swimming)),
+                    ),
+                ];
+                let found = fields.iter().find(|field| {
+                    targets
+                        .iter()
+                        .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+                });
+
+                match found {
+                    Some(_) => Some(|reader, endianness, bytes_to_read| {
+                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        Ok(DataMessageField {
+                            kind: FitMessage::Monitoring(MonitoringField::Strokes),
+                            values: value,
+                        })
+                    }),
+                    None => None,
+                }
+            },
+        ]
+    }
 }
 impl MonitoringField {
     fn from(definition_field: u8) -> Self {
@@ -14171,7 +19371,7 @@ impl MonitoringField {
             0 => ParseFunction::Simple(DeviceIndex::parse),
             1 => ParseFunction::Simple(parse_uint16),
             2 => ParseFunction::Simple(parse_uint32),
-            3 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Dynamic(MonitoringFieldCyclesSubfield::parse),
             4 => ParseFunction::Simple(parse_uint32),
             5 => ParseFunction::Simple(ActivityType::parse),
             6 => ParseFunction::Simple(ActivitySubtype::parse),

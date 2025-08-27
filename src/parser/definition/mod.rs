@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{
-    DataValue,
-    parser::{
-        definition::custom::CustomDescription,
-        reader::Reader,
-        records::{DefinitionMessageHeader, RecordError},
-        types::{
-            DataTypeError, ScaleOffset,
-            generated::{CustomField, FitMessage, MesgNum, ParseFunction},
-        },
+use crate::parser::{
+    definition::custom::CustomDescription,
+    reader::Reader,
+    records::{DefinitionMessageHeader, RecordError},
+    types::{
+        ScaleOffset,
+        generated::{CustomField, FitMessage, MesgNum, ParseFunction},
     },
 };
 
@@ -130,7 +127,10 @@ fn parse_definition_field(
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::types::generated::{FitMessage, MesgNum, RecordField};
+    use crate::{
+        DataValue,
+        parser::types::generated::{FitMessage, MesgNum, RecordField},
+    };
 
     use super::*;
 

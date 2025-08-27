@@ -1,8 +1,10 @@
 #![allow(clippy::const_is_empty)]
+#![allow(clippy::type_complexity)]
 
 use itertools::join;
 use std::collections::HashMap;
 use std::io::Write;
+use std::iter::zip;
 use std::process::{Command, Stdio};
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
@@ -175,6 +177,7 @@ fn generate_enums_code(enums: &[(EnumName, EnumType, Vec<(usize, EnumVariant)>)]
     code.push_str("#![allow(clippy::enum_variant_names)]\n");
     code.push_str("#![allow(clippy::upper_case_acronyms)]\n\n");
     code.push_str("#![allow(clippy::identity_op)]\n\n");
+    code.push_str("#![allow(clippy::type_complexity)]\n\n");
     code.push_str("#![allow(clippy::match_single_binding)]\n\n");
     code.push_str("#![allow(clippy::match_overlapping_arm)]\n\n");
     code.push_str("use crate::{parser::reader::Reader};\n");
@@ -559,7 +562,10 @@ struct Field {
     offset: Option<f32>,
 }
 
-fn parse_messages_definitions() -> (Vec<(String, Vec<Field>)>, Vec<EnumName>) {
+fn parse_messages_definitions() -> (
+    Vec<(String, Vec<Field>, HashMap<String, Vec<Subfield>>)>,
+    Vec<EnumName>,
+) {
     let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Messages")
@@ -578,11 +584,7 @@ fn parse_messages_definitions() -> (Vec<(String, Vec<Field>)>, Vec<EnumName>) {
     loop {
         let (next_message_name, definitions, subfields) = parse_fields_definitions(&mut iterator);
 
-        if subfields.len() > 0 {
-            dbg!(subfields);
-        }
-
-        messages.push((message_name, definitions));
+        messages.push((message_name, definitions, subfields));
 
         if next_message_name.is_none() {
             break;
@@ -592,19 +594,39 @@ fn parse_messages_definitions() -> (Vec<(String, Vec<Field>)>, Vec<EnumName>) {
     }
 
     if !MESSAGES_TO_IMPORT.is_empty() {
-        messages.retain(|(msg, _)| {
+        messages.retain(|(msg, _, __)| {
             MESSAGES_TO_IMPORT.contains(&snake_to_camel_case(msg.as_str()).as_str())
         })
     }
 
     let enums_used = messages
         .iter()
-        .flat_map(|(_, definitions)| {
+        .flat_map(|(_, definitions, subfields)| {
             definitions
                 .iter()
                 .filter_map(|def| is_fit_enum(&def.base_type))
+                .chain(subfields.iter().flat_map(|(_, subfields)| {
+                    subfields
+                        .iter()
+                        .filter_map(|field| is_fit_enum(&field.base_type))
+                }))
         })
         .collect();
+
+    let reference_types: Vec<String> = messages
+        .iter()
+        .flat_map(|(_, __, subfields)| {
+            subfields.values().flat_map(|message_subfields| {
+                message_subfields.iter().flat_map(|subfield| {
+                    subfield
+                        .references
+                        .iter()
+                        .flat_map(|reference| reference.base_type.clone())
+                })
+            })
+        })
+        .collect();
+    dbg!(reference_types);
 
     (messages, enums_used)
 }
@@ -632,10 +654,19 @@ fn get_parse_function(enums: &[String], type_name: &str) -> String {
 
 #[derive(Debug)]
 struct Subfield {
+    parent_field_definition_number: u8,
     name: String,
     base_type: String,
-    reference_fields: Vec<String>,
-    reference_field_values: Vec<String>,
+    references: Vec<SubfieldReference>,
+    scale: Option<f32>,
+    offset: Option<f32>,
+}
+
+#[derive(Debug)]
+struct SubfieldReference {
+    name: String,
+    value: String,
+    base_type: Option<String>,
 }
 
 fn parse_fields_definitions<'a, I>(
@@ -649,6 +680,7 @@ where
     let mut subfields: HashMap<String, Vec<Subfield>> = HashMap::new();
 
     let mut current_field = None;
+    let mut current_definition_field = None;
     for row in iter {
         let colums = parse_columns(row);
 
@@ -665,6 +697,7 @@ where
             &colums.field_type,
         ) {
             current_field = Some(field_name.to_string());
+            current_definition_field = Some(field_number);
             fields.push(Field {
                 field_def: field_number,
                 name: field_name.to_string(),
@@ -677,26 +710,53 @@ where
         // New subfield for the current field
         if let (
             Some(current_field),
+            Some(parent_field_definition_number),
             Some(subfield_name),
             Some(field_type),
             Some(reference_fields),
             Some(reference_field_values),
         ) = (
             &current_field,
+            &current_definition_field,
             &colums.field_name,
             &colums.field_type,
             colums.subfield_references,
             colums.subfield_reference_values,
         ) {
+            assert_eq!(reference_fields.len(), reference_field_values.len());
+
+            let references = zip(reference_fields, reference_field_values)
+                .map(|(name, value)| {
+                    SubfieldReference {
+                        name,
+                        value,
+                        base_type: None, // All message's fields must parsed before we can lookup the type of the reference field
+                    }
+                })
+                .collect();
+
             subfields
                 .entry(current_field.to_string())
                 .or_default()
                 .push(Subfield {
+                    parent_field_definition_number: *parent_field_definition_number,
                     name: subfield_name.to_string(),
                     base_type: field_type.to_string(),
-                    reference_fields,
-                    reference_field_values,
+                    references,
+                    scale: colums.scale,
+                    offset: colums.offset,
                 });
+        }
+    }
+
+    // Update the type of reference fields
+    for (_, message_subfields) in subfields.iter_mut() {
+        for subfield in message_subfields.iter_mut() {
+            for reference in subfield.references.iter_mut() {
+                if let Some(field) = fields.iter().find(|field| field.name == reference.name) {
+                    reference.base_type = Some(field.base_type.clone())
+                }
+            }
         }
     }
 
@@ -713,7 +773,7 @@ struct Columns {
     subfield_references: Option<Vec<String>>,
     subfield_reference_values: Option<Vec<String>>,
 }
-fn parse_columns<'a>(row: &'a [Data]) -> Columns {
+fn parse_columns(row: &[Data]) -> Columns {
     let message_name = column_string_content(row, 0);
     let field_definition_number = row.get(1).and_then(|data| match data {
         Data::Int(field_def) => Some(*field_def as u8),
@@ -749,18 +809,21 @@ fn parse_columns<'a>(row: &'a [Data]) -> Columns {
     }
 }
 
-fn column_string_content<'a>(row: &'a [Data], index: usize) -> Option<String> {
+fn column_string_content(row: &[Data], index: usize) -> Option<String> {
     row.get(index).and_then(|data| match data {
         Data::String(name) => Some(name.to_string()),
         _ => None,
     })
 }
 
-fn generate_messages_code(messages: Vec<(String, Vec<Field>)>, enums: Vec<String>) -> String {
+fn generate_messages_code(
+    messages: Vec<(String, Vec<Field>, HashMap<String, Vec<Subfield>>)>,
+    enums: Vec<String>,
+) -> String {
     let mut code = String::new();
 
     let mut messages_enum = join(
-        messages.iter().map(|(msg, _)| {
+        messages.iter().map(|(msg, _, __)| {
             format!(
                 "{}({}Field)",
                 snake_to_camel_case(msg),
@@ -776,10 +839,24 @@ fn generate_messages_code(messages: Vec<(String, Vec<Field>)>, enums: Vec<String
     code.push_str(&format!(
         r#"
 
+pub type SimpleParseFunction = fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>;
+pub type DynamicParseFunction = fn(&mut Reader, &Endianness, u8, &[DataMessageField]) -> Result<DataMessageField, DataTypeError>;
+
 #[derive(Debug, Clone)]
 pub enum ParseFunction {{
-    Simple(fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>),
-    Dynamic(fn(&mut Reader, &Endianness, u8, &[DataMessageField]) -> Result<Vec<DataValue>, DataTypeError>)
+    Simple(SimpleParseFunction),
+    Dynamic(DynamicParseFunction)
+}}
+
+#[derive(Debug, PartialEq, Clone)]
+struct Subfield {{
+    parent_field_definition_number: u8,
+    name: String,
+    base_type: String,
+    reference_fields: Vec<String>,
+    reference_field_values: Vec<String>,
+    scale: Option<f32>,
+    offset: Option<f32>,
 }}
 
 #[derive(Debug, PartialEq, Clone)]
@@ -796,12 +873,28 @@ pub struct CustomField {{
 }}"#
     ));
 
-    for (msg, definitions) in messages.iter() {
+    for (msg, definitions, subfields) in messages.iter() {
         let message = snake_to_camel_case(msg);
+
+        // Generate all variants (fields and their subfields)
         let variants = join(
             definitions
                 .iter()
-                .map(|def| snake_to_camel_case(&def.name).to_string())
+                .map(|def| {
+                    let base_variant = snake_to_camel_case(&def.name).to_string();
+                    let mut subfields: Vec<String> = subfields
+                        .get(&def.name)
+                        .map(|fields| {
+                            fields
+                                .iter()
+                                .map(|field| snake_to_camel_case(&field.name))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    subfields.insert(0, base_variant);
+                    join(subfields.into_iter(), ",\n")
+                })
                 .chain(vec!["Unknown".to_string()]),
             ",\n",
         );
@@ -828,15 +921,27 @@ pub enum {message}Field {{
             ",\n",
         );
 
+        for field in definitions {
+            if let Some(subfields_enums) = generate_subfields_enum(&message, field, subfields) {
+                code.push_str(&subfields_enums);
+            }
+        }
+
         let parse_mappings = join(
             definitions
                 .iter()
-                .map(|def| {
-                    format!(
+                .map(|def| match subfields.get(&def.name) {
+                    None => format!(
                         "{} => ParseFunction::Simple({})",
                         def.field_def,
                         get_parse_function(&enums, &def.base_type)
-                    )
+                    ),
+                    Some(_) => format!(
+                        "{} => ParseFunction::Dynamic({}Field{}Subfield::parse)",
+                        def.field_def,
+                        snake_to_camel_case(&message),
+                        snake_to_camel_case(&def.name)
+                    ),
                 })
                 .chain(vec!["_ => ParseFunction::Simple(parse_uint8)".to_string()]),
             ",\n",
@@ -912,4 +1017,130 @@ impl {message}Field {{
     }
 
     code
+}
+
+fn generate_subfields_enum(
+    message_name: &str,
+    field: &Field,
+    subfields: &HashMap<String, Vec<Subfield>>,
+) -> Option<String> {
+    let subfields = subfields.get(&field.name)?;
+    let parent_field = snake_to_camel_case(&field.name);
+    let parent_field_parse = if BASE_TYPES.contains(&field.base_type.as_str()) {
+        format!("parse_{}", field.base_type)
+    } else {
+        format!("{}::parse", snake_to_camel_case(&field.base_type))
+    };
+    let mut code = String::new();
+
+    let subfield_variants = join(
+        subfields
+            .iter()
+            .map(|subfield| snake_to_camel_case(&subfield.name)),
+        ",\n",
+    );
+
+    // Define enum for all subfields
+    code.push_str(&format!(
+        "#[derive(Debug, PartialEq, Clone)]
+pub enum {message_name}Field{parent_field}Subfield {{
+    {subfield_variants}
+}}"
+    ));
+
+    // Start impl block
+    code.push_str(&format!("
+impl {message_name}Field{parent_field}Subfield {{
+
+    pub fn parse(
+        reader: &mut Reader,
+        endianness: &Endianness,
+        bytes_to_read: u8,
+        fields: &[DataMessageField]
+    ) -> Result<DataMessageField, DataTypeError> {{
+        for match_subfield in {message_name}Field{parent_field}Subfield::subfields_parse_functions() {{
+            if let Some(parse) = match_subfield(fields) {{
+                return parse(reader, endianness, bytes_to_read);
+            }}
+        }};
+
+        // Default parse
+        let values = {parent_field_parse}(reader, endianness, bytes_to_read)?;
+
+        Ok(DataMessageField {{
+            kind: FitMessage::{message_name}({message_name}Field::{parent_field}),
+            values
+        }})
+    }}", ));
+
+    // Implement subfield detection functions
+    let subfield_targets = |subfield: &Subfield| -> String {
+        join(
+            subfield.references.iter().map(|reference| {
+                let base_type = snake_to_camel_case(reference.base_type.as_ref().unwrap());
+                let field = format!(
+                    "FitMessage::{message_name}({message_name}Field::{})",
+                    snake_to_camel_case(&reference.name)
+                );
+                let value = format!(
+                    "DataValue::Enum(FitEnum::{}({}::{}))",
+                    base_type,
+                    base_type,
+                    snake_to_camel_case(&reference.value),
+                );
+                format!("({field}, {value})")
+            }),
+            ",",
+        )
+    };
+    let subfields_parse_detection_functions = join(
+        subfields.iter().map(|subfield| {
+            let subfield_name = snake_to_camel_case(&subfield.name);
+            let parse_name = if BASE_TYPES.contains(&subfield.base_type.as_str()) {
+                format!("parse_{}", subfield.base_type)
+            } else {
+                format!("{}::parse", snake_to_camel_case(&subfield.base_type))
+            };
+            let targets = subfield_targets(subfield);
+            format!(
+                "
+|fields| {{
+    // {subfield_name} subfield
+    let targets: Vec<(FitMessage, DataValue)> = vec![{targets}];
+    let found = fields.iter().find(|field| {{
+        targets
+            .iter()
+            .any(|(msg, value)| &field.kind == msg && field.values.contains(value))
+    }});
+
+    match found {{
+        Some(_) => Some(|reader, endianness, bytes_to_read| {{
+            let value = {parse_name}(reader, endianness, bytes_to_read)?;
+            Ok(DataMessageField {{
+                kind: FitMessage::{message_name}({message_name}Field::{subfield_name}),
+                values: value
+
+            }})
+        }}),
+        None => {{ None }}
+    }}
+}}",
+            )
+        }),
+        ",\n",
+    );
+    code.push_str(&format!(
+        "
+fn subfields_parse_functions() -> Vec<
+    fn(&[DataMessageField]) -> Option<fn(&mut Reader, &Endianness, u8) -> Result<DataMessageField, DataTypeError>>
+> {{
+    vec![{subfields_parse_detection_functions}]
+}}
+    "
+    ));
+
+    // Close impl block
+    code.push('}');
+
+    Some(code)
 }
