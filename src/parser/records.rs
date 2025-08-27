@@ -334,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_data_message_with_dynamic_fields_same_size_than_original() {
+    fn test_parse_data_message_with_dynamic_fields_and_scale_offset() {
         let header = DataMessageHeader {
             local_message_type: 0,
         };
@@ -382,7 +382,7 @@ mod tests {
             *message.fields.get(1).unwrap(),
             DataMessageField {
                 kind: FitMessage::Event(EventField::SpeedHighAlert),
-                values: vec![DataValue::Uint32(51)]
+                values: vec![DataValue::Float32(0.051)] // Scale of 1000
             }
         );
     }

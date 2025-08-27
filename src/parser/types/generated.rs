@@ -8618,8 +8618,10 @@ impl FileIdFieldProductSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::FileId(FileIdField::Product),
             values,
@@ -8646,10 +8648,14 @@ impl FileIdFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = FaveroProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::FileId(FileIdField::FaveroProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -8683,10 +8689,14 @@ impl FileIdFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = GarminProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::FileId(FileIdField::GarminProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -8890,8 +8900,10 @@ impl SlaveDeviceFieldProductSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::SlaveDevice(SlaveDeviceField::Product),
             values,
@@ -8918,10 +8930,14 @@ impl SlaveDeviceFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = FaveroProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::SlaveDevice(SlaveDeviceField::FaveroProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -8955,10 +8971,14 @@ impl SlaveDeviceFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = GarminProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::SlaveDevice(SlaveDeviceField::GarminProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -9110,8 +9130,10 @@ impl MesgCapabilitiesFieldCountSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::Count),
             values,
@@ -9138,10 +9160,14 @@ impl MesgCapabilitiesFieldCountSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::NumPerFile),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -9161,10 +9187,14 @@ impl MesgCapabilitiesFieldCountSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::MaxPerFile),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -9184,12 +9214,16 @@ impl MesgCapabilitiesFieldCountSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::MesgCapabilities(
                                 MesgCapabilitiesField::MaxPerFileType,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -9848,8 +9882,10 @@ impl WatchfaceSettingsFieldLayoutSubfield {
         }
 
         // Default parse
-        let values = parse_byte(reader, endianness, bytes_to_read)?;
-
+        let values = parse_byte(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WatchfaceSettings(WatchfaceSettingsField::Layout),
             values,
@@ -9876,13 +9912,17 @@ impl WatchfaceSettingsFieldLayoutSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value =
-                            DigitalWatchfaceLayout::parse(reader, endianness, bytes_to_read)?;
+                        let values =
+                            DigitalWatchfaceLayout::parse(reader, endianness, bytes_to_read)?
+                                .iter()
+                                .flat_map(|val| val.apply_scale_offset(&None))
+                                .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WatchfaceSettings(
                                 WatchfaceSettingsField::DigitalLayout,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -9902,13 +9942,17 @@ impl WatchfaceSettingsFieldLayoutSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value =
-                            AnalogWatchfaceLayout::parse(reader, endianness, bytes_to_read)?;
+                        let values =
+                            AnalogWatchfaceLayout::parse(reader, endianness, bytes_to_read)?
+                                .iter()
+                                .flat_map(|val| val.apply_scale_offset(&None))
+                                .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WatchfaceSettings(
                                 WatchfaceSettingsField::AnalogLayout,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -10462,8 +10506,10 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::DiveSettings(DiveSettingsField::HeartRateSource),
             values,
@@ -10490,12 +10536,16 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        let values = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DiveSettings(
                                 DiveSettingsField::HeartRateAntplusDeviceType,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -10515,12 +10565,16 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = LocalDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        let values = LocalDeviceType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DiveSettings(
                                 DiveSettingsField::HeartRateLocalDeviceType,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -11164,8 +11218,10 @@ impl SessionFieldTotalCyclesSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Session(SessionField::TotalCycles),
             values,
@@ -11198,10 +11254,14 @@ impl SessionFieldTotalCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Session(SessionField::TotalStrides),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -11235,10 +11295,14 @@ impl SessionFieldTotalCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Session(SessionField::TotalStrokes),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -11265,8 +11329,10 @@ impl SessionFieldAvgCadenceSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Session(SessionField::AvgCadence),
             values,
@@ -11292,10 +11358,14 @@ impl SessionFieldAvgCadenceSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint8(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::Session(SessionField::AvgRunningCadence),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -11321,8 +11391,10 @@ impl SessionFieldMaxCadenceSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Session(SessionField::MaxCadence),
             values,
@@ -11348,10 +11420,14 @@ impl SessionFieldMaxCadenceSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint8(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::Session(SessionField::MaxRunningCadence),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -12164,8 +12240,10 @@ impl LapFieldTotalCyclesSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Lap(LapField::TotalCycles),
             values,
@@ -12198,10 +12276,14 @@ impl LapFieldTotalCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Lap(LapField::TotalStrides),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -12235,10 +12317,14 @@ impl LapFieldTotalCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Lap(LapField::TotalStrokes),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -12265,8 +12351,10 @@ impl LapFieldAvgCadenceSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Lap(LapField::AvgCadence),
             values,
@@ -12292,10 +12380,14 @@ impl LapFieldAvgCadenceSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint8(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::Lap(LapField::AvgRunningCadence),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -12321,8 +12413,10 @@ impl LapFieldMaxCadenceSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Lap(LapField::MaxCadence),
             values,
@@ -12348,10 +12442,14 @@ impl LapFieldMaxCadenceSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint8(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::Lap(LapField::MaxRunningCadence),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -13571,8 +13669,10 @@ impl EventFieldDataSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Event(EventField::Data),
             values,
@@ -13599,10 +13699,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = TimerTrigger::parse(reader, endianness, bytes_to_read)?;
+                        let values = TimerTrigger::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::TimerTrigger),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13622,10 +13726,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = MessageIndex::parse(reader, endianness, bytes_to_read)?;
+                        let values = MessageIndex::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::CoursePointIndex),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13645,10 +13753,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::BatteryLevel),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13668,10 +13785,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::VirtualPartnerSpeed),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13691,10 +13817,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint8(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::HrHighAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13714,10 +13844,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint8(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::HrLowAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13737,10 +13871,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::SpeedHighAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13760,10 +13903,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::SpeedLowAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13783,10 +13935,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::CadHighAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13806,10 +13962,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::CadLowAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13829,10 +13989,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::PowerHighAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13852,10 +14016,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::PowerLowAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13875,10 +14043,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::TimeDurationAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13898,10 +14075,19 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 100_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::DistanceDurationAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13921,10 +14107,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::CalorieDurationAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13944,11 +14134,15 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value =
-                            FitnessEquipmentState::parse(reader, endianness, bytes_to_read)?;
+                        let values =
+                            FitnessEquipmentState::parse(reader, endianness, bytes_to_read)?
+                                .iter()
+                                .flat_map(|val| val.apply_scale_offset(&None))
+                                .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::FitnessEquipmentState),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13968,10 +14162,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::SportPoint),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -13997,10 +14195,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::GearChangeData),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14020,10 +14222,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = RiderPositionType::parse(reader, endianness, bytes_to_read)?;
+                        let values = RiderPositionType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::RiderPosition),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14043,10 +14249,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = CommTimeoutType::parse(reader, endianness, bytes_to_read)?;
+                        let values = CommTimeoutType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::CommTimeout),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14066,10 +14276,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = DiveAlert::parse(reader, endianness, bytes_to_read)?;
+                        let values = DiveAlert::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::DiveAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14089,10 +14303,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint16(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint16(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::AutoActivityDetectDuration),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14112,10 +14330,14 @@ impl EventFieldDataSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Event(EventField::RadarThreatAlert),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14142,8 +14364,10 @@ impl EventFieldStartTimestampSubfield {
         }
 
         // Default parse
-        let values = DateTime::parse(reader, endianness, bytes_to_read)?;
-
+        let values = DateTime::parse(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Event(EventField::StartTimestamp),
             values,
@@ -14169,10 +14393,14 @@ impl EventFieldStartTimestampSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = DateTime::parse(reader, endianness, bytes_to_read)?;
+                    let values = DateTime::parse(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::Event(EventField::AutoActivityDetectStartTimestamp),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -14299,8 +14527,10 @@ impl DeviceInfoFieldDeviceTypeSubfield {
         }
 
         // Default parse
-        let values = parse_uint8(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint8(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::DeviceInfo(DeviceInfoField::DeviceType),
             values,
@@ -14327,10 +14557,14 @@ impl DeviceInfoFieldDeviceTypeSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = BleDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        let values = BleDeviceType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::BleDeviceType),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14350,10 +14584,14 @@ impl DeviceInfoFieldDeviceTypeSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        let values = AntplusDeviceType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::AntplusDeviceType),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14373,10 +14611,14 @@ impl DeviceInfoFieldDeviceTypeSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint8(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint8(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::AntDeviceType),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14396,10 +14638,14 @@ impl DeviceInfoFieldDeviceTypeSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = LocalDeviceType::parse(reader, endianness, bytes_to_read)?;
+                        let values = LocalDeviceType::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::LocalDeviceType),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14427,8 +14673,10 @@ impl DeviceInfoFieldProductSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::DeviceInfo(DeviceInfoField::Product),
             values,
@@ -14455,10 +14703,14 @@ impl DeviceInfoFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = FaveroProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::FaveroProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14492,10 +14744,14 @@ impl DeviceInfoFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = GarminProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::DeviceInfo(DeviceInfoField::GarminProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14652,8 +14908,10 @@ impl TrainingFileFieldProductSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::TrainingFile(TrainingFileField::Product),
             values,
@@ -14680,10 +14938,14 @@ impl TrainingFileFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = FaveroProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::TrainingFile(TrainingFileField::FaveroProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -14717,10 +14979,14 @@ impl TrainingFileFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = GarminProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::TrainingFile(TrainingFileField::GarminProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -15250,8 +15516,10 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::ThreeDSensorCalibration(
                 ThreeDSensorCalibrationField::CalibrationFactor,
@@ -15280,12 +15548,16 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::ThreeDSensorCalibration(
                                 ThreeDSensorCalibrationField::AccelCalFactor,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -15305,12 +15577,16 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::ThreeDSensorCalibration(
                                 ThreeDSensorCalibrationField::GyroCalFactor,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -15395,8 +15671,10 @@ impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::CalibrationFactor),
             values,
@@ -15422,12 +15700,16 @@ impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint32(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::OneDSensorCalibration(
                             OneDSensorCalibrationField::BaroCalFactor,
                         ),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -16726,8 +17008,10 @@ impl SegmentLapFieldTotalCyclesSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::SegmentLap(SegmentLapField::TotalCycles),
             values,
@@ -16753,10 +17037,14 @@ impl SegmentLapFieldTotalCyclesSubfield {
 
             match found {
                 Some(_) => Some(|reader, endianness, bytes_to_read| {
-                    let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                    let values = parse_uint32(reader, endianness, bytes_to_read)?
+                        .iter()
+                        .flat_map(|val| val.apply_scale_offset(&None))
+                        .collect();
+
                     Ok(DataMessageField {
                         kind: FitMessage::SegmentLap(SegmentLapField::TotalStrokes),
-                        values: value,
+                        values,
                     })
                 }),
                 None => None,
@@ -17391,8 +17679,10 @@ impl WorkoutStepFieldDurationValueSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationValue),
             values,
@@ -17425,10 +17715,19 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationTime),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17448,10 +17747,19 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 100_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationDistance),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17477,10 +17785,14 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationHr),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17500,10 +17812,14 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationCalories),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17567,10 +17883,14 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationStep),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17598,10 +17918,14 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationPower),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17621,10 +17945,14 @@ impl WorkoutStepFieldDurationValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::DurationReps),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17661,8 +17989,10 @@ impl WorkoutStepFieldTargetValueSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetValue),
             values,
@@ -17689,10 +18019,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetSpeedZone),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17712,10 +18046,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetHrZone),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17735,10 +18073,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetCadenceZone),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17758,10 +18100,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetPowerZone),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17783,10 +18129,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatSteps),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17806,10 +18156,19 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatTime),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17831,10 +18190,19 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 100_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatDistance),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17856,10 +18224,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatCalories),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17889,10 +18261,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatHr),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17922,10 +18298,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatPower),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17945,10 +18325,14 @@ impl WorkoutStepFieldTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = SwimStroke::parse(reader, endianness, bytes_to_read)?;
+                        let values = SwimStroke::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::TargetStrokeType),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -17980,8 +18364,10 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueLow),
             values,
@@ -18008,10 +18394,19 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedLow),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18031,12 +18426,16 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::CustomTargetHeartRateLow,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18056,10 +18455,14 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetCadenceLow),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18079,10 +18482,14 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerLow),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18114,8 +18521,10 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueHigh),
             values,
@@ -18142,10 +18551,19 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedHigh),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18165,12 +18583,16 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::CustomTargetHeartRateHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18190,12 +18612,16 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::CustomTargetCadenceHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18215,10 +18641,14 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerHigh),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18251,8 +18681,10 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetValue),
             values,
@@ -18279,12 +18711,16 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetSpeedZone,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18304,10 +18740,14 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetHrZone),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18327,12 +18767,16 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetCadenceZone,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18352,12 +18796,16 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetPowerZone,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18377,12 +18825,16 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = SwimStroke::parse(reader, endianness, bytes_to_read)?;
+                        let values = SwimStroke::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetStrokeType,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18414,8 +18866,10 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueLow),
             values,
@@ -18442,12 +18896,21 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetSpeedLow,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18467,12 +18930,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetHeartRateLow,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18492,12 +18959,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetCadenceLow,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18517,12 +18988,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetPowerLow,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18554,8 +19029,10 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueHigh),
             values,
@@ -18582,12 +19059,21 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1000_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetSpeedHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18607,12 +19093,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutHr::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutHr::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetHeartRateHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18632,12 +19122,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetCadenceHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18657,12 +19151,16 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = WorkoutPower::parse(reader, endianness, bytes_to_read)?;
+                        let values = WorkoutPower::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetPowerHigh,
                             ),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18811,8 +19309,10 @@ impl ScheduleFieldProductSubfield {
         }
 
         // Default parse
-        let values = parse_uint16(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint16(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&None))
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Schedule(ScheduleField::Product),
             values,
@@ -18839,10 +19339,14 @@ impl ScheduleFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = FaveroProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = FaveroProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Schedule(ScheduleField::FaveroProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -18876,10 +19380,14 @@ impl ScheduleFieldProductSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = GarminProduct::parse(reader, endianness, bytes_to_read)?;
+                        let values = GarminProduct::parse(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| val.apply_scale_offset(&None))
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Schedule(ScheduleField::GarminProduct),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -19254,8 +19762,15 @@ impl MonitoringFieldCyclesSubfield {
         }
 
         // Default parse
-        let values = parse_uint32(reader, endianness, bytes_to_read)?;
-
+        let values = parse_uint32(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| {
+                val.apply_scale_offset(&Some(ScaleOffset {
+                    scale: 2_f32,
+                    offset: 0_f32,
+                }))
+            })
+            .collect();
         Ok(DataMessageField {
             kind: FitMessage::Monitoring(MonitoringField::Cycles),
             values,
@@ -19288,10 +19803,19 @@ impl MonitoringFieldCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 1_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Monitoring(MonitoringField::Steps),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,
@@ -19317,10 +19841,19 @@ impl MonitoringFieldCyclesSubfield {
 
                 match found {
                     Some(_) => Some(|reader, endianness, bytes_to_read| {
-                        let value = parse_uint32(reader, endianness, bytes_to_read)?;
+                        let values = parse_uint32(reader, endianness, bytes_to_read)?
+                            .iter()
+                            .flat_map(|val| {
+                                val.apply_scale_offset(&Some(ScaleOffset {
+                                    scale: 2_f32,
+                                    offset: 0_f32,
+                                }))
+                            })
+                            .collect();
+
                         Ok(DataMessageField {
                             kind: FitMessage::Monitoring(MonitoringField::Strokes),
-                            values: value,
+                            values,
                         })
                     }),
                     None => None,

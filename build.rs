@@ -1031,6 +1031,14 @@ fn generate_subfields_enum(
     } else {
         format!("{}::parse", snake_to_camel_case(&field.base_type))
     };
+    let parent_scale_offset = match (field.scale, field.offset) {
+        (None, None) => "None".to_string(),
+        (scale, offset) => format!(
+            "Some(ScaleOffset {{scale: {}_f32, offset: {}_f32}})",
+            scale.unwrap_or(1.),
+            offset.unwrap_or(0.)
+        ),
+    };
     let mut code = String::new();
 
     let subfield_variants = join(
@@ -1065,8 +1073,10 @@ impl {message_name}Field{parent_field}Subfield {{
         }};
 
         // Default parse
-        let values = {parent_field_parse}(reader, endianness, bytes_to_read)?;
-
+        let values = {parent_field_parse}(reader, endianness, bytes_to_read)?
+            .iter()
+            .flat_map(|val| val.apply_scale_offset(&{parent_scale_offset}))
+            .collect();
         Ok(DataMessageField {{
             kind: FitMessage::{message_name}({message_name}Field::{parent_field}),
             values
@@ -1102,6 +1112,14 @@ impl {message_name}Field{parent_field}Subfield {{
                 format!("{}::parse", snake_to_camel_case(&subfield.base_type))
             };
             let targets = subfield_targets(subfield);
+            let scale_offset = match (subfield.scale, subfield.offset) {
+                (None, None) => "None".to_string(),
+                (scale, offset) => format!(
+                    "Some(ScaleOffset {{scale: {}_f32, offset: {}_f32}})",
+                    scale.unwrap_or(1.),
+                    offset.unwrap_or(0.)
+                ),
+            };
             format!(
                 "
 |fields| {{
@@ -1115,10 +1133,14 @@ impl {message_name}Field{parent_field}Subfield {{
 
     match found {{
         Some(_) => Some(|reader, endianness, bytes_to_read| {{
-            let value = {parse_name}(reader, endianness, bytes_to_read)?;
+            let values = {parse_name}(reader, endianness, bytes_to_read)?
+                .iter()
+                .flat_map(|val| val.apply_scale_offset(&{scale_offset}))
+                .collect();
+
             Ok(DataMessageField {{
                 kind: FitMessage::{message_name}({message_name}Field::{subfield_name}),
-                values: value
+                values
 
             }})
         }}),
