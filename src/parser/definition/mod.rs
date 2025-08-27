@@ -8,7 +8,7 @@ use crate::{
         records::{DefinitionMessageHeader, RecordError},
         types::{
             DataTypeError, ScaleOffset,
-            generated::{CustomField, FitMessage, MesgNum},
+            generated::{CustomField, FitMessage, MesgNum, ParseFunction},
         },
     },
 };
@@ -41,7 +41,7 @@ pub struct Definition {
 pub struct DefinitionField {
     pub endianness: Endianness,
     pub kind: FitMessage,
-    pub parse: fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>,
+    pub parse: ParseFunction,
     pub scale_offset: Option<ScaleOffset>,
     pub size: u8,
 }
@@ -100,7 +100,7 @@ fn parse_developer_field(
             name: description.name.clone(),
             units: description.units.clone(),
         }),
-        parse: description.base_type.get_parse_fn(),
+        parse: ParseFunction::Simple(description.base_type.get_parse_fn()),
         scale_offset: None,
         size,
     };
@@ -156,8 +156,11 @@ mod tests {
         assert_eq!(field.kind, FitMessage::Record(RecordField::HeartRate));
 
         let mut content = Reader::new(1, vec![12].into_iter());
+        let ParseFunction::Simple(parse) = field.parse else {
+            unreachable!("Should be a simple field");
+        };
         assert_eq!(
-            (field.parse)(&mut content, &Endianness::Little, 1).unwrap(),
+            parse(&mut content, &Endianness::Little, 1).unwrap(),
             vec![DataValue::Uint8(12)]
         );
     }

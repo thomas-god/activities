@@ -11,6 +11,7 @@
 
 use crate::parser::definition::Endianness;
 use crate::parser::reader::Reader;
+use crate::parser::records::DataMessageField;
 use crate::parser::types::{
     parse_byte_array as parse_byte, parse_float32, parse_float64, parse_sint16, parse_sint32,
     parse_sint64, parse_sint8, parse_string, parse_uint16, parse_uint16z, parse_uint32,
@@ -663,10 +664,7 @@ impl MesgNum {
         }
     }
 
-    pub fn field_parse(
-        &self,
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    pub fn field_parse(&self, def_number: u8) -> ParseFunction {
         match self {
             Self::FileId => FileIdField::get_parse_function(def_number),
             Self::Capabilities => CapabilitiesField::get_parse_function(def_number),
@@ -802,7 +800,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 HsaWristTemperatureDataField::get_parse_function(def_number)
             }
-            _ => parse_unknown,
+            _ => ParseFunction::Simple(parse_unknown),
         }
     }
 
@@ -6922,6 +6920,19 @@ impl FitBaseType {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ParseFunction {
+    Simple(fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>),
+    Dynamic(
+        fn(
+            &mut Reader,
+            &Endianness,
+            u8,
+            &[DataMessageField],
+        ) -> Result<Vec<DataValue>, DataTypeError>,
+    ),
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FitMessage {
     FileId(FileIdField),
@@ -7078,18 +7089,16 @@ impl FileIdField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => File::parse,
-            1 => Manufacturer::parse,
-            2 => parse_uint16,
-            3 => parse_unknown,
-            4 => DateTime::parse,
-            5 => parse_uint16,
-            8 => parse_string,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(File::parse),
+            1 => ParseFunction::Simple(Manufacturer::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(DateTime::parse),
+            5 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7118,13 +7127,11 @@ impl FileCreatorField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint16,
-            1 => parse_uint8,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7163,18 +7170,16 @@ impl TimestampCorrelationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => DateTime::parse,
-            2 => parse_uint16,
-            3 => LocalDateTime::parse,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(DateTime::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(LocalDateTime::parse),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7215,14 +7220,12 @@ impl SoftwareField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            3 => parse_uint16,
-            5 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7255,13 +7258,11 @@ impl SlaveDeviceField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => Manufacturer::parse,
-            1 => parse_uint16,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(Manufacturer::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7294,15 +7295,13 @@ impl CapabilitiesField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_unknown,
-            1 => SportBits0::parse,
-            21 => WorkoutCapabilities::parse,
-            23 => ConnectivityCapabilities::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_unknown),
+            1 => ParseFunction::Simple(SportBits0::parse),
+            21 => ParseFunction::Simple(WorkoutCapabilities::parse),
+            23 => ParseFunction::Simple(ConnectivityCapabilities::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7339,17 +7338,15 @@ impl FileCapabilitiesField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => File::parse,
-            1 => FileFlags::parse,
-            2 => parse_string,
-            3 => parse_uint16,
-            4 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(File::parse),
+            1 => ParseFunction::Simple(FileFlags::parse),
+            2 => ParseFunction::Simple(parse_string),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7384,16 +7381,14 @@ impl MesgCapabilitiesField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => File::parse,
-            1 => MesgNum::parse,
-            2 => MesgCount::parse,
-            3 => parse_uint16,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(File::parse),
+            1 => ParseFunction::Simple(MesgNum::parse),
+            2 => ParseFunction::Simple(MesgCount::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7428,16 +7423,14 @@ impl FieldCapabilitiesField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => File::parse,
-            1 => MesgNum::parse,
-            2 => parse_uint8,
-            3 => parse_uint16,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(File::parse),
+            1 => ParseFunction::Simple(MesgNum::parse),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7510,35 +7503,33 @@ impl DeviceSettingsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            4 => TimeMode::parse,
-            5 => parse_sint8,
-            12 => BacklightMode::parse,
-            36 => parse_unknown,
-            39 => DateTime::parse,
-            40 => parse_uint16,
-            46 => parse_unknown,
-            47 => DateMode::parse,
-            55 => DisplayOrientation::parse,
-            56 => Side::parse,
-            57 => parse_uint16,
-            58 => parse_uint16,
-            59 => parse_uint16,
-            80 => parse_unknown,
-            86 => parse_unknown,
-            89 => AutoSyncFrequency::parse,
-            90 => AutoActivityDetect::parse,
-            94 => parse_uint8,
-            95 => DisplayOrientation::parse,
-            134 => Switch::parse,
-            174 => TapSensitivity::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(TimeMode::parse),
+            5 => ParseFunction::Simple(parse_sint8),
+            12 => ParseFunction::Simple(BacklightMode::parse),
+            36 => ParseFunction::Simple(parse_unknown),
+            39 => ParseFunction::Simple(DateTime::parse),
+            40 => ParseFunction::Simple(parse_uint16),
+            46 => ParseFunction::Simple(parse_unknown),
+            47 => ParseFunction::Simple(DateMode::parse),
+            55 => ParseFunction::Simple(DisplayOrientation::parse),
+            56 => ParseFunction::Simple(Side::parse),
+            57 => ParseFunction::Simple(parse_uint16),
+            58 => ParseFunction::Simple(parse_uint16),
+            59 => ParseFunction::Simple(parse_uint16),
+            80 => ParseFunction::Simple(parse_unknown),
+            86 => ParseFunction::Simple(parse_unknown),
+            89 => ParseFunction::Simple(AutoSyncFrequency::parse),
+            90 => ParseFunction::Simple(AutoActivityDetect::parse),
+            94 => ParseFunction::Simple(parse_uint8),
+            95 => ParseFunction::Simple(DisplayOrientation::parse),
+            134 => ParseFunction::Simple(Switch::parse),
+            174 => ParseFunction::Simple(TapSensitivity::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7625,40 +7616,38 @@ impl UserProfileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_string,
-            1 => Gender::parse,
-            2 => parse_uint8,
-            3 => parse_uint8,
-            4 => parse_uint16,
-            5 => Language::parse,
-            6 => DisplayMeasure::parse,
-            7 => DisplayMeasure::parse,
-            8 => parse_uint8,
-            9 => parse_uint8,
-            10 => parse_uint8,
-            11 => parse_uint8,
-            12 => DisplayHeart::parse,
-            13 => DisplayMeasure::parse,
-            14 => DisplayMeasure::parse,
-            16 => DisplayPower::parse,
-            17 => ActivityClass::parse,
-            18 => DisplayPosition::parse,
-            21 => DisplayMeasure::parse,
-            22 => UserLocalId::parse,
-            23 => parse_byte,
-            28 => LocaltimeIntoDay::parse,
-            29 => LocaltimeIntoDay::parse,
-            30 => DisplayMeasure::parse,
-            31 => parse_uint16,
-            32 => parse_uint16,
-            47 => DisplayMeasure::parse,
-            49 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(Gender::parse),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(Language::parse),
+            6 => ParseFunction::Simple(DisplayMeasure::parse),
+            7 => ParseFunction::Simple(DisplayMeasure::parse),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint8),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_uint8),
+            12 => ParseFunction::Simple(DisplayHeart::parse),
+            13 => ParseFunction::Simple(DisplayMeasure::parse),
+            14 => ParseFunction::Simple(DisplayMeasure::parse),
+            16 => ParseFunction::Simple(DisplayPower::parse),
+            17 => ParseFunction::Simple(ActivityClass::parse),
+            18 => ParseFunction::Simple(DisplayPosition::parse),
+            21 => ParseFunction::Simple(DisplayMeasure::parse),
+            22 => ParseFunction::Simple(UserLocalId::parse),
+            23 => ParseFunction::Simple(parse_byte),
+            28 => ParseFunction::Simple(LocaltimeIntoDay::parse),
+            29 => ParseFunction::Simple(LocaltimeIntoDay::parse),
+            30 => ParseFunction::Simple(DisplayMeasure::parse),
+            31 => ParseFunction::Simple(parse_uint16),
+            32 => ParseFunction::Simple(parse_uint16),
+            47 => ParseFunction::Simple(DisplayMeasure::parse),
+            49 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7709,16 +7698,14 @@ impl HrmProfileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_unknown,
-            1 => parse_unknown,
-            2 => parse_unknown,
-            3 => parse_unknown,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_unknown),
+            1 => ParseFunction::Simple(parse_unknown),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7759,19 +7746,17 @@ impl SdmProfileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_unknown,
-            1 => parse_unknown,
-            2 => parse_uint16,
-            3 => parse_uint32,
-            4 => parse_unknown,
-            5 => parse_unknown,
-            7 => parse_uint8,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_unknown),
+            1 => ParseFunction::Simple(parse_unknown),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_unknown),
+            5 => ParseFunction::Simple(parse_unknown),
+            7 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7868,43 +7853,41 @@ impl BikeProfileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_string,
-            1 => Sport::parse,
-            2 => SubSport::parse,
-            3 => parse_uint32,
-            4 => parse_unknown,
-            5 => parse_unknown,
-            6 => parse_unknown,
-            7 => parse_unknown,
-            8 => parse_uint16,
-            9 => parse_uint16,
-            10 => parse_uint16,
-            11 => parse_uint16,
-            12 => parse_unknown,
-            13 => parse_unknown,
-            14 => parse_uint8,
-            15 => parse_unknown,
-            16 => parse_unknown,
-            17 => parse_unknown,
-            18 => parse_unknown,
-            19 => parse_uint8,
-            20 => parse_unknown,
-            21 => parse_unknown,
-            22 => parse_unknown,
-            23 => parse_unknown,
-            24 => parse_unknown,
-            37 => parse_uint8,
-            38 => parse_unknown,
-            39 => parse_unknown,
-            40 => parse_unknown,
-            41 => parse_unknown,
-            44 => parse_unknown,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(Sport::parse),
+            2 => ParseFunction::Simple(SubSport::parse),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_unknown),
+            5 => ParseFunction::Simple(parse_unknown),
+            6 => ParseFunction::Simple(parse_unknown),
+            7 => ParseFunction::Simple(parse_unknown),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_uint16),
+            11 => ParseFunction::Simple(parse_uint16),
+            12 => ParseFunction::Simple(parse_unknown),
+            13 => ParseFunction::Simple(parse_unknown),
+            14 => ParseFunction::Simple(parse_uint8),
+            15 => ParseFunction::Simple(parse_unknown),
+            16 => ParseFunction::Simple(parse_unknown),
+            17 => ParseFunction::Simple(parse_unknown),
+            18 => ParseFunction::Simple(parse_unknown),
+            19 => ParseFunction::Simple(parse_uint8),
+            20 => ParseFunction::Simple(parse_unknown),
+            21 => ParseFunction::Simple(parse_unknown),
+            22 => ParseFunction::Simple(parse_unknown),
+            23 => ParseFunction::Simple(parse_unknown),
+            24 => ParseFunction::Simple(parse_unknown),
+            37 => ParseFunction::Simple(parse_uint8),
+            38 => ParseFunction::Simple(parse_unknown),
+            39 => ParseFunction::Simple(parse_unknown),
+            40 => ParseFunction::Simple(parse_unknown),
+            41 => ParseFunction::Simple(parse_unknown),
+            44 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -7979,24 +7962,22 @@ impl ConnectivityField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_unknown,
-            1 => parse_unknown,
-            2 => parse_unknown,
-            3 => parse_string,
-            4 => parse_unknown,
-            5 => parse_unknown,
-            6 => parse_unknown,
-            7 => parse_unknown,
-            8 => parse_unknown,
-            9 => parse_unknown,
-            10 => parse_unknown,
-            11 => parse_unknown,
-            12 => parse_unknown,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_unknown),
+            1 => ParseFunction::Simple(parse_unknown),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(parse_string),
+            4 => ParseFunction::Simple(parse_unknown),
+            5 => ParseFunction::Simple(parse_unknown),
+            6 => ParseFunction::Simple(parse_unknown),
+            7 => ParseFunction::Simple(parse_unknown),
+            8 => ParseFunction::Simple(parse_unknown),
+            9 => ParseFunction::Simple(parse_unknown),
+            10 => ParseFunction::Simple(parse_unknown),
+            11 => ParseFunction::Simple(parse_unknown),
+            12 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8027,14 +8008,12 @@ impl WatchfaceSettingsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => WatchfaceMode::parse,
-            1 => parse_byte,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(WatchfaceMode::parse),
+            1 => ParseFunction::Simple(parse_byte),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8063,13 +8042,11 @@ impl OhrSettingsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => Switch::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Switch::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8128,28 +8105,26 @@ impl TimeInZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => MesgNum::parse,
-            1 => MessageIndex::parse,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => parse_uint32,
-            6 => parse_uint8,
-            7 => parse_uint16,
-            8 => parse_uint8,
-            9 => parse_uint16,
-            10 => HrZoneCalc::parse,
-            11 => parse_uint8,
-            12 => parse_uint8,
-            13 => parse_uint8,
-            14 => PwrZoneCalc::parse,
-            15 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(MesgNum::parse),
+            1 => ParseFunction::Simple(MessageIndex::parse),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(HrZoneCalc::parse),
+            11 => ParseFunction::Simple(parse_uint8),
+            12 => ParseFunction::Simple(parse_uint8),
+            13 => ParseFunction::Simple(parse_uint8),
+            14 => ParseFunction::Simple(PwrZoneCalc::parse),
+            15 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8204,16 +8179,14 @@ impl ZonesTargetField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            1 => parse_uint8,
-            2 => parse_uint8,
-            3 => parse_uint16,
-            5 => HrZoneCalc::parse,
-            7 => PwrZoneCalc::parse,
-            _ => parse_uint8,
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(HrZoneCalc::parse),
+            7 => ParseFunction::Simple(PwrZoneCalc::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8244,14 +8217,12 @@ impl SportField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => Sport::parse,
-            1 => SubSport::parse,
-            3 => parse_string,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(Sport::parse),
+            1 => ParseFunction::Simple(SubSport::parse),
+            3 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8282,14 +8253,12 @@ impl HrZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => parse_uint8,
-            2 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8320,14 +8289,12 @@ impl SpeedZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint16,
-            1 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8362,14 +8329,12 @@ impl CadenceZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint8,
-            1 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8400,14 +8365,12 @@ impl PowerZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => parse_uint16,
-            2 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8440,15 +8403,13 @@ impl MetZoneField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => parse_uint8,
-            2 => parse_uint16,
-            3 => parse_uint8,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8489,15 +8450,13 @@ impl TrainingSettingsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            31 => parse_uint32,
-            32 => parse_uint16,
-            33 => parse_uint32,
-            153 => parse_uint32,
-            _ => parse_uint8,
+            31 => ParseFunction::Simple(parse_uint32),
+            32 => ParseFunction::Simple(parse_uint16),
+            33 => ParseFunction::Simple(parse_uint32),
+            153 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8604,46 +8563,44 @@ impl DiveSettingsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            254 => MessageIndex::parse,
-            0 => parse_string,
-            1 => TissueModelType::parse,
-            2 => parse_uint8,
-            3 => parse_uint8,
-            4 => WaterType::parse,
-            5 => parse_float32,
-            6 => parse_uint8,
-            7 => parse_uint8,
-            8 => parse_uint8,
-            9 => parse_unknown,
-            10 => parse_float32,
-            11 => parse_uint32,
-            12 => parse_unknown,
-            13 => parse_uint32,
-            14 => DiveBacklightMode::parse,
-            15 => parse_uint8,
-            16 => BacklightTimeout::parse,
-            17 => parse_uint16,
-            18 => parse_uint16,
-            19 => SourceType::parse,
-            20 => parse_uint8,
-            21 => MessageIndex::parse,
-            22 => CcrSetpointSwitchMode::parse,
-            23 => parse_uint8,
-            24 => parse_uint32,
-            25 => CcrSetpointSwitchMode::parse,
-            26 => parse_uint8,
-            27 => parse_uint32,
-            29 => GasConsumptionRateType::parse,
-            30 => parse_unknown,
-            35 => Tone::parse,
-            36 => parse_uint8,
-            37 => NoFlyTimeMode::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(TissueModelType::parse),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(WaterType::parse),
+            5 => ParseFunction::Simple(parse_float32),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint8),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_unknown),
+            10 => ParseFunction::Simple(parse_float32),
+            11 => ParseFunction::Simple(parse_uint32),
+            12 => ParseFunction::Simple(parse_unknown),
+            13 => ParseFunction::Simple(parse_uint32),
+            14 => ParseFunction::Simple(DiveBacklightMode::parse),
+            15 => ParseFunction::Simple(parse_uint8),
+            16 => ParseFunction::Simple(BacklightTimeout::parse),
+            17 => ParseFunction::Simple(parse_uint16),
+            18 => ParseFunction::Simple(parse_uint16),
+            19 => ParseFunction::Simple(SourceType::parse),
+            20 => ParseFunction::Simple(parse_uint8),
+            21 => ParseFunction::Simple(MessageIndex::parse),
+            22 => ParseFunction::Simple(CcrSetpointSwitchMode::parse),
+            23 => ParseFunction::Simple(parse_uint8),
+            24 => ParseFunction::Simple(parse_uint32),
+            25 => ParseFunction::Simple(CcrSetpointSwitchMode::parse),
+            26 => ParseFunction::Simple(parse_uint8),
+            27 => ParseFunction::Simple(parse_uint32),
+            29 => ParseFunction::Simple(GasConsumptionRateType::parse),
+            30 => ParseFunction::Simple(parse_unknown),
+            35 => ParseFunction::Simple(Tone::parse),
+            36 => ParseFunction::Simple(parse_uint8),
+            37 => ParseFunction::Simple(NoFlyTimeMode::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8734,24 +8691,22 @@ impl DiveAlarmField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint32,
-            1 => parse_sint32,
-            2 => parse_unknown,
-            3 => DiveAlarmType::parse,
-            4 => Tone::parse,
-            5 => SubSport::parse,
-            6 => parse_uint32,
-            7 => parse_unknown,
-            8 => parse_unknown,
-            9 => parse_unknown,
-            10 => parse_unknown,
-            11 => parse_sint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(DiveAlarmType::parse),
+            4 => ParseFunction::Simple(Tone::parse),
+            5 => ParseFunction::Simple(SubSport::parse),
+            6 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(parse_unknown),
+            8 => ParseFunction::Simple(parse_unknown),
+            9 => ParseFunction::Simple(parse_unknown),
+            10 => ParseFunction::Simple(parse_unknown),
+            11 => ParseFunction::Simple(parse_sint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8814,24 +8769,22 @@ impl DiveApneaAlarmField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint32,
-            1 => parse_sint32,
-            2 => parse_unknown,
-            3 => DiveAlarmType::parse,
-            4 => Tone::parse,
-            5 => SubSport::parse,
-            6 => parse_uint32,
-            7 => parse_unknown,
-            8 => parse_unknown,
-            9 => parse_unknown,
-            10 => parse_unknown,
-            11 => parse_sint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(DiveAlarmType::parse),
+            4 => ParseFunction::Simple(Tone::parse),
+            5 => ParseFunction::Simple(SubSport::parse),
+            6 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(parse_unknown),
+            8 => ParseFunction::Simple(parse_unknown),
+            9 => ParseFunction::Simple(parse_unknown),
+            10 => ParseFunction::Simple(parse_unknown),
+            11 => ParseFunction::Simple(parse_sint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8878,16 +8831,14 @@ impl DiveGasField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint8,
-            1 => parse_uint8,
-            2 => DiveGasStatus::parse,
-            3 => DiveGasMode::parse,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(DiveGasStatus::parse),
+            3 => ParseFunction::Simple(DiveGasMode::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8938,24 +8889,22 @@ impl GoalField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => Sport::parse,
-            1 => SubSport::parse,
-            2 => DateTime::parse,
-            3 => DateTime::parse,
-            4 => Goal::parse,
-            5 => parse_uint32,
-            6 => parse_unknown,
-            7 => parse_uint32,
-            8 => GoalRecurrence::parse,
-            9 => parse_uint16,
-            10 => parse_unknown,
-            11 => GoalSource::parse,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(Sport::parse),
+            1 => ParseFunction::Simple(SubSport::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(DateTime::parse),
+            4 => ParseFunction::Simple(Goal::parse),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_unknown),
+            7 => ParseFunction::Simple(parse_uint32),
+            8 => ParseFunction::Simple(GoalRecurrence::parse),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_unknown),
+            11 => ParseFunction::Simple(GoalSource::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -8996,19 +8945,17 @@ impl ActivityField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint32,
-            1 => parse_uint16,
-            2 => Activity::parse,
-            3 => Event::parse,
-            4 => EventType::parse,
-            5 => LocalDateTime::parse,
-            6 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(Activity::parse),
+            3 => ParseFunction::Simple(Event::parse),
+            4 => ParseFunction::Simple(EventType::parse),
+            5 => ParseFunction::Simple(LocalDateTime::parse),
+            6 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -9349,167 +9296,165 @@ impl SessionField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            253 => DateTime::parse,
-            0 => Event::parse,
-            1 => EventType::parse,
-            2 => DateTime::parse,
-            3 => parse_sint32,
-            4 => parse_sint32,
-            5 => Sport::parse,
-            6 => SubSport::parse,
-            7 => parse_uint32,
-            8 => parse_uint32,
-            9 => parse_uint32,
-            10 => parse_uint32,
-            11 => parse_uint16,
-            13 => parse_uint16,
-            14 => parse_uint16,
-            15 => parse_uint16,
-            16 => parse_uint8,
-            17 => parse_uint8,
-            18 => parse_uint8,
-            19 => parse_uint8,
-            20 => parse_uint16,
-            21 => parse_uint16,
-            22 => parse_uint16,
-            23 => parse_uint16,
-            24 => parse_uint8,
-            25 => parse_uint16,
-            26 => parse_uint16,
-            27 => parse_uint8,
-            28 => SessionTrigger::parse,
-            29 => parse_sint32,
-            30 => parse_sint32,
-            31 => parse_sint32,
-            32 => parse_sint32,
-            33 => parse_uint16,
-            34 => parse_uint16,
-            35 => parse_uint16,
-            36 => parse_uint16,
-            37 => LeftRightBalance100::parse,
-            38 => parse_sint32,
-            39 => parse_sint32,
-            41 => parse_uint32,
-            42 => parse_uint16,
-            43 => SwimStroke::parse,
-            44 => parse_uint16,
-            45 => parse_uint16,
-            46 => DisplayMeasure::parse,
-            47 => parse_uint16,
-            48 => parse_uint32,
-            49 => parse_uint16,
-            50 => parse_uint16,
-            51 => parse_uint8,
-            52 => parse_sint16,
-            53 => parse_sint16,
-            54 => parse_sint16,
-            55 => parse_sint16,
-            56 => parse_sint16,
-            57 => parse_sint8,
-            58 => parse_sint8,
-            59 => parse_uint32,
-            60 => parse_sint16,
-            61 => parse_sint16,
-            62 => parse_sint16,
-            63 => parse_sint16,
-            64 => parse_uint8,
-            65 => parse_uint32,
-            66 => parse_uint32,
-            67 => parse_uint32,
-            68 => parse_uint32,
-            69 => parse_uint32,
-            70 => parse_uint16,
-            71 => parse_uint16,
-            82 => parse_uint16,
-            83 => parse_uint16,
-            84 => parse_string,
-            85 => parse_uint16,
-            86 => parse_uint16,
-            87 => parse_uint16,
-            88 => parse_uint16,
-            89 => parse_uint16,
-            90 => parse_uint16,
-            91 => parse_uint16,
-            92 => parse_uint8,
-            93 => parse_uint8,
-            94 => parse_uint8,
-            95 => parse_uint16,
-            96 => parse_uint16,
-            97 => parse_uint16,
-            98 => parse_uint16,
-            99 => parse_uint16,
-            100 => parse_uint16,
-            101 => parse_uint8,
-            102 => parse_uint8,
-            103 => parse_uint8,
-            104 => parse_uint8,
-            105 => parse_uint8,
-            110 => parse_string,
-            111 => parse_uint8,
-            112 => parse_uint32,
-            113 => parse_uint16,
-            114 => parse_sint8,
-            115 => parse_sint8,
-            116 => parse_uint8,
-            117 => parse_uint8,
-            118 => parse_uint8,
-            119 => parse_uint8,
-            120 => parse_uint16,
-            121 => parse_uint16,
-            122 => parse_uint8,
-            123 => parse_uint8,
-            124 => parse_uint32,
-            125 => parse_uint32,
-            126 => parse_uint32,
-            127 => parse_uint32,
-            128 => parse_uint32,
-            129 => parse_uint16,
-            130 => parse_uint16,
-            131 => parse_uint8,
-            132 => parse_uint16,
-            133 => parse_uint16,
-            134 => parse_uint16,
-            137 => parse_uint8,
-            139 => parse_uint16,
-            140 => parse_uint32,
-            141 => parse_uint32,
-            142 => parse_uint32,
-            143 => parse_uint8,
-            144 => parse_uint8,
-            145 => parse_uint16,
-            146 => parse_uint16,
-            147 => parse_uint8,
-            148 => parse_uint8,
-            149 => parse_uint8,
-            150 => parse_sint8,
-            155 => parse_uint16,
-            156 => parse_uint32,
-            168 => parse_sint32,
-            169 => parse_uint16,
-            170 => parse_uint16,
-            180 => parse_uint16,
-            181 => parse_float32,
-            182 => parse_float32,
-            183 => parse_uint16,
-            186 => parse_float32,
-            187 => parse_float32,
-            192 => parse_uint8,
-            193 => parse_uint8,
-            194 => parse_uint8,
-            195 => parse_uint8,
-            197 => parse_uint8,
-            198 => parse_uint8,
-            199 => parse_uint8,
-            200 => parse_uint8,
-            208 => parse_uint16,
-            209 => parse_uint16,
-            210 => parse_uint16,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Event::parse),
+            1 => ParseFunction::Simple(EventType::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(parse_sint32),
+            4 => ParseFunction::Simple(parse_sint32),
+            5 => ParseFunction::Simple(Sport::parse),
+            6 => ParseFunction::Simple(SubSport::parse),
+            7 => ParseFunction::Simple(parse_uint32),
+            8 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_uint32),
+            11 => ParseFunction::Simple(parse_uint16),
+            13 => ParseFunction::Simple(parse_uint16),
+            14 => ParseFunction::Simple(parse_uint16),
+            15 => ParseFunction::Simple(parse_uint16),
+            16 => ParseFunction::Simple(parse_uint8),
+            17 => ParseFunction::Simple(parse_uint8),
+            18 => ParseFunction::Simple(parse_uint8),
+            19 => ParseFunction::Simple(parse_uint8),
+            20 => ParseFunction::Simple(parse_uint16),
+            21 => ParseFunction::Simple(parse_uint16),
+            22 => ParseFunction::Simple(parse_uint16),
+            23 => ParseFunction::Simple(parse_uint16),
+            24 => ParseFunction::Simple(parse_uint8),
+            25 => ParseFunction::Simple(parse_uint16),
+            26 => ParseFunction::Simple(parse_uint16),
+            27 => ParseFunction::Simple(parse_uint8),
+            28 => ParseFunction::Simple(SessionTrigger::parse),
+            29 => ParseFunction::Simple(parse_sint32),
+            30 => ParseFunction::Simple(parse_sint32),
+            31 => ParseFunction::Simple(parse_sint32),
+            32 => ParseFunction::Simple(parse_sint32),
+            33 => ParseFunction::Simple(parse_uint16),
+            34 => ParseFunction::Simple(parse_uint16),
+            35 => ParseFunction::Simple(parse_uint16),
+            36 => ParseFunction::Simple(parse_uint16),
+            37 => ParseFunction::Simple(LeftRightBalance100::parse),
+            38 => ParseFunction::Simple(parse_sint32),
+            39 => ParseFunction::Simple(parse_sint32),
+            41 => ParseFunction::Simple(parse_uint32),
+            42 => ParseFunction::Simple(parse_uint16),
+            43 => ParseFunction::Simple(SwimStroke::parse),
+            44 => ParseFunction::Simple(parse_uint16),
+            45 => ParseFunction::Simple(parse_uint16),
+            46 => ParseFunction::Simple(DisplayMeasure::parse),
+            47 => ParseFunction::Simple(parse_uint16),
+            48 => ParseFunction::Simple(parse_uint32),
+            49 => ParseFunction::Simple(parse_uint16),
+            50 => ParseFunction::Simple(parse_uint16),
+            51 => ParseFunction::Simple(parse_uint8),
+            52 => ParseFunction::Simple(parse_sint16),
+            53 => ParseFunction::Simple(parse_sint16),
+            54 => ParseFunction::Simple(parse_sint16),
+            55 => ParseFunction::Simple(parse_sint16),
+            56 => ParseFunction::Simple(parse_sint16),
+            57 => ParseFunction::Simple(parse_sint8),
+            58 => ParseFunction::Simple(parse_sint8),
+            59 => ParseFunction::Simple(parse_uint32),
+            60 => ParseFunction::Simple(parse_sint16),
+            61 => ParseFunction::Simple(parse_sint16),
+            62 => ParseFunction::Simple(parse_sint16),
+            63 => ParseFunction::Simple(parse_sint16),
+            64 => ParseFunction::Simple(parse_uint8),
+            65 => ParseFunction::Simple(parse_uint32),
+            66 => ParseFunction::Simple(parse_uint32),
+            67 => ParseFunction::Simple(parse_uint32),
+            68 => ParseFunction::Simple(parse_uint32),
+            69 => ParseFunction::Simple(parse_uint32),
+            70 => ParseFunction::Simple(parse_uint16),
+            71 => ParseFunction::Simple(parse_uint16),
+            82 => ParseFunction::Simple(parse_uint16),
+            83 => ParseFunction::Simple(parse_uint16),
+            84 => ParseFunction::Simple(parse_string),
+            85 => ParseFunction::Simple(parse_uint16),
+            86 => ParseFunction::Simple(parse_uint16),
+            87 => ParseFunction::Simple(parse_uint16),
+            88 => ParseFunction::Simple(parse_uint16),
+            89 => ParseFunction::Simple(parse_uint16),
+            90 => ParseFunction::Simple(parse_uint16),
+            91 => ParseFunction::Simple(parse_uint16),
+            92 => ParseFunction::Simple(parse_uint8),
+            93 => ParseFunction::Simple(parse_uint8),
+            94 => ParseFunction::Simple(parse_uint8),
+            95 => ParseFunction::Simple(parse_uint16),
+            96 => ParseFunction::Simple(parse_uint16),
+            97 => ParseFunction::Simple(parse_uint16),
+            98 => ParseFunction::Simple(parse_uint16),
+            99 => ParseFunction::Simple(parse_uint16),
+            100 => ParseFunction::Simple(parse_uint16),
+            101 => ParseFunction::Simple(parse_uint8),
+            102 => ParseFunction::Simple(parse_uint8),
+            103 => ParseFunction::Simple(parse_uint8),
+            104 => ParseFunction::Simple(parse_uint8),
+            105 => ParseFunction::Simple(parse_uint8),
+            110 => ParseFunction::Simple(parse_string),
+            111 => ParseFunction::Simple(parse_uint8),
+            112 => ParseFunction::Simple(parse_uint32),
+            113 => ParseFunction::Simple(parse_uint16),
+            114 => ParseFunction::Simple(parse_sint8),
+            115 => ParseFunction::Simple(parse_sint8),
+            116 => ParseFunction::Simple(parse_uint8),
+            117 => ParseFunction::Simple(parse_uint8),
+            118 => ParseFunction::Simple(parse_uint8),
+            119 => ParseFunction::Simple(parse_uint8),
+            120 => ParseFunction::Simple(parse_uint16),
+            121 => ParseFunction::Simple(parse_uint16),
+            122 => ParseFunction::Simple(parse_uint8),
+            123 => ParseFunction::Simple(parse_uint8),
+            124 => ParseFunction::Simple(parse_uint32),
+            125 => ParseFunction::Simple(parse_uint32),
+            126 => ParseFunction::Simple(parse_uint32),
+            127 => ParseFunction::Simple(parse_uint32),
+            128 => ParseFunction::Simple(parse_uint32),
+            129 => ParseFunction::Simple(parse_uint16),
+            130 => ParseFunction::Simple(parse_uint16),
+            131 => ParseFunction::Simple(parse_uint8),
+            132 => ParseFunction::Simple(parse_uint16),
+            133 => ParseFunction::Simple(parse_uint16),
+            134 => ParseFunction::Simple(parse_uint16),
+            137 => ParseFunction::Simple(parse_uint8),
+            139 => ParseFunction::Simple(parse_uint16),
+            140 => ParseFunction::Simple(parse_uint32),
+            141 => ParseFunction::Simple(parse_uint32),
+            142 => ParseFunction::Simple(parse_uint32),
+            143 => ParseFunction::Simple(parse_uint8),
+            144 => ParseFunction::Simple(parse_uint8),
+            145 => ParseFunction::Simple(parse_uint16),
+            146 => ParseFunction::Simple(parse_uint16),
+            147 => ParseFunction::Simple(parse_uint8),
+            148 => ParseFunction::Simple(parse_uint8),
+            149 => ParseFunction::Simple(parse_uint8),
+            150 => ParseFunction::Simple(parse_sint8),
+            155 => ParseFunction::Simple(parse_uint16),
+            156 => ParseFunction::Simple(parse_uint32),
+            168 => ParseFunction::Simple(parse_sint32),
+            169 => ParseFunction::Simple(parse_uint16),
+            170 => ParseFunction::Simple(parse_uint16),
+            180 => ParseFunction::Simple(parse_uint16),
+            181 => ParseFunction::Simple(parse_float32),
+            182 => ParseFunction::Simple(parse_float32),
+            183 => ParseFunction::Simple(parse_uint16),
+            186 => ParseFunction::Simple(parse_float32),
+            187 => ParseFunction::Simple(parse_float32),
+            192 => ParseFunction::Simple(parse_uint8),
+            193 => ParseFunction::Simple(parse_uint8),
+            194 => ParseFunction::Simple(parse_uint8),
+            195 => ParseFunction::Simple(parse_uint8),
+            197 => ParseFunction::Simple(parse_uint8),
+            198 => ParseFunction::Simple(parse_uint8),
+            199 => ParseFunction::Simple(parse_uint8),
+            200 => ParseFunction::Simple(parse_uint8),
+            208 => ParseFunction::Simple(parse_uint16),
+            209 => ParseFunction::Simple(parse_uint16),
+            210 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -10100,134 +10045,132 @@ impl LapField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            253 => DateTime::parse,
-            0 => Event::parse,
-            1 => EventType::parse,
-            2 => DateTime::parse,
-            3 => parse_sint32,
-            4 => parse_sint32,
-            5 => parse_sint32,
-            6 => parse_sint32,
-            7 => parse_uint32,
-            8 => parse_uint32,
-            9 => parse_uint32,
-            10 => parse_uint32,
-            11 => parse_uint16,
-            12 => parse_uint16,
-            13 => parse_uint16,
-            14 => parse_uint16,
-            15 => parse_uint8,
-            16 => parse_uint8,
-            17 => parse_uint8,
-            18 => parse_uint8,
-            19 => parse_uint16,
-            20 => parse_uint16,
-            21 => parse_uint16,
-            22 => parse_uint16,
-            23 => Intensity::parse,
-            24 => LapTrigger::parse,
-            25 => Sport::parse,
-            26 => parse_uint8,
-            32 => parse_uint16,
-            33 => parse_uint16,
-            34 => LeftRightBalance100::parse,
-            35 => parse_uint16,
-            37 => parse_uint16,
-            38 => SwimStroke::parse,
-            39 => SubSport::parse,
-            40 => parse_uint16,
-            41 => parse_uint32,
-            42 => parse_uint16,
-            43 => parse_uint16,
-            44 => parse_uint8,
-            45 => parse_sint16,
-            46 => parse_sint16,
-            47 => parse_sint16,
-            48 => parse_sint16,
-            49 => parse_sint16,
-            50 => parse_sint8,
-            51 => parse_sint8,
-            52 => parse_uint32,
-            53 => parse_sint16,
-            54 => parse_sint16,
-            55 => parse_sint16,
-            56 => parse_sint16,
-            57 => parse_uint32,
-            58 => parse_uint32,
-            59 => parse_uint32,
-            60 => parse_uint32,
-            61 => parse_uint16,
-            62 => parse_uint16,
-            63 => parse_uint8,
-            71 => MessageIndex::parse,
-            74 => parse_uint16,
-            75 => parse_uint16,
-            76 => parse_uint16,
-            77 => parse_uint16,
-            78 => parse_uint16,
-            79 => parse_uint16,
-            80 => parse_uint8,
-            81 => parse_uint8,
-            82 => parse_uint8,
-            83 => parse_uint16,
-            84 => parse_uint16,
-            85 => parse_uint16,
-            86 => parse_uint16,
-            87 => parse_uint16,
-            88 => parse_uint16,
-            89 => parse_uint16,
-            91 => parse_uint8,
-            92 => parse_uint8,
-            93 => parse_uint8,
-            94 => parse_uint8,
-            95 => parse_uint8,
-            98 => parse_uint32,
-            99 => parse_uint16,
-            100 => parse_sint8,
-            101 => parse_sint8,
-            102 => parse_uint8,
-            103 => parse_uint8,
-            104 => parse_uint8,
-            105 => parse_uint8,
-            106 => parse_uint16,
-            107 => parse_uint16,
-            108 => parse_uint8,
-            109 => parse_uint8,
-            110 => parse_uint32,
-            111 => parse_uint32,
-            112 => parse_uint32,
-            113 => parse_uint32,
-            114 => parse_uint32,
-            115 => parse_uint16,
-            116 => parse_uint16,
-            117 => parse_uint8,
-            118 => parse_uint16,
-            119 => parse_uint16,
-            120 => parse_uint16,
-            121 => parse_uint16,
-            122 => parse_uint32,
-            123 => parse_uint32,
-            124 => parse_sint8,
-            136 => parse_uint16,
-            137 => parse_uint16,
-            147 => parse_uint8,
-            148 => parse_uint8,
-            149 => parse_float32,
-            150 => parse_float32,
-            151 => parse_uint16,
-            153 => parse_float32,
-            154 => parse_float32,
-            156 => parse_uint8,
-            157 => parse_uint8,
-            158 => parse_uint16,
-            159 => parse_uint16,
-            160 => parse_uint16,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Event::parse),
+            1 => ParseFunction::Simple(EventType::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(parse_sint32),
+            4 => ParseFunction::Simple(parse_sint32),
+            5 => ParseFunction::Simple(parse_sint32),
+            6 => ParseFunction::Simple(parse_sint32),
+            7 => ParseFunction::Simple(parse_uint32),
+            8 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_uint32),
+            11 => ParseFunction::Simple(parse_uint16),
+            12 => ParseFunction::Simple(parse_uint16),
+            13 => ParseFunction::Simple(parse_uint16),
+            14 => ParseFunction::Simple(parse_uint16),
+            15 => ParseFunction::Simple(parse_uint8),
+            16 => ParseFunction::Simple(parse_uint8),
+            17 => ParseFunction::Simple(parse_uint8),
+            18 => ParseFunction::Simple(parse_uint8),
+            19 => ParseFunction::Simple(parse_uint16),
+            20 => ParseFunction::Simple(parse_uint16),
+            21 => ParseFunction::Simple(parse_uint16),
+            22 => ParseFunction::Simple(parse_uint16),
+            23 => ParseFunction::Simple(Intensity::parse),
+            24 => ParseFunction::Simple(LapTrigger::parse),
+            25 => ParseFunction::Simple(Sport::parse),
+            26 => ParseFunction::Simple(parse_uint8),
+            32 => ParseFunction::Simple(parse_uint16),
+            33 => ParseFunction::Simple(parse_uint16),
+            34 => ParseFunction::Simple(LeftRightBalance100::parse),
+            35 => ParseFunction::Simple(parse_uint16),
+            37 => ParseFunction::Simple(parse_uint16),
+            38 => ParseFunction::Simple(SwimStroke::parse),
+            39 => ParseFunction::Simple(SubSport::parse),
+            40 => ParseFunction::Simple(parse_uint16),
+            41 => ParseFunction::Simple(parse_uint32),
+            42 => ParseFunction::Simple(parse_uint16),
+            43 => ParseFunction::Simple(parse_uint16),
+            44 => ParseFunction::Simple(parse_uint8),
+            45 => ParseFunction::Simple(parse_sint16),
+            46 => ParseFunction::Simple(parse_sint16),
+            47 => ParseFunction::Simple(parse_sint16),
+            48 => ParseFunction::Simple(parse_sint16),
+            49 => ParseFunction::Simple(parse_sint16),
+            50 => ParseFunction::Simple(parse_sint8),
+            51 => ParseFunction::Simple(parse_sint8),
+            52 => ParseFunction::Simple(parse_uint32),
+            53 => ParseFunction::Simple(parse_sint16),
+            54 => ParseFunction::Simple(parse_sint16),
+            55 => ParseFunction::Simple(parse_sint16),
+            56 => ParseFunction::Simple(parse_sint16),
+            57 => ParseFunction::Simple(parse_uint32),
+            58 => ParseFunction::Simple(parse_uint32),
+            59 => ParseFunction::Simple(parse_uint32),
+            60 => ParseFunction::Simple(parse_uint32),
+            61 => ParseFunction::Simple(parse_uint16),
+            62 => ParseFunction::Simple(parse_uint16),
+            63 => ParseFunction::Simple(parse_uint8),
+            71 => ParseFunction::Simple(MessageIndex::parse),
+            74 => ParseFunction::Simple(parse_uint16),
+            75 => ParseFunction::Simple(parse_uint16),
+            76 => ParseFunction::Simple(parse_uint16),
+            77 => ParseFunction::Simple(parse_uint16),
+            78 => ParseFunction::Simple(parse_uint16),
+            79 => ParseFunction::Simple(parse_uint16),
+            80 => ParseFunction::Simple(parse_uint8),
+            81 => ParseFunction::Simple(parse_uint8),
+            82 => ParseFunction::Simple(parse_uint8),
+            83 => ParseFunction::Simple(parse_uint16),
+            84 => ParseFunction::Simple(parse_uint16),
+            85 => ParseFunction::Simple(parse_uint16),
+            86 => ParseFunction::Simple(parse_uint16),
+            87 => ParseFunction::Simple(parse_uint16),
+            88 => ParseFunction::Simple(parse_uint16),
+            89 => ParseFunction::Simple(parse_uint16),
+            91 => ParseFunction::Simple(parse_uint8),
+            92 => ParseFunction::Simple(parse_uint8),
+            93 => ParseFunction::Simple(parse_uint8),
+            94 => ParseFunction::Simple(parse_uint8),
+            95 => ParseFunction::Simple(parse_uint8),
+            98 => ParseFunction::Simple(parse_uint32),
+            99 => ParseFunction::Simple(parse_uint16),
+            100 => ParseFunction::Simple(parse_sint8),
+            101 => ParseFunction::Simple(parse_sint8),
+            102 => ParseFunction::Simple(parse_uint8),
+            103 => ParseFunction::Simple(parse_uint8),
+            104 => ParseFunction::Simple(parse_uint8),
+            105 => ParseFunction::Simple(parse_uint8),
+            106 => ParseFunction::Simple(parse_uint16),
+            107 => ParseFunction::Simple(parse_uint16),
+            108 => ParseFunction::Simple(parse_uint8),
+            109 => ParseFunction::Simple(parse_uint8),
+            110 => ParseFunction::Simple(parse_uint32),
+            111 => ParseFunction::Simple(parse_uint32),
+            112 => ParseFunction::Simple(parse_uint32),
+            113 => ParseFunction::Simple(parse_uint32),
+            114 => ParseFunction::Simple(parse_uint32),
+            115 => ParseFunction::Simple(parse_uint16),
+            116 => ParseFunction::Simple(parse_uint16),
+            117 => ParseFunction::Simple(parse_uint8),
+            118 => ParseFunction::Simple(parse_uint16),
+            119 => ParseFunction::Simple(parse_uint16),
+            120 => ParseFunction::Simple(parse_uint16),
+            121 => ParseFunction::Simple(parse_uint16),
+            122 => ParseFunction::Simple(parse_uint32),
+            123 => ParseFunction::Simple(parse_uint32),
+            124 => ParseFunction::Simple(parse_sint8),
+            136 => ParseFunction::Simple(parse_uint16),
+            137 => ParseFunction::Simple(parse_uint16),
+            147 => ParseFunction::Simple(parse_uint8),
+            148 => ParseFunction::Simple(parse_uint8),
+            149 => ParseFunction::Simple(parse_float32),
+            150 => ParseFunction::Simple(parse_float32),
+            151 => ParseFunction::Simple(parse_uint16),
+            153 => ParseFunction::Simple(parse_float32),
+            154 => ParseFunction::Simple(parse_float32),
+            156 => ParseFunction::Simple(parse_uint8),
+            157 => ParseFunction::Simple(parse_uint8),
+            158 => ParseFunction::Simple(parse_uint16),
+            159 => ParseFunction::Simple(parse_uint16),
+            160 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -10552,33 +10495,31 @@ impl LengthField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            253 => DateTime::parse,
-            0 => Event::parse,
-            1 => EventType::parse,
-            2 => DateTime::parse,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => parse_uint16,
-            6 => parse_uint16,
-            7 => SwimStroke::parse,
-            9 => parse_uint8,
-            10 => parse_uint8,
-            11 => parse_uint16,
-            12 => LengthType::parse,
-            18 => parse_uint16,
-            19 => parse_uint16,
-            20 => parse_uint16,
-            21 => parse_uint16,
-            22 => parse_uint16,
-            23 => parse_uint16,
-            24 => parse_uint8,
-            25 => parse_uint8,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Event::parse),
+            1 => ParseFunction::Simple(EventType::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(parse_uint16),
+            7 => ParseFunction::Simple(SwimStroke::parse),
+            9 => ParseFunction::Simple(parse_uint8),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_uint16),
+            12 => ParseFunction::Simple(LengthType::parse),
+            18 => ParseFunction::Simple(parse_uint16),
+            19 => ParseFunction::Simple(parse_uint16),
+            20 => ParseFunction::Simple(parse_uint16),
+            21 => ParseFunction::Simple(parse_uint16),
+            22 => ParseFunction::Simple(parse_uint16),
+            23 => ParseFunction::Simple(parse_uint16),
+            24 => ParseFunction::Simple(parse_uint8),
+            25 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -10791,95 +10732,93 @@ impl RecordField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_sint32,
-            1 => parse_sint32,
-            2 => parse_uint16,
-            3 => parse_uint8,
-            4 => parse_uint8,
-            5 => parse_uint32,
-            6 => parse_uint16,
-            7 => parse_uint16,
-            8 => parse_byte,
-            9 => parse_sint16,
-            10 => parse_uint8,
-            11 => parse_sint32,
-            12 => parse_uint8,
-            13 => parse_sint8,
-            17 => parse_uint8,
-            18 => parse_uint8,
-            19 => parse_uint32,
-            28 => parse_uint16,
-            29 => parse_uint32,
-            30 => LeftRightBalance::parse,
-            31 => parse_uint8,
-            32 => parse_sint16,
-            33 => parse_uint16,
-            39 => parse_uint16,
-            40 => parse_uint16,
-            41 => parse_uint16,
-            42 => ActivityType::parse,
-            43 => parse_uint8,
-            44 => parse_uint8,
-            45 => parse_uint8,
-            46 => parse_uint8,
-            47 => parse_uint8,
-            48 => parse_uint8,
-            49 => StrokeType::parse,
-            50 => parse_uint8,
-            51 => parse_uint16,
-            52 => parse_uint16,
-            53 => parse_uint8,
-            54 => parse_uint16,
-            55 => parse_uint16,
-            56 => parse_uint16,
-            57 => parse_uint16,
-            58 => parse_uint16,
-            59 => parse_uint16,
-            62 => DeviceIndex::parse,
-            67 => parse_sint8,
-            68 => parse_sint8,
-            69 => parse_uint8,
-            70 => parse_uint8,
-            71 => parse_uint8,
-            72 => parse_uint8,
-            73 => parse_uint32,
-            78 => parse_uint32,
-            81 => parse_uint8,
-            82 => parse_uint16,
-            83 => parse_uint16,
-            84 => parse_uint16,
-            85 => parse_uint16,
-            87 => parse_uint16,
-            91 => parse_uint32,
-            92 => parse_uint32,
-            93 => parse_uint32,
-            94 => parse_uint32,
-            95 => parse_uint32,
-            96 => parse_uint32,
-            97 => parse_uint8,
-            98 => parse_uint16,
-            99 => parse_uint8,
-            108 => parse_uint16,
-            114 => parse_float32,
-            115 => parse_float32,
-            116 => parse_uint16,
-            117 => parse_uint16,
-            118 => parse_uint8,
-            119 => parse_uint8,
-            120 => parse_uint8,
-            123 => parse_uint32,
-            124 => parse_uint16,
-            125 => parse_uint16,
-            126 => parse_uint16,
-            127 => parse_sint32,
-            129 => parse_uint8,
-            139 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_sint32),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint16),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_byte),
+            9 => ParseFunction::Simple(parse_sint16),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_sint32),
+            12 => ParseFunction::Simple(parse_uint8),
+            13 => ParseFunction::Simple(parse_sint8),
+            17 => ParseFunction::Simple(parse_uint8),
+            18 => ParseFunction::Simple(parse_uint8),
+            19 => ParseFunction::Simple(parse_uint32),
+            28 => ParseFunction::Simple(parse_uint16),
+            29 => ParseFunction::Simple(parse_uint32),
+            30 => ParseFunction::Simple(LeftRightBalance::parse),
+            31 => ParseFunction::Simple(parse_uint8),
+            32 => ParseFunction::Simple(parse_sint16),
+            33 => ParseFunction::Simple(parse_uint16),
+            39 => ParseFunction::Simple(parse_uint16),
+            40 => ParseFunction::Simple(parse_uint16),
+            41 => ParseFunction::Simple(parse_uint16),
+            42 => ParseFunction::Simple(ActivityType::parse),
+            43 => ParseFunction::Simple(parse_uint8),
+            44 => ParseFunction::Simple(parse_uint8),
+            45 => ParseFunction::Simple(parse_uint8),
+            46 => ParseFunction::Simple(parse_uint8),
+            47 => ParseFunction::Simple(parse_uint8),
+            48 => ParseFunction::Simple(parse_uint8),
+            49 => ParseFunction::Simple(StrokeType::parse),
+            50 => ParseFunction::Simple(parse_uint8),
+            51 => ParseFunction::Simple(parse_uint16),
+            52 => ParseFunction::Simple(parse_uint16),
+            53 => ParseFunction::Simple(parse_uint8),
+            54 => ParseFunction::Simple(parse_uint16),
+            55 => ParseFunction::Simple(parse_uint16),
+            56 => ParseFunction::Simple(parse_uint16),
+            57 => ParseFunction::Simple(parse_uint16),
+            58 => ParseFunction::Simple(parse_uint16),
+            59 => ParseFunction::Simple(parse_uint16),
+            62 => ParseFunction::Simple(DeviceIndex::parse),
+            67 => ParseFunction::Simple(parse_sint8),
+            68 => ParseFunction::Simple(parse_sint8),
+            69 => ParseFunction::Simple(parse_uint8),
+            70 => ParseFunction::Simple(parse_uint8),
+            71 => ParseFunction::Simple(parse_uint8),
+            72 => ParseFunction::Simple(parse_uint8),
+            73 => ParseFunction::Simple(parse_uint32),
+            78 => ParseFunction::Simple(parse_uint32),
+            81 => ParseFunction::Simple(parse_uint8),
+            82 => ParseFunction::Simple(parse_uint16),
+            83 => ParseFunction::Simple(parse_uint16),
+            84 => ParseFunction::Simple(parse_uint16),
+            85 => ParseFunction::Simple(parse_uint16),
+            87 => ParseFunction::Simple(parse_uint16),
+            91 => ParseFunction::Simple(parse_uint32),
+            92 => ParseFunction::Simple(parse_uint32),
+            93 => ParseFunction::Simple(parse_uint32),
+            94 => ParseFunction::Simple(parse_uint32),
+            95 => ParseFunction::Simple(parse_uint32),
+            96 => ParseFunction::Simple(parse_uint32),
+            97 => ParseFunction::Simple(parse_uint8),
+            98 => ParseFunction::Simple(parse_uint16),
+            99 => ParseFunction::Simple(parse_uint8),
+            108 => ParseFunction::Simple(parse_uint16),
+            114 => ParseFunction::Simple(parse_float32),
+            115 => ParseFunction::Simple(parse_float32),
+            116 => ParseFunction::Simple(parse_uint16),
+            117 => ParseFunction::Simple(parse_uint16),
+            118 => ParseFunction::Simple(parse_uint8),
+            119 => ParseFunction::Simple(parse_uint8),
+            120 => ParseFunction::Simple(parse_uint8),
+            123 => ParseFunction::Simple(parse_uint32),
+            124 => ParseFunction::Simple(parse_uint16),
+            125 => ParseFunction::Simple(parse_uint16),
+            126 => ParseFunction::Simple(parse_uint16),
+            127 => ParseFunction::Simple(parse_sint32),
+            129 => ParseFunction::Simple(parse_uint8),
+            139 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11150,30 +11089,28 @@ impl EventField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => Event::parse,
-            1 => EventType::parse,
-            2 => parse_uint16,
-            3 => parse_uint32,
-            4 => parse_uint8,
-            7 => parse_uint16,
-            8 => parse_uint16,
-            9 => parse_unknown,
-            10 => parse_unknown,
-            11 => parse_unknown,
-            12 => parse_unknown,
-            13 => DeviceIndex::parse,
-            14 => ActivityType::parse,
-            15 => DateTime::parse,
-            21 => RadarThreatLevelType::parse,
-            22 => parse_uint8,
-            23 => parse_uint8,
-            24 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Event::parse),
+            1 => ParseFunction::Simple(EventType::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(parse_unknown),
+            10 => ParseFunction::Simple(parse_unknown),
+            11 => ParseFunction::Simple(parse_unknown),
+            12 => ParseFunction::Simple(parse_unknown),
+            13 => ParseFunction::Simple(DeviceIndex::parse),
+            14 => ParseFunction::Simple(ActivityType::parse),
+            15 => ParseFunction::Simple(DateTime::parse),
+            21 => ParseFunction::Simple(RadarThreatLevelType::parse),
+            22 => ParseFunction::Simple(parse_uint8),
+            23 => ParseFunction::Simple(parse_uint8),
+            24 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11244,30 +11181,28 @@ impl DeviceInfoField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => DeviceIndex::parse,
-            1 => parse_uint8,
-            2 => Manufacturer::parse,
-            3 => parse_unknown,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            6 => parse_uint8,
-            7 => parse_uint32,
-            10 => parse_uint16,
-            11 => BatteryStatus::parse,
-            18 => BodyLocation::parse,
-            19 => parse_string,
-            20 => parse_unknown,
-            21 => parse_unknown,
-            22 => AntNetwork::parse,
-            25 => SourceType::parse,
-            27 => parse_string,
-            32 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(DeviceIndex::parse),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(Manufacturer::parse),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_uint16),
+            11 => ParseFunction::Simple(BatteryStatus::parse),
+            18 => ParseFunction::Simple(BodyLocation::parse),
+            19 => ParseFunction::Simple(parse_string),
+            20 => ParseFunction::Simple(parse_unknown),
+            21 => ParseFunction::Simple(parse_unknown),
+            22 => ParseFunction::Simple(AntNetwork::parse),
+            25 => ParseFunction::Simple(SourceType::parse),
+            27 => ParseFunction::Simple(parse_string),
+            32 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11310,16 +11245,14 @@ impl DeviceAuxBatteryInfoField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => DeviceIndex::parse,
-            1 => parse_uint16,
-            2 => BatteryStatus::parse,
-            3 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(DeviceIndex::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(BatteryStatus::parse),
+            3 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11362,17 +11295,15 @@ impl TrainingFileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => File::parse,
-            1 => Manufacturer::parse,
-            2 => parse_uint16,
-            3 => parse_unknown,
-            4 => DateTime::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(File::parse),
+            1 => ParseFunction::Simple(Manufacturer::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(DateTime::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11429,27 +11360,25 @@ impl WeatherConditionsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => WeatherReport::parse,
-            1 => parse_sint8,
-            2 => WeatherStatus::parse,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_uint8,
-            6 => parse_sint8,
-            7 => parse_uint8,
-            8 => parse_string,
-            9 => DateTime::parse,
-            10 => parse_sint32,
-            11 => parse_sint32,
-            12 => DayOfWeek::parse,
-            13 => parse_sint8,
-            14 => parse_sint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(WeatherReport::parse),
+            1 => ParseFunction::Simple(parse_sint8),
+            2 => ParseFunction::Simple(WeatherStatus::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint8),
+            6 => ParseFunction::Simple(parse_sint8),
+            7 => ParseFunction::Simple(parse_uint8),
+            8 => ParseFunction::Simple(parse_string),
+            9 => ParseFunction::Simple(DateTime::parse),
+            10 => ParseFunction::Simple(parse_sint32),
+            11 => ParseFunction::Simple(parse_sint32),
+            12 => ParseFunction::Simple(DayOfWeek::parse),
+            13 => ParseFunction::Simple(parse_sint8),
+            14 => ParseFunction::Simple(parse_sint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11492,17 +11421,15 @@ impl WeatherAlertField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_string,
-            1 => DateTime::parse,
-            2 => DateTime::parse,
-            3 => WeatherSeverity::parse,
-            4 => WeatherSevereType::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(DateTime::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(WeatherSeverity::parse),
+            4 => ParseFunction::Simple(WeatherSevereType::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11545,20 +11472,18 @@ impl GpsMetadataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_sint32,
-            2 => parse_sint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => parse_uint16,
-            6 => DateTime::parse,
-            7 => parse_sint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(parse_sint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(DateTime::parse),
+            7 => ParseFunction::Simple(parse_sint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11609,16 +11534,14 @@ impl CameraEventField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => CameraEventType::parse,
-            2 => parse_string,
-            3 => CameraOrientationType::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(CameraEventType::parse),
+            2 => ParseFunction::Simple(parse_string),
+            3 => ParseFunction::Simple(CameraOrientationType::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11661,20 +11584,18 @@ impl GyroscopeDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_float32,
-            6 => parse_float32,
-            7 => parse_float32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_float32),
+            6 => ParseFunction::Simple(parse_float32),
+            7 => ParseFunction::Simple(parse_float32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11723,23 +11644,21 @@ impl AccelerometerDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_float32,
-            6 => parse_float32,
-            7 => parse_float32,
-            8 => parse_sint16,
-            9 => parse_sint16,
-            10 => parse_sint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_float32),
+            6 => ParseFunction::Simple(parse_float32),
+            7 => ParseFunction::Simple(parse_float32),
+            8 => ParseFunction::Simple(parse_sint16),
+            9 => ParseFunction::Simple(parse_sint16),
+            10 => ParseFunction::Simple(parse_sint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11784,20 +11703,18 @@ impl MagnetometerDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_float32,
-            6 => parse_float32,
-            7 => parse_float32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_float32),
+            6 => ParseFunction::Simple(parse_float32),
+            7 => ParseFunction::Simple(parse_float32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11832,15 +11749,13 @@ impl BarometerDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11879,18 +11794,16 @@ impl ThreeDSensorCalibrationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => SensorType::parse,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_sint32,
-            5 => parse_sint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(SensorType::parse),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_sint32),
+            5 => ParseFunction::Simple(parse_sint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11933,17 +11846,15 @@ impl OneDSensorCalibrationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => SensorType::parse,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_sint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(SensorType::parse),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_sint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -11976,14 +11887,12 @@ impl VideoFrameField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12026,20 +11935,18 @@ impl ObdiiDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_byte,
-            3 => parse_byte,
-            4 => parse_uint8,
-            5 => parse_uint32,
-            6 => DateTime::parse,
-            7 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_byte),
+            3 => ParseFunction::Simple(parse_byte),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(DateTime::parse),
+            7 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12070,14 +11977,12 @@ impl NmeaSentenceField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_string,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12126,23 +12031,21 @@ impl AviationAttitudeField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint32,
-            2 => parse_sint16,
-            3 => parse_sint16,
-            4 => parse_sint16,
-            5 => parse_sint16,
-            6 => parse_sint16,
-            7 => AttitudeStage::parse,
-            8 => parse_uint8,
-            9 => parse_uint16,
-            10 => AttitudeValidity::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_sint16),
+            3 => ParseFunction::Simple(parse_sint16),
+            4 => ParseFunction::Simple(parse_sint16),
+            5 => ParseFunction::Simple(parse_sint16),
+            6 => ParseFunction::Simple(parse_sint16),
+            7 => ParseFunction::Simple(AttitudeStage::parse),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(AttitudeValidity::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12199,14 +12102,12 @@ impl VideoField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_string,
-            1 => parse_string,
-            2 => parse_uint32,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(parse_string),
+            2 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12237,14 +12138,12 @@ impl VideoTitleField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint16,
-            1 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12275,14 +12174,12 @@ impl VideoDescriptionField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_uint16,
-            1 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12321,18 +12218,16 @@ impl VideoClipField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint16,
-            1 => DateTime::parse,
-            2 => parse_uint16,
-            3 => DateTime::parse,
-            4 => parse_uint16,
-            6 => parse_uint32,
-            7 => parse_uint32,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(DateTime::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(DateTime::parse),
+            4 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12379,22 +12274,20 @@ impl SetField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => DateTime::parse,
-            0 => parse_uint32,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => SetType::parse,
-            6 => DateTime::parse,
-            7 => ExerciseCategory::parse,
-            8 => parse_uint16,
-            9 => FitBaseUnit::parse,
-            10 => MessageIndex::parse,
-            11 => MessageIndex::parse,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(SetType::parse),
+            6 => ParseFunction::Simple(DateTime::parse),
+            7 => ParseFunction::Simple(ExerciseCategory::parse),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(FitBaseUnit::parse),
+            10 => ParseFunction::Simple(MessageIndex::parse),
+            11 => ParseFunction::Simple(MessageIndex::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12447,21 +12340,19 @@ impl JumpField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_float32,
-            1 => parse_float32,
-            2 => parse_uint8,
-            3 => parse_float32,
-            4 => parse_float32,
-            5 => parse_sint32,
-            6 => parse_sint32,
-            7 => parse_uint16,
-            8 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_float32),
+            1 => ParseFunction::Simple(parse_float32),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_float32),
+            4 => ParseFunction::Simple(parse_float32),
+            5 => ParseFunction::Simple(parse_sint32),
+            6 => ParseFunction::Simple(parse_sint32),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12532,30 +12423,28 @@ impl SplitField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => SplitType::parse,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            9 => DateTime::parse,
-            13 => parse_uint16,
-            14 => parse_uint16,
-            21 => parse_sint32,
-            22 => parse_sint32,
-            23 => parse_sint32,
-            24 => parse_sint32,
-            25 => parse_uint32,
-            26 => parse_sint32,
-            27 => DateTime::parse,
-            28 => parse_uint32,
-            74 => parse_uint32,
-            110 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(SplitType::parse),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(DateTime::parse),
+            13 => ParseFunction::Simple(parse_uint16),
+            14 => ParseFunction::Simple(parse_uint16),
+            21 => ParseFunction::Simple(parse_sint32),
+            22 => ParseFunction::Simple(parse_sint32),
+            23 => ParseFunction::Simple(parse_sint32),
+            24 => ParseFunction::Simple(parse_sint32),
+            25 => ParseFunction::Simple(parse_uint32),
+            26 => ParseFunction::Simple(parse_sint32),
+            27 => ParseFunction::Simple(DateTime::parse),
+            28 => ParseFunction::Simple(parse_uint32),
+            74 => ParseFunction::Simple(parse_uint32),
+            110 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12640,25 +12529,23 @@ impl SplitSummaryField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => SplitType::parse,
-            3 => parse_uint16,
-            4 => parse_uint32,
-            5 => parse_uint32,
-            6 => parse_uint32,
-            7 => parse_uint32,
-            8 => parse_uint16,
-            9 => parse_uint16,
-            10 => parse_uint8,
-            11 => parse_uint8,
-            12 => parse_sint32,
-            13 => parse_uint32,
-            77 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(SplitType::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(parse_uint32),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_uint8),
+            12 => ParseFunction::Simple(parse_sint32),
+            13 => ParseFunction::Simple(parse_uint32),
+            77 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12721,18 +12608,16 @@ impl ClimbProField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_sint32,
-            1 => parse_sint32,
-            2 => ClimbProEvent::parse,
-            3 => parse_uint16,
-            4 => parse_uint8,
-            5 => parse_float32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_sint32),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(ClimbProEvent::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_float32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12785,25 +12670,23 @@ impl FieldDescriptionField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_uint8,
-            2 => FitBaseType::parse,
-            3 => parse_string,
-            4 => parse_uint8,
-            5 => parse_string,
-            6 => parse_uint8,
-            7 => parse_sint8,
-            8 => parse_string,
-            9 => parse_string,
-            10 => parse_string,
-            13 => FitBaseUnit::parse,
-            14 => MesgNum::parse,
-            15 => parse_uint8,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(FitBaseType::parse),
+            3 => ParseFunction::Simple(parse_string),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_string),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_sint8),
+            8 => ParseFunction::Simple(parse_string),
+            9 => ParseFunction::Simple(parse_string),
+            10 => ParseFunction::Simple(parse_string),
+            13 => ParseFunction::Simple(FitBaseUnit::parse),
+            14 => ParseFunction::Simple(MesgNum::parse),
+            15 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12838,16 +12721,14 @@ impl DeveloperDataIdField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_byte,
-            1 => parse_byte,
-            2 => Manufacturer::parse,
-            3 => parse_uint8,
-            4 => parse_uint32,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_byte),
+            1 => ParseFunction::Simple(parse_byte),
+            2 => ParseFunction::Simple(Manufacturer::parse),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12880,15 +12761,13 @@ impl CourseField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            4 => Sport::parse,
-            5 => parse_string,
-            6 => CourseCapabilities::parse,
-            7 => SubSport::parse,
-            _ => parse_uint8,
+            4 => ParseFunction::Simple(Sport::parse),
+            5 => ParseFunction::Simple(parse_string),
+            6 => ParseFunction::Simple(CourseCapabilities::parse),
+            7 => ParseFunction::Simple(SubSport::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12929,19 +12808,17 @@ impl CoursePointField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => DateTime::parse,
-            2 => parse_sint32,
-            3 => parse_sint32,
-            4 => parse_uint32,
-            5 => CoursePoint::parse,
-            6 => parse_string,
-            8 => parse_unknown,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(DateTime::parse),
+            2 => ParseFunction::Simple(parse_sint32),
+            3 => ParseFunction::Simple(parse_sint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(CoursePoint::parse),
+            6 => ParseFunction::Simple(parse_string),
+            8 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -12988,20 +12865,18 @@ impl SegmentIdField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_string,
-            1 => parse_string,
-            2 => Sport::parse,
-            3 => parse_unknown,
-            4 => parse_uint32,
-            5 => parse_uint32,
-            6 => parse_uint8,
-            7 => SegmentDeleteStatus::parse,
-            8 => SegmentSelectionType::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(parse_string),
+            2 => ParseFunction::Simple(Sport::parse),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(SegmentDeleteStatus::parse),
+            8 => ParseFunction::Simple(SegmentSelectionType::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13040,18 +12915,16 @@ impl SegmentLeaderboardEntryField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_string,
-            1 => SegmentLeaderboardType::parse,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(SegmentLeaderboardType::parse),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13094,18 +12967,16 @@ impl SegmentPointField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => parse_sint32,
-            2 => parse_sint32,
-            3 => parse_uint32,
-            4 => parse_uint16,
-            5 => parse_uint32,
-            6 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(parse_sint32),
+            2 => ParseFunction::Simple(parse_sint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13336,106 +13207,104 @@ impl SegmentLapField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            253 => DateTime::parse,
-            0 => Event::parse,
-            1 => EventType::parse,
-            2 => DateTime::parse,
-            3 => parse_sint32,
-            4 => parse_sint32,
-            5 => parse_sint32,
-            6 => parse_sint32,
-            7 => parse_uint32,
-            8 => parse_uint32,
-            9 => parse_uint32,
-            10 => parse_uint32,
-            11 => parse_uint16,
-            12 => parse_uint16,
-            13 => parse_uint16,
-            14 => parse_uint16,
-            15 => parse_uint8,
-            16 => parse_uint8,
-            17 => parse_uint8,
-            18 => parse_uint8,
-            19 => parse_uint16,
-            20 => parse_uint16,
-            21 => parse_uint16,
-            22 => parse_uint16,
-            23 => Sport::parse,
-            24 => parse_uint8,
-            25 => parse_sint32,
-            26 => parse_sint32,
-            27 => parse_sint32,
-            28 => parse_sint32,
-            29 => parse_string,
-            30 => parse_uint16,
-            31 => LeftRightBalance100::parse,
-            32 => SubSport::parse,
-            33 => parse_uint32,
-            34 => parse_uint16,
-            35 => parse_uint16,
-            36 => parse_uint8,
-            37 => parse_sint16,
-            38 => parse_sint16,
-            39 => parse_sint16,
-            40 => parse_sint16,
-            41 => parse_sint16,
-            42 => parse_sint8,
-            43 => parse_sint8,
-            44 => parse_uint32,
-            45 => parse_sint16,
-            46 => parse_sint16,
-            47 => parse_sint16,
-            48 => parse_sint16,
-            49 => parse_uint32,
-            50 => parse_uint32,
-            51 => parse_uint32,
-            52 => parse_uint32,
-            53 => parse_uint16,
-            54 => parse_uint16,
-            55 => parse_uint8,
-            56 => parse_uint32,
-            57 => MessageIndex::parse,
-            58 => SportEvent::parse,
-            59 => parse_uint8,
-            60 => parse_uint8,
-            61 => parse_uint8,
-            62 => parse_uint8,
-            63 => parse_uint8,
-            64 => SegmentLapStatus::parse,
-            65 => parse_string,
-            66 => parse_uint8,
-            67 => parse_uint8,
-            68 => parse_uint8,
-            69 => parse_uint16,
-            70 => parse_uint16,
-            71 => parse_uint32,
-            72 => parse_uint16,
-            73 => parse_sint8,
-            74 => parse_sint8,
-            75 => parse_uint8,
-            76 => parse_uint8,
-            77 => parse_uint8,
-            78 => parse_uint8,
-            79 => parse_uint16,
-            80 => parse_uint16,
-            81 => parse_uint8,
-            82 => parse_uint8,
-            83 => Manufacturer::parse,
-            84 => parse_float32,
-            85 => parse_float32,
-            86 => parse_float32,
-            87 => parse_float32,
-            89 => parse_uint8,
-            90 => parse_uint8,
-            91 => parse_uint32,
-            92 => parse_uint32,
-            93 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Event::parse),
+            1 => ParseFunction::Simple(EventType::parse),
+            2 => ParseFunction::Simple(DateTime::parse),
+            3 => ParseFunction::Simple(parse_sint32),
+            4 => ParseFunction::Simple(parse_sint32),
+            5 => ParseFunction::Simple(parse_sint32),
+            6 => ParseFunction::Simple(parse_sint32),
+            7 => ParseFunction::Simple(parse_uint32),
+            8 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_uint32),
+            11 => ParseFunction::Simple(parse_uint16),
+            12 => ParseFunction::Simple(parse_uint16),
+            13 => ParseFunction::Simple(parse_uint16),
+            14 => ParseFunction::Simple(parse_uint16),
+            15 => ParseFunction::Simple(parse_uint8),
+            16 => ParseFunction::Simple(parse_uint8),
+            17 => ParseFunction::Simple(parse_uint8),
+            18 => ParseFunction::Simple(parse_uint8),
+            19 => ParseFunction::Simple(parse_uint16),
+            20 => ParseFunction::Simple(parse_uint16),
+            21 => ParseFunction::Simple(parse_uint16),
+            22 => ParseFunction::Simple(parse_uint16),
+            23 => ParseFunction::Simple(Sport::parse),
+            24 => ParseFunction::Simple(parse_uint8),
+            25 => ParseFunction::Simple(parse_sint32),
+            26 => ParseFunction::Simple(parse_sint32),
+            27 => ParseFunction::Simple(parse_sint32),
+            28 => ParseFunction::Simple(parse_sint32),
+            29 => ParseFunction::Simple(parse_string),
+            30 => ParseFunction::Simple(parse_uint16),
+            31 => ParseFunction::Simple(LeftRightBalance100::parse),
+            32 => ParseFunction::Simple(SubSport::parse),
+            33 => ParseFunction::Simple(parse_uint32),
+            34 => ParseFunction::Simple(parse_uint16),
+            35 => ParseFunction::Simple(parse_uint16),
+            36 => ParseFunction::Simple(parse_uint8),
+            37 => ParseFunction::Simple(parse_sint16),
+            38 => ParseFunction::Simple(parse_sint16),
+            39 => ParseFunction::Simple(parse_sint16),
+            40 => ParseFunction::Simple(parse_sint16),
+            41 => ParseFunction::Simple(parse_sint16),
+            42 => ParseFunction::Simple(parse_sint8),
+            43 => ParseFunction::Simple(parse_sint8),
+            44 => ParseFunction::Simple(parse_uint32),
+            45 => ParseFunction::Simple(parse_sint16),
+            46 => ParseFunction::Simple(parse_sint16),
+            47 => ParseFunction::Simple(parse_sint16),
+            48 => ParseFunction::Simple(parse_sint16),
+            49 => ParseFunction::Simple(parse_uint32),
+            50 => ParseFunction::Simple(parse_uint32),
+            51 => ParseFunction::Simple(parse_uint32),
+            52 => ParseFunction::Simple(parse_uint32),
+            53 => ParseFunction::Simple(parse_uint16),
+            54 => ParseFunction::Simple(parse_uint16),
+            55 => ParseFunction::Simple(parse_uint8),
+            56 => ParseFunction::Simple(parse_uint32),
+            57 => ParseFunction::Simple(MessageIndex::parse),
+            58 => ParseFunction::Simple(SportEvent::parse),
+            59 => ParseFunction::Simple(parse_uint8),
+            60 => ParseFunction::Simple(parse_uint8),
+            61 => ParseFunction::Simple(parse_uint8),
+            62 => ParseFunction::Simple(parse_uint8),
+            63 => ParseFunction::Simple(parse_uint8),
+            64 => ParseFunction::Simple(SegmentLapStatus::parse),
+            65 => ParseFunction::Simple(parse_string),
+            66 => ParseFunction::Simple(parse_uint8),
+            67 => ParseFunction::Simple(parse_uint8),
+            68 => ParseFunction::Simple(parse_uint8),
+            69 => ParseFunction::Simple(parse_uint16),
+            70 => ParseFunction::Simple(parse_uint16),
+            71 => ParseFunction::Simple(parse_uint32),
+            72 => ParseFunction::Simple(parse_uint16),
+            73 => ParseFunction::Simple(parse_sint8),
+            74 => ParseFunction::Simple(parse_sint8),
+            75 => ParseFunction::Simple(parse_uint8),
+            76 => ParseFunction::Simple(parse_uint8),
+            77 => ParseFunction::Simple(parse_uint8),
+            78 => ParseFunction::Simple(parse_uint8),
+            79 => ParseFunction::Simple(parse_uint16),
+            80 => ParseFunction::Simple(parse_uint16),
+            81 => ParseFunction::Simple(parse_uint8),
+            82 => ParseFunction::Simple(parse_uint8),
+            83 => ParseFunction::Simple(Manufacturer::parse),
+            84 => ParseFunction::Simple(parse_float32),
+            85 => ParseFunction::Simple(parse_float32),
+            86 => ParseFunction::Simple(parse_float32),
+            87 => ParseFunction::Simple(parse_float32),
+            89 => ParseFunction::Simple(parse_uint8),
+            90 => ParseFunction::Simple(parse_uint8),
+            91 => ParseFunction::Simple(parse_uint32),
+            92 => ParseFunction::Simple(parse_uint32),
+            93 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13642,20 +13511,18 @@ impl SegmentFileField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            1 => parse_string,
-            3 => parse_unknown,
-            4 => parse_uint32,
-            7 => SegmentLeaderboardType::parse,
-            8 => parse_uint32,
-            9 => parse_uint32,
-            10 => parse_string,
-            11 => parse_uint8,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            1 => ParseFunction::Simple(parse_string),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(SegmentLeaderboardType::parse),
+            8 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_string),
+            11 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13698,20 +13565,18 @@ impl WorkoutField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            4 => Sport::parse,
-            5 => WorkoutCapabilities::parse,
-            6 => parse_uint16,
-            8 => parse_string,
-            11 => SubSport::parse,
-            14 => parse_uint16,
-            15 => DisplayMeasure::parse,
-            17 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            4 => ParseFunction::Simple(Sport::parse),
+            5 => ParseFunction::Simple(WorkoutCapabilities::parse),
+            6 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_string),
+            11 => ParseFunction::Simple(SubSport::parse),
+            14 => ParseFunction::Simple(parse_uint16),
+            15 => ParseFunction::Simple(DisplayMeasure::parse),
+            17 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13754,18 +13619,16 @@ impl WorkoutSessionField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => Sport::parse,
-            1 => SubSport::parse,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => DisplayMeasure::parse,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(Sport::parse),
+            1 => ParseFunction::Simple(SubSport::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(DisplayMeasure::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13832,30 +13695,28 @@ impl WorkoutStepField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => parse_string,
-            1 => WktStepDuration::parse,
-            2 => parse_uint32,
-            3 => WktStepTarget::parse,
-            4 => parse_uint32,
-            5 => parse_uint32,
-            6 => parse_uint32,
-            7 => Intensity::parse,
-            8 => parse_string,
-            9 => WorkoutEquipment::parse,
-            10 => ExerciseCategory::parse,
-            11 => parse_uint16,
-            12 => parse_uint16,
-            13 => FitBaseUnit::parse,
-            19 => WktStepTarget::parse,
-            20 => parse_uint32,
-            21 => parse_uint32,
-            22 => parse_uint32,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(parse_string),
+            1 => ParseFunction::Simple(WktStepDuration::parse),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(WktStepTarget::parse),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint32),
+            7 => ParseFunction::Simple(Intensity::parse),
+            8 => ParseFunction::Simple(parse_string),
+            9 => ParseFunction::Simple(WorkoutEquipment::parse),
+            10 => ParseFunction::Simple(ExerciseCategory::parse),
+            11 => ParseFunction::Simple(parse_uint16),
+            12 => ParseFunction::Simple(parse_uint16),
+            13 => ParseFunction::Simple(FitBaseUnit::parse),
+            19 => ParseFunction::Simple(WktStepTarget::parse),
+            20 => ParseFunction::Simple(parse_uint32),
+            21 => ParseFunction::Simple(parse_uint32),
+            22 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13892,15 +13753,13 @@ impl ExerciseTitleField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            0 => ExerciseCategory::parse,
-            1 => parse_uint16,
-            2 => parse_string,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            0 => ParseFunction::Simple(ExerciseCategory::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13939,18 +13798,16 @@ impl ScheduleField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => Manufacturer::parse,
-            1 => parse_uint16,
-            2 => parse_unknown,
-            3 => DateTime::parse,
-            4 => parse_unknown,
-            5 => Schedule::parse,
-            6 => LocalDateTime::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(Manufacturer::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(DateTime::parse),
+            4 => ParseFunction::Simple(parse_unknown),
+            5 => ParseFunction::Simple(Schedule::parse),
+            6 => ParseFunction::Simple(LocalDateTime::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -13995,21 +13852,19 @@ impl TotalsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            254 => MessageIndex::parse,
-            253 => DateTime::parse,
-            0 => parse_uint32,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            3 => Sport::parse,
-            4 => parse_uint32,
-            5 => parse_uint16,
-            6 => parse_uint32,
-            9 => parse_uint8,
-            _ => parse_uint8,
+            254 => ParseFunction::Simple(MessageIndex::parse),
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(Sport::parse),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(parse_uint32),
+            9 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14062,25 +13917,23 @@ impl WeightScaleField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => Weight::parse,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            7 => parse_uint16,
-            8 => parse_uint8,
-            9 => parse_uint16,
-            10 => parse_uint8,
-            11 => parse_uint8,
-            12 => MessageIndex::parse,
-            13 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(Weight::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_uint8),
+            12 => ParseFunction::Simple(MessageIndex::parse),
+            13 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14163,22 +14016,20 @@ impl BloodPressureField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            6 => parse_uint8,
-            7 => HrType::parse,
-            8 => BpStatus::parse,
-            9 => MessageIndex::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(HrType::parse),
+            8 => ParseFunction::Simple(BpStatus::parse),
+            9 => ParseFunction::Simple(MessageIndex::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14215,17 +14066,15 @@ impl MonitoringInfoField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => LocalDateTime::parse,
-            1 => ActivityType::parse,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(LocalDateTime::parse),
+            1 => ParseFunction::Simple(ActivityType::parse),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14316,40 +14165,38 @@ impl MonitoringField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => DeviceIndex::parse,
-            1 => parse_uint16,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => ActivityType::parse,
-            6 => ActivitySubtype::parse,
-            7 => ActivityLevel::parse,
-            8 => parse_uint16,
-            9 => parse_uint16,
-            10 => parse_uint16,
-            11 => LocalDateTime::parse,
-            12 => parse_sint16,
-            14 => parse_sint16,
-            15 => parse_sint16,
-            16 => parse_uint16,
-            19 => parse_uint16,
-            24 => parse_byte,
-            25 => parse_uint8,
-            26 => parse_uint16,
-            27 => parse_uint8,
-            28 => parse_uint8,
-            29 => parse_uint16,
-            30 => parse_uint32,
-            31 => parse_uint32,
-            32 => parse_uint32,
-            33 => parse_uint16,
-            34 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(DeviceIndex::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(ActivityType::parse),
+            6 => ParseFunction::Simple(ActivitySubtype::parse),
+            7 => ParseFunction::Simple(ActivityLevel::parse),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_uint16),
+            11 => ParseFunction::Simple(LocalDateTime::parse),
+            12 => ParseFunction::Simple(parse_sint16),
+            14 => ParseFunction::Simple(parse_sint16),
+            15 => ParseFunction::Simple(parse_sint16),
+            16 => ParseFunction::Simple(parse_uint16),
+            19 => ParseFunction::Simple(parse_uint16),
+            24 => ParseFunction::Simple(parse_byte),
+            25 => ParseFunction::Simple(parse_uint8),
+            26 => ParseFunction::Simple(parse_uint16),
+            27 => ParseFunction::Simple(parse_uint8),
+            28 => ParseFunction::Simple(parse_uint8),
+            29 => ParseFunction::Simple(parse_uint16),
+            30 => ParseFunction::Simple(parse_uint32),
+            31 => ParseFunction::Simple(parse_uint32),
+            32 => ParseFunction::Simple(parse_uint32),
+            33 => ParseFunction::Simple(parse_uint16),
+            34 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14416,14 +14263,12 @@ impl MonitoringHrDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint8,
-            1 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14458,15 +14303,13 @@ impl Spo2DataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint8,
-            1 => parse_uint8,
-            2 => Spo2MeasurementType::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(Spo2MeasurementType::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14511,17 +14354,15 @@ impl HrField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint8,
-            6 => parse_uint8,
-            9 => parse_uint32,
-            10 => parse_byte,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint8),
+            6 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint32),
+            10 => ParseFunction::Simple(parse_byte),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14562,13 +14403,11 @@ impl StressLevelField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_sint16,
-            1 => DateTime::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_sint16),
+            1 => ParseFunction::Simple(DateTime::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14609,19 +14448,17 @@ impl MaxMetDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => DateTime::parse,
-            2 => parse_uint16,
-            5 => Sport::parse,
-            6 => SubSport::parse,
-            8 => MaxMetCategory::parse,
-            9 => parse_unknown,
-            12 => MaxMetHeartRateSource::parse,
-            13 => MaxMetSpeedSource::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(DateTime::parse),
+            2 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(Sport::parse),
+            6 => ParseFunction::Simple(SubSport::parse),
+            8 => ParseFunction::Simple(MaxMetCategory::parse),
+            9 => ParseFunction::Simple(parse_unknown),
+            12 => ParseFunction::Simple(MaxMetHeartRateSource::parse),
+            13 => ParseFunction::Simple(MaxMetSpeedSource::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14660,16 +14497,14 @@ impl HsaBodyBatteryDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_sint8,
-            2 => parse_sint16,
-            3 => parse_sint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_sint8),
+            2 => ParseFunction::Simple(parse_sint16),
+            3 => ParseFunction::Simple(parse_sint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14700,13 +14535,11 @@ impl HsaEventField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14745,18 +14578,16 @@ impl HsaAccelerometerDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_sint16,
-            3 => parse_sint16,
-            4 => parse_sint16,
-            5 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_sint16),
+            3 => ParseFunction::Simple(parse_sint16),
+            4 => ParseFunction::Simple(parse_sint16),
+            5 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14809,18 +14640,16 @@ impl HsaGyroscopeDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_sint16,
-            3 => parse_sint16,
-            4 => parse_sint16,
-            5 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_sint16),
+            3 => ParseFunction::Simple(parse_sint16),
+            4 => ParseFunction::Simple(parse_sint16),
+            5 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14865,14 +14694,12 @@ impl HsaStepDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14909,15 +14736,13 @@ impl HsaSpo2DataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint8,
-            2 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14948,14 +14773,12 @@ impl HsaStressDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_sint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_sint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -14990,14 +14813,12 @@ impl HsaRespirationDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_sint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_sint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15036,15 +14857,13 @@ impl HsaHeartRateDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint8,
-            2 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15081,14 +14900,12 @@ impl HsaConfigurationDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_byte,
-            1 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_byte),
+            1 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15121,14 +14938,12 @@ impl HsaWristTemperatureDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15171,17 +14986,15 @@ impl MemoGlobField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            250 => parse_uint32,
-            0 => parse_byte,
-            1 => MesgNum::parse,
-            2 => MessageIndex::parse,
-            3 => parse_uint8,
-            4 => parse_unknown,
-            _ => parse_uint8,
+            250 => ParseFunction::Simple(parse_uint32),
+            0 => ParseFunction::Simple(parse_byte),
+            1 => ParseFunction::Simple(MesgNum::parse),
+            2 => ParseFunction::Simple(MessageIndex::parse),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15210,13 +15023,11 @@ impl SleepLevelField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => SleepLevel::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(SleepLevel::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15251,16 +15062,14 @@ impl AntChannelIdField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_unknown,
-            2 => parse_unknown,
-            3 => parse_unknown,
-            4 => DeviceIndex::parse,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_unknown),
+            2 => ParseFunction::Simple(parse_unknown),
+            3 => ParseFunction::Simple(parse_unknown),
+            4 => ParseFunction::Simple(DeviceIndex::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15297,17 +15106,15 @@ impl AntRxField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_byte,
-            2 => parse_byte,
-            3 => parse_uint8,
-            4 => parse_byte,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_byte),
+            2 => ParseFunction::Simple(parse_byte),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_byte),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15348,17 +15155,15 @@ impl AntTxField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_byte,
-            2 => parse_byte,
-            3 => parse_uint8,
-            4 => parse_byte,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_byte),
+            2 => ParseFunction::Simple(parse_byte),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_byte),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15395,15 +15200,13 @@ impl ExdScreenConfigurationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_uint8,
-            2 => ExdLayout::parse,
-            3 => parse_unknown,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(ExdLayout::parse),
+            3 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15440,17 +15243,15 @@ impl ExdDataFieldConfigurationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_byte,
-            2 => parse_uint8,
-            3 => parse_uint8,
-            4 => ExdDisplayType::parse,
-            5 => parse_string,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_byte),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(ExdDisplayType::parse),
+            5 => ParseFunction::Simple(parse_string),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15497,22 +15298,20 @@ impl ExdDataConceptConfigurationField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_byte,
-            2 => parse_uint8,
-            3 => parse_uint8,
-            4 => parse_uint8,
-            5 => parse_uint8,
-            6 => parse_uint8,
-            8 => ExdDataUnits::parse,
-            9 => ExdQualifiers::parse,
-            10 => ExdDescriptors::parse,
-            11 => parse_unknown,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_byte),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_uint8),
+            6 => ParseFunction::Simple(parse_uint8),
+            8 => ParseFunction::Simple(ExdDataUnits::parse),
+            9 => ParseFunction::Simple(ExdQualifiers::parse),
+            10 => ParseFunction::Simple(ExdDescriptors::parse),
+            11 => ParseFunction::Simple(parse_unknown),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15583,34 +15382,32 @@ impl DiveSummaryField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => MesgNum::parse,
-            1 => MessageIndex::parse,
-            2 => parse_uint32,
-            3 => parse_uint32,
-            4 => parse_uint32,
-            5 => parse_uint8,
-            6 => parse_uint8,
-            7 => parse_uint16,
-            8 => parse_uint16,
-            9 => parse_uint16,
-            10 => parse_uint32,
-            11 => parse_uint32,
-            12 => parse_uint16,
-            13 => parse_uint16,
-            14 => parse_uint16,
-            15 => parse_uint32,
-            16 => parse_uint32,
-            17 => parse_sint32,
-            22 => parse_uint32,
-            23 => parse_uint32,
-            24 => parse_uint32,
-            25 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(MesgNum::parse),
+            1 => ParseFunction::Simple(MessageIndex::parse),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint32),
+            4 => ParseFunction::Simple(parse_uint32),
+            5 => ParseFunction::Simple(parse_uint8),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint16),
+            8 => ParseFunction::Simple(parse_uint16),
+            9 => ParseFunction::Simple(parse_uint16),
+            10 => ParseFunction::Simple(parse_uint32),
+            11 => ParseFunction::Simple(parse_uint32),
+            12 => ParseFunction::Simple(parse_uint16),
+            13 => ParseFunction::Simple(parse_uint16),
+            14 => ParseFunction::Simple(parse_uint16),
+            15 => ParseFunction::Simple(parse_uint32),
+            16 => ParseFunction::Simple(parse_uint32),
+            17 => ParseFunction::Simple(parse_sint32),
+            22 => ParseFunction::Simple(parse_uint32),
+            23 => ParseFunction::Simple(parse_uint32),
+            24 => ParseFunction::Simple(parse_uint32),
+            25 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15719,17 +15516,15 @@ impl AadAccelFeaturesField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint32,
-            2 => parse_uint16,
-            3 => parse_uint8,
-            4 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15762,12 +15557,10 @@ impl HrvField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint16,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15802,14 +15595,12 @@ impl BeatIntervalsField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15850,19 +15641,17 @@ impl HrvStatusSummaryField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint16,
-            4 => parse_uint16,
-            5 => parse_uint16,
-            6 => HrvStatus::parse,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(parse_uint16),
+            5 => ParseFunction::Simple(parse_uint16),
+            6 => ParseFunction::Simple(HrvStatus::parse),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15917,13 +15706,11 @@ impl HrvValueField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -15964,17 +15751,15 @@ impl RawBbiField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint16,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint8,
-            4 => parse_uint8,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint16),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint8),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16003,13 +15788,11 @@ impl RespirationRateField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_sint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_sint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16054,19 +15837,17 @@ impl ChronoShotSessionField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint32,
-            1 => parse_uint32,
-            2 => parse_uint32,
-            3 => parse_uint16,
-            4 => ProjectileType::parse,
-            5 => parse_uint32,
-            6 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_uint32),
+            2 => ParseFunction::Simple(parse_uint32),
+            3 => ParseFunction::Simple(parse_uint16),
+            4 => ParseFunction::Simple(ProjectileType::parse),
+            5 => ParseFunction::Simple(parse_uint32),
+            6 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16119,14 +15900,12 @@ impl ChronoShotDataField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => parse_uint32,
-            1 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(parse_uint32),
+            1 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16161,14 +15940,12 @@ impl TankUpdateField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => AntChannelId::parse,
-            1 => parse_uint16,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(AntChannelId::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16207,16 +15984,14 @@ impl TankSummaryField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => AntChannelId::parse,
-            1 => parse_uint16,
-            2 => parse_uint16,
-            3 => parse_uint32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(AntChannelId::parse),
+            1 => ParseFunction::Simple(parse_uint16),
+            2 => ParseFunction::Simple(parse_uint16),
+            3 => ParseFunction::Simple(parse_uint32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16281,25 +16056,23 @@ impl SleepAssessmentField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            0 => parse_uint8,
-            1 => parse_uint8,
-            2 => parse_uint8,
-            3 => parse_uint8,
-            4 => parse_uint8,
-            5 => parse_uint8,
-            6 => parse_uint8,
-            7 => parse_uint8,
-            8 => parse_uint8,
-            9 => parse_uint8,
-            10 => parse_uint8,
-            11 => parse_uint8,
-            14 => parse_uint8,
-            15 => parse_uint16,
-            _ => parse_uint8,
+            0 => ParseFunction::Simple(parse_uint8),
+            1 => ParseFunction::Simple(parse_uint8),
+            2 => ParseFunction::Simple(parse_uint8),
+            3 => ParseFunction::Simple(parse_uint8),
+            4 => ParseFunction::Simple(parse_uint8),
+            5 => ParseFunction::Simple(parse_uint8),
+            6 => ParseFunction::Simple(parse_uint8),
+            7 => ParseFunction::Simple(parse_uint8),
+            8 => ParseFunction::Simple(parse_uint8),
+            9 => ParseFunction::Simple(parse_uint8),
+            10 => ParseFunction::Simple(parse_uint8),
+            11 => ParseFunction::Simple(parse_uint8),
+            14 => ParseFunction::Simple(parse_uint8),
+            15 => ParseFunction::Simple(parse_uint16),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 
@@ -16338,16 +16111,14 @@ impl SkinTempOvernightField {
         }
     }
 
-    fn get_parse_function(
-        def_number: u8,
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {
+    fn get_parse_function(def_number: u8) -> ParseFunction {
         match def_number {
-            253 => DateTime::parse,
-            0 => LocalDateTime::parse,
-            1 => parse_float32,
-            2 => parse_float32,
-            4 => parse_float32,
-            _ => parse_uint8,
+            253 => ParseFunction::Simple(DateTime::parse),
+            0 => ParseFunction::Simple(LocalDateTime::parse),
+            1 => ParseFunction::Simple(parse_float32),
+            2 => ParseFunction::Simple(parse_float32),
+            4 => ParseFunction::Simple(parse_float32),
+            _ => ParseFunction::Simple(parse_uint8),
         }
     }
 

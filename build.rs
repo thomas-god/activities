@@ -178,6 +178,7 @@ fn generate_enums_code(enums: &[(EnumName, EnumType, Vec<(usize, EnumVariant)>)]
     code.push_str("#![allow(clippy::match_single_binding)]\n\n");
     code.push_str("#![allow(clippy::match_overlapping_arm)]\n\n");
     code.push_str("use crate::{parser::reader::Reader};\n");
+    code.push_str("use crate::{parser::records::DataMessageField};\n");
     code.push_str(
         "use crate::parser::types::{parse_uint8, parse_uint8z, parse_sint8,
         parse_uint16, parse_uint16z, parse_sint16,
@@ -417,7 +418,9 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
                     snake_to_camel_case(v)
                 )
             })
-            .chain(vec!["_ => parse_unknown".to_string()]),
+            .chain(vec![
+                "_ => ParseFunction::Simple(parse_unknown)".to_string(),
+            ]),
         ",\n",
     );
 
@@ -473,7 +476,7 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
 
     pub fn field_parse(
         &self, def_number: u8
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
+    ) -> ParseFunction {{
         match self {{
             {mapping_parse}
         }}
@@ -772,6 +775,13 @@ fn generate_messages_code(messages: Vec<(String, Vec<Field>)>, enums: Vec<String
 
     code.push_str(&format!(
         r#"
+
+#[derive(Debug, Clone)]
+pub enum ParseFunction {{
+    Simple(fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError>),
+    Dynamic(fn(&mut Reader, &Endianness, u8, &[DataMessageField]) -> Result<Vec<DataValue>, DataTypeError>)
+}}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FitMessage {{
     {messages_enum}
@@ -823,12 +833,12 @@ pub enum {message}Field {{
                 .iter()
                 .map(|def| {
                     format!(
-                        "{} => {}",
+                        "{} => ParseFunction::Simple({})",
                         def.field_def,
                         get_parse_function(&enums, &def.base_type)
                     )
                 })
-                .chain(vec!["_ => parse_uint8".to_string()]),
+                .chain(vec!["_ => ParseFunction::Simple(parse_uint8)".to_string()]),
             ",\n",
         );
 
@@ -880,7 +890,7 @@ impl {message}Field {{
 
     fn get_parse_function(
         def_number: u8
-    ) -> fn(&mut Reader, &Endianness, u8) -> Result<Vec<DataValue>, DataTypeError> {{
+    ) -> ParseFunction {{
         match def_number {{
             {parse_mappings}
         }}

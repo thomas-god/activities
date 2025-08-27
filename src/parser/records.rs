@@ -5,7 +5,10 @@ use thiserror::Error;
 use crate::parser::{
     definition::{Definition, custom::CustomDescription, parse_definition_message},
     reader::{Reader, ReaderError},
-    types::{DataTypeError, DataValue, generated::FitMessage},
+    types::{
+        DataTypeError, DataValue,
+        generated::{FitMessage, ParseFunction},
+    },
 };
 
 #[derive(Debug)]
@@ -151,10 +154,23 @@ fn parse_data_message(
 
     let mut fields = Vec::new();
     for field in definition.fields.iter() {
-        let values = (field.parse)(content, &field.endianness, field.size)?
-            .iter()
-            .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
-            .collect();
+        let values = match field.parse {
+            ParseFunction::Simple(parse) => parse(content, &field.endianness, field.size),
+            ParseFunction::Dynamic(parse) => parse(content, &field.endianness, field.size, &fields),
+        };
+
+        let values = match values {
+            Ok(values) => values
+                .iter()
+                .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+                .collect(),
+            Err(err) => {
+                for field in fields {
+                    println!("{field:?}");
+                }
+                return Err(RecordError::from(err));
+            }
+        };
         fields.push(DataMessageField {
             kind: field.kind.clone(),
             values,
@@ -195,10 +211,23 @@ fn parse_compressed_message(
 
     // Parse remaining fields
     for field in definition.fields.iter() {
-        let values = (field.parse)(content, &field.endianness, field.size)?
-            .iter()
-            .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
-            .collect();
+        let values = match field.parse {
+            ParseFunction::Simple(parse) => parse(content, &field.endianness, field.size),
+            ParseFunction::Dynamic(parse) => parse(content, &field.endianness, field.size, &fields),
+        };
+        let values = match values {
+            Ok(values) => values
+                .iter()
+                .flat_map(|val| val.apply_scale_offset(&field.scale_offset))
+                .collect(),
+
+            Err(err) => {
+                for field in fields {
+                    println!("{field:?}");
+                }
+                return Err(RecordError::from(err));
+            }
+        };
         fields.push(DataMessageField {
             kind: field.kind.clone(),
             values,
