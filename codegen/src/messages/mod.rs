@@ -4,7 +4,7 @@ mod parse;
 pub use generate::generate_messages_code;
 pub use parse::parse_messages_definitions;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Field {
     field_def: u8,
     name: String,
@@ -14,7 +14,7 @@ pub struct Field {
     offset: Option<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Subfield {
     name: String,
     base_type: String,
@@ -23,7 +23,7 @@ pub struct Subfield {
     offset: Option<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SubfieldReference {
     name: String,
     value: String,

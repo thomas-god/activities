@@ -1,8 +1,9 @@
 use itertools::join;
 
 use crate::{
-    MESSAGES_TO_IMPORT, snake_to_camel_case,
+    MESSAGES_TO_IMPORT,
     types::{EnumName, EnumType, EnumVariant},
+    utils::snake_to_camel_case,
 };
 
 pub fn generate_enums_code(enums: &[(EnumName, EnumType, Vec<(usize, EnumVariant)>)]) -> String {

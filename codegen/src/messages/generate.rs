@@ -5,7 +5,7 @@ use itertools::join;
 use crate::{
     BASE_TYPES,
     messages::{Field, Subfield},
-    snake_to_camel_case,
+    utils::snake_to_camel_case,
 };
 
 pub fn generate_messages_code(

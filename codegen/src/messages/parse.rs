@@ -6,8 +6,8 @@ use std::iter::zip;
 use crate::{
     MESSAGES_TO_IMPORT,
     messages::{Field, Subfield, SubfieldReference},
-    snake_to_camel_case,
     types::EnumName,
+    utils::snake_to_camel_case,
 };
 
 pub fn parse_messages_definitions(
@@ -165,6 +165,7 @@ struct Columns {
     subfield_references: Option<Vec<String>>,
     subfield_reference_values: Option<Vec<String>>,
 }
+
 fn parse_columns(row: &[Data]) -> Columns {
     let message_name = column_string_content(row, 0);
     let field_definition_number = row.get(1).and_then(|data| match data {
@@ -214,5 +215,242 @@ fn is_fit_enum(type_name: &str) -> Option<String> {
         | "uint32z" | "sint64" | "uint64" | "uint64z" | "string" | "float32" | "float64"
         | "byte" => None,
         val => Some(val.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_parse_fields_definitions() {
+        let first_row: &[Data] = &[
+            Data::Empty,                            // message_name
+            Data::Float(1.),                        // field def number
+            Data::String("field_name".to_string()), // field name
+            Data::String("field_type".to_string()), // field type
+            Data::Empty,                            // array
+            Data::Empty,                            // components
+            Data::Empty,                            // scale
+            Data::Empty,                            // offset
+            Data::Empty,                            // units
+            Data::Empty,                            // bits
+            Data::Empty,                            // accumulate
+            Data::Empty,                            // reference field name
+            Data::Empty,                            // reference field value
+        ];
+        let second_row: &[Data] = &[
+            Data::Empty,
+            Data::Float(2.),
+            Data::String("second_field_name".to_string()),
+            Data::String("second_field_type".to_string()),
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+        ];
+        let content = vec![first_row, second_row];
+        let mut iter = content.into_iter();
+
+        let (next_message_name, fields, subfields) = parse_fields_definitions(&mut iter);
+
+        assert!(next_message_name.is_none());
+        assert!(subfields.is_empty());
+        assert_eq!(
+            fields,
+            vec![
+                Field {
+                    name: "field_name".to_string(),
+                    field_def: 1,
+                    base_type: "field_type".to_string(),
+                    scale: None,
+                    offset: None
+                },
+                Field {
+                    name: "second_field_name".to_string(),
+                    field_def: 2,
+                    base_type: "second_field_type".to_string(),
+                    scale: None,
+                    offset: None
+                }
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_fields_definitions_next_definitions_message() {
+        let first_row: &[Data] = &[
+            Data::Empty,                            // message_name
+            Data::Float(1.),                        // field def number
+            Data::String("field_name".to_string()), // field name
+            Data::String("field_type".to_string()), // field type
+            Data::Empty,                            // array
+            Data::Empty,                            // components
+            Data::Empty,                            // scale
+            Data::Empty,                            // offset
+            Data::Empty,                            // units
+            Data::Empty,                            // bits
+            Data::Empty,                            // accumulate
+            Data::Empty,                            // reference field name
+            Data::Empty,                            // reference field value
+        ];
+        let second_row: &[Data] = &[
+            Data::String("next message".to_string()),
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+        ];
+        let content = vec![first_row, second_row];
+        let mut iter = content.into_iter();
+
+        let (next_message_name, fields, subfields) = parse_fields_definitions(&mut iter);
+
+        assert_eq!(next_message_name, Some("next message".to_string()));
+        assert!(subfields.is_empty());
+        assert_eq!(fields.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_fields_definitions_with_subfields() {
+        let first_row: &[Data] = &[
+            Data::Empty,                                // message_name
+            Data::Float(1.),                            // field def number
+            Data::String("ref_field".to_string()),      // field name
+            Data::String("ref_field_type".to_string()), // field type
+            Data::Empty,                                // array
+            Data::Empty,                                // components
+            Data::Empty,                                // scale
+            Data::Empty,                                // offset
+            Data::Empty,                                // units
+            Data::Empty,                                // bits
+            Data::Empty,                                // accumulate
+            Data::Empty,                                // reference field name
+            Data::Empty,                                // reference field value
+        ];
+        let second_row: &[Data] = &[
+            Data::Empty,
+            Data::Float(2.),
+            Data::String("field_name".to_string()),
+            Data::String("field_type".to_string()),
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+        ];
+        let third_row: &[Data] = &[
+            Data::Empty,
+            Data::Empty,
+            Data::String("subfield_name".to_string()),
+            Data::String("subfield_type".to_string()),
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::String("ref_field".to_string()),
+            Data::String("ref_field_value".to_string()),
+        ];
+
+        let fourth_row: &[Data] = &[
+            Data::Empty,
+            Data::Empty,
+            Data::String("another_subfield_name".to_string()),
+            Data::String("another_subfield_type".to_string()),
+            Data::Empty,
+            Data::Empty,
+            Data::Float(12.3),
+            Data::Int(500),
+            Data::Empty,
+            Data::Empty,
+            Data::Empty,
+            Data::String("ref_field,ref_field".to_string()),
+            Data::String("ref_field_value,another_ref_field_value".to_string()),
+        ];
+        let content = vec![first_row, second_row, third_row, fourth_row];
+        let mut iter = content.into_iter();
+
+        let (next_message_name, fields, subfields) = parse_fields_definitions(&mut iter);
+
+        assert!(next_message_name.is_none());
+
+        assert_eq!(
+            fields,
+            vec![
+                Field {
+                    name: "ref_field".to_string(),
+                    field_def: 1,
+                    base_type: "ref_field_type".to_string(),
+                    scale: None,
+                    offset: None
+                },
+                Field {
+                    name: "field_name".to_string(),
+                    field_def: 2,
+                    base_type: "field_type".to_string(),
+                    scale: None,
+                    offset: None
+                }
+            ]
+        );
+
+        assert_eq!(
+            subfields,
+            HashMap::from([(
+                "field_name".to_string(),
+                vec![
+                    Subfield {
+                        name: "subfield_name".to_string(),
+                        base_type: "subfield_type".to_string(),
+                        offset: None,
+                        scale: None,
+                        references: vec![SubfieldReference {
+                            name: "ref_field".to_string(),
+                            base_type: Some("ref_field_type".to_string()),
+                            value: "ref_field_value".to_string()
+                        }]
+                    },
+                    Subfield {
+                        name: "another_subfield_name".to_string(),
+                        base_type: "another_subfield_type".to_string(),
+                        offset: Some(500.),
+                        scale: Some(12.3),
+                        references: vec![
+                            SubfieldReference {
+                                name: "ref_field".to_string(),
+                                base_type: Some("ref_field_type".to_string()),
+                                value: "ref_field_value".to_string()
+                            },
+                            SubfieldReference {
+                                name: "ref_field".to_string(),
+                                base_type: Some("ref_field_type".to_string()),
+                                value: "another_ref_field_value".to_string()
+                            }
+                        ]
+                    }
+                ]
+            ),])
+        );
     }
 }

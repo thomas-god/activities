@@ -1,15 +1,15 @@
 #![allow(clippy::const_is_empty)]
 #![allow(clippy::type_complexity)]
 
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
 
 use crate::messages::{generate_messages_code, parse_messages_definitions};
 use crate::types::{generate_enums_code, parse_enums};
+use crate::utils::format_code;
 
 mod messages;
 mod types;
+mod utils;
 
 const MESSAGES_TO_IMPORT: &[&str] = &[]; // If empty, every message type is imported
 // const MESSAGES_TO_IMPORT: &[&str] = &["Record", "FieldDescription", "DeviceInfo"];
@@ -31,51 +31,4 @@ pub fn generate_code(profile: &Path) -> String {
     code = format_code(&code);
 
     code
-}
-
-fn snake_to_camel_case(input: &str) -> String {
-    let trimmed = input.trim_start_matches(char::is_numeric);
-    trimmed
-        .split('_')
-        .map(|w| {
-            let mut new = w.to_string();
-            if new.is_empty() {
-                return new;
-            }
-            if let Some((idx, c)) = new.char_indices().next() {
-                new.replace_range(idx..idx + 1, &c.to_uppercase().to_string());
-            }
-
-            new
-        })
-        .collect()
-}
-
-fn format_code(code: &str) -> String {
-    let mut child = Command::new("rustfmt")
-        .arg("--emit=stdout")
-        .arg("--quiet")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to spawn rustfmt");
-
-    // Write code to rustfmt's stdin
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(code.as_bytes())
-            .expect("Failed to write to rustfmt");
-    }
-
-    let output = child
-        .wait_with_output()
-        .expect("Failed to read rustfmt output");
-
-    if output.status.success() {
-        String::from_utf8(output.stdout).unwrap_or_else(|_| code.to_string())
-    } else {
-        println!("cargo:warning=rustfmt failed, using unformatted code");
-        code.to_string()
-    }
 }
