@@ -9,7 +9,7 @@ use crate::parser::{
     records::{CompressedTimestamp, RecordError},
 };
 
-pub use crate::parser::definition::{Definition, DefinitionField, Endianness};
+pub use crate::parser::definition::{Definition, Endianness};
 pub use crate::parser::records::Record;
 pub use crate::parser::records::{DataMessage, DataMessageField};
 
@@ -37,7 +37,7 @@ pub enum FitParserError {
     ParserError(#[from] RecordError),
 }
 
-pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
+pub fn parse_fit_messages(file: &str) -> Result<Vec<DataMessage>, FitParserError> {
     let content = fs::read(file)?.into_iter();
 
     let mut header_reader = Reader::new(HEADER_SIZE as u32, content);
@@ -48,7 +48,7 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
     let mut definitions: HashMap<u8, Definition> = HashMap::new();
     let mut custom_descriptions: HashMap<u8, HashMap<u8, CustomDescription>> = HashMap::new();
     let mut compressed_timestamp = CompressedTimestamp::default();
-    let mut records = Vec::new();
+    let mut messages = Vec::new();
 
     loop {
         if reader.is_empty() {
@@ -66,12 +66,12 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
             Record::Definition(ref definition) => {
                 definitions.insert(definition.local_message_type, definition.clone());
             }
-            Record::Data(ref data) => {
-                parse_custom_definition_description(data, &definitions, &mut custom_descriptions);
+            Record::Data(data) => {
+                parse_custom_definition_description(&data, &definitions, &mut custom_descriptions);
                 compressed_timestamp.set_last_timestamp(data.last_timestamp());
+                messages.push(data);
             }
         }
-        records.push(record);
 
         if reader.is_empty() {
             break;
@@ -87,15 +87,15 @@ pub fn parse_records(file: &str) -> Result<Vec<Record>, FitParserError> {
         return Err(FitParserError::InvalidBodyCRC(expected_crc, body_crc));
     }
 
-    Ok(records)
+    Ok(messages)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_records;
+    use crate::parser::parse_fit_messages;
 
     #[test]
     fn test_no_error() {
-        let _ = parse_records("test.fit");
+        let _ = parse_fit_messages("test.fit");
     }
 }

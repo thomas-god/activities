@@ -1,6 +1,6 @@
 use std::env;
 
-use activities::{Activity, parse_records};
+use activities::{Activity, parse_fit_messages};
 
 enum Mode {
     Raw,
@@ -52,9 +52,9 @@ fn main() {
 
     match mode {
         Mode::Raw => {
-            let records = parse_records(&file).unwrap();
-            for record in records.iter() {
-                println!("{record:?}");
+            let messages = parse_fit_messages(&file).unwrap();
+            for message in messages.iter() {
+                println!("{message:?}");
             }
         }
         Mode::Activity => {

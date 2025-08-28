@@ -3,7 +3,7 @@ use std::{collections::HashMap, mem::discriminant};
 use crate::{
     DataValue,
     parser::{
-        definition::{Definition, Endianness},
+        definition::Definition,
         records::DataMessage,
         types::generated::{FieldDescriptionField, FitBaseType, FitEnum, FitMessage, MesgNum},
     },
@@ -11,7 +11,6 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct CustomDescription {
-    pub endianness: Endianness,
     pub base_type: FitBaseType,
     pub name: Option<String>,
     pub units: Option<String>,
@@ -53,16 +52,13 @@ pub fn parse_custom_definition_description(
     ) else {
         return;
     };
-    let Some(endianness) = definition.fields.first().map(|f| f.endianness) else {
-        return;
-    };
+
     let name =
         find_value_of_field_as_string(message, definition, &FieldDescriptionField::FieldName);
     let units = find_value_of_field_as_string(message, definition, &FieldDescriptionField::Units);
 
     let description = CustomDescription {
         base_type,
-        endianness,
         name,
         units,
     };
@@ -137,6 +133,7 @@ mod test {
     use crate::{
         DataValue,
         parser::{
+            Endianness,
             definition::DefinitionField,
             records::DataMessageField,
             types::{

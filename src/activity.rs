@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    DataValue, FitParserError, Record, parse_records,
+    DataMessage, DataValue, FitParserError, parse_fit_messages,
     parser::types::generated::{DeviceInfoField, FitMessage, RecordField},
 };
 
@@ -24,10 +24,10 @@ pub enum ParseActivityError {
 
 impl Activity {
     pub fn from_file(file: &str) -> Result<Self, ParseActivityError> {
-        let records = parse_records(file)?;
+        let records = parse_fit_messages(file)?;
         Ok(Self::from_records(&records))
     }
-    pub fn from_records(records: &[Record]) -> Self {
+    pub fn from_records(records: &[DataMessage]) -> Self {
         // Metadata
         let mut metadata = None;
         for record in records.iter() {
@@ -40,7 +40,7 @@ impl Activity {
 
         // Values
         let mut values = Vec::new();
-        let reader = RecordsReader::new(records);
+        let reader = MessagesReader::new(records);
         for val in reader {
             values.push(val.clone());
         }
@@ -52,12 +52,8 @@ impl Activity {
     }
 }
 
-fn find_product_name(record: &Record) -> Option<String> {
-    let Record::Data(data) = record else {
-        return None;
-    };
-
-    for field in data.fields.iter() {
+fn find_product_name(message: &DataMessage) -> Option<String> {
+    for field in message.fields.iter() {
         if let FitMessage::DeviceInfo(DeviceInfoField::ProductName) = field.kind {
             return field
                 .values
@@ -75,21 +71,21 @@ fn find_product_name(record: &Record) -> Option<String> {
     None
 }
 
-struct RecordsReader<'a> {
-    records_iterator: std::slice::Iter<'a, Record>,
+struct MessagesReader<'a> {
+    messages_iterator: std::slice::Iter<'a, DataMessage>,
     current_values: Option<Vec<&'a DataValue>>,
 }
 
-impl<'a> RecordsReader<'a> {
-    pub fn new(content: &'a [Record]) -> Self {
+impl<'a> MessagesReader<'a> {
+    pub fn new(content: &'a [DataMessage]) -> Self {
         Self {
-            records_iterator: content.iter(),
+            messages_iterator: content.iter(),
             current_values: None,
         }
     }
 }
 
-impl<'a> Iterator for RecordsReader<'a> {
+impl<'a> Iterator for MessagesReader<'a> {
     type Item = &'a DataValue;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -98,14 +94,7 @@ impl<'a> Iterator for RecordsReader<'a> {
         };
 
         loop {
-            // Find next Record::Data message
-            let msg = loop {
-                match self.records_iterator.next() {
-                    Some(Record::Data(msg)) => break msg,
-                    None => return None,
-                    _ => {}
-                }
-            };
+            let msg = self.messages_iterator.next()?;
 
             // Parse fields and search for timestamp
             let mut values = Vec::new();
@@ -137,7 +126,7 @@ mod test {
 
     #[test]
     fn test() {
-        let records = vec![Record::Data(DataMessage {
+        let records = vec![DataMessage {
             local_message_type: 0,
             fields: vec![
                 DataMessageField {
@@ -149,7 +138,7 @@ mod test {
                     values: vec![DataValue::Float32(9.8)],
                 },
             ],
-        })];
+        }];
 
         let activity = Activity::from_records(&records);
 

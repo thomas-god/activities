@@ -266,8 +266,12 @@ impl CompressedTimestamp {
 mod tests {
 
     use crate::{
-        DefinitionField, Endianness, FitEnum, MesgNum,
-        parser::types::generated::{Event, EventField, EventFieldDataSubfield, RecordField},
+        FitEnum, MesgNum,
+        parser::{
+            Endianness,
+            definition::DefinitionField,
+            types::generated::{Event, EventField, EventFieldDataSubfield, RecordField},
+        },
     };
 
     use super::*;

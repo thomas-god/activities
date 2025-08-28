@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{Endianness, parser::reader::Reader};
+use crate::parser::{Endianness, reader::Reader};
 
 #[derive(Error, Debug)]
 pub enum FileHeaderError {
