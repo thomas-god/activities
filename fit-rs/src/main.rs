@@ -1,6 +1,6 @@
 use std::env;
 
-use activities::{Activity, parse_fit_messages};
+use fit_rs::{Activity, parse_fit_messages};
 
 enum Mode {
     Raw,

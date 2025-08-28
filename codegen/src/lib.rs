@@ -5,6 +5,7 @@ use itertools::join;
 use std::collections::HashMap;
 use std::io::Write;
 use std::iter::zip;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
@@ -21,11 +22,9 @@ type EnumName = String;
 type EnumVariant = String;
 type EnumType = String;
 
-fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
-
-    let mut enums = parse_enums();
-    let (messages, enums_used) = parse_messages_definitions();
+pub fn generate_code(profile: &Path) -> String {
+    let mut enums = parse_enums(profile);
+    let (messages, enums_used) = parse_messages_definitions(profile);
 
     enums.retain(|(name, _, __)| enums_used.contains(name));
 
@@ -35,11 +34,11 @@ fn main() {
     code.push_str(&generate_messages_code(messages, enums_names));
     code = format_code(&code);
 
-    std::fs::write("src/parser/types/generated.rs", code).expect("Could not wirte to ouptut file");
+    code
 }
 
-fn parse_enums() -> Vec<(EnumName, EnumType, Vec<(usize, EnumVariant)>)> {
-    let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
+fn parse_enums(profile: &Path) -> Vec<(EnumName, EnumType, Vec<(usize, EnumVariant)>)> {
+    let mut workbook: Xlsx<_> = open_workbook(profile).expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Types")
         .expect("The profile file does not contain a Types sheet");
@@ -564,11 +563,13 @@ struct Field {
     offset: Option<f32>,
 }
 
-fn parse_messages_definitions() -> (
+fn parse_messages_definitions(
+    profile: &Path,
+) -> (
     Vec<(String, Vec<Field>, HashMap<String, Vec<Subfield>>)>,
     Vec<EnumName>,
 ) {
-    let mut workbook: Xlsx<_> = open_workbook("Profile.xlsx").expect("Unable to load profile file");
+    let mut workbook: Xlsx<_> = open_workbook(profile).expect("Unable to load profile file");
     let range = workbook
         .worksheet_range("Messages")
         .expect("The profile file does not contain a Types sheet");
