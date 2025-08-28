@@ -400,7 +400,9 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
                     snake_to_camel_case(v)
                 )
             })
-            .chain(vec!["_ => FitMessage::UnknownVariant(0)".to_string()]),
+            .chain(vec![
+                "_ => FitMessage::UnknownVariant(def_number)".to_string(),
+            ]),
         ",\n",
     );
 

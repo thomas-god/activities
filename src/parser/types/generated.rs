@@ -675,7 +675,7 @@ impl MesgNum {
             Self::HsaWristTemperatureData => {
                 FitMessage::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
             }
-            _ => FitMessage::UnknownVariant(0),
+            _ => FitMessage::UnknownVariant(def_number),
         }
     }
 
