@@ -12,8 +12,8 @@ use calamine::{Data, Reader, Xlsx, open_workbook};
 const MESSAGES_TO_IMPORT: &[&str] = &[]; // If empty, every message type is imported
 // const MESSAGES_TO_IMPORT: &[&str] = &["Record", "FieldDescription", "DeviceInfo"];
 const BASE_TYPES: &[&str] = &[
-    "sint8", "uint8", "uintz8", "sint16", "uint16", "uintz16", "sint32", "uint32", "uintz32",
-    "sint64", "uint64", "uintz64", "string", "float32", "float64", "byte",
+    "sint8", "uint8", "uint8z", "sint16", "uint16", "uint16z", "sint32", "uint32", "uint32z",
+    "sint64", "uint64", "uint64z", "string", "float32", "float64", "byte",
 ];
 const ENUMS_SKIPPED_VARIANTS: &[&str] = &["mfg_range_min", "mfg_range_max", "pad"];
 
@@ -613,28 +613,13 @@ fn parse_messages_definitions() -> (
         })
         .collect();
 
-    let reference_types: Vec<String> = messages
-        .iter()
-        .flat_map(|(_, __, subfields)| {
-            subfields.values().flat_map(|message_subfields| {
-                message_subfields.iter().flat_map(|subfield| {
-                    subfield
-                        .references
-                        .iter()
-                        .flat_map(|reference| reference.base_type.clone())
-                })
-            })
-        })
-        .collect();
-    dbg!(reference_types);
-
     (messages, enums_used)
 }
 
 fn is_fit_enum(type_name: &str) -> Option<String> {
     match type_name {
-        "sint8" | "uint8" | "uintz8" | "sint16" | "uint16" | "uintz16" | "sint32" | "uint32"
-        | "uintz32" | "sint64" | "uint64" | "uintz64" | "string" | "float32" | "float64"
+        "sint8" | "uint8" | "uint8z" | "sint16" | "uint16" | "uint16z" | "sint32" | "uint32"
+        | "uint32z" | "sint64" | "uint64" | "uint64z" | "string" | "float32" | "float64"
         | "byte" => None,
         val => Some(val.to_string()),
     }
