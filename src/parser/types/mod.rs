@@ -312,9 +312,10 @@ pub fn parse_string(
         bytes.push(content.next_u8()?)
     }
 
-    Ok(vec![DataValue::String(
-        String::from_utf8(bytes).map_err(|_| DataTypeError::InvalidUtf8)?,
-    )])
+    let string = String::from_utf8(bytes).map_err(|_| DataTypeError::InvalidUtf8)?;
+    let string = string.trim_matches(char::from(0));
+
+    Ok(vec![DataValue::String(string.to_string())])
 }
 
 pub fn parse_byte_array(
