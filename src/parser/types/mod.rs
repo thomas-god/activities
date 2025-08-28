@@ -29,7 +29,7 @@ pub enum DataValue {
     Uint64(u64),
     Uint64z(u64),
     DateTime(u32),
-    Unknown,
+    Unknown(Vec<u8>),
 }
 
 #[derive(Debug, Error)]
@@ -335,11 +335,12 @@ pub fn parse_unknown(
     _endianness: &Endianness,
     number_of_bytes: u8,
 ) -> Result<Vec<DataValue>, DataTypeError> {
+    let mut bytes = Vec::new();
     for _ in 0..number_of_bytes {
-        let _ = content.next_u8()?;
+        bytes.push(content.next_u8()?);
     }
 
-    Ok(Vec::new())
+    Ok(vec![DataValue::Unknown(bytes)])
 }
 
 impl DataValue {
@@ -370,7 +371,7 @@ impl DataValue {
             Self::String(_) => false,
             Self::DateTime(_) => false,
             Self::Enum(_) => false,
-            Self::Unknown => true,
+            Self::Unknown(_) => true,
         }
     }
 
@@ -521,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_data_value_unknown_always_invalid() {
-        assert!(DataValue::Unknown.is_invalid());
+        assert!(DataValue::Unknown(vec![]).is_invalid());
     }
 
     #[test]
