@@ -1,4 +1,5 @@
 mod parser;
+pub mod utils;
 
 pub use crate::parser::types::DataValue;
 pub use crate::parser::types::generated::*;
