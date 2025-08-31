@@ -6,7 +6,7 @@ use crate::parser::{
     records::{DefinitionMessageHeader, RecordError},
     types::{
         ScaleOffset,
-        generated::{CustomField, FitMessage, MesgNum, ParseFunction},
+        generated::{CustomField, FitField, MesgNum, ParseFunction},
     },
 };
 
@@ -37,7 +37,7 @@ pub struct Definition {
 #[derive(Debug, Clone)]
 pub struct DefinitionField {
     pub endianness: Endianness,
-    pub kind: FitMessage,
+    pub kind: FitField,
     pub parse: ParseFunction,
     pub scale_offset: Option<ScaleOffset>,
     pub size: u8,
@@ -93,7 +93,7 @@ fn parse_developer_field(
         ))?;
     let field = DefinitionField {
         endianness,
-        kind: FitMessage::Custom(CustomField {
+        kind: FitField::Custom(CustomField {
             name: description.name.clone(),
             units: description.units.clone(),
         }),
@@ -129,7 +129,7 @@ fn parse_definition_field(
 mod tests {
     use crate::{
         DataValue,
-        parser::types::generated::{FitMessage, MesgNum, RecordField},
+        parser::types::generated::{FitField, MesgNum, RecordField},
     };
 
     use super::*;
@@ -153,7 +153,7 @@ mod tests {
 
         let field = definition.fields.first().unwrap();
         assert_eq!(field.endianness, Endianness::Little);
-        assert_eq!(field.kind, FitMessage::Record(RecordField::HeartRate));
+        assert_eq!(field.kind, FitField::Record(RecordField::HeartRate));
 
         let mut content = Reader::new(1, vec![12].into_iter());
         let ParseFunction::Simple(parse) = field.parse else {

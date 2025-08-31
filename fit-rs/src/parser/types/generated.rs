@@ -475,207 +475,197 @@ impl MesgNum {
         }
         Ok(values)
     }
-    pub fn message_field(&self, def_number: u8) -> FitMessage {
+    pub fn message_field(&self, def_number: u8) -> FitField {
         match self {
-            Self::FileId => FitMessage::FileId(FileIdField::from(def_number)),
-            Self::Capabilities => FitMessage::Capabilities(CapabilitiesField::from(def_number)),
-            Self::DeviceSettings => {
-                FitMessage::DeviceSettings(DeviceSettingsField::from(def_number))
-            }
-            Self::UserProfile => FitMessage::UserProfile(UserProfileField::from(def_number)),
-            Self::HrmProfile => FitMessage::HrmProfile(HrmProfileField::from(def_number)),
-            Self::SdmProfile => FitMessage::SdmProfile(SdmProfileField::from(def_number)),
-            Self::BikeProfile => FitMessage::BikeProfile(BikeProfileField::from(def_number)),
-            Self::ZonesTarget => FitMessage::ZonesTarget(ZonesTargetField::from(def_number)),
-            Self::HrZone => FitMessage::HrZone(HrZoneField::from(def_number)),
-            Self::PowerZone => FitMessage::PowerZone(PowerZoneField::from(def_number)),
-            Self::MetZone => FitMessage::MetZone(MetZoneField::from(def_number)),
-            Self::Sport => FitMessage::Sport(SportField::from(def_number)),
+            Self::FileId => FitField::FileId(FileIdField::from(def_number)),
+            Self::Capabilities => FitField::Capabilities(CapabilitiesField::from(def_number)),
+            Self::DeviceSettings => FitField::DeviceSettings(DeviceSettingsField::from(def_number)),
+            Self::UserProfile => FitField::UserProfile(UserProfileField::from(def_number)),
+            Self::HrmProfile => FitField::HrmProfile(HrmProfileField::from(def_number)),
+            Self::SdmProfile => FitField::SdmProfile(SdmProfileField::from(def_number)),
+            Self::BikeProfile => FitField::BikeProfile(BikeProfileField::from(def_number)),
+            Self::ZonesTarget => FitField::ZonesTarget(ZonesTargetField::from(def_number)),
+            Self::HrZone => FitField::HrZone(HrZoneField::from(def_number)),
+            Self::PowerZone => FitField::PowerZone(PowerZoneField::from(def_number)),
+            Self::MetZone => FitField::MetZone(MetZoneField::from(def_number)),
+            Self::Sport => FitField::Sport(SportField::from(def_number)),
             Self::TrainingSettings => {
-                FitMessage::TrainingSettings(TrainingSettingsField::from(def_number))
+                FitField::TrainingSettings(TrainingSettingsField::from(def_number))
             }
-            Self::Goal => FitMessage::Goal(GoalField::from(def_number)),
-            Self::Session => FitMessage::Session(SessionField::from(def_number)),
-            Self::Lap => FitMessage::Lap(LapField::from(def_number)),
-            Self::Record => FitMessage::Record(RecordField::from(def_number)),
-            Self::Event => FitMessage::Event(EventField::from(def_number)),
-            Self::DeviceInfo => FitMessage::DeviceInfo(DeviceInfoField::from(def_number)),
-            Self::Workout => FitMessage::Workout(WorkoutField::from(def_number)),
-            Self::WorkoutStep => FitMessage::WorkoutStep(WorkoutStepField::from(def_number)),
-            Self::Schedule => FitMessage::Schedule(ScheduleField::from(def_number)),
-            Self::WeightScale => FitMessage::WeightScale(WeightScaleField::from(def_number)),
-            Self::Course => FitMessage::Course(CourseField::from(def_number)),
-            Self::CoursePoint => FitMessage::CoursePoint(CoursePointField::from(def_number)),
-            Self::Totals => FitMessage::Totals(TotalsField::from(def_number)),
-            Self::Activity => FitMessage::Activity(ActivityField::from(def_number)),
-            Self::Software => FitMessage::Software(SoftwareField::from(def_number)),
+            Self::Goal => FitField::Goal(GoalField::from(def_number)),
+            Self::Session => FitField::Session(SessionField::from(def_number)),
+            Self::Lap => FitField::Lap(LapField::from(def_number)),
+            Self::Record => FitField::Record(RecordField::from(def_number)),
+            Self::Event => FitField::Event(EventField::from(def_number)),
+            Self::DeviceInfo => FitField::DeviceInfo(DeviceInfoField::from(def_number)),
+            Self::Workout => FitField::Workout(WorkoutField::from(def_number)),
+            Self::WorkoutStep => FitField::WorkoutStep(WorkoutStepField::from(def_number)),
+            Self::Schedule => FitField::Schedule(ScheduleField::from(def_number)),
+            Self::WeightScale => FitField::WeightScale(WeightScaleField::from(def_number)),
+            Self::Course => FitField::Course(CourseField::from(def_number)),
+            Self::CoursePoint => FitField::CoursePoint(CoursePointField::from(def_number)),
+            Self::Totals => FitField::Totals(TotalsField::from(def_number)),
+            Self::Activity => FitField::Activity(ActivityField::from(def_number)),
+            Self::Software => FitField::Software(SoftwareField::from(def_number)),
             Self::FileCapabilities => {
-                FitMessage::FileCapabilities(FileCapabilitiesField::from(def_number))
+                FitField::FileCapabilities(FileCapabilitiesField::from(def_number))
             }
             Self::MesgCapabilities => {
-                FitMessage::MesgCapabilities(MesgCapabilitiesField::from(def_number))
+                FitField::MesgCapabilities(MesgCapabilitiesField::from(def_number))
             }
             Self::FieldCapabilities => {
-                FitMessage::FieldCapabilities(FieldCapabilitiesField::from(def_number))
+                FitField::FieldCapabilities(FieldCapabilitiesField::from(def_number))
             }
-            Self::FileCreator => FitMessage::FileCreator(FileCreatorField::from(def_number)),
-            Self::BloodPressure => FitMessage::BloodPressure(BloodPressureField::from(def_number)),
-            Self::SpeedZone => FitMessage::SpeedZone(SpeedZoneField::from(def_number)),
-            Self::Monitoring => FitMessage::Monitoring(MonitoringField::from(def_number)),
-            Self::TrainingFile => FitMessage::TrainingFile(TrainingFileField::from(def_number)),
-            Self::Hrv => FitMessage::Hrv(HrvField::from(def_number)),
-            Self::AntRx => FitMessage::AntRx(AntRxField::from(def_number)),
-            Self::AntTx => FitMessage::AntTx(AntTxField::from(def_number)),
-            Self::AntChannelId => FitMessage::AntChannelId(AntChannelIdField::from(def_number)),
-            Self::Length => FitMessage::Length(LengthField::from(def_number)),
-            Self::MonitoringInfo => {
-                FitMessage::MonitoringInfo(MonitoringInfoField::from(def_number))
-            }
-            Self::SlaveDevice => FitMessage::SlaveDevice(SlaveDeviceField::from(def_number)),
-            Self::Connectivity => FitMessage::Connectivity(ConnectivityField::from(def_number)),
+            Self::FileCreator => FitField::FileCreator(FileCreatorField::from(def_number)),
+            Self::BloodPressure => FitField::BloodPressure(BloodPressureField::from(def_number)),
+            Self::SpeedZone => FitField::SpeedZone(SpeedZoneField::from(def_number)),
+            Self::Monitoring => FitField::Monitoring(MonitoringField::from(def_number)),
+            Self::TrainingFile => FitField::TrainingFile(TrainingFileField::from(def_number)),
+            Self::Hrv => FitField::Hrv(HrvField::from(def_number)),
+            Self::AntRx => FitField::AntRx(AntRxField::from(def_number)),
+            Self::AntTx => FitField::AntTx(AntTxField::from(def_number)),
+            Self::AntChannelId => FitField::AntChannelId(AntChannelIdField::from(def_number)),
+            Self::Length => FitField::Length(LengthField::from(def_number)),
+            Self::MonitoringInfo => FitField::MonitoringInfo(MonitoringInfoField::from(def_number)),
+            Self::SlaveDevice => FitField::SlaveDevice(SlaveDeviceField::from(def_number)),
+            Self::Connectivity => FitField::Connectivity(ConnectivityField::from(def_number)),
             Self::WeatherConditions => {
-                FitMessage::WeatherConditions(WeatherConditionsField::from(def_number))
+                FitField::WeatherConditions(WeatherConditionsField::from(def_number))
             }
-            Self::WeatherAlert => FitMessage::WeatherAlert(WeatherAlertField::from(def_number)),
-            Self::CadenceZone => FitMessage::CadenceZone(CadenceZoneField::from(def_number)),
-            Self::Hr => FitMessage::Hr(HrField::from(def_number)),
-            Self::SegmentLap => FitMessage::SegmentLap(SegmentLapField::from(def_number)),
-            Self::MemoGlob => FitMessage::MemoGlob(MemoGlobField::from(def_number)),
-            Self::SegmentId => FitMessage::SegmentId(SegmentIdField::from(def_number)),
+            Self::WeatherAlert => FitField::WeatherAlert(WeatherAlertField::from(def_number)),
+            Self::CadenceZone => FitField::CadenceZone(CadenceZoneField::from(def_number)),
+            Self::Hr => FitField::Hr(HrField::from(def_number)),
+            Self::SegmentLap => FitField::SegmentLap(SegmentLapField::from(def_number)),
+            Self::MemoGlob => FitField::MemoGlob(MemoGlobField::from(def_number)),
+            Self::SegmentId => FitField::SegmentId(SegmentIdField::from(def_number)),
             Self::SegmentLeaderboardEntry => {
-                FitMessage::SegmentLeaderboardEntry(SegmentLeaderboardEntryField::from(def_number))
+                FitField::SegmentLeaderboardEntry(SegmentLeaderboardEntryField::from(def_number))
             }
-            Self::SegmentPoint => FitMessage::SegmentPoint(SegmentPointField::from(def_number)),
-            Self::SegmentFile => FitMessage::SegmentFile(SegmentFileField::from(def_number)),
-            Self::WorkoutSession => {
-                FitMessage::WorkoutSession(WorkoutSessionField::from(def_number))
-            }
+            Self::SegmentPoint => FitField::SegmentPoint(SegmentPointField::from(def_number)),
+            Self::SegmentFile => FitField::SegmentFile(SegmentFileField::from(def_number)),
+            Self::WorkoutSession => FitField::WorkoutSession(WorkoutSessionField::from(def_number)),
             Self::WatchfaceSettings => {
-                FitMessage::WatchfaceSettings(WatchfaceSettingsField::from(def_number))
+                FitField::WatchfaceSettings(WatchfaceSettingsField::from(def_number))
             }
-            Self::GpsMetadata => FitMessage::GpsMetadata(GpsMetadataField::from(def_number)),
-            Self::CameraEvent => FitMessage::CameraEvent(CameraEventField::from(def_number)),
+            Self::GpsMetadata => FitField::GpsMetadata(GpsMetadataField::from(def_number)),
+            Self::CameraEvent => FitField::CameraEvent(CameraEventField::from(def_number)),
             Self::TimestampCorrelation => {
-                FitMessage::TimestampCorrelation(TimestampCorrelationField::from(def_number))
+                FitField::TimestampCorrelation(TimestampCorrelationField::from(def_number))
             }
-            Self::GyroscopeData => FitMessage::GyroscopeData(GyroscopeDataField::from(def_number)),
+            Self::GyroscopeData => FitField::GyroscopeData(GyroscopeDataField::from(def_number)),
             Self::AccelerometerData => {
-                FitMessage::AccelerometerData(AccelerometerDataField::from(def_number))
+                FitField::AccelerometerData(AccelerometerDataField::from(def_number))
             }
             Self::ThreeDSensorCalibration => {
-                FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::from(def_number))
+                FitField::ThreeDSensorCalibration(ThreeDSensorCalibrationField::from(def_number))
             }
-            Self::VideoFrame => FitMessage::VideoFrame(VideoFrameField::from(def_number)),
-            Self::ObdiiData => FitMessage::ObdiiData(ObdiiDataField::from(def_number)),
-            Self::NmeaSentence => FitMessage::NmeaSentence(NmeaSentenceField::from(def_number)),
+            Self::VideoFrame => FitField::VideoFrame(VideoFrameField::from(def_number)),
+            Self::ObdiiData => FitField::ObdiiData(ObdiiDataField::from(def_number)),
+            Self::NmeaSentence => FitField::NmeaSentence(NmeaSentenceField::from(def_number)),
             Self::AviationAttitude => {
-                FitMessage::AviationAttitude(AviationAttitudeField::from(def_number))
+                FitField::AviationAttitude(AviationAttitudeField::from(def_number))
             }
-            Self::Video => FitMessage::Video(VideoField::from(def_number)),
-            Self::VideoTitle => FitMessage::VideoTitle(VideoTitleField::from(def_number)),
+            Self::Video => FitField::Video(VideoField::from(def_number)),
+            Self::VideoTitle => FitField::VideoTitle(VideoTitleField::from(def_number)),
             Self::VideoDescription => {
-                FitMessage::VideoDescription(VideoDescriptionField::from(def_number))
+                FitField::VideoDescription(VideoDescriptionField::from(def_number))
             }
-            Self::VideoClip => FitMessage::VideoClip(VideoClipField::from(def_number)),
-            Self::OhrSettings => FitMessage::OhrSettings(OhrSettingsField::from(def_number)),
+            Self::VideoClip => FitField::VideoClip(VideoClipField::from(def_number)),
+            Self::OhrSettings => FitField::OhrSettings(OhrSettingsField::from(def_number)),
             Self::ExdScreenConfiguration => {
-                FitMessage::ExdScreenConfiguration(ExdScreenConfigurationField::from(def_number))
+                FitField::ExdScreenConfiguration(ExdScreenConfigurationField::from(def_number))
             }
-            Self::ExdDataFieldConfiguration => FitMessage::ExdDataFieldConfiguration(
+            Self::ExdDataFieldConfiguration => FitField::ExdDataFieldConfiguration(
                 ExdDataFieldConfigurationField::from(def_number),
             ),
-            Self::ExdDataConceptConfiguration => FitMessage::ExdDataConceptConfiguration(
+            Self::ExdDataConceptConfiguration => FitField::ExdDataConceptConfiguration(
                 ExdDataConceptConfigurationField::from(def_number),
             ),
             Self::FieldDescription => {
-                FitMessage::FieldDescription(FieldDescriptionField::from(def_number))
+                FitField::FieldDescription(FieldDescriptionField::from(def_number))
             }
             Self::DeveloperDataId => {
-                FitMessage::DeveloperDataId(DeveloperDataIdField::from(def_number))
+                FitField::DeveloperDataId(DeveloperDataIdField::from(def_number))
             }
             Self::MagnetometerData => {
-                FitMessage::MagnetometerData(MagnetometerDataField::from(def_number))
+                FitField::MagnetometerData(MagnetometerDataField::from(def_number))
             }
-            Self::BarometerData => FitMessage::BarometerData(BarometerDataField::from(def_number)),
+            Self::BarometerData => FitField::BarometerData(BarometerDataField::from(def_number)),
             Self::OneDSensorCalibration => {
-                FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::from(def_number))
+                FitField::OneDSensorCalibration(OneDSensorCalibrationField::from(def_number))
             }
             Self::MonitoringHrData => {
-                FitMessage::MonitoringHrData(MonitoringHrDataField::from(def_number))
+                FitField::MonitoringHrData(MonitoringHrDataField::from(def_number))
             }
-            Self::TimeInZone => FitMessage::TimeInZone(TimeInZoneField::from(def_number)),
-            Self::Set => FitMessage::Set(SetField::from(def_number)),
-            Self::StressLevel => FitMessage::StressLevel(StressLevelField::from(def_number)),
-            Self::MaxMetData => FitMessage::MaxMetData(MaxMetDataField::from(def_number)),
-            Self::DiveSettings => FitMessage::DiveSettings(DiveSettingsField::from(def_number)),
-            Self::DiveGas => FitMessage::DiveGas(DiveGasField::from(def_number)),
-            Self::DiveAlarm => FitMessage::DiveAlarm(DiveAlarmField::from(def_number)),
-            Self::ExerciseTitle => FitMessage::ExerciseTitle(ExerciseTitleField::from(def_number)),
-            Self::DiveSummary => FitMessage::DiveSummary(DiveSummaryField::from(def_number)),
-            Self::Spo2Data => FitMessage::Spo2Data(Spo2DataField::from(def_number)),
-            Self::SleepLevel => FitMessage::SleepLevel(SleepLevelField::from(def_number)),
-            Self::Jump => FitMessage::Jump(JumpField::from(def_number)),
+            Self::TimeInZone => FitField::TimeInZone(TimeInZoneField::from(def_number)),
+            Self::Set => FitField::Set(SetField::from(def_number)),
+            Self::StressLevel => FitField::StressLevel(StressLevelField::from(def_number)),
+            Self::MaxMetData => FitField::MaxMetData(MaxMetDataField::from(def_number)),
+            Self::DiveSettings => FitField::DiveSettings(DiveSettingsField::from(def_number)),
+            Self::DiveGas => FitField::DiveGas(DiveGasField::from(def_number)),
+            Self::DiveAlarm => FitField::DiveAlarm(DiveAlarmField::from(def_number)),
+            Self::ExerciseTitle => FitField::ExerciseTitle(ExerciseTitleField::from(def_number)),
+            Self::DiveSummary => FitField::DiveSummary(DiveSummaryField::from(def_number)),
+            Self::Spo2Data => FitField::Spo2Data(Spo2DataField::from(def_number)),
+            Self::SleepLevel => FitField::SleepLevel(SleepLevelField::from(def_number)),
+            Self::Jump => FitField::Jump(JumpField::from(def_number)),
             Self::AadAccelFeatures => {
-                FitMessage::AadAccelFeatures(AadAccelFeaturesField::from(def_number))
+                FitField::AadAccelFeatures(AadAccelFeaturesField::from(def_number))
             }
-            Self::BeatIntervals => FitMessage::BeatIntervals(BeatIntervalsField::from(def_number)),
+            Self::BeatIntervals => FitField::BeatIntervals(BeatIntervalsField::from(def_number)),
             Self::RespirationRate => {
-                FitMessage::RespirationRate(RespirationRateField::from(def_number))
+                FitField::RespirationRate(RespirationRateField::from(def_number))
             }
             Self::HsaAccelerometerData => {
-                FitMessage::HsaAccelerometerData(HsaAccelerometerDataField::from(def_number))
+                FitField::HsaAccelerometerData(HsaAccelerometerDataField::from(def_number))
             }
-            Self::HsaStepData => FitMessage::HsaStepData(HsaStepDataField::from(def_number)),
-            Self::HsaSpo2Data => FitMessage::HsaSpo2Data(HsaSpo2DataField::from(def_number)),
-            Self::HsaStressData => FitMessage::HsaStressData(HsaStressDataField::from(def_number)),
+            Self::HsaStepData => FitField::HsaStepData(HsaStepDataField::from(def_number)),
+            Self::HsaSpo2Data => FitField::HsaSpo2Data(HsaSpo2DataField::from(def_number)),
+            Self::HsaStressData => FitField::HsaStressData(HsaStressDataField::from(def_number)),
             Self::HsaRespirationData => {
-                FitMessage::HsaRespirationData(HsaRespirationDataField::from(def_number))
+                FitField::HsaRespirationData(HsaRespirationDataField::from(def_number))
             }
             Self::HsaHeartRateData => {
-                FitMessage::HsaHeartRateData(HsaHeartRateDataField::from(def_number))
+                FitField::HsaHeartRateData(HsaHeartRateDataField::from(def_number))
             }
-            Self::Split => FitMessage::Split(SplitField::from(def_number)),
-            Self::SplitSummary => FitMessage::SplitSummary(SplitSummaryField::from(def_number)),
+            Self::Split => FitField::Split(SplitField::from(def_number)),
+            Self::SplitSummary => FitField::SplitSummary(SplitSummaryField::from(def_number)),
             Self::HsaBodyBatteryData => {
-                FitMessage::HsaBodyBatteryData(HsaBodyBatteryDataField::from(def_number))
+                FitField::HsaBodyBatteryData(HsaBodyBatteryDataField::from(def_number))
             }
-            Self::HsaEvent => FitMessage::HsaEvent(HsaEventField::from(def_number)),
-            Self::ClimbPro => FitMessage::ClimbPro(ClimbProField::from(def_number)),
-            Self::TankUpdate => FitMessage::TankUpdate(TankUpdateField::from(def_number)),
-            Self::TankSummary => FitMessage::TankSummary(TankSummaryField::from(def_number)),
+            Self::HsaEvent => FitField::HsaEvent(HsaEventField::from(def_number)),
+            Self::ClimbPro => FitField::ClimbPro(ClimbProField::from(def_number)),
+            Self::TankUpdate => FitField::TankUpdate(TankUpdateField::from(def_number)),
+            Self::TankSummary => FitField::TankSummary(TankSummaryField::from(def_number)),
             Self::SleepAssessment => {
-                FitMessage::SleepAssessment(SleepAssessmentField::from(def_number))
+                FitField::SleepAssessment(SleepAssessmentField::from(def_number))
             }
             Self::HrvStatusSummary => {
-                FitMessage::HrvStatusSummary(HrvStatusSummaryField::from(def_number))
+                FitField::HrvStatusSummary(HrvStatusSummaryField::from(def_number))
             }
-            Self::HrvValue => FitMessage::HrvValue(HrvValueField::from(def_number)),
-            Self::RawBbi => FitMessage::RawBbi(RawBbiField::from(def_number)),
+            Self::HrvValue => FitField::HrvValue(HrvValueField::from(def_number)),
+            Self::RawBbi => FitField::RawBbi(RawBbiField::from(def_number)),
             Self::DeviceAuxBatteryInfo => {
-                FitMessage::DeviceAuxBatteryInfo(DeviceAuxBatteryInfoField::from(def_number))
+                FitField::DeviceAuxBatteryInfo(DeviceAuxBatteryInfoField::from(def_number))
             }
             Self::HsaGyroscopeData => {
-                FitMessage::HsaGyroscopeData(HsaGyroscopeDataField::from(def_number))
+                FitField::HsaGyroscopeData(HsaGyroscopeDataField::from(def_number))
             }
             Self::ChronoShotSession => {
-                FitMessage::ChronoShotSession(ChronoShotSessionField::from(def_number))
+                FitField::ChronoShotSession(ChronoShotSessionField::from(def_number))
             }
-            Self::ChronoShotData => {
-                FitMessage::ChronoShotData(ChronoShotDataField::from(def_number))
-            }
+            Self::ChronoShotData => FitField::ChronoShotData(ChronoShotDataField::from(def_number)),
             Self::HsaConfigurationData => {
-                FitMessage::HsaConfigurationData(HsaConfigurationDataField::from(def_number))
+                FitField::HsaConfigurationData(HsaConfigurationDataField::from(def_number))
             }
-            Self::DiveApneaAlarm => {
-                FitMessage::DiveApneaAlarm(DiveApneaAlarmField::from(def_number))
-            }
+            Self::DiveApneaAlarm => FitField::DiveApneaAlarm(DiveApneaAlarmField::from(def_number)),
             Self::SkinTempOvernight => {
-                FitMessage::SkinTempOvernight(SkinTempOvernightField::from(def_number))
+                FitField::SkinTempOvernight(SkinTempOvernightField::from(def_number))
             }
             Self::HsaWristTemperatureData => {
-                FitMessage::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
+                FitField::HsaWristTemperatureData(HsaWristTemperatureDataField::from(def_number))
             }
-            _ => FitMessage::UnknownVariant(def_number),
+            _ => FitField::UnknownVariant(def_number),
         }
     }
 
@@ -957,7 +947,7 @@ impl MesgNum {
         }
     }
 
-    pub fn timestamp_field(&self) -> Option<FitMessage> {
+    pub fn timestamp_field(&self) -> Option<FitField> {
         match self {
             Self::FileId => FileIdField::timestamp_field(),
             Self::Capabilities => CapabilitiesField::timestamp_field(),
@@ -8456,7 +8446,7 @@ struct Subfield {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum FitMessage {
+pub enum FitField {
     FileId(FileIdField),
     FileCreator(FileCreatorField),
     TimestampCorrelation(TimestampCorrelationField),
@@ -8623,7 +8613,7 @@ impl FileIdFieldProductSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::FileId(FileIdField::Product),
+            kind: FitField::FileId(FileIdField::Product),
             values,
         })
     }
@@ -8636,8 +8626,8 @@ impl FileIdFieldProductSubfield {
         vec![
             |fields| {
                 // FaveroProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::FileId(FileIdField::Manufacturer),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::FileId(FileIdField::Manufacturer),
                     DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -8654,7 +8644,7 @@ impl FileIdFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::FileId(FileIdField::FaveroProduct),
+                            kind: FitField::FileId(FileIdField::FaveroProduct),
                             values,
                         })
                     }),
@@ -8663,21 +8653,21 @@ impl FileIdFieldProductSubfield {
             },
             |fields| {
                 // GarminProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::FileId(FileIdField::Manufacturer),
+                        FitField::FileId(FileIdField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
                     ),
                     (
-                        FitMessage::FileId(FileIdField::Manufacturer),
+                        FitField::FileId(FileIdField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
                     ),
                     (
-                        FitMessage::FileId(FileIdField::Manufacturer),
+                        FitField::FileId(FileIdField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
                     ),
                     (
-                        FitMessage::FileId(FileIdField::Manufacturer),
+                        FitField::FileId(FileIdField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
                     ),
                 ];
@@ -8695,7 +8685,7 @@ impl FileIdFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::FileId(FileIdField::GarminProduct),
+                            kind: FitField::FileId(FileIdField::GarminProduct),
                             values,
                         })
                     }),
@@ -8738,7 +8728,7 @@ impl FileIdField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -8771,7 +8761,7 @@ impl FileCreatorField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -8827,8 +8817,8 @@ impl TimestampCorrelationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::TimestampCorrelation(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::TimestampCorrelation(
             TimestampCorrelationField::Timestamp,
         ))
     }
@@ -8869,7 +8859,7 @@ impl SoftwareField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -8905,7 +8895,7 @@ impl SlaveDeviceFieldProductSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::SlaveDevice(SlaveDeviceField::Product),
+            kind: FitField::SlaveDevice(SlaveDeviceField::Product),
             values,
         })
     }
@@ -8918,8 +8908,8 @@ impl SlaveDeviceFieldProductSubfield {
         vec![
             |fields| {
                 // FaveroProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::SlaveDevice(SlaveDeviceField::Manufacturer),
                     DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -8936,7 +8926,7 @@ impl SlaveDeviceFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::SlaveDevice(SlaveDeviceField::FaveroProduct),
+                            kind: FitField::SlaveDevice(SlaveDeviceField::FaveroProduct),
                             values,
                         })
                     }),
@@ -8945,21 +8935,21 @@ impl SlaveDeviceFieldProductSubfield {
             },
             |fields| {
                 // GarminProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        FitField::SlaveDevice(SlaveDeviceField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
                     ),
                     (
-                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        FitField::SlaveDevice(SlaveDeviceField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
                     ),
                     (
-                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        FitField::SlaveDevice(SlaveDeviceField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
                     ),
                     (
-                        FitMessage::SlaveDevice(SlaveDeviceField::Manufacturer),
+                        FitField::SlaveDevice(SlaveDeviceField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
                     ),
                 ];
@@ -8977,7 +8967,7 @@ impl SlaveDeviceFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::SlaveDevice(SlaveDeviceField::GarminProduct),
+                            kind: FitField::SlaveDevice(SlaveDeviceField::GarminProduct),
                             values,
                         })
                     }),
@@ -9010,7 +9000,7 @@ impl SlaveDeviceField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9049,7 +9039,7 @@ impl CapabilitiesField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9094,7 +9084,7 @@ impl FileCapabilitiesField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9135,7 +9125,7 @@ impl MesgCapabilitiesFieldCountSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::Count),
+            kind: FitField::MesgCapabilities(MesgCapabilitiesField::Count),
             values,
         })
     }
@@ -9148,8 +9138,8 @@ impl MesgCapabilitiesFieldCountSubfield {
         vec![
             |fields| {
                 // NumPerFile subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::MesgCapabilities(MesgCapabilitiesField::CountType),
                     DataValue::Enum(FitEnum::MesgCount(MesgCount::NumPerFile)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -9166,7 +9156,7 @@ impl MesgCapabilitiesFieldCountSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::NumPerFile),
+                            kind: FitField::MesgCapabilities(MesgCapabilitiesField::NumPerFile),
                             values,
                         })
                     }),
@@ -9175,8 +9165,8 @@ impl MesgCapabilitiesFieldCountSubfield {
             },
             |fields| {
                 // MaxPerFile subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::MesgCapabilities(MesgCapabilitiesField::CountType),
                     DataValue::Enum(FitEnum::MesgCount(MesgCount::MaxPerFile)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -9193,7 +9183,7 @@ impl MesgCapabilitiesFieldCountSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::MesgCapabilities(MesgCapabilitiesField::MaxPerFile),
+                            kind: FitField::MesgCapabilities(MesgCapabilitiesField::MaxPerFile),
                             values,
                         })
                     }),
@@ -9202,8 +9192,8 @@ impl MesgCapabilitiesFieldCountSubfield {
             },
             |fields| {
                 // MaxPerFileType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::MesgCapabilities(MesgCapabilitiesField::CountType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::MesgCapabilities(MesgCapabilitiesField::CountType),
                     DataValue::Enum(FitEnum::MesgCount(MesgCount::MaxPerFileType)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -9220,9 +9210,7 @@ impl MesgCapabilitiesFieldCountSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::MesgCapabilities(
-                                MesgCapabilitiesField::MaxPerFileType,
-                            ),
+                            kind: FitField::MesgCapabilities(MesgCapabilitiesField::MaxPerFileType),
                             values,
                         })
                     }),
@@ -9261,7 +9249,7 @@ impl MesgCapabilitiesField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9303,7 +9291,7 @@ impl FieldCapabilitiesField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9406,7 +9394,7 @@ impl DeviceSettingsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9536,7 +9524,7 @@ impl UserProfileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9578,7 +9566,7 @@ impl HrmProfileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9637,7 +9625,7 @@ impl SdmProfileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9784,7 +9772,7 @@ impl BikeProfileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9850,7 +9838,7 @@ impl ConnectivityField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -9887,7 +9875,7 @@ impl WatchfaceSettingsFieldLayoutSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WatchfaceSettings(WatchfaceSettingsField::Layout),
+            kind: FitField::WatchfaceSettings(WatchfaceSettingsField::Layout),
             values,
         })
     }
@@ -9900,8 +9888,8 @@ impl WatchfaceSettingsFieldLayoutSubfield {
         vec![
             |fields| {
                 // DigitalLayout subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WatchfaceSettings(WatchfaceSettingsField::Mode),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WatchfaceSettings(WatchfaceSettingsField::Mode),
                     DataValue::Enum(FitEnum::WatchfaceMode(WatchfaceMode::Digital)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -9919,7 +9907,7 @@ impl WatchfaceSettingsFieldLayoutSubfield {
                                 .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WatchfaceSettings(
+                            kind: FitField::WatchfaceSettings(
                                 WatchfaceSettingsField::DigitalLayout,
                             ),
                             values,
@@ -9930,8 +9918,8 @@ impl WatchfaceSettingsFieldLayoutSubfield {
             },
             |fields| {
                 // AnalogLayout subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WatchfaceSettings(WatchfaceSettingsField::Mode),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WatchfaceSettings(WatchfaceSettingsField::Mode),
                     DataValue::Enum(FitEnum::WatchfaceMode(WatchfaceMode::Analog)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -9949,9 +9937,7 @@ impl WatchfaceSettingsFieldLayoutSubfield {
                                 .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WatchfaceSettings(
-                                WatchfaceSettingsField::AnalogLayout,
-                            ),
+                            kind: FitField::WatchfaceSettings(WatchfaceSettingsField::AnalogLayout),
                             values,
                         })
                     }),
@@ -9986,7 +9972,7 @@ impl WatchfaceSettingsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10019,8 +10005,8 @@ impl OhrSettingsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::OhrSettings(OhrSettingsField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::OhrSettings(OhrSettingsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -10117,8 +10103,8 @@ impl TimeInZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::TimeInZone(TimeInZoneField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::TimeInZone(TimeInZoneField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -10159,7 +10145,7 @@ impl ZonesTargetField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10195,7 +10181,7 @@ impl SportField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10231,7 +10217,7 @@ impl HrZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10271,7 +10257,7 @@ impl SpeedZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10307,7 +10293,7 @@ impl CadenceZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10343,7 +10329,7 @@ impl PowerZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10390,7 +10376,7 @@ impl MetZoneField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10441,7 +10427,7 @@ impl TrainingSettingsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10511,7 +10497,7 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::DiveSettings(DiveSettingsField::HeartRateSource),
+            kind: FitField::DiveSettings(DiveSettingsField::HeartRateSource),
             values,
         })
     }
@@ -10524,8 +10510,8 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
         vec![
             |fields| {
                 // HeartRateAntplusDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DiveSettings(DiveSettingsField::HeartRateSourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DiveSettings(DiveSettingsField::HeartRateSourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::Antplus)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -10542,7 +10528,7 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DiveSettings(
+                            kind: FitField::DiveSettings(
                                 DiveSettingsField::HeartRateAntplusDeviceType,
                             ),
                             values,
@@ -10553,8 +10539,8 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
             },
             |fields| {
                 // HeartRateLocalDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DiveSettings(DiveSettingsField::HeartRateSourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DiveSettings(DiveSettingsField::HeartRateSourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::Local)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -10571,7 +10557,7 @@ impl DiveSettingsFieldHeartRateSourceSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DiveSettings(
+                            kind: FitField::DiveSettings(
                                 DiveSettingsField::HeartRateLocalDeviceType,
                             ),
                             values,
@@ -10712,8 +10698,8 @@ impl DiveSettingsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::DiveSettings(DiveSettingsField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::DiveSettings(DiveSettingsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -10790,7 +10776,7 @@ impl DiveAlarmField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10868,7 +10854,7 @@ impl DiveApneaAlarmField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10910,7 +10896,7 @@ impl DiveGasField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -10976,7 +10962,7 @@ impl GoalField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -11031,8 +11017,8 @@ impl ActivityField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Activity(ActivityField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Activity(ActivityField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -11223,7 +11209,7 @@ impl SessionFieldTotalCyclesSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Session(SessionField::TotalCycles),
+            kind: FitField::Session(SessionField::TotalCycles),
             values,
         })
     }
@@ -11236,13 +11222,13 @@ impl SessionFieldTotalCyclesSubfield {
         vec![
             |fields| {
                 // TotalStrides subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Running)),
                     ),
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Walking)),
                     ),
                 ];
@@ -11260,7 +11246,7 @@ impl SessionFieldTotalCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Session(SessionField::TotalStrides),
+                            kind: FitField::Session(SessionField::TotalStrides),
                             values,
                         })
                     }),
@@ -11269,21 +11255,21 @@ impl SessionFieldTotalCyclesSubfield {
             },
             |fields| {
                 // TotalStrokes subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
                     ),
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Swimming)),
                     ),
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Rowing)),
                     ),
                     (
-                        FitMessage::Session(SessionField::Sport),
+                        FitField::Session(SessionField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::StandUpPaddleboarding)),
                     ),
                 ];
@@ -11301,7 +11287,7 @@ impl SessionFieldTotalCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Session(SessionField::TotalStrokes),
+                            kind: FitField::Session(SessionField::TotalStrokes),
                             values,
                         })
                     }),
@@ -11334,7 +11320,7 @@ impl SessionFieldAvgCadenceSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Session(SessionField::AvgCadence),
+            kind: FitField::Session(SessionField::AvgCadence),
             values,
         })
     }
@@ -11346,8 +11332,8 @@ impl SessionFieldAvgCadenceSubfield {
     > {
         vec![|fields| {
             // AvgRunningCadence subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::Session(SessionField::Sport),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::Session(SessionField::Sport),
                 DataValue::Enum(FitEnum::Sport(Sport::Running)),
             )];
             let found = fields.iter().find(|field| {
@@ -11364,7 +11350,7 @@ impl SessionFieldAvgCadenceSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::Session(SessionField::AvgRunningCadence),
+                        kind: FitField::Session(SessionField::AvgRunningCadence),
                         values,
                     })
                 }),
@@ -11396,7 +11382,7 @@ impl SessionFieldMaxCadenceSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Session(SessionField::MaxCadence),
+            kind: FitField::Session(SessionField::MaxCadence),
             values,
         })
     }
@@ -11408,8 +11394,8 @@ impl SessionFieldMaxCadenceSubfield {
     > {
         vec![|fields| {
             // MaxRunningCadence subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::Session(SessionField::Sport),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::Session(SessionField::Sport),
                 DataValue::Enum(FitEnum::Sport(Sport::Running)),
             )];
             let found = fields.iter().find(|field| {
@@ -11426,7 +11412,7 @@ impl SessionFieldMaxCadenceSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::Session(SessionField::MaxRunningCadence),
+                        kind: FitField::Session(SessionField::MaxRunningCadence),
                         values,
                     })
                 }),
@@ -12086,8 +12072,8 @@ impl SessionField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Session(SessionField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Session(SessionField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -12245,7 +12231,7 @@ impl LapFieldTotalCyclesSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Lap(LapField::TotalCycles),
+            kind: FitField::Lap(LapField::TotalCycles),
             values,
         })
     }
@@ -12258,13 +12244,13 @@ impl LapFieldTotalCyclesSubfield {
         vec![
             |fields| {
                 // TotalStrides subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Running)),
                     ),
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Walking)),
                     ),
                 ];
@@ -12282,7 +12268,7 @@ impl LapFieldTotalCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Lap(LapField::TotalStrides),
+                            kind: FitField::Lap(LapField::TotalStrides),
                             values,
                         })
                     }),
@@ -12291,21 +12277,21 @@ impl LapFieldTotalCyclesSubfield {
             },
             |fields| {
                 // TotalStrokes subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
                     ),
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Swimming)),
                     ),
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::Rowing)),
                     ),
                     (
-                        FitMessage::Lap(LapField::Sport),
+                        FitField::Lap(LapField::Sport),
                         DataValue::Enum(FitEnum::Sport(Sport::StandUpPaddleboarding)),
                     ),
                 ];
@@ -12323,7 +12309,7 @@ impl LapFieldTotalCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Lap(LapField::TotalStrokes),
+                            kind: FitField::Lap(LapField::TotalStrokes),
                             values,
                         })
                     }),
@@ -12356,7 +12342,7 @@ impl LapFieldAvgCadenceSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Lap(LapField::AvgCadence),
+            kind: FitField::Lap(LapField::AvgCadence),
             values,
         })
     }
@@ -12368,8 +12354,8 @@ impl LapFieldAvgCadenceSubfield {
     > {
         vec![|fields| {
             // AvgRunningCadence subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::Lap(LapField::Sport),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::Lap(LapField::Sport),
                 DataValue::Enum(FitEnum::Sport(Sport::Running)),
             )];
             let found = fields.iter().find(|field| {
@@ -12386,7 +12372,7 @@ impl LapFieldAvgCadenceSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::Lap(LapField::AvgRunningCadence),
+                        kind: FitField::Lap(LapField::AvgRunningCadence),
                         values,
                     })
                 }),
@@ -12418,7 +12404,7 @@ impl LapFieldMaxCadenceSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Lap(LapField::MaxCadence),
+            kind: FitField::Lap(LapField::MaxCadence),
             values,
         })
     }
@@ -12430,8 +12416,8 @@ impl LapFieldMaxCadenceSubfield {
     > {
         vec![|fields| {
             // MaxRunningCadence subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::Lap(LapField::Sport),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::Lap(LapField::Sport),
                 DataValue::Enum(FitEnum::Sport(Sport::Running)),
             )];
             let found = fields.iter().find(|field| {
@@ -12448,7 +12434,7 @@ impl LapFieldMaxCadenceSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::Lap(LapField::MaxRunningCadence),
+                        kind: FitField::Lap(LapField::MaxRunningCadence),
                         values,
                     })
                 }),
@@ -12978,8 +12964,8 @@ impl LapField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Lap(LapField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Lap(LapField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13091,8 +13077,8 @@ impl LengthField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Length(LengthField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Length(LengthField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13578,8 +13564,8 @@ impl RecordField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Record(RecordField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Record(RecordField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -13674,7 +13660,7 @@ impl EventFieldDataSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Event(EventField::Data),
+            kind: FitField::Event(EventField::Data),
             values,
         })
     }
@@ -13687,8 +13673,8 @@ impl EventFieldDataSubfield {
         vec![
             |fields| {
                 // TimerTrigger subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::Timer)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13705,7 +13691,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::TimerTrigger),
+                            kind: FitField::Event(EventField::TimerTrigger),
                             values,
                         })
                     }),
@@ -13714,8 +13700,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // CoursePointIndex subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::CoursePoint)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13732,7 +13718,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::CoursePointIndex),
+                            kind: FitField::Event(EventField::CoursePointIndex),
                             values,
                         })
                     }),
@@ -13741,8 +13727,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // BatteryLevel subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::Battery)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13764,7 +13750,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::BatteryLevel),
+                            kind: FitField::Event(EventField::BatteryLevel),
                             values,
                         })
                     }),
@@ -13773,8 +13759,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // VirtualPartnerSpeed subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::VirtualPartnerPace)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13796,7 +13782,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::VirtualPartnerSpeed),
+                            kind: FitField::Event(EventField::VirtualPartnerSpeed),
                             values,
                         })
                     }),
@@ -13805,8 +13791,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // HrHighAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::HrHighAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13823,7 +13809,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::HrHighAlert),
+                            kind: FitField::Event(EventField::HrHighAlert),
                             values,
                         })
                     }),
@@ -13832,8 +13818,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // HrLowAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::HrLowAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13850,7 +13836,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::HrLowAlert),
+                            kind: FitField::Event(EventField::HrLowAlert),
                             values,
                         })
                     }),
@@ -13859,8 +13845,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // SpeedHighAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::SpeedHighAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13882,7 +13868,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::SpeedHighAlert),
+                            kind: FitField::Event(EventField::SpeedHighAlert),
                             values,
                         })
                     }),
@@ -13891,8 +13877,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // SpeedLowAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::SpeedLowAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13914,7 +13900,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::SpeedLowAlert),
+                            kind: FitField::Event(EventField::SpeedLowAlert),
                             values,
                         })
                     }),
@@ -13923,8 +13909,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // CadHighAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::CadHighAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13941,7 +13927,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::CadHighAlert),
+                            kind: FitField::Event(EventField::CadHighAlert),
                             values,
                         })
                     }),
@@ -13950,8 +13936,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // CadLowAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::CadLowAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13968,7 +13954,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::CadLowAlert),
+                            kind: FitField::Event(EventField::CadLowAlert),
                             values,
                         })
                     }),
@@ -13977,8 +13963,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // PowerHighAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::PowerHighAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -13995,7 +13981,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::PowerHighAlert),
+                            kind: FitField::Event(EventField::PowerHighAlert),
                             values,
                         })
                     }),
@@ -14004,8 +13990,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // PowerLowAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::PowerLowAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14022,7 +14008,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::PowerLowAlert),
+                            kind: FitField::Event(EventField::PowerLowAlert),
                             values,
                         })
                     }),
@@ -14031,8 +14017,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // TimeDurationAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::TimeDurationAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14054,7 +14040,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::TimeDurationAlert),
+                            kind: FitField::Event(EventField::TimeDurationAlert),
                             values,
                         })
                     }),
@@ -14063,8 +14049,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // DistanceDurationAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::DistanceDurationAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14086,7 +14072,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::DistanceDurationAlert),
+                            kind: FitField::Event(EventField::DistanceDurationAlert),
                             values,
                         })
                     }),
@@ -14095,8 +14081,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // CalorieDurationAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::CalorieDurationAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14113,7 +14099,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::CalorieDurationAlert),
+                            kind: FitField::Event(EventField::CalorieDurationAlert),
                             values,
                         })
                     }),
@@ -14122,8 +14108,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // FitnessEquipmentState subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::FitnessEquipment)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14141,7 +14127,7 @@ impl EventFieldDataSubfield {
                                 .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::FitnessEquipmentState),
+                            kind: FitField::Event(EventField::FitnessEquipmentState),
                             values,
                         })
                     }),
@@ -14150,8 +14136,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // SportPoint subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::SportPoint)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14168,7 +14154,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::SportPoint),
+                            kind: FitField::Event(EventField::SportPoint),
                             values,
                         })
                     }),
@@ -14177,13 +14163,13 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // GearChangeData subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Event(EventField::Event),
+                        FitField::Event(EventField::Event),
                         DataValue::Enum(FitEnum::Event(Event::FrontGearChange)),
                     ),
                     (
-                        FitMessage::Event(EventField::Event),
+                        FitField::Event(EventField::Event),
                         DataValue::Enum(FitEnum::Event(Event::RearGearChange)),
                     ),
                 ];
@@ -14201,7 +14187,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::GearChangeData),
+                            kind: FitField::Event(EventField::GearChangeData),
                             values,
                         })
                     }),
@@ -14210,8 +14196,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // RiderPosition subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::RiderPositionChange)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14228,7 +14214,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::RiderPosition),
+                            kind: FitField::Event(EventField::RiderPosition),
                             values,
                         })
                     }),
@@ -14237,8 +14223,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // CommTimeout subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::CommTimeout)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14255,7 +14241,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::CommTimeout),
+                            kind: FitField::Event(EventField::CommTimeout),
                             values,
                         })
                     }),
@@ -14264,8 +14250,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // DiveAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::DiveAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14282,7 +14268,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::DiveAlert),
+                            kind: FitField::Event(EventField::DiveAlert),
                             values,
                         })
                     }),
@@ -14291,8 +14277,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // AutoActivityDetectDuration subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::AutoActivityDetect)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14309,7 +14295,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::AutoActivityDetectDuration),
+                            kind: FitField::Event(EventField::AutoActivityDetectDuration),
                             values,
                         })
                     }),
@@ -14318,8 +14304,8 @@ impl EventFieldDataSubfield {
             },
             |fields| {
                 // RadarThreatAlert subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Event(EventField::Event),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Event(EventField::Event),
                     DataValue::Enum(FitEnum::Event(Event::RadarThreatAlert)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14336,7 +14322,7 @@ impl EventFieldDataSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Event(EventField::RadarThreatAlert),
+                            kind: FitField::Event(EventField::RadarThreatAlert),
                             values,
                         })
                     }),
@@ -14369,7 +14355,7 @@ impl EventFieldStartTimestampSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Event(EventField::StartTimestamp),
+            kind: FitField::Event(EventField::StartTimestamp),
             values,
         })
     }
@@ -14381,8 +14367,8 @@ impl EventFieldStartTimestampSubfield {
     > {
         vec![|fields| {
             // AutoActivityDetectStartTimestamp subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::Event(EventField::Event),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::Event(EventField::Event),
                 DataValue::Enum(FitEnum::Event(Event::AutoActivityDetect)),
             )];
             let found = fields.iter().find(|field| {
@@ -14399,7 +14385,7 @@ impl EventFieldStartTimestampSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::Event(EventField::AutoActivityDetectStartTimestamp),
+                        kind: FitField::Event(EventField::AutoActivityDetectStartTimestamp),
                         values,
                     })
                 }),
@@ -14473,8 +14459,8 @@ impl EventField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Event(EventField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Event(EventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14532,7 +14518,7 @@ impl DeviceInfoFieldDeviceTypeSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::DeviceInfo(DeviceInfoField::DeviceType),
+            kind: FitField::DeviceInfo(DeviceInfoField::DeviceType),
             values,
         })
     }
@@ -14545,8 +14531,8 @@ impl DeviceInfoFieldDeviceTypeSubfield {
         vec![
             |fields| {
                 // BleDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DeviceInfo(DeviceInfoField::SourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::BluetoothLowEnergy)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14563,7 +14549,7 @@ impl DeviceInfoFieldDeviceTypeSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::BleDeviceType),
+                            kind: FitField::DeviceInfo(DeviceInfoField::BleDeviceType),
                             values,
                         })
                     }),
@@ -14572,8 +14558,8 @@ impl DeviceInfoFieldDeviceTypeSubfield {
             },
             |fields| {
                 // AntplusDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DeviceInfo(DeviceInfoField::SourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::Antplus)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14590,7 +14576,7 @@ impl DeviceInfoFieldDeviceTypeSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::AntplusDeviceType),
+                            kind: FitField::DeviceInfo(DeviceInfoField::AntplusDeviceType),
                             values,
                         })
                     }),
@@ -14599,8 +14585,8 @@ impl DeviceInfoFieldDeviceTypeSubfield {
             },
             |fields| {
                 // AntDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DeviceInfo(DeviceInfoField::SourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::Ant)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14617,7 +14603,7 @@ impl DeviceInfoFieldDeviceTypeSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::AntDeviceType),
+                            kind: FitField::DeviceInfo(DeviceInfoField::AntDeviceType),
                             values,
                         })
                     }),
@@ -14626,8 +14612,8 @@ impl DeviceInfoFieldDeviceTypeSubfield {
             },
             |fields| {
                 // LocalDeviceType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DeviceInfo(DeviceInfoField::SourceType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DeviceInfo(DeviceInfoField::SourceType),
                     DataValue::Enum(FitEnum::SourceType(SourceType::Local)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14644,7 +14630,7 @@ impl DeviceInfoFieldDeviceTypeSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::LocalDeviceType),
+                            kind: FitField::DeviceInfo(DeviceInfoField::LocalDeviceType),
                             values,
                         })
                     }),
@@ -14678,7 +14664,7 @@ impl DeviceInfoFieldProductSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::DeviceInfo(DeviceInfoField::Product),
+            kind: FitField::DeviceInfo(DeviceInfoField::Product),
             values,
         })
     }
@@ -14691,8 +14677,8 @@ impl DeviceInfoFieldProductSubfield {
         vec![
             |fields| {
                 // FaveroProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::DeviceInfo(DeviceInfoField::Manufacturer),
                     DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14709,7 +14695,7 @@ impl DeviceInfoFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::FaveroProduct),
+                            kind: FitField::DeviceInfo(DeviceInfoField::FaveroProduct),
                             values,
                         })
                     }),
@@ -14718,21 +14704,21 @@ impl DeviceInfoFieldProductSubfield {
             },
             |fields| {
                 // GarminProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        FitField::DeviceInfo(DeviceInfoField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
                     ),
                     (
-                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        FitField::DeviceInfo(DeviceInfoField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
                     ),
                     (
-                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        FitField::DeviceInfo(DeviceInfoField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
                     ),
                     (
-                        FitMessage::DeviceInfo(DeviceInfoField::Manufacturer),
+                        FitField::DeviceInfo(DeviceInfoField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
                     ),
                 ];
@@ -14750,7 +14736,7 @@ impl DeviceInfoFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::DeviceInfo(DeviceInfoField::GarminProduct),
+                            kind: FitField::DeviceInfo(DeviceInfoField::GarminProduct),
                             values,
                         })
                     }),
@@ -14825,8 +14811,8 @@ impl DeviceInfoField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::DeviceInfo(DeviceInfoField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::DeviceInfo(DeviceInfoField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -14871,8 +14857,8 @@ impl DeviceAuxBatteryInfoField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::DeviceAuxBatteryInfo(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::DeviceAuxBatteryInfo(
             DeviceAuxBatteryInfoField::Timestamp,
         ))
     }
@@ -14913,7 +14899,7 @@ impl TrainingFileFieldProductSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::TrainingFile(TrainingFileField::Product),
+            kind: FitField::TrainingFile(TrainingFileField::Product),
             values,
         })
     }
@@ -14926,8 +14912,8 @@ impl TrainingFileFieldProductSubfield {
         vec![
             |fields| {
                 // FaveroProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::TrainingFile(TrainingFileField::Manufacturer),
                     DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -14944,7 +14930,7 @@ impl TrainingFileFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::TrainingFile(TrainingFileField::FaveroProduct),
+                            kind: FitField::TrainingFile(TrainingFileField::FaveroProduct),
                             values,
                         })
                     }),
@@ -14953,21 +14939,21 @@ impl TrainingFileFieldProductSubfield {
             },
             |fields| {
                 // GarminProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        FitField::TrainingFile(TrainingFileField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
                     ),
                     (
-                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        FitField::TrainingFile(TrainingFileField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
                     ),
                     (
-                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        FitField::TrainingFile(TrainingFileField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
                     ),
                     (
-                        FitMessage::TrainingFile(TrainingFileField::Manufacturer),
+                        FitField::TrainingFile(TrainingFileField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
                     ),
                 ];
@@ -14985,7 +14971,7 @@ impl TrainingFileFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::TrainingFile(TrainingFileField::GarminProduct),
+                            kind: FitField::TrainingFile(TrainingFileField::GarminProduct),
                             values,
                         })
                     }),
@@ -15026,8 +15012,8 @@ impl TrainingFileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::TrainingFile(TrainingFileField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::TrainingFile(TrainingFileField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15105,8 +15091,8 @@ impl WeatherConditionsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::WeatherConditions(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::WeatherConditions(
             WeatherConditionsField::Timestamp,
         ))
     }
@@ -15152,8 +15138,8 @@ impl WeatherAlertField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::WeatherAlert(WeatherAlertField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::WeatherAlert(WeatherAlertField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15222,8 +15208,8 @@ impl GpsMetadataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::GpsMetadata(GpsMetadataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::GpsMetadata(GpsMetadataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15264,8 +15250,8 @@ impl CameraEventField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::CameraEvent(CameraEventField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::CameraEvent(CameraEventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15318,8 +15304,8 @@ impl GyroscopeDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::GyroscopeData(GyroscopeDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::GyroscopeData(GyroscopeDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15381,8 +15367,8 @@ impl AccelerometerDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::AccelerometerData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::AccelerometerData(
             AccelerometerDataField::Timestamp,
         ))
     }
@@ -15437,10 +15423,8 @@ impl MagnetometerDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::MagnetometerData(
-            MagnetometerDataField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::MagnetometerData(MagnetometerDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15478,8 +15462,8 @@ impl BarometerDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::BarometerData(BarometerDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::BarometerData(BarometerDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15521,7 +15505,7 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::ThreeDSensorCalibration(
+            kind: FitField::ThreeDSensorCalibration(
                 ThreeDSensorCalibrationField::CalibrationFactor,
             ),
             values,
@@ -15536,8 +15520,8 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
         vec![
             |fields| {
                 // AccelCalFactor subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
                     DataValue::Enum(FitEnum::SensorType(SensorType::Accelerometer)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -15554,7 +15538,7 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::ThreeDSensorCalibration(
+                            kind: FitField::ThreeDSensorCalibration(
                                 ThreeDSensorCalibrationField::AccelCalFactor,
                             ),
                             values,
@@ -15565,8 +15549,8 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
             },
             |fields| {
                 // GyroCalFactor subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::ThreeDSensorCalibration(ThreeDSensorCalibrationField::SensorType),
                     DataValue::Enum(FitEnum::SensorType(SensorType::Gyroscope)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -15583,7 +15567,7 @@ impl ThreeDSensorCalibrationFieldCalibrationFactorSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::ThreeDSensorCalibration(
+                            kind: FitField::ThreeDSensorCalibration(
                                 ThreeDSensorCalibrationField::GyroCalFactor,
                             ),
                             values,
@@ -15634,8 +15618,8 @@ impl ThreeDSensorCalibrationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::ThreeDSensorCalibration(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::ThreeDSensorCalibration(
             ThreeDSensorCalibrationField::Timestamp,
         ))
     }
@@ -15676,7 +15660,7 @@ impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::CalibrationFactor),
+            kind: FitField::OneDSensorCalibration(OneDSensorCalibrationField::CalibrationFactor),
             values,
         })
     }
@@ -15688,8 +15672,8 @@ impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
     > {
         vec![|fields| {
             // BaroCalFactor subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::OneDSensorCalibration(OneDSensorCalibrationField::SensorType),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::OneDSensorCalibration(OneDSensorCalibrationField::SensorType),
                 DataValue::Enum(FitEnum::SensorType(SensorType::Barometer)),
             )];
             let found = fields.iter().find(|field| {
@@ -15706,7 +15690,7 @@ impl OneDSensorCalibrationFieldCalibrationFactorSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::OneDSensorCalibration(
+                        kind: FitField::OneDSensorCalibration(
                             OneDSensorCalibrationField::BaroCalFactor,
                         ),
                         values,
@@ -15748,8 +15732,8 @@ impl OneDSensorCalibrationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::OneDSensorCalibration(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::OneDSensorCalibration(
             OneDSensorCalibrationField::Timestamp,
         ))
     }
@@ -15786,8 +15770,8 @@ impl VideoFrameField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::VideoFrame(VideoFrameField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::VideoFrame(VideoFrameField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15840,8 +15824,8 @@ impl ObdiiDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::ObdiiData(ObdiiDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::ObdiiData(ObdiiDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15876,8 +15860,8 @@ impl NmeaSentenceField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::NmeaSentence(NmeaSentenceField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::NmeaSentence(NmeaSentenceField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -15963,10 +15947,8 @@ impl AviationAttitudeField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::AviationAttitude(
-            AviationAttitudeField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::AviationAttitude(AviationAttitudeField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -16001,7 +15983,7 @@ impl VideoField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16037,7 +16019,7 @@ impl VideoTitleField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16073,7 +16055,7 @@ impl VideoDescriptionField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16121,7 +16103,7 @@ impl VideoClipField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16189,8 +16171,8 @@ impl SetField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Set(SetField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Set(SetField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -16254,8 +16236,8 @@ impl JumpField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Jump(JumpField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Jump(JumpField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -16370,7 +16352,7 @@ impl SplitField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16463,7 +16445,7 @@ impl SplitSummaryField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16511,8 +16493,8 @@ impl ClimbProField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::ClimbPro(ClimbProField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::ClimbPro(ClimbProField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -16580,7 +16562,7 @@ impl FieldDescriptionField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16622,7 +16604,7 @@ impl DeveloperDataIdField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16661,7 +16643,7 @@ impl CourseField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16716,8 +16698,8 @@ impl CoursePointField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::CoursePoint(CoursePointField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::CoursePoint(CoursePointField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -16770,7 +16752,7 @@ impl SegmentIdField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16822,7 +16804,7 @@ impl SegmentLeaderboardEntryField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -16886,7 +16868,7 @@ impl SegmentPointField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -17013,7 +16995,7 @@ impl SegmentLapFieldTotalCyclesSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::SegmentLap(SegmentLapField::TotalCycles),
+            kind: FitField::SegmentLap(SegmentLapField::TotalCycles),
             values,
         })
     }
@@ -17025,8 +17007,8 @@ impl SegmentLapFieldTotalCyclesSubfield {
     > {
         vec![|fields| {
             // TotalStrokes subfield
-            let targets: Vec<(FitMessage, DataValue)> = vec![(
-                FitMessage::SegmentLap(SegmentLapField::Sport),
+            let targets: Vec<(FitField, DataValue)> = vec![(
+                FitField::SegmentLap(SegmentLapField::Sport),
                 DataValue::Enum(FitEnum::Sport(Sport::Cycling)),
             )];
             let found = fields.iter().find(|field| {
@@ -17043,7 +17025,7 @@ impl SegmentLapFieldTotalCyclesSubfield {
                         .collect();
 
                     Ok(DataMessageField {
-                        kind: FitMessage::SegmentLap(SegmentLapField::TotalStrokes),
+                        kind: FitField::SegmentLap(SegmentLapField::TotalStrokes),
                         values,
                     })
                 }),
@@ -17425,8 +17407,8 @@ impl SegmentLapField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::SegmentLap(SegmentLapField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::SegmentLap(SegmentLapField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -17479,7 +17461,7 @@ impl SegmentFileField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -17537,7 +17519,7 @@ impl WorkoutField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -17589,7 +17571,7 @@ impl WorkoutSessionField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -17684,7 +17666,7 @@ impl WorkoutStepFieldDurationValueSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationValue),
+            kind: FitField::WorkoutStep(WorkoutStepField::DurationValue),
             values,
         })
     }
@@ -17697,13 +17679,13 @@ impl WorkoutStepFieldDurationValueSubfield {
         vec![
             |fields| {
                 // DurationTime subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Time)),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepetitionTime)),
                     ),
                 ];
@@ -17726,7 +17708,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationTime),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationTime),
                             values,
                         })
                     }),
@@ -17735,8 +17717,8 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationDistance subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Distance)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -17758,7 +17740,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationDistance),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationDistance),
                             values,
                         })
                     }),
@@ -17767,13 +17749,13 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationHr subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::HrLessThan)),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::HrGreaterThan)),
                     ),
                 ];
@@ -17791,7 +17773,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationHr),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationHr),
                             values,
                         })
                     }),
@@ -17800,8 +17782,8 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationCalories subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Calories)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -17818,7 +17800,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationCalories),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationCalories),
                             values,
                         })
                     }),
@@ -17827,49 +17809,49 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationStep subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilStepsCmplt,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepeatUntilTime)),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilDistance,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilCalories,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilHrLessThan,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilHrGreaterThan,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilPowerLessThan,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilPowerGreaterThan,
                         )),
@@ -17889,7 +17871,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationStep),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationStep),
                             values,
                         })
                     }),
@@ -17898,13 +17880,13 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationPower subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::PowerLessThan)),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::PowerGreaterThan,
                         )),
@@ -17924,7 +17906,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationPower),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationPower),
                             values,
                         })
                     }),
@@ -17933,8 +17915,8 @@ impl WorkoutStepFieldDurationValueSubfield {
             },
             |fields| {
                 // DurationReps subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::Reps)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -17951,7 +17933,7 @@ impl WorkoutStepFieldDurationValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::DurationReps),
+                            kind: FitField::WorkoutStep(WorkoutStepField::DurationReps),
                             values,
                         })
                     }),
@@ -17994,7 +17976,7 @@ impl WorkoutStepFieldTargetValueSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetValue),
+            kind: FitField::WorkoutStep(WorkoutStepField::TargetValue),
             values,
         })
     }
@@ -18007,8 +17989,8 @@ impl WorkoutStepFieldTargetValueSubfield {
         vec![
             |fields| {
                 // TargetSpeedZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18025,7 +18007,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetSpeedZone),
+                            kind: FitField::WorkoutStep(WorkoutStepField::TargetSpeedZone),
                             values,
                         })
                     }),
@@ -18034,8 +18016,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // TargetHrZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18052,7 +18034,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetHrZone),
+                            kind: FitField::WorkoutStep(WorkoutStepField::TargetHrZone),
                             values,
                         })
                     }),
@@ -18061,8 +18043,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // TargetCadenceZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18079,7 +18061,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetCadenceZone),
+                            kind: FitField::WorkoutStep(WorkoutStepField::TargetCadenceZone),
                             values,
                         })
                     }),
@@ -18088,8 +18070,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // TargetPowerZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18106,7 +18088,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetPowerZone),
+                            kind: FitField::WorkoutStep(WorkoutStepField::TargetPowerZone),
                             values,
                         })
                     }),
@@ -18115,8 +18097,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatSteps subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(
                         WktStepDuration::RepeatUntilStepsCmplt,
                     )),
@@ -18135,7 +18117,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatSteps),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatSteps),
                             values,
                         })
                     }),
@@ -18144,8 +18126,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatTime subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(WktStepDuration::RepeatUntilTime)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18167,7 +18149,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatTime),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatTime),
                             values,
                         })
                     }),
@@ -18176,8 +18158,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatDistance subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(
                         WktStepDuration::RepeatUntilDistance,
                     )),
@@ -18201,7 +18183,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatDistance),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatDistance),
                             values,
                         })
                     }),
@@ -18210,8 +18192,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatCalories subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::DurationType),
                     DataValue::Enum(FitEnum::WktStepDuration(
                         WktStepDuration::RepeatUntilCalories,
                     )),
@@ -18230,7 +18212,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatCalories),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatCalories),
                             values,
                         })
                     }),
@@ -18239,15 +18221,15 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatHr subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilHrLessThan,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilHrGreaterThan,
                         )),
@@ -18267,7 +18249,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatHr),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatHr),
                             values,
                         })
                     }),
@@ -18276,15 +18258,15 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // RepeatPower subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilPowerLessThan,
                         )),
                     ),
                     (
-                        FitMessage::WorkoutStep(WorkoutStepField::DurationType),
+                        FitField::WorkoutStep(WorkoutStepField::DurationType),
                         DataValue::Enum(FitEnum::WktStepDuration(
                             WktStepDuration::RepeatUntilPowerGreaterThan,
                         )),
@@ -18304,7 +18286,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::RepeatPower),
+                            kind: FitField::WorkoutStep(WorkoutStepField::RepeatPower),
                             values,
                         })
                     }),
@@ -18313,8 +18295,8 @@ impl WorkoutStepFieldTargetValueSubfield {
             },
             |fields| {
                 // TargetStrokeType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::SwimStroke)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18331,7 +18313,7 @@ impl WorkoutStepFieldTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::TargetStrokeType),
+                            kind: FitField::WorkoutStep(WorkoutStepField::TargetStrokeType),
                             values,
                         })
                     }),
@@ -18369,7 +18351,7 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueLow),
+            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetValueLow),
             values,
         })
     }
@@ -18382,8 +18364,8 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
         vec![
             |fields| {
                 // CustomTargetSpeedLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18405,7 +18387,7 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedLow),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetSpeedLow),
                             values,
                         })
                     }),
@@ -18414,8 +18396,8 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
             },
             |fields| {
                 // CustomTargetHeartRateLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18432,9 +18414,7 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
-                                WorkoutStepField::CustomTargetHeartRateLow,
-                            ),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetHeartRateLow),
                             values,
                         })
                     }),
@@ -18443,8 +18423,8 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
             },
             |fields| {
                 // CustomTargetCadenceLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18461,7 +18441,7 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetCadenceLow),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetCadenceLow),
                             values,
                         })
                     }),
@@ -18470,8 +18450,8 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
             },
             |fields| {
                 // CustomTargetPowerLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18488,7 +18468,7 @@ impl WorkoutStepFieldCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerLow),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetPowerLow),
                             values,
                         })
                     }),
@@ -18526,7 +18506,7 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetValueHigh),
+            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetValueHigh),
             values,
         })
     }
@@ -18539,8 +18519,8 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
         vec![
             |fields| {
                 // CustomTargetSpeedHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18562,7 +18542,7 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetSpeedHigh),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetSpeedHigh),
                             values,
                         })
                     }),
@@ -18571,8 +18551,8 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
             },
             |fields| {
                 // CustomTargetHeartRateHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18589,7 +18569,7 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::CustomTargetHeartRateHigh,
                             ),
                             values,
@@ -18600,8 +18580,8 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
             },
             |fields| {
                 // CustomTargetCadenceHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18618,9 +18598,7 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
-                                WorkoutStepField::CustomTargetCadenceHigh,
-                            ),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetCadenceHigh),
                             values,
                         })
                     }),
@@ -18629,8 +18607,8 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
             },
             |fields| {
                 // CustomTargetPowerHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::TargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::TargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18647,7 +18625,7 @@ impl WorkoutStepFieldCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::CustomTargetPowerHigh),
+                            kind: FitField::WorkoutStep(WorkoutStepField::CustomTargetPowerHigh),
                             values,
                         })
                     }),
@@ -18686,7 +18664,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetValue),
+            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryTargetValue),
             values,
         })
     }
@@ -18699,8 +18677,8 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
         vec![
             |fields| {
                 // SecondaryTargetSpeedZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18717,9 +18695,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
-                                WorkoutStepField::SecondaryTargetSpeedZone,
-                            ),
+                            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryTargetSpeedZone),
                             values,
                         })
                     }),
@@ -18728,8 +18704,8 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
             },
             |fields| {
                 // SecondaryTargetHrZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18746,7 +18722,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetHrZone),
+                            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryTargetHrZone),
                             values,
                         })
                     }),
@@ -18755,8 +18731,8 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
             },
             |fields| {
                 // SecondaryTargetCadenceZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18773,7 +18749,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetCadenceZone,
                             ),
                             values,
@@ -18784,8 +18760,8 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
             },
             |fields| {
                 // SecondaryTargetPowerZone subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18802,9 +18778,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
-                                WorkoutStepField::SecondaryTargetPowerZone,
-                            ),
+                            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryTargetPowerZone),
                             values,
                         })
                     }),
@@ -18813,8 +18787,8 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
             },
             |fields| {
                 // SecondaryTargetStrokeType subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::SwimStroke)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18831,7 +18805,7 @@ impl WorkoutStepFieldSecondaryTargetValueSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryTargetStrokeType,
                             ),
                             values,
@@ -18871,7 +18845,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueLow),
+            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueLow),
             values,
         })
     }
@@ -18884,8 +18858,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
         vec![
             |fields| {
                 // SecondaryCustomTargetSpeedLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18907,7 +18881,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetSpeedLow,
                             ),
                             values,
@@ -18918,8 +18892,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetHeartRateLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18936,7 +18910,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetHeartRateLow,
                             ),
                             values,
@@ -18947,8 +18921,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetCadenceLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18965,7 +18939,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetCadenceLow,
                             ),
                             values,
@@ -18976,8 +18950,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetPowerLow subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -18994,7 +18968,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueLowSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetPowerLow,
                             ),
                             values,
@@ -19034,7 +19008,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueHigh),
+            kind: FitField::WorkoutStep(WorkoutStepField::SecondaryCustomTargetValueHigh),
             values,
         })
     }
@@ -19047,8 +19021,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
         vec![
             |fields| {
                 // SecondaryCustomTargetSpeedHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Speed)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -19070,7 +19044,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetSpeedHigh,
                             ),
                             values,
@@ -19081,8 +19055,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetHeartRateHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::HeartRate)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -19099,7 +19073,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetHeartRateHigh,
                             ),
                             values,
@@ -19110,8 +19084,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetCadenceHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Cadence)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -19128,7 +19102,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetCadenceHigh,
                             ),
                             values,
@@ -19139,8 +19113,8 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
             },
             |fields| {
                 // SecondaryCustomTargetPowerHigh subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::WorkoutStep(WorkoutStepField::SecondaryTargetType),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::WorkoutStep(WorkoutStepField::SecondaryTargetType),
                     DataValue::Enum(FitEnum::WktStepTarget(WktStepTarget::Power)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -19157,7 +19131,7 @@ impl WorkoutStepFieldSecondaryCustomTargetValueHighSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::WorkoutStep(
+                            kind: FitField::WorkoutStep(
                                 WorkoutStepField::SecondaryCustomTargetPowerHigh,
                             ),
                             values,
@@ -19234,7 +19208,7 @@ impl WorkoutStepField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -19273,7 +19247,7 @@ impl ExerciseTitleField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -19314,7 +19288,7 @@ impl ScheduleFieldProductSubfield {
             .flat_map(|val| val.apply_scale_offset(&None))
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Schedule(ScheduleField::Product),
+            kind: FitField::Schedule(ScheduleField::Product),
             values,
         })
     }
@@ -19327,8 +19301,8 @@ impl ScheduleFieldProductSubfield {
         vec![
             |fields| {
                 // FaveroProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![(
-                    FitMessage::Schedule(ScheduleField::Manufacturer),
+                let targets: Vec<(FitField, DataValue)> = vec![(
+                    FitField::Schedule(ScheduleField::Manufacturer),
                     DataValue::Enum(FitEnum::Manufacturer(Manufacturer::FaveroElectronics)),
                 )];
                 let found = fields.iter().find(|field| {
@@ -19345,7 +19319,7 @@ impl ScheduleFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Schedule(ScheduleField::FaveroProduct),
+                            kind: FitField::Schedule(ScheduleField::FaveroProduct),
                             values,
                         })
                     }),
@@ -19354,21 +19328,21 @@ impl ScheduleFieldProductSubfield {
             },
             |fields| {
                 // GarminProduct subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        FitField::Schedule(ScheduleField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Garmin)),
                     ),
                     (
-                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        FitField::Schedule(ScheduleField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Dynastream)),
                     ),
                     (
-                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        FitField::Schedule(ScheduleField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::DynastreamOem)),
                     ),
                     (
-                        FitMessage::Schedule(ScheduleField::Manufacturer),
+                        FitField::Schedule(ScheduleField::Manufacturer),
                         DataValue::Enum(FitEnum::Manufacturer(Manufacturer::Tacx)),
                     ),
                 ];
@@ -19386,7 +19360,7 @@ impl ScheduleFieldProductSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Schedule(ScheduleField::GarminProduct),
+                            kind: FitField::Schedule(ScheduleField::GarminProduct),
                             values,
                         })
                     }),
@@ -19429,7 +19403,7 @@ impl ScheduleField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -19486,8 +19460,8 @@ impl TotalsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Totals(TotalsField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Totals(TotalsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -19591,8 +19565,8 @@ impl WeightScaleField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::WeightScale(WeightScaleField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::WeightScale(WeightScaleField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -19651,8 +19625,8 @@ impl BloodPressureField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::BloodPressure(BloodPressureField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::BloodPressure(BloodPressureField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -19704,8 +19678,8 @@ impl MonitoringInfoField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::MonitoringInfo(MonitoringInfoField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::MonitoringInfo(MonitoringInfoField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -19772,7 +19746,7 @@ impl MonitoringFieldCyclesSubfield {
             })
             .collect();
         Ok(DataMessageField {
-            kind: FitMessage::Monitoring(MonitoringField::Cycles),
+            kind: FitField::Monitoring(MonitoringField::Cycles),
             values,
         })
     }
@@ -19785,13 +19759,13 @@ impl MonitoringFieldCyclesSubfield {
         vec![
             |fields| {
                 // Steps subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        FitField::Monitoring(MonitoringField::ActivityType),
                         DataValue::Enum(FitEnum::ActivityType(ActivityType::Walking)),
                     ),
                     (
-                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        FitField::Monitoring(MonitoringField::ActivityType),
                         DataValue::Enum(FitEnum::ActivityType(ActivityType::Running)),
                     ),
                 ];
@@ -19814,7 +19788,7 @@ impl MonitoringFieldCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Monitoring(MonitoringField::Steps),
+                            kind: FitField::Monitoring(MonitoringField::Steps),
                             values,
                         })
                     }),
@@ -19823,13 +19797,13 @@ impl MonitoringFieldCyclesSubfield {
             },
             |fields| {
                 // Strokes subfield
-                let targets: Vec<(FitMessage, DataValue)> = vec![
+                let targets: Vec<(FitField, DataValue)> = vec![
                     (
-                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        FitField::Monitoring(MonitoringField::ActivityType),
                         DataValue::Enum(FitEnum::ActivityType(ActivityType::Cycling)),
                     ),
                     (
-                        FitMessage::Monitoring(MonitoringField::ActivityType),
+                        FitField::Monitoring(MonitoringField::ActivityType),
                         DataValue::Enum(FitEnum::ActivityType(ActivityType::Swimming)),
                     ),
                 ];
@@ -19852,7 +19826,7 @@ impl MonitoringFieldCyclesSubfield {
                             .collect();
 
                         Ok(DataMessageField {
-                            kind: FitMessage::Monitoring(MonitoringField::Strokes),
+                            kind: FitField::Monitoring(MonitoringField::Strokes),
                             values,
                         })
                     }),
@@ -19975,8 +19949,8 @@ impl MonitoringField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Monitoring(MonitoringField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Monitoring(MonitoringField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20011,10 +19985,8 @@ impl MonitoringHrDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::MonitoringHrData(
-            MonitoringHrDataField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::MonitoringHrData(MonitoringHrDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20060,8 +20032,8 @@ impl Spo2DataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Spo2Data(Spo2DataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Spo2Data(Spo2DataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20117,8 +20089,8 @@ impl HrField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::Hr(HrField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::Hr(HrField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20150,7 +20122,7 @@ impl StressLevelField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -20205,7 +20177,7 @@ impl MaxMetDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -20247,8 +20219,8 @@ impl HsaBodyBatteryDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaBodyBatteryData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaBodyBatteryData(
             HsaBodyBatteryDataField::Timestamp,
         ))
     }
@@ -20282,8 +20254,8 @@ impl HsaEventField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaEvent(HsaEventField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaEvent(HsaEventField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20342,8 +20314,8 @@ impl HsaAccelerometerDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaAccelerometerData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaAccelerometerData(
             HsaAccelerometerDataField::Timestamp,
         ))
     }
@@ -20404,10 +20376,8 @@ impl HsaGyroscopeDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaGyroscopeData(
-            HsaGyroscopeDataField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaGyroscopeData(HsaGyroscopeDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20446,8 +20416,8 @@ impl HsaStepDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaStepData(HsaStepDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaStepData(HsaStepDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20485,8 +20455,8 @@ impl HsaSpo2DataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaSpo2Data(HsaSpo2DataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaSpo2Data(HsaSpo2DataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20525,8 +20495,8 @@ impl HsaStressDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaStressData(HsaStressDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaStressData(HsaStressDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20565,8 +20535,8 @@ impl HsaRespirationDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaRespirationData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaRespirationData(
             HsaRespirationDataField::Timestamp,
         ))
     }
@@ -20610,10 +20580,8 @@ impl HsaHeartRateDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaHeartRateData(
-            HsaHeartRateDataField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaHeartRateData(HsaHeartRateDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20648,8 +20616,8 @@ impl HsaConfigurationDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaConfigurationData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaConfigurationData(
             HsaConfigurationDataField::Timestamp,
         ))
     }
@@ -20690,8 +20658,8 @@ impl HsaWristTemperatureDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HsaWristTemperatureData(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HsaWristTemperatureData(
             HsaWristTemperatureDataField::Timestamp,
         ))
     }
@@ -20737,7 +20705,7 @@ impl MemoGlobField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -20770,8 +20738,8 @@ impl SleepLevelField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::SleepLevel(SleepLevelField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::SleepLevel(SleepLevelField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20812,7 +20780,7 @@ impl AntChannelIdField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -20861,8 +20829,8 @@ impl AntRxField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::AntRx(AntRxField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::AntRx(AntRxField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20910,8 +20878,8 @@ impl AntTxField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::AntTx(AntTxField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::AntTx(AntTxField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -20949,7 +20917,7 @@ impl ExdScreenConfigurationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -20994,7 +20962,7 @@ impl ExdDataFieldConfigurationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -21054,7 +21022,7 @@ impl ExdDataConceptConfigurationField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -21222,8 +21190,8 @@ impl DiveSummaryField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::DiveSummary(DiveSummaryField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::DiveSummary(DiveSummaryField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21271,10 +21239,8 @@ impl AadAccelFeaturesField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::AadAccelFeatures(
-            AadAccelFeaturesField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::AadAccelFeatures(AadAccelFeaturesField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21307,7 +21273,7 @@ impl HrvField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -21343,8 +21309,8 @@ impl BeatIntervalsField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::BeatIntervals(BeatIntervalsField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::BeatIntervals(BeatIntervalsField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21418,10 +21384,8 @@ impl HrvStatusSummaryField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HrvStatusSummary(
-            HrvStatusSummaryField::Timestamp,
-        ))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HrvStatusSummary(HrvStatusSummaryField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21457,8 +21421,8 @@ impl HrvValueField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::HrvValue(HrvValueField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::HrvValue(HrvValueField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21502,8 +21466,8 @@ impl RawBbiField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::RawBbi(RawBbiField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::RawBbi(RawBbiField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21539,8 +21503,8 @@ impl RespirationRateField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::RespirationRate(RespirationRateField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::RespirationRate(RespirationRateField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21610,8 +21574,8 @@ impl ChronoShotSessionField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::ChronoShotSession(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::ChronoShotSession(
             ChronoShotSessionField::Timestamp,
         ))
     }
@@ -21652,8 +21616,8 @@ impl ChronoShotDataField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::ChronoShotData(ChronoShotDataField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::ChronoShotData(ChronoShotDataField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21692,8 +21656,8 @@ impl TankUpdateField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::TankUpdate(TankUpdateField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::TankUpdate(TankUpdateField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21746,8 +21710,8 @@ impl TankSummaryField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::TankSummary(TankSummaryField::Timestamp))
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::TankSummary(TankSummaryField::Timestamp))
     }
 }
 #[derive(Debug, PartialEq, Clone)]
@@ -21819,7 +21783,7 @@ impl SleepAssessmentField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
+    fn timestamp_field() -> Option<FitField> {
         None
     }
 }
@@ -21861,8 +21825,8 @@ impl SkinTempOvernightField {
         }
     }
 
-    fn timestamp_field() -> Option<FitMessage> {
-        Some(FitMessage::SkinTempOvernight(
+    fn timestamp_field() -> Option<FitField> {
+        Some(FitField::SkinTempOvernight(
             SkinTempOvernightField::Timestamp,
         ))
     }

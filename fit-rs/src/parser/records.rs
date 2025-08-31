@@ -7,7 +7,7 @@ use crate::parser::{
     reader::{Reader, ReaderError},
     types::{
         DataTypeError, DataValue,
-        generated::{FitMessage, ParseFunction},
+        generated::{FitField, ParseFunction},
     },
 };
 
@@ -104,7 +104,7 @@ impl DataMessage {
 
 #[derive(Debug, PartialEq)]
 pub struct DataMessageField {
-    pub kind: FitMessage,
+    pub kind: FitField,
     pub values: Vec<DataValue>,
 }
 
@@ -281,7 +281,7 @@ mod tests {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::Record(RecordField::Timestamp),
+                kind: FitField::Record(RecordField::Timestamp),
                 values: vec![DataValue::DateTime(0)],
             }],
         };
@@ -295,7 +295,7 @@ mod tests {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::Record(RecordField::Timestamp),
+                kind: FitField::Record(RecordField::Timestamp),
                 values: vec![DataValue::DateTime(0), DataValue::DateTime(3)],
             }],
         };
@@ -310,11 +310,11 @@ mod tests {
             local_message_type: 0,
             fields: vec![
                 DataMessageField {
-                    kind: FitMessage::Record(RecordField::Timestamp),
+                    kind: FitField::Record(RecordField::Timestamp),
                     values: vec![DataValue::DateTime(16)],
                 },
                 DataMessageField {
-                    kind: FitMessage::Record(RecordField::Timestamp),
+                    kind: FitField::Record(RecordField::Timestamp),
                     values: vec![DataValue::DateTime(0), DataValue::DateTime(3)],
                 },
             ],
@@ -329,7 +329,7 @@ mod tests {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::Record(RecordField::Timestamp),
+                kind: FitField::Record(RecordField::Timestamp),
                 values: vec![DataValue::String("toto".to_string())],
             }],
         };
@@ -351,14 +351,14 @@ mod tests {
                 fields: vec![
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::Event(EventField::Event),
+                        kind: FitField::Event(EventField::Event),
                         parse: ParseFunction::Simple(Event::parse),
                         scale_offset: None,
                         size: 1,
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
+                        kind: FitField::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
                         parse: ParseFunction::Dynamic(EventFieldDataSubfield::parse),
                         scale_offset: None,
                         size: 4,
@@ -378,14 +378,14 @@ mod tests {
         assert_eq!(
             *message.fields.first().unwrap(),
             DataMessageField {
-                kind: FitMessage::Event(EventField::Event),
+                kind: FitField::Event(EventField::Event),
                 values: vec![DataValue::Enum(FitEnum::Event(Event::SpeedHighAlert))]
             }
         );
         assert_eq!(
             *message.fields.get(1).unwrap(),
             DataMessageField {
-                kind: FitMessage::Event(EventField::SpeedHighAlert),
+                kind: FitField::Event(EventField::SpeedHighAlert),
                 values: vec![DataValue::Float32(0.051)] // Scale of 1000
             }
         );
@@ -405,14 +405,14 @@ mod tests {
                 fields: vec![
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::Event(EventField::Event),
+                        kind: FitField::Event(EventField::Event),
                         parse: ParseFunction::Simple(Event::parse),
                         scale_offset: None,
                         size: 1,
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
+                        kind: FitField::Event(EventField::Data), // Subfield will depend on the value taken by EventField::Event
                         parse: ParseFunction::Dynamic(EventFieldDataSubfield::parse),
                         scale_offset: None,
                         size: 4,
@@ -432,14 +432,14 @@ mod tests {
         assert_eq!(
             *message.fields.first().unwrap(),
             DataMessageField {
-                kind: FitMessage::Event(EventField::Event),
+                kind: FitField::Event(EventField::Event),
                 values: vec![DataValue::Enum(FitEnum::Event(Event::TankPressureCritical))]
             }
         );
         assert_eq!(
             *message.fields.get(1).unwrap(),
             DataMessageField {
-                kind: FitMessage::Event(EventField::Data),
+                kind: FitField::Event(EventField::Data),
                 values: vec![DataValue::Uint32(51)]
             }
         );

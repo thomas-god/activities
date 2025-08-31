@@ -52,7 +52,7 @@ struct Subfield {{
 }}
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum FitMessage {{
+pub enum FitField {{
     {messages_enum}
     Custom(CustomField),
     UnknownVariant(u8)
@@ -166,7 +166,7 @@ pub enum {message}Field {{
             .filter_map(|def| {
                 if def.name == "timestamp" {
                     Some(format!(
-                        "Some(FitMessage::{message}({message}Field::Timestamp))"
+                        "Some(FitField::{message}({message}Field::Timestamp))"
                     ))
                 } else {
                     None
@@ -201,7 +201,7 @@ impl {message}Field {{
         }}
     }}
 
-    fn timestamp_field() -> Option<FitMessage> {{
+    fn timestamp_field() -> Option<FitField> {{
         {timestamp_field}
     }}
 }}"#
@@ -270,7 +270,7 @@ impl {message_name}Field{parent_field}Subfield {{
             .flat_map(|val| val.apply_scale_offset(&{parent_scale_offset}))
             .collect();
         Ok(DataMessageField {{
-            kind: FitMessage::{message_name}({message_name}Field::{parent_field}),
+            kind: FitField::{message_name}({message_name}Field::{parent_field}),
             values
         }})
     }}", ));
@@ -281,7 +281,7 @@ impl {message_name}Field{parent_field}Subfield {{
             subfield.references.iter().map(|reference| {
                 let base_type = snake_to_camel_case(reference.base_type.as_ref().unwrap());
                 let field = format!(
-                    "FitMessage::{message_name}({message_name}Field::{})",
+                    "FitField::{message_name}({message_name}Field::{})",
                     snake_to_camel_case(&reference.name)
                 );
                 let value = format!(
@@ -316,7 +316,7 @@ impl {message_name}Field{parent_field}Subfield {{
                 "
 |fields| {{
     // {subfield_name} subfield
-    let targets: Vec<(FitMessage, DataValue)> = vec![{targets}];
+    let targets: Vec<(FitField, DataValue)> = vec![{targets}];
     let found = fields.iter().find(|field| {{
         targets
             .iter()
@@ -331,7 +331,7 @@ impl {message_name}Field{parent_field}Subfield {{
                 .collect();
 
             Ok(DataMessageField {{
-                kind: FitMessage::{message_name}({message_name}Field::{subfield_name}),
+                kind: FitField::{message_name}({message_name}Field::{subfield_name}),
                 values
 
             }})

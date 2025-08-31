@@ -208,7 +208,7 @@ pub enum {enum_name} {{
         }}"
     ));
 
-    // MesgNum need special treatment to be able to link to a FitMessage
+    // MesgNum need special treatment to be able to link to a FitField
     if enum_name == "MesgNum" {
         code.push_str(&generate_mesg_num_mappings(mapping));
     }
@@ -233,14 +233,14 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
             })
             .map(|(_, v)| {
                 format!(
-                    "Self::{} => FitMessage::{}({}Field::from(def_number))",
+                    "Self::{} => FitField::{}({}Field::from(def_number))",
                     snake_to_camel_case(v),
                     snake_to_camel_case(v),
                     snake_to_camel_case(v)
                 )
             })
             .chain(vec![
-                "_ => FitMessage::UnknownVariant(def_number)".to_string(),
+                "_ => FitField::UnknownVariant(def_number)".to_string(),
             ]),
         ",\n",
     );
@@ -312,7 +312,7 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
 
     code.push_str(&format!(
         "
-    pub fn message_field(&self, def_number: u8) -> FitMessage {{
+    pub fn message_field(&self, def_number: u8) -> FitField {{
         match self {{
             {mapping_field}
         }}
@@ -337,7 +337,7 @@ fn generate_mesg_num_mappings(mapping: &[(usize, String)]) -> String {
 
     pub fn timestamp_field(
         &self,
-    ) -> Option<FitMessage> {{
+    ) -> Option<FitField> {{
         match self {{
             {mapping_timestamp_field}
         }}

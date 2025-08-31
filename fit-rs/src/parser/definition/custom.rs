@@ -5,7 +5,7 @@ use crate::{
     parser::{
         definition::Definition,
         records::DataMessage,
-        types::generated::{FieldDescriptionField, FitBaseType, FitEnum, FitMessage, MesgNum},
+        types::generated::{FieldDescriptionField, FitBaseType, FitEnum, FitField, MesgNum},
     },
 };
 
@@ -78,14 +78,14 @@ fn find_value_of_field(
         .fields
         .iter()
         .position(|field| match &field.kind {
-            FitMessage::FieldDescription(field) => discriminant(field) == discriminant(variant),
+            FitField::FieldDescription(field) => discriminant(field) == discriminant(variant),
             _ => false,
         })?;
 
     let field = message.fields.get(index)?;
 
     match &field.kind {
-        FitMessage::FieldDescription(field) => {
+        FitField::FieldDescription(field) => {
             if discriminant(field) != discriminant(variant) {
                 return None;
             }
@@ -157,16 +157,14 @@ mod test {
                 fields: vec![
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::FieldDescription(
-                            FieldDescriptionField::DeveloperDataIndex,
-                        ),
+                        kind: FitField::FieldDescription(FieldDescriptionField::DeveloperDataIndex),
                         parse: ParseFunction::Simple(parse_uint8),
                         scale_offset: None,
                         size: 1,
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::FieldDescription(
+                        kind: FitField::FieldDescription(
                             FieldDescriptionField::FieldDefinitionNumber,
                         ),
                         parse: ParseFunction::Simple(parse_uint8),
@@ -175,21 +173,21 @@ mod test {
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::FieldDescription(FieldDescriptionField::FitBaseTypeId),
+                        kind: FitField::FieldDescription(FieldDescriptionField::FitBaseTypeId),
                         parse: ParseFunction::Simple(FitBaseType::parse),
                         scale_offset: None,
                         size: 1,
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::FieldDescription(FieldDescriptionField::FieldName),
+                        kind: FitField::FieldDescription(FieldDescriptionField::FieldName),
                         parse: ParseFunction::Simple(parse_string),
                         scale_offset: None,
                         size: 64,
                     },
                     DefinitionField {
                         endianness: Endianness::Little,
-                        kind: FitMessage::FieldDescription(FieldDescriptionField::Units),
+                        kind: FitField::FieldDescription(FieldDescriptionField::Units),
                         parse: ParseFunction::Simple(parse_string),
                         scale_offset: None,
                         size: 16,
@@ -202,25 +200,23 @@ mod test {
             local_message_type: 0,
             fields: vec![
                 DataMessageField {
-                    kind: FitMessage::FieldDescription(FieldDescriptionField::DeveloperDataIndex),
+                    kind: FitField::FieldDescription(FieldDescriptionField::DeveloperDataIndex),
                     values: vec![DataValue::Uint8(0)],
                 },
                 DataMessageField {
-                    kind: FitMessage::FieldDescription(
-                        FieldDescriptionField::FieldDefinitionNumber,
-                    ),
+                    kind: FitField::FieldDescription(FieldDescriptionField::FieldDefinitionNumber),
                     values: vec![DataValue::Uint8(0)],
                 },
                 DataMessageField {
-                    kind: FitMessage::FieldDescription(FieldDescriptionField::FitBaseTypeId),
+                    kind: FitField::FieldDescription(FieldDescriptionField::FitBaseTypeId),
                     values: vec![DataValue::Enum(FitEnum::FitBaseType(FitBaseType::Sint8))],
                 },
                 DataMessageField {
-                    kind: FitMessage::FieldDescription(FieldDescriptionField::FieldName),
+                    kind: FitField::FieldDescription(FieldDescriptionField::FieldName),
                     values: vec![DataValue::String("new field".to_string())],
                 },
                 DataMessageField {
-                    kind: FitMessage::FieldDescription(FieldDescriptionField::Units),
+                    kind: FitField::FieldDescription(FieldDescriptionField::Units),
                     values: vec![DataValue::String("km/h".to_string())],
                 },
             ],

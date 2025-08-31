@@ -1,8 +1,8 @@
-use crate::{DataMessage, DataValue, FitMessage};
+use crate::{DataMessage, DataValue, FitField};
 
 pub fn find_field_value_by_kind<'a>(
     messages: &'a [DataMessage],
-    target_kind: &FitMessage,
+    target_kind: &FitField,
 ) -> Option<&'a [DataValue]> {
     messages.iter().find_map(|msg| {
         msg.fields.iter().find_map(|field| {
@@ -17,7 +17,7 @@ pub fn find_field_value_by_kind<'a>(
 
 pub fn find_fied_value_as_string(
     messages: &[DataMessage],
-    target_field: &FitMessage,
+    target_field: &FitField,
 ) -> Option<String> {
     find_field_value_by_kind(messages, target_field).and_then(|values| {
         values.iter().find_map(|val| match val {
@@ -39,7 +39,7 @@ mod tests {
         let messages = vec![DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::Record(crate::RecordField::Speed),
+                kind: FitField::Record(crate::RecordField::Speed),
                 values: vec![DataValue::Float32(1.3)],
             }],
         }];
@@ -47,7 +47,7 @@ mod tests {
         assert!(
             find_field_value_by_kind(
                 &messages,
-                &FitMessage::DeviceInfo(crate::DeviceInfoField::Product)
+                &FitField::DeviceInfo(crate::DeviceInfoField::Product)
             )
             .is_none()
         );
@@ -59,14 +59,14 @@ mod tests {
             DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
-                    kind: FitMessage::Record(crate::RecordField::Speed),
+                    kind: FitField::Record(crate::RecordField::Speed),
                     values: vec![DataValue::Float32(1.3)],
                 }],
             },
             DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
-                    kind: FitMessage::DeviceInfo(crate::DeviceInfoField::Product),
+                    kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("device".to_string())],
                 }],
             },
@@ -75,7 +75,7 @@ mod tests {
         assert_eq!(
             find_field_value_by_kind(
                 &messages,
-                &FitMessage::DeviceInfo(crate::DeviceInfoField::Product)
+                &FitField::DeviceInfo(crate::DeviceInfoField::Product)
             ),
             Some(vec![DataValue::String("device".to_string())].as_slice())
         );
@@ -87,21 +87,21 @@ mod tests {
             DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
-                    kind: FitMessage::Record(crate::RecordField::Speed),
+                    kind: FitField::Record(crate::RecordField::Speed),
                     values: vec![DataValue::Float32(1.3)],
                 }],
             },
             DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
-                    kind: FitMessage::DeviceInfo(crate::DeviceInfoField::Product),
+                    kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("device".to_string())],
                 }],
             },
             DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
-                    kind: FitMessage::DeviceInfo(crate::DeviceInfoField::Product),
+                    kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("another_device".to_string())],
                 }],
             },
@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(
             find_field_value_by_kind(
                 &messages,
-                &FitMessage::DeviceInfo(crate::DeviceInfoField::Product)
+                &FitField::DeviceInfo(crate::DeviceInfoField::Product)
             ),
             Some(vec![DataValue::String("device".to_string())].as_slice())
         );
@@ -121,7 +121,7 @@ mod tests {
         let messages = vec![DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::DeviceInfo(crate::DeviceInfoField::Product),
+                kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                 values: vec![DataValue::String("device".to_string())],
             }],
         }];
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(
             find_fied_value_as_string(
                 &messages,
-                &FitMessage::DeviceInfo(crate::DeviceInfoField::Product)
+                &FitField::DeviceInfo(crate::DeviceInfoField::Product)
             ),
             Some("device".to_string())
         );
@@ -140,7 +140,7 @@ mod tests {
         let messages = vec![DataMessage {
             local_message_type: 0,
             fields: vec![DataMessageField {
-                kind: FitMessage::DeviceInfo(crate::DeviceInfoField::Product),
+                kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                 values: vec![DataValue::Uint32(12)],
             }],
         }];
@@ -148,7 +148,7 @@ mod tests {
         assert!(
             find_fied_value_as_string(
                 &messages,
-                &FitMessage::DeviceInfo(crate::DeviceInfoField::Product)
+                &FitField::DeviceInfo(crate::DeviceInfoField::Product)
             )
             .is_none(),
         );
