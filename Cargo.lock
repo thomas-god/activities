@@ -23,6 +23,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "fit-parser",
+ "serde",
+ "serde_json",
  "tokio",
  "tower-http",
  "tracing",

@@ -1,14 +1,17 @@
 use std::env;
 
 use axum::{
-    Router,
+    Json, Router,
     body::Bytes,
     http::{
         HeaderValue, Method, StatusCode,
         header::{CONTENT_TYPE, COOKIE},
     },
+    response::IntoResponse,
     routing::{get, post},
 };
+use fit_parser::{parse_fit_messages, utils::find_field_value_as_uint};
+use serde::Serialize;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 #[tokio::main]
@@ -56,7 +59,21 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn post_activity(bytes: Bytes) -> StatusCode {
+#[derive(Debug, Serialize)]
+struct NewActivityResponse {
+    calories: Option<usize>,
+}
+
+async fn post_activity(bytes: Bytes) -> Result<impl IntoResponse, StatusCode> {
+    let content = bytes.to_vec().into_iter();
+    let Ok(messages) = parse_fit_messages(content) else {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    };
+    let calories = find_field_value_as_uint(
+        &messages,
+        &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
+    );
     tracing::info!("Hello from post_activity");
-    StatusCode::CREATED
+
+    Ok((StatusCode::CREATED, Json(NewActivityResponse { calories })))
 }
