@@ -37,9 +37,9 @@ pub enum FitParserError {
     ParserError(#[from] RecordError),
 }
 
-pub fn parse_fit_messages(file: &str) -> Result<Vec<DataMessage>, FitParserError> {
-    let content = fs::read(file)?.into_iter();
-
+pub fn parse_fit_messages(
+    content: std::vec::IntoIter<u8>,
+) -> Result<Vec<DataMessage>, FitParserError> {
     let mut header_reader = Reader::new(HEADER_SIZE as u32, content);
     let header = FileHeader::from_bytes(&mut header_reader)?;
 
@@ -90,12 +90,18 @@ pub fn parse_fit_messages(file: &str) -> Result<Vec<DataMessage>, FitParserError
     Ok(messages)
 }
 
+pub fn parse_fit_file(file: &str) -> Result<Vec<DataMessage>, FitParserError> {
+    let content = fs::read(file)?.into_iter();
+    parse_fit_messages(content)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_fit_messages;
+
+    use crate::parser::parse_fit_file;
 
     #[test]
     fn test_no_error() {
-        let _ = parse_fit_messages("test.fit");
+        let _ = parse_fit_file("test.fit");
     }
 }
