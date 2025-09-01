@@ -77,7 +77,7 @@ pub enum RecordError {
     ScaleByZeroError,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DataMessage {
     pub local_message_type: u8,
     pub fields: Vec<DataMessageField>,
@@ -102,7 +102,7 @@ impl DataMessage {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DataMessageField {
     pub kind: FitField,
     pub values: Vec<DataValue>,

@@ -18,8 +18,8 @@ pub const HEADER_SIZE: u8 = 14;
 
 #[derive(Debug)]
 pub struct FileHeader {
-    pub protocol: u8,
-    pub profile_version: u16,
+    pub _protocol: u8,
+    pub _profile_version: u16,
     pub data_size: u32,
 }
 
@@ -76,8 +76,8 @@ impl FileHeader {
         }
 
         Ok(Self {
-            protocol,
-            profile_version,
+            _protocol: protocol,
+            _profile_version: profile_version,
             data_size,
         })
     }
@@ -188,8 +188,8 @@ mod tests {
             unreachable!("Should have return an Ok(FileHeader)")
         };
 
-        assert_eq!(header.protocol, 0);
-        assert_eq!(header.profile_version, 13);
+        assert_eq!(header._protocol, 0);
+        assert_eq!(header._profile_version, 13);
         assert_eq!(header.data_size, 1);
     }
 }

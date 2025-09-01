@@ -8,7 +8,7 @@ use axum::{
         header::{CONTENT_TYPE, COOKIE},
     },
     response::IntoResponse,
-    routing::{get, post},
+    routing::post,
 };
 use fit_parser::{parse_fit_messages, utils::find_field_value_as_uint};
 use serde::Serialize;
@@ -33,16 +33,8 @@ async fn main() {
         .unwrap_or("http://127.0.0.1:5173".to_string())
         .parse::<HeaderValue>()
         .expect("ALLOW_ORIGIN is not a valid origin");
-    tracing::info!("allowed origin: {origin:?}");
 
     let app = Router::new()
-        .route(
-            "/",
-            get(|| async {
-                tracing::info!("Hello world");
-                "Hello, World!"
-            }),
-        )
         .route("/activity", post(post_activity))
         .layer(TraceLayer::new_for_http())
         .layer(
