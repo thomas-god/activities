@@ -1,10 +1,10 @@
-use fit_rs::{
-    DeviceInfoField, FitField, parse_fit_messages,
+use fit_parser::{
+    DeviceInfoField, FitField, SessionField, parse_fit_messages,
     utils::{find_fied_value_as_string, find_field_value_by_kind},
 };
 
 fn main() {
-    let messages = parse_fit_messages("fit-rs/examples/example.fit").unwrap();
+    let messages = parse_fit_messages("fit-parser/examples/example.fit").unwrap();
 
     let device = find_fied_value_as_string(
         &messages,
@@ -12,13 +12,10 @@ fn main() {
     );
     println!("Device name: {device:?}");
 
-    let sport =
-        find_field_value_by_kind(&messages, &FitField::Session(fit_rs::SessionField::Sport));
+    let sport = find_field_value_by_kind(&messages, &FitField::Session(SessionField::Sport));
     println!("Sport: {sport:?}");
 
-    let calories = find_field_value_by_kind(
-        &messages,
-        &FitField::Session(fit_rs::SessionField::TotalCalories),
-    );
+    let calories =
+        find_field_value_by_kind(&messages, &FitField::Session(SessionField::TotalCalories));
     println!("Calories: {calories:?} kcal");
 }
