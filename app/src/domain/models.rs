@@ -1,39 +1,31 @@
-use fit_parser::{DataMessage, parse_fit_messages};
-use thiserror::Error;
+use derive_more::{AsRef, Deref, Display};
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct Activity {
-    content: FitContent,
+    id: ActivityId,
+    calories: Option<usize>,
 }
 
 impl Activity {
-    pub fn new(content: FitContent) -> Self {
-        Self { content }
+    pub fn new(id: ActivityId, calories: Option<usize>) -> Self {
+        Self { id, calories }
     }
 
-    pub fn fit_content(&self) -> &[DataMessage] {
-        &self.content.messages
+    pub fn id(&self) -> &ActivityId {
+        &self.id
+    }
+
+    pub fn calories(&self) -> &Option<usize> {
+        &self.calories
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct FitContent {
-    raw: Vec<u8>,
-    messages: Vec<DataMessage>,
-}
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref)]
+pub struct ActivityId(String);
 
-#[derive(Debug, Clone, Error)]
-#[error("The content is not a valid FIT content")]
-pub struct InvalidFitContentError;
-
-impl FitContent {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidFitContentError> {
-        match parse_fit_messages(bytes.clone().into_iter()) {
-            Err(_) => Err(InvalidFitContentError),
-            Ok(messages) => Ok(Self {
-                raw: bytes,
-                messages,
-            }),
-        }
+impl ActivityId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_string())
     }
 }

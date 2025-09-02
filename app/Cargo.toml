@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["macros"] }
 derive_more = { version = "2.0.1", features = ["full"] }
 fit-parser = {path = "../fit-parser"}
@@ -14,3 +15,4 @@ tokio = { version = "1.47.1", features = ["full"] }
 tower-http = { version = "0.6.6", features = ["cors", "trace"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.20"
+uuid = { version = "1.18.1", features = ["v4", "serde"] }
