@@ -42,7 +42,9 @@ where
     ) -> Result<Activity, CreateActivityError> {
         // Create activity from request
         let id = ActivityId::new();
-        let activity = Activity::new(id.clone(), *req.calories());
+        let activity = Activity::new(id.clone(), *req.calories(), *req.duration(), *req.sport());
+
+        tracing::info!("Parsed new activity {:?}", &activity);
 
         // Persist activity
         self.activity_repository
@@ -69,7 +71,10 @@ mod tests {
     use anyhow::anyhow;
     use tokio::sync::Mutex;
 
-    use crate::domain::ports::{SaveActivityError, SaveRawDataError};
+    use crate::domain::{
+        models::Sport,
+        ports::{SaveActivityError, SaveRawDataError},
+    };
 
     use super::*;
 
@@ -115,9 +120,11 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
+        let sport = Some(Sport::Running);
+        let duration = Some(1200);
         let calories = Some(12);
         let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(calories, content);
+        let req = CreateActivityRequest::new(sport, duration, calories, content);
 
         let res = service.create_activity(req).await;
 
@@ -138,9 +145,11 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
+        let sport = Some(Sport::Running);
+        let duration = Some(1200);
         let calories = Some(12);
         let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(calories, content);
+        let req = CreateActivityRequest::new(sport, duration, calories, content);
 
         let res = service.create_activity(req).await;
 
@@ -159,9 +168,11 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
+        let sport = Some(Sport::Running);
+        let duration = Some(1200);
         let calories = Some(12);
         let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(calories, content);
+        let req = CreateActivityRequest::new(sport, duration, calories, content);
 
         let res = service.create_activity(req).await;
 

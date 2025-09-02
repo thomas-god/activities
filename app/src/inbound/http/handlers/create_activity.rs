@@ -1,25 +1,62 @@
 use axum::{body::Bytes, extract::State, http::StatusCode};
-use fit_parser::{FitParserError, parse_fit_messages, utils::find_field_value_as_uint};
+use fit_parser::{
+    FitEnum, FitParserError, Sport as FitSport, parse_fit_messages,
+    utils::{find_field_value_as_float, find_field_value_by_kind},
+};
 use thiserror::Error;
 
 use crate::{
-    domain::ports::{ActivityService, CreateActivityError, CreateActivityRequest},
+    domain::{
+        models::Sport,
+        ports::{ActivityService, CreateActivityError, CreateActivityRequest},
+    },
     inbound::http::AppState,
 };
 
 fn try_bytes_into_domain(
     bytes: Bytes,
 ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
-    let iter = bytes.to_vec().into_iter();
-    let Ok(messages) = parse_fit_messages(iter) else {
+    let content = bytes.to_vec();
+    let Ok(messages) = parse_fit_messages(content.into_iter()) else {
         return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
     };
-    let calories = find_field_value_as_uint(
+    let calories = find_field_value_as_float(
         &messages,
         &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
-    );
+    )
+    .map(|val| val.round() as usize);
+    let duration = find_field_value_as_float(
+        &messages,
+        &fit_parser::FitField::Session(fit_parser::SessionField::TotalElapsedTime),
+    )
+    .map(|val| val.round() as usize);
+    let sport = find_field_value_by_kind(
+        &messages,
+        &fit_parser::FitField::Session(fit_parser::SessionField::Sport),
+    )
+    .and_then(|field| {
+        field.iter().find_map(|value| match value {
+            fit_parser::DataValue::Enum(FitEnum::Sport(sport)) => Some(sport.into()),
+            _ => None,
+        })
+    });
 
-    Ok(CreateActivityRequest::new(calories, bytes.to_vec()))
+    Ok(CreateActivityRequest::new(
+        sport,
+        duration,
+        calories,
+        bytes.to_vec(),
+    ))
+}
+
+impl From<&FitSport> for Sport {
+    fn from(value: &FitSport) -> Self {
+        match value {
+            FitSport::Running => Self::Running,
+            FitSport::Cycling => Self::Cycling,
+            _ => Self::Other,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Error)]
@@ -95,6 +132,8 @@ mod tests {
             create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                 ActivityId::new(),
                 Some(12),
+                Some(3600),
+                Some(Sport::Cycling),
             )))),
         };
 

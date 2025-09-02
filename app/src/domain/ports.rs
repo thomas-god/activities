@@ -1,16 +1,25 @@
 use thiserror::Error;
 
-use crate::domain::models::{Activity, ActivityId};
+use crate::domain::models::{Activity, ActivityId, Sport};
 
 #[derive(Debug, Clone)]
 pub struct CreateActivityRequest {
+    sport: Option<Sport>,
+    duration: Option<usize>,
     calories: Option<usize>,
     raw_content: Vec<u8>,
 }
 
 impl CreateActivityRequest {
-    pub fn new(calories: Option<usize>, raw_content: Vec<u8>) -> Self {
+    pub fn new(
+        sport: Option<Sport>,
+        duration: Option<usize>,
+        calories: Option<usize>,
+        raw_content: Vec<u8>,
+    ) -> Self {
         Self {
+            sport,
+            duration,
             calories,
             raw_content,
         }
@@ -22,6 +31,14 @@ impl CreateActivityRequest {
 
     pub fn raw_content(&self) -> &[u8] {
         &self.raw_content
+    }
+
+    pub fn sport(&self) -> &Option<Sport> {
+        &self.sport
+    }
+
+    pub fn duration(&self) -> &Option<usize> {
+        &self.duration
     }
 }
 
