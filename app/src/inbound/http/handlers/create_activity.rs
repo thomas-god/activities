@@ -1,6 +1,5 @@
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{body::Bytes, extract::State, http::StatusCode};
 use fit_parser::{FitParserError, parse_fit_messages, utils::find_field_value_as_uint};
-use serde::Deserialize;
 use thiserror::Error;
 
 use crate::{
@@ -8,25 +7,19 @@ use crate::{
     inbound::http::AppState,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct CreateActivityHttpRequestBody {
-    content: Vec<u8>,
-}
+fn try_bytes_into_domain(
+    bytes: Bytes,
+) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
+    let iter = bytes.to_vec().into_iter();
+    let Ok(messages) = parse_fit_messages(iter) else {
+        return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
+    };
+    let calories = find_field_value_as_uint(
+        &messages,
+        &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
+    );
 
-impl CreateActivityHttpRequestBody {
-    fn try_into_domain(
-        self,
-    ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
-        let Ok(messages) = parse_fit_messages(self.content.clone().into_iter()) else {
-            return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
-        };
-        let calories = find_field_value_as_uint(
-            &messages,
-            &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
-        );
-
-        Ok(CreateActivityRequest::new(calories, self.content))
-    }
+    Ok(CreateActivityRequest::new(calories, bytes.to_vec()))
 }
 
 #[derive(Debug, Clone, Error)]
@@ -49,11 +42,10 @@ impl From<CreateActivityError> for StatusCode {
 
 pub async fn create_activity<AS: ActivityService>(
     State(state): State<AppState<AS>>,
-    Json(body): Json<CreateActivityHttpRequestBody>,
+    bytes: Bytes,
 ) -> Result<StatusCode, StatusCode> {
-    let domain_request = body
-        .try_into_domain()
-        .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+    let domain_request =
+        try_bytes_into_domain(bytes).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     state
         .activity_service
@@ -109,9 +101,9 @@ mod tests {
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
         });
-        let body = axum::extract::Json(CreateActivityHttpRequestBody { content });
+        let bytes = axum::body::Bytes::from(content);
 
-        let response = create_activity(state, body).await;
+        let response = create_activity(state, bytes).await;
         assert!(response.is_ok());
         assert_eq!(response.unwrap(), StatusCode::CREATED)
     }
@@ -128,9 +120,9 @@ mod tests {
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
         });
-        let body = axum::extract::Json(CreateActivityHttpRequestBody { content });
+        let bytes = axum::body::Bytes::from(content);
 
-        let response = create_activity(state, body).await;
+        let response = create_activity(state, bytes).await;
         assert!(response.is_err());
         assert_eq!(response.unwrap_err(), StatusCode::UNPROCESSABLE_ENTITY)
     }

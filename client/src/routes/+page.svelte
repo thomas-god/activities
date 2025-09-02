@@ -22,7 +22,7 @@
 
 		const file = fileList.item(0)!;
 
-		let res = await fetch(`${PUBLIC_APP_URL}/activity`, {
+		let res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
 			body: file,
 			method: 'POST'
 		});
