@@ -8,7 +8,7 @@ pub struct CreateActivityRequest {
     raw_content: Vec<u8>,
 }
 
-impl<'a> CreateActivityRequest {
+impl CreateActivityRequest {
     pub fn new(calories: Option<usize>, raw_content: Vec<u8>) -> Self {
         Self {
             calories,

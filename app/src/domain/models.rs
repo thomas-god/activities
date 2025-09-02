@@ -29,3 +29,9 @@ impl ActivityId {
         Self(Uuid::new_v4().to_string())
     }
 }
+
+impl Default for ActivityId {
+    fn default() -> Self {
+        Self::new()
+    }
+}

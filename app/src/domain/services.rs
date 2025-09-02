@@ -42,7 +42,7 @@ where
     ) -> Result<Activity, CreateActivityError> {
         // Create activity from request
         let id = ActivityId::new();
-        let activity = Activity::new(id.clone(), req.calories().clone());
+        let activity = Activity::new(id.clone(), *req.calories());
 
         // Persist activity
         self.activity_repository
@@ -52,7 +52,7 @@ where
 
         // Persist raw data
         self.raw_data_repository
-            .save_raw_data(&id, &req.raw_content())
+            .save_raw_data(&id, req.raw_content())
             .await
             .map_err(|err| {
                 anyhow!(err).context(format!("Failed to persist raw data for activity {}", id))
