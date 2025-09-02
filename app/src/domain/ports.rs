@@ -35,7 +35,7 @@ pub trait ActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
         req: CreateActivityRequest,
-    ) -> impl Future<Output = Result<Activity, CreateActivityError>>;
+    ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -48,7 +48,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn save_activity(
         &self,
         activity: &Activity,
-    ) -> impl Future<Output = Result<(), SaveActivityError>>;
+    ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -62,5 +62,5 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
         &self,
         activity_id: &ActivityId,
         content: &[u8],
-    ) -> impl Future<Output = Result<(), SaveRawDataError>>;
+    ) -> impl Future<Output = Result<(), SaveRawDataError>> + Send;
 }
