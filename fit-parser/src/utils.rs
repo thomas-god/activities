@@ -46,6 +46,28 @@ pub fn find_field_value_as_uint(
     })
 }
 
+pub fn find_field_value_as_float(messages: &[DataMessage], target_field: &FitField) -> Option<f64> {
+    find_field_value_by_kind(messages, target_field).and_then(|values| {
+        values.iter().find_map(|val| match val {
+            DataValue::Uint8(val) => Some(*val as f64),
+            DataValue::Uint16(val) => Some(*val as f64),
+            DataValue::Uint32(val) => Some(*val as f64),
+            DataValue::Uint64(val) => Some(*val as f64),
+            DataValue::Uint8z(val) => Some(*val as f64),
+            DataValue::Uint16z(val) => Some(*val as f64),
+            DataValue::Uint32z(val) => Some(*val as f64),
+            DataValue::Uint64z(val) => Some(*val as f64),
+            DataValue::Sint8(val) => Some(*val as f64),
+            DataValue::Sint16(val) => Some(*val as f64),
+            DataValue::Sint32(val) => Some(*val as f64),
+            DataValue::Sint64(val) => Some(*val as f64),
+            DataValue::Float32(val) => Some(*val as f64),
+            DataValue::Float64(val) => Some(*val),
+            _ => None,
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -199,21 +221,70 @@ mod tests {
             (DataValue::DateTime(0), None),
         ];
 
-        for (val, res) in test_values {
+        for (val, expected) in test_values {
             let messages = vec![DataMessage {
                 local_message_type: 0,
                 fields: vec![DataMessageField {
                     kind: FitField::Session(SessionField::TotalCalories),
-                    values: vec![val],
+                    values: vec![val.clone()],
                 }],
             }];
 
+            let res = find_field_value_as_uint(
+                &messages,
+                &FitField::Session(SessionField::TotalCalories),
+            );
             assert_eq!(
-                find_field_value_as_uint(
-                    &messages,
-                    &FitField::Session(SessionField::TotalCalories)
-                ),
-                res
+                res, expected,
+                "expected {:?} but got {:?} instead when testing for {:?}",
+                expected, res, val
+            );
+        }
+    }
+
+    #[test]
+    fn test_find_field_value_as_float() {
+        let test_values = vec![
+            // Valid values
+            (DataValue::Uint8(12), Some(12.)),
+            (DataValue::Uint16(12), Some(12.)),
+            (DataValue::Uint32(12), Some(12.)),
+            (DataValue::Uint64(12), Some(12.)),
+            (DataValue::Uint8z(12), Some(12.)),
+            (DataValue::Uint16z(12), Some(12.)),
+            (DataValue::Uint32z(12), Some(12.)),
+            (DataValue::Uint64z(12), Some(12.)),
+            (DataValue::Sint8(-12), Some(-12.)),
+            (DataValue::Sint16(-12), Some(-12.)),
+            (DataValue::Sint32(-12), Some(-12.)),
+            (DataValue::Sint64(-12), Some(-12.)),
+            (DataValue::Float32(12.), Some(12.)),
+            (DataValue::Float64(12.), Some(12.)),
+            // Invalid values
+            (DataValue::String("toto".to_string()), None),
+            (DataValue::Enum(FitEnum::Sport(Sport::Running)), None),
+            (DataValue::Byte(vec![]), None),
+            (DataValue::Unknown(vec![]), None),
+            (DataValue::DateTime(0), None),
+        ];
+
+        for (val, expected) in test_values {
+            let messages = vec![DataMessage {
+                local_message_type: 0,
+                fields: vec![DataMessageField {
+                    kind: FitField::Session(SessionField::TotalCalories),
+                    values: vec![val.clone()],
+                }],
+            }];
+
+            let res = find_field_value_as_float(
+                &messages,
+                &FitField::Session(SessionField::TotalCalories),
+            );
+            assert_eq!(
+                res, expected,
+                "expected {:?} but got {:?} instead when testing for {:?}",
+                expected, res, val
             );
         }
     }
