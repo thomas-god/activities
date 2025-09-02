@@ -1,21 +1,14 @@
-use std::env;
+use std::collections::HashMap;
 
-use axum::{
-    Json, Router,
-    body::Bytes,
-    http::{
-        HeaderValue, Method, StatusCode,
-        header::{CONTENT_TYPE, COOKIE},
-    },
-    response::IntoResponse,
-    routing::post,
+use app::{
+    config::Config,
+    domain::services::Service,
+    inbound::http::HttpServer,
+    outbound::memory::{InMemoryActivityRepository, InMemoryRawDataRepository},
 };
-use fit_parser::{parse_fit_messages, utils::find_field_value_as_uint};
-use serde::Serialize;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // start tracing
     let subscriber = tracing_subscriber::fmt()
         .compact()
@@ -29,43 +22,14 @@ async fn main() {
         tracing::error!("Error while setting up tracing subscriber: {err:?}");
     };
 
-    let origin = env::var("ALLOW_ORIGIN")
-        .unwrap_or("http://127.0.0.1:5173".to_string())
-        .parse::<HeaderValue>()
-        .expect("ALLOW_ORIGIN is not a valid origin");
+    let config = Config::from_env()?;
 
-    let app = Router::new()
-        .route("/activity", post(post_activity))
-        .layer(TraceLayer::new_for_http())
-        .layer(
-            CorsLayer::new()
-                .allow_headers([CONTENT_TYPE, COOKIE])
-                .allow_origin([origin])
-                .allow_methods([Method::GET, Method::POST]),
-        );
+    let activity_repository = InMemoryActivityRepository::new(vec![]);
+    let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
 
-    // run our app with hyper, listening globally on port 3001
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3001));
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    tracing::info!("App started");
-    axum::serve(listener, app).await.unwrap();
-}
+    let activity_service = Service::new(activity_repository, raw_data_repository);
 
-#[derive(Debug, Serialize)]
-struct NewActivityResponse {
-    calories: Option<usize>,
-}
+    let http_server = HttpServer::new(activity_service, config).await?;
 
-async fn post_activity(bytes: Bytes) -> Result<impl IntoResponse, StatusCode> {
-    let content = bytes.to_vec().into_iter();
-    let Ok(messages) = parse_fit_messages(content) else {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    };
-    let calories = find_field_value_as_uint(
-        &messages,
-        &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
-    );
-    tracing::info!("Hello from post_activity");
-
-    Ok((StatusCode::CREATED, Json(NewActivityResponse { calories })))
+    http_server.run().await
 }
