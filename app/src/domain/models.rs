@@ -21,7 +21,7 @@ impl Activity {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct ActivityId(String);
 
 impl ActivityId {
