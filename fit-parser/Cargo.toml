@@ -4,7 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.5.47", features = ["derive"], optional = true }
 thiserror = "2.0.16"
 
 [dev-dependencies]
 strum = { version = "0.27.2", features = ["derive"] }
+
+[features]
+default = []
+cli = ["clap"]
+
+[[bin]]
+name = "fit-parser"
+required-features = ["cli"]
+path = "src/bin/main.rs"
