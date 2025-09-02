@@ -1,5 +1,9 @@
 <script lang="ts">
+	import { invalidate } from '$app/navigation';
 	import { PUBLIC_APP_URL } from '$env/static/public';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
 
 	let files: FileList | undefined = $state(undefined);
 	let file_upload_content: string = $state('');
@@ -27,7 +31,10 @@
 			method: 'POST'
 		});
 
-		console.log(res.status);
+		if (res.status === 201) {
+			// Trigger activities refresh
+			invalidate('app:activities');
+		}
 	};
 </script>
 
@@ -44,3 +51,7 @@
 	name="activity file"
 />
 <button class="btn" disabled={!can_upload} onclick={() => postActivity(files)}>Upload</button>
+
+{#each data.activities as activity}
+	{JSON.stringify(activity)})
+{/each}
