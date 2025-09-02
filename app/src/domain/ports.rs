@@ -53,10 +53,20 @@ pub trait ActivityService: Clone + Send + Sync + 'static {
         &self,
         req: CreateActivityRequest,
     ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
+
+    fn list_activities(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 }
 
 #[derive(Debug, Error)]
 pub enum SaveActivityError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum ListActivitiesError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -66,6 +76,10 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
+
+    fn list_activities(
+        &self,
+    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 }
 
 #[derive(Debug, Error)]

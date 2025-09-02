@@ -9,6 +9,7 @@ pub enum Sport {
 }
 
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(Default))]
 pub struct Activity {
     id: ActivityId,
     calories: Option<usize>,
@@ -45,18 +46,6 @@ impl Activity {
 
     pub fn sport(&self) -> &Option<Sport> {
         &self.sport
-    }
-}
-
-#[cfg(test)]
-impl Default for Activity {
-    fn default() -> Self {
-        Self {
-            id: ActivityId::new(),
-            calories: None,
-            duration: None,
-            sport: None,
-        }
     }
 }
 

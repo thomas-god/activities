@@ -28,6 +28,13 @@ impl ActivityRepository for InMemoryActivityRepository {
         guard.deref_mut().push(activity.clone());
         Ok(())
     }
+
+    async fn list_activities(
+        &self,
+    ) -> Result<Vec<Activity>, crate::domain::ports::ListActivitiesError> {
+        let guard = self.activities.lock().await;
+        Ok(guard.clone())
+    }
 }
 
 #[derive(Clone)]

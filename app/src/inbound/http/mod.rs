@@ -3,13 +3,14 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, Method};
+use axum::routing::get;
 use axum::{Router, routing::post};
 use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::ActivityService;
-use crate::inbound::http::handlers::create_activity;
+use crate::inbound::http::handlers::{create_activity, list_activities};
 
 mod handlers;
 
@@ -72,5 +73,7 @@ impl HttpServer {
 }
 
 fn api_routes<AS: ActivityService>() -> Router<AppState<AS>> {
-    Router::new().route("/activity", post(create_activity::<AS>))
+    Router::new()
+        .route("/activity", post(create_activity::<AS>))
+        .route("/activities", get(list_activities::<AS>))
 }

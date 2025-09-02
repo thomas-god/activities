@@ -95,8 +95,9 @@ pub async fn create_activity<AS: ActivityService>(
 #[cfg(test)]
 mod tests {
     use std::{
-        fs, mem,
+        fs,
         sync::{Arc, Mutex},
+        vec,
     };
 
     use anyhow::anyhow;
@@ -104,26 +105,10 @@ mod tests {
     use crate::domain::{
         models::{Activity, ActivityId},
         ports::CreateActivityError,
+        services::test_utils::MockActivityService,
     };
 
     use super::*;
-
-    #[derive(Clone)]
-    struct MockActivityService {
-        create_activity_result: Arc<Mutex<Result<Activity, CreateActivityError>>>,
-    }
-
-    impl ActivityService for MockActivityService {
-        async fn create_activity(
-            &self,
-            _req: CreateActivityRequest,
-        ) -> Result<Activity, CreateActivityError> {
-            let mut guard = self.create_activity_result.lock();
-            let mut result = Err(CreateActivityError::Unknown(anyhow!("Substitute errror")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-    }
 
     #[tokio::test]
     async fn test_create_activity() {
@@ -135,6 +120,7 @@ mod tests {
                 Some(3600),
                 Some(Sport::Cycling),
             )))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
         };
 
         let state = axum::extract::State(AppState {
@@ -154,6 +140,7 @@ mod tests {
             create_activity_result: Arc::new(Mutex::new(Err(CreateActivityError::Unknown(
                 anyhow!("Should not be reached"),
             )))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
         };
 
         let state = axum::extract::State(AppState {
