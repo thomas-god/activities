@@ -27,11 +27,6 @@ impl ParseFile for FitParser {
         let Ok(messages) = parse_fit_messages(bytes.clone().into_iter()) else {
             return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
         };
-        // let calories = find_field_value_as_float(
-        //     &messages,
-        //     &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
-        // )
-        // .map(|val| val.round() as usize);
 
         let duration = find_field_value_as_float(
             &messages,
@@ -46,7 +41,7 @@ impl ParseFile for FitParser {
         )
         .and_then(|values| {
             values.iter().find_map(|val| match val {
-                DataValue::DateTime(dt) => Some(ActivityStartTime(*dt as usize)),
+                DataValue::DateTime(dt) => ActivityStartTime::new(*dt as usize),
                 _ => None,
             })
         })

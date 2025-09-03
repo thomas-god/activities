@@ -1,4 +1,5 @@
-use derive_more::{AsRef, Deref, Display, From, Into};
+use chrono::{DateTime, NaiveDateTime};
+use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -59,11 +60,31 @@ impl Default for ActivityId {
 #[derive(
     Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
 )]
-pub struct ActivityStartTime(pub usize);
+pub struct ActivityStartTime(NaiveDateTime);
+
+impl ActivityStartTime {
+    pub fn new(datetime: usize) -> Option<Self> {
+        DateTime::from_timestamp(datetime as i64, 0).map(|dt| Self(dt.naive_utc()))
+    }
+}
 
 #[derive(
-    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
+    Clone,
+    Debug,
+    Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    AsRef,
+    Deref,
+    Hash,
+    From,
+    Into,
+    Copy,
+    Constructor,
 )]
+
 pub struct ActivityDuration(pub usize);
 
 #[derive(Clone, Debug, Copy, PartialEq)]

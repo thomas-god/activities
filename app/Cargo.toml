@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["macros"] }
+chrono = { version = "0.4.41", features = ["serde"] }
 derive_more = { version = "2.0.1", features = ["full"] }
 fit-parser = { path = "../fit-parser", features = []}
 serde = { version = "1.0.219", features = ["derive"] }

@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse};
+use chrono::NaiveDateTime;
 use serde::Serialize;
 use serde_json::json;
 
@@ -18,7 +19,7 @@ pub struct ResponseBodyItem {
     id: String,
     sport: String,
     duration: usize,
-    start_time: usize,
+    start_time: NaiveDateTime,
 }
 
 impl From<&Activity> for ResponseBodyItem {
@@ -30,8 +31,8 @@ impl From<&Activity> for ResponseBodyItem {
                 Sport::Cycling => "Cycling".to_string(),
                 Sport::Other => "Other".to_string(),
             },
+            start_time: **activity.start_time(),
             duration: (*activity.duration()).into(),
-            start_time: (*activity.start_time()).into(),
         }
     }
 }

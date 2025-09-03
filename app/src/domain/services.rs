@@ -159,7 +159,7 @@ mod tests {
 
     fn default_activity_request() -> CreateActivityRequest {
         let sport = Sport::Running;
-        let start_time = ActivityStartTime(3600);
+        let start_time = ActivityStartTime::new(3600).unwrap();
         let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
         CreateActivityRequest::new(sport, duration, start_time, content)

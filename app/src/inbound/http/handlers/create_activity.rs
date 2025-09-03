@@ -55,7 +55,7 @@ mod tests {
     async fn test_create_activity() {
         let content = vec![1, 2, 3];
         let sport = Sport::Cycling;
-        let start_time = ActivityStartTime(0);
+        let start_time = ActivityStartTime::new(0).unwrap();
         let duration = ActivityDuration(3600);
 
         let service = MockActivityService {
