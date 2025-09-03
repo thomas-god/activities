@@ -3,8 +3,8 @@ import * as z from 'zod';
 export const ActivityListItem = z.object({
 	id: z.string(),
 	sport: z.string(),
-	duration: z.number().nullable(),
-	calories: z.number().nullable()
+	duration: z.number(),
+	start_time: z.iso.datetime({local: true})
 });
 
 export const ActivityList = z.array(ActivityListItem);
