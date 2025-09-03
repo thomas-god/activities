@@ -1,5 +1,5 @@
 use fit_parser::{
-    FitEnum, FitParserError, Sport as FitSport, parse_fit_messages,
+    DataValue, FitEnum, FitParserError, Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 use thiserror::Error;
@@ -40,11 +40,16 @@ impl ParseFile for FitParser {
         .map(|val| ActivityDuration(val.round() as usize))
         .ok_or(ParseCreateActivityHttpRequestBodyError::NoDurationFound)?;
 
-        let start_time = find_field_value_as_float(
+        let start_time = find_field_value_by_kind(
             &messages,
             &fit_parser::FitField::Session(fit_parser::SessionField::StartTime),
         )
-        .map(|val| ActivityStartTime(val.round() as usize))
+        .and_then(|values| {
+            values.iter().find_map(|val| match val {
+                DataValue::DateTime(dt) => Some(ActivityStartTime(*dt as usize)),
+                _ => None,
+            })
+        })
         .ok_or(ParseCreateActivityHttpRequestBodyError::NoStartTimeFound)?;
 
         let sport = find_field_value_by_kind(

@@ -18,7 +18,10 @@ pub async fn create_activity<AS: ActivityService, PF: ParseFile>(
     let domain_request = state
         .file_parser
         .try_bytes_into_domain(bytes.to_vec())
-        .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+        .map_err(|err| {
+            tracing::warn!("Unable to process fit file {:?}", err);
+            StatusCode::UNPROCESSABLE_ENTITY
+        })?;
 
     state
         .activity_service
