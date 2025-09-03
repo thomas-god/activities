@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import { PUBLIC_APP_URL } from '$env/static/public';
+	import ActivityList from '../organisms/ActivityList.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -52,6 +53,4 @@
 />
 <button class="btn" disabled={!can_upload} onclick={() => postActivity(files)}>Upload</button>
 
-{#each data.activities as activity}
-	{JSON.stringify(activity)})
-{/each}
+<ActivityList activityList={data.activities} />
