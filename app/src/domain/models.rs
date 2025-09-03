@@ -1,32 +1,24 @@
-use derive_more::{AsRef, Deref, Display};
+use derive_more::{AsRef, Deref, Display, From, Into};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Copy, PartialEq)]
-pub enum Sport {
-    Running,
-    Cycling,
-    Other,
-}
-
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(Default))]
 pub struct Activity {
     id: ActivityId,
-    calories: Option<usize>,
-    duration: Option<usize>,
-    sport: Option<Sport>,
+    start_time: ActivityStartTime,
+    duration: ActivityDuration,
+    sport: Sport,
 }
 
 impl Activity {
     pub fn new(
         id: ActivityId,
-        calories: Option<usize>,
-        duration: Option<usize>,
-        sport: Option<Sport>,
+        start_time: ActivityStartTime,
+        duration: ActivityDuration,
+        sport: Sport,
     ) -> Self {
         Self {
             id,
-            calories,
+            start_time,
             duration,
             sport,
         }
@@ -36,15 +28,15 @@ impl Activity {
         &self.id
     }
 
-    pub fn calories(&self) -> &Option<usize> {
-        &self.calories
+    pub fn start_time(&self) -> &ActivityStartTime {
+        &self.start_time
     }
 
-    pub fn duration(&self) -> &Option<usize> {
+    pub fn duration(&self) -> &ActivityDuration {
         &self.duration
     }
 
-    pub fn sport(&self) -> &Option<Sport> {
+    pub fn sport(&self) -> &Sport {
         &self.sport
     }
 }
@@ -62,4 +54,21 @@ impl Default for ActivityId {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(
+    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
+)]
+pub struct ActivityStartTime(pub usize);
+
+#[derive(
+    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
+)]
+pub struct ActivityDuration(pub usize);
+
+#[derive(Clone, Debug, Copy, PartialEq)]
+pub enum Sport {
+    Running,
+    Cycling,
+    Other,
 }

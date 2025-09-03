@@ -1,75 +1,9 @@
 use axum::{body::Bytes, extract::State, http::StatusCode};
-use fit_parser::{
-    FitEnum, FitParserError, Sport as FitSport, parse_fit_messages,
-    utils::{find_field_value_as_float, find_field_value_by_kind},
-};
-use thiserror::Error;
 
 use crate::{
-    domain::{
-        models::Sport,
-        ports::{ActivityService, CreateActivityError, CreateActivityRequest},
-    },
-    inbound::http::AppState,
+    domain::ports::{ActivityService, CreateActivityError},
+    inbound::{http::AppState, parser::ParseFile},
 };
-
-fn try_bytes_into_domain(
-    bytes: Bytes,
-) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
-    let content = bytes.to_vec();
-    let Ok(messages) = parse_fit_messages(content.into_iter()) else {
-        return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
-    };
-    let calories = find_field_value_as_float(
-        &messages,
-        &fit_parser::FitField::Session(fit_parser::SessionField::TotalCalories),
-    )
-    .map(|val| val.round() as usize);
-    let duration = find_field_value_as_float(
-        &messages,
-        &fit_parser::FitField::Session(fit_parser::SessionField::TotalElapsedTime),
-    )
-    .map(|val| val.round() as usize);
-    let sport = find_field_value_by_kind(
-        &messages,
-        &fit_parser::FitField::Session(fit_parser::SessionField::Sport),
-    )
-    .and_then(|field| {
-        field.iter().find_map(|value| match value {
-            fit_parser::DataValue::Enum(FitEnum::Sport(sport)) => Some(sport.into()),
-            _ => None,
-        })
-    });
-
-    Ok(CreateActivityRequest::new(
-        sport,
-        duration,
-        calories,
-        bytes.to_vec(),
-    ))
-}
-
-impl From<&FitSport> for Sport {
-    fn from(value: &FitSport) -> Self {
-        match value {
-            FitSport::Running => Self::Running,
-            FitSport::Cycling => Self::Cycling,
-            _ => Self::Other,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Error)]
-enum ParseCreateActivityHttpRequestBodyError {
-    #[error("Error when parsing FIT content")]
-    InvalidFitContent,
-}
-
-impl From<FitParserError> for ParseCreateActivityHttpRequestBodyError {
-    fn from(_value: FitParserError) -> Self {
-        Self::InvalidFitContent
-    }
-}
 
 impl From<CreateActivityError> for StatusCode {
     fn from(_value: CreateActivityError) -> Self {
@@ -77,12 +11,14 @@ impl From<CreateActivityError> for StatusCode {
     }
 }
 
-pub async fn create_activity<AS: ActivityService>(
-    State(state): State<AppState<AS>>,
+pub async fn create_activity<AS: ActivityService, PF: ParseFile>(
+    State(state): State<AppState<AS, PF>>,
     bytes: Bytes,
 ) -> Result<StatusCode, StatusCode> {
-    let domain_request =
-        try_bytes_into_domain(bytes).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
+    let domain_request = state
+        .file_parser
+        .try_bytes_into_domain(bytes.to_vec())
+        .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     state
         .activity_service
@@ -95,36 +31,51 @@ pub async fn create_activity<AS: ActivityService>(
 #[cfg(test)]
 mod tests {
     use std::{
-        fs,
         sync::{Arc, Mutex},
         vec,
     };
 
     use anyhow::anyhow;
 
-    use crate::domain::{
-        models::{Activity, ActivityId},
-        ports::CreateActivityError,
-        services::test_utils::MockActivityService,
+    use crate::{
+        domain::{
+            models::{Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport},
+            ports::{CreateActivityError, CreateActivityRequest},
+            services::test_utils::MockActivityService,
+        },
+        inbound::parser::{ParseCreateActivityHttpRequestBodyError, test_utils::MockFileParser},
     };
 
     use super::*;
 
     #[tokio::test]
     async fn test_create_activity() {
-        let content = fs::read("../test.fit").unwrap().to_vec();
+        let content = vec![1, 2, 3];
+        let sport = Sport::Cycling;
+        let start_time = ActivityStartTime(0);
+        let duration = ActivityDuration(3600);
+
         let service = MockActivityService {
             create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                 ActivityId::new(),
-                Some(12),
-                Some(3600),
-                Some(Sport::Cycling),
+                start_time,
+                duration,
+                sport,
             )))),
             list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+        };
+        let file_parser = MockFileParser {
+            try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
+                sport,
+                duration,
+                start_time,
+                content.clone(),
+            )))),
         };
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            file_parser: Arc::new(file_parser),
         });
         let bytes = axum::body::Bytes::from(content);
 
@@ -143,8 +94,15 @@ mod tests {
             list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
         };
 
+        let file_parser = MockFileParser {
+            try_into_domain_result: Arc::new(Mutex::new(Err(
+                ParseCreateActivityHttpRequestBodyError::InvalidFitContent,
+            ))),
+        };
+
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            file_parser: Arc::new(file_parser),
         });
         let bytes = axum::body::Bytes::from(content);
 

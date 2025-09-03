@@ -7,7 +7,7 @@ use crate::{
         models::{Activity, Sport},
         ports::ActivityService,
     },
-    inbound::http::AppState,
+    inbound::{http::AppState, parser::ParseFile},
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -16,28 +16,28 @@ pub struct ResponseBody(Vec<ResponseBodyItem>);
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBodyItem {
     id: String,
-    sport: Option<String>,
-    duration: Option<usize>,
-    calories: Option<usize>,
+    sport: String,
+    duration: usize,
+    start_time: usize,
 }
 
 impl From<&Activity> for ResponseBodyItem {
     fn from(activity: &Activity) -> Self {
         Self {
             id: activity.id().to_string(),
-            sport: activity.sport().map(|s| match s {
+            sport: match *activity.sport() {
                 Sport::Running => "Running".to_string(),
                 Sport::Cycling => "Cycling".to_string(),
                 Sport::Other => "Other".to_string(),
-            }),
-            duration: *activity.duration(),
-            calories: *activity.calories(),
+            },
+            duration: (*activity.duration()).into(),
+            start_time: (*activity.start_time()).into(),
         }
     }
 }
 
-pub async fn list_activities<AS: ActivityService>(
-    State(state): State<AppState<AS>>,
+pub async fn list_activities<AS: ActivityService, FP: ParseFile>(
+    State(state): State<AppState<AS, FP>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let Ok(res) = state.activity_service.list_activities().await else {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);

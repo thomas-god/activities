@@ -11,12 +11,14 @@ use tower_http::cors::CorsLayer;
 use crate::config::Config;
 use crate::domain::ports::ActivityService;
 use crate::inbound::http::handlers::{create_activity, list_activities};
+use crate::inbound::parser::ParseFile;
 
 mod handlers;
 
 #[derive(Debug, Clone)]
-struct AppState<AS: ActivityService> {
+struct AppState<AS: ActivityService, PF: ParseFile> {
     activity_service: Arc<AS>,
+    file_parser: Arc<PF>,
 }
 
 pub struct HttpServer {
@@ -27,6 +29,7 @@ pub struct HttpServer {
 impl HttpServer {
     pub async fn new(
         activity_service: impl ActivityService,
+        file_parser: impl ParseFile,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -38,6 +41,7 @@ impl HttpServer {
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
+            file_parser: Arc::new(file_parser),
         };
 
         let origin = config
@@ -72,8 +76,8 @@ impl HttpServer {
     }
 }
 
-fn api_routes<AS: ActivityService>() -> Router<AppState<AS>> {
+fn api_routes<AS: ActivityService, FP: ParseFile>() -> Router<AppState<AS, FP>> {
     Router::new()
-        .route("/activity", post(create_activity::<AS>))
-        .route("/activities", get(list_activities::<AS>))
+        .route("/activity", post(create_activity::<AS, FP>))
+        .route("/activities", get(list_activities::<AS, FP>))
 }

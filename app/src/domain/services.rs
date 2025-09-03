@@ -42,7 +42,7 @@ where
     ) -> Result<Activity, CreateActivityError> {
         // Create activity from request
         let id = ActivityId::new();
-        let activity = Activity::new(id.clone(), *req.calories(), *req.duration(), *req.sport());
+        let activity = Activity::new(id.clone(), *req.start_time(), *req.duration(), *req.sport());
 
         tracing::info!("Parsed new activity {:?}", &activity);
 
@@ -111,7 +111,7 @@ mod tests {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::Sport,
+        models::{ActivityDuration, ActivityStartTime, Sport},
         ports::{ListActivitiesError, SaveActivityError, SaveRawDataError},
     };
 
@@ -157,6 +157,14 @@ mod tests {
         }
     }
 
+    fn default_activity_request() -> CreateActivityRequest {
+        let sport = Sport::Running;
+        let start_time = ActivityStartTime(3600);
+        let duration = ActivityDuration(1200);
+        let content = vec![1, 2, 3];
+        CreateActivityRequest::new(sport, duration, start_time, content)
+    }
+
     #[tokio::test]
     async fn test_service_create_activity() {
         let activity_repository = MockActivityRepository {
@@ -168,17 +176,11 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
-        let sport = Some(Sport::Running);
-        let duration = Some(1200);
-        let calories = Some(12);
-        let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(sport, duration, calories, content);
+        let req = default_activity_request();
 
         let res = service.create_activity(req).await;
 
         assert!(res.is_ok());
-        let res = res.unwrap();
-        assert_eq!(res.calories(), &Some(12))
     }
 
     #[tokio::test]
@@ -194,11 +196,7 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
-        let sport = Some(Sport::Running);
-        let duration = Some(1200);
-        let calories = Some(12);
-        let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(sport, duration, calories, content);
+        let req = default_activity_request();
 
         let res = service.create_activity(req).await;
 
@@ -218,11 +216,7 @@ mod tests {
         };
         let service = Service::new(activity_repository, raw_data_repository);
 
-        let sport = Some(Sport::Running);
-        let duration = Some(1200);
-        let calories = Some(12);
-        let content = vec![1, 2, 3];
-        let req = CreateActivityRequest::new(sport, duration, calories, content);
+        let req = default_activity_request();
 
         let res = service.create_activity(req).await;
 
