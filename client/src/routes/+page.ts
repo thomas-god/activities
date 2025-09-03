@@ -15,3 +15,4 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 	return { activities: [] };
 };
 
+export const prerender = false;
