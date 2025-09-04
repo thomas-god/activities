@@ -58,7 +58,7 @@ mod tests {
     async fn test_create_activity() {
         let content = vec![1, 2, 3];
         let sport = Sport::Cycling;
-        let start_time = ActivityStartTime::new(0).unwrap();
+        let start_time = ActivityStartTime::from_timestamp(0).unwrap();
         let duration = ActivityDuration(3600);
 
         let service = MockActivityService {
@@ -121,7 +121,7 @@ mod tests {
     async fn test_create_activity_with_similar_already_exists() {
         let content = vec![1, 2, 3];
         let sport = Sport::Cycling;
-        let start_time = ActivityStartTime::new(0).unwrap();
+        let start_time = ActivityStartTime::from_timestamp(0).unwrap();
         let duration = ActivityDuration(3600);
         let service = MockActivityService {
             create_activity_result: Arc::new(Mutex::new(Err(

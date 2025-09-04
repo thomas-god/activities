@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
 
@@ -72,11 +72,15 @@ pub struct ActivityNaturalKey(String);
 #[derive(
     Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
 )]
-pub struct ActivityStartTime(NaiveDateTime);
+pub struct ActivityStartTime(DateTime<FixedOffset>);
 
 impl ActivityStartTime {
-    pub fn new(datetime: usize) -> Option<Self> {
-        DateTime::from_timestamp(datetime as i64, 0).map(|dt| Self(dt.naive_utc()))
+    pub fn new(datetime: DateTime<FixedOffset>) -> Self {
+        Self(datetime)
+    }
+
+    pub fn from_timestamp(timestamp: usize) -> Option<Self> {
+        DateTime::from_timestamp(timestamp as i64, 0).map(|dt| Self(dt.fixed_offset()))
     }
 }
 
@@ -115,13 +119,13 @@ mod tests {
     fn test_different_activities_different_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
-            ActivityStartTime::new(0).unwrap(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
-            ActivityStartTime::new(0).unwrap(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
         );
@@ -133,13 +137,13 @@ mod tests {
     fn test_similar_activities_same_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
-            ActivityStartTime::new(0).unwrap(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
-            ActivityStartTime::new(0).unwrap(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
         );
