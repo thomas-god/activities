@@ -58,6 +58,10 @@ impl ActivityId {
     pub fn new() -> Self {
         Self(Uuid::new_v4().to_string())
     }
+
+    pub fn from(id: &str) -> Self {
+        Self(id.to_string())
+    }
 }
 
 impl Default for ActivityId {

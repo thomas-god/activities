@@ -10,7 +10,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::ActivityService;
-use crate::inbound::http::handlers::{create_activity, list_activities};
+use crate::inbound::http::handlers::{create_activity, get_activity, list_activities};
 use crate::inbound::parser::ParseFile;
 
 mod handlers;
@@ -80,4 +80,5 @@ fn api_routes<AS: ActivityService, FP: ParseFile>() -> Router<AppState<AS, FP>> 
     Router::new()
         .route("/activity", post(create_activity::<AS, FP>))
         .route("/activities", get(list_activities::<AS, FP>))
+        .route("/activity/{activity_id}", get(get_activity::<AS, FP>))
 }

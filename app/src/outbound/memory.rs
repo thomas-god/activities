@@ -7,8 +7,8 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{Activity, ActivityId, ActivityNaturalKey},
     ports::{
-        ActivityRepository, RawDataRepository, SaveActivityError, SaveRawDataError,
-        SimilarActivityError,
+        ActivityRepository, GetActivityError, ListActivitiesError, RawDataRepository,
+        SaveActivityError, SaveRawDataError, SimilarActivityError,
     },
 };
 
@@ -42,11 +42,17 @@ impl ActivityRepository for InMemoryActivityRepository {
         Ok(())
     }
 
-    async fn list_activities(
-        &self,
-    ) -> Result<Vec<Activity>, crate::domain::ports::ListActivitiesError> {
+    async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
         let guard = self.activities.lock().await;
         Ok(guard.clone())
+    }
+
+    async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
+        let activities = self.activities.lock().await;
+        Ok(activities
+            .iter()
+            .find(|activity| activity.id() == id)
+            .cloned())
     }
 }
 

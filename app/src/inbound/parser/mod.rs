@@ -154,6 +154,19 @@ pub mod test_utils {
             result
         }
     }
+
+    impl Default for MockFileParser {
+        fn default() -> Self {
+            Self {
+                try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
+                    Sport::Cycling,
+                    ActivityDuration(3600),
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    vec![1, 2, 3],
+                )))),
+            }
+        }
+    }
 }
 
 #[cfg(test)]

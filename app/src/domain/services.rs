@@ -4,7 +4,7 @@ use crate::domain::{
     models::{Activity, ActivityId},
     ports::{
         ActivityRepository, ActivityService, CreateActivityError, CreateActivityRequest,
-        RawDataRepository,
+        GetActivityError, ListActivitiesError, RawDataRepository,
     },
 };
 
@@ -74,8 +74,16 @@ where
         Ok(activity)
     }
 
-    async fn list_activities(&self) -> Result<Vec<Activity>, super::ports::ListActivitiesError> {
+    async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
         self.activity_repository.list_activities().await
+    }
+
+    async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
+        match self.activity_repository.get_activity(activity_id).await {
+            Ok(Some(activity)) => Ok(activity),
+            Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
+            Err(err) => Err(err),
+        }
     }
 }
 
@@ -86,12 +94,34 @@ pub mod test_utils {
 
     use super::*;
 
+    use crate::domain::models::{ActivityDuration, ActivityStartTime, Sport};
     use crate::domain::ports::ListActivitiesError;
 
     #[derive(Clone)]
     pub struct MockActivityService {
         pub create_activity_result: Arc<Mutex<Result<Activity, CreateActivityError>>>,
         pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
+        pub get_activity_result: Arc<Mutex<Result<Activity, GetActivityError>>>,
+    }
+
+    impl Default for MockActivityService {
+        fn default() -> Self {
+            Self {
+                create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
+                    ActivityId::new(),
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::from(3600),
+                    Sport::Running,
+                )))),
+                list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+                get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
+                    ActivityId::new(),
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::from(3600),
+                    Sport::Running,
+                )))),
+            }
+        }
     }
 
     impl ActivityService for MockActivityService {
@@ -111,6 +141,16 @@ pub mod test_utils {
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
+
+        async fn get_activity(
+            &self,
+            _activity_id: &ActivityId,
+        ) -> Result<Activity, GetActivityError> {
+            let mut guard = self.get_activity_result.lock();
+            let mut result = Err(GetActivityError::Unknown(anyhow!("Substitute errror")));
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
+        }
     }
 }
 
@@ -123,7 +163,10 @@ mod tests {
 
     use crate::domain::{
         models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport},
-        ports::{ListActivitiesError, SaveActivityError, SaveRawDataError, SimilarActivityError},
+        ports::{
+            GetActivityError, ListActivitiesError, SaveActivityError, SaveRawDataError,
+            SimilarActivityError,
+        },
     };
 
     use super::*;
@@ -132,7 +175,8 @@ mod tests {
     struct MockActivityRepository {
         similar_activity_result: Arc<Mutex<Result<bool, SimilarActivityError>>>,
         save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
-        list_activity_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
+        list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
+        get_activity_result: Arc<Mutex<Result<Option<Activity>, GetActivityError>>>,
     }
 
     impl ActivityRepository for MockActivityRepository {
@@ -154,8 +198,18 @@ mod tests {
         }
 
         async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
-            let mut guard = self.list_activity_result.lock().await;
+            let mut guard = self.list_activities_result.lock().await;
             let mut result = Err(ListActivitiesError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
+        async fn get_activity(
+            &self,
+            _id: &ActivityId,
+        ) -> Result<Option<Activity>, GetActivityError> {
+            let mut guard = self.get_activity_result.lock().await;
+            let mut result = Err(GetActivityError::Unknown(anyhow!("substitute error")));
             mem::swap(guard.deref_mut(), &mut result);
             result
         }
@@ -192,7 +246,8 @@ mod tests {
         let activity_repository = MockActivityRepository {
             similar_activity_result: Arc::new(Mutex::new(Ok(true))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+            get_activity_result: Arc::new(Mutex::new(Ok(None))),
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
@@ -216,7 +271,8 @@ mod tests {
         let activity_repository = MockActivityRepository {
             similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+            get_activity_result: Arc::new(Mutex::new(Ok(None))),
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
@@ -237,7 +293,8 @@ mod tests {
             save_activity_result: Arc::new(Mutex::new(Err(SaveActivityError::Unknown(anyhow!(
                 "an error occured"
             ))))),
-            list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+            get_activity_result: Arc::new(Mutex::new(Ok(None))),
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
@@ -256,7 +313,8 @@ mod tests {
         let activity_repository = MockActivityRepository {
             similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
+            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+            get_activity_result: Arc::new(Mutex::new(Ok(None))),
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(

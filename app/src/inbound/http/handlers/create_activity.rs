@@ -41,14 +41,8 @@ mod tests {
         vec,
     };
 
-    use anyhow::anyhow;
-
     use crate::{
-        domain::{
-            models::{Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport},
-            ports::{CreateActivityError, CreateActivityRequest},
-            services::test_utils::MockActivityService,
-        },
+        domain::{ports::CreateActivityError, services::test_utils::MockActivityService},
         inbound::parser::{ParseCreateActivityHttpRequestBodyError, test_utils::MockFileParser},
     };
 
@@ -57,28 +51,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_activity() {
         let content = vec![1, 2, 3];
-        let sport = Sport::Cycling;
-        let start_time = ActivityStartTime::from_timestamp(0).unwrap();
-        let duration = ActivityDuration(3600);
-
-        let service = MockActivityService {
-            create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
-                ActivityId::new(),
-                start_time,
-                duration,
-                sport,
-            )))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-        };
-        let file_parser = MockFileParser {
-            try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
-                sport,
-                duration,
-                start_time,
-                content.clone(),
-            )))),
-        };
-
+        let service = MockActivityService::default();
+        let file_parser = MockFileParser::default();
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
             file_parser: Arc::new(file_parser),
@@ -93,12 +67,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_activity_fit_parse_fails() {
         let content = vec![1, 2, 3];
-        let service = MockActivityService {
-            create_activity_result: Arc::new(Mutex::new(Err(CreateActivityError::Unknown(
-                anyhow!("Should not be reached"),
-            )))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-        };
+        let service = MockActivityService::default();
 
         let file_parser = MockFileParser {
             try_into_domain_result: Arc::new(Mutex::new(Err(
@@ -120,24 +89,14 @@ mod tests {
     #[tokio::test]
     async fn test_create_activity_with_similar_already_exists() {
         let content = vec![1, 2, 3];
-        let sport = Sport::Cycling;
-        let start_time = ActivityStartTime::from_timestamp(0).unwrap();
-        let duration = ActivityDuration(3600);
         let service = MockActivityService {
             create_activity_result: Arc::new(Mutex::new(Err(
                 CreateActivityError::SimilarActivityExistsError,
             ))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+            ..Default::default()
         };
 
-        let file_parser = MockFileParser {
-            try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
-                sport,
-                duration,
-                start_time,
-                content.clone(),
-            )))),
-        };
+        let file_parser = MockFileParser::default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),

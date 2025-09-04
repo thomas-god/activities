@@ -61,6 +61,11 @@ pub trait ActivityService: Clone + Send + Sync + 'static {
     fn list_activities(
         &self,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
+
+    fn get_activity(
+        &self,
+        activity_id: &ActivityId,
+    ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
 }
 #[derive(Debug, Error)]
 pub enum SimilarActivityError {
@@ -80,6 +85,14 @@ pub enum ListActivitiesError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum GetActivityError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+    #[error("Activity {0} does not exist")]
+    ActivityDoesNotExist(ActivityId),
+}
+
 pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn similar_activity_exists(
         &self,
@@ -94,6 +107,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn list_activities(
         &self,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
+
+    fn get_activity(
+        &self,
+        id: &ActivityId,
+    ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
 }
 
 #[derive(Debug, Error)]
