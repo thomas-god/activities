@@ -5,6 +5,11 @@
 	let { activityList }: { activityList: ActivityList } = $props();
 </script>
 
-{#each activityList as activity}
-	<ActivityOverview {activity} />
-{/each}
+<ul class="list">
+	<li>Last activities</li>
+	{#each activityList as activity}
+		<li class="list-row">
+			<ActivityOverview {activity} />
+		</li>
+	{/each}
+</ul>

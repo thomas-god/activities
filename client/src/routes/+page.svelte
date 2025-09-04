@@ -40,6 +40,10 @@
 		file_upload_content = '';
 		invalidate('app:activities');
 	};
+
+	let sorted_activities = $derived(
+		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
+	);
 </script>
 
 <h1>Welcome to activities</h1>
@@ -57,4 +61,4 @@
 />
 <button class="btn" disabled={!can_upload} onclick={() => postActivity(files)}>Upload</button>
 
-<ActivityList activityList={data.activities} />
+<ActivityList activityList={sorted_activities} />

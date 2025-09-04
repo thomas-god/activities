@@ -14,8 +14,12 @@
 
 <div>
 	{activity.sport}:
+</div>
 
+<div>
 	{`${String(duration.hours).padStart(2, '0')}:${String(duration.minutes).padStart(2, '0')}:${String(duration.seconds).padStart(2, '0')}`}
+</div>
 
+<div>
 	{activity.start_time}
 </div>
