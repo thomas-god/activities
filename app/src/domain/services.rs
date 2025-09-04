@@ -111,19 +111,30 @@ mod tests {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::{ActivityDuration, ActivityStartTime, Sport},
-        ports::{ListActivitiesError, SaveActivityError, SaveRawDataError},
+        models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport},
+        ports::{ListActivitiesError, SaveActivityError, SaveRawDataError, SimilarActivityError},
     };
 
     use super::*;
 
     #[derive(Clone)]
     struct MockActivityRepository {
+        similar_activity_result: Arc<Mutex<Result<bool, SimilarActivityError>>>,
         save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
         list_activity_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
     }
 
     impl ActivityRepository for MockActivityRepository {
+        async fn similar_activity_exists(
+            &self,
+            _natural_key: &ActivityNaturalKey,
+        ) -> Result<bool, SimilarActivityError> {
+            let mut guard = self.similar_activity_result.lock().await;
+            let mut result = Err(SimilarActivityError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
         async fn save_activity(&self, _activity: &Activity) -> Result<(), SaveActivityError> {
             let mut guard = self.save_activity_result.lock().await;
             let mut result = Err(SaveActivityError::Unknown(anyhow!("substitute error")));
@@ -168,6 +179,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity() {
         let activity_repository = MockActivityRepository {
+            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
             list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
         };
@@ -186,6 +198,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
         let activity_repository = MockActivityRepository {
+            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
             save_activity_result: Arc::new(Mutex::new(Err(SaveActivityError::Unknown(anyhow!(
                 "an error occured"
             ))))),
@@ -206,6 +219,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_raw_data_error() {
         let activity_repository = MockActivityRepository {
+            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
             list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
         };

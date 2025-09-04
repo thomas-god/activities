@@ -5,8 +5,11 @@ use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::domain::{
-    models::{Activity, ActivityId},
-    ports::{ActivityRepository, RawDataRepository, SaveActivityError, SaveRawDataError},
+    models::{Activity, ActivityId, ActivityNaturalKey},
+    ports::{
+        ActivityRepository, RawDataRepository, SaveActivityError, SaveRawDataError,
+        SimilarActivityError,
+    },
 };
 
 #[derive(Clone)]
@@ -23,6 +26,16 @@ impl InMemoryActivityRepository {
 }
 
 impl ActivityRepository for InMemoryActivityRepository {
+    async fn similar_activity_exists(
+        &self,
+        natural_key: &ActivityNaturalKey,
+    ) -> Result<bool, SimilarActivityError> {
+        let guard = self.activities.lock().await;
+        Ok(guard
+            .iter()
+            .any(|activity| activity.natural_key() == *natural_key))
+    }
+
     async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
         let mut guard = self.activities.lock().await;
         guard.deref_mut().push(activity.clone());

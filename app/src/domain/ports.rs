@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-use crate::domain::models::{Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport};
+use crate::domain::models::{
+    Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime, Sport,
+};
 
 #[derive(Debug, Clone)]
 pub struct CreateActivityRequest {
@@ -58,6 +60,11 @@ pub trait ActivityService: Clone + Send + Sync + 'static {
         &self,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 }
+#[derive(Debug, Error)]
+pub enum SimilarActivityError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
 
 #[derive(Debug, Error)]
 pub enum SaveActivityError {
@@ -72,6 +79,11 @@ pub enum ListActivitiesError {
 }
 
 pub trait ActivityRepository: Clone + Send + Sync + 'static {
+    fn similar_activity_exists(
+        &self,
+        natural_key: &ActivityNaturalKey,
+    ) -> impl Future<Output = Result<bool, SimilarActivityError>> + Send;
+
     fn save_activity(
         &self,
         activity: &Activity,
