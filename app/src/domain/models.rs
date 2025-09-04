@@ -25,6 +25,15 @@ impl Activity {
         }
     }
 
+    /// Activity's natural key defined from its defining fields. Two activities with identical
+    /// natural keys should be considered identical/duplicate regardless of their ID.
+    pub fn natural_key(&self) -> ActivityNaturalKey {
+        ActivityNaturalKey(format!(
+            "{:?}:{:?}:{:?}",
+            self.sport, self.start_time, self.duration
+        ))
+    }
+
     pub fn id(&self) -> &ActivityId {
         &self.id
     }
@@ -56,6 +65,9 @@ impl Default for ActivityId {
         Self::new()
     }
 }
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
+pub struct ActivityNaturalKey(String);
 
 #[derive(
     Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
@@ -92,4 +104,46 @@ pub enum Sport {
     Running,
     Cycling,
     Other,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_different_activities_different_natural_keys() {
+        let first_activity = Activity::new(
+            ActivityId::new(),
+            ActivityStartTime::new(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Cycling,
+        );
+        let second_activity = Activity::new(
+            ActivityId::new(),
+            ActivityStartTime::new(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Running,
+        );
+
+        assert_ne!(first_activity.natural_key(), second_activity.natural_key());
+    }
+
+    #[test]
+    fn test_similar_activities_same_natural_keys() {
+        let first_activity = Activity::new(
+            ActivityId::new(),
+            ActivityStartTime::new(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Cycling,
+        );
+        let second_activity = Activity::new(
+            ActivityId::new(),
+            ActivityStartTime::new(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Cycling,
+        );
+
+        assert_eq!(first_activity.natural_key(), second_activity.natural_key());
+    }
 }
