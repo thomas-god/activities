@@ -46,6 +46,17 @@ where
 
         tracing::info!("Parsed new activity {:?}", &activity);
 
+        if self
+            .activity_repository
+            .similar_activity_exists(&activity.natural_key())
+            .await
+            .map_err(|err| {
+                anyhow!(err).context(format!("A similar activity already exists {:?}", activity))
+            })?
+        {
+            return Err(CreateActivityError::SimilarActivityExistsError);
+        }
+
         // Persist activity
         self.activity_repository
             .save_activity(&activity)
@@ -177,9 +188,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_service_create_activity() {
+    async fn test_service_create_activity_err_if_similar_activity_exists() {
         let activity_repository = MockActivityRepository {
             similar_activity_result: Arc::new(Mutex::new(Ok(true))),
+            save_activity_result: Arc::new(Mutex::new(Ok(()))),
+            list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
+        };
+        let raw_data_repository = MockRawDataRepository {
+            save_raw_data: Arc::new(Mutex::new(Ok(()))),
+        };
+        let service = Service::new(activity_repository, raw_data_repository);
+
+        let req = default_activity_request();
+
+        let res = service.create_activity(req).await;
+
+        assert!(res.is_err());
+        let Err(CreateActivityError::SimilarActivityExistsError) = res else {
+            unreachable!(
+                "Should have returned a Err(CreateActivityError::SimilarActivityExistsError)"
+            )
+        };
+    }
+
+    #[tokio::test]
+    async fn test_service_create_activity() {
+        let activity_repository = MockActivityRepository {
+            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
             list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
         };
@@ -198,7 +233,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
         let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
+            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Err(SaveActivityError::Unknown(anyhow!(
                 "an error occured"
             ))))),
@@ -219,7 +254,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_raw_data_error() {
         let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
+            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Ok(()))),
             list_activity_result: Arc::new(Mutex::new(Ok(vec![]))),
         };

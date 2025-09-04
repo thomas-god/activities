@@ -48,6 +48,8 @@ impl CreateActivityRequest {
 pub enum CreateActivityError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+    #[error("An activity with similar data already exists")]
+    SimilarActivityExistsError,
 }
 
 pub trait ActivityService: Clone + Send + Sync + 'static {
