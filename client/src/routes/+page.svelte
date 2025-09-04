@@ -7,7 +7,7 @@
 	let { data }: PageProps = $props();
 
 	let files: FileList | undefined = $state(undefined);
-	let file_upload_content: string = $state('');
+	let file_upload_content = $state('');
 
 	const checkCanUpload = (fileList: FileList | undefined): fileList is FileList => {
 		if (fileList) {
@@ -25,17 +25,20 @@
 			return;
 		}
 
-		const file = fileList.item(0)!;
-
-		let res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
-			body: file,
-			method: 'POST'
-		});
-
-		if (res.status === 201) {
-			// Trigger activities refresh
-			invalidate('app:activities');
+		let promises = [];
+		for (let i = 0; i < fileList.length; i++) {
+			const file = fileList.item(i);
+			promises.push(
+				fetch(`${PUBLIC_APP_URL}/api/activity`, {
+					body: file,
+					method: 'POST'
+				})
+			);
 		}
+
+		let _res = await Promise.all(promises);
+		file_upload_content = '';
+		invalidate('app:activities');
 	};
 </script>
 
@@ -46,6 +49,7 @@
 	type="file"
 	class="file-input"
 	accept=".fit"
+	multiple
 	bind:files
 	bind:value={file_upload_content}
 	id="activity_file"
