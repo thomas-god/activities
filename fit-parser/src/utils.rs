@@ -71,7 +71,7 @@ pub fn find_field_value_as_float(messages: &[DataMessage], target_field: &FitFie
 #[cfg(test)]
 mod tests {
 
-    use crate::{DataMessageField, FitEnum, SessionField, Sport};
+    use crate::{DataMessageField, FitEnum, MesgNum, SessionField, Sport};
 
     use super::*;
 
@@ -79,6 +79,7 @@ mod tests {
     fn test_find_value_by_field_kind_not_found() {
         let messages = vec![DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::Record,
             fields: vec![DataMessageField {
                 kind: FitField::Record(crate::RecordField::Speed),
                 values: vec![DataValue::Float32(1.3)],
@@ -99,6 +100,7 @@ mod tests {
         let messages = vec![
             DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::Record,
                 fields: vec![DataMessageField {
                     kind: FitField::Record(crate::RecordField::Speed),
                     values: vec![DataValue::Float32(1.3)],
@@ -106,6 +108,7 @@ mod tests {
             },
             DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::Record,
                 fields: vec![DataMessageField {
                     kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("device".to_string())],
@@ -127,6 +130,7 @@ mod tests {
         let messages = vec![
             DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::Record,
                 fields: vec![DataMessageField {
                     kind: FitField::Record(crate::RecordField::Speed),
                     values: vec![DataValue::Float32(1.3)],
@@ -134,6 +138,7 @@ mod tests {
             },
             DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::DeviceInfo,
                 fields: vec![DataMessageField {
                     kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("device".to_string())],
@@ -141,6 +146,7 @@ mod tests {
             },
             DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::DeviceInfo,
                 fields: vec![DataMessageField {
                     kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                     values: vec![DataValue::String("another_device".to_string())],
@@ -161,6 +167,7 @@ mod tests {
     fn test_find_value_by_field_kind_as_string() {
         let messages = vec![DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::DeviceInfo,
             fields: vec![DataMessageField {
                 kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
                 values: vec![DataValue::String("device".to_string())],
@@ -179,6 +186,7 @@ mod tests {
     #[test]
     fn test_find_value_by_field_kind_as_string_not_a_string() {
         let messages = vec![DataMessage {
+            message_kind: MesgNum::DeviceInfo,
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: FitField::DeviceInfo(crate::DeviceInfoField::Product),
@@ -224,6 +232,7 @@ mod tests {
         for (val, expected) in test_values {
             let messages = vec![DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::Session,
                 fields: vec![DataMessageField {
                     kind: FitField::Session(SessionField::TotalCalories),
                     values: vec![val.clone()],
@@ -271,6 +280,7 @@ mod tests {
         for (val, expected) in test_values {
             let messages = vec![DataMessage {
                 local_message_type: 0,
+                message_kind: MesgNum::Session,
                 fields: vec![DataMessageField {
                     kind: FitField::Session(SessionField::TotalCalories),
                     values: vec![val.clone()],

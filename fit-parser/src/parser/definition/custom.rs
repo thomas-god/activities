@@ -198,6 +198,7 @@ mod test {
 
         let message = DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::FieldDescription,
             fields: vec![
                 DataMessageField {
                     kind: FitField::FieldDescription(FieldDescriptionField::DeveloperDataIndex),

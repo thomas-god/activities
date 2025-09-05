@@ -2,12 +2,15 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use crate::parser::{
-    definition::{Definition, custom::CustomDescription, parse_definition_message},
-    reader::{Reader, ReaderError},
-    types::{
-        DataTypeError, DataValue,
-        generated::{FitField, ParseFunction},
+use crate::{
+    MesgNum,
+    parser::{
+        definition::{Definition, custom::CustomDescription, parse_definition_message},
+        reader::{Reader, ReaderError},
+        types::{
+            DataTypeError, DataValue,
+            generated::{FitField, ParseFunction},
+        },
     },
 };
 
@@ -80,6 +83,7 @@ pub enum RecordError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataMessage {
     pub local_message_type: u8,
+    pub message_kind: MesgNum,
     pub fields: Vec<DataMessageField>,
 }
 
@@ -173,6 +177,7 @@ fn parse_data_message(
 
     Ok(DataMessage {
         local_message_type: header.local_message_type,
+        message_kind: definition.message_type.clone(),
         fields,
     })
 }
@@ -224,6 +229,7 @@ fn parse_compressed_message(
 
     Ok(DataMessage {
         local_message_type: header.local_message_type,
+        message_kind: definition.message_type.clone(),
         fields,
     })
 }
@@ -280,6 +286,7 @@ mod tests {
     fn test_data_message_contains_datetime() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::Record,
             fields: vec![DataMessageField {
                 kind: FitField::Record(RecordField::Timestamp),
                 values: vec![DataValue::DateTime(0)],
@@ -293,6 +300,7 @@ mod tests {
     #[test]
     fn test_data_message_contains_multiple_datetimes() {
         let message_w_timestamp = DataMessage {
+            message_kind: MesgNum::Record,
             local_message_type: 0,
             fields: vec![DataMessageField {
                 kind: FitField::Record(RecordField::Timestamp),
@@ -308,6 +316,7 @@ mod tests {
     fn test_data_message_contains_multiple_fields_with_datetime() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::Record,
             fields: vec![
                 DataMessageField {
                     kind: FitField::Record(RecordField::Timestamp),
@@ -328,6 +337,7 @@ mod tests {
     fn test_data_message_contains_no_timestamp() {
         let message_w_timestamp = DataMessage {
             local_message_type: 0,
+            message_kind: MesgNum::Record,
             fields: vec![DataMessageField {
                 kind: FitField::Record(RecordField::Timestamp),
                 values: vec![DataValue::String("toto".to_string())],
