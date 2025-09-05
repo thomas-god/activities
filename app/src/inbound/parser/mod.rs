@@ -1,12 +1,16 @@
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
-    DataMessage, DataValue, FitEnum, FitParserError, Sport as FitSport, parse_fit_messages,
+    DataMessage, DataValue, FitEnum, FitField, FitParserError, MesgNum, RecordField,
+    Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 use thiserror::Error;
 
 use crate::domain::{
-    models::{ActivityDuration, ActivityStartTime, Sport, Timeseries},
+    models::{
+        ActivityDuration, ActivityStartTime, Sport, Timeseries, TimeseriesItem, TimeseriesMetric,
+        TimeseriesTime,
+    },
     ports::CreateActivityRequest,
 };
 
@@ -40,7 +44,7 @@ impl ParseFile for FitParser {
 
         let sport = extract_sport(&messages);
 
-        let timeseries = Timeseries::new(vec![]);
+        let timeseries = extract_timeseries(&start_time, &messages);
 
         Ok(CreateActivityRequest::new(
             sport, duration, start_time, timeseries, bytes,
@@ -101,6 +105,74 @@ fn extract_sport(messages: &[DataMessage]) -> Sport {
         })
     })
     .unwrap_or(Sport::Other)
+}
+
+fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Timeseries {
+    Timeseries::new(
+        messages
+            .iter()
+            .filter_map(|msg| {
+                if msg.message_kind != MesgNum::Record {
+                    return None;
+                }
+
+                let timestamp = msg.fields.iter().find_map(|field| match field.kind {
+                    FitField::Record(RecordField::Timestamp) => {
+                        field.values.iter().find_map(|val| match val {
+                            DataValue::DateTime(dt) => {
+                                Some(dt.saturating_sub(start.timestamp().try_into().unwrap()))
+                            }
+                            _ => None,
+                        })
+                    }
+                    _ => None,
+                })?;
+
+                let mut metrics = vec![];
+
+                if let Some(heart_rate) = msg.fields.iter().find_map(|field| match field.kind {
+                    FitField::Record(RecordField::HeartRate) => {
+                        field.values.iter().find_map(|val| match val {
+                            DataValue::Uint8(hr) => Some(*hr),
+                            _ => None,
+                        })
+                    }
+                    _ => None,
+                }) {
+                    metrics.push(TimeseriesMetric::HeartRate(heart_rate as usize));
+                };
+
+                if let Some(speed) = msg.fields.iter().find_map(|field| match field.kind {
+                    FitField::Record(RecordField::Speed) => {
+                        field.values.iter().find_map(|val| match val {
+                            DataValue::Float32(speed) => Some(*speed),
+                            _ => None,
+                        })
+                    }
+                    _ => None,
+                }) {
+                    metrics.push(TimeseriesMetric::Speed(speed as f64));
+                };
+
+                if let Some(power) = msg.fields.iter().find_map(|field| match field.kind {
+                    FitField::Record(RecordField::Power) => {
+                        field.values.iter().find_map(|val| match val {
+                            DataValue::Uint16(power) => Some(*power),
+                            _ => None,
+                        })
+                    }
+                    _ => None,
+                }) {
+                    metrics.push(TimeseriesMetric::Power(power as usize));
+                };
+
+                Some(TimeseriesItem::new(
+                    TimeseriesTime::new(timestamp as usize),
+                    metrics,
+                ))
+            })
+            .collect(),
+    )
 }
 
 #[derive(Debug, Clone, Error)]
@@ -176,6 +248,7 @@ pub mod test_utils {
 mod tests {
     use std::fs;
 
+    use assert_approx_eq::assert_approx_eq;
     use chrono::{DateTime, FixedOffset, Utc};
 
     use super::*;
@@ -206,5 +279,30 @@ mod tests {
             (**res.start_time()).to_rfc3339(),
             "2025-08-08T19:14:54+02:00".to_string()
         );
+    }
+
+    #[test]
+    fn test_parsing_of_timeseries() {
+        let content = fs::read("../test.fit").unwrap();
+        let parser = FitParser {};
+
+        let res = parser.try_bytes_into_domain(content).unwrap();
+
+        assert_eq!(res.timeseries().len(), 3602);
+
+        let first = res.timeseries().first().unwrap();
+
+        // First timestamp should 0 (i.e. equal to activity start_time)
+        assert_eq!(*first.time(), TimeseriesTime::new(0));
+        assert_eq!(*first.metrics(), vec![]);
+
+        // Check 4th element as the first 3 have no power/speed/hr data
+        let fourth = res.timeseries().get(3).unwrap();
+        let metrics = fourth.metrics();
+        assert_eq!(*metrics.get(0).unwrap(), TimeseriesMetric::HeartRate(77));
+        if let TimeseriesMetric::Speed(speed) = *metrics.get(1).unwrap() {
+            assert_approx_eq!(speed, 3.969);
+        }
+        assert_eq!(*metrics.get(2).unwrap(), TimeseriesMetric::Power(74));
     }
 }

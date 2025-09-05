@@ -1,5 +1,5 @@
 use chrono::{DateTime, FixedOffset};
-use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
+use derive_more::{AsRef, Constructor, Deref, Display, From, Into, Sub};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -124,16 +124,26 @@ pub enum Sport {
 #[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref)]
 pub struct Timeseries(Vec<TimeseriesItem>);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TimeseriesItem {
     time: TimeseriesTime,
     metrics: Vec<TimeseriesMetric>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl TimeseriesItem {
+    pub fn time(&self) -> &TimeseriesTime {
+        &self.time
+    }
+
+    pub fn metrics(&self) -> &[TimeseriesMetric] {
+        &self.metrics
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TimeseriesTime(usize);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Sub)]
 pub enum TimeseriesMetric {
     Speed(f64),
     Power(usize),

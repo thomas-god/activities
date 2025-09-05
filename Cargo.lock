@@ -93,6 +93,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "assert_approx_eq",
  "axum",
  "chrono",
  "derive_more",
@@ -115,6 +116,12 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 dependencies = [
  "derive_arbitrary",
 ]
+
+[[package]]
+name = "assert_approx_eq"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c07dab4369547dbe5114677b33fbbf724971019f3818172d59a97a61c774ffd"
 
 [[package]]
 name = "atoi_simd"
