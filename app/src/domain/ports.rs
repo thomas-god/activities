@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::domain::models::{
     Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime, Sport,
+    Timeseries,
 };
 
 #[derive(Debug, Clone)]
@@ -9,6 +10,7 @@ pub struct CreateActivityRequest {
     sport: Sport,
     duration: ActivityDuration,
     start_time: ActivityStartTime,
+    timeseries: Timeseries,
     raw_content: Vec<u8>,
 }
 
@@ -17,12 +19,14 @@ impl CreateActivityRequest {
         sport: Sport,
         duration: ActivityDuration,
         start_time: ActivityStartTime,
+        timeseries: Timeseries,
         raw_content: Vec<u8>,
     ) -> Self {
         Self {
             sport,
             duration,
             start_time,
+            timeseries,
             raw_content,
         }
     }
@@ -41,6 +45,10 @@ impl CreateActivityRequest {
 
     pub fn duration(&self) -> &ActivityDuration {
         &self.duration
+    }
+
+    pub fn timeseries(&self) -> &Timeseries {
+        &self.timeseries
     }
 }
 

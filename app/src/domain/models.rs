@@ -8,6 +8,7 @@ pub struct Activity {
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
+    timeseries: Timeseries,
 }
 
 impl Activity {
@@ -16,12 +17,14 @@ impl Activity {
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
+        timeseries: Timeseries,
     ) -> Self {
         Self {
             id,
             start_time,
             duration,
             sport,
+            timeseries,
         }
     }
 
@@ -48,6 +51,10 @@ impl Activity {
 
     pub fn sport(&self) -> &Sport {
         &self.sport
+    }
+
+    pub fn timeseries(&self) -> &[TimeseriesItem] {
+        &self.timeseries
     }
 }
 
@@ -114,6 +121,25 @@ pub enum Sport {
     Other,
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref)]
+pub struct Timeseries(Vec<TimeseriesItem>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeseriesItem {
+    time: TimeseriesTime,
+    metrics: Vec<TimeseriesMetric>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimeseriesTime(usize);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeseriesMetric {
+    Speed(f64),
+    Power(usize),
+    HeartRate(usize),
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -126,12 +152,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            Timeseries(vec![]),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
+            Timeseries(vec![]),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -144,12 +172,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            Timeseries(vec![]),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            Timeseries(vec![]),
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());

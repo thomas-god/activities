@@ -42,7 +42,13 @@ where
     ) -> Result<Activity, CreateActivityError> {
         // Create activity from request
         let id = ActivityId::new();
-        let activity = Activity::new(id.clone(), *req.start_time(), *req.duration(), *req.sport());
+        let activity = Activity::new(
+            id.clone(),
+            *req.start_time(),
+            *req.duration(),
+            *req.sport(),
+            req.timeseries().clone(),
+        );
 
         tracing::info!("Parsed new activity {:?}", &activity);
 
@@ -94,7 +100,7 @@ pub mod test_utils {
 
     use super::*;
 
-    use crate::domain::models::{ActivityDuration, ActivityStartTime, Sport};
+    use crate::domain::models::{ActivityDuration, ActivityStartTime, Sport, Timeseries};
     use crate::domain::ports::ListActivitiesError;
 
     #[derive(Clone)]
@@ -112,6 +118,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
+                    Timeseries::new(vec![]),
                 )))),
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
                 get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
@@ -119,6 +126,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
+                    Timeseries::new(vec![]),
                 )))),
             }
         }
@@ -162,7 +170,7 @@ mod tests {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport},
+        models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport, Timeseries},
         ports::{
             GetActivityError, ListActivitiesError, SaveActivityError, SaveRawDataError,
             SimilarActivityError,
@@ -238,7 +246,8 @@ mod tests {
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
         let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
-        CreateActivityRequest::new(sport, duration, start_time, content)
+        let timeseries = Timeseries::new(vec![]);
+        CreateActivityRequest::new(sport, duration, start_time, timeseries, content)
     }
 
     #[tokio::test]
