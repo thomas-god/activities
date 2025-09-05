@@ -1,7 +1,7 @@
 import type { PageLoad } from './$types';
+import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
-import { ActivityList } from '$lib/types/activity';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
@@ -16,3 +16,12 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 };
 
 export const prerender = false;
+
+const ActivityListItem = z.object({
+	id: z.string(),
+	sport: z.string(),
+	duration: z.number(),
+	start_time: z.iso.datetime({ offset: true })
+});
+
+const ActivityList = z.array(ActivityListItem);
