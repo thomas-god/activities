@@ -119,9 +119,13 @@ fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Ti
                 let timestamp = msg.fields.iter().find_map(|field| match field.kind {
                     FitField::Record(RecordField::Timestamp) => {
                         field.values.iter().find_map(|val| match val {
-                            DataValue::DateTime(dt) => {
-                                Some(dt.saturating_sub(start.timestamp().try_into().unwrap()))
-                            }
+                            DataValue::DateTime(dt) => Some(
+                                dt.saturating_sub(
+                                    (start.timestamp() - FIT_DATETIME_OFFSET as i64)
+                                        .try_into()
+                                        .unwrap(),
+                                ),
+                            ),
                             _ => None,
                         })
                     }
@@ -298,8 +302,9 @@ mod tests {
 
         // Check 4th element as the first 3 have no power/speed/hr data
         let fourth = res.timeseries().get(3).unwrap();
+        assert_eq!(*fourth.time(), TimeseriesTime::new(3));
         let metrics = fourth.metrics();
-        assert_eq!(*metrics.get(0).unwrap(), TimeseriesMetric::HeartRate(77));
+        assert_eq!(*metrics.first().unwrap(), TimeseriesMetric::HeartRate(77));
         if let TimeseriesMetric::Speed(speed) = *metrics.get(1).unwrap() {
             assert_approx_eq!(speed, 3.969);
         }

@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::{Activity, ActivityId, Sport},
+        models::{Activity, ActivityId, Sport, TimeseriesItem, TimeseriesMetric},
         ports::ActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -20,6 +20,16 @@ pub struct ResponseBody {
     sport: String,
     duration: usize,
     start_time: DateTime<FixedOffset>,
+    timeseries: TimeseriesBody,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TimeseriesBody(Vec<TimeseriesItemBody>);
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TimeseriesItemBody {
+    time: usize,
+    metrics: Vec<(String, f64)>,
 }
 
 impl From<&Activity> for ResponseBody {
@@ -33,7 +43,32 @@ impl From<&Activity> for ResponseBody {
             },
             start_time: **activity.start_time(),
             duration: (*activity.duration()).into(),
+            timeseries: (*activity.timeseries()).into(),
         }
+    }
+}
+
+impl From<&[TimeseriesItem]> for TimeseriesBody {
+    fn from(value: &[TimeseriesItem]) -> Self {
+        TimeseriesBody(
+            value
+                .iter()
+                .map(|val| TimeseriesItemBody {
+                    time: **val.time(),
+                    metrics: val
+                        .metrics()
+                        .iter()
+                        .map(|metric| match metric {
+                            TimeseriesMetric::Speed(speed) => ("Speed".to_string(), *speed),
+                            TimeseriesMetric::Power(power) => ("Power".to_string(), *power as f64),
+                            TimeseriesMetric::HeartRate(hr) => {
+                                ("HeartRate".to_string(), *hr as f64)
+                            }
+                        })
+                        .collect(),
+                })
+                .collect(),
+        )
     }
 }
 
@@ -62,7 +97,10 @@ mod tests {
 
     use crate::{
         domain::{
-            models::{ActivityDuration, ActivityStartTime, Timeseries},
+            models::{
+                ActivityDuration, ActivityStartTime, Timeseries, TimeseriesItem, TimeseriesMetric,
+                TimeseriesTime,
+            },
             ports::GetActivityError,
             services::test_utils::MockActivityService,
         },
@@ -84,7 +122,10 @@ mod tests {
                 ),
                 ActivityDuration::new(1200),
                 Sport::Cycling,
-                Timeseries::new(vec![]),
+                Timeseries::new(vec![TimeseriesItem::new(
+                    TimeseriesTime::new(0),
+                    vec![TimeseriesMetric::Power(120)],
+                )]),
             )))),
             ..Default::default()
         };
@@ -108,7 +149,11 @@ mod tests {
                 sport: "Cycling".to_string(),
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
-                    .unwrap()
+                    .unwrap(),
+                timeseries: TimeseriesBody(vec![TimeseriesItemBody {
+                    time: 0,
+                    metrics: vec![("Power".to_string(), 120.0)]
+                }])
             }
         );
     }

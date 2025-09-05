@@ -140,7 +140,7 @@ impl TimeseriesItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref)]
 pub struct TimeseriesTime(usize);
 
 #[derive(Debug, Clone, PartialEq, Sub)]
