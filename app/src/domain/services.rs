@@ -50,8 +50,6 @@ where
             req.timeseries().clone(),
         );
 
-        tracing::info!("Parsed new activity {:?}", &activity);
-
         if self
             .activity_repository
             .similar_activity_exists(&activity.natural_key())

@@ -16,6 +16,7 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 };
 
 export const prerender = false;
+export const ssr = false;
 
 const ActivityDetails = z.object({
 	id: z.string(),
@@ -30,4 +31,5 @@ const ActivityDetails = z.object({
 	)
 });
 
-type ActivityDetails = z.infer<typeof ActivityDetails>;
+export type ActivityDetails = z.infer<typeof ActivityDetails>;
+export type Timeseries = ActivityDetails["timeseries"];
