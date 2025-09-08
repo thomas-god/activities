@@ -32,4 +32,4 @@ const ActivityDetails = z.object({
 });
 
 export type ActivityDetails = z.infer<typeof ActivityDetails>;
-export type Timeseries = ActivityDetails["timeseries"];
+export type Timeseries = ActivityDetails['timeseries'];

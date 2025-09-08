@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LineChart from '../../../molecules/LineChart.svelte';
+	import TimeseriesChart from '../../../molecules/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -18,6 +18,8 @@
 
 {JSON.stringify(summary)}
 
-{#if data.activity}
-	<LineChart timeseries={data.activity.timeseries} />
-{/if}
+<div class="m-3">
+	{#if data.activity}
+		<TimeseriesChart timeseries={data.activity.timeseries} targetMetric={'Power'} />
+	{/if}
+</div>
