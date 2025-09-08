@@ -15,12 +15,30 @@
 		}
 		return undefined;
 	});
+
+	let metricOptions = [
+		{ option: 'Power', display: 'Power' },
+		{ option: 'Speed', display: 'Speed' },
+		{ option: 'HeartRate', display: 'Heart rate' }
+	];
+
+	let selectedOption = $state(metricOptions.at(1));
 </script>
 
 {JSON.stringify(summary)}
 
 <div class="m-3">
 	{#if data.activity}
-		<TimeseriesChart timeseries={data.activity.timeseries} targetMetric={'Power'} />
+		<fieldset class="fieldset">
+			<legend class="fieldset-legend">Metrics</legend>
+			<select class="select" bind:value={selectedOption}>
+				{#each metricOptions as option (option.option)}
+					<option value={option}>{option.display}</option>
+				{/each}
+			</select>
+		</fieldset>
+		{#if selectedOption}
+			<TimeseriesChart timeseries={data.activity.timeseries} targetMetric={selectedOption.option} />
+		{/if}
 	{/if}
 </div>
