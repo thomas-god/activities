@@ -39,12 +39,12 @@ impl ParseFile for FitParser {
         let duration = extract_duration(&messages)
             .ok_or(ParseCreateActivityHttpRequestBodyError::NoDurationFound)?;
 
-        let start_time = extract_start_time(&messages)
+        let (start_time, reference_timestamp) = extract_start_time(&messages)
             .ok_or(ParseCreateActivityHttpRequestBodyError::NoStartTimeFound)?;
 
         let sport = extract_sport(&messages);
 
-        let timeseries = extract_timeseries(&start_time, &messages);
+        let timeseries = extract_timeseries(reference_timestamp, &messages)?;
 
         Ok(CreateActivityRequest::new(
             sport, duration, start_time, timeseries, bytes,
@@ -52,7 +52,7 @@ impl ParseFile for FitParser {
     }
 }
 
-fn extract_start_time(messages: &[DataMessage]) -> Option<ActivityStartTime> {
+fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u32)> {
     let start_timestamp = find_field_value_by_kind(
         messages,
         &fit_parser::FitField::Activity(fit_parser::ActivityField::Timestamp),
@@ -79,10 +79,9 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<ActivityStartTime> {
 
     let start_datetime =
         DateTime::from_timestamp((*start_timestamp as usize + FIT_DATETIME_OFFSET) as i64, 0)?;
-    let start_datetime =
-        start_datetime.with_timezone(&FixedOffset::east_opt(offset as i32).unwrap());
+    let start_datetime = start_datetime.with_timezone(&FixedOffset::east_opt(offset as i32)?);
 
-    Some(ActivityStartTime::new(start_datetime))
+    Some((ActivityStartTime::new(start_datetime), *start_timestamp))
 }
 
 fn extract_duration(messages: &[DataMessage]) -> Option<ActivityDuration> {
@@ -107,8 +106,11 @@ fn extract_sport(messages: &[DataMessage]) -> Sport {
     .unwrap_or(Sport::Other)
 }
 
-fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Timeseries {
-    Timeseries::new(
+fn extract_timeseries(
+    reference_timestamp: u32,
+    messages: &[DataMessage],
+) -> Result<Timeseries, ParseCreateActivityHttpRequestBodyError> {
+    Ok(Timeseries::new(
         messages
             .iter()
             .filter_map(|msg| {
@@ -119,13 +121,9 @@ fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Ti
                 let timestamp = msg.fields.iter().find_map(|field| match field.kind {
                     FitField::Record(RecordField::Timestamp) => {
                         field.values.iter().find_map(|val| match val {
-                            DataValue::DateTime(dt) => Some(
-                                dt.saturating_sub(
-                                    (start.timestamp() - FIT_DATETIME_OFFSET as i64)
-                                        .try_into()
-                                        .unwrap(),
-                                ),
-                            ),
+                            DataValue::DateTime(timestamp) => {
+                                timestamp.checked_sub(reference_timestamp)
+                            }
                             _ => None,
                         })
                     }
@@ -136,9 +134,14 @@ fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Ti
 
                 if let Some(heart_rate) = msg.fields.iter().find_map(|field| match field.kind {
                     FitField::Record(RecordField::HeartRate) => {
-                        field.values.iter().find_map(|val| match val {
-                            DataValue::Uint8(hr) => Some(*hr),
-                            _ => None,
+                        field.values.iter().find_map(|val| {
+                            if val.is_invalid() {
+                                return None;
+                            }
+                            match val {
+                                DataValue::Uint8(hr) => Some(*hr),
+                                _ => None,
+                            }
                         })
                     }
                     _ => None,
@@ -147,24 +150,30 @@ fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Ti
                 };
 
                 if let Some(speed) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Speed) => {
-                        field.values.iter().find_map(|val| match val {
+                    FitField::Record(RecordField::Speed) => field.values.iter().find_map(|val| {
+                        if val.is_invalid() {
+                            return None;
+                        }
+                        match val {
                             DataValue::Float32(speed) => Some(*speed),
                             _ => None,
-                        })
-                    }
+                        }
+                    }),
                     _ => None,
                 }) {
                     metrics.push(TimeseriesMetric::Speed(speed as f64));
                 };
 
                 if let Some(power) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Power) => {
-                        field.values.iter().find_map(|val| match val {
+                    FitField::Record(RecordField::Power) => field.values.iter().find_map(|val| {
+                        if val.is_invalid() {
+                            return None;
+                        }
+                        match val {
                             DataValue::Uint16(power) => Some(*power),
                             _ => None,
-                        })
-                    }
+                        }
+                    }),
                     _ => None,
                 }) {
                     metrics.push(TimeseriesMetric::Power(power as usize));
@@ -176,7 +185,7 @@ fn extract_timeseries(start: &ActivityStartTime, messages: &[DataMessage]) -> Ti
                 ))
             })
             .collect(),
-    )
+    ))
 }
 
 #[derive(Debug, Clone, Error)]
@@ -254,6 +263,7 @@ mod tests {
 
     use assert_approx_eq::assert_approx_eq;
     use chrono::{DateTime, FixedOffset, Utc};
+    use fit_parser::DataMessageField;
 
     use super::*;
 
@@ -309,5 +319,214 @@ mod tests {
             assert_approx_eq!(speed, 3.969);
         }
         assert_eq!(*metrics.get(2).unwrap(), TimeseriesMetric::Power(74));
+    }
+
+    #[test]
+    fn test_extract_timeseries_timestamp_from_activity_start_reference() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Record,
+            fields: vec![DataMessageField {
+                kind: FitField::Record(RecordField::Timestamp),
+                values: vec![DataValue::DateTime(10)],
+            }],
+        }];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 1);
+        assert_eq!(timeseries.first().unwrap().time(), &TimeseriesTime::new(0));
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_records_without_timestamp() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Record,
+            fields: vec![DataMessageField {
+                kind: FitField::Record(RecordField::Power),
+                values: vec![DataValue::Uint16(12)],
+            }],
+        }];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 0);
+    }
+    #[test]
+    fn test_extract_timeseries_skip_records_before_reference() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Record,
+            fields: vec![DataMessageField {
+                kind: FitField::Record(RecordField::Timestamp),
+                values: vec![DataValue::DateTime(5)],
+            }],
+        }];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_invalid_power_values() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Power),
+                        values: vec![DataValue::Uint16(12)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(11)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Power),
+                        values: vec![DataValue::Uint16(u16::MAX)],
+                    },
+                ],
+            },
+        ];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 2);
+        assert_eq!(
+            timeseries.first().unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Power(12)])
+        );
+        assert_eq!(
+            timeseries.get(1).unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
+        )
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_invalid_heart_rate_values() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::HeartRate),
+                        values: vec![DataValue::Uint8(120)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(11)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::HeartRate),
+                        values: vec![DataValue::Uint8(u8::MAX)],
+                    },
+                ],
+            },
+        ];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 2);
+        assert_eq!(
+            timeseries.first().unwrap(),
+            &TimeseriesItem::new(
+                TimeseriesTime::new(0),
+                vec![TimeseriesMetric::HeartRate(120)]
+            )
+        );
+        assert_eq!(
+            timeseries.get(1).unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
+        )
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_invalid_speed_values() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Speed),
+                        values: vec![DataValue::Float32(12.)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(11)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Speed),
+                        values: vec![DataValue::Float32(f32::from_le_bytes([
+                            0xFF, 0xFF, 0xFF, 0xFF,
+                        ]))],
+                    },
+                ],
+            },
+        ];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 2);
+        assert_eq!(
+            timeseries.first().unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Speed(12.)])
+        );
+        assert_eq!(
+            timeseries.get(1).unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
+        )
     }
 }
