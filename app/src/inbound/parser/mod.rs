@@ -150,15 +150,18 @@ fn extract_timeseries(
                 };
 
                 if let Some(speed) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Speed) => field.values.iter().find_map(|val| {
-                        if val.is_invalid() {
-                            return None;
-                        }
-                        match val {
-                            DataValue::Float32(speed) => Some(*speed),
-                            _ => None,
-                        }
-                    }),
+                    FitField::Record(RecordField::Speed)
+                    | FitField::Record(RecordField::EnhancedSpeed) => {
+                        field.values.iter().find_map(|val| {
+                            if val.is_invalid() {
+                                return None;
+                            }
+                            match val {
+                                DataValue::Float32(speed) => Some(*speed),
+                                _ => None,
+                            }
+                        })
+                    }
                     _ => None,
                 }) {
                     metrics.push(TimeseriesMetric::Speed(speed as f64));
@@ -528,5 +531,34 @@ mod tests {
             timeseries.get(1).unwrap(),
             &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
         )
+    }
+
+    #[test]
+    fn test_extract_timeseries_enhanced_speed_field_as_speed() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Record,
+            fields: vec![
+                DataMessageField {
+                    kind: FitField::Record(RecordField::Timestamp),
+                    values: vec![DataValue::DateTime(10)],
+                },
+                DataMessageField {
+                    kind: FitField::Record(RecordField::EnhancedSpeed),
+                    values: vec![DataValue::Float32(12.)],
+                },
+            ],
+        }];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 1);
+        assert_eq!(
+            timeseries.first().unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Speed(12.)])
+        );
     }
 }
