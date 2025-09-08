@@ -45,6 +45,7 @@
 
 	let gx: SVGGElement;
 	let gy: SVGGElement;
+	let brushElement: SVGGElement;
 
 	const updateXAxis = (selection: d3.Selection<SVGGElement, any, any, any>) => {
 		const axis = d3.axisBottom(x);
@@ -52,16 +53,35 @@
 		axis(selection);
 	};
 
+	const brushedEnd = (event: d3.D3BrushEvent<any>) => {
+		if (!event.sourceEvent) return; // Only transition after interaction.
+
+		if (!!event.selection) {
+			const x_min = Math.floor(x.invert(event.selection[0]));
+			const x_max = Math.ceil(x.invert(event.selection[1]));
+			x = d3.scaleLinear([x_min, x_max], [marginLeft, width - marginRight]);
+			d3.select(brushElement).call(brush.move, null);
+		} else {
+			x = d3.scaleLinear([values.at(0)![0], values.at(-1)![0]], [marginLeft, width - marginRight]);
+		}
+	};
+
+	let brush = d3.brushX().on('end', brushedEnd);
+
 	$effect(() => {
 		d3.select<SVGGElement, any>(gx).call(updateXAxis);
 	});
 	$effect(() => {
 		d3.select(gy).call(d3.axisLeft(y));
 	});
+	$effect(() => {
+		d3.select(brushElement).call(brush);
+	});
 </script>
 
 <svg {width} {height}>
 	<path fill="none" stroke="currentColor" stroke-width="1.5" d={line(values)} />
+	<g bind:this={brushElement} />
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 	<g bind:this={gy} transform="translate({marginLeft} 0)" />
 </svg>
