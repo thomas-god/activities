@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ActivityList } from '$lib/types/activity';
 	import ActivityOverview from '../molecules/ActivityOverview.svelte';
+	import type { ActivityList } from '../routes/+page';
 
 	let { activityList }: { activityList: ActivityList } = $props();
 </script>

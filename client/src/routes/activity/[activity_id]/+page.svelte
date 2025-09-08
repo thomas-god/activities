@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDuration } from '$lib/duration';
 	import TimeseriesChart from '../../../molecules/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 
@@ -8,7 +9,7 @@
 		if (data.activity) {
 			return {
 				sport: data.activity.sport,
-				duration: data.activity.duration,
+				duration: formatDuration(data.activity.duration),
 				start_time: data.activity.start_time
 			};
 		}

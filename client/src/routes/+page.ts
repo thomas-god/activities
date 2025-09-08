@@ -25,3 +25,6 @@ const ActivityListItem = z.object({
 });
 
 const ActivityList = z.array(ActivityListItem);
+
+export type ActivityList = z.infer<typeof ActivityList>;
+export type ActivityListItem = z.infer<typeof ActivityListItem>;

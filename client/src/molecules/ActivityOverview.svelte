@@ -1,15 +1,8 @@
 <script lang="ts">
-	import type { ActivityListItem } from '$lib/types/activity';
+	import { formatDuration } from '$lib/duration';
+	import type { ActivityListItem } from '../routes/+page';
 
 	let { activity }: { activity: ActivityListItem } = $props();
-
-	let duration = $derived.by(() => {
-		const hours = Math.floor(activity.duration / 3600);
-		const minutes = Math.floor((activity.duration - hours * 3600) / 60);
-		const seconds = activity.duration - hours * 3600 - minutes * 60;
-
-		return { hours, minutes, seconds };
-	});
 </script>
 
 <div>
@@ -17,7 +10,7 @@
 </div>
 
 <div>
-	{`${String(duration.hours).padStart(2, '0')}:${String(duration.minutes).padStart(2, '0')}:${String(duration.seconds).padStart(2, '0')}`}
+	{`${formatDuration(activity.duration)}`}
 </div>
 
 <div>

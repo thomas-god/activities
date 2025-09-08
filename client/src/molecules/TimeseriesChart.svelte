@@ -46,8 +46,6 @@
 	let gx: SVGGElement;
 	let gy: SVGGElement;
 
-	$inspect(Math.max(...values.map(([_, v]) => v)));
-
 	const updateXAxis = (selection: d3.Selection<SVGGElement, any, any, any>) => {
 		const axis = d3.axisBottom(x);
 		axis.tickFormat((time, _) => formatDuration(time.valueOf()));
