@@ -148,6 +148,7 @@ pub enum TimeseriesMetric {
     Speed(f64),
     Power(usize),
     HeartRate(usize),
+    Distance(f32),
 }
 
 #[cfg(test)]

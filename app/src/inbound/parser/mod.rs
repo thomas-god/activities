@@ -182,6 +182,23 @@ fn extract_timeseries(
                     metrics.push(TimeseriesMetric::Power(power as usize));
                 };
 
+                if let Some(distance) = msg.fields.iter().find_map(|field| match field.kind {
+                    FitField::Record(RecordField::Distance) => {
+                        field.values.iter().find_map(|val| {
+                            if val.is_invalid() {
+                                return None;
+                            }
+                            match val {
+                                DataValue::Float32(distance) => Some(*distance),
+                                _ => None,
+                            }
+                        })
+                    }
+                    _ => None,
+                }) {
+                    metrics.push(TimeseriesMetric::Distance(distance));
+                };
+
                 Some(TimeseriesItem::new(
                     TimeseriesTime::new(timestamp as usize),
                     metrics,
@@ -311,7 +328,7 @@ mod tests {
 
         // First timestamp should 0 (i.e. equal to activity start_time)
         assert_eq!(*first.time(), TimeseriesTime::new(0));
-        assert_eq!(*first.metrics(), vec![]);
+        assert_eq!(*first.metrics(), vec![TimeseriesMetric::Distance(0.0)]);
 
         // Check 4th element as the first 3 have no power/speed/hr data
         let fourth = res.timeseries().get(3).unwrap();
@@ -474,6 +491,58 @@ mod tests {
             &TimeseriesItem::new(
                 TimeseriesTime::new(0),
                 vec![TimeseriesMetric::HeartRate(120)]
+            )
+        );
+        assert_eq!(
+            timeseries.get(1).unwrap(),
+            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
+        )
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_invalid_distance_values() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Distance),
+                        values: vec![DataValue::Float32(120.)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(11)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Distance),
+                        values: vec![DataValue::Uint32(u32::MAX)],
+                    },
+                ],
+            },
+        ];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages);
+        assert!(timeseries.is_ok());
+        let timeseries = timeseries.unwrap();
+
+        assert_eq!(timeseries.len(), 2);
+        assert_eq!(
+            timeseries.first().unwrap(),
+            &TimeseriesItem::new(
+                TimeseriesTime::new(0),
+                vec![TimeseriesMetric::Distance(120.)]
             )
         );
         assert_eq!(

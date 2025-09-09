@@ -64,6 +64,9 @@ impl From<&[TimeseriesItem]> for TimeseriesBody {
                             TimeseriesMetric::HeartRate(hr) => {
                                 ("HeartRate".to_string(), *hr as f64)
                             }
+                            TimeseriesMetric::Distance(distance) => {
+                                ("Distance".to_string(), *distance as f64)
+                            }
                         })
                         .collect(),
                 })
