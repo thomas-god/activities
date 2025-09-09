@@ -1,0 +1,19 @@
+services:
+  activities:
+    image: ghcr.io/thomas-god/activities:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.activities.loadbalancer.server.port=80"
+      - "traefik.http.routers.activities.rule=Host(`demo.trackforge.fr`)"
+      - "traefik.http.routers.activities.entrypoints=websecure"
+      - "traefik.http.routers.activities.tls.certresolver=myresolver"
+      - "traefik.docker.network=traefik-public"
+    networks:
+      - traefik-public
+    deploy:
+      update_config:
+        order: start-first
+
+networks:
+  traefik-public:
+    external: true
