@@ -31,57 +31,91 @@
 		)
 	);
 
-	let x = $derived(
-		d3.scaleLinear([values.at(0)![0], values.at(-1)![0]], [marginLeft, width - marginRight])
+	let svgElement: SVGElement;
+	let path: SVGPathElement;
+
+	// Define x scale and axis
+	let x_min = $derived(values.at(0)![0]);
+	let x_max = $derived(values.at(-1)![0]);
+	let max_zoom = $derived((x_max - x_min) / 60);
+	let x = $derived(d3.scaleLinear([x_min, x_max], [marginLeft, width - marginRight]));
+	let xAxis = $derived(
+		(
+			g: d3.Selection<SVGGElement, unknown, null, undefined>,
+			x: d3.ScaleLinear<number, number, never>
+		) => g.call(d3.axisBottom(x).tickFormat((time, _) => formatDuration(time.valueOf())))
 	);
+	let gx: SVGGElement;
+	$effect(() => {
+		d3.select(gx).call(xAxis, x);
+	});
+
+	// Define y scale and axis
+	let gy: SVGGElement;
 	let y_range = $derived(d3.extent(values, (p) => p[1])) as [number, number];
 	let y = $derived(d3.scaleLinear(y_range, [height - marginBottom, marginTop]));
-	let line = $derived(
+	let yAxis = $derived(d3.axisLeft(y));
+	$effect(() => {
+		d3.select(gy).call(yAxis);
+	});
+
+	// Define line generator
+	let line = $derived((data: [number, number][], xScale: d3.ScaleLinear<number, number, never>) =>
 		d3
 			.line()
-			.x((point) => x(point[0]))
-			.y((point) => y(point[1]))
+			.x((point) => xScale(point[0]))
+			.y((point) => y(point[1]))(data)
 	);
 
-	let gx: SVGGElement;
-	let gy: SVGGElement;
-	let brushElement: SVGGElement;
+	// Create the zoom behavior
+	let zoom = $derived(
+		d3
+			.zoom()
+			.scaleExtent([1, max_zoom])
+			.extent([
+				[marginLeft, 0],
+				[width - marginRight, height]
+			])
+			.translateExtent([
+				[marginLeft, -Infinity],
+				[width - marginRight, Infinity]
+			])
+			.on('zoom', zoomed)
+	);
 
-	const updateXAxis = (selection: d3.Selection<SVGGElement, any, any, any>) => {
-		const axis = d3.axisBottom(x);
-		axis.tickFormat((time, _) => formatDuration(time.valueOf()));
-		axis(selection);
+	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
+		const zoomedXScale = event.transform.rescaleX(x);
+		d3.select(path).attr('d', line(values, zoomedXScale));
+		d3.select(gx).call(xAxis, zoomedXScale);
+	}
+
+	const resetZoom = () => {
+		d3.select(svgElement).call(zoom.scaleTo, 1);
 	};
 
-	const brushedEnd = (event: d3.D3BrushEvent<any>) => {
-		if (!event.sourceEvent) return; // Only transition after interaction.
-
-		if (!!event.selection) {
-			const x_min = Math.floor(x.invert(event.selection[0]));
-			const x_max = Math.ceil(x.invert(event.selection[1]));
-			x = d3.scaleLinear([x_min, x_max], [marginLeft, width - marginRight]);
-			d3.select(brushElement).call(brush.move, null);
-		} else {
-			x = d3.scaleLinear([values.at(0)![0], values.at(-1)![0]], [marginLeft, width - marginRight]);
-		}
-	};
-
-	let brush = d3.brushX().on('end', brushedEnd);
-
 	$effect(() => {
-		d3.select<SVGGElement, any>(gx).call(updateXAxis);
-	});
-	$effect(() => {
-		d3.select(gy).call(d3.axisLeft(y));
-	});
-	$effect(() => {
-		d3.select(brushElement).call(brush);
+		d3.select(svgElement).call(zoom);
 	});
 </script>
 
-<svg {width} {height}>
-	<path fill="none" stroke="currentColor" stroke-width="1.5" d={line(values)} />
-	<g bind:this={brushElement} />
+<button class="btn" onclick={resetZoom}>Reset zoom</button>
+<svg bind:this={svgElement} {width} {height} viewBox={`0 0 ${width} ${height}`}>
+	<clipPath id="clip-path">
+		<rect
+			x={marginLeft}
+			y={marginRight}
+			width={width - marginLeft - marginRight}
+			height={height - marginTop - marginBottom}
+		/>
+	</clipPath>
+	<path
+		bind:this={path}
+		clip-path="url(#clip-path)"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.5"
+		d={line(values, x)}
+	/>
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 	<g bind:this={gy} transform="translate({marginLeft} 0)" />
 </svg>
