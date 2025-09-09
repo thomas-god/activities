@@ -34,9 +34,9 @@ FROM nginx:alpine
 RUN apk add --no-cache nginx
 
 COPY --from=backend-builder /app/backend/target/release/app ./app
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-builder --chown=nginx:nginx /app/frontend/build /usr/share/nginx/html
-COPY --chmod=0755 start.sh ./
+COPY --chmod=0755 docker/start.sh ./
 
 EXPOSE 80
 
