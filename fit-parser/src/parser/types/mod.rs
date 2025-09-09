@@ -380,6 +380,10 @@ impl DataValue {
         &self,
         scale_offset: &Option<ScaleOffset>,
     ) -> Result<DataValue, RecordError> {
+        if self.is_invalid() {
+            return Ok(self.clone());
+        }
+
         let Some(ScaleOffset { scale, offset }) = scale_offset else {
             return Ok(self.clone());
         };
@@ -592,5 +596,59 @@ mod tests {
         let result = value.apply_scale_offset(&scale);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scale_offset_keeps_invalid_values() {
+        let test_values = vec![
+            DataValue::Uint8(u8::MAX),
+            DataValue::Uint16(u16::MAX),
+            DataValue::Uint32(u32::MAX),
+            DataValue::Uint64(u64::MAX),
+            DataValue::Uint8z(0),
+            DataValue::Uint16z(0),
+            DataValue::Uint32z(0),
+            DataValue::Uint64z(0),
+            DataValue::Sint8(i8::MAX),
+            DataValue::Sint16(i16::MAX),
+            DataValue::Sint32(i32::MAX),
+            DataValue::Sint64(i64::MAX),
+        ];
+        let scale = Some(ScaleOffset {
+            scale: 0.5,
+            offset: 1.,
+        });
+
+        for invalid_value in test_values {
+            assert_eq!(
+                invalid_value.apply_scale_offset(&scale).unwrap(),
+                invalid_value,
+                "Invalid value {:?} shoud not be applied a scale/offset",
+                invalid_value
+            );
+        }
+    }
+
+    #[test]
+    fn test_scale_offset_keeps_nan_values() {
+        let scale = Some(ScaleOffset {
+            scale: 0.5,
+            offset: 1.,
+        });
+
+        let invalid_f32 = DataValue::Float32(f32::from_le_bytes([0xFF, 0xFF, 0xFF, 0xFF]));
+
+        match invalid_f32.apply_scale_offset(&scale) {
+            Ok(DataValue::Float32(val)) => assert!(val.is_nan()),
+            _ => unreachable!("Should have return an Ok(DataValue::Float32()"),
+        }
+        let invalid_f64 = DataValue::Float64(f64::from_le_bytes([
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        ]));
+
+        match invalid_f64.apply_scale_offset(&scale) {
+            Ok(DataValue::Float64(val)) => assert!(val.is_nan()),
+            _ => unreachable!("Should have return an Ok(DataValue::Float32()"),
+        }
     }
 }
