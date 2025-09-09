@@ -55,7 +55,7 @@ impl ParseFile for FitParser {
 fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u32)> {
     let start_timestamp = find_field_value_by_kind(
         messages,
-        &fit_parser::FitField::Activity(fit_parser::ActivityField::Timestamp),
+        &fit_parser::FitField::Session(fit_parser::SessionField::StartTime),
     )
     .and_then(|values| {
         values.iter().find_map(|val| match val {
@@ -129,6 +129,7 @@ fn extract_timeseries(
                     }
                     _ => None,
                 })?;
+                println!("{:?}", timestamp);
 
                 let mut metrics = vec![];
 
