@@ -99,25 +99,24 @@
 		d3.select(svgElement).call(zoom);
 	});
 
-	// Tooltip
-	let tooltip:
-		| {
-				xOffset: number;
-				yOffset: number;
-				timestamp: string;
-				value: number;
-		  }
-		| undefined = $state(undefined);
-	const tooltipCallback = (event: MouseEvent) => {
+	let tooltipXOffset: number | undefined = $state(undefined);
+	let tooltip = $derived.by(() => {
+		if (tooltipXOffset === undefined) {
+			return undefined;
+		}
+
 		const bisector = d3.bisector<[number, number], number>((point) => point[0]);
 
-		let nearestValues = values[bisector.center(values, zoomedXScale.invert(event.offsetX))];
-		tooltip = {
+		let nearestValues = values[bisector.center(values, zoomedXScale.invert(tooltipXOffset))];
+		return {
 			xOffset: zoomedXScale(nearestValues[0]),
 			yOffset: yScale(nearestValues[1]),
 			timestamp: formatDuration(nearestValues[0]),
 			value: nearestValues[1]
 		};
+	});
+	const tooltipCallback = (event: MouseEvent) => {
+		tooltipXOffset = event.offsetX;
 	};
 </script>
 
