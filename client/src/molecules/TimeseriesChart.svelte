@@ -2,6 +2,7 @@
 	import * as d3 from 'd3';
 	import type { Timeseries } from '../routes/activity/[activity_id]/+page';
 	import { formatDuration } from '$lib/duration';
+	import { number } from 'zod';
 
 	export interface TimeseriesChartProps {
 		timeseries: Timeseries;
@@ -53,8 +54,8 @@
 	// Define y scale and axis
 	let gy: SVGGElement;
 	let y_range = $derived(d3.extent(values, (p) => p[1])) as [number, number];
-	let y = $derived(d3.scaleLinear(y_range, [height - marginBottom, marginTop]));
-	let yAxis = $derived(d3.axisLeft(y));
+	let yScale = $derived(d3.scaleLinear(y_range, [height - marginBottom, marginTop]));
+	let yAxis = $derived(d3.axisLeft(yScale));
 	$effect(() => {
 		d3.select(gy).call(yAxis);
 	});
@@ -64,13 +65,13 @@
 		d3
 			.line()
 			.x((point) => xScale(point[0]))
-			.y((point) => y(point[1]))(data)
+			.y((point) => yScale(point[1]))(data)
 	);
 
 	// Create the zoom behavior
 	let zoom = $derived(
 		d3
-			.zoom()
+			.zoom<SVGElement, unknown>()
 			.scaleExtent([1, max_zoom])
 			.extent([
 				[marginLeft, 0],
@@ -83,8 +84,9 @@
 			.on('zoom', zoomed)
 	);
 
+	let zoomedXScale = $state(x);
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
-		const zoomedXScale = event.transform.rescaleX(x);
+		zoomedXScale = event.transform.rescaleX(x);
 		d3.select(path).attr('d', line(values, zoomedXScale));
 		d3.select(gx).call(xAxis, zoomedXScale);
 	}
@@ -96,10 +98,38 @@
 	$effect(() => {
 		d3.select(svgElement).call(zoom);
 	});
+
+	// Tooltip
+	let tooltip:
+		| {
+				xOffset: number;
+				yOffset: number;
+				timestamp: string;
+				value: number;
+		  }
+		| undefined = $state(undefined);
+	const tooltipCallback = (event: MouseEvent) => {
+		const bisector = d3.bisector<[number, number], number>((point) => point[0]);
+
+		let nearestValues = values[bisector.center(values, zoomedXScale.invert(event.offsetX))];
+		tooltip = {
+			xOffset: zoomedXScale(nearestValues[0]),
+			yOffset: yScale(nearestValues[1]),
+			timestamp: formatDuration(nearestValues[0]),
+			value: nearestValues[1]
+		};
+	};
 </script>
 
 <button class="btn" onclick={resetZoom}>Reset zoom</button>
-<svg bind:this={svgElement} {width} {height} viewBox={`0 0 ${width} ${height}`}>
+<svg
+	bind:this={svgElement}
+	{width}
+	{height}
+	viewBox={`0 0 ${width} ${height}`}
+	onmousemove={tooltipCallback}
+	role="img"
+>
 	<clipPath id="clip-path">
 		<rect
 			x={marginLeft}
@@ -118,4 +148,18 @@
 	/>
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 	<g bind:this={gy} transform="translate({marginLeft} 0)" />
+	{#if tooltip}
+		<g
+			transform={`translate(${tooltip.xOffset},${tooltip.yOffset})`}
+			pointer-events="none"
+			font-family="sans-serif"
+			font-size="10"
+			text-anchor="middle"
+		>
+			<rect x="-27" width="54" y="-30" height="24" class="fill-info" />
+			<text y="-22">{tooltip.timestamp}</text>
+			<text y="-12">{tooltip.value.toFixed(2)}</text>
+			<circle r="3.5" class="fill-info" />
+		</g>
+	{/if}
 </svg>
