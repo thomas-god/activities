@@ -64,7 +64,18 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
         })
     })?;
 
-    let start_local_timestamp = find_field_value_by_kind(
+    let activity_timestamp = find_field_value_by_kind(
+        messages,
+        &fit_parser::FitField::Activity(fit_parser::ActivityField::Timestamp),
+    )
+    .and_then(|values| {
+        values.iter().find_map(|val| match val {
+            DataValue::DateTime(dt) => Some(dt),
+            _ => None,
+        })
+    })?;
+
+    let activity_local_timestamp = find_field_value_by_kind(
         messages,
         &fit_parser::FitField::Activity(fit_parser::ActivityField::LocalTimestamp),
     )
@@ -75,7 +86,7 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
         })
     })?;
 
-    let offset = *start_local_timestamp as isize - *start_timestamp as isize;
+    let offset = *activity_local_timestamp as isize - *activity_timestamp as isize;
 
     let start_datetime =
         DateTime::from_timestamp((*start_timestamp as usize + FIT_DATETIME_OFFSET) as i64, 0)?;
@@ -129,7 +140,6 @@ fn extract_timeseries(
                     }
                     _ => None,
                 })?;
-                println!("{:?}", timestamp);
 
                 let mut metrics = vec![];
 
