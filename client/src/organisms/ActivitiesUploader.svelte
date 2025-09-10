@@ -1,0 +1,62 @@
+<script lang="ts">
+	import { PUBLIC_APP_URL } from '$env/static/public';
+
+	let { activitiesUploadedCallback }: { activitiesUploadedCallback: () => void } = $props();
+
+	let files: FileList | undefined = $state(undefined);
+	let file_upload_content = $state('');
+
+	const checkCanUpload = (files: FileList | undefined): files is FileList => {
+		if (files) {
+			return files.length > 0;
+		}
+		return false;
+	};
+
+	let can_upload = $derived.by(() => {
+		return checkCanUpload(files);
+	});
+
+	const postActivity = async (fileList: FileList | undefined) => {
+		if (!checkCanUpload(fileList)) {
+			return;
+		}
+
+		let promises = [];
+		for (let i = 0; i < fileList.length; i++) {
+			const file = fileList.item(i);
+			promises.push(
+				fetch(`${PUBLIC_APP_URL}/api/activity`, {
+					body: file,
+					method: 'POST'
+				})
+			);
+		}
+
+		let _res = await Promise.all(promises);
+		file_upload_content = '';
+		activitiesUploadedCallback();
+	};
+</script>
+
+<fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-4">
+	<legend class="fieldset-legend">Upload new activities</legend>
+	<div class="join gap-3">
+		<input
+			type="file"
+			class="file-input"
+			accept=".fit"
+			multiple
+			bind:files
+			bind:value={file_upload_content}
+			id="activity_file"
+			name="activity file"
+		/>
+		<button
+			class="btn bg-accent text-accent-content disabled:bg-base-200/10 disabled:text-base-content/20"
+			disabled={!can_upload}
+			onclick={() => postActivity(files)}>Upload</button
+		>
+	</div>
+	<p class="label">.fit files are supported</p>
+</fieldset>
