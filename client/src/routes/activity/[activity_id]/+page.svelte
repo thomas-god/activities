@@ -24,7 +24,29 @@
 		{ option: 'HeartRate', display: 'Heart rate' }
 	];
 
+	let availableOptions = $derived.by(() => {
+		if (data.activity === undefined) {
+			return [];
+		}
+
+		let options = [];
+		for (const option of metricOptions) {
+			if (option.option in data.activity.timeseries.metrics) {
+				options.push(option);
+			}
+		}
+		return options;
+	});
+
 	let selectedOption = $state(metricOptions.at(1));
+
+	let selectedMetric = $derived.by(() => {
+		if (data.activity === undefined) {
+			return [];
+		}
+
+		return data.activity.timeseries.metrics[selectedOption?.option!];
+	});
 </script>
 
 {JSON.stringify(summary)}
@@ -34,7 +56,7 @@
 		<fieldset class="fieldset">
 			<legend class="fieldset-legend">Metrics</legend>
 			<select class="select" bind:value={selectedOption}>
-				{#each metricOptions as option (option.option)}
+				{#each availableOptions as option (option.option)}
 					<option value={option}>{option.display}</option>
 				{/each}
 			</select>
@@ -42,8 +64,8 @@
 		{#if selectedOption}
 			<div bind:clientWidth={chartWidth}>
 				<TimeseriesChart
-					timeseries={data.activity.timeseries}
-					targetMetric={selectedOption.option}
+					time={data.activity.timeseries.time}
+					metric={selectedMetric}
 					height={400}
 					width={chartWidth}
 				/>

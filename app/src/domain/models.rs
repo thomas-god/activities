@@ -1,5 +1,5 @@
 use chrono::{DateTime, FixedOffset};
-use derive_more::{AsRef, Constructor, Deref, Display, From, Into, Sub};
+use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -53,7 +53,7 @@ impl Activity {
         &self.sport
     }
 
-    pub fn timeseries(&self) -> &[TimeseriesItem] {
+    pub fn timeseries(&self) -> &Timeseries {
         &self.timeseries
     }
 }
@@ -121,16 +121,13 @@ pub enum Sport {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref)]
-pub struct Timeseries(Vec<TimeseriesItem>);
-
-#[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct TimeseriesItem {
+#[derive(Debug, Clone, PartialEq, Constructor, Default)]
+pub struct Timeseries {
     time: TimeseriesTime,
     metrics: Vec<TimeseriesMetric>,
 }
 
-impl TimeseriesItem {
+impl Timeseries {
     pub fn time(&self) -> &TimeseriesTime {
         &self.time
     }
@@ -140,15 +137,30 @@ impl TimeseriesItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref)]
-pub struct TimeseriesTime(usize);
+#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref, Default)]
+pub struct TimeseriesTime(Vec<usize>);
 
-#[derive(Debug, Clone, PartialEq, Sub)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TimeseriesMetric {
-    Speed(f64),
-    Power(usize),
-    HeartRate(usize),
-    Distance(f32),
+    Speed(Vec<Option<f64>>),
+    Power(Vec<Option<usize>>),
+    HeartRate(Vec<Option<usize>>),
+    Distance(Vec<Option<f32>>),
+}
+
+impl TimeseriesMetric {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Distance(values) => values.len(),
+            Self::Power(values) => values.len(),
+            Self::HeartRate(values) => values.len(),
+            Self::Speed(values) => values.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[cfg(test)]
@@ -163,14 +175,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries(vec![]),
+            Timeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
-            Timeseries(vec![]),
+            Timeseries::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -183,14 +195,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries(vec![]),
+            Timeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries(vec![]),
+            Timeseries::default(),
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, State},
@@ -8,7 +10,7 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::{Activity, ActivityId, Sport, TimeseriesItem, TimeseriesMetric},
+        models::{Activity, ActivityId, Sport, Timeseries, TimeseriesMetric},
         ports::ActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -23,13 +25,17 @@ pub struct ResponseBody {
     timeseries: TimeseriesBody,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesBody(Vec<TimeseriesItemBody>);
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum TimeseriesValue {
+    Int(usize),
+    Float(f64),
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesItemBody {
-    time: usize,
-    metrics: Vec<(String, f64)>,
+pub struct TimeseriesBody {
+    time: Vec<usize>,
+    metrics: HashMap<String, Vec<Option<TimeseriesValue>>>,
 }
 
 impl From<&Activity> for ResponseBody {
@@ -43,35 +49,48 @@ impl From<&Activity> for ResponseBody {
             },
             start_time: **activity.start_time(),
             duration: (*activity.duration()).into(),
-            timeseries: (*activity.timeseries()).into(),
+            timeseries: activity.timeseries().into(),
         }
     }
 }
 
-impl From<&[TimeseriesItem]> for TimeseriesBody {
-    fn from(value: &[TimeseriesItem]) -> Self {
-        TimeseriesBody(
-            value
-                .iter()
-                .map(|val| TimeseriesItemBody {
-                    time: **val.time(),
-                    metrics: val
-                        .metrics()
-                        .iter()
-                        .map(|metric| match metric {
-                            TimeseriesMetric::Speed(speed) => ("Speed".to_string(), *speed),
-                            TimeseriesMetric::Power(power) => ("Power".to_string(), *power as f64),
-                            TimeseriesMetric::HeartRate(hr) => {
-                                ("HeartRate".to_string(), *hr as f64)
-                            }
-                            TimeseriesMetric::Distance(distance) => {
-                                ("Distance".to_string(), *distance as f64)
-                            }
-                        })
-                        .collect(),
-                })
-                .collect(),
-        )
+impl From<&Timeseries> for TimeseriesBody {
+    fn from(value: &Timeseries) -> Self {
+        Self {
+            time: (**value.time()).clone(),
+            metrics: HashMap::from_iter(value.metrics().iter().map(|metric| {
+                match metric {
+                    TimeseriesMetric::Speed(values) => (
+                        "Speed".to_string(),
+                        values
+                            .iter()
+                            .map(|value| value.map(TimeseriesValue::Float))
+                            .collect(),
+                    ),
+                    TimeseriesMetric::Power(values) => (
+                        "Power".to_string(),
+                        values
+                            .iter()
+                            .map(|value| value.map(TimeseriesValue::Int))
+                            .collect(),
+                    ),
+                    TimeseriesMetric::HeartRate(values) => (
+                        "HeartRate".to_string(),
+                        values
+                            .iter()
+                            .map(|value| value.map(TimeseriesValue::Int))
+                            .collect(),
+                    ),
+                    TimeseriesMetric::Distance(values) => (
+                        "Distance".to_string(),
+                        values
+                            .iter()
+                            .map(|value| value.map(|v| TimeseriesValue::Float(v.into())))
+                            .collect(),
+                    ),
+                }
+            })),
+        }
     }
 }
 
@@ -94,15 +113,17 @@ pub async fn get_activity<AS: ActivityService, FP: ParseFile>(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        sync::{Arc, Mutex},
+        vec,
+    };
 
     use axum::extract::Path;
 
     use crate::{
         domain::{
             models::{
-                ActivityDuration, ActivityStartTime, Timeseries, TimeseriesItem, TimeseriesMetric,
-                TimeseriesTime,
+                ActivityDuration, ActivityStartTime, Timeseries, TimeseriesMetric, TimeseriesTime,
             },
             ports::GetActivityError,
             services::test_utils::MockActivityService,
@@ -125,10 +146,10 @@ mod tests {
                 ),
                 ActivityDuration::new(1200),
                 Sport::Cycling,
-                Timeseries::new(vec![TimeseriesItem::new(
-                    TimeseriesTime::new(0),
-                    vec![TimeseriesMetric::Power(120)],
-                )]),
+                Timeseries::new(
+                    TimeseriesTime::new(vec![0, 1, 2]),
+                    vec![TimeseriesMetric::Power(vec![Some(120), None, Some(130)])],
+                ),
             )))),
             ..Default::default()
         };
@@ -153,10 +174,17 @@ mod tests {
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
-                timeseries: TimeseriesBody(vec![TimeseriesItemBody {
-                    time: 0,
-                    metrics: vec![("Power".to_string(), 120.0)]
-                }])
+                timeseries: TimeseriesBody {
+                    time: vec![0, 1, 2],
+                    metrics: HashMap::from([(
+                        "Power".to_string(),
+                        vec![
+                            Some(TimeseriesValue::Int(120)),
+                            None,
+                            Some(TimeseriesValue::Int(130))
+                        ]
+                    )])
+                }
             }
         );
     }

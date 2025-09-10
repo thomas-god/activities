@@ -58,6 +58,8 @@ pub enum CreateActivityError {
     Unknown(#[from] anyhow::Error),
     #[error("An activity with similar data already exists")]
     SimilarActivityExistsError,
+    #[error("Timeseries metrics do not have the same length")]
+    TimeseriesMetricsNotSameLength,
 }
 
 pub trait ActivityService: Clone + Send + Sync + 'static {

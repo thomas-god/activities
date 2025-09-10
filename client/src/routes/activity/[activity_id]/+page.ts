@@ -23,12 +23,10 @@ const ActivityDetails = z.object({
 	sport: z.string(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
-	timeseries: z.array(
-		z.object({
-			time: z.number(),
-			metrics: z.array(z.tuple([z.string(), z.number()]))
-		})
-	)
+	timeseries: z.object({
+		time: z.array(z.number()),
+		metrics: z.record(z.string(), z.array(z.number().nullable()))
+	})
 });
 
 export type ActivityDetails = z.infer<typeof ActivityDetails>;

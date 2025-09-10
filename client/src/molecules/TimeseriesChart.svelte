@@ -1,35 +1,30 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import type { Timeseries } from '../routes/activity/[activity_id]/+page';
 	import { formatDuration } from '$lib/duration';
 
 	export interface TimeseriesChartProps {
-		timeseries: Timeseries;
-		targetMetric: String;
+		time: number[];
+		metric: Array<number | null>;
 		width: number;
 		height: number;
 	}
 
-	let { timeseries, targetMetric, height, width }: TimeseriesChartProps = $props();
+	let { time, metric, height, width }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
 	let marginLeft = 30;
 
-	let values = $derived(
-		timeseries.reduce(
-			(filtered, current) => {
-				for (const [metric, value] of current.metrics) {
-					if (metric === targetMetric) {
-						filtered.push([current.time, value]);
-						break;
-					}
-				}
-				return filtered;
-			},
-			[] as [number, number][]
-		)
-	);
+	let values = $derived.by(() => {
+		let v = [];
+		for (let i = 0; i < time.length; i++) {
+			let val = metric[i];
+			if (val !== null) {
+				v.push([time[i], val]);
+			}
+		}
+		return v as [number, number][];
+	});
 
 	let svgElement: SVGElement;
 	let path: SVGPathElement;

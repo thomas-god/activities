@@ -40,6 +40,17 @@ where
         &self,
         req: CreateActivityRequest,
     ) -> Result<Activity, CreateActivityError> {
+        // Check candidate timeseries metrics have the same lenghts
+        let time_len = req.timeseries().time().len();
+        if req
+            .timeseries()
+            .metrics()
+            .iter()
+            .any(|metric| metric.len() != time_len)
+        {
+            return Err(CreateActivityError::TimeseriesMetricsNotSameLength);
+        }
+
         // Create activity from request
         let id = ActivityId::new();
         let activity = Activity::new(
@@ -116,7 +127,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
-                    Timeseries::new(vec![]),
+                    Timeseries::default(),
                 )))),
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
                 get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
@@ -124,7 +135,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
-                    Timeseries::new(vec![]),
+                    Timeseries::default(),
                 )))),
             }
         }
@@ -168,7 +179,10 @@ mod tests {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::{ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport, Timeseries},
+        models::{
+            ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport, Timeseries,
+            TimeseriesMetric, TimeseriesTime,
+        },
         ports::{
             GetActivityError, ListActivitiesError, SaveActivityError, SaveRawDataError,
             SimilarActivityError,
@@ -221,6 +235,17 @@ mod tests {
         }
     }
 
+    impl Default for MockActivityRepository {
+        fn default() -> Self {
+            Self {
+                similar_activity_result: Arc::new(Mutex::new(Ok(false))),
+                save_activity_result: Arc::new(Mutex::new(Ok(()))),
+                list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
+                get_activity_result: Arc::new(Mutex::new(Ok(None))),
+            }
+        }
+    }
+
     #[derive(Clone)]
     struct MockRawDataRepository {
         save_raw_data: Arc<Mutex<Result<(), SaveRawDataError>>>,
@@ -244,7 +269,7 @@ mod tests {
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
         let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
-        let timeseries = Timeseries::new(vec![]);
+        let timeseries = Timeseries::default();
         CreateActivityRequest::new(sport, duration, start_time, timeseries, content)
     }
 
@@ -252,9 +277,7 @@ mod tests {
     async fn test_service_create_activity_err_if_similar_activity_exists() {
         let activity_repository = MockActivityRepository {
             similar_activity_result: Arc::new(Mutex::new(Ok(true))),
-            save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-            get_activity_result: Arc::new(Mutex::new(Ok(None))),
+            ..Default::default()
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
@@ -275,12 +298,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_create_activity() {
-        let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
-            save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-            get_activity_result: Arc::new(Mutex::new(Ok(None))),
-        };
+        let activity_repository = MockActivityRepository::default();
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
@@ -296,12 +314,10 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
         let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
             save_activity_result: Arc::new(Mutex::new(Err(SaveActivityError::Unknown(anyhow!(
                 "an error occured"
             ))))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-            get_activity_result: Arc::new(Mutex::new(Ok(None))),
+            ..Default::default()
         };
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
@@ -317,12 +333,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_create_activity_raw_data_error() {
-        let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(false))),
-            save_activity_result: Arc::new(Mutex::new(Ok(()))),
-            list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-            get_activity_result: Arc::new(Mutex::new(Ok(None))),
-        };
+        let activity_repository = MockActivityRepository::default();
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
                 "an error occured"
@@ -335,5 +346,40 @@ mod tests {
         let res = service.create_activity(req).await;
 
         assert!(res.is_err())
+    }
+
+    #[tokio::test]
+    async fn test_create_timeseries_returns_err_when_timeseries_have_different_lenghts_than_time_vec()
+     {
+        let activity_repository = MockActivityRepository::default();
+        let raw_data_repository = MockRawDataRepository {
+            save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
+                "an error occured"
+            ))))),
+        };
+        let service = Service::new(activity_repository, raw_data_repository);
+
+        let sport = Sport::Running;
+        let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
+        let duration = ActivityDuration(1200);
+        let content = vec![1, 2, 3];
+        let timeseries = Timeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2]),
+            vec![
+                TimeseriesMetric::Power(vec![Some(0), Some(100)]),
+                TimeseriesMetric::Speed(vec![Some(0.), Some(100.), Some(4.)]),
+            ],
+        );
+
+        let req = CreateActivityRequest::new(sport, duration, start_time, timeseries, content);
+
+        let res = service.create_activity(req).await;
+
+        match res {
+            Err(CreateActivityError::TimeseriesMetricsNotSameLength) => {}
+            _ => unreachable!(
+                "Should have returned an Err(CreateActivityError::TimeseriesNotSameLength) "
+            ),
+        }
     }
 }

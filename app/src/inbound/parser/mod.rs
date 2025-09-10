@@ -8,8 +8,7 @@ use thiserror::Error;
 
 use crate::domain::{
     models::{
-        ActivityDuration, ActivityStartTime, Sport, Timeseries, TimeseriesItem, TimeseriesMetric,
-        TimeseriesTime,
+        ActivityDuration, ActivityStartTime, Sport, Timeseries, TimeseriesMetric, TimeseriesTime,
     },
     ports::CreateActivityRequest,
 };
@@ -121,102 +120,96 @@ fn extract_timeseries(
     reference_timestamp: u32,
     messages: &[DataMessage],
 ) -> Result<Timeseries, ParseCreateActivityHttpRequestBodyError> {
-    Ok(Timeseries::new(
-        messages
-            .iter()
-            .filter_map(|msg| {
-                if msg.message_kind != MesgNum::Record {
+    let mut time = vec![];
+    let mut speed_values = vec![];
+    let mut power_values = vec![];
+    let mut distance_values = vec![];
+    let mut heart_rate_values = vec![];
+
+    for message in messages {
+        if message.message_kind != MesgNum::Record {
+            continue;
+        }
+
+        let Some(timestamp) = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::Timestamp) => {
+                field.values.iter().find_map(|val| match val {
+                    DataValue::DateTime(timestamp) => timestamp.checked_sub(reference_timestamp),
+                    _ => None,
+                })
+            }
+            _ => None,
+        }) else {
+            continue;
+        };
+        time.push(timestamp as usize);
+
+        let heart_rate = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::HeartRate) => field.values.iter().find_map(|val| {
+                if val.is_invalid() {
                     return None;
                 }
+                match val {
+                    DataValue::Uint8(hr) => Some(*hr as usize),
+                    _ => None,
+                }
+            }),
+            _ => None,
+        });
+        heart_rate_values.push(heart_rate);
 
-                let timestamp = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Timestamp) => {
-                        field.values.iter().find_map(|val| match val {
-                            DataValue::DateTime(timestamp) => {
-                                timestamp.checked_sub(reference_timestamp)
-                            }
-                            _ => None,
-                        })
+        let speed = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::Speed) | FitField::Record(RecordField::EnhancedSpeed) => {
+                field.values.iter().find_map(|val| {
+                    if val.is_invalid() {
+                        return None;
                     }
-                    _ => None,
-                })?;
-
-                let mut metrics = vec![];
-
-                if let Some(heart_rate) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::HeartRate) => {
-                        field.values.iter().find_map(|val| {
-                            if val.is_invalid() {
-                                return None;
-                            }
-                            match val {
-                                DataValue::Uint8(hr) => Some(*hr),
-                                _ => None,
-                            }
-                        })
+                    match val {
+                        DataValue::Float32(speed) => Some(*speed as f64),
+                        _ => None,
                     }
-                    _ => None,
-                }) {
-                    metrics.push(TimeseriesMetric::HeartRate(heart_rate as usize));
-                };
+                })
+            }
+            _ => None,
+        });
+        speed_values.push(speed);
 
-                if let Some(speed) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Speed)
-                    | FitField::Record(RecordField::EnhancedSpeed) => {
-                        field.values.iter().find_map(|val| {
-                            if val.is_invalid() {
-                                return None;
-                            }
-                            match val {
-                                DataValue::Float32(speed) => Some(*speed),
-                                _ => None,
-                            }
-                        })
-                    }
+        let power = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::Power) => field.values.iter().find_map(|val| {
+                if val.is_invalid() {
+                    return None;
+                }
+                match val {
+                    DataValue::Uint16(power) => Some(*power as usize),
                     _ => None,
-                }) {
-                    metrics.push(TimeseriesMetric::Speed(speed as f64));
-                };
+                }
+            }),
+            _ => None,
+        });
+        power_values.push(power);
 
-                if let Some(power) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Power) => field.values.iter().find_map(|val| {
-                        if val.is_invalid() {
-                            return None;
-                        }
-                        match val {
-                            DataValue::Uint16(power) => Some(*power),
-                            _ => None,
-                        }
-                    }),
+        let distance = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::Distance) => field.values.iter().find_map(|val| {
+                if val.is_invalid() {
+                    return None;
+                }
+                match val {
+                    DataValue::Float32(distance) => Some(*distance),
                     _ => None,
-                }) {
-                    metrics.push(TimeseriesMetric::Power(power as usize));
-                };
+                }
+            }),
+            _ => None,
+        });
+        distance_values.push(distance);
+    }
 
-                if let Some(distance) = msg.fields.iter().find_map(|field| match field.kind {
-                    FitField::Record(RecordField::Distance) => {
-                        field.values.iter().find_map(|val| {
-                            if val.is_invalid() {
-                                return None;
-                            }
-                            match val {
-                                DataValue::Float32(distance) => Some(*distance),
-                                _ => None,
-                            }
-                        })
-                    }
-                    _ => None,
-                }) {
-                    metrics.push(TimeseriesMetric::Distance(distance));
-                };
-
-                Some(TimeseriesItem::new(
-                    TimeseriesTime::new(timestamp as usize),
-                    metrics,
-                ))
-            })
-            .collect(),
-    ))
+    let metrics = vec![
+        TimeseriesMetric::Speed(speed_values),
+        TimeseriesMetric::Distance(distance_values),
+        TimeseriesMetric::HeartRate(heart_rate_values),
+        TimeseriesMetric::Power(power_values),
+    ];
+    Ok(Timeseries::new(TimeseriesTime::new(time), metrics))
 }
 
 #[derive(Debug, Clone, Error)]
@@ -280,7 +273,7 @@ pub mod test_utils {
                     Sport::Cycling,
                     ActivityDuration(3600),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
-                    Timeseries::new(vec![]),
+                    Timeseries::default(),
                     vec![1, 2, 3],
                 )))),
             }
@@ -297,6 +290,42 @@ mod tests {
     use fit_parser::DataMessageField;
 
     use super::*;
+
+    struct TestMetrics<'a> {
+        speed: Option<&'a Vec<Option<f64>>>,
+        power: Option<&'a Vec<Option<usize>>>,
+        heart_rate: Option<&'a Vec<Option<usize>>>,
+        distance: Option<&'a Vec<Option<f32>>>,
+    }
+    fn extract_metrics_from_req<'a>(req: &'a CreateActivityRequest) -> TestMetrics<'a> {
+        extract_metrics(req.timeseries())
+    }
+
+    fn extract_metrics<'a>(timeseries: &'a Timeseries) -> TestMetrics<'a> {
+        let speed = timeseries.metrics().iter().find_map(|metric| match metric {
+            TimeseriesMetric::Speed(speed) => Some(speed),
+            _ => None,
+        });
+        let power = timeseries.metrics().iter().find_map(|metric| match metric {
+            TimeseriesMetric::Power(power) => Some(power),
+            _ => None,
+        });
+        let distance = timeseries.metrics().iter().find_map(|metric| match metric {
+            TimeseriesMetric::Distance(distance) => Some(distance),
+            _ => None,
+        });
+        let heart_rate = timeseries.metrics().iter().find_map(|metric| match metric {
+            TimeseriesMetric::HeartRate(hr) => Some(hr),
+            _ => None,
+        });
+
+        TestMetrics {
+            speed,
+            power,
+            heart_rate,
+            distance,
+        }
+    }
 
     #[test]
     fn test_fit_datetime_reference_utc_offset() {
@@ -333,23 +362,31 @@ mod tests {
 
         let res = parser.try_bytes_into_domain(content).unwrap();
 
-        assert_eq!(res.timeseries().len(), 3602);
+        assert_eq!(res.timeseries().time().len(), 3602);
 
-        let first = res.timeseries().first().unwrap();
+        let TestMetrics {
+            speed,
+            power,
+            heart_rate,
+            distance,
+        } = extract_metrics_from_req(&res);
 
-        // First timestamp should 0 (i.e. equal to activity start_time)
-        assert_eq!(*first.time(), TimeseriesTime::new(0));
-        assert_eq!(*first.metrics(), vec![TimeseriesMetric::Distance(0.0)]);
+        // First timestamp should be 0 (i.e. equal to activity start_time), speed, power and
+        // heart rate are none/absent
+        assert_eq!(*res.timeseries().time().first().unwrap(), 0);
+        assert_eq!(*distance.unwrap().first().unwrap(), Some(0.0));
+        assert!(speed.unwrap().first().unwrap().is_none());
+        assert!(power.unwrap().first().unwrap().is_none());
+        assert!(heart_rate.unwrap().first().unwrap().is_none());
+
+        // assert_eq!(*first.metrics(), vec![TimeseriesMetric::Distance(0.0)]);
 
         // Check 4th element as the first 3 have no power/speed/hr data
-        let fourth = res.timeseries().get(3).unwrap();
-        assert_eq!(*fourth.time(), TimeseriesTime::new(3));
-        let metrics = fourth.metrics();
-        assert_eq!(*metrics.first().unwrap(), TimeseriesMetric::HeartRate(77));
-        if let TimeseriesMetric::Speed(speed) = *metrics.get(1).unwrap() {
-            assert_approx_eq!(speed, 3.969);
-        }
-        assert_eq!(*metrics.get(2).unwrap(), TimeseriesMetric::Power(74));
+        assert_eq!(*res.timeseries().time().get(3).unwrap(), 3);
+        assert_eq!(*distance.unwrap().get(3).unwrap(), Some(0.0));
+        assert_approx_eq!(speed.unwrap().get(3).unwrap().unwrap(), 3.969);
+        assert_eq!(power.unwrap().get(3).unwrap().unwrap(), 74);
+        assert_eq!(heart_rate.unwrap().get(3).unwrap().unwrap(), 77);
     }
 
     #[test]
@@ -368,8 +405,8 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 1);
-        assert_eq!(timeseries.first().unwrap().time(), &TimeseriesTime::new(0));
+        assert_eq!(timeseries.time().len(), 1);
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
     }
 
     #[test]
@@ -388,8 +425,9 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 0);
+        assert_eq!(timeseries.time().len(), 0);
     }
+
     #[test]
     fn test_extract_timeseries_skip_records_before_reference() {
         let messages = vec![DataMessage {
@@ -406,7 +444,7 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 0);
+        assert_eq!(timeseries.time().len(), 0);
     }
 
     #[test]
@@ -447,15 +485,16 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 2);
-        assert_eq!(
-            timeseries.first().unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Power(12)])
-        );
-        assert_eq!(
-            timeseries.get(1).unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
-        )
+        let TestMetrics { power, .. } = extract_metrics(&timeseries);
+        let power = power.unwrap();
+
+        assert_eq!(timeseries.time().len(), 2);
+
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*power.first().unwrap(), Some(12));
+
+        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*power.get(1).unwrap(), None);
     }
 
     #[test]
@@ -496,18 +535,16 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 2);
-        assert_eq!(
-            timeseries.first().unwrap(),
-            &TimeseriesItem::new(
-                TimeseriesTime::new(0),
-                vec![TimeseriesMetric::HeartRate(120)]
-            )
-        );
-        assert_eq!(
-            timeseries.get(1).unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
-        )
+        let TestMetrics { heart_rate, .. } = extract_metrics(&timeseries);
+        let hear_rate = heart_rate.unwrap();
+
+        assert_eq!(timeseries.time().len(), 2);
+
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*hear_rate.first().unwrap(), Some(120));
+
+        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*hear_rate.get(1).unwrap(), None);
     }
 
     #[test]
@@ -548,18 +585,16 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 2);
-        assert_eq!(
-            timeseries.first().unwrap(),
-            &TimeseriesItem::new(
-                TimeseriesTime::new(0),
-                vec![TimeseriesMetric::Distance(120.)]
-            )
-        );
-        assert_eq!(
-            timeseries.get(1).unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
-        )
+        let TestMetrics { distance, .. } = extract_metrics(&timeseries);
+        let distance = distance.unwrap();
+
+        assert_eq!(timeseries.time().len(), 2);
+
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*distance.first().unwrap(), Some(120.));
+
+        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*distance.get(1).unwrap(), None);
     }
 
     #[test]
@@ -602,15 +637,16 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 2);
-        assert_eq!(
-            timeseries.first().unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Speed(12.)])
-        );
-        assert_eq!(
-            timeseries.get(1).unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(1), vec![])
-        )
+        let TestMetrics { speed, .. } = extract_metrics(&timeseries);
+        let speed = speed.unwrap();
+
+        assert_eq!(timeseries.time().len(), 2);
+
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*speed.first().unwrap(), Some(12.));
+
+        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*speed.get(1).unwrap(), None);
     }
 
     #[test]
@@ -635,10 +671,12 @@ mod tests {
         assert!(timeseries.is_ok());
         let timeseries = timeseries.unwrap();
 
-        assert_eq!(timeseries.len(), 1);
-        assert_eq!(
-            timeseries.first().unwrap(),
-            &TimeseriesItem::new(TimeseriesTime::new(0), vec![TimeseriesMetric::Speed(12.)])
-        );
+        let TestMetrics { speed, .. } = extract_metrics(&timeseries);
+        let speed = speed.unwrap();
+
+        assert_eq!(timeseries.time().len(), 1);
+
+        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*speed.first().unwrap(), Some(12.));
     }
 }
