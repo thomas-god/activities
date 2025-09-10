@@ -5,6 +5,8 @@
 
 	let { data }: PageProps = $props();
 
+	let chartWidth: number = $state(0);
+
 	let summary = $derived.by(() => {
 		if (data.activity) {
 			return {
@@ -38,7 +40,14 @@
 			</select>
 		</fieldset>
 		{#if selectedOption}
-			<TimeseriesChart timeseries={data.activity.timeseries} targetMetric={selectedOption.option} />
+			<div bind:clientWidth={chartWidth}>
+				<TimeseriesChart
+					timeseries={data.activity.timeseries}
+					targetMetric={selectedOption.option}
+					height={400}
+					width={chartWidth}
+				/>
+			</div>
 		{/if}
 	{/if}
 </div>

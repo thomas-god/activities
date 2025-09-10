@@ -2,16 +2,15 @@
 	import * as d3 from 'd3';
 	import type { Timeseries } from '../routes/activity/[activity_id]/+page';
 	import { formatDuration } from '$lib/duration';
-	import { number } from 'zod';
 
 	export interface TimeseriesChartProps {
 		timeseries: Timeseries;
 		targetMetric: String;
+		width: number;
+		height: number;
 	}
 
-	let { timeseries, targetMetric }: TimeseriesChartProps = $props();
-	let width = 640;
-	let height = 400;
+	let { timeseries, targetMetric, height, width }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
