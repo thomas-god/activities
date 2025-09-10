@@ -141,7 +141,7 @@
 		bind:this={path}
 		clip-path="url(#clip-path)"
 		fill="none"
-		stroke="currentColor"
+		class="stroke-neutral"
 		stroke-width="1.5"
 		d={line(values, x)}
 	/>
@@ -155,10 +155,10 @@
 			font-size="10"
 			text-anchor="middle"
 		>
-			<rect x="-27" width="54" y="-30" height="24" class="fill-info" />
+			<rect x="-27" width="54" y="-30" height="24" class="fill-base-100" />
 			<text y="-22">{tooltip.timestamp}</text>
 			<text y="-12">{tooltip.value.toFixed(2)}</text>
-			<circle r="3.5" class="fill-info" />
+			<circle r="3.5" class="fill-accent" />
 		</g>
 	{/if}
 </svg>
