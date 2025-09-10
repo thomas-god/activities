@@ -10,7 +10,7 @@
 	<li class="p-4 pb-2 text-xs tracking-wide opacity-60">Past activities</li>
 	{#each activityList as activity}
 		<a href={`/activity/${activity.id}`} class="block">
-			<li class="bg-base-100 hover:bg-base-200 flex flex-row gap-3 p-3">
+			<li class="flex flex-row gap-3 bg-base-100 p-3 hover:bg-base-200">
 				<div class="basis-20 text-end">
 					{activity.sport}:
 				</div>

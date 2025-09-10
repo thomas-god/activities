@@ -78,7 +78,7 @@
 			.on('zoom', zoomed)
 	);
 
-	let zoomedXScale = $state(x);
+	let zoomedXScale = $derived(x);
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
 		zoomedXScale = event.transform.rescaleX(x);
 		d3.select(path).attr('d', line(values, zoomedXScale));
@@ -94,12 +94,11 @@
 	});
 
 	let tooltipXOffset: number | undefined = $state(undefined);
+	const bisector = d3.bisector<[number, number], number>((point) => point[0]);
 	let tooltip = $derived.by(() => {
 		if (tooltipXOffset === undefined) {
 			return undefined;
 		}
-
-		const bisector = d3.bisector<[number, number], number>((point) => point[0]);
 
 		let nearestValues = values[bisector.center(values, zoomedXScale.invert(tooltipXOffset))];
 		return {

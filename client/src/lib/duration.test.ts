@@ -32,6 +32,8 @@ it('Should format a date duration from a reference in local', () => {
 	expect(formatRelativeDuration(reference.subtract(1, 'hour'), reference)).toEqual('an hour ago');
 	expect(formatRelativeDuration(reference.subtract(2, 'hour'), reference)).toEqual('2 hours ago');
 	expect(formatRelativeDuration(reference.subtract(2, 'days'), reference)).toEqual('2 days ago');
-	expect(formatRelativeDuration(reference.subtract(2, 'days').subtract(3, "hour"), reference)).toEqual('2 days ago');
+	expect(
+		formatRelativeDuration(reference.subtract(2, 'days').subtract(3, 'hour'), reference)
+	).toEqual('2 days ago');
 	expect(formatRelativeDuration(reference.subtract(7, 'days'), reference)).toEqual('7 days ago');
 });
