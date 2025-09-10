@@ -1,3 +1,10 @@
+import dayjs from 'dayjs';
+import duration from "dayjs/plugin/duration";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(duration);
+dayjs.extend(relativeTime);
+
 const ONE_MINUTE_IN_SECONDS = 60;
 const ONE_HOUR_IN_SECONDS = ONE_MINUTE_IN_SECONDS * 60;
 const ONE_DAY_IN_SECONDS = 24 * ONE_HOUR_IN_SECONDS;
@@ -23,4 +30,8 @@ export const formatDuration = (time: number): string => {
 	}
 
 	return `${days.toString()}d:${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+export const formatRelativeDuration = (value: dayjs.Dayjs, reference: dayjs.Dayjs): string => {
+	return dayjs.duration(value.diff(reference)).humanize(true);
 };
