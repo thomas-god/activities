@@ -15,8 +15,10 @@
 	);
 </script>
 
-<div class="w-sm mx-auto mb-2">
+<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
 	<ActivitiesUploader {activitiesUploadedCallback} />
 </div>
 
-<ActivityList activityList={sorted_activities} />
+<div class="mx-2 mt-5 sm:mx-auto sm:w-lg">
+	<ActivityList activityList={sorted_activities} />
+</div>
