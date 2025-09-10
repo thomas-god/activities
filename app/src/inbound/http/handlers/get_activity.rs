@@ -33,9 +33,15 @@ pub enum TimeseriesValue {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TimeseriesMetricsBody {
+    unit: String,
+    values: Vec<Option<TimeseriesValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct TimeseriesBody {
     time: Vec<usize>,
-    metrics: HashMap<String, Vec<Option<TimeseriesValue>>>,
+    metrics: HashMap<String, TimeseriesMetricsBody>,
 }
 
 impl From<&Activity> for ResponseBody {
@@ -62,31 +68,43 @@ impl From<&Timeseries> for TimeseriesBody {
                 match metric {
                     TimeseriesMetric::Speed(values) => (
                         "Speed".to_string(),
-                        values
-                            .iter()
-                            .map(|value| value.map(TimeseriesValue::Float))
-                            .collect(),
+                        TimeseriesMetricsBody {
+                            unit: metric.unit(),
+                            values: values
+                                .iter()
+                                .map(|value| value.map(TimeseriesValue::Float))
+                                .collect(),
+                        },
                     ),
                     TimeseriesMetric::Power(values) => (
                         "Power".to_string(),
-                        values
-                            .iter()
-                            .map(|value| value.map(TimeseriesValue::Int))
-                            .collect(),
+                        TimeseriesMetricsBody {
+                            unit: metric.unit(),
+                            values: values
+                                .iter()
+                                .map(|value| value.map(TimeseriesValue::Int))
+                                .collect(),
+                        },
                     ),
                     TimeseriesMetric::HeartRate(values) => (
                         "HeartRate".to_string(),
-                        values
-                            .iter()
-                            .map(|value| value.map(TimeseriesValue::Int))
-                            .collect(),
+                        TimeseriesMetricsBody {
+                            unit: metric.unit(),
+                            values: values
+                                .iter()
+                                .map(|value| value.map(TimeseriesValue::Int))
+                                .collect(),
+                        },
                     ),
                     TimeseriesMetric::Distance(values) => (
                         "Distance".to_string(),
-                        values
-                            .iter()
-                            .map(|value| value.map(|v| TimeseriesValue::Float(v.into())))
-                            .collect(),
+                        TimeseriesMetricsBody {
+                            unit: metric.unit(),
+                            values: values
+                                .iter()
+                                .map(|value| value.map(|v| TimeseriesValue::Float(v.into())))
+                                .collect(),
+                        },
                     ),
                 }
             })),
@@ -178,11 +196,14 @@ mod tests {
                     time: vec![0, 1, 2],
                     metrics: HashMap::from([(
                         "Power".to_string(),
-                        vec![
-                            Some(TimeseriesValue::Int(120)),
-                            None,
-                            Some(TimeseriesValue::Int(130))
-                        ]
+                        TimeseriesMetricsBody {
+                            unit: "W".to_string(),
+                            values: vec![
+                                Some(TimeseriesValue::Int(120)),
+                                None,
+                                Some(TimeseriesValue::Int(130))
+                            ]
+                        }
                     )])
                 }
             }

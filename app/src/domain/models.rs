@@ -161,6 +161,15 @@ impl TimeseriesMetric {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn unit(&self) -> String {
+        match self {
+            Self::Distance(_) => "m".to_string(),
+            Self::Power(_) => "W".to_string(),
+            Self::HeartRate(_) => "bpm".to_string(),
+            Self::Speed(_) => "m/s".to_string(),
+        }
+    }
 }
 
 #[cfg(test)]

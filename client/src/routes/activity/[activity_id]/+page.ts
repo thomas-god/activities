@@ -25,7 +25,13 @@ const ActivityDetails = z.object({
 	start_time: z.iso.datetime({ offset: true }),
 	timeseries: z.object({
 		time: z.array(z.number()),
-		metrics: z.record(z.string(), z.array(z.number().nullable()))
+		metrics: z.record(
+			z.string(),
+			z.object({
+				unit: z.string(),
+				values: z.array(z.number().nullable())
+			})
+		)
 	})
 });
 

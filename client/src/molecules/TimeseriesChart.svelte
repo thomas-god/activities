@@ -7,9 +7,10 @@
 		metric: Array<number | null>;
 		width: number;
 		height: number;
+		unit: string;
 	}
 
-	let { time, metric, height, width }: TimeseriesChartProps = $props();
+	let { time, metric, height, width, unit }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -151,7 +152,7 @@
 		>
 			<rect x="-27" width="54" y="-30" height="24" class="fill-base-100" />
 			<text y="-22">{tooltip.timestamp}</text>
-			<text y="-12">{tooltip.value.toFixed(2)}</text>
+			<text y="-12">{tooltip.value.toFixed(2)} {unit}</text>
 			<circle r="3.5" class="fill-accent" />
 		</g>
 	{/if}

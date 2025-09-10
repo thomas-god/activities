@@ -42,7 +42,7 @@
 
 	let selectedMetric = $derived.by(() => {
 		if (data.activity === undefined) {
-			return [];
+			return undefined;
 		}
 
 		return data.activity.timeseries.metrics[selectedOption?.option!];
@@ -61,11 +61,12 @@
 				{/each}
 			</select>
 		</fieldset>
-		{#if selectedOption}
+		{#if selectedMetric}
 			<div bind:clientWidth={chartWidth}>
 				<TimeseriesChart
 					time={data.activity.timeseries.time}
-					metric={selectedMetric}
+					metric={selectedMetric.values}
+					unit={selectedMetric.unit}
 					height={400}
 					width={chartWidth}
 				/>
