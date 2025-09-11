@@ -1,4 +1,6 @@
-use chrono::{DateTime, FixedOffset};
+use std::collections::HashMap;
+
+use chrono::{DateTime, Datelike, FixedOffset, SecondsFormat};
 use derive_more::{AsRef, Constructor, Deref, Display};
 use uuid::Uuid;
 
@@ -32,6 +34,34 @@ pub struct TrainingMetricDefinition {
     granularity_aggregate: TrainingMetricAggregate,
 }
 
+#[derive(Debug, Clone)]
+pub enum MetricValueComputationError {}
+
+impl TrainingMetricDefinition {
+    pub fn compute_values(
+        &self,
+        activities: &[Activity],
+    ) -> Result<HashMap<String, f64>, MetricValueComputationError> {
+        Ok(aggregate_metrics(
+            &self.granularity_aggregate,
+            group_metrics_by_granularity(
+                &self.granularity,
+                activities
+                    .iter()
+                    .filter_map(|activity| {
+                        extract_aggregated_activity_metric(
+                            &self.activity_metric_aggregate,
+                            &self.activity_metric,
+                            activity,
+                        )
+                        .map(|val| (**activity.start_time(), val))
+                    })
+                    .collect(),
+            ),
+        ))
+    }
+}
+
 fn extract_aggregated_activity_metric(
     aggregate: &TrainingMetricAggregate,
     metric: &Metric,
@@ -42,28 +72,14 @@ fn extract_aggregated_activity_metric(
             Some(
                 m.values()
                     .iter()
-                    .filter_map(|val| val.as_ref().and_then(|v| Some(f64::from(v))))
+                    .filter_map(|val| val.as_ref().map(f64::from))
                     .collect(),
             )
         } else {
             None
         }
     })?;
-
-    let length = values.len();
-    if length == 0 {
-        return None;
-    }
-
-    match aggregate {
-        TrainingMetricAggregate::Min => values.into_iter().reduce(|a, b| f64::min(a, b)),
-        TrainingMetricAggregate::Max => values.into_iter().reduce(|a, b| f64::max(a, b)),
-        TrainingMetricAggregate::Average => values
-            .into_iter()
-            .reduce(|acc, e| acc + e)
-            .and_then(|val| Some(val / length as f64)),
-        TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
-    }
+    aggregate.aggregate(values)
 }
 
 fn group_metrics_by_granularity(
@@ -93,6 +109,22 @@ fn group_metrics_by_granularity(
     grouped_value
 }
 
+fn aggregate_metrics(
+    aggregate: &TrainingMetricAggregate,
+    metrics: HashMap<String, Vec<f64>>,
+) -> HashMap<String, f64> {
+    let mut res = HashMap::new();
+
+    for (key, values) in metrics.into_iter() {
+        let Some(aggregated_value) = aggregate.aggregate(values) else {
+            continue;
+        };
+        res.insert(key, aggregated_value);
+    }
+
+    res
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TrainingMetricGranularity {
     Activity,
@@ -107,6 +139,24 @@ pub enum TrainingMetricAggregate {
     Max,
     Average,
     Sum,
+}
+
+impl TrainingMetricAggregate {
+    fn aggregate(&self, values: Vec<f64>) -> Option<f64> {
+        if values.is_empty() {
+            return None;
+        }
+        let length = values.len();
+        match self {
+            TrainingMetricAggregate::Min => values.into_iter().reduce(f64::min),
+            TrainingMetricAggregate::Max => values.into_iter().reduce(f64::max),
+            TrainingMetricAggregate::Average => values
+                .into_iter()
+                .reduce(|acc, e| acc + e)
+                .map(|val| val / length as f64),
+            TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -290,14 +340,8 @@ mod test_training_metrics {
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
         dbg!(&res);
-        assert_eq!(
-            res.get(&"2025-09-03T00:00:00Z".to_string()).unwrap(),
-            &vec![12.3]
-        );
-        assert_eq!(
-            res.get(&"2025-09-03T02:00:00Z".to_string()).unwrap(),
-            &vec![18.1]
-        );
+        assert_eq!(res.get("2025-09-03T00:00:00Z").unwrap(), &vec![12.3]);
+        assert_eq!(res.get("2025-09-03T02:00:00Z").unwrap(), &vec![18.1]);
     }
 
     #[test]
@@ -326,11 +370,8 @@ mod test_training_metrics {
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&"2025-09-03".to_string()).unwrap(),
-            &vec![12.3, 18.1]
-        );
-        assert_eq!(res.get(&"2025-09-04".to_string()).unwrap(), &vec![67.1]);
+        assert_eq!(res.get("2025-09-03").unwrap(), &vec![12.3, 18.1]);
+        assert_eq!(res.get("2025-09-04").unwrap(), &vec![67.1]);
     }
 
     #[test]
@@ -359,11 +400,8 @@ mod test_training_metrics {
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&"2025-09-01".to_string()).unwrap(),
-            &vec![12.3, 18.1]
-        );
-        assert_eq!(res.get(&"2025-09-08".to_string()).unwrap(), &vec![67.1]);
+        assert_eq!(res.get("2025-09-01").unwrap(), &vec![12.3, 18.1]);
+        assert_eq!(res.get("2025-09-08").unwrap(), &vec![67.1]);
     }
 
     #[test]
@@ -392,10 +430,35 @@ mod test_training_metrics {
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&"2025-09-01".to_string()).unwrap(),
-            &vec![12.3, 18.1]
+        assert_eq!(res.get("2025-09-01").unwrap(), &vec![12.3, 18.1]);
+        assert_eq!(res.get("2025-08-01").unwrap(), &vec![67.1]);
+    }
+
+    #[test]
+    fn test_aggregate_metrics_min() {
+        let metrics = HashMap::from([("2025-09-01".to_string(), vec![1., 2., 3.])]);
+        let aggregate = TrainingMetricAggregate::Min;
+
+        let res = aggregate_metrics(&aggregate, metrics);
+
+        assert_eq!(*res.get("2025-09-01").unwrap(), 1.);
+    }
+
+    #[test]
+    fn test_compute_training_metrics() {
+        let activities = vec![default_activity()];
+        let metric_definition = TrainingMetricDefinition::new(
+            TrainingMetricId::default(),
+            Metric::Power,
+            TrainingMetricAggregate::Average,
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
         );
-        assert_eq!(res.get(&"2025-08-01".to_string()).unwrap(), &vec![67.1]);
+
+        let metrics = metric_definition.compute_values(&activities);
+
+        assert!(metrics.is_ok());
+        dbg!(&metrics);
+        assert_eq!(*metrics.unwrap().get("2025-09-01").unwrap(), 20.);
     }
 }
