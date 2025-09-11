@@ -1,9 +1,12 @@
 use chrono::{DateTime, FixedOffset};
 use thiserror::Error;
 
-use crate::domain::models::{
+use crate::domain::models::activity::{
     Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime, Sport,
-    Timeseries, TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues,
+    Timeseries,
+};
+use crate::domain::models::training_metrics::{
+    TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues,
 };
 
 ///////////////////////////////////////////////////////////////////

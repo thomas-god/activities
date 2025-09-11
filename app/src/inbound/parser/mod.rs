@@ -7,7 +7,7 @@ use fit_parser::{
 use thiserror::Error;
 
 use crate::domain::{
-    models::{
+    models::activity::{
         ActivityDuration, ActivityStartTime, Metric, Sport, Timeseries, TimeseriesMetric,
         TimeseriesTime, TimeseriesValue,
     },
@@ -290,7 +290,7 @@ mod tests {
     use chrono::{DateTime, FixedOffset, Utc};
     use fit_parser::DataMessageField;
 
-    use crate::domain::models::{Metric, TimeseriesValue};
+    use crate::domain::models::activity::{Metric, TimeseriesValue};
 
     use super::*;
 

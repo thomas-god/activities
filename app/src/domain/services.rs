@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 
 use crate::domain::{
-    models::{Activity, ActivityId},
+    models::activity::{Activity, ActivityId},
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, GetActivityError,
         IActivityService, ListActivitiesError, RawDataRepository,
@@ -109,7 +109,7 @@ pub mod test_utils {
 
     use super::*;
 
-    use crate::domain::models::{ActivityDuration, ActivityStartTime, Sport, Timeseries};
+    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime, Sport, Timeseries};
     use crate::domain::ports::ListActivitiesError;
 
     #[derive(Clone)]
@@ -179,7 +179,7 @@ mod tests {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::{
+        models::activity::{
             ActivityDuration, ActivityNaturalKey, ActivityStartTime, Metric, Sport, Timeseries,
             TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         },

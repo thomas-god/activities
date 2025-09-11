@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
+        models::activity::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
         ports::IActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -118,7 +118,7 @@ mod tests {
 
     use crate::{
         domain::{
-            models::{
+            models::activity::{
                 ActivityDuration, ActivityStartTime, Metric, Timeseries, TimeseriesMetric,
                 TimeseriesTime, TimeseriesValue,
             },

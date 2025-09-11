@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{
     domain::{
-        models::{Activity, Sport},
+        models::activity::{Activity, Sport},
         ports::IActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},

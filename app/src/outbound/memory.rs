@@ -5,7 +5,7 @@ use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::domain::{
-    models::{Activity, ActivityId, ActivityNaturalKey},
+    models::activity::{Activity, ActivityId, ActivityNaturalKey},
     ports::{
         ActivityRepository, GetActivityError, ListActivitiesError, RawDataRepository,
         SaveActivityError, SaveRawDataError, SimilarActivityError,
