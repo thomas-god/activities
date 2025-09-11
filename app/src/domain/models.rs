@@ -2,6 +2,10 @@ use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
 
+///////////////////////////////////////////////////////////////////
+/// ACTIVITY
+///////////////////////////////////////////////////////////////////
+
 #[derive(Clone, Debug)]
 pub struct Activity {
     id: ActivityId,
@@ -11,6 +15,7 @@ pub struct Activity {
     timeseries: Timeseries,
 }
 
+/// An [Activity] is an entity representing a single sport or training session.
 impl Activity {
     pub fn new(
         id: ActivityId,
@@ -28,8 +33,9 @@ impl Activity {
         }
     }
 
-    /// Activity's natural key defined from its defining fields. Two activities with identical
-    /// natural keys should be considered identical/duplicate regardless of their ID.
+    /// An [Activity]'s natural key defined from its defining fields. Two activities with identical
+    /// natural keys should be considered identical/duplicate regardless of their technical
+    /// [Activity::id].
     pub fn natural_key(&self) -> ActivityNaturalKey {
         ActivityNaturalKey(format!(
             "{:?}:{:?}:{:?}",
@@ -58,6 +64,7 @@ impl Activity {
     }
 }
 
+/// Technical ID of an [Activity].
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct ActivityId(String);
 
@@ -121,6 +128,11 @@ pub enum Sport {
     Other,
 }
 
+///////////////////////////////////////////////////////////////////
+// TIMESERIES
+///////////////////////////////////////////////////////////////////
+
+/// A [Timeseries] represent a coherent set of time dependant [TimeseriesMetric]s.
 #[derive(Debug, Clone, PartialEq, Constructor, Default)]
 pub struct Timeseries {
     time: TimeseriesTime,
@@ -137,39 +149,50 @@ impl Timeseries {
     }
 }
 
+/// [TimeseriesTime] represent relative timestamp of a timeseries, starting from the
+/// [Activity::start_time].
 #[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref, Default)]
 pub struct TimeseriesTime(Vec<usize>);
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum TimeseriesMetric {
-    Speed(Vec<Option<f64>>),
-    Power(Vec<Option<usize>>),
-    HeartRate(Vec<Option<usize>>),
-    Distance(Vec<Option<f32>>),
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TimeseriesMetric {
+    metric: Metric,
+    values: Vec<Option<TimeseriesValue>>,
 }
 
 impl TimeseriesMetric {
-    pub fn len(&self) -> usize {
-        match self {
-            Self::Distance(values) => values.len(),
-            Self::Power(values) => values.len(),
-            Self::HeartRate(values) => values.len(),
-            Self::Speed(values) => values.len(),
-        }
+    pub fn metric(&self) -> &Metric {
+        &self.metric
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub fn values(&self) -> &[Option<TimeseriesValue>] {
+        &self.values
     }
+}
 
+#[derive(Debug, Clone, PartialEq, Display)]
+pub enum Metric {
+    Speed,
+    Power,
+    HeartRate,
+    Distance,
+}
+
+impl Metric {
     pub fn unit(&self) -> String {
         match self {
-            Self::Distance(_) => "m".to_string(),
-            Self::Power(_) => "W".to_string(),
-            Self::HeartRate(_) => "bpm".to_string(),
-            Self::Speed(_) => "m/s".to_string(),
+            Self::Distance => "m".to_string(),
+            Self::Power => "W".to_string(),
+            Self::HeartRate => "bpm".to_string(),
+            Self::Speed => "m/s".to_string(),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TimeseriesValue {
+    Int(usize),
+    Float(f64),
 }
 
 #[cfg(test)]

@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use crate::domain::{
     models::{
-        ActivityDuration, ActivityStartTime, Sport, Timeseries, TimeseriesMetric, TimeseriesTime,
+        ActivityDuration, ActivityStartTime, Metric, Sport, Timeseries, TimeseriesMetric,
+        TimeseriesTime, TimeseriesValue,
     },
     ports::CreateActivityRequest,
 };
@@ -150,7 +151,7 @@ fn extract_timeseries(
                     return None;
                 }
                 match val {
-                    DataValue::Uint8(hr) => Some(*hr as usize),
+                    DataValue::Uint8(hr) => Some(TimeseriesValue::Int(*hr as usize)),
                     _ => None,
                 }
             }),
@@ -165,7 +166,7 @@ fn extract_timeseries(
                         return None;
                     }
                     match val {
-                        DataValue::Float32(speed) => Some(*speed as f64),
+                        DataValue::Float32(speed) => Some(TimeseriesValue::Float(*speed as f64)),
                         _ => None,
                     }
                 })
@@ -180,7 +181,7 @@ fn extract_timeseries(
                     return None;
                 }
                 match val {
-                    DataValue::Uint16(power) => Some(*power as usize),
+                    DataValue::Uint16(power) => Some(TimeseriesValue::Int(*power as usize)),
                     _ => None,
                 }
             }),
@@ -194,7 +195,7 @@ fn extract_timeseries(
                     return None;
                 }
                 match val {
-                    DataValue::Float32(distance) => Some(*distance),
+                    DataValue::Float32(distance) => Some(TimeseriesValue::Float(*distance as f64)),
                     _ => None,
                 }
             }),
@@ -204,10 +205,10 @@ fn extract_timeseries(
     }
 
     let metrics = vec![
-        TimeseriesMetric::Speed(speed_values),
-        TimeseriesMetric::Distance(distance_values),
-        TimeseriesMetric::HeartRate(heart_rate_values),
-        TimeseriesMetric::Power(power_values),
+        TimeseriesMetric::new(Metric::Speed, speed_values),
+        TimeseriesMetric::new(Metric::Distance, distance_values),
+        TimeseriesMetric::new(Metric::HeartRate, heart_rate_values),
+        TimeseriesMetric::new(Metric::Power, power_values),
     ];
     Ok(Timeseries::new(TimeseriesTime::new(time), metrics))
 }
@@ -289,35 +290,49 @@ mod tests {
     use chrono::{DateTime, FixedOffset, Utc};
     use fit_parser::DataMessageField;
 
+    use crate::domain::models::{Metric, TimeseriesValue};
+
     use super::*;
 
     struct TestMetrics<'a> {
-        speed: Option<&'a Vec<Option<f64>>>,
-        power: Option<&'a Vec<Option<usize>>>,
-        heart_rate: Option<&'a Vec<Option<usize>>>,
-        distance: Option<&'a Vec<Option<f32>>>,
+        speed: Option<&'a [Option<TimeseriesValue>]>,
+        power: Option<&'a [Option<TimeseriesValue>]>,
+        heart_rate: Option<&'a [Option<TimeseriesValue>]>,
+        distance: Option<&'a [Option<TimeseriesValue>]>,
     }
     fn extract_metrics_from_req<'a>(req: &'a CreateActivityRequest) -> TestMetrics<'a> {
         extract_metrics(req.timeseries())
     }
 
     fn extract_metrics<'a>(timeseries: &'a Timeseries) -> TestMetrics<'a> {
-        let speed = timeseries.metrics().iter().find_map(|metric| match metric {
-            TimeseriesMetric::Speed(speed) => Some(speed),
-            _ => None,
-        });
-        let power = timeseries.metrics().iter().find_map(|metric| match metric {
-            TimeseriesMetric::Power(power) => Some(power),
-            _ => None,
-        });
-        let distance = timeseries.metrics().iter().find_map(|metric| match metric {
-            TimeseriesMetric::Distance(distance) => Some(distance),
-            _ => None,
-        });
-        let heart_rate = timeseries.metrics().iter().find_map(|metric| match metric {
-            TimeseriesMetric::HeartRate(hr) => Some(hr),
-            _ => None,
-        });
+        let speed = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                Metric::Speed => Some(metric.values()),
+                _ => None,
+            });
+        let power = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                Metric::Power => Some(metric.values()),
+                _ => None,
+            });
+        let distance = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                Metric::Distance => Some(metric.values()),
+                _ => None,
+            });
+        let heart_rate = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                Metric::HeartRate => Some(metric.values()),
+                _ => None,
+            });
 
         TestMetrics {
             speed,
@@ -374,19 +389,32 @@ mod tests {
         // First timestamp should be 0 (i.e. equal to activity start_time), speed, power and
         // heart rate are none/absent
         assert_eq!(*res.timeseries().time().first().unwrap(), 0);
-        assert_eq!(*distance.unwrap().first().unwrap(), Some(0.0));
+        assert_eq!(
+            *distance.unwrap().first().unwrap(),
+            Some(TimeseriesValue::Float(0.0))
+        );
         assert!(speed.unwrap().first().unwrap().is_none());
         assert!(power.unwrap().first().unwrap().is_none());
         assert!(heart_rate.unwrap().first().unwrap().is_none());
 
-        // assert_eq!(*first.metrics(), vec![TimeseriesMetric::Distance(0.0)]);
-
         // Check 4th element as the first 3 have no power/speed/hr data
         assert_eq!(*res.timeseries().time().get(3).unwrap(), 3);
-        assert_eq!(*distance.unwrap().get(3).unwrap(), Some(0.0));
-        assert_approx_eq!(speed.unwrap().get(3).unwrap().unwrap(), 3.969);
-        assert_eq!(power.unwrap().get(3).unwrap().unwrap(), 74);
-        assert_eq!(heart_rate.unwrap().get(3).unwrap().unwrap(), 77);
+        assert_eq!(
+            *distance.unwrap().get(3).unwrap(),
+            Some(TimeseriesValue::Float(0.0))
+        );
+        match speed.unwrap().get(3).unwrap().as_ref().unwrap() {
+            TimeseriesValue::Float(val) => assert_approx_eq!(val, 3.969),
+            _ => unreachable!("Should be a float"),
+        }
+        assert_eq!(
+            power.unwrap().get(3).unwrap().as_ref().unwrap(),
+            &TimeseriesValue::Int(74)
+        );
+        assert_eq!(
+            heart_rate.unwrap().get(3).unwrap().as_ref().unwrap(),
+            &TimeseriesValue::Int(77)
+        );
     }
 
     #[test]
@@ -491,7 +519,7 @@ mod tests {
         assert_eq!(timeseries.time().len(), 2);
 
         assert_eq!(*timeseries.time().first().unwrap(), 0);
-        assert_eq!(*power.first().unwrap(), Some(12));
+        assert_eq!(*power.first().unwrap(), Some(TimeseriesValue::Int(12)));
 
         assert_eq!(*timeseries.time().get(1).unwrap(), 1);
         assert_eq!(*power.get(1).unwrap(), None);
@@ -541,7 +569,7 @@ mod tests {
         assert_eq!(timeseries.time().len(), 2);
 
         assert_eq!(*timeseries.time().first().unwrap(), 0);
-        assert_eq!(*hear_rate.first().unwrap(), Some(120));
+        assert_eq!(*hear_rate.first().unwrap(), Some(TimeseriesValue::Int(120)));
 
         assert_eq!(*timeseries.time().get(1).unwrap(), 1);
         assert_eq!(*hear_rate.get(1).unwrap(), None);
@@ -591,7 +619,10 @@ mod tests {
         assert_eq!(timeseries.time().len(), 2);
 
         assert_eq!(*timeseries.time().first().unwrap(), 0);
-        assert_eq!(*distance.first().unwrap(), Some(120.));
+        assert_eq!(
+            *distance.first().unwrap(),
+            Some(TimeseriesValue::Float(120.))
+        );
 
         assert_eq!(*timeseries.time().get(1).unwrap(), 1);
         assert_eq!(*distance.get(1).unwrap(), None);
@@ -643,7 +674,7 @@ mod tests {
         assert_eq!(timeseries.time().len(), 2);
 
         assert_eq!(*timeseries.time().first().unwrap(), 0);
-        assert_eq!(*speed.first().unwrap(), Some(12.));
+        assert_eq!(*speed.first().unwrap(), Some(TimeseriesValue::Float(12.)));
 
         assert_eq!(*timeseries.time().get(1).unwrap(), 1);
         assert_eq!(*speed.get(1).unwrap(), None);
@@ -677,6 +708,6 @@ mod tests {
         assert_eq!(timeseries.time().len(), 1);
 
         assert_eq!(*timeseries.time().first().unwrap(), 0);
-        assert_eq!(*speed.first().unwrap(), Some(12.));
+        assert_eq!(*speed.first().unwrap(), Some(TimeseriesValue::Float(12.)));
     }
 }

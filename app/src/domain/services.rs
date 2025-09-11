@@ -46,7 +46,7 @@ where
             .timeseries()
             .metrics()
             .iter()
-            .any(|metric| metric.len() != time_len)
+            .any(|metric| metric.values().len() != time_len)
         {
             return Err(CreateActivityError::TimeseriesMetricsNotSameLength);
         }
@@ -180,8 +180,8 @@ mod tests {
 
     use crate::domain::{
         models::{
-            ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport, Timeseries,
-            TimeseriesMetric, TimeseriesTime,
+            ActivityDuration, ActivityNaturalKey, ActivityStartTime, Metric, Sport, Timeseries,
+            TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         },
         ports::{
             GetActivityError, ListActivitiesError, SaveActivityError, SaveRawDataError,
@@ -366,8 +366,21 @@ mod tests {
         let timeseries = Timeseries::new(
             TimeseriesTime::new(vec![0, 1, 2]),
             vec![
-                TimeseriesMetric::Power(vec![Some(0), Some(100)]),
-                TimeseriesMetric::Speed(vec![Some(0.), Some(100.), Some(4.)]),
+                TimeseriesMetric::new(
+                    Metric::Power,
+                    vec![
+                        Some(TimeseriesValue::Int(0)),
+                        Some(TimeseriesValue::Int(100)),
+                    ],
+                ),
+                TimeseriesMetric::new(
+                    Metric::Speed,
+                    vec![
+                        Some(TimeseriesValue::Float(0.)),
+                        Some(TimeseriesValue::Float(100.)),
+                        None,
+                    ],
+                ),
             ],
         );
 

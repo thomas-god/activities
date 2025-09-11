@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::{Activity, ActivityId, Sport, Timeseries, TimeseriesMetric},
+        models::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
         ports::ActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -27,15 +27,24 @@ pub struct ResponseBody {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum TimeseriesValue {
+pub enum TimeseriesValueBody {
     Int(usize),
     Float(f64),
+}
+
+impl From<&TimeseriesValue> for TimeseriesValueBody {
+    fn from(value: &TimeseriesValue) -> Self {
+        match value {
+            TimeseriesValue::Int(val) => Self::Int(*val),
+            TimeseriesValue::Float(val) => Self::Float(*val),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct TimeseriesMetricsBody {
     unit: String,
-    values: Vec<Option<TimeseriesValue>>,
+    values: Vec<Option<TimeseriesValueBody>>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -65,48 +74,17 @@ impl From<&Timeseries> for TimeseriesBody {
         Self {
             time: (**value.time()).clone(),
             metrics: HashMap::from_iter(value.metrics().iter().map(|metric| {
-                match metric {
-                    TimeseriesMetric::Speed(values) => (
-                        "Speed".to_string(),
-                        TimeseriesMetricsBody {
-                            unit: metric.unit(),
-                            values: values
-                                .iter()
-                                .map(|value| value.map(TimeseriesValue::Float))
-                                .collect(),
-                        },
-                    ),
-                    TimeseriesMetric::Power(values) => (
-                        "Power".to_string(),
-                        TimeseriesMetricsBody {
-                            unit: metric.unit(),
-                            values: values
-                                .iter()
-                                .map(|value| value.map(TimeseriesValue::Int))
-                                .collect(),
-                        },
-                    ),
-                    TimeseriesMetric::HeartRate(values) => (
-                        "HeartRate".to_string(),
-                        TimeseriesMetricsBody {
-                            unit: metric.unit(),
-                            values: values
-                                .iter()
-                                .map(|value| value.map(TimeseriesValue::Int))
-                                .collect(),
-                        },
-                    ),
-                    TimeseriesMetric::Distance(values) => (
-                        "Distance".to_string(),
-                        TimeseriesMetricsBody {
-                            unit: metric.unit(),
-                            values: values
-                                .iter()
-                                .map(|value| value.map(|v| TimeseriesValue::Float(v.into())))
-                                .collect(),
-                        },
-                    ),
-                }
+                (
+                    metric.metric().to_string(),
+                    TimeseriesMetricsBody {
+                        unit: metric.metric().unit(),
+                        values: metric
+                            .values()
+                            .iter()
+                            .map(|val| val.as_ref().map(TimeseriesValueBody::from))
+                            .collect(),
+                    },
+                )
             })),
         }
     }
@@ -141,7 +119,8 @@ mod tests {
     use crate::{
         domain::{
             models::{
-                ActivityDuration, ActivityStartTime, Timeseries, TimeseriesMetric, TimeseriesTime,
+                ActivityDuration, ActivityStartTime, Metric, Timeseries, TimeseriesMetric,
+                TimeseriesTime, TimeseriesValue,
             },
             ports::GetActivityError,
             services::test_utils::MockActivityService,
@@ -166,7 +145,14 @@ mod tests {
                 Sport::Cycling,
                 Timeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),
-                    vec![TimeseriesMetric::Power(vec![Some(120), None, Some(130)])],
+                    vec![TimeseriesMetric::new(
+                        Metric::Power,
+                        vec![
+                            Some(TimeseriesValue::Int(120)),
+                            None,
+                            Some(TimeseriesValue::Int(130)),
+                        ],
+                    )],
                 ),
             )))),
             ..Default::default()
@@ -199,9 +185,9 @@ mod tests {
                         TimeseriesMetricsBody {
                             unit: "W".to_string(),
                             values: vec![
-                                Some(TimeseriesValue::Int(120)),
+                                Some(TimeseriesValueBody::Int(120)),
                                 None,
-                                Some(TimeseriesValue::Int(130))
+                                Some(TimeseriesValueBody::Int(130))
                             ]
                         }
                     )])
