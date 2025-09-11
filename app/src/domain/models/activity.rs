@@ -195,6 +195,15 @@ pub enum TimeseriesValue {
     Float(f64),
 }
 
+impl From<&TimeseriesValue> for f64 {
+    fn from(value: &TimeseriesValue) -> Self {
+        match value {
+            &TimeseriesValue::Int(val) => val as f64,
+            &TimeseriesValue::Float(val) => val as f64,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
