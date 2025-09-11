@@ -1,12 +1,18 @@
 use anyhow::anyhow;
+use derive_more::Constructor;
 
 use crate::domain::{
     models::activity::{Activity, ActivityId},
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, GetActivityError,
-        IActivityService, ListActivitiesError, RawDataRepository,
+        IActivityService, ITrainingMetricService, ListActivitiesError, RawDataRepository,
+        RecomputeMetricRequest, TrainingMetricsRepository,
     },
 };
+
+///////////////////////////////////////////////////////////////////
+/// ACTIVITY SERVICE
+///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct ActivityService<AR, RDR>
@@ -102,6 +108,37 @@ where
     }
 }
 
+///////////////////////////////////////////////////////////////////
+/// TRAINING METRICS SERVICE
+///////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Constructor)]
+pub struct TrainingMetricService<TMR, AR>
+where
+    TMR: TrainingMetricsRepository,
+    AR: ActivityRepository,
+{
+    metrics_repository: TMR,
+    activity_repository: AR,
+}
+
+impl<TMR, AR> ITrainingMetricService for TrainingMetricService<TMR, AR>
+where
+    TMR: TrainingMetricsRepository,
+    AR: ActivityRepository,
+{
+    async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
+        let metrics = self.metrics_repository.get_definitions().await.unwrap();
+        let activities = self.activity_repository.list_activities().await.unwrap();
+
+        for metric in metrics {
+            let a = metric.compute_values(&activities);
+            println!("New metrics: {:?}", a);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 pub mod test_utils {
     use std::mem;
@@ -109,8 +146,10 @@ pub mod test_utils {
 
     use super::*;
 
-    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime, Sport, Timeseries};
-    use crate::domain::ports::ListActivitiesError;
+    use crate::domain::models::activity::{
+        ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport, Timeseries,
+    };
+    use crate::domain::ports::{ListActivitiesError, SaveActivityError, SimilarActivityError};
 
     #[derive(Clone)]
     pub struct MockActivityService {
@@ -169,34 +208,13 @@ pub mod test_utils {
             result
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{mem, ops::DerefMut, sync::Arc};
-
-    use anyhow::anyhow;
-    use tokio::sync::Mutex;
-
-    use crate::domain::{
-        models::activity::{
-            ActivityDuration, ActivityNaturalKey, ActivityStartTime, Metric, Sport, Timeseries,
-            TimeseriesMetric, TimeseriesTime, TimeseriesValue,
-        },
-        ports::{
-            GetActivityError, ListActivitiesError, SaveActivityError, SaveRawDataError,
-            SimilarActivityError,
-        },
-    };
-
-    use super::*;
 
     #[derive(Clone)]
-    struct MockActivityRepository {
-        similar_activity_result: Arc<Mutex<Result<bool, SimilarActivityError>>>,
-        save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
-        list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
-        get_activity_result: Arc<Mutex<Result<Option<Activity>, GetActivityError>>>,
+    pub struct MockActivityRepository {
+        pub similar_activity_result: Arc<Mutex<Result<bool, SimilarActivityError>>>,
+        pub save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
+        pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
+        pub get_activity_result: Arc<Mutex<Result<Option<Activity>, GetActivityError>>>,
     }
 
     impl ActivityRepository for MockActivityRepository {
@@ -204,23 +222,23 @@ mod tests {
             &self,
             _natural_key: &ActivityNaturalKey,
         ) -> Result<bool, SimilarActivityError> {
-            let mut guard = self.similar_activity_result.lock().await;
+            let mut guard = self.similar_activity_result.lock();
             let mut result = Err(SimilarActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.deref_mut(), &mut result);
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
 
         async fn save_activity(&self, _activity: &Activity) -> Result<(), SaveActivityError> {
-            let mut guard = self.save_activity_result.lock().await;
+            let mut guard = self.save_activity_result.lock();
             let mut result = Err(SaveActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.deref_mut(), &mut result);
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
 
         async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
-            let mut guard = self.list_activities_result.lock().await;
+            let mut guard = self.list_activities_result.lock();
             let mut result = Err(ListActivitiesError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.deref_mut(), &mut result);
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
 
@@ -228,9 +246,9 @@ mod tests {
             &self,
             _id: &ActivityId,
         ) -> Result<Option<Activity>, GetActivityError> {
-            let mut guard = self.get_activity_result.lock().await;
+            let mut guard = self.get_activity_result.lock();
             let mut result = Err(GetActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.deref_mut(), &mut result);
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
     }
@@ -245,6 +263,25 @@ mod tests {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests_activity_service {
+    use std::{mem, ops::DerefMut, sync::Arc};
+
+    use anyhow::anyhow;
+    use tokio::sync::Mutex;
+
+    use crate::domain::{
+        models::activity::{
+            ActivityDuration, ActivityStartTime, Metric, Sport, Timeseries, TimeseriesMetric,
+            TimeseriesTime, TimeseriesValue,
+        },
+        ports::{SaveActivityError, SaveRawDataError},
+        services::test_utils::MockActivityRepository,
+    };
+
+    use super::*;
 
     #[derive(Clone)]
     struct MockRawDataRepository {
@@ -276,7 +313,7 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_err_if_similar_activity_exists() {
         let activity_repository = MockActivityRepository {
-            similar_activity_result: Arc::new(Mutex::new(Ok(true))),
+            similar_activity_result: Arc::new(std::sync::Mutex::new(Ok(true))),
             ..Default::default()
         };
         let raw_data_repository = MockRawDataRepository {
@@ -314,9 +351,9 @@ mod tests {
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
         let activity_repository = MockActivityRepository {
-            save_activity_result: Arc::new(Mutex::new(Err(SaveActivityError::Unknown(anyhow!(
-                "an error occured"
-            ))))),
+            save_activity_result: Arc::new(std::sync::Mutex::new(Err(SaveActivityError::Unknown(
+                anyhow!("an error occured"),
+            )))),
             ..Default::default()
         };
         let raw_data_repository = MockRawDataRepository {
@@ -394,5 +431,106 @@ mod tests {
                 "Should have returned an Err(CreateActivityError::TimeseriesNotSameLength) "
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_training_metrics_service {
+    use std::{mem, ops::DerefMut, sync::Arc};
+
+    use tokio::sync::Mutex;
+
+    use crate::domain::{
+        models::{
+            activity::Metric,
+            training_metrics::{
+                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricId, TrainingMetricValues,
+            },
+        },
+        ports::{
+            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, UpdateMetricError,
+        },
+        services::test_utils::MockActivityRepository,
+    };
+
+    use super::*;
+
+    #[derive(Clone)]
+    struct MockTrainingMetricsRepository {
+        get_definitions_result:
+            Arc<Mutex<Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>>>,
+        update_metric_values_result: Arc<Mutex<Result<(), UpdateMetricError>>>,
+        get_metric_values_result:
+            Arc<Mutex<Result<TrainingMetricValues, GetTrainingMetricValueError>>>,
+    }
+
+    impl TrainingMetricsRepository for MockTrainingMetricsRepository {
+        async fn get_definitions(
+            &self,
+        ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
+            let mut guard = self.get_definitions_result.lock().await;
+            let mut result = Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
+                "substitute error"
+            )));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
+        async fn update_metric_values(
+            &self,
+            _id: &TrainingMetricId,
+            _new_value: (chrono::DateTime<chrono::FixedOffset>, f64),
+        ) -> Result<(), UpdateMetricError> {
+            let mut guard = self.update_metric_values_result.lock().await;
+            let mut result = Err(UpdateMetricError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
+        async fn get_metric_values(
+            &self,
+            _id: &TrainingMetricId,
+        ) -> Result<TrainingMetricValues, GetTrainingMetricValueError> {
+            let mut guard = self.get_metric_values_result.lock().await;
+            let mut result = Err(GetTrainingMetricValueError::Unknown(anyhow!(
+                "substitute error"
+            )));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+    }
+
+    impl Default for MockTrainingMetricsRepository {
+        fn default() -> Self {
+            Self {
+                get_definitions_result: Arc::new(Mutex::new(Ok(vec![
+                    TrainingMetricDefinition::new(
+                        TrainingMetricId::default(),
+                        Metric::Power,
+                        TrainingMetricAggregate::Average,
+                        TrainingMetricGranularity::Weekly,
+                        TrainingMetricAggregate::Max,
+                    ),
+                ]))),
+                update_metric_values_result: Arc::new(Mutex::new(Ok(()))),
+                get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::new(
+                    TrainingMetricGranularity::Weekly,
+                    vec![],
+                )))),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_training_metric_service() {
+        let repository = MockTrainingMetricsRepository::default();
+        let activity_repository = MockActivityRepository::default();
+        let service = TrainingMetricService::new(repository, activity_repository);
+        let req = RecomputeMetricRequest::new(ActivityId::default());
+
+        let res = service.recompute_metric(req).await;
+
+        assert!(res.is_ok())
     }
 }

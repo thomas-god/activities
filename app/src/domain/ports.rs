@@ -1,4 +1,5 @@
 use chrono::{DateTime, FixedOffset};
+use derive_more::Constructor;
 use thiserror::Error;
 
 use crate::domain::models::activity::{
@@ -155,7 +156,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 /// TRAINING METRICS SERVICE
 ///////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct RecomputeMetricRequest {
     new_activity: ActivityId,
 }
@@ -166,11 +167,11 @@ impl RecomputeMetricRequest {
     }
 }
 
-pub trait TrainingMetricService: Clone + Send + Sync + 'static {
+pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
     fn recompute_metric(
         &self,
         req: RecomputeMetricRequest,
-    ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
+    ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
 #[derive(Debug, Error)]
