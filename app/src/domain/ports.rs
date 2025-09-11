@@ -1,9 +1,14 @@
+use chrono::{DateTime, FixedOffset};
 use thiserror::Error;
 
 use crate::domain::models::{
     Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime, Sport,
-    Timeseries,
+    Timeseries, TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues,
 };
+
+///////////////////////////////////////////////////////////////////
+/// ACTIVITY SERVICE
+///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct CreateActivityRequest {
@@ -77,6 +82,7 @@ pub trait ActivityService: Clone + Send + Sync + 'static {
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
 }
+
 #[derive(Debug, Error)]
 pub enum SimilarActivityError {
     #[error(transparent)]
@@ -102,6 +108,10 @@ pub enum GetActivityError {
     #[error("Activity {0} does not exist")]
     ActivityDoesNotExist(ActivityId),
 }
+
+///////////////////////////////////////////////////////////////////
+// ACTIVITY AND RAW DATA REPOSITORIES
+///////////////////////////////////////////////////////////////////
 
 pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn similar_activity_exists(
@@ -136,4 +146,67 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
         activity_id: &ActivityId,
         content: &[u8],
     ) -> impl Future<Output = Result<(), SaveRawDataError>> + Send;
+}
+
+///////////////////////////////////////////////////////////////////
+/// TRAINING METRICS SERVICE
+///////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecomputeMetricRequest {
+    new_activity: ActivityId,
+}
+
+impl RecomputeMetricRequest {
+    pub fn new_activity(&self) -> &ActivityId {
+        &self.new_activity
+    }
+}
+
+pub trait TraininMetricService: Clone + Send + Sync + 'static {
+    fn recompute_metric(
+        &self,
+        req: RecomputeMetricRequest,
+    ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
+}
+
+#[derive(Debug, Error)]
+pub enum GetTrainingMetricsDefinitionsError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateMetricError {
+    #[error("Training metric {0} does not exist")]
+    TrainingMetricDoesNotExists(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum GetTrainingMetricValueError {
+    #[error("Training metric {0} does not exist")]
+    TrainingMetricDoesNotExists(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
+    fn get_definitions(
+        &self,
+    ) -> impl Future<
+        Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
+    > + Send;
+
+    fn update_metric_values(
+        &self,
+        id: &TrainingMetricId,
+        new_value: (DateTime<FixedOffset>, f64),
+    ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
+
+    fn get_metric_values(
+        &self,
+        id: &TrainingMetricId,
+    ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
 }
