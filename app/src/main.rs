@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use app::{
     config::Config,
-    domain::services::Service,
+    domain::services::ActivityService,
     inbound::{http::HttpServer, parser::FitParser},
     outbound::memory::{InMemoryActivityRepository, InMemoryRawDataRepository},
 };
@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     let activity_repository = InMemoryActivityRepository::new(vec![]);
     let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
 
-    let activity_service = Service::new(activity_repository, raw_data_repository);
+    let activity_service = ActivityService::new(activity_repository, raw_data_repository);
     let parser = FitParser {};
 
     let http_server = HttpServer::new(activity_service, parser, config).await?;

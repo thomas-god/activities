@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::{
     domain::{
         models::{Activity, Sport},
-        ports::ActivityService,
+        ports::IActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
 };
@@ -37,7 +37,7 @@ impl From<&Activity> for ResponseBodyItem {
     }
 }
 
-pub async fn list_activities<AS: ActivityService, FP: ParseFile>(
+pub async fn list_activities<AS: IActivityService, FP: ParseFile>(
     State(state): State<AppState<AS, FP>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let Ok(res) = state.activity_service.list_activities().await else {

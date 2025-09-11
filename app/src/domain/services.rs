@@ -3,13 +3,13 @@ use anyhow::anyhow;
 use crate::domain::{
     models::{Activity, ActivityId},
     ports::{
-        ActivityRepository, ActivityService, CreateActivityError, CreateActivityRequest,
-        GetActivityError, ListActivitiesError, RawDataRepository,
+        ActivityRepository, CreateActivityError, CreateActivityRequest, GetActivityError,
+        IActivityService, ListActivitiesError, RawDataRepository,
     },
 };
 
 #[derive(Debug, Clone)]
-pub struct Service<AR, RDR>
+pub struct ActivityService<AR, RDR>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
@@ -18,7 +18,7 @@ where
     raw_data_repository: RDR,
 }
 
-impl<AR, RDR> Service<AR, RDR>
+impl<AR, RDR> ActivityService<AR, RDR>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
@@ -31,7 +31,7 @@ where
     }
 }
 
-impl<AR, RDR> ActivityService for Service<AR, RDR>
+impl<AR, RDR> IActivityService for ActivityService<AR, RDR>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
@@ -141,7 +141,7 @@ pub mod test_utils {
         }
     }
 
-    impl ActivityService for MockActivityService {
+    impl IActivityService for MockActivityService {
         async fn create_activity(
             &self,
             _req: CreateActivityRequest,
@@ -282,7 +282,7 @@ mod tests {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = Service::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -302,7 +302,7 @@ mod tests {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = Service::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -322,7 +322,7 @@ mod tests {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = Service::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -339,7 +339,7 @@ mod tests {
                 "an error occured"
             ))))),
         };
-        let service = Service::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -357,7 +357,7 @@ mod tests {
                 "an error occured"
             ))))),
         };
-        let service = Service::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();

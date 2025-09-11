@@ -67,7 +67,7 @@ pub enum CreateActivityError {
     TimeseriesMetricsNotSameLength,
 }
 
-pub trait ActivityService: Clone + Send + Sync + 'static {
+pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
         req: CreateActivityRequest,
@@ -163,7 +163,7 @@ impl RecomputeMetricRequest {
     }
 }
 
-pub trait TraininMetricService: Clone + Send + Sync + 'static {
+pub trait TrainingMetricService: Clone + Send + Sync + 'static {
     fn recompute_metric(
         &self,
         req: RecomputeMetricRequest,

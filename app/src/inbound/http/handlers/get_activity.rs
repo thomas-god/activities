@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
-        ports::ActivityService,
+        ports::IActivityService,
     },
     inbound::{http::AppState, parser::ParseFile},
 };
@@ -90,7 +90,7 @@ impl From<&Timeseries> for TimeseriesBody {
     }
 }
 
-pub async fn get_activity<AS: ActivityService, FP: ParseFile>(
+pub async fn get_activity<AS: IActivityService, FP: ParseFile>(
     State(state): State<AppState<AS, FP>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {

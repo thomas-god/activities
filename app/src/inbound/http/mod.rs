@@ -9,14 +9,14 @@ use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
-use crate::domain::ports::ActivityService;
+use crate::domain::ports::IActivityService;
 use crate::inbound::http::handlers::{create_activity, get_activity, list_activities};
 use crate::inbound::parser::ParseFile;
 
 mod handlers;
 
 #[derive(Debug, Clone)]
-struct AppState<AS: ActivityService, PF: ParseFile> {
+struct AppState<AS: IActivityService, PF: ParseFile> {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
 }
@@ -28,7 +28,7 @@ pub struct HttpServer {
 
 impl HttpServer {
     pub async fn new(
-        activity_service: impl ActivityService,
+        activity_service: impl IActivityService,
         file_parser: impl ParseFile,
         config: Config,
     ) -> anyhow::Result<Self> {
@@ -76,7 +76,7 @@ impl HttpServer {
     }
 }
 
-fn api_routes<AS: ActivityService, FP: ParseFile>() -> Router<AppState<AS, FP>> {
+fn api_routes<AS: IActivityService, FP: ParseFile>() -> Router<AppState<AS, FP>> {
     Router::new()
         .route("/activity", post(create_activity::<AS, FP>))
         .route("/activities", get(list_activities::<AS, FP>))

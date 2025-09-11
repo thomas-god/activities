@@ -1,7 +1,7 @@
 use axum::{body::Bytes, extract::State, http::StatusCode};
 
 use crate::{
-    domain::ports::{ActivityService, CreateActivityError},
+    domain::ports::{IActivityService, CreateActivityError},
     inbound::{http::AppState, parser::ParseFile},
 };
 
@@ -11,7 +11,7 @@ impl From<CreateActivityError> for StatusCode {
     }
 }
 
-pub async fn create_activity<AS: ActivityService, PF: ParseFile>(
+pub async fn create_activity<AS: IActivityService, PF: ParseFile>(
     State(state): State<AppState<AS, PF>>,
     bytes: Bytes,
 ) -> Result<StatusCode, StatusCode> {
