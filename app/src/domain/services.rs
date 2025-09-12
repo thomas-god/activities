@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use derive_more::Constructor;
+use tokio::sync::Mutex;
 
 use crate::domain::{
     models::activity::{Activity, ActivityId},
@@ -20,7 +23,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    activity_repository: AR,
+    activity_repository: Arc<Mutex<AR>>,
     raw_data_repository: RDR,
 }
 
@@ -29,7 +32,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    pub fn new(activity_repository: AR, raw_data_repository: RDR) -> Self {
+    pub fn new(activity_repository: Arc<Mutex<AR>>, raw_data_repository: RDR) -> Self {
         Self {
             activity_repository,
             raw_data_repository,
@@ -67,8 +70,8 @@ where
             req.timeseries().clone(),
         );
 
-        if self
-            .activity_repository
+        let activity_repository = self.activity_repository.lock().await;
+        if activity_repository
             .similar_activity_exists(&activity.natural_key())
             .await
             .map_err(|err| {
@@ -79,7 +82,7 @@ where
         }
 
         // Persist activity
-        self.activity_repository
+        activity_repository
             .save_activity(&activity)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
@@ -96,11 +99,13 @@ where
     }
 
     async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
-        self.activity_repository.list_activities().await
+        let repository = self.activity_repository.lock().await;
+        repository.list_activities().await
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
-        match self.activity_repository.get_activity(activity_id).await {
+        let repository = self.activity_repository.lock().await;
+        match repository.get_activity(activity_id).await {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
             Err(err) => Err(err),
@@ -119,7 +124,7 @@ where
     AR: ActivityRepository,
 {
     metrics_repository: TMR,
-    activity_repository: AR,
+    activity_repository: Arc<Mutex<AR>>,
 }
 
 impl<TMR, AR> ITrainingMetricService for TrainingMetricService<TMR, AR>
@@ -129,7 +134,13 @@ where
 {
     async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
         let metrics = self.metrics_repository.get_definitions().await.unwrap();
-        let activities = self.activity_repository.list_activities().await.unwrap();
+        let activities = self
+            .activity_repository
+            .lock()
+            .await
+            .list_activities()
+            .await
+            .unwrap();
 
         for metric in metrics {
             let a = metric.compute_values(&activities);
@@ -312,10 +323,10 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_err_if_similar_activity_exists() {
-        let activity_repository = MockActivityRepository {
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository {
             similar_activity_result: Arc::new(std::sync::Mutex::new(Ok(true))),
             ..Default::default()
-        };
+        }));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
@@ -335,7 +346,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity() {
-        let activity_repository = MockActivityRepository::default();
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
@@ -350,12 +361,12 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
-        let activity_repository = MockActivityRepository {
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository {
             save_activity_result: Arc::new(std::sync::Mutex::new(Err(SaveActivityError::Unknown(
                 anyhow!("an error occured"),
             )))),
             ..Default::default()
-        };
+        }));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
@@ -370,7 +381,7 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_raw_data_error() {
-        let activity_repository = MockActivityRepository::default();
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
                 "an error occured"
@@ -388,7 +399,7 @@ mod tests_activity_service {
     #[tokio::test]
     async fn test_create_timeseries_returns_err_when_timeseries_have_different_lenghts_than_time_vec()
      {
-        let activity_repository = MockActivityRepository::default();
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
                 "an error occured"
@@ -525,7 +536,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_metric_service() {
         let repository = MockTrainingMetricsRepository::default();
-        let activity_repository = MockActivityRepository::default();
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
         let req = RecomputeMetricRequest::new(ActivityId::default());
 

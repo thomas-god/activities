@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use app::{
     config::Config,
@@ -6,6 +6,7 @@ use app::{
     inbound::{http::HttpServer, parser::FitParser},
     outbound::memory::{InMemoryActivityRepository, InMemoryRawDataRepository},
 };
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -24,10 +25,10 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::from_env()?;
 
-    let activity_repository = InMemoryActivityRepository::new(vec![]);
+    let activity_repository = Arc::new(Mutex::new(InMemoryActivityRepository::new(vec![])));
     let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
+    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
-    let activity_service = ActivityService::new(activity_repository, raw_data_repository);
     let parser = FitParser {};
 
     let http_server = HttpServer::new(activity_service, parser, config).await?;
