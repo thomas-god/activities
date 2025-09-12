@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, FixedOffset, SecondsFormat};
 use derive_more::{AsRef, Constructor, Deref, Display};
 use uuid::Uuid;
 
-use crate::domain::models::activity::{Activity, TimeseriesMetric};
+use crate::domain::models::activity::{Activity, ActivityStatistic, TimeseriesMetric};
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct TrainingMetricId(String);
@@ -28,10 +28,30 @@ impl Default for TrainingMetricId {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
-    activity_metric: TimeseriesMetric,
-    activity_metric_aggregate: TrainingMetricAggregate,
+    source: TrainingMetricSource,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrainingMetricSource {
+    Statistic(ActivityStatistic),
+    Timeseries((TimeseriesMetric, TrainingMetricAggregate)),
+}
+
+impl TrainingMetricSource {
+    pub fn extract_from_activity(
+        &self,
+        activity: &Activity,
+    ) -> Option<(DateTime<FixedOffset>, f64)> {
+        match self {
+            Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
+            Self::Timeseries((metric, aggregate)) => {
+                extract_aggregated_activity_metric(aggregate, metric, activity)
+            }
+        }
+        .map(|value| (**activity.start_time(), value))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,14 +64,7 @@ impl TrainingMetricDefinition {
     ) -> Result<HashMap<String, f64>, MetricValueComputationError> {
         let metrics_per_activity = activities
             .iter()
-            .filter_map(|activity| {
-                extract_aggregated_activity_metric(
-                    &self.activity_metric_aggregate,
-                    &self.activity_metric,
-                    activity,
-                )
-                .map(|val| (**activity.start_time(), val))
-            })
+            .filter_map(|activity| self.source.extract_from_activity(activity))
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
         Ok(aggregate_metrics(
@@ -85,27 +98,12 @@ fn group_metrics_by_granularity(
     granularity: &TrainingMetricGranularity,
     metrics: Vec<(DateTime<FixedOffset>, f64)>,
 ) -> HashMap<String, Vec<f64>> {
-    let key_lambda = match granularity {
-        TrainingMetricGranularity::Activity => {
-            |dt: DateTime<FixedOffset>| dt.to_rfc3339_opts(SecondsFormat::Secs, true)
-        }
-        TrainingMetricGranularity::Daily => |dt: DateTime<FixedOffset>| dt.date_naive().to_string(),
-        TrainingMetricGranularity::Weekly => |dt: DateTime<FixedOffset>| {
-            dt.date_naive()
-                .week(chrono::Weekday::Mon)
-                .first_day()
-                .to_string()
-        },
-        TrainingMetricGranularity::Monthly => {
-            |dt: DateTime<FixedOffset>| dt.date_naive().with_day(1).unwrap().to_string()
-        }
-    };
-    let mut grouped_value: HashMap<String, Vec<f64>> = HashMap::new();
+    let mut grouped_values: HashMap<String, Vec<f64>> = HashMap::new();
     for (date, value) in metrics {
-        let key = key_lambda(date);
-        grouped_value.entry(key).or_default().push(value);
+        let key = granularity.datetime_key(&date);
+        grouped_values.entry(key).or_default().push(value);
     }
-    grouped_value
+    grouped_values
 }
 
 fn aggregate_metrics(
@@ -130,6 +128,21 @@ pub enum TrainingMetricGranularity {
     Daily,
     Weekly,
     Monthly,
+}
+
+impl TrainingMetricGranularity {
+    pub fn datetime_key(&self, dt: &DateTime<FixedOffset>) -> String {
+        match self {
+            TrainingMetricGranularity::Activity => dt.to_rfc3339_opts(SecondsFormat::Secs, true),
+            TrainingMetricGranularity::Daily => dt.date_naive().to_string(),
+            TrainingMetricGranularity::Weekly => dt
+                .date_naive()
+                .week(chrono::Weekday::Mon)
+                .first_day()
+                .to_string(),
+            TrainingMetricGranularity::Monthly => dt.date_naive().with_day(1).unwrap().to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -330,7 +343,6 @@ mod test_training_metrics {
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        dbg!(&res);
         assert_eq!(res.get("2025-09-03T00:00:00Z").unwrap(), &vec![12.3]);
         assert_eq!(res.get("2025-09-03T02:00:00Z").unwrap(), &vec![18.1]);
     }
@@ -440,8 +452,10 @@ mod test_training_metrics {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
-            TimeseriesMetric::Power,
-            TrainingMetricAggregate::Average,
+            TrainingMetricSource::Timeseries((
+                TimeseriesMetric::Power,
+                TrainingMetricAggregate::Average,
+            )),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
         );
@@ -449,7 +463,6 @@ mod test_training_metrics {
         let metrics = metric_definition.compute_values(&activities);
 
         assert!(metrics.is_ok());
-        dbg!(&metrics);
         assert_eq!(*metrics.unwrap().get("2025-09-01").unwrap(), 20.);
     }
 }

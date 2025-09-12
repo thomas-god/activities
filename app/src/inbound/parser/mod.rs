@@ -49,7 +49,6 @@ impl ParseFile for FitParser {
         let timeseries = extract_timeseries(reference_timestamp, &messages)?;
 
         let statistics = extract_statistics(&messages);
-        dbg!(&statistics);
 
         Ok(CreateActivityRequest::new(
             sport, duration, start_time, statistics, timeseries, bytes,

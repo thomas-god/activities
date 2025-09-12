@@ -64,6 +64,10 @@ impl Activity {
         &self.sport
     }
 
+    pub fn statistics(&self) -> &ActivityStatistics {
+        &self.statistics
+    }
+
     pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
     }

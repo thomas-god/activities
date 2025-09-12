@@ -161,8 +161,8 @@ where
             .unwrap();
 
         for metric in metrics {
-            let a = metric.compute_values(&activities);
-            println!("New metrics: {:?}", a);
+            let res = metric.compute_values(&activities);
+            tracing::info!("New value {:?} for metric {:?}", res, metric);
         }
         Ok(())
     }
@@ -517,7 +517,7 @@ mod tests_training_metrics_service {
             activity::TimeseriesMetric,
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricId, TrainingMetricValues,
+                TrainingMetricId, TrainingMetricSource, TrainingMetricValues,
             },
         },
         ports::{
@@ -579,8 +579,10 @@ mod tests_training_metrics_service {
                 get_definitions_result: Arc::new(Mutex::new(Ok(vec![
                     TrainingMetricDefinition::new(
                         TrainingMetricId::default(),
-                        TimeseriesMetric::Power,
-                        TrainingMetricAggregate::Average,
+                        TrainingMetricSource::Timeseries((
+                            TimeseriesMetric::Power,
+                            TrainingMetricAggregate::Average,
+                        )),
                         TrainingMetricGranularity::Weekly,
                         TrainingMetricAggregate::Max,
                     ),

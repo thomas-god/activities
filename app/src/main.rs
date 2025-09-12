@@ -4,10 +4,10 @@ use app::{
     config::Config,
     domain::{
         models::{
-            activity::TimeseriesMetric,
+            activity::{ActivityStatistic, TimeseriesMetric},
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricId,
+                TrainingMetricId, TrainingMetricSource,
             },
         },
         services::{ActivityService, TrainingMetricService},
@@ -38,17 +38,9 @@ async fn main() -> anyhow::Result<()> {
 
     let activity_repository = Arc::new(Mutex::new(InMemoryActivityRepository::new(vec![])));
     let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
-    let id = TrainingMetricId::new();
-    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::from([(
-        id.clone(),
-        TrainingMetricDefinition::new(
-            id,
-            TimeseriesMetric::Power,
-            TrainingMetricAggregate::Max,
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
-        ),
-    )]));
+    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::from_iter(
+        default_training_metrics_definitions(),
+    ));
 
     let training_metrics_service = Arc::new(TrainingMetricService::new(
         training_metrics_repository,
@@ -65,4 +57,37 @@ async fn main() -> anyhow::Result<()> {
         HttpServer::new(activity_service, parser, training_metrics_service, config).await?;
 
     http_server.run().await
+}
+
+fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetricDefinition)> {
+    let mut definitions = Vec::new();
+
+    // Weekly distance
+    let id = TrainingMetricId::new();
+    definitions.push((
+        id.clone(),
+        TrainingMetricDefinition::new(
+            id.clone(),
+            TrainingMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+        ),
+    ));
+
+    // Activity max heart rate
+    let id = TrainingMetricId::new();
+    definitions.push((
+        id.clone(),
+        TrainingMetricDefinition::new(
+            id.clone(),
+            TrainingMetricSource::Timeseries((
+                TimeseriesMetric::HeartRate,
+                TrainingMetricAggregate::Max,
+            )),
+            TrainingMetricGranularity::Activity,
+            TrainingMetricAggregate::Max,
+        ),
+    ));
+
+    definitions
 }
