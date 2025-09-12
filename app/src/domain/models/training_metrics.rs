@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Datelike, FixedOffset, SecondsFormat};
-use derive_more::{AsRef, Constructor, Deref, Display};
+use derive_more::{AsRef, Constructor, Deref, DerefMut, Display};
 use uuid::Uuid;
 
 use crate::domain::models::activity::{Activity, ActivityStatistic, TimeseriesMetric};
@@ -33,6 +33,12 @@ pub struct TrainingMetricDefinition {
     granularity_aggregate: TrainingMetricAggregate,
 }
 
+impl TrainingMetricDefinition {
+    pub fn id(&self) -> &TrainingMetricId {
+        &self.id
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TrainingMetricSource {
     Statistic(ActivityStatistic),
@@ -54,20 +60,14 @@ impl TrainingMetricSource {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum MetricValueComputationError {}
-
 impl TrainingMetricDefinition {
-    pub fn compute_values(
-        &self,
-        activities: &[Activity],
-    ) -> Result<HashMap<String, f64>, MetricValueComputationError> {
+    pub fn compute_values(&self, activities: &[Activity]) -> TrainingMetricValues {
         let metrics_per_activity = activities
             .iter()
             .filter_map(|activity| self.source.extract_from_activity(activity))
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
-        Ok(aggregate_metrics(
+        TrainingMetricValues(aggregate_metrics(
             &self.granularity_aggregate,
             grouped_metrics,
         ))
@@ -171,21 +171,8 @@ impl TrainingMetricAggregate {
     }
 }
 
-#[derive(Debug, Clone, Constructor, Deref, Default)]
-pub struct TrainingMetricValues(Vec<(String, f64)>);
-
-impl TrainingMetricValues {
-    pub fn append(self, new_value: (String, f64)) -> Self {
-        let mut values = self.0;
-        values.push(new_value);
-
-        Self(values)
-    }
-
-    pub fn push(&mut self, new_value: (String, f64)) {
-        self.0.push(new_value);
-    }
-}
+#[derive(Debug, Clone, Constructor, Deref, DerefMut, Default)]
+pub struct TrainingMetricValues(HashMap<String, f64>);
 
 #[cfg(test)]
 mod test_training_metrics {
@@ -196,29 +183,6 @@ mod test_training_metrics {
     };
 
     use super::*;
-
-    #[test]
-    fn test_append_new_value_to_existing_metric() {
-        let metric = TrainingMetricValues::new(vec![]);
-        let new_value = ("2025-09-03T00:00:00Z".to_string(), 12.3);
-
-        let updated_metric = metric.append(new_value);
-
-        assert_eq!(
-            *updated_metric,
-            vec![("2025-09-03T00:00:00Z".to_string(), 12.3,)]
-        );
-    }
-
-    #[test]
-    fn test_push_new_value_to_existing_metric() {
-        let mut metric = TrainingMetricValues::new(vec![]);
-        let new_value = ("2025-09-03T00:00:00Z".to_string(), 12.3);
-
-        metric.push(new_value);
-
-        assert_eq!(*metric, vec![("2025-09-03T00:00:00Z".to_string(), 12.3,)]);
-    }
 
     fn default_activity() -> Activity {
         Activity::new(
@@ -462,7 +426,6 @@ mod test_training_metrics {
 
         let metrics = metric_definition.compute_values(&activities);
 
-        assert!(metrics.is_ok());
-        assert_eq!(*metrics.unwrap().get("2025-09-01").unwrap(), 20.);
+        assert_eq!(*metrics.get("2025-09-01").unwrap(), 20.);
     }
 }

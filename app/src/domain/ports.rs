@@ -209,10 +209,10 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
     > + Send;
 
-    fn update_metric_values(
+    fn save_metric_values(
         &self,
         id: &TrainingMetricId,
-        new_value: (String, f64),
+        values: (&str, f64),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
     fn get_metric_values(

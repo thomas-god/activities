@@ -161,8 +161,14 @@ where
             .unwrap();
 
         for metric in metrics {
-            let res = metric.compute_values(&activities);
-            tracing::info!("New value {:?} for metric {:?}", res, metric);
+            let values = metric.compute_values(&activities);
+            tracing::info!("New value {:?} for metric {:?}", values, metric);
+            for (key, value) in values.iter() {
+                let _ = self
+                    .metrics_repository
+                    .save_metric_values(metric.id(), (key, *value))
+                    .await;
+            }
         }
         Ok(())
     }
@@ -549,10 +555,10 @@ mod tests_training_metrics_service {
             result
         }
 
-        async fn update_metric_values(
+        async fn save_metric_values(
             &self,
             _id: &TrainingMetricId,
-            _new_value: (String, f64),
+            _values: (&str, f64),
         ) -> Result<(), UpdateMetricError> {
             let mut guard = self.update_metric_values_result.lock().await;
             let mut result = Err(UpdateMetricError::Unknown(anyhow!("substitute error")));
@@ -588,9 +594,7 @@ mod tests_training_metrics_service {
                     ),
                 ]))),
                 update_metric_values_result: Arc::new(Mutex::new(Ok(()))),
-                get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::new(
-                    vec![],
-                )))),
+                get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::default()))),
             }
         }
     }

@@ -124,13 +124,17 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
             .cloned()
     }
 
-    async fn update_metric_values(
+    async fn save_metric_values(
         &self,
         id: &TrainingMetricId,
-        new_value: (String, f64),
+        new_value: (&str, f64),
     ) -> Result<(), UpdateMetricError> {
         let mut metrics = self.values.lock().await;
-        metrics.entry(id.clone()).or_default().push(new_value);
+        let (key, value) = new_value;
+        metrics
+            .entry(id.clone())
+            .or_default()
+            .insert(key.to_string(), value);
         Ok(())
     }
 }
