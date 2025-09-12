@@ -178,6 +178,10 @@ pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
         &self,
         req: RecomputeMetricRequest,
     ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn get_training_metrics(
+        &self,
+    ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
 }
 
 #[derive(Debug, Error)]

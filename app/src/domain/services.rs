@@ -5,7 +5,10 @@ use derive_more::Constructor;
 use tokio::sync::Mutex;
 
 use crate::domain::{
-    models::activity::{Activity, ActivityId},
+    models::{
+        activity::{Activity, ActivityId},
+        training_metrics::{TrainingMetricDefinition, TrainingMetricValues},
+    },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, GetActivityError,
         IActivityService, ITrainingMetricService, ListActivitiesError, RawDataRepository,
@@ -172,6 +175,25 @@ where
         }
         Ok(())
     }
+
+    async fn get_training_metrics(&self) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
+        let Ok(definitions) = self.metrics_repository.get_definitions().await else {
+            return vec![];
+        };
+
+        let mut res = vec![];
+        for definition in definitions {
+            if let Ok(values) = self
+                .metrics_repository
+                .get_metric_values(definition.id())
+                .await
+            {
+                res.push((definition.clone(), values.clone()))
+            }
+        }
+
+        res
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -309,12 +331,15 @@ pub mod test_utils {
     #[derive(Clone)]
     pub struct MockTrainingMetricsService {
         pub recompute_metrics_result: Arc<Mutex<Result<(), ()>>>,
+        pub get_training_metrics_result:
+            Arc<Mutex<Vec<(TrainingMetricDefinition, TrainingMetricValues)>>>,
     }
 
     impl Default for MockTrainingMetricsService {
         fn default() -> Self {
             Self {
                 recompute_metrics_result: Arc::new(Mutex::new(Ok(()))),
+                get_training_metrics_result: Arc::new(Mutex::new(vec![])),
             }
         }
     }
@@ -323,6 +348,15 @@ pub mod test_utils {
         async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
             let mut guard = self.recompute_metrics_result.lock();
             let mut result = Err(());
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
+        }
+
+        async fn get_training_metrics(
+            &self,
+        ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
+            let mut guard = self.get_training_metrics_result.lock();
+            let mut result = Vec::new();
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
@@ -514,13 +548,13 @@ mod tests_activity_service {
 
 #[cfg(test)]
 mod tests_training_metrics_service {
-    use std::{mem, ops::DerefMut, sync::Arc};
+    use std::{collections::HashMap, mem, ops::DerefMut, sync::Arc};
 
     use tokio::sync::Mutex;
 
     use crate::domain::{
         models::{
-            activity::TimeseriesMetric,
+            activity::{ActivityStatistic, TimeseriesMetric},
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricId, TrainingMetricSource, TrainingMetricValues,
@@ -609,5 +643,83 @@ mod tests_training_metrics_service {
         let res = service.recompute_metric(req).await;
 
         assert!(res.is_ok())
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_when_get_definitions_err() {
+        let repository = MockTrainingMetricsRepository {
+            get_definitions_result: Arc::new(Mutex::new(Err(
+                GetTrainingMetricsDefinitionsError::Unknown(anyhow!("an error")),
+            ))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository, activity_repository);
+
+        let res = service.get_training_metrics().await;
+        assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_def_without_values() {
+        let repository = MockTrainingMetricsRepository {
+            get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
+                TrainingMetricId::from(&"test"),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )]))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository, activity_repository);
+
+        let res = service.get_training_metrics().await;
+
+        assert_eq!(res.len(), 1);
+        let (def, value) = res.first().unwrap();
+        assert_eq!(
+            def,
+            &TrainingMetricDefinition::new(
+                TrainingMetricId::from(&"test"),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )
+        );
+        assert!(value.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
+        let repository = MockTrainingMetricsRepository {
+            get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
+                TrainingMetricId::from(&"test"),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )]))),
+            get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::new(
+                HashMap::from([("toto".to_string(), 0.3)]),
+            )))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository, activity_repository);
+
+        let res = service.get_training_metrics().await;
+
+        assert_eq!(res.len(), 1);
+        let (def, value) = res.first().unwrap();
+        assert_eq!(
+            def,
+            &TrainingMetricDefinition::new(
+                TrainingMetricId::from(&"test"),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            )
+        );
+        assert_eq!(*value.get("toto").unwrap(), 0.3);
     }
 }
