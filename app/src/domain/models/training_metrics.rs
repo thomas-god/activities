@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::models::activity::{Activity, ActivityStatistic, TimeseriesMetric};
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct TrainingMetricId(String);
 
 impl TrainingMetricId {
@@ -16,6 +16,10 @@ impl TrainingMetricId {
 
     pub fn from(id: &str) -> Self {
         Self(id.to_string())
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.clone()
     }
 }
 
@@ -36,6 +40,18 @@ pub struct TrainingMetricDefinition {
 impl TrainingMetricDefinition {
     pub fn id(&self) -> &TrainingMetricId {
         &self.id
+    }
+
+    pub fn source(&self) -> &TrainingMetricSource {
+        &self.source
+    }
+
+    pub fn granularity(&self) -> &TrainingMetricGranularity {
+        &self.granularity
+    }
+
+    pub fn aggregate(&self) -> &TrainingMetricAggregate {
+        &self.granularity_aggregate
     }
 }
 
@@ -122,7 +138,7 @@ fn aggregate_metrics(
     res
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum TrainingMetricGranularity {
     Activity,
     Daily,
@@ -145,7 +161,7 @@ impl TrainingMetricGranularity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum TrainingMetricAggregate {
     Min,
     Max,
@@ -173,6 +189,12 @@ impl TrainingMetricAggregate {
 
 #[derive(Debug, Clone, Constructor, Deref, DerefMut, Default)]
 pub struct TrainingMetricValues(HashMap<String, f64>);
+
+impl TrainingMetricValues {
+    pub fn as_hash_map(self) -> HashMap<String, f64> {
+        self.0
+    }
+}
 
 #[cfg(test)]
 mod test_training_metrics {

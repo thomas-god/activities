@@ -192,7 +192,7 @@ pub enum GetTrainingMetricsDefinitionsError {
 
 #[derive(Debug, Error)]
 pub enum UpdateMetricError {
-    #[error("Training metric {0} does not exist")]
+    #[error("Training metric {0:?} does not exist")]
     TrainingMetricDoesNotExists(TrainingMetricId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
@@ -200,7 +200,7 @@ pub enum UpdateMetricError {
 
 #[derive(Debug, Error)]
 pub enum GetTrainingMetricValueError {
-    #[error("Training metric {0} does not exist")]
+    #[error("Training metric {0:?} does not exist")]
     TrainingMetricDoesNotExists(TrainingMetricId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),

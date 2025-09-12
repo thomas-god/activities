@@ -140,7 +140,7 @@ pub enum Sport {
 #[derive(Clone, Debug, Constructor, Default, Deref)]
 pub struct ActivityStatistics(HashMap<ActivityStatistic, f64>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 pub enum ActivityStatistic {
     Calories,
     Elevation,
