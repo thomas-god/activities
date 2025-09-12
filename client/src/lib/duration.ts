@@ -43,4 +43,4 @@ export const formatRelativeDuration = (value: dayjs.Dayjs, reference: dayjs.Dayj
 
 export const formatDateTime = (value: string, timezone = 'Europe/Paris', format = 'DD-MM-YYYY HH:mm:ss'): string => {
 	return dayjs(value).tz(timezone).format(format);
-}
+};
