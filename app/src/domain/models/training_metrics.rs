@@ -178,8 +178,8 @@ impl TrainingMetricValues {
 mod test_training_metrics {
 
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport, ActivityTimeseries,
-        Timeseries, TimeseriesTime, TimeseriesValue,
+        Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
+        ActivityTimeseries, Sport, Timeseries, TimeseriesTime, TimeseriesValue,
     };
 
     use super::*;
@@ -217,6 +217,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::new(3),
             Sport::Cycling,
+            ActivityStatistics::default(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
                 vec![Timeseries::new(
@@ -254,6 +255,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::new(1),
             Sport::Cycling,
+            ActivityStatistics::default(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],

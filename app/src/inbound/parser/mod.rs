@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::domain::{
     models::activity::{
-        ActivityDuration, ActivityStartTime, ActivityTimeseries, Sport, Timeseries,
-        TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+        Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
     ports::CreateActivityRequest,
 };
@@ -46,8 +46,10 @@ impl ParseFile for FitParser {
 
         let timeseries = extract_timeseries(reference_timestamp, &messages)?;
 
+        let statistics = ActivityStatistics::default();
+
         Ok(CreateActivityRequest::new(
-            sport, duration, start_time, timeseries, bytes,
+            sport, duration, start_time, statistics, timeseries, bytes,
         ))
     }
 }
@@ -274,6 +276,7 @@ pub mod test_utils {
                     Sport::Cycling,
                     ActivityDuration(3600),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                     vec![1, 2, 3],
                 )))),

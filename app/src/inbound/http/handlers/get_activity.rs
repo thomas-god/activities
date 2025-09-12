@@ -119,8 +119,8 @@ mod tests {
     use crate::{
         domain::{
             models::activity::{
-                ActivityDuration, ActivityStartTime, ActivityTimeseries, Timeseries,
-                TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+                Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
             },
             ports::GetActivityError,
             services::test_utils::{MockActivityService, MockTrainingMetricsService},
@@ -143,6 +143,7 @@ mod tests {
                 ),
                 ActivityDuration::new(1200),
                 Sport::Cycling,
+                ActivityStatistics::default(),
                 ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),
                     vec![Timeseries::new(

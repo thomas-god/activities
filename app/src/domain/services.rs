@@ -76,6 +76,7 @@ where
             *req.start_time(),
             *req.duration(),
             *req.sport(),
+            req.statistics().clone(),
             req.timeseries().clone(),
         );
 
@@ -179,7 +180,8 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityDuration, ActivityNaturalKey, ActivityStartTime, ActivityTimeseries, Sport,
+        ActivityDuration, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
+        ActivityTimeseries, Sport,
     };
     use crate::domain::ports::{ListActivitiesError, SaveActivityError, SimilarActivityError};
 
@@ -198,6 +200,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
+                    ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                 )))),
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
@@ -206,6 +209,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
+                    ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                 )))),
             }
@@ -328,8 +332,8 @@ mod tests_activity_service {
 
     use crate::domain::{
         models::activity::{
-            ActivityDuration, ActivityStartTime, ActivityTimeseries, Sport, Timeseries,
-            TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+            ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+            Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         },
         ports::{SaveActivityError, SaveRawDataError},
         services::test_utils::{MockActivityRepository, MockTrainingMetricsService},
@@ -360,8 +364,9 @@ mod tests_activity_service {
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
         let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
+        let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
-        CreateActivityRequest::new(sport, duration, start_time, timeseries, content)
+        CreateActivityRequest::new(sport, duration, start_time, statistics, timeseries, content)
     }
 
     #[tokio::test]
@@ -464,6 +469,7 @@ mod tests_activity_service {
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
         let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
+        let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::new(
             TimeseriesTime::new(vec![0, 1, 2]),
             vec![
@@ -485,7 +491,9 @@ mod tests_activity_service {
             ],
         );
 
-        let req = CreateActivityRequest::new(sport, duration, start_time, timeseries, content);
+        let req = CreateActivityRequest::new(
+            sport, duration, start_time, statistics, timeseries, content,
+        );
 
         let res = service.create_activity(req).await;
 

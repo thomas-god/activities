@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
@@ -12,6 +14,7 @@ pub struct Activity {
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
+    statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
 }
 
@@ -22,6 +25,7 @@ impl Activity {
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
+        statistics: ActivityStatistics,
         timeseries: ActivityTimeseries,
     ) -> Self {
         Self {
@@ -29,6 +33,7 @@ impl Activity {
             start_time,
             duration,
             sport,
+            statistics,
             timeseries,
         }
     }
@@ -128,6 +133,16 @@ pub enum Sport {
     Other,
 }
 
+#[derive(Clone, Debug, Constructor, Default, Deref)]
+pub struct ActivityStatistics(HashMap<ActivityStatistic, f64>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash)]
+pub enum ActivityStatistic {
+    Calories,
+    Elevation,
+    Distance,
+}
+
 ///////////////////////////////////////////////////////////////////
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
@@ -217,6 +232,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            ActivityStatistics::default(),
             ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
@@ -224,6 +240,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
+            ActivityStatistics::default(),
             ActivityTimeseries::default(),
         );
 
@@ -237,6 +254,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            ActivityStatistics::default(),
             ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
@@ -244,6 +262,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
+            ActivityStatistics::default(),
             ActivityTimeseries::default(),
         );
 
