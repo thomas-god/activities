@@ -40,7 +40,6 @@ export const formatRelativeDuration = (value: dayjs.Dayjs, reference: dayjs.Dayj
 	return dayjs.duration(value.diff(reference)).humanize(true);
 };
 
-
 export const formatDateTime = (value: string, timezone = 'Europe/Paris', format = 'DD-MM-YYYY HH:mm:ss'): string => {
 	return dayjs(value).tz(timezone).format(format);
 };
