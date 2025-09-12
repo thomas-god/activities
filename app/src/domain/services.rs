@@ -491,7 +491,7 @@ mod tests_training_metrics_service {
         async fn update_metric_values(
             &self,
             _id: &TrainingMetricId,
-            _new_value: (chrono::DateTime<chrono::FixedOffset>, f64),
+            _new_value: (String, f64),
         ) -> Result<(), UpdateMetricError> {
             let mut guard = self.update_metric_values_result.lock().await;
             let mut result = Err(UpdateMetricError::Unknown(anyhow!("substitute error")));
@@ -526,7 +526,6 @@ mod tests_training_metrics_service {
                 ]))),
                 update_metric_values_result: Arc::new(Mutex::new(Ok(()))),
                 get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::new(
-                    TrainingMetricGranularity::Weekly,
                     vec![],
                 )))),
             }

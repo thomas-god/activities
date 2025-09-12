@@ -5,10 +5,15 @@ use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::domain::{
-    models::activity::{Activity, ActivityId, ActivityNaturalKey},
+    models::{
+        activity::{Activity, ActivityId, ActivityNaturalKey},
+        training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
+    },
     ports::{
-        ActivityRepository, GetActivityError, ListActivitiesError, RawDataRepository,
-        SaveActivityError, SaveRawDataError, SimilarActivityError,
+        ActivityRepository, GetActivityError, GetTrainingMetricValueError,
+        GetTrainingMetricsDefinitionsError, ListActivitiesError, RawDataRepository,
+        SaveActivityError, SaveRawDataError, SimilarActivityError, TrainingMetricsRepository,
+        UpdateMetricError,
     },
 };
 
@@ -79,6 +84,53 @@ impl RawDataRepository for InMemoryRawDataRepository {
         guard
             .deref_mut()
             .insert(activity_id.clone(), content.into());
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct InMemoryTrainingMetricsRepository {
+    definitions: Arc<Mutex<HashMap<TrainingMetricId, TrainingMetricDefinition>>>,
+    values: Arc<Mutex<HashMap<TrainingMetricId, TrainingMetricValues>>>,
+}
+
+impl InMemoryTrainingMetricsRepository {
+    pub fn new(definitions: HashMap<TrainingMetricId, TrainingMetricDefinition>) -> Self {
+        Self {
+            definitions: Arc::new(Mutex::new(definitions)),
+            values: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
+    async fn get_definitions(
+        &self,
+    ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
+        let definitions = self.definitions.lock().await;
+        Ok(definitions.values().cloned().collect())
+    }
+
+    async fn get_metric_values(
+        &self,
+        id: &TrainingMetricId,
+    ) -> Result<TrainingMetricValues, GetTrainingMetricValueError> {
+        let metrics = self.values.lock().await;
+        metrics
+            .get(id)
+            .ok_or(GetTrainingMetricValueError::TrainingMetricDoesNotExists(
+                id.clone(),
+            ))
+            .cloned()
+    }
+
+    async fn update_metric_values(
+        &self,
+        id: &TrainingMetricId,
+        new_value: (String, f64),
+    ) -> Result<(), UpdateMetricError> {
+        let mut metrics = self.values.lock().await;
+        metrics.entry(id.clone()).or_default().push(new_value);
         Ok(())
     }
 }

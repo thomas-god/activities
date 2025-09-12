@@ -1,4 +1,3 @@
-use chrono::{DateTime, FixedOffset};
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -206,7 +205,7 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
     fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        new_value: (DateTime<FixedOffset>, f64),
+        new_value: (String, f64),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
     fn get_metric_values(

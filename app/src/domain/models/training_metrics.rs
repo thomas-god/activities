@@ -42,22 +42,21 @@ impl TrainingMetricDefinition {
         &self,
         activities: &[Activity],
     ) -> Result<HashMap<String, f64>, MetricValueComputationError> {
+        let metrics_per_activity = activities
+            .iter()
+            .filter_map(|activity| {
+                extract_aggregated_activity_metric(
+                    &self.activity_metric_aggregate,
+                    &self.activity_metric,
+                    activity,
+                )
+                .map(|val| (**activity.start_time(), val))
+            })
+            .collect();
+        let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
         Ok(aggregate_metrics(
             &self.granularity_aggregate,
-            group_metrics_by_granularity(
-                &self.granularity,
-                activities
-                    .iter()
-                    .filter_map(|activity| {
-                        extract_aggregated_activity_metric(
-                            &self.activity_metric_aggregate,
-                            &self.activity_metric,
-                            activity,
-                        )
-                        .map(|val| (**activity.start_time(), val))
-                    })
-                    .collect(),
-            ),
+            grouped_metrics,
         ))
     }
 }
@@ -159,29 +158,19 @@ impl TrainingMetricAggregate {
     }
 }
 
-#[derive(Debug, Clone, Constructor)]
-pub struct TrainingMetricValues {
-    granularity: TrainingMetricGranularity,
-    values: Vec<(DateTime<FixedOffset>, f64)>,
-}
+#[derive(Debug, Clone, Constructor, Deref, Default)]
+pub struct TrainingMetricValues(Vec<(String, f64)>);
 
 impl TrainingMetricValues {
-    pub fn append(self, new_value: (DateTime<FixedOffset>, f64)) -> Self {
-        let mut values = self.values;
+    pub fn append(self, new_value: (String, f64)) -> Self {
+        let mut values = self.0;
         values.push(new_value);
 
-        Self {
-            granularity: self.granularity,
-            values,
-        }
+        Self(values)
     }
 
-    pub fn granularity(&self) -> &TrainingMetricGranularity {
-        &self.granularity
-    }
-
-    pub fn values(&self) -> &[(DateTime<FixedOffset>, f64)] {
-        &self.values
+    pub fn push(&mut self, new_value: (String, f64)) {
+        self.0.push(new_value);
     }
 }
 
@@ -197,25 +186,25 @@ mod test_training_metrics {
 
     #[test]
     fn test_append_new_value_to_existing_metric() {
-        let metric = TrainingMetricValues::new(TrainingMetricGranularity::Weekly, vec![]);
-        let new_value = (
-            "2025-09-03T00:00:00Z"
-                .parse::<DateTime<FixedOffset>>()
-                .unwrap(),
-            12.3,
-        );
+        let metric = TrainingMetricValues::new(vec![]);
+        let new_value = ("2025-09-03T00:00:00Z".to_string(), 12.3);
 
         let updated_metric = metric.append(new_value);
 
         assert_eq!(
-            updated_metric.values(),
-            vec![(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-                12.3,
-            )]
+            *updated_metric,
+            vec![("2025-09-03T00:00:00Z".to_string(), 12.3,)]
         );
+    }
+
+    #[test]
+    fn test_push_new_value_to_existing_metric() {
+        let mut metric = TrainingMetricValues::new(vec![]);
+        let new_value = ("2025-09-03T00:00:00Z".to_string(), 12.3);
+
+        metric.push(new_value);
+
+        assert_eq!(*metric, vec![("2025-09-03T00:00:00Z".to_string(), 12.3,)]);
     }
 
     fn default_activity() -> Activity {
