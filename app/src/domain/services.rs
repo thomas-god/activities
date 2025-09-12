@@ -18,32 +18,41 @@ use crate::domain::{
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ActivityService<AR, RDR>
+pub struct ActivityService<AR, RDR, TMS>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
+    TMS: ITrainingMetricService,
 {
     activity_repository: Arc<Mutex<AR>>,
     raw_data_repository: RDR,
+    training_metrics_service: Arc<TMS>,
 }
 
-impl<AR, RDR> ActivityService<AR, RDR>
+impl<AR, RDR, TMS> ActivityService<AR, RDR, TMS>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
+    TMS: ITrainingMetricService,
 {
-    pub fn new(activity_repository: Arc<Mutex<AR>>, raw_data_repository: RDR) -> Self {
+    pub fn new(
+        activity_repository: Arc<Mutex<AR>>,
+        raw_data_repository: RDR,
+        training_metrics_service: Arc<TMS>,
+    ) -> Self {
         Self {
             activity_repository,
             raw_data_repository,
+            training_metrics_service,
         }
     }
 }
 
-impl<AR, RDR> IActivityService for ActivityService<AR, RDR>
+impl<AR, RDR, TMS> IActivityService for ActivityService<AR, RDR, TMS>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
+    TMS: ITrainingMetricService,
 {
     async fn create_activity(
         &self,
@@ -94,6 +103,14 @@ where
             .map_err(|err| {
                 anyhow!(err).context(format!("Failed to persist raw data for activity {}", id))
             })?;
+
+        // Dispatch metrics update
+        let metric_service = self.training_metrics_service.clone();
+        let activity_id = activity.id().clone();
+        tokio::spawn(async move {
+            let req = RecomputeMetricRequest::new(activity_id);
+            metric_service.recompute_metric(req).await
+        });
 
         Ok(activity)
     }
@@ -315,7 +332,7 @@ mod tests_activity_service {
             TimeseriesTime, TimeseriesValue,
         },
         ports::{SaveActivityError, SaveRawDataError},
-        services::test_utils::MockActivityRepository,
+        services::test_utils::{MockActivityRepository, MockTrainingMetricsService},
     };
 
     use super::*;
@@ -356,7 +373,9 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
         let req = default_activity_request();
 
@@ -376,7 +395,9 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
         let req = default_activity_request();
 
@@ -396,7 +417,9 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
         let req = default_activity_request();
 
@@ -413,7 +436,9 @@ mod tests_activity_service {
                 "an error occured"
             ))))),
         };
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
         let req = default_activity_request();
 
@@ -431,7 +456,9 @@ mod tests_activity_service {
                 "an error occured"
             ))))),
         };
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();

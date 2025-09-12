@@ -2,7 +2,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use app::{
     config::Config,
-    domain::services::{ActivityService, TrainingMetricService},
+    domain::{
+        models::{
+            activity::Metric,
+            training_metrics::{
+                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricId,
+            },
+        },
+        services::{ActivityService, TrainingMetricService},
+    },
     inbound::{http::HttpServer, parser::FitParser},
     outbound::memory::{
         InMemoryActivityRepository, InMemoryRawDataRepository, InMemoryTrainingMetricsRepository,
@@ -29,11 +38,27 @@ async fn main() -> anyhow::Result<()> {
 
     let activity_repository = Arc::new(Mutex::new(InMemoryActivityRepository::new(vec![])));
     let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
-    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::new());
+    let id = TrainingMetricId::new();
+    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::from([(
+        id.clone(),
+        TrainingMetricDefinition::new(
+            id,
+            Metric::Power,
+            TrainingMetricAggregate::Max,
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+        ),
+    )]));
 
-    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
-    let training_metrics_service =
-        TrainingMetricService::new(training_metrics_repository, activity_repository.clone());
+    let training_metrics_service = Arc::new(TrainingMetricService::new(
+        training_metrics_repository,
+        activity_repository.clone(),
+    ));
+    let activity_service = ActivityService::new(
+        activity_repository.clone(),
+        raw_data_repository,
+        training_metrics_service.clone(),
+    );
 
     let parser = FitParser {};
     let http_server =

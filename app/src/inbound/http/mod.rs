@@ -31,7 +31,7 @@ impl HttpServer {
     pub async fn new(
         activity_service: impl IActivityService,
         file_parser: impl ParseFile,
-        training_metric_service: impl ITrainingMetricService,
+        training_metric_service: Arc<impl ITrainingMetricService>,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -43,7 +43,7 @@ impl HttpServer {
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
-            training_metrics_service: Arc::new(training_metric_service),
+            training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
         };
 
