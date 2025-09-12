@@ -12,17 +12,17 @@ pub struct Activity {
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
-    timeseries: Timeseries,
+    timeseries: ActivityTimeseries,
 }
 
-/// An [Activity] is an entity representing a single sport or training session.
+/// An [Activity] is an entity representing a single sport activity or training session.
 impl Activity {
     pub fn new(
         id: ActivityId,
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
-        timeseries: Timeseries,
+        timeseries: ActivityTimeseries,
     ) -> Self {
         Self {
             id,
@@ -33,9 +33,9 @@ impl Activity {
         }
     }
 
-    /// An [Activity]'s natural key defined from its defining fields. Two activities with identical
-    /// natural keys should be considered identical/duplicate regardless of their technical
-    /// [Activity::id].
+    /// An [Activity]'s natural key if a key generated from its defining fields. Two activities with
+    /// identical natural keys should be considered identical/duplicate regardless of their
+    /// technical [Activity::id].
     pub fn natural_key(&self) -> ActivityNaturalKey {
         ActivityNaturalKey(format!(
             "{:?}:{:?}:{:?}",
@@ -59,7 +59,7 @@ impl Activity {
         &self.sport
     }
 
-    pub fn timeseries(&self) -> &Timeseries {
+    pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
     }
 }
@@ -132,36 +132,37 @@ pub enum Sport {
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
 
-/// A [Timeseries] represent a coherent set of time dependant [TimeseriesMetric]s.
+/// An [ActivityTimeseries] is a coherent set of time dependant [TimeseriesMetric] (plural)
+/// from the same [Activity].
 #[derive(Debug, Clone, PartialEq, Constructor, Default)]
-pub struct Timeseries {
+pub struct ActivityTimeseries {
     time: TimeseriesTime,
-    metrics: Vec<TimeseriesMetric>,
+    metrics: Vec<Timeseries>,
 }
 
-impl Timeseries {
+impl ActivityTimeseries {
     pub fn time(&self) -> &TimeseriesTime {
         &self.time
     }
 
-    pub fn metrics(&self) -> &[TimeseriesMetric] {
+    pub fn metrics(&self) -> &[Timeseries] {
         &self.metrics
     }
 }
 
-/// [TimeseriesTime] represent relative timestamp of a timeseries, starting from the
+/// [TimeseriesTime] represents the relative timestamp of a timeseries, starting from the
 /// [Activity::start_time].
 #[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref, Default)]
 pub struct TimeseriesTime(Vec<usize>);
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct TimeseriesMetric {
-    metric: Metric,
+pub struct Timeseries {
+    metric: TimeseriesMetric,
     values: Vec<Option<TimeseriesValue>>,
 }
 
-impl TimeseriesMetric {
-    pub fn metric(&self) -> &Metric {
+impl Timeseries {
+    pub fn metric(&self) -> &TimeseriesMetric {
         &self.metric
     }
 
@@ -171,14 +172,14 @@ impl TimeseriesMetric {
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]
-pub enum Metric {
+pub enum TimeseriesMetric {
     Speed,
     Power,
     HeartRate,
     Distance,
 }
 
-impl Metric {
+impl TimeseriesMetric {
     pub fn unit(&self) -> String {
         match self {
             Self::Distance => "m".to_string(),
@@ -216,14 +217,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries::default(),
+            ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
-            Timeseries::default(),
+            ActivityTimeseries::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -236,14 +237,14 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries::default(),
+            ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
-            Timeseries::default(),
+            ActivityTimeseries::default(),
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());

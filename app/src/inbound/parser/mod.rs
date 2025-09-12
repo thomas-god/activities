@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::domain::{
     models::activity::{
-        ActivityDuration, ActivityStartTime, Metric, Sport, Timeseries, TimeseriesMetric,
-        TimeseriesTime, TimeseriesValue,
+        ActivityDuration, ActivityStartTime, ActivityTimeseries, Sport, Timeseries,
+        TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
     ports::CreateActivityRequest,
 };
@@ -120,7 +120,7 @@ fn extract_sport(messages: &[DataMessage]) -> Sport {
 fn extract_timeseries(
     reference_timestamp: u32,
     messages: &[DataMessage],
-) -> Result<Timeseries, ParseCreateActivityHttpRequestBodyError> {
+) -> Result<ActivityTimeseries, ParseCreateActivityHttpRequestBodyError> {
     let mut time = vec![];
     let mut speed_values = vec![];
     let mut power_values = vec![];
@@ -205,12 +205,12 @@ fn extract_timeseries(
     }
 
     let metrics = vec![
-        TimeseriesMetric::new(Metric::Speed, speed_values),
-        TimeseriesMetric::new(Metric::Distance, distance_values),
-        TimeseriesMetric::new(Metric::HeartRate, heart_rate_values),
-        TimeseriesMetric::new(Metric::Power, power_values),
+        Timeseries::new(TimeseriesMetric::Speed, speed_values),
+        Timeseries::new(TimeseriesMetric::Distance, distance_values),
+        Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
+        Timeseries::new(TimeseriesMetric::Power, power_values),
     ];
-    Ok(Timeseries::new(TimeseriesTime::new(time), metrics))
+    Ok(ActivityTimeseries::new(TimeseriesTime::new(time), metrics))
 }
 
 #[derive(Debug, Clone, Error)]
@@ -274,7 +274,7 @@ pub mod test_utils {
                     Sport::Cycling,
                     ActivityDuration(3600),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
-                    Timeseries::default(),
+                    ActivityTimeseries::default(),
                     vec![1, 2, 3],
                 )))),
             }
@@ -290,7 +290,7 @@ mod tests {
     use chrono::{DateTime, FixedOffset, Utc};
     use fit_parser::DataMessageField;
 
-    use crate::domain::models::activity::{Metric, TimeseriesValue};
+    use crate::domain::models::activity::{TimeseriesMetric, TimeseriesValue};
 
     use super::*;
 
@@ -304,33 +304,33 @@ mod tests {
         extract_metrics(req.timeseries())
     }
 
-    fn extract_metrics<'a>(timeseries: &'a Timeseries) -> TestMetrics<'a> {
+    fn extract_metrics<'a>(timeseries: &'a ActivityTimeseries) -> TestMetrics<'a> {
         let speed = timeseries
             .metrics()
             .iter()
             .find_map(|metric| match metric.metric() {
-                Metric::Speed => Some(metric.values()),
+                TimeseriesMetric::Speed => Some(metric.values()),
                 _ => None,
             });
         let power = timeseries
             .metrics()
             .iter()
             .find_map(|metric| match metric.metric() {
-                Metric::Power => Some(metric.values()),
+                TimeseriesMetric::Power => Some(metric.values()),
                 _ => None,
             });
         let distance = timeseries
             .metrics()
             .iter()
             .find_map(|metric| match metric.metric() {
-                Metric::Distance => Some(metric.values()),
+                TimeseriesMetric::Distance => Some(metric.values()),
                 _ => None,
             });
         let heart_rate = timeseries
             .metrics()
             .iter()
             .find_map(|metric| match metric.metric() {
-                Metric::HeartRate => Some(metric.values()),
+                TimeseriesMetric::HeartRate => Some(metric.values()),
                 _ => None,
             });
 

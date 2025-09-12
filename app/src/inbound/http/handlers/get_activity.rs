@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::activity::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
+        models::activity::{Activity, ActivityId, ActivityTimeseries, Sport, TimeseriesValue},
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -22,7 +22,7 @@ pub struct ResponseBody {
     sport: String,
     duration: usize,
     start_time: DateTime<FixedOffset>,
-    timeseries: TimeseriesBody,
+    timeseries: ActivityTimeseriesBody,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -42,15 +42,15 @@ impl From<&TimeseriesValue> for TimeseriesValueBody {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesMetricsBody {
+pub struct TimeseriesBody {
     unit: String,
     values: Vec<Option<TimeseriesValueBody>>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesBody {
+pub struct ActivityTimeseriesBody {
     time: Vec<usize>,
-    metrics: HashMap<String, TimeseriesMetricsBody>,
+    metrics: HashMap<String, TimeseriesBody>,
 }
 
 impl From<&Activity> for ResponseBody {
@@ -69,14 +69,14 @@ impl From<&Activity> for ResponseBody {
     }
 }
 
-impl From<&Timeseries> for TimeseriesBody {
-    fn from(value: &Timeseries) -> Self {
+impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
+    fn from(value: &ActivityTimeseries) -> Self {
         Self {
             time: (**value.time()).clone(),
             metrics: HashMap::from_iter(value.metrics().iter().map(|metric| {
                 (
                     metric.metric().to_string(),
-                    TimeseriesMetricsBody {
+                    TimeseriesBody {
                         unit: metric.metric().unit(),
                         values: metric
                             .values()
@@ -119,8 +119,8 @@ mod tests {
     use crate::{
         domain::{
             models::activity::{
-                ActivityDuration, ActivityStartTime, Metric, Timeseries, TimeseriesMetric,
-                TimeseriesTime, TimeseriesValue,
+                ActivityDuration, ActivityStartTime, ActivityTimeseries, Timeseries,
+                TimeseriesMetric, TimeseriesTime, TimeseriesValue,
             },
             ports::GetActivityError,
             services::test_utils::{MockActivityService, MockTrainingMetricsService},
@@ -143,10 +143,10 @@ mod tests {
                 ),
                 ActivityDuration::new(1200),
                 Sport::Cycling,
-                Timeseries::new(
+                ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),
-                    vec![TimeseriesMetric::new(
-                        Metric::Power,
+                    vec![Timeseries::new(
+                        TimeseriesMetric::Power,
                         vec![
                             Some(TimeseriesValue::Int(120)),
                             None,
@@ -180,11 +180,11 @@ mod tests {
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
-                timeseries: TimeseriesBody {
+                timeseries: ActivityTimeseriesBody {
                     time: vec![0, 1, 2],
                     metrics: HashMap::from([(
                         "Power".to_string(),
-                        TimeseriesMetricsBody {
+                        TimeseriesBody {
                             unit: "W".to_string(),
                             values: vec![
                                 Some(TimeseriesValueBody::Int(120)),

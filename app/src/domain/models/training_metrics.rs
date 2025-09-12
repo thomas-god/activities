@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, FixedOffset, SecondsFormat};
 use derive_more::{AsRef, Constructor, Deref, Display};
 use uuid::Uuid;
 
-use crate::domain::models::activity::{Activity, Metric};
+use crate::domain::models::activity::{Activity, TimeseriesMetric};
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct TrainingMetricId(String);
@@ -28,7 +28,7 @@ impl Default for TrainingMetricId {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
-    activity_metric: Metric,
+    activity_metric: TimeseriesMetric,
     activity_metric_aggregate: TrainingMetricAggregate,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
@@ -63,7 +63,7 @@ impl TrainingMetricDefinition {
 
 fn extract_aggregated_activity_metric(
     aggregate: &TrainingMetricAggregate,
-    metric: &Metric,
+    metric: &TimeseriesMetric,
     activity: &Activity,
 ) -> Option<f64> {
     let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
@@ -178,8 +178,8 @@ impl TrainingMetricValues {
 mod test_training_metrics {
 
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport, Timeseries,
-        TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        Activity, ActivityDuration, ActivityId, ActivityStartTime, Sport, ActivityTimeseries,
+        Timeseries, TimeseriesTime, TimeseriesValue,
     };
 
     use super::*;
@@ -217,10 +217,10 @@ mod test_training_metrics {
             ),
             ActivityDuration::new(3),
             Sport::Cycling,
-            Timeseries::new(
+            ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
-                vec![TimeseriesMetric::new(
-                    Metric::Power,
+                vec![Timeseries::new(
+                    TimeseriesMetric::Power,
                     vec![
                         Some(TimeseriesValue::Int(10)),
                         Some(TimeseriesValue::Int(20)),
@@ -233,7 +233,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_no_metric_found() {
-        let metric = Metric::Speed;
+        let metric = TimeseriesMetric::Speed;
         let aggregate = TrainingMetricAggregate::Min;
         let activity = default_activity();
 
@@ -243,7 +243,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_metric_is_empty() {
-        let metric = Metric::Power;
+        let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Average;
         let activity = Activity::new(
             ActivityId::default(),
@@ -254,9 +254,9 @@ mod test_training_metrics {
             ),
             ActivityDuration::new(1),
             Sport::Cycling,
-            Timeseries::new(
+            ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
-                vec![TimeseriesMetric::new(Metric::Power, vec![])],
+                vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
             ),
         );
 
@@ -266,7 +266,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_min_value() {
-        let metric = Metric::Power;
+        let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Min;
         let activity = default_activity();
 
@@ -277,7 +277,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_max_value() {
-        let metric = Metric::Power;
+        let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Max;
         let activity = default_activity();
 
@@ -288,7 +288,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_average_value() {
-        let metric = Metric::Power;
+        let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Average;
         let activity = default_activity();
 
@@ -299,7 +299,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_extract_aggregated_activity_metric_total_value() {
-        let metric = Metric::Power;
+        let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Sum;
         let activity = default_activity();
 
@@ -438,7 +438,7 @@ mod test_training_metrics {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
-            Metric::Power,
+            TimeseriesMetric::Power,
             TrainingMetricAggregate::Average,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,

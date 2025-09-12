@@ -2,8 +2,8 @@ use derive_more::Constructor;
 use thiserror::Error;
 
 use crate::domain::models::activity::{
-    Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime, Sport,
-    Timeseries,
+    Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime,
+    ActivityTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
     TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues,
@@ -18,7 +18,7 @@ pub struct CreateActivityRequest {
     sport: Sport,
     duration: ActivityDuration,
     start_time: ActivityStartTime,
-    timeseries: Timeseries,
+    timeseries: ActivityTimeseries,
     raw_content: Vec<u8>,
 }
 
@@ -27,7 +27,7 @@ impl CreateActivityRequest {
         sport: Sport,
         duration: ActivityDuration,
         start_time: ActivityStartTime,
-        timeseries: Timeseries,
+        timeseries: ActivityTimeseries,
         raw_content: Vec<u8>,
     ) -> Self {
         Self {
@@ -55,7 +55,7 @@ impl CreateActivityRequest {
         &self.duration
     }
 
-    pub fn timeseries(&self) -> &Timeseries {
+    pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
     }
 }

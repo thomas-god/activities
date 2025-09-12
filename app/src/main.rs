@@ -4,7 +4,7 @@ use app::{
     config::Config,
     domain::{
         models::{
-            activity::Metric,
+            activity::TimeseriesMetric,
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricId,
@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         id.clone(),
         TrainingMetricDefinition::new(
             id,
-            Metric::Power,
+            TimeseriesMetric::Power,
             TrainingMetricAggregate::Max,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
