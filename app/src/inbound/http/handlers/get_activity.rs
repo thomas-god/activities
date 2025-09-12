@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::activity::{Activity, ActivityId, Sport, Timeseries, TimeseriesValue},
-        ports::IActivityService,
+        ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{http::AppState, parser::ParseFile},
 };
@@ -90,8 +90,8 @@ impl From<&Timeseries> for TimeseriesBody {
     }
 }
 
-pub async fn get_activity<AS: IActivityService, FP: ParseFile>(
-    State(state): State<AppState<AS, FP>>,
+pub async fn get_activity<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
+    State(state): State<AppState<AS, FP, TMS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {
     let Ok(res) = state
@@ -123,7 +123,7 @@ mod tests {
                 TimeseriesTime, TimeseriesValue,
             },
             ports::GetActivityError,
-            services::test_utils::MockActivityService,
+            services::test_utils::{MockActivityService, MockTrainingMetricsService},
         },
         inbound::parser::test_utils::MockFileParser,
     };
@@ -159,9 +159,11 @@ mod tests {
         };
 
         let file_parser = MockFileParser::default();
+        let metrics = MockTrainingMetricsService::default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
         });
         let path = Path("target_id".to_string());
@@ -207,9 +209,11 @@ mod tests {
         };
 
         let file_parser = MockFileParser::default();
+        let metrics = MockTrainingMetricsService::default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
         });
         let path = Path("target_id".to_string());

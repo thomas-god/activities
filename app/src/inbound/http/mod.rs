@@ -9,16 +9,17 @@ use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
-use crate::domain::ports::IActivityService;
+use crate::domain::ports::{IActivityService, ITrainingMetricService};
 use crate::inbound::http::handlers::{create_activity, get_activity, list_activities};
 use crate::inbound::parser::ParseFile;
 
 mod handlers;
 
 #[derive(Debug, Clone)]
-struct AppState<AS: IActivityService, PF: ParseFile> {
+struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService> {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
+    training_metrics_service: Arc<TMS>,
 }
 
 pub struct HttpServer {
@@ -30,6 +31,7 @@ impl HttpServer {
     pub async fn new(
         activity_service: impl IActivityService,
         file_parser: impl ParseFile,
+        training_metric_service: impl ITrainingMetricService,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -41,6 +43,7 @@ impl HttpServer {
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
+            training_metrics_service: Arc::new(training_metric_service),
             file_parser: Arc::new(file_parser),
         };
 
@@ -76,9 +79,10 @@ impl HttpServer {
     }
 }
 
-fn api_routes<AS: IActivityService, FP: ParseFile>() -> Router<AppState<AS, FP>> {
+fn api_routes<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>()
+-> Router<AppState<AS, FP, TMS>> {
     Router::new()
-        .route("/activity", post(create_activity::<AS, FP>))
-        .route("/activities", get(list_activities::<AS, FP>))
-        .route("/activity/{activity_id}", get(get_activity::<AS, FP>))
+        .route("/activity", post(create_activity::<AS, FP, TMS>))
+        .route("/activities", get(list_activities::<AS, FP, TMS>))
+        .route("/activity/{activity_id}", get(get_activity::<AS, FP, TMS>))
 }

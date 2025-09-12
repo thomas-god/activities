@@ -150,6 +150,10 @@ where
     }
 }
 
+///////////////////////////////////////////////////////////////////
+// MOCK IMPLEMENTATIONS FOR TESTING
+///////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 pub mod test_utils {
     use std::mem;
@@ -272,6 +276,28 @@ pub mod test_utils {
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
                 get_activity_result: Arc::new(Mutex::new(Ok(None))),
             }
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct MockTrainingMetricsService {
+        pub recompute_metrics_result: Arc<Mutex<Result<(), ()>>>,
+    }
+
+    impl Default for MockTrainingMetricsService {
+        fn default() -> Self {
+            Self {
+                recompute_metrics_result: Arc::new(Mutex::new(Ok(()))),
+            }
+        }
+    }
+
+    impl ITrainingMetricService for MockTrainingMetricsService {
+        async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
+            let mut guard = self.recompute_metrics_result.lock();
+            let mut result = Err(());
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
         }
     }
 }

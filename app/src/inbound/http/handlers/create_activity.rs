@@ -1,7 +1,7 @@
 use axum::{body::Bytes, extract::State, http::StatusCode};
 
 use crate::{
-    domain::ports::{IActivityService, CreateActivityError},
+    domain::ports::{CreateActivityError, IActivityService, ITrainingMetricService},
     inbound::{http::AppState, parser::ParseFile},
 };
 
@@ -11,8 +11,8 @@ impl From<CreateActivityError> for StatusCode {
     }
 }
 
-pub async fn create_activity<AS: IActivityService, PF: ParseFile>(
-    State(state): State<AppState<AS, PF>>,
+pub async fn create_activity<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+    State(state): State<AppState<AS, PF, TMS>>,
     bytes: Bytes,
 ) -> Result<StatusCode, StatusCode> {
     let create_activity_request = state
@@ -42,7 +42,10 @@ mod tests {
     };
 
     use crate::{
-        domain::{ports::CreateActivityError, services::test_utils::MockActivityService},
+        domain::{
+            ports::CreateActivityError,
+            services::test_utils::{MockActivityService, MockTrainingMetricsService},
+        },
         inbound::parser::{ParseCreateActivityHttpRequestBodyError, test_utils::MockFileParser},
     };
 
@@ -52,9 +55,11 @@ mod tests {
     async fn test_create_activity() {
         let content = vec![1, 2, 3];
         let service = MockActivityService::default();
+        let metrics = MockTrainingMetricsService::default();
         let file_parser = MockFileParser::default();
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
         });
         let bytes = axum::body::Bytes::from(content);
@@ -68,6 +73,7 @@ mod tests {
     async fn test_create_activity_fit_parse_fails() {
         let content = vec![1, 2, 3];
         let service = MockActivityService::default();
+        let metrics = MockTrainingMetricsService::default();
 
         let file_parser = MockFileParser {
             try_into_domain_result: Arc::new(Mutex::new(Err(
@@ -77,6 +83,7 @@ mod tests {
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
         });
         let bytes = axum::body::Bytes::from(content);
@@ -95,11 +102,13 @@ mod tests {
             ))),
             ..Default::default()
         };
+        let metrics = MockTrainingMetricsService::default();
 
         let file_parser = MockFileParser::default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
         });
         let bytes = axum::body::Bytes::from(content);

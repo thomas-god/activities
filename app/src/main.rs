@@ -2,9 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use app::{
     config::Config,
-    domain::services::ActivityService,
+    domain::services::{ActivityService, TrainingMetricService},
     inbound::{http::HttpServer, parser::FitParser},
-    outbound::memory::{InMemoryActivityRepository, InMemoryRawDataRepository},
+    outbound::memory::{
+        InMemoryActivityRepository, InMemoryRawDataRepository, InMemoryTrainingMetricsRepository,
+    },
 };
 use tokio::sync::Mutex;
 
@@ -27,11 +29,15 @@ async fn main() -> anyhow::Result<()> {
 
     let activity_repository = Arc::new(Mutex::new(InMemoryActivityRepository::new(vec![])));
     let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
+    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::new());
+
     let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
+    let training_metrics_service =
+        TrainingMetricService::new(training_metrics_repository, activity_repository.clone());
 
     let parser = FitParser {};
-
-    let http_server = HttpServer::new(activity_service, parser, config).await?;
+    let http_server =
+        HttpServer::new(activity_service, parser, training_metrics_service, config).await?;
 
     http_server.run().await
 }
