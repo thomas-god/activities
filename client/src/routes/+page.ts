@@ -6,13 +6,33 @@ import { PUBLIC_APP_URL } from '$env/static/public';
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
 
-	let res = await fetch(`${PUBLIC_APP_URL}/api/activities`, {
+	const [activities, metrics] = await Promise.all([fetchActivities(fetch), fetchMetrics(fetch)]);
+
+	return { activities, metrics };
+};
+
+const fetchActivities = async (
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<ActivityList> => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/activities`, {
 		method: 'GET'
 	});
 	if (res.status === 200) {
-		return { activities: ActivityList.parse(await res.json()) };
+		return ActivityList.parse(await res.json());
 	}
-	return { activities: [] };
+	return [];
+};
+
+const fetchMetrics = async (
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<MetricsList> => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics`, {
+		method: 'GET'
+	});
+	if (res.status === 200) {
+		return MetricsList.parse(await res.json());
+	}
+	return [];
 };
 
 export const prerender = false;
@@ -28,3 +48,16 @@ const ActivityList = z.array(ActivityListItem);
 
 export type ActivityList = z.infer<typeof ActivityList>;
 export type ActivityListItem = z.infer<typeof ActivityListItem>;
+
+const MetricsListItem = z.object({
+	id: z.string(),
+	metric: z.string(),
+	granularity: z.string(),
+	aggregate: z.string(),
+	values: z.record(z.string(), z.number())
+});
+
+const MetricsList = z.array(MetricsListItem);
+
+export type MetricsList = z.infer<typeof MetricsList>;
+export type MetricsListItem = z.infer<typeof MetricsListItem>;

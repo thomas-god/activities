@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { formatDuration, formatDateTime } from '$lib/duration';
-	import TimeseriesChart from '../../../molecules/TimeseriesChart.svelte';
+	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
-  	import Chip from '../../../molecules/Chip.svelte';
+	import Chip from '../../../molecules/Chip.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -51,9 +51,9 @@
 </script>
 
 <div class="m-3">
-  <Chip text={summary?.sport} />
-  <Chip text={`⌛ ${summary?.duration}`} />
-  <Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
+	<Chip text={summary?.sport} />
+	<Chip text={`⌛ ${summary?.duration}`} />
+	<Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
 </div>
 
 <div class="m-3">
