@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
-    DataMessage, DataValue, FitEnum, FitField, FitParserError, MesgNum, RecordField,
+    DataMessage, DataValue, FitEnum, FitField, FitParserError, MesgNum, RecordField, SessionField,
     Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
@@ -8,8 +10,8 @@ use thiserror::Error;
 
 use crate::domain::{
     models::activity::{
-        ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-        Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+        ActivityTimeseries, Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
     ports::CreateActivityRequest,
 };
@@ -46,7 +48,8 @@ impl ParseFile for FitParser {
 
         let timeseries = extract_timeseries(reference_timestamp, &messages)?;
 
-        let statistics = ActivityStatistics::default();
+        let statistics = extract_statistics(&messages);
+        dbg!(&statistics);
 
         Ok(CreateActivityRequest::new(
             sport, duration, start_time, statistics, timeseries, bytes,
@@ -213,6 +216,32 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Power, power_values),
     ];
     Ok(ActivityTimeseries::new(TimeseriesTime::new(time), metrics))
+}
+
+fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
+    let mut stats = HashMap::new();
+    let pairs = [
+        (
+            FitField::Session(SessionField::TotalCalories),
+            ActivityStatistic::Calories,
+        ),
+        (
+            FitField::Session(SessionField::TotalDistance),
+            ActivityStatistic::Distance,
+        ),
+        (
+            FitField::Session(SessionField::TotalAscent),
+            ActivityStatistic::Elevation,
+        ),
+    ];
+
+    for (field, statistic) in pairs.iter() {
+        if let Some(value) = find_field_value_as_float(messages, field) {
+            stats.insert(*statistic, value);
+        }
+    }
+
+    ActivityStatistics::new(stats)
 }
 
 #[derive(Debug, Clone, Error)]
