@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Start the Rust API in the background
-SERVER_PORT=8080 ALLOW_ORIGIN= ./app &
+SERVER_PORT=8080 ALLOW_ORIGIN= ./app_bin &
 API_PID=$!
 
 # Check if API started successfully

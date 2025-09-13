@@ -207,6 +207,7 @@ __marimo__/
 
 # .fit files
 *.fit
+!app/resources/*.fit
 
 # Added by cargo
 
