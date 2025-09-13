@@ -171,6 +171,7 @@ impl TrainingMetricGranularity {
     ) -> Option<Vec<String>> {
         let mut dates = vec![];
 
+        #[allow(clippy::type_complexity)]
         let (mut start, end, next_dt): (
             NaiveDate,
             NaiveDate,

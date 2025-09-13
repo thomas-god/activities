@@ -1,18 +1,30 @@
 use std::collections::HashMap;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse};
-use serde::Serialize;
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use chrono::{DateTime, FixedOffset, Local};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     domain::{
         models::training_metrics::{
-            TrainingMetricDefinition, TrainingMetricSource, TrainingMetricValues,
+            TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
+            TrainingMetricValues,
         },
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{http::AppState, parser::ParseFile},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct MetricsDateRange {
+    start: DateTime<FixedOffset>,
+    end: Option<DateTime<FixedOffset>>,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<ResponseBodyItem>);
@@ -26,16 +38,36 @@ pub struct ResponseBodyItem {
     values: HashMap<String, f64>,
 }
 
-impl From<(TrainingMetricDefinition, TrainingMetricValues)> for ResponseBodyItem {
-    fn from(value: (TrainingMetricDefinition, TrainingMetricValues)) -> Self {
-        let (def, values) = value;
-        Self {
-            id: def.id().to_string(),
-            metric: format_source(def.source()),
-            granularity: def.granularity().to_string(),
-            aggregate: def.aggregate().to_string(),
-            values: values.as_hash_map(),
-        }
+fn to_response_body_item(
+    metric: (TrainingMetricDefinition, TrainingMetricValues),
+    range: &MetricsDateRange,
+) -> ResponseBodyItem {
+    let (def, metric_values) = metric;
+    let values = fill_metric_values(def.granularity(), metric_values, range);
+
+    ResponseBodyItem {
+        id: def.id().to_string(),
+        metric: format_source(def.source()),
+        granularity: def.granularity().to_string(),
+        aggregate: def.aggregate().to_string(),
+        values,
+    }
+}
+
+fn fill_metric_values(
+    granularity: &TrainingMetricGranularity,
+    values: TrainingMetricValues,
+    range: &MetricsDateRange,
+) -> HashMap<String, f64> {
+    match granularity.bins(
+        &range.start,
+        &range.end.unwrap_or(Local::now().fixed_offset()),
+    ) {
+        Some(bins) => HashMap::from_iter(
+            bins.iter()
+                .map(|bin| (bin.to_string(), values.get(bin).cloned().unwrap_or(0.))),
+        ),
+        None => values.as_hash_map(),
     }
 }
 
@@ -54,10 +86,15 @@ pub async fn get_training_metrics<
     TMS: ITrainingMetricService,
 >(
     State(state): State<AppState<AS, PF, TMS>>,
+    Query(date_range): Query<MetricsDateRange>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state.training_metrics_service.get_training_metrics().await;
 
-    let body = ResponseBody(res.into_iter().map(ResponseBodyItem::from).collect());
+    let body = ResponseBody(
+        res.into_iter()
+            .map(|metric| to_response_body_item(metric, &date_range))
+            .collect(),
+    );
 
     Ok(json!(body).to_string())
 }

@@ -2,6 +2,7 @@ import type { PageLoad } from './$types';
 import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
+import dayjs from 'dayjs';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
@@ -26,7 +27,9 @@ const fetchActivities = async (
 const fetchMetrics = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<MetricsList> => {
-	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics`, {
+	let now = dayjs();
+	let start = encodeURIComponent(now.subtract(1, "month").format('YYYY-MM-DDTHH:mm:ssZ'));
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
 		method: 'GET'
 	});
 	if (res.status === 200) {

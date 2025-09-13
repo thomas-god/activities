@@ -183,13 +183,12 @@ where
 
         let mut res = vec![];
         for definition in definitions {
-            if let Ok(values) = self
+            let values = self
                 .metrics_repository
                 .get_metric_values(definition.id())
                 .await
-            {
-                res.push((definition.clone(), values.clone()))
-            }
+                .unwrap_or_default();
+            res.push((definition.clone(), values.clone()))
         }
 
         res
@@ -664,7 +663,7 @@ mod tests_training_metrics_service {
     async fn test_training_metrics_service_get_metrics_def_without_values() {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
-                TrainingMetricId::from(&"test"),
+                TrainingMetricId::from("test"),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -681,7 +680,7 @@ mod tests_training_metrics_service {
         assert_eq!(
             def,
             &TrainingMetricDefinition::new(
-                TrainingMetricId::from(&"test"),
+                TrainingMetricId::from("test"),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -694,7 +693,7 @@ mod tests_training_metrics_service {
     async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
-                TrainingMetricId::from(&"test"),
+                TrainingMetricId::from("test"),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -714,7 +713,7 @@ mod tests_training_metrics_service {
         assert_eq!(
             def,
             &TrainingMetricDefinition::new(
-                TrainingMetricId::from(&"test"),
+                TrainingMetricId::from("test"),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
