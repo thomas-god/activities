@@ -4,6 +4,7 @@
 	import ActivitiesUploader from '../organisms/ActivitiesUploader.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
+	import { union } from 'zod';
 
 	let { data }: PageProps = $props();
 
@@ -27,7 +28,7 @@
 			values.push({ time: dt, value: metric.values[dt] });
 		}
 
-		return { values: values, title: `${metric.metric} (${metric.granularity})` };
+		return { values: values, title: `${metric.metric} (${metric.granularity})`, unit: metric.unit };
 	});
 </script>
 
@@ -45,6 +46,7 @@
 			width={chartWidth}
 			values={topMetric.values}
 			title={topMetric.title}
+			unit={topMetric.unit}
 		/>
 	</div>
 {/if}

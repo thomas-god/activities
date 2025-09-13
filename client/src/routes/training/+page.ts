@@ -20,21 +20,10 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 
 export const prerender = false;
 
-const ActivityListItem = z.object({
-	id: z.string(),
-	sport: z.string(),
-	duration: z.number(),
-	start_time: z.iso.datetime({ offset: true })
-});
-
-const ActivityList = z.array(ActivityListItem);
-
-export type ActivityList = z.infer<typeof ActivityList>;
-export type ActivityListItem = z.infer<typeof ActivityListItem>;
-
 const MetricsListItem = z.object({
 	id: z.string(),
 	metric: z.string(),
+	unit: z.string(),
 	granularity: z.string(),
 	aggregate: z.string(),
 	values: z.record(z.string(), z.number())

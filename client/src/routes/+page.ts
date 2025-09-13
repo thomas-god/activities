@@ -55,6 +55,7 @@ export type ActivityListItem = z.infer<typeof ActivityListItem>;
 const MetricsListItem = z.object({
 	id: z.string(),
 	metric: z.string(),
+	unit: z.string(),
 	granularity: z.string(),
 	aggregate: z.string(),
 	values: z.record(z.string(), z.number())
