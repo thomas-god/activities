@@ -1,4 +1,9 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fs::{self},
+    sync::Arc,
+};
 
 use app::{
     config::Config,
@@ -10,9 +15,13 @@ use app::{
                 TrainingMetricId, TrainingMetricSource,
             },
         },
+        ports::{ActivityRepository, IActivityService, ITrainingMetricService, RawDataRepository},
         services::{ActivityService, TrainingMetricService},
     },
-    inbound::{http::HttpServer, parser::FitParser},
+    inbound::{
+        http::HttpServer,
+        parser::{FitParser, ParseFile},
+    },
     outbound::memory::{
         InMemoryActivityRepository, InMemoryRawDataRepository, InMemoryTrainingMetricsRepository,
     },
@@ -53,6 +62,10 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let parser = FitParser {};
+
+    // Load demo activities before starting receiving request
+    load_demo_activities(&activity_service, &parser).await;
+
     let http_server =
         HttpServer::new(activity_service, parser, training_metrics_service, config).await?;
 
@@ -74,6 +87,18 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         ),
     ));
 
+    // Weekly calories
+    let id = TrainingMetricId::new();
+    definitions.push((
+        id.clone(),
+        TrainingMetricDefinition::new(
+            id.clone(),
+            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+        ),
+    ));
+
     // Activity max heart rate
     let id = TrainingMetricId::new();
     definitions.push((
@@ -90,4 +115,26 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
     ));
 
     definitions
+}
+
+async fn load_demo_activities<AR, RDR, TMS>(
+    activity_service: &ActivityService<AR, RDR, TMS>,
+    parser: &FitParser,
+) where
+    AR: ActivityRepository,
+    RDR: RawDataRepository,
+    TMS: ITrainingMetricService,
+{
+    if let Ok(dir) = fs::read_dir("app/resources") {
+        for file in dir {
+            if let Ok(file) = file {
+                if file.path().extension().and_then(OsStr::to_str) == Some("fit") {
+                    let content = fs::read(file.path()).unwrap();
+                    let req = parser.try_bytes_into_domain(content).unwrap();
+                    activity_service.create_activity(req).await.unwrap();
+                    tracing::info!("Loaded {:?}", file.path());
+                }
+            }
+        }
+    }
 }
