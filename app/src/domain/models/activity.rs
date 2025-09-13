@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self},
+};
 
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
@@ -147,6 +150,48 @@ pub enum ActivityStatistic {
     Distance,
 }
 
+impl ToUnit for ActivityStatistic {
+    fn unit(&self) -> Unit {
+        match self {
+            Self::Calories => Unit::KiloCalorie,
+            Self::Elevation => Unit::Meter,
+            Self::Distance => Unit::Meter,
+        }
+    }
+}
+
+/// Trait to represent the associated physical unit (e.g., meters, watt) of some value.
+pub trait ToUnit {
+    fn unit(&self) -> Unit;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Unit {
+    KiloCalorie,
+    Meter,
+    Kilometer,
+    MeterPerSecond,
+    KilometerPerHour,
+    Watt,
+    BeatPerMinute,
+}
+
+impl fmt::Display for Unit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let unit = match self {
+            Self::KiloCalorie => "kcal",
+            Self::Meter => "m",
+            Self::Kilometer => "km",
+            Self::MeterPerSecond => "m/s",
+            Self::KilometerPerHour => "km/h",
+            Self::Watt => "W",
+            Self::BeatPerMinute => "bpm",
+        };
+
+        write!(f, "{}", unit)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
@@ -198,13 +243,13 @@ pub enum TimeseriesMetric {
     Distance,
 }
 
-impl TimeseriesMetric {
-    pub fn unit(&self) -> String {
+impl ToUnit for TimeseriesMetric {
+    fn unit(&self) -> Unit {
         match self {
-            Self::Distance => "m".to_string(),
-            Self::Power => "W".to_string(),
-            Self::HeartRate => "bpm".to_string(),
-            Self::Speed => "m/s".to_string(),
+            Self::Distance => Unit::Meter,
+            Self::Power => Unit::Watt,
+            Self::HeartRate => Unit::BeatPerMinute,
+            Self::Speed => Unit::MeterPerSecond,
         }
     }
 }

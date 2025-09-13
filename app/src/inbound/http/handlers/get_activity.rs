@@ -10,7 +10,9 @@ use serde::Serialize;
 
 use crate::{
     domain::{
-        models::activity::{Activity, ActivityId, ActivityTimeseries, Sport, TimeseriesValue},
+        models::activity::{
+            Activity, ActivityId, ActivityTimeseries, Sport, TimeseriesValue, ToUnit,
+        },
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{http::AppState, parser::ParseFile},
@@ -77,7 +79,7 @@ impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
                 (
                     metric.metric().to_string(),
                     TimeseriesBody {
-                        unit: metric.metric().unit(),
+                        unit: metric.metric().unit().to_string(),
                         values: metric
                             .values()
                             .iter()
