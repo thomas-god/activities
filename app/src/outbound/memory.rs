@@ -1,4 +1,4 @@
-// In memory implemenations of repository ports
+// In memory implementations of repository ports
 
 use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 
@@ -12,8 +12,8 @@ use crate::domain::{
     ports::{
         ActivityRepository, GetActivityError, GetTrainingMetricValueError,
         GetTrainingMetricsDefinitionsError, ListActivitiesError, RawDataRepository,
-        SaveActivityError, SaveRawDataError, SimilarActivityError, TrainingMetricsRepository,
-        UpdateMetricError,
+        SaveActivityError, SaveRawDataError, SaveTrainingMetricError, SimilarActivityError,
+        TrainingMetricsRepository, UpdateMetricError,
     },
 };
 
@@ -104,6 +104,15 @@ impl InMemoryTrainingMetricsRepository {
 }
 
 impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
+    async fn save_definitions(
+        &self,
+        definition: TrainingMetricDefinition,
+    ) -> Result<(), SaveTrainingMetricError> {
+        let mut definitons = self.definitions.lock().await;
+        definitons.insert(definition.id().clone(), definition);
+        Ok(())
+    }
+
     async fn get_definitions(
         &self,
     ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {

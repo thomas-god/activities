@@ -6,7 +6,8 @@ use crate::domain::models::activity::{
     ActivityStatistics, ActivityTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
-    TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues,
+    TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
+    TrainingMetricSource, TrainingMetricValues,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -163,6 +164,35 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct CreateTrainingMetricRequest {
+    source: TrainingMetricSource,
+    granularity: TrainingMetricGranularity,
+    aggregate: TrainingMetricAggregate,
+}
+
+impl CreateTrainingMetricRequest {
+    pub fn source(&self) -> &TrainingMetricSource {
+        &self.source
+    }
+
+    pub fn granularity(&self) -> &TrainingMetricGranularity {
+        &self.granularity
+    }
+
+    pub fn aggregate(&self) -> &TrainingMetricAggregate {
+        &self.aggregate
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CreateTrainingMetricError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+    #[error("Error when saving training metric definition")]
+    SaveMetricError(#[from] SaveTrainingMetricError),
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct RecomputeMetricRequest {
     new_activity: ActivityId,
 }
@@ -174,6 +204,11 @@ impl RecomputeMetricRequest {
 }
 
 pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
+    fn create_metric(
+        &self,
+        req: CreateTrainingMetricRequest,
+    ) -> impl Future<Output = Result<TrainingMetricId, CreateTrainingMetricError>> + Send;
+
     fn recompute_metric(
         &self,
         req: RecomputeMetricRequest,
@@ -182,6 +217,12 @@ pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
     fn get_training_metrics(
         &self,
     ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
+}
+
+#[derive(Debug, Error)]
+pub enum SaveTrainingMetricError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Error)]
@@ -207,6 +248,11 @@ pub enum GetTrainingMetricValueError {
 }
 
 pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
+    fn save_definitions(
+        &self,
+        definition: TrainingMetricDefinition,
+    ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
+
     fn get_definitions(
         &self,
     ) -> impl Future<

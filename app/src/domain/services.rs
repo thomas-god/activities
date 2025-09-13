@@ -7,12 +7,12 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         activity::{Activity, ActivityId},
-        training_metrics::{TrainingMetricDefinition, TrainingMetricValues},
+        training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
-        ActivityRepository, CreateActivityError, CreateActivityRequest, GetActivityError,
-        IActivityService, ITrainingMetricService, ListActivitiesError, RawDataRepository,
-        RecomputeMetricRequest, TrainingMetricsRepository,
+        ActivityRepository, CreateActivityError, CreateActivityRequest, CreateTrainingMetricError,
+        CreateTrainingMetricRequest, GetActivityError, IActivityService, ITrainingMetricService,
+        ListActivitiesError, RawDataRepository, RecomputeMetricRequest, TrainingMetricsRepository,
     },
 };
 
@@ -153,6 +153,24 @@ where
     TMR: TrainingMetricsRepository,
     AR: ActivityRepository,
 {
+    async fn create_metric(
+        &self,
+        req: CreateTrainingMetricRequest,
+    ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
+        let id = TrainingMetricId::new();
+        let metric_definition = TrainingMetricDefinition::new(
+            id.clone(),
+            req.source().clone(),
+            req.granularity().clone(),
+            req.aggregate().clone(),
+        );
+        self.metrics_repository
+            .save_definitions(metric_definition)
+            .await?;
+
+        Ok(id)
+    }
+
     async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
         let metrics = self.metrics_repository.get_definitions().await.unwrap();
         let activities = self
@@ -329,6 +347,7 @@ pub mod test_utils {
 
     #[derive(Clone)]
     pub struct MockTrainingMetricsService {
+        pub create_metric_result: Arc<Mutex<Result<TrainingMetricId, CreateTrainingMetricError>>>,
         pub recompute_metrics_result: Arc<Mutex<Result<(), ()>>>,
         pub get_training_metrics_result:
             Arc<Mutex<Vec<(TrainingMetricDefinition, TrainingMetricValues)>>>,
@@ -337,6 +356,7 @@ pub mod test_utils {
     impl Default for MockTrainingMetricsService {
         fn default() -> Self {
             Self {
+                create_metric_result: Arc::new(Mutex::new(Ok(TrainingMetricId::default()))),
                 recompute_metrics_result: Arc::new(Mutex::new(Ok(()))),
                 get_training_metrics_result: Arc::new(Mutex::new(vec![])),
             }
@@ -344,6 +364,17 @@ pub mod test_utils {
     }
 
     impl ITrainingMetricService for MockTrainingMetricsService {
+        async fn create_metric(
+            &self,
+            _req: crate::domain::ports::CreateTrainingMetricRequest,
+        ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
+            let mut guard = self.create_metric_result.lock();
+            let mut result = Err(CreateTrainingMetricError::Unknown(anyhow!(
+                "substitute error"
+            )));
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
+        }
         async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
             let mut guard = self.recompute_metrics_result.lock();
             let mut result = Err(());
@@ -560,7 +591,8 @@ mod tests_training_metrics_service {
             },
         },
         ports::{
-            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, UpdateMetricError,
+            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
+            SaveTrainingMetricError, UpdateMetricError,
         },
         services::test_utils::MockActivityRepository,
     };
@@ -569,6 +601,7 @@ mod tests_training_metrics_service {
 
     #[derive(Clone)]
     struct MockTrainingMetricsRepository {
+        save_definitins_result: Arc<Mutex<Result<(), SaveTrainingMetricError>>>,
         get_definitions_result:
             Arc<Mutex<Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>>>,
         update_metric_values_result: Arc<Mutex<Result<(), UpdateMetricError>>>,
@@ -577,6 +610,18 @@ mod tests_training_metrics_service {
     }
 
     impl TrainingMetricsRepository for MockTrainingMetricsRepository {
+        async fn save_definitions(
+            &self,
+            _definition: TrainingMetricDefinition,
+        ) -> Result<(), crate::domain::ports::SaveTrainingMetricError> {
+            let mut guard = self.save_definitins_result.lock().await;
+            let mut result = Err(SaveTrainingMetricError::Unknown(anyhow!(
+                "substitute error"
+            )));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
         async fn get_definitions(
             &self,
         ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
@@ -615,6 +660,7 @@ mod tests_training_metrics_service {
     impl Default for MockTrainingMetricsRepository {
         fn default() -> Self {
             Self {
+                save_definitins_result: Arc::new(Mutex::new(Ok(()))),
                 get_definitions_result: Arc::new(Mutex::new(Ok(vec![
                     TrainingMetricDefinition::new(
                         TrainingMetricId::default(),
