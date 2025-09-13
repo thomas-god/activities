@@ -40,7 +40,6 @@
 		bind:clientWidth={chartWidth}
 		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"
 	>
-		<p class="text-center">{topMetric.title}</p>
 		<TrainingMetricsChart
 			height={250}
 			width={chartWidth}

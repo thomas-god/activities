@@ -17,6 +17,8 @@
 	let gx: SVGGElement;
 	let gy: SVGGElement;
 
+	let noValues = $derived(values.every((val) => val.value === 0));
+
 	let time = $derived.by(() => {
 		let time = [];
 		for (let i = 0; i < values.length; i++) {
@@ -45,20 +47,28 @@
 	});
 </script>
 
-<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
-	<g>
-		{#each values as value (value.time)}
-			<rect
-				x={x(value.time)}
-				y={y(value.value)}
-				height={y(0) - y(value.value)}
-				width={x.bandwidth()}
-				rx={7}
-				ry={0}
-				class="fill-accent"
-			/>
-		{/each}
-	</g>
-	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
-	<g bind:this={gy} transform="translate({marginLeft} 0)" />
-</svg>
+<p class="pt-4 text-center">{title}</p>
+
+{#if noValues}
+	<p class="py-6 text-center text-sm italic opacity-60">
+		No activities found for this metric over the selected period
+	</p>
+{:else}
+	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
+		<g>
+			{#each values as value (value.time)}
+				<rect
+					x={x(value.time)}
+					y={y(value.value)}
+					height={y(0) - y(value.value)}
+					width={x.bandwidth()}
+					rx={7}
+					ry={0}
+					class="fill-accent"
+				/>
+			{/each}
+		</g>
+		<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
+		<g bind:this={gy} transform="translate({marginLeft} 0)" />
+	</svg>
+{/if}

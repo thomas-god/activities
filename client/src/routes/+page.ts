@@ -28,7 +28,7 @@ const fetchMetrics = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<MetricsList> => {
 	let now = dayjs();
-	let start = encodeURIComponent(now.subtract(1, "month").format('YYYY-MM-DDTHH:mm:ssZ'));
+	let start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DDTHH:mm:ssZ'));
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
 		method: 'GET'
 	});
