@@ -39,20 +39,20 @@ it('Should format a date duration from a reference in local', () => {
 });
 
 it('Should format a date string in default timezone and format', () => {
-    const dateStr = '2023-09-12T15:30:45Z';
-    expect(formatDateTime(dateStr)).toEqual('12-09-2023 17:30:45');
+	const dateStr = '2023-09-12T15:30:45Z';
+	expect(formatDateTime(dateStr)).toEqual('12-09-2023 17:30:45');
 });
 
 it('Should format a date string in a custom timezone', () => {
-    const dateStr = '2023-09-12T15:30:45Z';
-    expect(formatDateTime(dateStr, 'America/New_York')).toEqual('12-09-2023 11:30:45');
+	const dateStr = '2023-09-12T15:30:45Z';
+	expect(formatDateTime(dateStr, 'America/New_York')).toEqual('12-09-2023 11:30:45');
 });
 
 it('Should format a date string in a custom format', () => {
-    const dateStr = '2023-09-12T15:30:45Z';
-    expect(formatDateTime(dateStr, 'Europe/Paris', 'YYYY/MM/DD HH:mm')).toEqual('2023/09/12 17:30');
+	const dateStr = '2023-09-12T15:30:45Z';
+	expect(formatDateTime(dateStr, 'Europe/Paris', 'YYYY/MM/DD HH:mm')).toEqual('2023/09/12 17:30');
 });
 
 it('Should handle empty string gracefully', () => {
-    expect(formatDateTime('')).toEqual(dayjs('').tz('Europe/Paris').format('DD-MM-YYYY HH:mm:ss'));
+	expect(formatDateTime('')).toEqual(dayjs('').tz('Europe/Paris').format('DD-MM-YYYY HH:mm:ss'));
 });

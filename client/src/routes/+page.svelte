@@ -31,14 +31,14 @@
 	});
 </script>
 
-<div class="sm:w-sm mx-2 mb-2 sm:mx-auto">
+<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
 	<ActivitiesUploader {activitiesUploadedCallback} />
 </div>
 
 {#if topMetric}
 	<div
 		bind:clientWidth={chartWidth}
-		class="rounded-box bg-base-100 sm:w-2xl mx-2 mt-5 shadow-md sm:mx-auto"
+		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"
 	>
 		<p class="text-center">{topMetric.title}</p>
 		<TrainingMetricsChart
@@ -50,6 +50,6 @@
 	</div>
 {/if}
 
-<div class="sm:w-md mx-2 mt-5 sm:mx-auto">
+<div class="mx-2 mt-5 sm:mx-auto sm:w-md">
 	<ActivityList activityList={sorted_activities} />
 </div>

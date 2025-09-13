@@ -15,10 +15,12 @@
 					{activity.sport}
 				</div>
 				<div class="justify-self-start">
-					⌛ <span class="font-mono italic font-medium">{formatDuration(activity.duration)}</span>
+					⌛ <span class="font-mono font-medium italic">{formatDuration(activity.duration)}</span>
 				</div>
 				<div class="justify-self-end">
-					📅 <span class="italic">{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span>
+					📅 <span class="italic"
+						>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
+					>
 				</div>
 			</li>
 		</a>
