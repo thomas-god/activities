@@ -11,7 +11,7 @@ use tower_http::cors::CorsLayer;
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
 use crate::inbound::http::handlers::{
-    create_activity, get_activity, get_training_metrics, list_activities,
+    create_activity, create_training_metric, get_activity, get_training_metrics, list_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -90,5 +90,9 @@ fn api_routes<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
         .route(
             "/training/metrics",
             get(get_training_metrics::<AS, FP, TMS>),
+        )
+        .route(
+            "/training/metric",
+            post(create_training_metric::<AS, FP, TMS>),
         )
 }

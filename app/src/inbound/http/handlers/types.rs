@@ -1,0 +1,103 @@
+/// Mappings between domain types and types part of the HTTP API
+use serde::Deserialize;
+
+use crate::domain::models::{
+    activity::{ActivityStatistic, TimeseriesMetric},
+    training_metrics::{TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricSource},
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub enum APIActivityStatistic {
+    Calories,
+    Elevation,
+    Distance,
+}
+
+impl From<APIActivityStatistic> for ActivityStatistic {
+    fn from(value: APIActivityStatistic) -> Self {
+        match value {
+            APIActivityStatistic::Calories => Self::Calories,
+            APIActivityStatistic::Elevation => Self::Elevation,
+            APIActivityStatistic::Distance => Self::Distance,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITimeseriesMetric {
+    Speed,
+    Power,
+    HeartRate,
+    Distance,
+}
+
+impl From<APITimeseriesMetric> for TimeseriesMetric {
+    fn from(value: APITimeseriesMetric) -> Self {
+        match value {
+            APITimeseriesMetric::Speed => Self::Speed,
+            APITimeseriesMetric::Power => Self::Distance,
+            APITimeseriesMetric::HeartRate => Self::HeartRate,
+            APITimeseriesMetric::Distance => Self::Distance,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITrainingMetricSource {
+    Statistic(APIActivityStatistic),
+    Timeseries((APITimeseriesMetric, APITrainingMetricAggregate)),
+}
+
+impl From<APITrainingMetricSource> for TrainingMetricSource {
+    fn from(value: APITrainingMetricSource) -> Self {
+        match value {
+            APITrainingMetricSource::Statistic(stat) => {
+                TrainingMetricSource::Statistic(ActivityStatistic::from(stat))
+            }
+            APITrainingMetricSource::Timeseries((metric, aggregate)) => {
+                TrainingMetricSource::Timeseries((
+                    TimeseriesMetric::from(metric),
+                    TrainingMetricAggregate::from(aggregate),
+                ))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITrainingMetricAggregate {
+    Min,
+    Max,
+    Average,
+    Sum,
+}
+
+impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
+    fn from(value: APITrainingMetricAggregate) -> Self {
+        match value {
+            APITrainingMetricAggregate::Min => Self::Min,
+            APITrainingMetricAggregate::Max => Self::Max,
+            APITrainingMetricAggregate::Average => Self::Average,
+            APITrainingMetricAggregate::Sum => Self::Sum,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITrainingMetricGranularity {
+    Activity,
+    Daily,
+    Weekly,
+    Monthly,
+}
+
+impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
+    fn from(value: APITrainingMetricGranularity) -> Self {
+        match value {
+            APITrainingMetricGranularity::Activity => Self::Activity,
+            APITrainingMetricGranularity::Daily => Self::Daily,
+            APITrainingMetricGranularity::Weekly => Self::Weekly,
+            APITrainingMetricGranularity::Monthly => Self::Monthly,
+        }
+    }
+}
