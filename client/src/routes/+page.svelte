@@ -50,6 +50,6 @@
 	</div>
 {/if}
 
-<div class="mx-2 mt-5 sm:mx-auto sm:w-lg">
+<div class="mx-2 mt-5 sm:mx-auto sm:w-md">
 	<ActivityList activityList={sorted_activities} />
 </div>
