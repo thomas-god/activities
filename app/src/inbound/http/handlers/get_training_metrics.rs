@@ -11,9 +11,12 @@ use serde_json::json;
 
 use crate::{
     domain::{
-        models::training_metrics::{
-            TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
-            TrainingMetricValues,
+        models::{
+            activity::ToUnit,
+            training_metrics::{
+                TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
+                TrainingMetricValues,
+            },
         },
         ports::{IActivityService, ITrainingMetricService},
     },
@@ -33,6 +36,7 @@ pub struct ResponseBody(Vec<ResponseBodyItem>);
 pub struct ResponseBodyItem {
     id: String,
     metric: String,
+    unit: String,
     granularity: String,
     aggregate: String,
     values: HashMap<String, f64>,
@@ -48,6 +52,7 @@ fn to_response_body_item(
     ResponseBodyItem {
         id: def.id().to_string(),
         metric: format_source(def.source()),
+        unit: def.source().unit().to_string(),
         granularity: def.granularity().to_string(),
         aggregate: def.aggregate().to_string(),
         values,

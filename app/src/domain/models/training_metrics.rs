@@ -4,7 +4,9 @@ use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFo
 use derive_more::{AsRef, Constructor, Deref, DerefMut, Display};
 use uuid::Uuid;
 
-use crate::domain::models::activity::{Activity, ActivityStatistic, TimeseriesMetric};
+use crate::domain::models::activity::{
+    Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
 pub struct TrainingMetricId(String);
@@ -73,6 +75,15 @@ impl TrainingMetricSource {
             }
         }
         .map(|value| (**activity.start_time(), value))
+    }
+}
+
+impl ToUnit for TrainingMetricSource {
+    fn unit(&self) -> Unit {
+        match self {
+            Self::Statistic(stat) => stat.unit(),
+            Self::Timeseries((metric, _)) => metric.unit(),
+        }
     }
 }
 
