@@ -60,6 +60,10 @@ impl Activity {
         &self.id
     }
 
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
     pub fn start_time(&self) -> &ActivityStartTime {
         &self.start_time
     }

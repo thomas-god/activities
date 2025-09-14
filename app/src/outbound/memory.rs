@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::domain::{
     models::{
+        UserId,
         activity::{Activity, ActivityId, ActivityNaturalKey},
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
@@ -47,9 +48,13 @@ impl ActivityRepository for InMemoryActivityRepository {
         Ok(())
     }
 
-    async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
-        let guard = self.activities.lock().await;
-        Ok(guard.clone())
+    async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
+        let activities = self.activities.lock().await;
+        Ok(activities
+            .iter()
+            .filter(|activity| activity.user() == user)
+            .cloned()
+            .collect())
     }
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
@@ -145,5 +150,50 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
             .or_default()
             .insert(key.to_string(), value);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests_activities_repository {
+
+    use crate::domain::models::activity::{
+        ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+        TimeseriesTime,
+    };
+
+    use super::*;
+
+    fn default_activity(user: Option<String>) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            user.unwrap_or_default().into(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::new(10),
+            Sport::Cycling,
+            ActivityStatistics::new(HashMap::new()),
+            ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_list_only_activities_belonging_to_the_requested_user() {
+        let activities = vec![
+            default_activity(Some("user1".to_string())),
+            default_activity(Some("user2".to_string())),
+        ];
+
+        let repository = InMemoryActivityRepository::new(activities);
+
+        let res = repository
+            .list_activities(&"user1".to_string().into())
+            .await;
+
+        let res = res.expect("Res should be Ok");
+
+        assert_eq!(res.len(), 1);
+        assert!(
+            res.iter()
+                .all(|activity| activity.user() == &"user1".to_string().into())
+        )
     }
 }

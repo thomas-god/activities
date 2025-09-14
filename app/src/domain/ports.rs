@@ -148,6 +148,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn list_activities(
         &self,
+        user: &UserId,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
     fn get_activity(

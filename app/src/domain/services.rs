@@ -121,9 +121,9 @@ where
         Ok(activity)
     }
 
-    async fn list_activities(&self, _user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
+    async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
         let repository = self.activity_repository.lock().await;
-        repository.list_activities().await
+        repository.list_activities(user).await
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
@@ -179,7 +179,7 @@ where
             .activity_repository
             .lock()
             .await
-            .list_activities()
+            .list_activities(&UserId::default())
             .await
             .unwrap();
 
@@ -323,7 +323,10 @@ pub mod test_utils {
             result
         }
 
-        async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
+        async fn list_activities(
+            &self,
+            _user: &UserId,
+        ) -> Result<Vec<Activity>, ListActivitiesError> {
             let mut guard = self.list_activities_result.lock();
             let mut result = Err(ListActivitiesError::Unknown(anyhow!("substitute error")));
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
