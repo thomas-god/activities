@@ -258,9 +258,12 @@ impl TrainingMetricValues {
 #[cfg(test)]
 mod test_training_metrics {
 
-    use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
-        ActivityTimeseries, Sport, Timeseries, TimeseriesTime, TimeseriesValue,
+    use crate::domain::models::{
+        UserId,
+        activity::{
+            Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
+            ActivityTimeseries, Sport, Timeseries, TimeseriesTime, TimeseriesValue,
+        },
     };
 
     use super::*;
@@ -268,6 +271,7 @@ mod test_training_metrics {
     fn default_activity() -> Activity {
         Activity::new(
             ActivityId::default(),
+            UserId::default(),
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
@@ -306,6 +310,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Average;
         let activity = Activity::new(
             ActivityId::default(),
+            UserId::default(),
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()

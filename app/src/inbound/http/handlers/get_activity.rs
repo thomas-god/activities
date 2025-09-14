@@ -120,9 +120,12 @@ mod tests {
 
     use crate::{
         domain::{
-            models::activity::{
-                ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
-                Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+            models::{
+                UserId,
+                activity::{
+                    ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+                    Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                },
             },
             ports::GetActivityError,
             services::test_utils::{MockActivityService, MockTrainingMetricsService},
@@ -138,6 +141,7 @@ mod tests {
         let service = MockActivityService {
             get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                 ActivityId::from(&target_id),
+                UserId::default(),
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()

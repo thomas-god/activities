@@ -9,9 +9,13 @@ use fit_parser::{
 use thiserror::Error;
 
 use crate::domain::{
-    models::activity::{
-        ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-        ActivityTimeseries, Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+    models::{
+        UserId,
+        activity::{
+            ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+            ActivityTimeseries, Sport, Timeseries, TimeseriesMetric, TimeseriesTime,
+            TimeseriesValue,
+        },
     },
     ports::CreateActivityRequest,
 };
@@ -51,7 +55,13 @@ impl ParseFile for FitParser {
         let statistics = extract_statistics(&messages);
 
         Ok(CreateActivityRequest::new(
-            sport, duration, start_time, statistics, timeseries, bytes,
+            UserId::default(),
+            sport,
+            duration,
+            start_time,
+            statistics,
+            timeseries,
+            bytes,
         ))
     }
 }
@@ -301,6 +311,7 @@ pub mod test_utils {
         fn default() -> Self {
             Self {
                 try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
+                    UserId::default(),
                     Sport::Cycling,
                     ActivityDuration(3600),
                     ActivityStartTime::from_timestamp(1000).unwrap(),

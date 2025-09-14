@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::domain::{
     models::{
+        UserId,
         activity::{Activity, ActivityId},
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
@@ -76,6 +77,7 @@ where
         let id = ActivityId::new();
         let activity = Activity::new(
             id.clone(),
+            UserId::default(),
             *req.start_time(),
             *req.duration(),
             *req.sport(),
@@ -119,7 +121,7 @@ where
         Ok(activity)
     }
 
-    async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
+    async fn list_activities(&self, _user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
         let repository = self.activity_repository.lock().await;
         repository.list_activities().await
     }
@@ -242,6 +244,7 @@ pub mod test_utils {
             Self {
                 create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                     ActivityId::new(),
+                    UserId::default(),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
@@ -251,6 +254,7 @@ pub mod test_utils {
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
                 get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                     ActivityId::new(),
+                    UserId::default(),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
@@ -272,7 +276,10 @@ pub mod test_utils {
             result
         }
 
-        async fn list_activities(&self) -> Result<Vec<Activity>, ListActivitiesError> {
+        async fn list_activities(
+            &self,
+            _user: &UserId,
+        ) -> Result<Vec<Activity>, ListActivitiesError> {
             let mut guard = self.list_activities_result.lock();
             let mut result = Err(ListActivitiesError::Unknown(anyhow!("Substitute errror")));
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
@@ -401,9 +408,12 @@ mod tests_activity_service {
     use tokio::sync::Mutex;
 
     use crate::domain::{
-        models::activity::{
-            ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-            Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        models::{
+            UserId,
+            activity::{
+                ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+                Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+            },
         },
         ports::{SaveActivityError, SaveRawDataError},
         services::test_utils::{MockActivityRepository, MockTrainingMetricsService},
@@ -436,7 +446,15 @@ mod tests_activity_service {
         let content = vec![1, 2, 3];
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
-        CreateActivityRequest::new(sport, duration, start_time, statistics, timeseries, content)
+        CreateActivityRequest::new(
+            UserId::default(),
+            sport,
+            duration,
+            start_time,
+            statistics,
+            timeseries,
+            content,
+        )
     }
 
     #[tokio::test]
@@ -562,7 +580,13 @@ mod tests_activity_service {
         );
 
         let req = CreateActivityRequest::new(
-            sport, duration, start_time, statistics, timeseries, content,
+            UserId::default(),
+            sport,
+            duration,
+            start_time,
+            statistics,
+            timeseries,
+            content,
         );
 
         let res = service.create_activity(req).await;

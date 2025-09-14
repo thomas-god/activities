@@ -1,6 +1,7 @@
 use derive_more::Constructor;
 use thiserror::Error;
 
+use crate::domain::models::UserId;
 use crate::domain::models::activity::{
     Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime,
     ActivityStatistics, ActivityTimeseries, Sport,
@@ -16,6 +17,7 @@ use crate::domain::models::training_metrics::{
 
 #[derive(Debug, Clone)]
 pub struct CreateActivityRequest {
+    user: UserId,
     sport: Sport,
     duration: ActivityDuration,
     start_time: ActivityStartTime,
@@ -26,6 +28,7 @@ pub struct CreateActivityRequest {
 
 impl CreateActivityRequest {
     pub fn new(
+        user: UserId,
         sport: Sport,
         duration: ActivityDuration,
         start_time: ActivityStartTime,
@@ -34,6 +37,7 @@ impl CreateActivityRequest {
         raw_content: Vec<u8>,
     ) -> Self {
         Self {
+            user,
             sport,
             duration,
             start_time,
@@ -41,6 +45,10 @@ impl CreateActivityRequest {
             timeseries,
             raw_content,
         }
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
     }
 
     pub fn start_time(&self) -> &ActivityStartTime {
@@ -76,6 +84,8 @@ pub enum CreateActivityError {
     SimilarActivityExistsError,
     #[error("Timeseries metrics do not have the same length")]
     TimeseriesMetricsNotSameLength,
+    #[error("User {0} does not exists")]
+    UserDoesNotExist(UserId),
 }
 
 pub trait IActivityService: Clone + Send + Sync + 'static {
@@ -86,6 +96,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
 
     fn list_activities(
         &self,
+        user: &UserId,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
     fn get_activity(

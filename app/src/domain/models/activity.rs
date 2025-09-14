@@ -7,6 +7,8 @@ use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
 use uuid::Uuid;
 
+use crate::domain::models::UserId;
+
 ///////////////////////////////////////////////////////////////////
 /// ACTIVITY
 ///////////////////////////////////////////////////////////////////
@@ -14,6 +16,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub struct Activity {
     id: ActivityId,
+    user: UserId,
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
@@ -25,6 +28,7 @@ pub struct Activity {
 impl Activity {
     pub fn new(
         id: ActivityId,
+        user: UserId,
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
@@ -33,6 +37,7 @@ impl Activity {
     ) -> Self {
         Self {
             id,
+            user,
             start_time,
             duration,
             sport,
@@ -46,8 +51,8 @@ impl Activity {
     /// technical [Activity::id].
     pub fn natural_key(&self) -> ActivityNaturalKey {
         ActivityNaturalKey(format!(
-            "{:?}:{:?}:{:?}",
-            self.sport, self.start_time, self.duration
+            "{:?}{:?}:{:?}:{:?}",
+            self.user, self.sport, self.start_time, self.duration
         ))
     }
 
@@ -278,6 +283,7 @@ mod tests {
     fn test_different_activities_different_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
+            UserId::default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -286,6 +292,7 @@ mod tests {
         );
         let second_activity = Activity::new(
             ActivityId::new(),
+            UserId::default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
@@ -300,6 +307,7 @@ mod tests {
     fn test_similar_activities_same_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
+            UserId::default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -308,6 +316,7 @@ mod tests {
         );
         let second_activity = Activity::new(
             ActivityId::new(),
+            UserId::default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -316,5 +325,29 @@ mod tests {
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());
+    }
+
+    #[test]
+    fn test_same_activity_different_user_natural_keys_not_equal() {
+        let first_activity = Activity::new(
+            ActivityId::new(),
+            UserId::default(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Cycling,
+            ActivityStatistics::default(),
+            ActivityTimeseries::default(),
+        );
+        let second_activity = Activity::new(
+            ActivityId::new(),
+            "another_user".to_string().into(),
+            ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration(100),
+            Sport::Cycling,
+            ActivityStatistics::default(),
+            ActivityTimeseries::default(),
+        );
+
+        assert_ne!(first_activity.natural_key(), second_activity.natural_key());
     }
 }
