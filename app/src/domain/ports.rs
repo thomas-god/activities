@@ -206,6 +206,7 @@ pub enum CreateTrainingMetricError {
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct RecomputeMetricRequest {
+    user: UserId,
     new_activity: ActivityId,
 }
 

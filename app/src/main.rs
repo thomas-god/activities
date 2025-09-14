@@ -9,6 +9,7 @@ use app::{
     config::Config,
     domain::{
         models::{
+            UserId,
             activity::{ActivityStatistic, TimeseriesMetric},
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
@@ -81,6 +82,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         id.clone(),
         TrainingMetricDefinition::new(
             id.clone(),
+            UserId::default(),
             TrainingMetricSource::Statistic(ActivityStatistic::Distance),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
@@ -93,6 +95,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         id.clone(),
         TrainingMetricDefinition::new(
             id.clone(),
+            UserId::default(),
             TrainingMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
@@ -105,6 +108,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         id.clone(),
         TrainingMetricDefinition::new(
             id.clone(),
+            UserId::default(),
             TrainingMetricSource::Timeseries((
                 TimeseriesMetric::HeartRate,
                 TrainingMetricAggregate::Max,

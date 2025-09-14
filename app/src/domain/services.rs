@@ -114,7 +114,7 @@ where
         let metric_service = self.training_metrics_service.clone();
         let activity_id = activity.id().clone();
         tokio::spawn(async move {
-            let req = RecomputeMetricRequest::new(activity_id);
+            let req = RecomputeMetricRequest::new(UserId::default(), activity_id);
             metric_service.recompute_metric(req).await
         });
 
@@ -162,6 +162,7 @@ where
         let id = TrainingMetricId::new();
         let metric_definition = TrainingMetricDefinition::new(
             id.clone(),
+            UserId::default(),
             req.source().clone(),
             req.granularity().clone(),
             req.aggregate().clone(),
@@ -691,6 +692,7 @@ mod tests_training_metrics_service {
                 get_definitions_result: Arc::new(Mutex::new(Ok(vec![
                     TrainingMetricDefinition::new(
                         TrainingMetricId::default(),
+                        UserId::default(),
                         TrainingMetricSource::Timeseries((
                             TimeseriesMetric::Power,
                             TrainingMetricAggregate::Average,
@@ -710,7 +712,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository::default();
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
-        let req = RecomputeMetricRequest::new(ActivityId::default());
+        let req = RecomputeMetricRequest::new(UserId::default(), ActivityId::default());
 
         let res = service.recompute_metric(req).await;
 
@@ -737,6 +739,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
+                UserId::default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -754,6 +757,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
+                UserId::default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -767,6 +771,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
+                UserId::default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -787,6 +792,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
+                UserId::default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,

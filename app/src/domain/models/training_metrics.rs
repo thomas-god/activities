@@ -4,8 +4,9 @@ use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFo
 use derive_more::{AsRef, Constructor, Deref, DerefMut, Display};
 use uuid::Uuid;
 
-use crate::domain::models::activity::{
-    Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit,
+use crate::domain::models::{
+    UserId,
+    activity::{Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
@@ -34,6 +35,7 @@ impl Default for TrainingMetricId {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
+    user: UserId,
     source: TrainingMetricSource,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
@@ -42,6 +44,10 @@ pub struct TrainingMetricDefinition {
 impl TrainingMetricDefinition {
     pub fn id(&self) -> &TrainingMetricId {
         &self.id
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
     }
 
     pub fn source(&self) -> &TrainingMetricSource {
@@ -502,6 +508,7 @@ mod test_training_metrics {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
+            UserId::default(),
             TrainingMetricSource::Timeseries((
                 TimeseriesMetric::Power,
                 TrainingMetricAggregate::Average,
