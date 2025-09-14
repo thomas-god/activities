@@ -214,6 +214,10 @@ impl RecomputeMetricRequest {
     pub fn new_activity(&self) -> &ActivityId {
         &self.new_activity
     }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
 }
 
 pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
@@ -229,6 +233,7 @@ pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
 
     fn get_training_metrics(
         &self,
+        user: &UserId,
     ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
 }
 
@@ -268,6 +273,7 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
 
     fn get_definitions(
         &self,
+        user: &UserId,
     ) -> impl Future<
         Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
     > + Send;

@@ -174,8 +174,12 @@ where
         Ok(id)
     }
 
-    async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
-        let metrics = self.metrics_repository.get_definitions().await.unwrap();
+    async fn recompute_metric(&self, req: RecomputeMetricRequest) -> Result<(), ()> {
+        let metrics = self
+            .metrics_repository
+            .get_definitions(req.user())
+            .await
+            .unwrap();
         let activities = self
             .activity_repository
             .lock()
@@ -197,8 +201,11 @@ where
         Ok(())
     }
 
-    async fn get_training_metrics(&self) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
-        let Ok(definitions) = self.metrics_repository.get_definitions().await else {
+    async fn get_training_metrics(
+        &self,
+        user: &UserId,
+    ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
+        let Ok(definitions) = self.metrics_repository.get_definitions(user).await else {
             return vec![];
         };
 
@@ -395,6 +402,7 @@ pub mod test_utils {
 
         async fn get_training_metrics(
             &self,
+            _user: &UserId,
         ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
             let mut guard = self.get_training_metrics_result.lock();
             let mut result = Vec::new();
@@ -652,6 +660,7 @@ mod tests_training_metrics_service {
 
         async fn get_definitions(
             &self,
+            _user: &UserId,
         ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
             let mut guard = self.get_definitions_result.lock().await;
             let mut result = Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
@@ -730,7 +739,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics().await;
+        let res = service.get_training_metrics(&UserId::default()).await;
         assert!(res.is_empty());
     }
 
@@ -749,7 +758,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics().await;
+        let res = service.get_training_metrics(&UserId::default()).await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -784,7 +793,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics().await;
+        let res = service.get_training_metrics(&UserId::default()).await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();

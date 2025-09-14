@@ -120,9 +120,14 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
 
     async fn get_definitions(
         &self,
+        user: &UserId,
     ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
         let definitions = self.definitions.lock().await;
-        Ok(definitions.values().cloned().collect())
+        Ok(definitions
+            .values()
+            .filter(|metric| metric.user() == user)
+            .cloned()
+            .collect())
     }
 
     async fn get_metric_values(
@@ -195,5 +200,54 @@ mod tests_activities_repository {
             res.iter()
                 .all(|activity| activity.user() == &"user1".to_string().into())
         )
+    }
+}
+
+#[cfg(test)]
+mod tests_training_metrics_repository {
+
+    use crate::domain::models::{
+        activity::ActivityStatistic,
+        training_metrics::{
+            TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricSource,
+        },
+    };
+
+    use super::*;
+
+    fn default_metric(user: Option<String>) -> (TrainingMetricId, TrainingMetricDefinition) {
+        let id = TrainingMetricId::default();
+        (
+            id.clone(),
+            TrainingMetricDefinition::new(
+                id.clone(),
+                user.unwrap_or_default().into(),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_list_only_metrics_belonging_to_the_requested_user() {
+        let metrics = HashMap::from_iter(vec![
+            default_metric(Some("user1".to_string())),
+            default_metric(Some("user2".to_string())),
+        ]);
+
+        let repository = InMemoryTrainingMetricsRepository::new(metrics);
+
+        let res = repository
+            .get_definitions(&"user1".to_string().into())
+            .await;
+
+        let res = res.expect("Res should be Ok");
+
+        assert_eq!(res.len(), 1);
+        assert!(
+            res.iter()
+                .all(|metric| metric.user() == &"user1".to_string().into())
+        );
     }
 }

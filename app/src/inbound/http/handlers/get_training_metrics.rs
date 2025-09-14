@@ -12,6 +12,7 @@ use serde_json::json;
 use crate::{
     domain::{
         models::{
+            UserId,
             activity::ToUnit,
             training_metrics::{
                 TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
@@ -93,7 +94,10 @@ pub async fn get_training_metrics<
     State(state): State<AppState<AS, PF, TMS>>,
     Query(date_range): Query<MetricsDateRange>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let res = state.training_metrics_service.get_training_metrics().await;
+    let res = state
+        .training_metrics_service
+        .get_training_metrics(&UserId::default())
+        .await;
 
     let body = ResponseBody(
         res.into_iter()
