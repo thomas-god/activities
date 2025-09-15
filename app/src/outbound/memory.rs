@@ -64,6 +64,14 @@ impl ActivityRepository for InMemoryActivityRepository {
             .find(|activity| activity.id() == id)
             .cloned())
     }
+
+    async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
+        self.activities
+            .lock()
+            .await
+            .retain(|ac| ac.id() != activity);
+        Ok(())
+    }
 }
 
 #[derive(Clone)]

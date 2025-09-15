@@ -12,9 +12,10 @@ use crate::domain::{
     },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, CreateTrainingMetricError,
-        CreateTrainingMetricRequest, DeleteTrainingMetricError, DeleteTrainingMetricRequest,
-        GetActivityError, IActivityService, ITrainingMetricService, ListActivitiesError,
-        RawDataRepository, RecomputeMetricRequest, TrainingMetricsRepository,
+        CreateTrainingMetricRequest, DeleteActivityError, DeleteActivityRequest,
+        DeleteTrainingMetricError, DeleteTrainingMetricRequest, GetActivityError, IActivityService,
+        ITrainingMetricService, ListActivitiesError, RawDataRepository, RecomputeMetricRequest,
+        TrainingMetricsRepository,
     },
 };
 
@@ -134,6 +135,35 @@ where
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
             Err(err) => Err(err),
         }
+    }
+
+    async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
+        let Ok(Some(activity)) = self
+            .activity_repository
+            .lock()
+            .await
+            .get_activity(req.activity())
+            .await
+        else {
+            return Err(DeleteActivityError::ActivityDoesNotExist(
+                req.activity().clone(),
+            ));
+        };
+
+        if activity.user() != req.user() {
+            return Err(DeleteActivityError::UserDoesNotOwnActivity(
+                req.user().clone(),
+                req.activity().clone(),
+            ));
+        }
+
+        self.activity_repository
+            .lock()
+            .await
+            .delete_activity(req.activity())
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -267,13 +297,16 @@ pub mod test_utils {
         ActivityDuration, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
         ActivityTimeseries, Sport,
     };
-    use crate::domain::ports::{ListActivitiesError, SaveActivityError, SimilarActivityError};
+    use crate::domain::ports::{
+        DeleteActivityError, ListActivitiesError, SaveActivityError, SimilarActivityError,
+    };
 
     #[derive(Clone)]
     pub struct MockActivityService {
         pub create_activity_result: Arc<Mutex<Result<Activity, CreateActivityError>>>,
         pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
         pub get_activity_result: Arc<Mutex<Result<Activity, GetActivityError>>>,
+        pub delete_activity_result: Arc<Mutex<Result<(), DeleteActivityError>>>,
     }
 
     impl Default for MockActivityService {
@@ -298,6 +331,7 @@ pub mod test_utils {
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                 )))),
+                delete_activity_result: Arc::new(Mutex::new(Ok(()))),
             }
         }
     }
@@ -332,6 +366,16 @@ pub mod test_utils {
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
+
+        async fn delete_activity(
+            &self,
+            _req: crate::domain::ports::DeleteActivityRequest,
+        ) -> Result<(), crate::domain::ports::DeleteActivityError> {
+            let mut guard = self.delete_activity_result.lock();
+            let mut result = Err(DeleteActivityError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
+        }
     }
 
     #[derive(Clone)]
@@ -340,6 +384,8 @@ pub mod test_utils {
         pub save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
         pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
         pub get_activity_result: Arc<Mutex<Result<Option<Activity>, GetActivityError>>>,
+        pub delete_activity_result: Arc<Mutex<Result<(), anyhow::Error>>>,
+        pub delete_activity_call_list: Arc<Mutex<Vec<ActivityId>>>,
     }
 
     impl ActivityRepository for MockActivityRepository {
@@ -379,6 +425,17 @@ pub mod test_utils {
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
+
+        async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
+            let mut guard = self.delete_activity_result.lock();
+            let mut result = Err(anyhow!("substitute error"));
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            self.delete_activity_call_list
+                .lock()
+                .unwrap()
+                .push(activity.clone());
+            result
+        }
     }
 
     impl Default for MockActivityRepository {
@@ -388,6 +445,8 @@ pub mod test_utils {
                 save_activity_result: Arc::new(Mutex::new(Ok(()))),
                 list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
                 get_activity_result: Arc::new(Mutex::new(Ok(None))),
+                delete_activity_result: Arc::new(Mutex::new(Ok(()))),
+                delete_activity_call_list: Arc::new(Mutex::new(Vec::new())),
             }
         }
     }
@@ -457,7 +516,7 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests_activity_service {
-    use std::{mem, ops::DerefMut, sync::Arc};
+    use std::{collections::HashMap, mem, ops::DerefMut, sync::Arc};
 
     use anyhow::anyhow;
     use tokio::sync::Mutex;
@@ -470,7 +529,7 @@ mod tests_activity_service {
                 Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
             },
         },
-        ports::{SaveActivityError, SaveRawDataError},
+        ports::{DeleteActivityError, DeleteActivityRequest, SaveActivityError, SaveRawDataError},
         services::test_utils::{MockActivityRepository, MockTrainingMetricsService},
     };
 
@@ -491,6 +550,14 @@ mod tests_activity_service {
             let mut result = Err(SaveRawDataError::Unknown(anyhow!("substitute error")));
             mem::swap(guard.deref_mut(), &mut result);
             result
+        }
+    }
+
+    impl Default for MockRawDataRepository {
+        fn default() -> Self {
+            Self {
+                save_raw_data: Arc::new(Mutex::new(Ok(()))),
+            }
         }
     }
 
@@ -652,6 +719,99 @@ mod tests_activity_service {
                 "Should have returned an Err(CreateActivityError::TimeseriesNotSameLength) "
             ),
         }
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_not_found() {
+        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
+            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(None))),
+            ..Default::default()
+        }));
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+
+        let req = DeleteActivityRequest::new(UserId::default(), ActivityId::from("test"));
+
+        let Err(DeleteActivityError::ActivityDoesNotExist(activity)) =
+            service.delete_activity(req).await
+        else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(activity, ActivityId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_not_owned_by_user() {
+        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
+            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                UserId::from("another_user".to_string()),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration(0),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::new()),
+                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
+            ))))),
+            ..Default::default()
+        }));
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+
+        let req = DeleteActivityRequest::new(
+            "test_user".to_string().into(),
+            ActivityId::from("test_activity"),
+        );
+
+        let Err(DeleteActivityError::UserDoesNotOwnActivity(user, activity)) =
+            service.delete_activity(req).await
+        else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(user, "test_user".to_string().into());
+        assert_eq!(activity, ActivityId::from("test_activity"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_ok() {
+        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
+            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                UserId::from("test_user".to_string()),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration(0),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::new()),
+                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
+            ))))),
+            ..Default::default()
+        }));
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service = ActivityService::new(
+            activity_repository.clone(),
+            raw_data_repository,
+            metrics_service,
+        );
+
+        let req = DeleteActivityRequest::new(
+            "test_user".to_string().into(),
+            ActivityId::from("test_activity"),
+        );
+
+        let res = service.delete_activity(req).await;
+        assert!(res.is_ok());
+        let call_list = activity_repository
+            .lock()
+            .await
+            .delete_activity_call_list
+            .lock()
+            .unwrap()
+            .clone();
+        assert_eq!(call_list, vec![ActivityId::from("test_activity")]);
     }
 }
 

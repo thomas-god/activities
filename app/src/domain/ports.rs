@@ -88,6 +88,32 @@ pub enum CreateActivityError {
     UserDoesNotExist(UserId),
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct DeleteActivityRequest {
+    user: UserId,
+    activity: ActivityId,
+}
+
+impl DeleteActivityRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteActivityError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+}
+
 pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
@@ -103,6 +129,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
+
+    fn delete_activity(
+        &self,
+        req: DeleteActivityRequest,
+    ) -> impl Future<Output = Result<(), DeleteActivityError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -155,6 +186,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
+
+    fn delete_activity(
+        &self,
+        activity: &ActivityId,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Error)]
