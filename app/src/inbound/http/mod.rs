@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, Method};
-use axum::routing::get;
+use axum::routing::{delete, get};
 use axum::{Router, routing::post};
 use tokio::net;
 use tower_http::cors::CorsLayer;
@@ -11,7 +11,8 @@ use tower_http::cors::CorsLayer;
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
 use crate::inbound::http::handlers::{
-    create_activity, create_training_metric, get_activity, get_training_metrics, list_activities,
+    create_activity, create_training_metric, delete_training_metric, get_activity,
+    get_training_metrics, list_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -94,5 +95,9 @@ fn api_routes<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
         .route(
             "/training/metric",
             post(create_training_metric::<AS, FP, TMS>),
+        )
+        .route(
+            "/training/metric/{metric_id}",
+            delete(delete_training_metric::<AS, FP, TMS>),
         )
 }
