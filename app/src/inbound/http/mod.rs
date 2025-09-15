@@ -62,7 +62,7 @@ impl HttpServer {
                 CorsLayer::new()
                     .allow_headers([CONTENT_TYPE])
                     .allow_origin([origin])
-                    .allow_methods([Method::GET, Method::POST]),
+                    .allow_methods([Method::GET, Method::POST, Method::DELETE]),
             )
             .with_state(state);
 

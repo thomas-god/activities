@@ -5,11 +5,10 @@
 		values: { time: string; value: number }[];
 		width: number;
 		height: number;
-		title: string;
 		unit: string;
 	}
 
-	let { values, height, width, title, unit }: TimeseriesChartProps = $props();
+	let { values, height, width, unit }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -61,8 +60,6 @@
 		}
 	};
 </script>
-
-<p class="pt-4 text-center">{title}</p>
 
 {#if noValues}
 	<p class="py-6 text-center text-sm italic opacity-60">

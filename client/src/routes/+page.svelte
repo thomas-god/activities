@@ -41,11 +41,11 @@
 		bind:clientWidth={chartWidth}
 		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"
 	>
+		<p class="pt-4 text-center">{topMetric.title}</p>
 		<TrainingMetricsChart
 			height={250}
 			width={chartWidth}
 			values={topMetric.values}
-			title={topMetric.title}
 			unit={topMetric.unit}
 		/>
 	</div>
