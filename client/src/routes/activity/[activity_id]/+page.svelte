@@ -3,6 +3,8 @@
 	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import Chip from '../../../molecules/Chip.svelte';
+	import { PUBLIC_APP_URL } from '$env/static/public';
+	import { goto } from '$app/navigation';
 
 	let { data }: PageProps = $props();
 
@@ -48,12 +50,20 @@
 
 		return data.activity.timeseries.metrics[selectedOption?.option!];
 	});
+
+	const deleteActivityCallback = async (): Promise<void> => {
+		await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
+			method: 'DELETE'
+		});
+		goto('/');
+	};
 </script>
 
 <div class="m-3">
 	<Chip text={summary?.sport} />
 	<Chip text={`⌛ ${summary?.duration}`} />
 	<Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
+	<button onclick={deleteActivityCallback}>🗑️</button>
 </div>
 
 <div class="m-3">
