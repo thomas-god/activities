@@ -129,16 +129,16 @@ async fn load_demo_activities<AR, RDR, TMS>(
     RDR: RawDataRepository,
     TMS: ITrainingMetricService,
 {
-    if let Ok(dir) = fs::read_dir("app/resources") {
-        for file in dir {
-            if let Ok(file) = file {
-                if file.path().extension().and_then(OsStr::to_str) == Some("fit") {
-                    let content = fs::read(file.path()).unwrap();
-                    let req = parser.try_bytes_into_domain(content).unwrap();
-                    activity_service.create_activity(req).await.unwrap();
-                    tracing::info!("Loaded {:?}", file.path());
-                }
-            }
+    let Ok(dir) = fs::read_dir("app/resources") else {
+        return;
+    };
+
+    for file in dir.flatten() {
+        if file.path().extension().and_then(OsStr::to_str) == Some("fit") {
+            let content = fs::read(file.path()).unwrap();
+            let req = parser.try_bytes_into_domain(content).unwrap();
+            activity_service.create_activity(req).await.unwrap();
+            tracing::info!("Loaded {:?}", file.path());
         }
     }
 }

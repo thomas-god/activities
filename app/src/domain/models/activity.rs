@@ -4,7 +4,7 @@ use std::{
 };
 
 use chrono::{DateTime, FixedOffset};
-use derive_more::{AsRef, Constructor, Deref, Display, From, Into};
+use derive_more::{AsRef, Constructor, Display, From, Into};
 use uuid::Uuid;
 
 use crate::domain::models::UserId;
@@ -86,7 +86,7 @@ impl Activity {
 }
 
 /// Technical ID of an [Activity].
-#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
 pub struct ActivityId(String);
 
 impl ActivityId {
@@ -105,12 +105,10 @@ impl Default for ActivityId {
     }
 }
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActivityNaturalKey(String);
 
-#[derive(
-    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash, From, Into, Copy,
-)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash, From, Into, Copy)]
 pub struct ActivityStartTime(DateTime<FixedOffset>);
 
 impl ActivityStartTime {
@@ -121,23 +119,14 @@ impl ActivityStartTime {
     pub fn from_timestamp(timestamp: usize) -> Option<Self> {
         DateTime::from_timestamp(timestamp as i64, 0).map(|dt| Self(dt.fixed_offset()))
     }
+
+    pub fn date(&self) -> &DateTime<FixedOffset> {
+        &self.0
+    }
 }
 
 #[derive(
-    Clone,
-    Debug,
-    Display,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    AsRef,
-    Deref,
-    Hash,
-    From,
-    Into,
-    Copy,
-    Constructor,
+    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash, From, Into, Copy, Constructor,
 )]
 
 pub struct ActivityDuration(pub usize);
@@ -149,8 +138,14 @@ pub enum Sport {
     Other,
 }
 
-#[derive(Clone, Debug, Constructor, Default, Deref)]
+#[derive(Clone, Debug, Constructor, Default)]
 pub struct ActivityStatistics(HashMap<ActivityStatistic, f64>);
+
+impl ActivityStatistics {
+    pub fn get(&self, stat: &ActivityStatistic) -> Option<&f64> {
+        self.0.get(stat)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 pub enum ActivityStatistic {
@@ -225,8 +220,22 @@ impl ActivityTimeseries {
 
 /// [TimeseriesTime] represents the relative timestamp of a timeseries, starting from the
 /// [Activity::start_time].
-#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Deref, Default)]
+#[derive(Debug, Clone, PartialEq, Constructor, AsRef, Default)]
 pub struct TimeseriesTime(Vec<usize>);
+
+impl TimeseriesTime {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn values(&self) -> &[usize] {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct Timeseries {

@@ -1,7 +1,10 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, hash_map::Iter},
+    fmt,
+};
 
 use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFormat};
-use derive_more::{AsRef, Constructor, Deref, DerefMut, Display};
+use derive_more::{AsRef, Constructor, Display};
 use uuid::Uuid;
 
 use crate::domain::models::{
@@ -9,7 +12,7 @@ use crate::domain::models::{
     activity::{Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Deref, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
 pub struct TrainingMetricId(String);
 
 impl TrainingMetricId {
@@ -20,9 +23,11 @@ impl TrainingMetricId {
     pub fn from(id: &str) -> Self {
         Self(id.to_string())
     }
+}
 
-    pub fn to_string(&self) -> String {
-        self.0.clone()
+impl fmt::Display for TrainingMetricId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -80,7 +85,7 @@ impl TrainingMetricSource {
                 extract_aggregated_activity_metric(aggregate, metric, activity)
             }
         }
-        .map(|value| (**activity.start_time(), value))
+        .map(|value| (*activity.start_time().date(), value))
     }
 }
 
@@ -252,8 +257,30 @@ impl TrainingMetricAggregate {
     }
 }
 
-#[derive(Debug, Clone, Constructor, Deref, DerefMut, Default)]
+#[derive(Debug, Clone, Constructor, Default)]
 pub struct TrainingMetricValues(HashMap<String, f64>);
+
+impl TrainingMetricValues {
+    pub fn insert(&mut self, key: String, value: f64) -> Option<f64> {
+        self.0.insert(key, value)
+    }
+
+    pub fn get(&self, key: &str) -> Option<&f64> {
+        self.0.get(key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn iter(&self) -> Iter<'_, String, f64> {
+        self.0.iter()
+    }
+}
 
 impl TrainingMetricValues {
     pub fn as_hash_map(self) -> HashMap<String, f64> {

@@ -403,11 +403,11 @@ mod tests {
         let expected_time = "2025-08-08T19:14:54+02:00"
             .parse::<DateTime<FixedOffset>>()
             .unwrap();
-        assert_eq!(**res.start_time(), expected_time);
+        assert_eq!(*res.start_time().date(), expected_time);
 
         // Check for correct offset to UTC
         assert_eq!(
-            (**res.start_time()).to_rfc3339(),
+            (*res.start_time().date()).to_rfc3339(),
             "2025-08-08T19:14:54+02:00".to_string()
         );
     }
@@ -430,7 +430,7 @@ mod tests {
 
         // First timestamp should be 0 (i.e. equal to activity start_time), speed, power and
         // heart rate are none/absent
-        assert_eq!(*res.timeseries().time().first().unwrap(), 0);
+        assert_eq!(*res.timeseries().time().values().first().unwrap(), 0);
         assert_eq!(
             *distance.unwrap().first().unwrap(),
             Some(TimeseriesValue::Float(0.0))
@@ -440,7 +440,7 @@ mod tests {
         assert!(heart_rate.unwrap().first().unwrap().is_none());
 
         // Check 4th element as the first 3 have no power/speed/hr data
-        assert_eq!(*res.timeseries().time().get(3).unwrap(), 3);
+        assert_eq!(*res.timeseries().time().values().get(3).unwrap(), 3);
         assert_eq!(
             *distance.unwrap().get(3).unwrap(),
             Some(TimeseriesValue::Float(0.0))
@@ -476,7 +476,7 @@ mod tests {
         let timeseries = timeseries.unwrap();
 
         assert_eq!(timeseries.time().len(), 1);
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
     }
 
     #[test]
@@ -560,10 +560,10 @@ mod tests {
 
         assert_eq!(timeseries.time().len(), 2);
 
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(*power.first().unwrap(), Some(TimeseriesValue::Int(12)));
 
-        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*timeseries.time().values().get(1).unwrap(), 1);
         assert_eq!(*power.get(1).unwrap(), None);
     }
 
@@ -610,10 +610,10 @@ mod tests {
 
         assert_eq!(timeseries.time().len(), 2);
 
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(*hear_rate.first().unwrap(), Some(TimeseriesValue::Int(120)));
 
-        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*timeseries.time().values().get(1).unwrap(), 1);
         assert_eq!(*hear_rate.get(1).unwrap(), None);
     }
 
@@ -660,13 +660,13 @@ mod tests {
 
         assert_eq!(timeseries.time().len(), 2);
 
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(
             *distance.first().unwrap(),
             Some(TimeseriesValue::Float(120.))
         );
 
-        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*timeseries.time().values().get(1).unwrap(), 1);
         assert_eq!(*distance.get(1).unwrap(), None);
     }
 
@@ -715,10 +715,10 @@ mod tests {
 
         assert_eq!(timeseries.time().len(), 2);
 
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(*speed.first().unwrap(), Some(TimeseriesValue::Float(12.)));
 
-        assert_eq!(*timeseries.time().get(1).unwrap(), 1);
+        assert_eq!(*timeseries.time().values().get(1).unwrap(), 1);
         assert_eq!(*speed.get(1).unwrap(), None);
     }
 
@@ -749,7 +749,7 @@ mod tests {
 
         assert_eq!(timeseries.time().len(), 1);
 
-        assert_eq!(*timeseries.time().first().unwrap(), 0);
+        assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(*speed.first().unwrap(), Some(TimeseriesValue::Float(12.)));
     }
 }

@@ -34,7 +34,7 @@ impl From<&Activity> for ResponseBodyItem {
                 Sport::Cycling => "Cycling".to_string(),
                 Sport::Other => "Other".to_string(),
             },
-            start_time: **activity.start_time(),
+            start_time: *activity.start_time().date(),
             duration: (*activity.duration()).into(),
         }
     }

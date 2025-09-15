@@ -64,7 +64,7 @@ impl From<&Activity> for ResponseBody {
                 Sport::Cycling => "Cycling".to_string(),
                 Sport::Other => "Other".to_string(),
             },
-            start_time: **activity.start_time(),
+            start_time: *activity.start_time().date(),
             duration: (*activity.duration()).into(),
             timeseries: activity.timeseries().into(),
         }
@@ -74,7 +74,7 @@ impl From<&Activity> for ResponseBody {
 impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
     fn from(value: &ActivityTimeseries) -> Self {
         Self {
-            time: (**value.time()).clone(),
+            time: value.time().values().into(),
             metrics: HashMap::from_iter(value.metrics().iter().map(|metric| {
                 (
                     metric.metric().to_string(),
