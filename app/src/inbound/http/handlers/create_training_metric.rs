@@ -57,3 +57,34 @@ pub async fn create_training_metric<
         .map(|_| StatusCode::CREATED)
         .map_err(StatusCode::from)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_payload_format() {
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Statistic": "Calories"},
+            "granularity": "Weekly",
+            "aggregate": "Min"
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Timeseries": ["Distance", "Average"]},
+            "granularity": "Weekly",
+            "aggregate": "Min"
+        }"#,
+            )
+            .is_ok()
+        );
+    }
+}
