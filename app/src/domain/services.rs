@@ -114,7 +114,7 @@ where
         let metric_service = self.training_metrics_service.clone();
         let activity_id = activity.id().clone();
         tokio::spawn(async move {
-            let req = RecomputeMetricRequest::new(UserId::default(), activity_id);
+            let req = RecomputeMetricRequest::new(UserId::default(), Some(activity_id));
             metric_service.recompute_metric(req).await
         });
 
@@ -162,7 +162,7 @@ where
         let id = TrainingMetricId::new();
         let metric_definition = TrainingMetricDefinition::new(
             id.clone(),
-            UserId::default(),
+            req.user().clone(),
             req.source().clone(),
             req.granularity().clone(),
             req.aggregate().clone(),
@@ -170,6 +170,10 @@ where
         self.metrics_repository
             .save_definitions(metric_definition)
             .await?;
+
+        let _ = self
+            .recompute_metric(RecomputeMetricRequest::new(req.user().clone(), None))
+            .await;
 
         Ok(id)
     }
@@ -184,7 +188,7 @@ where
             .activity_repository
             .lock()
             .await
-            .list_activities(&UserId::default())
+            .list_activities(req.user())
             .await
             .unwrap();
 
@@ -721,7 +725,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository::default();
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
-        let req = RecomputeMetricRequest::new(UserId::default(), ActivityId::default());
+        let req = RecomputeMetricRequest::new(UserId::default(), Some(ActivityId::default()));
 
         let res = service.recompute_metric(req).await;
 

@@ -2,9 +2,12 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::{
-    domain::ports::{
-        CreateTrainingMetricError, CreateTrainingMetricRequest, IActivityService,
-        ITrainingMetricService,
+    domain::{
+        models::UserId,
+        ports::{
+            CreateTrainingMetricError, CreateTrainingMetricRequest, IActivityService,
+            ITrainingMetricService,
+        },
     },
     inbound::{
         http::{
@@ -27,6 +30,7 @@ pub struct CreateTrainingMetricBody {
 impl From<CreateTrainingMetricBody> for CreateTrainingMetricRequest {
     fn from(body: CreateTrainingMetricBody) -> Self {
         Self::new(
+            UserId::default(),
             body.source.into(),
             body.granularity.into(),
             body.aggregate.into(),

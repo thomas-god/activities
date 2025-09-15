@@ -177,12 +177,17 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingMetricRequest {
+    user: UserId,
     source: TrainingMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
 }
 
 impl CreateTrainingMetricRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
     pub fn source(&self) -> &TrainingMetricSource {
         &self.source
     }
@@ -207,11 +212,11 @@ pub enum CreateTrainingMetricError {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct RecomputeMetricRequest {
     user: UserId,
-    new_activity: ActivityId,
+    new_activity: Option<ActivityId>,
 }
 
 impl RecomputeMetricRequest {
-    pub fn new_activity(&self) -> &ActivityId {
+    pub fn new_activity(&self) -> &Option<ActivityId> {
         &self.new_activity
     }
 
