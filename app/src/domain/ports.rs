@@ -225,6 +225,36 @@ impl RecomputeMetricRequest {
     }
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct DeleteTrainingMetricRequest {
+    user: UserId,
+    metric: TrainingMetricId,
+}
+
+impl DeleteTrainingMetricRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn metric(&self) -> &TrainingMetricId {
+        &self.metric
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteTrainingMetricError {
+    #[error("Training metric with id {0} does not exists")]
+    MetricDoesNotExist(TrainingMetricId),
+    #[error("User {0} does not own training metric {1}")]
+    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
+    #[error("An infratstructure error occured when getting defintion")]
+    GetDefinitionError(#[from] GetDefinitionError),
+    #[error("An infratstructure error occured when trying to delete defintion")]
+    DeleteMetricError(#[from] DeleteMetricError),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
@@ -240,6 +270,11 @@ pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
     ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
+
+    fn delete_metric(
+        &self,
+        req: DeleteTrainingMetricRequest,
+    ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -270,6 +305,20 @@ pub enum GetTrainingMetricValueError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum DeleteMetricError {
+    #[error("Training metric {0:?} does not exist")]
+    TrainingMetricDoesNotExists(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum GetDefinitionError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
     fn save_definitions(
         &self,
@@ -283,7 +332,7 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
     > + Send;
 
-    fn save_metric_values(
+    fn update_metric_values(
         &self,
         id: &TrainingMetricId,
         values: (&str, f64),
@@ -293,4 +342,14 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         &self,
         id: &TrainingMetricId,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
+
+    fn get_definition(
+        &self,
+        metric: &TrainingMetricId,
+    ) -> impl Future<Output = Result<Option<TrainingMetricDefinition>, GetDefinitionError>> + Send;
+
+    fn delete_definition(
+        &self,
+        metric: &TrainingMetricId,
+    ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
 }

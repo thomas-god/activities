@@ -11,10 +11,10 @@ use crate::domain::{
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
-        ActivityRepository, GetActivityError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, ListActivitiesError, RawDataRepository,
-        SaveActivityError, SaveRawDataError, SaveTrainingMetricError, SimilarActivityError,
-        TrainingMetricsRepository, UpdateMetricError,
+        ActivityRepository, DeleteMetricError, GetActivityError, GetDefinitionError,
+        GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
+        RawDataRepository, SaveActivityError, SaveRawDataError, SaveTrainingMetricError,
+        SimilarActivityError, TrainingMetricsRepository, UpdateMetricError,
     },
 };
 
@@ -143,7 +143,7 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
             .cloned()
     }
 
-    async fn save_metric_values(
+    async fn update_metric_values(
         &self,
         id: &TrainingMetricId,
         new_value: (&str, f64),
@@ -154,6 +154,18 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
             .entry(id.clone())
             .or_default()
             .insert(key.to_string(), value);
+        Ok(())
+    }
+
+    async fn get_definition(
+        &self,
+        metric: &TrainingMetricId,
+    ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
+        Ok(self.definitions.lock().await.get(metric).cloned())
+    }
+
+    async fn delete_definition(&self, metric: &TrainingMetricId) -> Result<(), DeleteMetricError> {
+        self.definitions.lock().await.remove(metric);
         Ok(())
     }
 }

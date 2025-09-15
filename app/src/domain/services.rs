@@ -12,8 +12,9 @@ use crate::domain::{
     },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, CreateTrainingMetricError,
-        CreateTrainingMetricRequest, GetActivityError, IActivityService, ITrainingMetricService,
-        ListActivitiesError, RawDataRepository, RecomputeMetricRequest, TrainingMetricsRepository,
+        CreateTrainingMetricRequest, DeleteTrainingMetricError, DeleteTrainingMetricRequest,
+        GetActivityError, IActivityService, ITrainingMetricService, ListActivitiesError,
+        RawDataRepository, RecomputeMetricRequest, TrainingMetricsRepository,
     },
 };
 
@@ -198,7 +199,7 @@ where
             for (key, value) in values.iter() {
                 let _ = self
                     .metrics_repository
-                    .save_metric_values(metric.id(), (key, *value))
+                    .update_metric_values(metric.id(), (key, *value))
                     .await;
             }
         }
@@ -224,6 +225,30 @@ where
         }
 
         res
+    }
+
+    async fn delete_metric(
+        &self,
+        req: DeleteTrainingMetricRequest,
+    ) -> Result<(), DeleteTrainingMetricError> {
+        let Some(definition) = self.metrics_repository.get_definition(req.metric()).await? else {
+            return Err(DeleteTrainingMetricError::MetricDoesNotExist(
+                req.metric().clone(),
+            ));
+        };
+
+        if definition.user() != req.user() {
+            return Err(DeleteTrainingMetricError::UserDoesNotOwnTrainingMetric(
+                req.user().clone(),
+                req.metric().clone(),
+            ));
+        }
+
+        self.metrics_repository
+            .delete_definition(req.metric())
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -373,6 +398,7 @@ pub mod test_utils {
         pub recompute_metrics_result: Arc<Mutex<Result<(), ()>>>,
         pub get_training_metrics_result:
             Arc<Mutex<Vec<(TrainingMetricDefinition, TrainingMetricValues)>>>,
+        pub delete_metric_result: Arc<Mutex<Result<(), DeleteTrainingMetricError>>>,
     }
 
     impl Default for MockTrainingMetricsService {
@@ -381,6 +407,7 @@ pub mod test_utils {
                 create_metric_result: Arc::new(Mutex::new(Ok(TrainingMetricId::default()))),
                 recompute_metrics_result: Arc::new(Mutex::new(Ok(()))),
                 get_training_metrics_result: Arc::new(Mutex::new(vec![])),
+                delete_metric_result: Arc::new(Mutex::new(Ok(()))),
             }
         }
     }
@@ -410,6 +437,18 @@ pub mod test_utils {
         ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
             let mut guard = self.get_training_metrics_result.lock();
             let mut result = Vec::new();
+            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
+            result
+        }
+
+        async fn delete_metric(
+            &self,
+            _req: DeleteTrainingMetricRequest,
+        ) -> Result<(), DeleteTrainingMetricError> {
+            let mut guard = self.delete_metric_result.lock();
+            let mut result = Err(DeleteTrainingMetricError::Unknown(anyhow!(
+                "substitute error"
+            )));
             mem::swap(guard.as_deref_mut().unwrap(), &mut result);
             result
         }
@@ -631,8 +670,8 @@ mod tests_training_metrics_service {
             },
         },
         ports::{
-            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
-            SaveTrainingMetricError, UpdateMetricError,
+            DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
+            GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, UpdateMetricError,
         },
         services::test_utils::MockActivityRepository,
     };
@@ -647,6 +686,10 @@ mod tests_training_metrics_service {
         update_metric_values_result: Arc<Mutex<Result<(), UpdateMetricError>>>,
         get_metric_values_result:
             Arc<Mutex<Result<TrainingMetricValues, GetTrainingMetricValueError>>>,
+        get_definition_result:
+            Arc<Mutex<Result<Option<TrainingMetricDefinition>, GetDefinitionError>>>,
+        delete_definition_result: Arc<Mutex<Result<(), DeleteMetricError>>>,
+        delete_definition_call_list: Arc<Mutex<Vec<TrainingMetricId>>>,
     }
 
     impl TrainingMetricsRepository for MockTrainingMetricsRepository {
@@ -674,7 +717,7 @@ mod tests_training_metrics_service {
             result
         }
 
-        async fn save_metric_values(
+        async fn update_metric_values(
             &self,
             _id: &TrainingMetricId,
             _values: (&str, f64),
@@ -694,6 +737,30 @@ mod tests_training_metrics_service {
                 "substitute error"
             )));
             mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
+        async fn get_definition(
+            &self,
+            _metric: &TrainingMetricId,
+        ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
+            let mut guard = self.get_definition_result.lock().await;
+            let mut result = Err(GetDefinitionError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.deref_mut(), &mut result);
+            result
+        }
+
+        async fn delete_definition(
+            &self,
+            metric: &TrainingMetricId,
+        ) -> Result<(), DeleteMetricError> {
+            let mut guard = self.delete_definition_result.lock().await;
+            let mut result = Err(DeleteMetricError::Unknown(anyhow!("substitute error")));
+            mem::swap(guard.deref_mut(), &mut result);
+            self.delete_definition_call_list
+                .lock()
+                .await
+                .push(metric.clone());
             result
         }
     }
@@ -716,6 +783,20 @@ mod tests_training_metrics_service {
                 ]))),
                 update_metric_values_result: Arc::new(Mutex::new(Ok(()))),
                 get_metric_values_result: Arc::new(Mutex::new(Ok(TrainingMetricValues::default()))),
+                get_definition_result: Arc::new(Mutex::new(Ok(Some(
+                    TrainingMetricDefinition::new(
+                        TrainingMetricId::default(),
+                        UserId::default(),
+                        TrainingMetricSource::Timeseries((
+                            TimeseriesMetric::Power,
+                            TrainingMetricAggregate::Average,
+                        )),
+                        TrainingMetricGranularity::Weekly,
+                        TrainingMetricAggregate::Max,
+                    ),
+                )))),
+                delete_definition_result: Arc::new(Mutex::new(Ok(()))),
+                delete_definition_call_list: Arc::new(Mutex::new(Vec::new())),
             }
         }
     }
@@ -812,5 +893,83 @@ mod tests_training_metrics_service {
             )
         );
         assert_eq!(*value.get("toto").unwrap(), 0.3);
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric_does_not_exist() {
+        let repository = MockTrainingMetricsRepository {
+            get_definition_result: Arc::new(Mutex::new(Ok(None))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository, activity_repository);
+
+        let req = DeleteTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+        );
+
+        let res = service.delete_metric(req).await;
+
+        let Err(DeleteTrainingMetricError::MetricDoesNotExist(metric)) = res else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric_wrong_user() {
+        let repository = MockTrainingMetricsRepository {
+            get_definition_result: Arc::new(Mutex::new(Ok(Some(TrainingMetricDefinition::new(
+                TrainingMetricId::from("test"),
+                "other_user".to_string().into(),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            ))))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository, activity_repository);
+
+        let req = DeleteTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+        );
+
+        let res = service.delete_metric(req).await;
+
+        let Err(DeleteTrainingMetricError::UserDoesNotOwnTrainingMetric(user, metric)) = res else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(user, "user".to_string().into());
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric() {
+        let repository = MockTrainingMetricsRepository {
+            get_definition_result: Arc::new(Mutex::new(Ok(Some(TrainingMetricDefinition::new(
+                TrainingMetricId::from("test"),
+                "user".to_string().into(),
+                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            ))))),
+            ..Default::default()
+        };
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingMetricService::new(repository.clone(), activity_repository);
+
+        let req = DeleteTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+        );
+
+        let res = service.delete_metric(req).await;
+
+        assert!(res.is_ok());
+        let call_list = repository.delete_definition_call_list.lock().await.clone();
+        assert_eq!(call_list, vec![TrainingMetricId::from("test")]);
     }
 }
