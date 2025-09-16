@@ -11,6 +11,7 @@ pub enum APIActivityStatistic {
     Calories,
     Elevation,
     Distance,
+    Duration,
 }
 
 impl From<APIActivityStatistic> for ActivityStatistic {
@@ -19,6 +20,7 @@ impl From<APIActivityStatistic> for ActivityStatistic {
             APIActivityStatistic::Calories => Self::Calories,
             APIActivityStatistic::Elevation => Self::Elevation,
             APIActivityStatistic::Distance => Self::Distance,
+            APIActivityStatistic::Duration => Self::Duration,
         }
     }
 }

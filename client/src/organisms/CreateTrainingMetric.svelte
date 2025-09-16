@@ -4,7 +4,8 @@
 	let formOpen = $state(false);
 
 	let sourceType: 'activity-statistics' | 'timeseries-aggregate' = $state('activity-statistics');
-	let sourceActivityStatistics: 'Calories' | 'Elevation' | 'Distance' = $state('Calories');
+	let sourceActivityStatistics: 'Calories' | 'Elevation' | 'Distance' | 'Duration' =
+		$state('Calories');
 	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' = $state('Power');
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 	let granularity: 'Activity' | 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
@@ -47,6 +48,7 @@
 					<option value="Calories">Calories</option>
 					<option value="Elevation">Elevation gain</option>
 					<option value="Distance">Distance</option>
+					<option value="Duration">Duration</option>
 				</select>
 			{:else}
 				<div class="join">

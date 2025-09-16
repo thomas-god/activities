@@ -11,7 +11,8 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::activity::{
-            Activity, ActivityId, ActivityTimeseries, Sport, TimeseriesValue, ToUnit,
+            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, Sport, TimeseriesValue,
+            ToUnit,
         },
         ports::{IActivityService, ITrainingMetricService},
     },
@@ -23,7 +24,7 @@ pub struct ResponseBody {
     id: String,
     sport: String,
     name: Option<String>,
-    duration: usize,
+    duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
     timeseries: ActivityTimeseriesBody,
 }
@@ -67,7 +68,10 @@ impl From<&Activity> for ResponseBody {
                 Sport::Other => "Other".to_string(),
             },
             start_time: *activity.start_time().date(),
-            duration: (*activity.duration()).into(),
+            duration: activity
+                .statistics()
+                .get(&ActivityStatistic::Duration)
+                .cloned(),
             timeseries: activity.timeseries().into(),
         }
     }
@@ -125,8 +129,8 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
-                    Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActivityStartTime, ActivityStatistics, ActivityTimeseries, Timeseries,
+                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::GetActivityError,
@@ -150,9 +154,8 @@ mod tests {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
-                ActivityDuration::new(1200),
                 Sport::Cycling,
-                ActivityStatistics::default(),
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
                 ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),
                     vec![Timeseries::new(
@@ -184,7 +187,7 @@ mod tests {
         assert_eq!(
             response.0,
             ResponseBody {
-                duration: 1200,
+                duration: Some(1200.),
                 id: target_id,
                 name: None,
                 sport: "Cycling".to_string(),

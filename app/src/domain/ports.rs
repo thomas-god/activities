@@ -3,8 +3,8 @@ use thiserror::Error;
 
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
-    Activity, ActivityDuration, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime,
-    ActivityStatistics, ActivityTimeseries, Sport,
+    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
+    ActivityTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
     TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
@@ -19,7 +19,6 @@ use crate::domain::models::training_metrics::{
 pub struct CreateActivityRequest {
     user: UserId,
     sport: Sport,
-    duration: ActivityDuration,
     start_time: ActivityStartTime,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
@@ -30,7 +29,6 @@ impl CreateActivityRequest {
     pub fn new(
         user: UserId,
         sport: Sport,
-        duration: ActivityDuration,
         start_time: ActivityStartTime,
         statistics: ActivityStatistics,
         timeseries: ActivityTimeseries,
@@ -39,7 +37,6 @@ impl CreateActivityRequest {
         Self {
             user,
             sport,
-            duration,
             start_time,
             statistics,
             timeseries,
@@ -61,10 +58,6 @@ impl CreateActivityRequest {
 
     pub fn sport(&self) -> &Sport {
         &self.sport
-    }
-
-    pub fn duration(&self) -> &ActivityDuration {
-        &self.duration
     }
 
     pub fn statistics(&self) -> &ActivityStatistics {

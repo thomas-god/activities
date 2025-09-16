@@ -294,8 +294,8 @@ mod test_training_metrics {
     use crate::domain::models::{
         UserId,
         activity::{
-            Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
-            ActivityTimeseries, Sport, Timeseries, TimeseriesTime, TimeseriesValue,
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+            Timeseries, TimeseriesTime, TimeseriesValue,
         },
     };
 
@@ -311,7 +311,6 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            ActivityDuration::new(3),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::new(
@@ -351,7 +350,6 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            ActivityDuration::new(1),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::new(

@@ -77,7 +77,6 @@ impl ActivityRepository for InMemoryActivityRepository {
                     activity.user().clone(),
                     name.clone(),
                     *activity.start_time(),
-                    *activity.duration(),
                     *activity.sport(),
                     activity.statistics().clone(),
                     activity.timeseries().clone(),
@@ -207,8 +206,7 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
 mod tests_activities_repository {
 
     use crate::domain::models::activity::{
-        ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-        TimeseriesTime,
+        ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport, TimeseriesTime,
     };
 
     use super::*;
@@ -219,7 +217,6 @@ mod tests_activities_repository {
             user.unwrap_or_default().into(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration::new(10),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::new()),
             ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),

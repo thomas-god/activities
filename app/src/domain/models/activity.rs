@@ -19,7 +19,6 @@ pub struct Activity {
     user: UserId,
     name: Option<ActivityName>,
     start_time: ActivityStartTime,
-    duration: ActivityDuration,
     sport: Sport,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
@@ -33,7 +32,6 @@ impl Activity {
         user: UserId,
         name: Option<ActivityName>,
         start_time: ActivityStartTime,
-        duration: ActivityDuration,
         sport: Sport,
         statistics: ActivityStatistics,
         timeseries: ActivityTimeseries,
@@ -43,7 +41,6 @@ impl Activity {
             user,
             name,
             start_time,
-            duration,
             sport,
             statistics,
             timeseries,
@@ -54,9 +51,13 @@ impl Activity {
     /// identical natural keys should be considered identical/duplicate regardless of their
     /// technical [Activity::id].
     pub fn natural_key(&self) -> ActivityNaturalKey {
+        let duration = self
+            .statistics
+            .get(&ActivityStatistic::Duration)
+            .unwrap_or(&0.);
         ActivityNaturalKey(format!(
             "{:?}{:?}:{:?}:{:?}",
-            self.user, self.sport, self.start_time, self.duration
+            self.user, self.sport, self.start_time, duration
         ))
     }
 
@@ -74,10 +75,6 @@ impl Activity {
 
     pub fn start_time(&self) -> &ActivityStartTime {
         &self.start_time
-    }
-
-    pub fn duration(&self) -> &ActivityDuration {
-        &self.duration
     }
 
     pub fn sport(&self) -> &Sport {
@@ -142,12 +139,6 @@ impl ActivityStartTime {
     }
 }
 
-#[derive(
-    Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash, From, Into, Copy, Constructor,
-)]
-
-pub struct ActivityDuration(pub usize);
-
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub enum Sport {
     Running,
@@ -166,6 +157,7 @@ impl ActivityStatistics {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 pub enum ActivityStatistic {
+    Duration,
     Calories,
     Elevation,
     Distance,
@@ -174,6 +166,7 @@ pub enum ActivityStatistic {
 impl ToUnit for ActivityStatistic {
     fn unit(&self) -> Unit {
         match self {
+            Self::Duration => Unit::Second,
             Self::Calories => Unit::KiloCalorie,
             Self::Elevation => Unit::Meter,
             Self::Distance => Unit::Meter,
@@ -195,6 +188,7 @@ pub enum Unit {
     KilometerPerHour,
     Watt,
     BeatPerMinute,
+    Second,
 }
 
 impl fmt::Display for Unit {
@@ -207,6 +201,7 @@ impl fmt::Display for Unit {
             Self::KilometerPerHour => "km/h",
             Self::Watt => "W",
             Self::BeatPerMinute => "bpm",
+            Self::Second => "s",
         };
 
         write!(f, "{}", unit)
@@ -316,7 +311,6 @@ mod tests {
             UserId::default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),
@@ -326,7 +320,6 @@ mod tests {
             UserId::default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Running,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),
@@ -342,7 +335,6 @@ mod tests {
             UserId::default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),
@@ -352,7 +344,6 @@ mod tests {
             UserId::default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),
@@ -368,7 +359,6 @@ mod tests {
             UserId::default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),
@@ -378,7 +368,6 @@ mod tests {
             "another_user".to_string().into(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
-            ActivityDuration(100),
             Sport::Cycling,
             ActivityStatistics::default(),
             ActivityTimeseries::default(),

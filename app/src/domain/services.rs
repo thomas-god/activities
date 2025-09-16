@@ -82,7 +82,6 @@ where
             UserId::default(),
             None,
             *req.start_time(),
-            *req.duration(),
             *req.sport(),
             req.statistics().clone(),
             req.timeseries().clone(),
@@ -325,7 +324,7 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityDuration, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
+        ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
         ActivityTimeseries, Sport,
     };
     use crate::domain::ports::{
@@ -350,7 +349,6 @@ pub mod test_utils {
                     UserId::default(),
                     None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
-                    ActivityDuration::from(3600),
                     Sport::Running,
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
@@ -361,7 +359,6 @@ pub mod test_utils {
                     UserId::default(),
                     None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
-                    ActivityDuration::from(3600),
                     Sport::Running,
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
@@ -591,9 +588,8 @@ mod tests_activity_service {
         models::{
             UserId,
             activity::{
-                ActivityDuration, ActivityName, ActivityStartTime, ActivityStatistics,
-                ActivityTimeseries, Sport, Timeseries, TimeseriesMetric, TimeseriesTime,
-                TimeseriesValue,
+                ActivityName, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+                Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
             },
         },
         ports::{
@@ -634,14 +630,12 @@ mod tests_activity_service {
     fn default_activity_request() -> CreateActivityRequest {
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
-        let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
         CreateActivityRequest::new(
             UserId::default(),
             sport,
-            duration,
             start_time,
             statistics,
             timeseries,
@@ -747,7 +741,6 @@ mod tests_activity_service {
 
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
-        let duration = ActivityDuration(1200);
         let content = vec![1, 2, 3];
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::new(
@@ -774,7 +767,6 @@ mod tests_activity_service {
         let req = CreateActivityRequest::new(
             UserId::default(),
             sport,
-            duration,
             start_time,
             statistics,
             timeseries,
@@ -820,7 +812,6 @@ mod tests_activity_service {
                 UserId::from("another_user".to_string()),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration(0),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
@@ -852,7 +843,6 @@ mod tests_activity_service {
                 UserId::default(),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration(0),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
@@ -921,7 +911,6 @@ mod tests_activity_service {
                 UserId::from("another_user".to_string()),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration(0),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
@@ -955,7 +944,6 @@ mod tests_activity_service {
                 UserId::from("test_user".to_string()),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration(0),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),

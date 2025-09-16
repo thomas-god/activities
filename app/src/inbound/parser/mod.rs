@@ -12,9 +12,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-            ActivityTimeseries, Sport, Timeseries, TimeseriesMetric, TimeseriesTime,
-            TimeseriesValue,
+            ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
+            Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         },
     },
     ports::CreateActivityRequest,
@@ -42,9 +41,6 @@ impl ParseFile for FitParser {
             return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
         };
 
-        let duration = extract_duration(&messages)
-            .ok_or(ParseCreateActivityHttpRequestBodyError::NoDurationFound)?;
-
         let (start_time, reference_timestamp) = extract_start_time(&messages)
             .ok_or(ParseCreateActivityHttpRequestBodyError::NoStartTimeFound)?;
 
@@ -57,7 +53,6 @@ impl ParseFile for FitParser {
         Ok(CreateActivityRequest::new(
             UserId::default(),
             sport,
-            duration,
             start_time,
             statistics,
             timeseries,
@@ -107,14 +102,6 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
     let start_datetime = start_datetime.with_timezone(&FixedOffset::east_opt(offset as i32)?);
 
     Some((ActivityStartTime::new(start_datetime), *start_timestamp))
-}
-
-fn extract_duration(messages: &[DataMessage]) -> Option<ActivityDuration> {
-    find_field_value_as_float(
-        messages,
-        &fit_parser::FitField::Session(fit_parser::SessionField::TotalElapsedTime),
-    )
-    .map(|val| ActivityDuration(val.round() as usize))
 }
 
 fn extract_sport(messages: &[DataMessage]) -> Sport {
@@ -242,6 +229,10 @@ fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
             FitField::Session(SessionField::TotalAscent),
             ActivityStatistic::Elevation,
         ),
+        (
+            FitField::Session(SessionField::TotalElapsedTime),
+            ActivityStatistic::Duration,
+        ),
     ];
 
     for (field, statistic) in pairs.iter() {
@@ -313,7 +304,6 @@ pub mod test_utils {
                 try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
                     UserId::default(),
                     Sport::Cycling,
-                    ActivityDuration(3600),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),

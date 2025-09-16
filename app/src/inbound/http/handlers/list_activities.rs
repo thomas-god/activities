@@ -7,7 +7,7 @@ use crate::{
     domain::{
         models::{
             UserId,
-            activity::{Activity, Sport},
+            activity::{Activity, ActivityStatistic, Sport},
         },
         ports::{IActivityService, ITrainingMetricService},
     },
@@ -22,7 +22,7 @@ pub struct ResponseBodyItem {
     id: String,
     sport: String,
     name: Option<String>,
-    duration: usize,
+    duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
 }
 
@@ -37,7 +37,10 @@ impl From<&Activity> for ResponseBodyItem {
             },
             name: activity.name().map(|name| name.to_string()),
             start_time: *activity.start_time().date(),
-            duration: (*activity.duration()).into(),
+            duration: activity
+                .statistics()
+                .get(&ActivityStatistic::Duration)
+                .cloned(),
         }
     }
 }
