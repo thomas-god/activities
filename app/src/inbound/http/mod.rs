@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, Method};
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, patch};
 use axum::{Router, routing::post};
 use tokio::net;
 use tower_http::cors::CorsLayer;
@@ -12,7 +12,7 @@ use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
 use crate::inbound::http::handlers::{
     create_activity, create_training_metric, delete_activity, delete_training_metric, get_activity,
-    get_training_metrics, list_activities,
+    get_training_metrics, list_activities, patch_activity,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -62,7 +62,7 @@ impl HttpServer {
                 CorsLayer::new()
                     .allow_headers([CONTENT_TYPE])
                     .allow_origin([origin])
-                    .allow_methods([Method::GET, Method::POST, Method::DELETE]),
+                    .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
             )
             .with_state(state);
 
@@ -88,6 +88,10 @@ fn api_routes<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
         .route("/activity", post(create_activity::<AS, FP, TMS>))
         .route("/activities", get(list_activities::<AS, FP, TMS>))
         .route("/activity/{activity_id}", get(get_activity::<AS, FP, TMS>))
+        .route(
+            "/activity/{activity_id}",
+            patch(patch_activity::<AS, FP, TMS>),
+        )
         .route(
             "/activity/{activity_id}",
             delete(delete_activity::<AS, FP, TMS>),
