@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityNaturalKey},
+        activity::{Activity, ActivityId, ActivityName, ActivityNaturalKey},
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
@@ -63,6 +63,31 @@ impl ActivityRepository for InMemoryActivityRepository {
             .iter()
             .find(|activity| activity.id() == id)
             .cloned())
+    }
+
+    async fn modify_activity_name(
+        &self,
+        id: &ActivityId,
+        name: Option<ActivityName>,
+    ) -> Result<(), anyhow::Error> {
+        for activity in &mut self.activities.lock().await.iter_mut() {
+            if activity.id() == id {
+                let new_activity = Activity::new(
+                    activity.id().clone(),
+                    activity.user().clone(),
+                    name.clone(),
+                    *activity.start_time(),
+                    *activity.duration(),
+                    *activity.sport(),
+                    activity.statistics().clone(),
+                    activity.timeseries().clone(),
+                );
+                let _ = std::mem::replace(activity, new_activity);
+                return Ok(());
+            }
+        }
+
+        Ok(())
     }
 
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {

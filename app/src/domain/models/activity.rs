@@ -25,6 +25,7 @@ pub struct Activity {
     timeseries: ActivityTimeseries,
 }
 
+#[allow(clippy::too_many_arguments)]
 /// An [Activity] is an entity representing a single sport activity or training session.
 impl Activity {
     pub fn new(

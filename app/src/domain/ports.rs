@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
-    Activity, ActivityDuration, ActivityId, ActivityNaturalKey, ActivityStartTime,
+    Activity, ActivityDuration, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime,
     ActivityStatistics, ActivityTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
@@ -88,6 +88,30 @@ pub enum CreateActivityError {
     UserDoesNotExist(UserId),
 }
 
+#[derive(Debug, Clone, Constructor, Default)]
+pub struct ModifyActivityRequest {
+    activity: ActivityId,
+    name: Option<ActivityName>,
+}
+
+impl ModifyActivityRequest {
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+
+    pub fn name(&self) -> Option<&ActivityName> {
+        self.name.as_ref()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ModifyActivityError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 #[derive(Debug, Clone, Constructor)]
 pub struct DeleteActivityRequest {
     user: UserId,
@@ -129,6 +153,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
+
+    fn modify_activity(
+        &self,
+        req: ModifyActivityRequest,
+    ) -> impl Future<Output = Result<(), ModifyActivityError>> + Send;
 
     fn delete_activity(
         &self,
@@ -186,6 +215,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
+
+    fn modify_activity_name(
+        &self,
+        id: &ActivityId,
+        name: Option<ActivityName>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn delete_activity(
         &self,
