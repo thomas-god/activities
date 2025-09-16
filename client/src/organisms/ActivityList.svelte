@@ -1,9 +1,16 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration } from '$lib/duration';
 	import dayjs from 'dayjs';
-	import type { ActivityList } from '../routes/+page';
+	import type { ActivityList, ActivityListItem } from '../routes/+page';
 
 	let { activityList }: { activityList: ActivityList } = $props();
+
+	const activityTitle = (activity: ActivityListItem) => {
+		if (activity.name === null || activity.name === '') {
+			return activity.sport;
+		}
+		return activity.name;
+	};
 </script>
 
 <ul class="rounded-box bg-base-100 shadow-md">
@@ -12,7 +19,7 @@
 		<a href={`/activity/${activity.id}`} class="block">
 			<li class="grid grid-cols-3 justify-self-auto bg-base-100 p-3 hover:bg-base-200">
 				<div class="italic">
-					{activity.sport}
+					{activityTitle(activity)}
 				</div>
 				<div class="justify-self-start">
 					⌛ <span class="font-mono font-medium italic">{formatDuration(activity.duration)}</span>

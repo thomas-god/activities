@@ -2,6 +2,7 @@ import type { PageLoad } from './$types';
 import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
+import { redirect } from '@sveltejs/kit';
 
 export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);
@@ -12,7 +13,7 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 	if (res.status === 200) {
 		return { activity: ActivityDetails.parse(await res.json()) };
 	}
-	return { activity: undefined };
+	redirect(307, '/');
 };
 
 export const prerender = false;
@@ -21,6 +22,7 @@ export const ssr = false;
 const ActivityDetails = z.object({
 	id: z.string(),
 	sport: z.string(),
+	name: z.string().nullable(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
 	timeseries: z.object({

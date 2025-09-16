@@ -6,7 +6,10 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::activity::{ActivityId, ActivityName},
+        models::{
+            UserId,
+            activity::{ActivityId, ActivityName},
+        },
         ports::{
             IActivityService, ITrainingMetricService, ModifyActivityError, ModifyActivityRequest,
         },
@@ -25,7 +28,6 @@ impl From<ModifyActivityError> for StatusCode {
 
 #[derive(Debug, Deserialize)]
 pub struct PatchActivityQuery {
-    user: String,
     name: Option<String>,
 }
 
@@ -35,7 +37,7 @@ pub async fn patch_activity<AS: IActivityService, PF: ParseFile, TMS: ITrainingM
     Query(query): Query<PatchActivityQuery>,
 ) -> Result<StatusCode, StatusCode> {
     let req = ModifyActivityRequest::new(
-        query.user.into(),
+        UserId::default(),
         ActivityId::from(&activity_id),
         query.name.map(ActivityName::new),
     );

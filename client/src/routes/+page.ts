@@ -42,6 +42,7 @@ export const prerender = false;
 
 const ActivityListItem = z.object({
 	id: z.string(),
+	name: z.string().nullable(),
 	sport: z.string(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true })

@@ -5,20 +5,22 @@
 	import Chip from '../../../molecules/Chip.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
+	import EditableString from '../../../molecules/EditableString.svelte';
 
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
 
 	let summary = $derived.by(() => {
-		if (data.activity) {
-			return {
-				sport: data.activity.sport,
-				duration: formatDuration(data.activity.duration),
-				start_time: data.activity.start_time
-			};
-		}
-		return undefined;
+		return {
+			sport: data.activity.sport,
+			duration: formatDuration(data.activity.duration),
+			start_time: data.activity.start_time,
+			title:
+				data.activity.name === null || data.activity.name === ''
+					? data.activity.sport
+					: data.activity.name
+		};
 	});
 
 	let metricOptions = [
@@ -28,10 +30,6 @@
 	];
 
 	let availableOptions = $derived.by(() => {
-		if (data.activity === undefined) {
-			return [];
-		}
-
 		let options = [];
 		for (const option of metricOptions) {
 			if (option.option in data.activity.timeseries.metrics) {
@@ -44,10 +42,6 @@
 	let selectedOption = $state(metricOptions.at(1));
 
 	let selectedMetric = $derived.by(() => {
-		if (data.activity === undefined) {
-			return undefined;
-		}
-
 		return data.activity.timeseries.metrics[selectedOption?.option!];
 	});
 
@@ -57,7 +51,20 @@
 		});
 		goto('/');
 	};
+
+	const updateActivityNameCallback = async (newName: string) => {
+		await fetch(
+			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?name=${encodeURIComponent(newName)}`,
+			{
+				method: 'PATCH'
+			}
+		);
+	};
 </script>
+
+<h1 class="m-3 text-xl">
+	<EditableString content={summary?.title} editCallback={updateActivityNameCallback} />
+</h1>
 
 <div class="m-3">
 	<Chip text={summary?.sport} />
