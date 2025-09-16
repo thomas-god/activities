@@ -66,7 +66,7 @@
 		No activities found for this metric over the selected period
 	</p>
 {:else}
-	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
+	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="select-none p-1">
 		<g>
 			{#each values as value (value.time)}
 				<g
@@ -94,7 +94,7 @@
 						>
 							<rect x="-30" width="60" y="-30" height="30" class="fill-base-100" rx="3" />
 							<text y="-18">{selectedMetric.time}</text>
-							<text y="-6">{selectedMetric.value} {unit}</text>
+							<text y="-6">{selectedMetric.value.toFixed(2)} {unit}</text>
 						</g>
 					{/if}
 				</g>

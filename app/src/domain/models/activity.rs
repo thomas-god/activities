@@ -161,6 +161,7 @@ pub enum ActivityStatistic {
     Calories,
     Elevation,
     Distance,
+    NormalizedPower,
 }
 
 impl ToUnit for ActivityStatistic {
@@ -170,6 +171,7 @@ impl ToUnit for ActivityStatistic {
             Self::Calories => Unit::KiloCalorie,
             Self::Elevation => Unit::Meter,
             Self::Distance => Unit::Meter,
+            Self::NormalizedPower => Unit::Watt,
         }
     }
 }
@@ -271,6 +273,7 @@ pub enum TimeseriesMetric {
     Power,
     HeartRate,
     Distance,
+    Altitude,
 }
 
 impl ToUnit for TimeseriesMetric {
@@ -280,6 +283,7 @@ impl ToUnit for TimeseriesMetric {
             Self::Power => Unit::Watt,
             Self::HeartRate => Unit::BeatPerMinute,
             Self::Speed => Unit::MeterPerSecond,
+            Self::Altitude => Unit::Meter,
         }
     }
 }

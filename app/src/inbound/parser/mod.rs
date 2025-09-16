@@ -126,6 +126,7 @@ fn extract_timeseries(
     let mut speed_values = vec![];
     let mut power_values = vec![];
     let mut distance_values = vec![];
+    let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
 
     for message in messages {
@@ -203,6 +204,25 @@ fn extract_timeseries(
             _ => None,
         });
         distance_values.push(distance);
+
+        let altitude = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::Altitude)
+            | FitField::Record(RecordField::EnhancedAltitude) => {
+                field.values.iter().find_map(|val| {
+                    if val.is_invalid() {
+                        return None;
+                    }
+                    match val {
+                        DataValue::Float32(altitude) => {
+                            Some(TimeseriesValue::Float(*altitude as f64))
+                        }
+                        _ => None,
+                    }
+                })
+            }
+            _ => None,
+        });
+        altitude_values.push(altitude);
     }
 
     let metrics = vec![
@@ -210,6 +230,7 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Distance, distance_values),
         Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
         Timeseries::new(TimeseriesMetric::Power, power_values),
+        Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
     Ok(ActivityTimeseries::new(TimeseriesTime::new(time), metrics))
 }
@@ -232,6 +253,10 @@ fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
         (
             FitField::Session(SessionField::TotalElapsedTime),
             ActivityStatistic::Duration,
+        ),
+        (
+            FitField::Session(SessionField::NormalizedPower),
+            ActivityStatistic::NormalizedPower,
         ),
     ];
 

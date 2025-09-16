@@ -12,6 +12,7 @@ pub enum APIActivityStatistic {
     Elevation,
     Distance,
     Duration,
+    NormalizedPower,
 }
 
 impl From<APIActivityStatistic> for ActivityStatistic {
@@ -21,6 +22,7 @@ impl From<APIActivityStatistic> for ActivityStatistic {
             APIActivityStatistic::Elevation => Self::Elevation,
             APIActivityStatistic::Distance => Self::Distance,
             APIActivityStatistic::Duration => Self::Duration,
+            APIActivityStatistic::NormalizedPower => Self::NormalizedPower,
         }
     }
 }
@@ -31,6 +33,7 @@ pub enum APITimeseriesMetric {
     Power,
     HeartRate,
     Distance,
+    Altitude,
 }
 
 impl From<APITimeseriesMetric> for TimeseriesMetric {
@@ -40,6 +43,7 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
             APITimeseriesMetric::Power => Self::Distance,
             APITimeseriesMetric::HeartRate => Self::HeartRate,
             APITimeseriesMetric::Distance => Self::Distance,
+            APITimeseriesMetric::Altitude => Self::Altitude,
         }
     }
 }

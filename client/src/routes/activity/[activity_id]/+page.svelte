@@ -26,13 +26,17 @@
 	let metricOptions = [
 		{ option: 'Power', display: 'Power' },
 		{ option: 'Speed', display: 'Speed' },
-		{ option: 'HeartRate', display: 'Heart rate' }
+		{ option: 'HeartRate', display: 'Heart rate' },
+		{ option: 'Altitude', display: 'Altitude' }
 	];
 
 	let availableOptions = $derived.by(() => {
 		let options = [];
 		for (const option of metricOptions) {
-			if (option.option in data.activity.timeseries.metrics) {
+			if (
+				option.option in data.activity.timeseries.metrics &&
+				data.activity.timeseries.metrics[option.option].values.some((value) => value !== null)
+			) {
 				options.push(option);
 			}
 		}
