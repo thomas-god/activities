@@ -80,6 +80,7 @@ where
         let activity = Activity::new(
             id.clone(),
             UserId::default(),
+            None,
             *req.start_time(),
             *req.duration(),
             *req.sport(),
@@ -315,6 +316,7 @@ pub mod test_utils {
                 create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                     ActivityId::new(),
                     UserId::default(),
+                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
@@ -325,6 +327,7 @@ pub mod test_utils {
                 get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                     ActivityId::new(),
                     UserId::default(),
+                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::from(3600),
                     Sport::Running,
@@ -748,6 +751,7 @@ mod tests_activity_service {
             get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
+                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration(0),
                 Sport::Cycling,
@@ -781,6 +785,7 @@ mod tests_activity_service {
             get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("test_user".to_string()),
+                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration(0),
                 Sport::Cycling,

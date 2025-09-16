@@ -17,6 +17,7 @@ use crate::domain::models::UserId;
 pub struct Activity {
     id: ActivityId,
     user: UserId,
+    name: Option<ActivityName>,
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
@@ -29,6 +30,7 @@ impl Activity {
     pub fn new(
         id: ActivityId,
         user: UserId,
+        name: Option<ActivityName>,
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
@@ -38,6 +40,7 @@ impl Activity {
         Self {
             id,
             user,
+            name,
             start_time,
             duration,
             sport,
@@ -62,6 +65,10 @@ impl Activity {
 
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    pub fn name(&self) -> Option<&ActivityName> {
+        self.name.as_ref()
     }
 
     pub fn start_time(&self) -> &ActivityStartTime {
@@ -102,6 +109,15 @@ impl ActivityId {
 impl Default for ActivityId {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Constructor)]
+pub struct ActivityName(String);
+
+impl fmt::Display for ActivityName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -297,6 +313,7 @@ mod tests {
         let first_activity = Activity::new(
             ActivityId::new(),
             UserId::default(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -306,6 +323,7 @@ mod tests {
         let second_activity = Activity::new(
             ActivityId::new(),
             UserId::default(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Running,
@@ -321,6 +339,7 @@ mod tests {
         let first_activity = Activity::new(
             ActivityId::new(),
             UserId::default(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -330,6 +349,7 @@ mod tests {
         let second_activity = Activity::new(
             ActivityId::new(),
             UserId::default(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -345,6 +365,7 @@ mod tests {
         let first_activity = Activity::new(
             ActivityId::new(),
             UserId::default(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,
@@ -354,6 +375,7 @@ mod tests {
         let second_activity = Activity::new(
             ActivityId::new(),
             "another_user".to_string().into(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration(100),
             Sport::Cycling,

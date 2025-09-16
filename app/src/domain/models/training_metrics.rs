@@ -305,6 +305,7 @@ mod test_training_metrics {
         Activity::new(
             ActivityId::default(),
             UserId::default(),
+            None,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
@@ -344,6 +345,7 @@ mod test_training_metrics {
         let activity = Activity::new(
             ActivityId::default(),
             UserId::default(),
+            None,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()

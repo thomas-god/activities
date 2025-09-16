@@ -192,6 +192,7 @@ mod tests_activities_repository {
         Activity::new(
             ActivityId::default(),
             user.unwrap_or_default().into(),
+            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::new(10),
             Sport::Cycling,

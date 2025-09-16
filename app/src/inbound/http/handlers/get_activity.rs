@@ -22,6 +22,7 @@ use crate::{
 pub struct ResponseBody {
     id: String,
     sport: String,
+    name: Option<String>,
     duration: usize,
     start_time: DateTime<FixedOffset>,
     timeseries: ActivityTimeseriesBody,
@@ -59,6 +60,7 @@ impl From<&Activity> for ResponseBody {
     fn from(activity: &Activity) -> Self {
         Self {
             id: activity.id().to_string(),
+            name: activity.name().map(|name| name.to_string()),
             sport: match *activity.sport() {
                 Sport::Running => "Running".to_string(),
                 Sport::Cycling => "Cycling".to_string(),
@@ -142,6 +144,7 @@ mod tests {
             get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
                 ActivityId::from(&target_id),
                 UserId::default(),
+                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -183,6 +186,7 @@ mod tests {
             ResponseBody {
                 duration: 1200,
                 id: target_id,
+                name: None,
                 sport: "Cycling".to_string(),
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
