@@ -13,7 +13,7 @@ use crate::{
     domain::{
         models::{
             UserId,
-            activity::ToUnit,
+            activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training_metrics::{
                 TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
                 TrainingMetricValues,
@@ -49,11 +49,12 @@ fn to_response_body_item(
 ) -> ResponseBodyItem {
     let (def, metric_values) = metric;
     let values = fill_metric_values(def.granularity(), metric_values, range);
+    let (unit, values) = convert_metric_values(values, def.source());
 
     ResponseBodyItem {
         id: def.id().to_string(),
         metric: format_source(def.source()),
-        unit: def.source().unit().to_string(),
+        unit: unit.to_string(),
         granularity: def.granularity().to_string(),
         aggregate: def.aggregate().to_string(),
         values,
@@ -74,6 +75,41 @@ fn fill_metric_values(
                 .map(|bin| (bin.to_string(), values.get(bin).cloned().unwrap_or(0.))),
         ),
         None => values.as_hash_map(),
+    }
+}
+
+fn convert_metric_values(
+    values: HashMap<String, f64>,
+    source: &TrainingMetricSource,
+) -> (Unit, HashMap<String, f64>) {
+    match source {
+        TrainingMetricSource::Statistic(stat) => match stat {
+            ActivityStatistic::Distance => (
+                Unit::Kilometer,
+                values
+                    .iter()
+                    .map(|(k, val)| (k.clone(), *val / 1000.))
+                    .collect(),
+            ),
+            _ => (stat.unit(), values),
+        },
+        TrainingMetricSource::Timeseries((metric, _)) => match metric {
+            TimeseriesMetric::Distance => (
+                Unit::Kilometer,
+                values
+                    .iter()
+                    .map(|(k, val)| (k.clone(), *val / 1000.))
+                    .collect(),
+            ),
+            TimeseriesMetric::Speed => (
+                Unit::KilometerPerHour,
+                values
+                    .iter()
+                    .map(|(k, val)| (k.clone(), *val * 3.6))
+                    .collect(),
+            ),
+            _ => (metric.unit(), values),
+        },
     }
 }
 

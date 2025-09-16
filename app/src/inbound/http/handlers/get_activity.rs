@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Mul};
 
 use axum::{
     Json,
@@ -11,8 +11,8 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::activity::{
-            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, Sport, TimeseriesValue,
-            ToUnit,
+            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, Sport, Timeseries,
+            TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
         },
         ports::{IActivityService, ITrainingMetricService},
     },
@@ -29,11 +29,34 @@ pub struct ResponseBody {
     timeseries: ActivityTimeseriesBody,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ActivityTimeseriesBody {
+    time: Vec<usize>,
+    metrics: HashMap<String, TimeseriesBody>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct TimeseriesBody {
+    unit: String,
+    values: Vec<Option<TimeseriesValueBody>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum TimeseriesValueBody {
     Int(usize),
     Float(f64),
+}
+
+impl Mul<f64> for TimeseriesValueBody {
+    type Output = TimeseriesValueBody;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        match self {
+            Self::Int(val) => Self::Float(val as f64 * rhs),
+            Self::Float(val) => Self::Float(val * rhs),
+        }
+    }
 }
 
 impl From<&TimeseriesValue> for TimeseriesValueBody {
@@ -43,18 +66,6 @@ impl From<&TimeseriesValue> for TimeseriesValueBody {
             TimeseriesValue::Float(val) => Self::Float(*val),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesBody {
-    unit: String,
-    values: Vec<Option<TimeseriesValueBody>>,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct ActivityTimeseriesBody {
-    time: Vec<usize>,
-    metrics: HashMap<String, TimeseriesBody>,
 }
 
 impl From<&Activity> for ResponseBody {
@@ -81,21 +92,55 @@ impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
     fn from(value: &ActivityTimeseries) -> Self {
         Self {
             time: value.time().values().into(),
-            metrics: HashMap::from_iter(value.metrics().iter().map(|metric| {
-                (
-                    metric.metric().to_string(),
-                    TimeseriesBody {
-                        unit: metric.metric().unit().to_string(),
-                        values: metric
-                            .values()
-                            .iter()
-                            .map(|val| val.as_ref().map(TimeseriesValueBody::from))
-                            .collect(),
-                    },
-                )
-            })),
+            metrics: extract_and_convert_metrics(value.metrics()),
         }
     }
+}
+
+fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, TimeseriesBody> {
+    HashMap::from_iter(metrics.iter().map(|metric| {
+        let (unit, values) = match metric.metric() {
+            TimeseriesMetric::Speed => (
+                Unit::KilometerPerHour,
+                metric
+                    .values()
+                    .iter()
+                    .map(|val| {
+                        val.as_ref()
+                            .map(TimeseriesValueBody::from)
+                            .map(|val| val * 3.6)
+                    })
+                    .collect(),
+            ),
+            TimeseriesMetric::Distance => (
+                Unit::Kilometer,
+                metric
+                    .values()
+                    .iter()
+                    .map(|val| {
+                        val.as_ref()
+                            .map(TimeseriesValueBody::from)
+                            .map(|val| val * 0.001)
+                    })
+                    .collect(),
+            ),
+            _ => (
+                metric.metric().unit(),
+                metric
+                    .values()
+                    .iter()
+                    .map(|val| val.as_ref().map(TimeseriesValueBody::from))
+                    .collect(),
+            ),
+        };
+        return (
+            metric.metric().to_string(),
+            TimeseriesBody {
+                unit: unit.to_string(),
+                values,
+            },
+        );
+    }))
 }
 
 pub async fn get_activity<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
