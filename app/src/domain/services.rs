@@ -139,7 +139,7 @@ where
     }
 
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
-        let Ok(Some(_activity)) = self
+        let Ok(Some(activity)) = self
             .activity_repository
             .lock()
             .await
@@ -150,6 +150,13 @@ where
                 req.activity().clone(),
             ));
         };
+
+        if activity.user() != req.user() {
+            return Err(ModifyActivityError::UserDoesNotOwnActivity(
+                req.user().clone(),
+                req.activity().clone(),
+            ));
+        }
 
         let _ = self
             .activity_repository
@@ -795,7 +802,7 @@ mod tests_activity_service {
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
-        let req = ModifyActivityRequest::new(ActivityId::from("test"), None);
+        let req = ModifyActivityRequest::new(UserId::default(), ActivityId::from("test"), None);
 
         let Err(ModifyActivityError::ActivityDoesNotExist(activity)) =
             service.modify_activity(req).await
@@ -806,11 +813,43 @@ mod tests_activity_service {
     }
 
     #[tokio::test]
-    async fn test_activity_service_modify_activity_ok() {
+    async fn test_activity_service_modify_activity_not_owned_by_user() {
         let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
             get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
+                None,
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration(0),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::new()),
+                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
+            ))))),
+            ..Default::default()
+        }));
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let service =
+            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+
+        let req =
+            ModifyActivityRequest::new("test_user".into(), ActivityId::from("test_activity"), None);
+
+        let Err(ModifyActivityError::UserDoesNotOwnActivity(user, activity)) =
+            service.modify_activity(req).await
+        else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(user, "test_user".to_string().into());
+        assert_eq!(activity, ActivityId::from("test_activity"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_modify_activity_ok() {
+        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
+            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                UserId::default(),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration(0),
@@ -829,6 +868,7 @@ mod tests_activity_service {
         );
 
         let req = ModifyActivityRequest::new(
+            UserId::default(),
             ActivityId::from("test"),
             Some(ActivityName::new("new name".to_string())),
         );

@@ -90,11 +90,16 @@ pub enum CreateActivityError {
 
 #[derive(Debug, Clone, Constructor, Default)]
 pub struct ModifyActivityRequest {
+    user: UserId,
     activity: ActivityId,
     name: Option<ActivityName>,
 }
 
 impl ModifyActivityRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
     pub fn activity(&self) -> &ActivityId {
         &self.activity
     }
@@ -108,6 +113,8 @@ impl ModifyActivityRequest {
 pub enum ModifyActivityError {
     #[error("Activity {0} does not exists")]
     ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }

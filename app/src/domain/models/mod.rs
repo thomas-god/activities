@@ -37,6 +37,12 @@ impl From<String> for UserId {
     }
 }
 
+impl From<&str> for UserId {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 impl fmt::Display for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
