@@ -1,14 +1,16 @@
 <script lang="ts">
 	import * as d3 from 'd3';
+	import dayjs from 'dayjs';
 
 	export interface TimeseriesChartProps {
 		values: { time: string; value: number }[];
 		width: number;
 		height: number;
 		unit: string;
+		granularity: string;
 	}
 
-	let { values, height, width, unit }: TimeseriesChartProps = $props();
+	let { values, height, width, unit, granularity }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -27,6 +29,36 @@
 		return time;
 	});
 
+	let tooltipTimeFormater = $derived.by(() => {
+		if (granularity === 'Activity') {
+			return (date: string) => {
+				return dayjs(date).format('YYYY-MM-DD');
+			};
+		}
+		if (granularity === 'Monthly') {
+			return (date: string) => {
+				return dayjs(date).format('MMM YYYY');
+			};
+		}
+
+		return (date: string) => date;
+	});
+
+	let tickAxisTimeFormater = $derived.by(() => {
+		if (granularity === 'Activity') {
+			return (date: string, _idx: number) => {
+				return dayjs(date).format('YYYY-MM-DD');
+			};
+		}
+		if (granularity === 'Monthly') {
+			return (date: string, _idx: number) => {
+				return dayjs(date).format('MMM YYYY');
+			};
+		}
+
+		return (date: string, _idx: number) => date;
+	});
+
 	let x = $derived(
 		d3
 			.scaleBand()
@@ -41,8 +73,23 @@
 			.range([height - marginBottom, marginTop])
 	);
 
+	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
+	$inspect(maxTicks);
 	$effect(() => {
-		d3.select(gx).call((sel) => sel.call(d3.axisBottom(x)));
+		d3.select(gx).call((sel) =>
+			sel.call(
+				d3
+					.axisBottom(x)
+					.tickFormat(tickAxisTimeFormater)
+					.tickValues(
+						x.domain().filter((val, idx, arr) => {
+							return idx % (arr.length > maxTicks ? Math.ceil(arr.length / maxTicks) : 1) === 0
+								? val
+								: false;
+						})
+					)
+			)
+		);
 		d3.select(gy).call((sel) => sel.call(d3.axisLeft(y)));
 	});
 
@@ -93,7 +140,7 @@
 							text-anchor="middle"
 						>
 							<rect x="-30" width="60" y="-30" height="30" class="fill-base-100" rx="3" />
-							<text y="-18">{selectedMetric.time}</text>
+							<text y="-18">{tooltipTimeFormater(selectedMetric.time)}</text>
 							<text y="-6">{selectedMetric.value.toFixed(2)} {unit}</text>
 						</g>
 					{/if}

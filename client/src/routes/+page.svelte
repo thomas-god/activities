@@ -28,7 +28,12 @@
 			values.push({ time: dt, value: metric.values[dt] });
 		}
 
-		return { values: values, title: `${metric.metric} (${metric.granularity})`, unit: metric.unit };
+		return {
+			values: values,
+			title: `${metric.metric} (${metric.granularity})`,
+			unit: metric.unit,
+			granularity: metric.granularity
+		};
 	});
 </script>
 
@@ -47,6 +52,7 @@
 			width={chartWidth}
 			values={topMetric.values}
 			unit={topMetric.unit}
+			granularity={topMetric.granularity}
 		/>
 	</div>
 {/if}

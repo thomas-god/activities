@@ -25,7 +25,8 @@
 				values: values,
 				title: `${metric.metric} (${metric.granularity})`,
 				unit: metric.unit,
-				id: metric.id
+				id: metric.id,
+				granularity: metric.granularity
 			});
 		}
 		return metrics;
@@ -72,6 +73,7 @@
 			width={chartWidth}
 			values={metric.values}
 			unit={metric.unit}
+			granularity={metric.granularity}
 		/>
 	</div>
 {/each}
