@@ -43,7 +43,7 @@
 		return options;
 	});
 
-	let selectedOption = $state(metricOptions.at(1));
+	let selectedOption = $state(availableOptions.at(0));
 
 	let selectedMetric = $derived.by(() => {
 		return data.activity.timeseries.metrics[selectedOption?.option!];
