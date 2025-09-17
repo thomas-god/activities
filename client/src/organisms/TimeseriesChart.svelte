@@ -35,11 +35,28 @@
 	let x_max = $derived(values.at(-1)![0]);
 	let max_zoom = $derived((x_max - x_min) / 60);
 	let x = $derived(d3.scaleLinear([x_min, x_max], [marginLeft, width - marginRight]));
+	let zoomedXScale = $derived(x);
+	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
+	const generateTicks = (x: d3.ScaleLinear<number, number, never>, nTicks: number) => {
+		const [min, max] = x.domain();
+		const di = (max - min) / nTicks;
+		const ticks = [];
+		for (let i = min; i < max; i = i + di) {
+			ticks.push(i);
+		}
+		return ticks;
+	};
 	let xAxis = $derived(
 		(
 			g: d3.Selection<SVGGElement, unknown, null, undefined>,
 			x: d3.ScaleLinear<number, number, never>
-		) => g.call(d3.axisBottom(x).tickFormat((time, _) => formatDuration(time.valueOf())))
+		) =>
+			g.call(
+				d3
+					.axisBottom(x)
+					.tickFormat((time, _) => formatDuration(time.valueOf()))
+					.tickValues(generateTicks(x, maxTicks))
+			)
 	);
 	let gx: SVGGElement;
 	$effect(() => {
@@ -79,7 +96,6 @@
 			.on('zoom', zoomed)
 	);
 
-	let zoomedXScale = $derived(x);
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
 		zoomedXScale = event.transform.rescaleX(x);
 		d3.select(path).attr('d', line(values, zoomedXScale));

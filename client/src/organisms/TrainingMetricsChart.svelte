@@ -74,7 +74,6 @@
 	);
 
 	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
-	$inspect(maxTicks);
 	$effect(() => {
 		d3.select(gx).call((sel) =>
 			sel.call(
@@ -113,7 +112,7 @@
 		No activities found for this metric over the selected period
 	</p>
 {:else}
-	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="select-none p-1">
+	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
 		<g>
 			{#each values as value (value.time)}
 				<g
