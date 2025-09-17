@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
+	import TimseriesLine from '../molecules/TimseriesLine.svelte';
 
 	export interface TimeseriesChartProps {
 		time: number[];
@@ -28,7 +29,6 @@
 	});
 
 	let svgElement: SVGElement;
-	let path: SVGPathElement;
 
 	// Define x scale and axis
 	let x_min = $derived(values.at(0)![0]);
@@ -63,22 +63,9 @@
 		d3.select(gx).call(xAxis, x);
 	});
 
-	// Define y scale and axis
-	let gy: SVGGElement;
-	let y_range = $derived(d3.extent(values, (p) => p[1])) as [number, number];
-	let yScale = $derived(d3.scaleLinear(y_range, [height - marginBottom, marginTop]));
-	let yAxis = $derived(d3.axisLeft(yScale));
-	$effect(() => {
-		d3.select(gy).call(yAxis);
-	});
-
-	// Define line generator
-	let line = $derived((data: [number, number][], xScale: d3.ScaleLinear<number, number, never>) =>
-		d3
-			.line()
-			.x((point) => xScale(point[0]))
-			.y((point) => yScale(point[1]))(data)
-	);
+	let yRange = $derived([height - marginBottom, marginTop]);
+	let yDomain = $derived(d3.extent(values, (p) => p[1])) as [number, number];
+	let yScale = $derived(d3.scaleLinear(yDomain, yRange));
 
 	// Create the zoom behavior
 	let zoom = $derived(
@@ -98,8 +85,6 @@
 
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
 		zoomedXScale = event.transform.rescaleX(x);
-		d3.select(path).attr('d', line(values, zoomedXScale));
-		d3.select(gx).call(xAxis, zoomedXScale);
 	}
 
 	const resetZoom = () => {
@@ -148,16 +133,10 @@
 			height={height - marginTop - marginBottom}
 		/>
 	</clipPath>
-	<path
-		bind:this={path}
-		clip-path="url(#clip-path)"
-		fill="none"
-		class="stroke-neutral"
-		stroke-width="1.5"
-		d={line(values, x)}
-	/>
+
+	<TimseriesLine {values} range={yRange} xScale={zoomedXScale} yMargin={30} />
+
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
-	<g bind:this={gy} transform="translate({marginLeft} 0)" />
 	{#if tooltip}
 		<g
 			transform={`translate(${tooltip.xOffset},${tooltip.yOffset})`}
