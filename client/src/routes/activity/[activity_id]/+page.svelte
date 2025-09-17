@@ -43,10 +43,16 @@
 		return options;
 	});
 
-	let selectedOption = $state(availableOptions.at(0));
+	let selectedOptions = $state([availableOptions[0]]);
 
-	let selectedMetric = $derived.by(() => {
-		return data.activity.timeseries.metrics[selectedOption?.option!];
+	let selectedMetrics = $derived.by(() => {
+		return selectedOptions.map((option) => {
+			return {
+				values: data.activity.timeseries.metrics[option.option!].values,
+				name: option.option,
+				unit: data.activity.timeseries.metrics[option.option!].unit
+			};
+		});
 	});
 
 	const deleteActivityCallback = async (): Promise<void> => {
@@ -81,18 +87,17 @@
 	{#if data.activity}
 		<fieldset class="fieldset">
 			<legend class="fieldset-legend">Metrics</legend>
-			<select class="select" bind:value={selectedOption}>
+			<select class="select h-auto" multiple required bind:value={selectedOptions}>
 				{#each availableOptions as option (option.option)}
 					<option value={option}>{option.display}</option>
 				{/each}
 			</select>
 		</fieldset>
-		{#if selectedMetric}
+		{#if selectedMetrics}
 			<div bind:clientWidth={chartWidth}>
 				<TimeseriesChart
 					time={data.activity.timeseries.time}
-					metric={selectedMetric.values}
-					unit={selectedMetric.unit}
+					metrics={selectedMetrics}
 					height={400}
 					width={chartWidth}
 				/>
