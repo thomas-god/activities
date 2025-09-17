@@ -6,6 +6,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';
+	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -87,11 +88,7 @@
 	{#if data.activity}
 		<fieldset class="fieldset">
 			<legend class="fieldset-legend">Metrics</legend>
-			<select class="select h-auto" multiple required bind:value={selectedOptions}>
-				{#each availableOptions as option (option.option)}
-					<option value={option}>{option.display}</option>
-				{/each}
-			</select>
+			<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
 		</fieldset>
 		{#if selectedMetrics}
 			<div bind:clientWidth={chartWidth}>

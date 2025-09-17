@@ -169,7 +169,7 @@
 >
 	<clipPath id="clip-path">
 		<rect
-			x={axisWidth * Math.min(2, numberOfMetrics)}
+			x={axisWidth * Math.ceil(numberOfMetrics / 2)}
 			y={marginRight}
 			width={width - axisWidth * numberOfMetrics}
 			height={height - marginTop - marginBottom}
