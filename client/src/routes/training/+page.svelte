@@ -1,15 +1,17 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import CreateTrainingMetric from '../../organisms/CreateTrainingMetric.svelte';
 	import TrainingMetricsChart from '../../organisms/TrainingMetricsChart.svelte';
 	import type { PageProps } from './$types';
+	import dayjs from 'dayjs';
 
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
 
-	let metrics = $derived.by(() => {
+	let metricsProps = $derived.by(() => {
 		let metrics = [];
 		for (let i = 0; i < data.metrics.length; i++) {
 			let metric = data.metrics.at(i);
@@ -48,13 +50,23 @@
 		});
 		invalidate('app:training-metrics');
 	};
+
+	$effect(() => {
+		// Redirect if no start parameter
+		const startDate = page.url.searchParams.get('start');
+		if (startDate === null) {
+			const now = dayjs();
+			const start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DD'));
+			goto(`${page.url.toString()}?start=${start}`);
+		}
+	});
 </script>
 
 <div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl">
 	<CreateTrainingMetric callback={createMetricCallback} />
 </div>
 
-{#each metrics as metric}
+{#each metricsProps as metric}
 	<div
 		bind:clientWidth={chartWidth}
 		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"

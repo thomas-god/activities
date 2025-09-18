@@ -4,11 +4,14 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import dayjs from 'dayjs';
 
-export const load: PageLoad = async ({ fetch, depends }) => {
+export const load: PageLoad = async ({ fetch, depends, url }) => {
 	depends('app:training-metrics');
 
-	let now = dayjs();
-	let start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DDTHH:mm:ssZ'));
+	const startDate = url.searchParams.get('start');
+	if (startDate === null) {
+		return { metrics: [] };
+	}
+	const start = encodeURIComponent(dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ'));
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
 		method: 'GET'
 	});
