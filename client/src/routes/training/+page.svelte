@@ -2,6 +2,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
+	import DateRange from '../../molecules/DateRange.svelte';
 	import CreateTrainingMetric from '../../organisms/CreateTrainingMetric.svelte';
 	import TrainingMetricsChart from '../../organisms/TrainingMetricsChart.svelte';
 	import type { PageProps } from './$types';
@@ -10,6 +11,11 @@
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
+
+	let dates = $derived({
+		start: page.url.searchParams.get('start') as string,
+		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
+	});
 
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
@@ -60,10 +66,24 @@
 			goto(`${page.url.toString()}?start=${start}`);
 		}
 	});
+
+	const datesUpdateCallback = (newDates: { start: string; end: string }) => {
+		let url = page.url.pathname.toString();
+		url += `?start=${encodeURIComponent(dayjs(newDates.start).format('YYYY-MM-DD'))}`;
+		if (newDates.end !== dayjs().format('YYYY-MM-DD')) {
+			// For convenience, don't add end date if it's today
+			url += `&end=${encodeURIComponent(dayjs(newDates.end).format('YYYY-MM-DD'))}`;
+		}
+		goto(url);
+	};
 </script>
 
 <div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl">
 	<CreateTrainingMetric callback={createMetricCallback} />
+</div>
+
+<div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl">
+	<DateRange bind:dates={() => dates, datesUpdateCallback} />
 </div>
 
 {#each metricsProps as metric}
