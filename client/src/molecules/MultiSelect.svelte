@@ -43,7 +43,7 @@
 </div>
 
 <style>
-	.btn:disabled {
+	.btn:disabled:checked {
 		background-color: var(--color-primary);
 		color: var(--color-primary-content);
 	}
