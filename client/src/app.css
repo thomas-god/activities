@@ -4,7 +4,7 @@
 }
 
 @theme {
-	--color-chart-one: #e07a5f;
-	--color-chart-two: #3d405b;
-	--color-chart-three: #81b29a;
+	--color-first-chart: #e07a5f;
+	--color-second-chart: #3d405b;
+	--color-third-chart: #81b29a;
 }

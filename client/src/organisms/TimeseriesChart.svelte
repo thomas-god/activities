@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
-	import TimseriesLine, { type AxisPosition } from '../molecules/TimseriesLine.svelte';
+	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
 
 	export interface Metric {
 		name: string;
@@ -30,6 +30,15 @@
 			return [axisWidth, width - axisWidth];
 		} else {
 			return [2 * axisWidth, width - axisWidth];
+		}
+	});
+	let margins = $derived.by(() => {
+		if (numberOfMetrics === 1) {
+			return { left: axisWidth, right: 0 };
+		} else if (numberOfMetrics === 2) {
+			return { left: axisWidth, right: axisWidth };
+		} else {
+			return { left: axisWidth * 2, right: axisWidth };
 		}
 	});
 
@@ -74,19 +83,20 @@
 		for (let idx = 0; idx < Math.min(metrics.length, 3); idx++) {
 			const metric = metrics[idx];
 
-			let position: AxisPosition = 'left';
+			let order: LineOrder = 'first';
 			if (idx === 1) {
-				position = 'right';
+				order = 'second';
 			} else if (idx === 2) {
-				position = 'leftOffset';
+				order = 'third';
 			}
 			let values = extractMetricValues(time, metric.values);
 
 			metricsProps.push({
 				values,
 				range: yRange,
-				position,
-				yMargin: 30
+				order,
+				name: metric.name,
+				unit: metric.unit
 			});
 		}
 		return metricsProps;
@@ -134,27 +144,51 @@
 		d3.select(svgElement).call(zoom);
 	});
 
-	// let tooltipXOffset: number | undefined = $state(undefined);
-	// const bisector = d3.bisector<[number, number], number>((point) => point[0]);
-	// let tooltip = $derived.by(() => {
-	// 	if (tooltipXOffset === undefined) {
-	// 		return undefined;
-	// 	}
+	let tooltipXOffset: number | undefined = $state(undefined);
+	const tooltipCallback = (event: MouseEvent) => {
+		tooltipXOffset = Math.min(Math.max(event.offsetX, margins.left), width - margins.right);
+	};
 
-	// 	// let nearestValues = values[bisector.center(values, xScale.invert(tooltipXOffset))];
-	// 	return {
-	// 		xOffset: 0, // xScale(nearestValues[0]),
-	// 		yOffset: 0, // yScale(nearestValues[1]),
-	// 		timestamp: '', // formatDuration(nearestValues[0]),
-	// 		value: 0 //nearestValues[1]
-	// 	};
-	// });
-	// const tooltipCallback = (event: MouseEvent) => {
-	// 	tooltipXOffset = event.offsetX;
-	// };
+	const bisector = d3.bisector<[number, number], number>((point) => point[0]);
+	let nearestValues = $derived.by(() => {
+		if (tooltipXOffset === undefined) {
+			return undefined;
+		}
+		const values = metricsProps.map((metric) => {
+			let nearestValue =
+				metric.values[bisector.center(metric.values, xScale.invert(tooltipXOffset))];
+			return {
+				metric: metric.name,
+				value: nearestValue[1],
+				unit: metric.unit,
+				order: metric.order
+			};
+		});
+		return { time: xScale.invert(tooltipXOffset), values };
+	});
+
+	const tooltipColors: Record<LineOrder, string> = {
+		first: 'text-first-chart',
+		second: 'text-second-chart',
+		third: 'text-third-chart'
+	};
 </script>
 
 <button class="btn" onclick={resetZoom}>Reset zoom</button>
+
+{#if nearestValues}
+	<p class="flex justify-center pt-2 text-sm sm:text-base">
+		<span class="px-1.5">
+			⌚ {formatDuration(nearestValues.time)} :
+		</span>
+		{#each nearestValues.values as value}
+			<span class={`px-1.5 ${tooltipColors[value.order]}`}>
+				{value.metric}: {value.value.toFixed(2)}
+				{value.unit}
+			</span>
+		{/each}
+	</p>
+{/if}
 <svg
 	bind:this={svgElement}
 	{width}
@@ -162,10 +196,11 @@
 	viewBox={`0 0 ${width} ${height}`}
 	role="img"
 	class="select-none"
+	onmousemove={tooltipCallback}
 >
 	<clipPath id="clip-path">
 		<rect
-			x={axisWidth * Math.ceil(numberOfMetrics / 2)}
+			x={margins.left}
 			y={marginRight}
 			width={width - axisWidth * numberOfMetrics}
 			height={height - marginTop - marginBottom}
@@ -177,25 +212,21 @@
 			range={props.range}
 			values={props.values}
 			xScale={zoomedXScale}
-			position={props.position}
-			yMargin={30}
+			order={props.order}
+			yMargin={axisWidth}
 			{width}
 		/>
 	{/each}
 
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
-	<!-- {#if tooltip}
-		<g
-			transform={`translate(${tooltip.xOffset},${tooltip.yOffset})`}
-			pointer-events="none"
-			font-family="sans-serif"
-			font-size="10"
-			text-anchor="middle"
-		>
-			<rect x="-27" width="54" y="-30" height="24" class="fill-base-100" />
-			<text y="-22">{tooltip.timestamp}</text>
-			<text y="-12">{tooltip.value.toFixed(2)} </text>
-			<circle r="3.5" class="fill-accent" />
-		</g>
-	{/if} -->
+	{#if tooltipXOffset}
+		<line
+			stroke="black"
+			x1={tooltipXOffset}
+			x2={tooltipXOffset}
+			y1={marginTop}
+			y2={height - marginBottom}
+			stroke-dasharray="3, 2"
+		/>
+	{/if}
 </svg>
