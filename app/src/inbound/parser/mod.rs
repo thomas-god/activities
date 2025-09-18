@@ -303,13 +303,13 @@ pub mod test_utils {
     use super::*;
 
     mock! {
-        pub TestFileParser {}
+        pub FileParser {}
 
-        impl Clone for  TestFileParser {
+        impl Clone for  FileParser {
             fn clone(&self) -> Self;
         }
 
-        impl ParseFile for TestFileParser {
+        impl ParseFile for FileParser {
             fn try_bytes_into_domain(
                 &self,
                 bytes: Vec<u8>,
@@ -318,7 +318,7 @@ pub mod test_utils {
 
     }
 
-    impl MockTestFileParser {
+    impl MockFileParser {
         pub fn test_default() -> Self {
             let mut mock = Self::new();
             mock.expect_try_bytes_into_domain().returning(|_| {

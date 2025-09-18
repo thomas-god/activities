@@ -321,6 +321,8 @@ pub mod test_utils {
     use std::mem;
     use std::sync::{Arc, Mutex};
 
+    use mockall::mock;
+
     use super::*;
 
     use crate::domain::models::activity::{
@@ -514,65 +516,48 @@ pub mod test_utils {
         }
     }
 
-    #[derive(Clone)]
-    pub struct MockTrainingMetricsService {
-        pub create_metric_result: Arc<Mutex<Result<TrainingMetricId, CreateTrainingMetricError>>>,
-        pub recompute_metrics_result: Arc<Mutex<Result<(), ()>>>,
-        pub get_training_metrics_result:
-            Arc<Mutex<Vec<(TrainingMetricDefinition, TrainingMetricValues)>>>,
-        pub delete_metric_result: Arc<Mutex<Result<(), DeleteTrainingMetricError>>>,
-    }
+    mock! {
+        pub TrainingMetricService {}
 
-    impl Default for MockTrainingMetricsService {
-        fn default() -> Self {
-            Self {
-                create_metric_result: Arc::new(Mutex::new(Ok(TrainingMetricId::default()))),
-                recompute_metrics_result: Arc::new(Mutex::new(Ok(()))),
-                get_training_metrics_result: Arc::new(Mutex::new(vec![])),
-                delete_metric_result: Arc::new(Mutex::new(Ok(()))),
-            }
+        impl Clone for TrainingMetricService {
+            fn clone(&self) -> Self;
+        }
+
+        impl ITrainingMetricService for TrainingMetricService {
+
+            async fn create_metric(
+                &self,
+                req: CreateTrainingMetricRequest
+            ) -> Result<TrainingMetricId, CreateTrainingMetricError>;
+
+            async fn recompute_metric(
+                &self,
+                req: RecomputeMetricRequest,
+            ) -> Result<(), ()>;
+
+            async fn get_training_metrics(
+                &self,
+                user: &UserId,
+            ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)>;
+
+            async fn delete_metric(
+                &self,
+                req: DeleteTrainingMetricRequest,
+            ) -> Result<(), DeleteTrainingMetricError>;
         }
     }
 
-    impl ITrainingMetricService for MockTrainingMetricsService {
-        async fn create_metric(
-            &self,
-            _req: crate::domain::ports::CreateTrainingMetricRequest,
-        ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
-            let mut guard = self.create_metric_result.lock();
-            let mut result = Err(CreateTrainingMetricError::Unknown(anyhow!(
-                "substitute error"
-            )));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-        async fn recompute_metric(&self, _req: RecomputeMetricRequest) -> Result<(), ()> {
-            let mut guard = self.recompute_metrics_result.lock();
-            let mut result = Err(());
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
+    impl MockTrainingMetricService {
+        pub fn test_default() -> Self {
+            let mut mock = Self::new();
 
-        async fn get_training_metrics(
-            &self,
-            _user: &UserId,
-        ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
-            let mut guard = self.get_training_metrics_result.lock();
-            let mut result = Vec::new();
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
+            mock.expect_create_metric()
+                .returning(|_| Ok(TrainingMetricId::default()));
+            mock.expect_recompute_metric().returning(|_| Ok(()));
+            mock.expect_get_training_metrics().returning(|_| vec![]);
+            mock.expect_delete_metric().returning(|_| Ok(()));
 
-        async fn delete_metric(
-            &self,
-            _req: DeleteTrainingMetricRequest,
-        ) -> Result<(), DeleteTrainingMetricError> {
-            let mut guard = self.delete_metric_result.lock();
-            let mut result = Err(DeleteTrainingMetricError::Unknown(anyhow!(
-                "substitute error"
-            )));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+            mock
         }
     }
 }
@@ -596,7 +581,7 @@ mod tests_activity_service {
             DeleteActivityError, DeleteActivityRequest, ModifyActivityError, ModifyActivityRequest,
             SaveActivityError, SaveRawDataError,
         },
-        services::test_utils::{MockActivityRepository, MockTrainingMetricsService},
+        services::test_utils::{MockActivityRepository, MockTrainingMetricService},
     };
 
     use super::*;
@@ -652,7 +637,7 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -674,7 +659,7 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -696,7 +681,7 @@ mod tests_activity_service {
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -715,7 +700,7 @@ mod tests_activity_service {
                 "an error occured"
             ))))),
         };
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -735,7 +720,7 @@ mod tests_activity_service {
                 "an error occured"
             ))))),
         };
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -790,7 +775,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -819,7 +804,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -850,7 +835,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             activity_repository.clone(),
             raw_data_repository,
@@ -889,7 +874,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -918,7 +903,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);
 
@@ -951,7 +936,7 @@ mod tests_activity_service {
             ..Default::default()
         }));
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingMetricsService::default());
+        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             activity_repository.clone(),
             raw_data_repository,
