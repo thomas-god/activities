@@ -1,8 +1,8 @@
 <script lang="ts">
 	let { dates = $bindable() }: { dates: { start: string | null; end: string | null } } = $props();
 
-	let start = $state(dates.start);
-	let end = $state(dates.end);
+	let start = $derived(dates.start);
+	let end = $derived(dates.end);
 
 	const callback = () => {
 		dates = { start, end };
