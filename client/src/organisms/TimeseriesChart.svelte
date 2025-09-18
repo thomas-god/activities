@@ -156,7 +156,7 @@
 		}
 		const values = metricsProps.map((metric) => {
 			let nearestValue =
-				metric.values[bisector.center(metric.values, xScale.invert(tooltipXOffset))];
+				metric.values[bisector.center(metric.values, zoomedXScale.invert(tooltipXOffset))];
 			return {
 				metric: metric.name,
 				value: nearestValue[1],
@@ -164,7 +164,7 @@
 				order: metric.order
 			};
 		});
-		return { time: xScale.invert(tooltipXOffset), values };
+		return { time: zoomedXScale.invert(tooltipXOffset), values };
 	});
 
 	const tooltipColors: Record<LineOrder, string> = {
