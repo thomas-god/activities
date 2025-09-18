@@ -298,10 +298,7 @@ impl From<&FitSport> for Sport {
 #[cfg(test)]
 pub mod test_utils {
 
-    use std::{
-        mem,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use super::*;
 
@@ -316,10 +313,11 @@ pub mod test_utils {
             &self,
             _bytes: Vec<u8>,
         ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
-            let mut guard = self.try_into_domain_result.lock();
-            let mut result = Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+            let guard = self
+                .try_into_domain_result
+                .lock()
+                .expect("mocked parser cannot lock result");
+            guard.clone()
         }
     }
 

@@ -22,24 +22,24 @@
 			return;
 		}
 
-		let promises = [];
+		const formData = new FormData();
+
 		for (let i = 0; i < fileList.length; i++) {
-			const file = fileList.item(i);
-			promises.push(
-				fetch(`${PUBLIC_APP_URL}/api/activity`, {
-					body: file,
-					method: 'POST'
-				})
-			);
+			const file = fileList.item(i)!;
+			formData.append(file.name, file);
 		}
 
-		let _res = await Promise.all(promises);
+		let _res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
+			body: formData,
+			method: 'POST'
+		});
+
 		file_upload_content = '';
 		activitiesUploadedCallback();
 	};
 </script>
 
-<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
+<fieldset class="fieldset rounded-box border-base-300 bg-base-100 border p-4">
 	<legend class="fieldset-legend">Upload new activities</legend>
 	<div class="join gap-3">
 		<input
