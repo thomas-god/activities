@@ -162,12 +162,10 @@ pub async fn get_activity<AS: IActivityService, FP: ParseFile, TMS: ITrainingMet
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::{Arc, Mutex},
-        vec,
-    };
+    use std::{sync::Arc, vec};
 
     use axum::extract::Path;
+    use mockall::predicate::eq;
 
     use crate::{
         domain::{
@@ -189,9 +187,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_activity_exists() {
         let target_id = "target_id".to_string();
-        let service = MockActivityService {
-            get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
-                ActivityId::from(&target_id),
+        let mut service = MockActivityService::new();
+        service.expect_get_activity().returning(|_| {
+            Ok(Activity::new(
+                ActivityId::from(&"target_id"),
                 UserId::default(),
                 None,
                 ActivityStartTime::new(
@@ -212,10 +211,8 @@ mod tests {
                         ],
                     )],
                 ),
-            )))),
-            ..Default::default()
-        };
-
+            ))
+        });
         let file_parser = MockFileParser::test_default();
         let metrics = MockTrainingMetricService::test_default();
 
@@ -259,13 +256,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_activity_does_not_exist() {
-        let target_id = "target_id".to_string();
-        let service = MockActivityService {
-            get_activity_result: Arc::new(Mutex::new(Err(GetActivityError::ActivityDoesNotExist(
-                ActivityId::from(&target_id),
-            )))),
-            ..Default::default()
-        };
+        let mut service = MockActivityService::new();
+        service
+            .expect_get_activity()
+            .with(eq(ActivityId::from(&"target_id")))
+            .returning(|_| {
+                Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
+                    &"target_id",
+                )))
+            });
 
         let file_parser = MockFileParser::test_default();
         let metrics = MockTrainingMetricService::test_default();

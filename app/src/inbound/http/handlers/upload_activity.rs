@@ -66,161 +66,86 @@ pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITraini
     }
 }
 
-// [TODO]: Need to refactor how services are mocked to extensively test this handler
-// #[cfg(test)]
-// mod tests {
-//     use std::sync::{Arc, Mutex};
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
 
-//     use axum::{Router, routing::post};
-//     use axum_test::TestServer;
+    use axum::{Router, routing::post};
+    use axum_test::TestServer;
 
-//     use crate::{
-//         domain::services::test_utils::{MockActivityService, MockTrainingMetricsService},
-//         inbound::parser::{ParseCreateActivityHttpRequestBodyError, test_utils::MockFileParser},
-//     };
+    use crate::{
+        domain::services::test_utils::{MockActivityService, MockTrainingMetricService},
+        inbound::parser::test_utils::MockFileParser,
+    };
 
-//     use super::*;
+    use super::*;
 
-//     #[tokio::test]
-//     async fn test_upload_single_activity() {
-//         let service = MockActivityService::default();
-//         let metrics = MockTrainingMetricsService::default();
-//         let file_parser = MockFileParser::default();
-//         let state = AppState {
-//             activity_service: Arc::new(service),
-//             training_metrics_service: Arc::new(metrics),
-//             file_parser: Arc::new(file_parser),
-//         };
+    #[tokio::test]
+    async fn test_upload_single_activity() {
+        let service = MockActivityService::test_default();
+        let metrics = MockTrainingMetricService::test_default();
+        let file_parser = MockFileParser::test_default();
+        let state = AppState {
+            activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
+            file_parser: Arc::new(file_parser),
+        };
 
-//         let app = Router::new()
-//             .route("/test_upload", post(upload_activities))
-//             .with_state(state);
-//         let server = TestServer::new(app).expect("unable to create test server");
+        let app = Router::new()
+            .route("/test_upload", post(upload_activities))
+            .with_state(state);
+        let server = TestServer::new(app).expect("unable to create test server");
 
-//         let file1_data = b"test fit file content 1".to_vec();
-//         // let file2_data = b"test fit file content 2".to_vec();
+        let file1_data = b"test fit file content 1".to_vec();
 
-//         let response = server
-//             .post("/test_upload")
-//             .multipart(
-//                 axum_test::multipart::MultipartForm::new().add_part(
-//                     "test1.fit".to_string(),
-//                     axum_test::multipart::Part::bytes(file1_data),
-//                 ), // .add_part(
-//                    //     "test2.fit".to_string(),
-//                    //     axum_test::multipart::Part::bytes(file2_data),
-//                    // ),
-//             )
-//             .await;
+        let response = server
+            .post("/test_upload")
+            .multipart(axum_test::multipart::MultipartForm::new().add_part(
+                "test1.fit".to_string(),
+                axum_test::multipart::Part::bytes(file1_data),
+            ))
+            .await;
 
-//         response.assert_status(StatusCode::CREATED);
-//         assert!(response.as_bytes().is_empty());
-//     }
+        response.assert_status(StatusCode::CREATED);
+        assert!(response.as_bytes().is_empty());
+    }
 
-//     #[tokio::test]
-//     async fn test_upload_multiple_activities() {
-//         let service = MockActivityService::default();
-//         let metrics = MockTrainingMetricsService::default();
-//         let file_parser = MockFileParser::default();
-//         let state = AppState {
-//             activity_service: Arc::new(service),
-//             training_metrics_service: Arc::new(metrics),
-//             file_parser: Arc::new(file_parser),
-//         };
+    #[tokio::test]
+    async fn test_upload_multiple_activities() {
+        let service = MockActivityService::test_default();
+        let metrics = MockTrainingMetricService::test_default();
+        let file_parser = MockFileParser::test_default();
+        let state = AppState {
+            activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
+            file_parser: Arc::new(file_parser),
+        };
 
-//         let app = Router::new()
-//             .route("/test_upload", post(upload_activities))
-//             .with_state(state);
-//         let server = TestServer::new(app).expect("unable to create test server");
+        let app = Router::new()
+            .route("/test_upload", post(upload_activities))
+            .with_state(state);
+        let server = TestServer::new(app).expect("unable to create test server");
 
-//         let file1_data = b"test fit file content 1".to_vec();
-//         let file2_data = b"test fit file content 2".to_vec();
+        let file1_data = b"test fit file content 1".to_vec();
+        let file2_data = b"test fit file content 2".to_vec();
 
-//         let response = server
-//             .post("/test_upload")
-//             .multipart(
-//                 axum_test::multipart::MultipartForm::new()
-//                     .add_part(
-//                         "test1.fit".to_string(),
-//                         axum_test::multipart::Part::bytes(file1_data),
-//                     )
-//                     .add_part(
-//                         "test2.fit".to_string(),
-//                         axum_test::multipart::Part::bytes(file2_data),
-//                     ),
-//             )
-//             .await;
+        let response = server
+            .post("/test_upload")
+            .multipart(
+                axum_test::multipart::MultipartForm::new()
+                    .add_part(
+                        "test1.fit".to_string(),
+                        axum_test::multipart::Part::bytes(file1_data),
+                    )
+                    .add_part(
+                        "test2.fit".to_string(),
+                        axum_test::multipart::Part::bytes(file2_data),
+                    ),
+            )
+            .await;
 
-//         response.assert_status(StatusCode::CREATED);
-//         dbg!(response.text());
-//         assert!(response.as_bytes().is_empty());
-//     }
-
-//     // #[tokio::test]
-//     // async fn test_upload_activities_contains_non_fit_files() {
-//     //     let service = MockActivityService::default();
-//     //     let metrics = MockTrainingMetricsService::default();
-//     //     let file_parser = MockFileParser {
-//     //         try_into_domain_result: Arc::new(Mutex::new(Err(
-//     //             ParseCreateActivityHttpRequestBodyError::InvalidFitContent,
-//     //         ))),
-//     //     };
-//     //     let state = AppState {
-//     //         activity_service: Arc::new(service),
-//     //         training_metrics_service: Arc::new(metrics),
-//     //         file_parser: Arc::new(file_parser),
-//     //     };
-
-//     //     let app = Router::new()
-//     //         .route("/test_upload", post(upload_activities))
-//     //         .with_state(state);
-//     //     let server = TestServer::new(app).expect("unable to create test server");
-
-//     //     let file1_data = b"test fit file content 1".to_vec();
-//     //     let file2_data = b"test fit file content 2".to_vec();
-
-//     //     let response = server
-//     //         .post("/test_upload")
-//     //         .multipart(
-//     //             axum_test::multipart::MultipartForm::new()
-//     //                 .add_part(
-//     //                     "test1.fit".to_string(),
-//     //                     axum_test::multipart::Part::bytes(file1_data),
-//     //                 )
-//     //                 .add_part(
-//     //                     "test2.fit".to_string(),
-//     //                     axum_test::multipart::Part::bytes(file2_data),
-//     //                 ),
-//     //         )
-//     //         .await;
-
-//     //     response.assert_status(StatusCode::CREATED);
-//     //     let json: serde_json::Value = response.json();
-//     //     assert!(json.is_array())
-//     // }
-
-//     // #[tokio::test]
-//     // async fn test_create_activity_with_similar_already_exists() {
-//     //     let content = vec![1, 2, 3];
-//     //     let service = MockActivityService {
-//     //         create_activity_result: Arc::new(Mutex::new(Err(
-//     //             CreateActivityError::SimilarActivityExistsError,
-//     //         ))),
-//     //         ..Default::default()
-//     //     };
-//     //     let metrics = MockTrainingMetricsService::default();
-
-//     //     let file_parser = MockFileParser::default();
-
-//     //     let state = axum::extract::State(AppState {
-//     //         activity_service: Arc::new(service),
-//     //         training_metrics_service: Arc::new(metrics),
-//     //         file_parser: Arc::new(file_parser),
-//     //     });
-//     //     let bytes = axum::body::Bytes::from(content);
-
-//     //     let response = upload_activities(state, bytes).await;
-//     //     assert!(response.is_err());
-//     //     assert_eq!(response.unwrap_err(), StatusCode::CONFLICT)
-//     // }
-// }
+        response.assert_status(StatusCode::CREATED);
+        dbg!(response.text());
+        assert!(response.as_bytes().is_empty());
+    }
+}

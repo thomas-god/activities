@@ -20,4 +20,5 @@ uuid = { version = "1.18.1", features = ["v4", "serde"] }
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
+axum-test = "18.1.0"
 mockall = "0.13.1"

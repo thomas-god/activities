@@ -334,19 +334,56 @@ pub mod test_utils {
         SimilarActivityError,
     };
 
-    #[derive(Clone)]
-    pub struct MockActivityService {
-        pub create_activity_result: Arc<Mutex<Result<Activity, CreateActivityError>>>,
-        pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
-        pub get_activity_result: Arc<Mutex<Result<Activity, GetActivityError>>>,
-        pub modify_activity_result: Arc<Mutex<Result<(), ModifyActivityError>>>,
-        pub delete_activity_result: Arc<Mutex<Result<(), DeleteActivityError>>>,
+    mock! {
+        pub ActivityService {}
+
+        impl Clone for  ActivityService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IActivityService for ActivityService {
+            async fn create_activity(
+                &self,
+                req: CreateActivityRequest,
+            ) -> Result<Activity, CreateActivityError>;
+
+            async fn list_activities(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<Activity>, ListActivitiesError>;
+
+            async fn get_activity(
+                &self,
+                activity_id: &ActivityId,
+            ) -> Result<Activity, GetActivityError>;
+
+            async fn modify_activity(
+                &self,
+                req: ModifyActivityRequest,
+            ) -> Result<(), ModifyActivityError>;
+
+            async fn delete_activity(
+                &self,
+                req: DeleteActivityRequest,
+            ) -> Result<(), DeleteActivityError>;
+        }
     }
 
-    impl Default for MockActivityService {
-        fn default() -> Self {
-            Self {
-                create_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
+    impl MockActivityService {
+        pub fn test_default() -> Self {
+            let mut mock = Self::new();
+            mock.default_create_activity();
+            mock.default_list_activities();
+            mock.default_get_activity();
+            mock.default_modify_activity();
+            mock.default_delete_activity();
+
+            mock
+        }
+
+        pub fn default_create_activity(&mut self) {
+            self.expect_create_activity().returning(|_| {
+                Ok(Activity::new(
                     ActivityId::new(),
                     UserId::default(),
                     None,
@@ -354,9 +391,16 @@ pub mod test_utils {
                     Sport::Running,
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
-                )))),
-                list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-                get_activity_result: Arc::new(Mutex::new(Ok(Activity::new(
+                ))
+            });
+        }
+        pub fn default_list_activities(&mut self) {
+            self.expect_list_activities().returning(|_| Ok(vec![]));
+        }
+
+        pub fn default_get_activity(&mut self) {
+            self.expect_get_activity().returning(|_| {
+                Ok(Activity::new(
                     ActivityId::new(),
                     UserId::default(),
                     None,
@@ -364,62 +408,16 @@ pub mod test_utils {
                     Sport::Running,
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
-                )))),
-                modify_activity_result: Arc::new(Mutex::new(Ok(()))),
-                delete_activity_result: Arc::new(Mutex::new(Ok(()))),
-            }
-        }
-    }
-
-    impl IActivityService for MockActivityService {
-        async fn create_activity(
-            &self,
-            _req: CreateActivityRequest,
-        ) -> Result<Activity, CreateActivityError> {
-            let mut guard = self.create_activity_result.lock();
-            let mut result = Err(CreateActivityError::Unknown(anyhow!("Substitute errror")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+                ))
+            });
         }
 
-        async fn list_activities(
-            &self,
-            _user: &UserId,
-        ) -> Result<Vec<Activity>, ListActivitiesError> {
-            let mut guard = self.list_activities_result.lock();
-            let mut result = Err(ListActivitiesError::Unknown(anyhow!("Substitute errror")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+        pub fn default_modify_activity(&mut self) {
+            self.expect_modify_activity().returning(|_| Ok(()));
         }
 
-        async fn get_activity(
-            &self,
-            _activity_id: &ActivityId,
-        ) -> Result<Activity, GetActivityError> {
-            let mut guard = self.get_activity_result.lock();
-            let mut result = Err(GetActivityError::Unknown(anyhow!("Substitute errror")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-
-        async fn modify_activity(
-            &self,
-            _req: crate::domain::ports::ModifyActivityRequest,
-        ) -> Result<(), ModifyActivityError> {
-            let mut guard = self.modify_activity_result.lock();
-            let mut result = Err(ModifyActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-
-        async fn delete_activity(
-            &self,
-            _req: crate::domain::ports::DeleteActivityRequest,
-        ) -> Result<(), crate::domain::ports::DeleteActivityError> {
-            let mut guard = self.delete_activity_result.lock();
-            let mut result = Err(DeleteActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+        pub fn default_delete_activity(&mut self) {
+            self.expect_delete_activity().returning(|_| Ok(()));
         }
     }
 
