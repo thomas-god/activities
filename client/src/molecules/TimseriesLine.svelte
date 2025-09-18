@@ -9,10 +9,9 @@
 		position: AxisPosition;
 		yMargin: number;
 		width: number;
-		color: string;
 	}
 
-	let { values, xScale, range, yMargin, position, width, color }: TimseriesLineProps = $props();
+	let { values, xScale, range, yMargin, position, width }: TimseriesLineProps = $props();
 	let path: SVGPathElement;
 	let gy: SVGGElement;
 
@@ -41,7 +40,19 @@
 			return `translate(${yMargin} 0)`;
 		}
 	});
+
+	const colors: Record<AxisPosition, string> = {
+		left: 'stroke-chart-one',
+		right: 'stroke-chart-two',
+		leftOffset: 'stroke-chart-three'
+	};
 </script>
 
-<g bind:this={gy} transform={axisTranslate} class={color} />
-<path bind:this={path} clip-path="url(#clip-path)" fill="none" class={color} stroke-width="1.5" />
+<g bind:this={gy} transform={axisTranslate} class={colors[position]} fill={null} />
+<path
+	bind:this={path}
+	clip-path="url(#clip-path)"
+	fill="none"
+	class={colors[position]}
+	stroke-width="1.5"
+/>

@@ -75,13 +75,10 @@
 			const metric = metrics[idx];
 
 			let position: AxisPosition = 'left';
-			let color = 'stroke-chart-one';
 			if (idx === 1) {
 				position = 'right';
-				color = 'stroke-chart-two';
 			} else if (idx === 2) {
 				position = 'leftOffset';
-				color = 'stroke-chart-three';
 			}
 			let values = extractMetricValues(time, metric.values);
 
@@ -89,7 +86,6 @@
 				values,
 				range: yRange,
 				position,
-				color,
 				yMargin: 30
 			});
 		}
@@ -182,7 +178,6 @@
 			values={props.values}
 			xScale={zoomedXScale}
 			position={props.position}
-			color={props.color}
 			yMargin={30}
 			{width}
 		/>
