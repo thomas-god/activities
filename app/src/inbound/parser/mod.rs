@@ -298,41 +298,40 @@ impl From<&FitSport> for Sport {
 #[cfg(test)]
 pub mod test_utils {
 
-    use std::sync::{Arc, Mutex};
+    use mockall::mock;
 
     use super::*;
 
-    #[derive(Clone)]
-    pub struct MockFileParser {
-        pub try_into_domain_result:
-            Arc<Mutex<Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError>>>,
-    }
+    mock! {
+        pub TestFileParser {}
 
-    impl ParseFile for MockFileParser {
-        fn try_bytes_into_domain(
-            &self,
-            _bytes: Vec<u8>,
-        ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
-            let guard = self
-                .try_into_domain_result
-                .lock()
-                .expect("mocked parser cannot lock result");
-            guard.clone()
+        impl Clone for  TestFileParser {
+            fn clone(&self) -> Self;
         }
+
+        impl ParseFile for TestFileParser {
+            fn try_bytes_into_domain(
+                &self,
+                bytes: Vec<u8>,
+            ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError>;
+        }
+
     }
 
-    impl Default for MockFileParser {
-        fn default() -> Self {
-            Self {
-                try_into_domain_result: Arc::new(Mutex::new(Ok(CreateActivityRequest::new(
+    impl MockTestFileParser {
+        pub fn test_default() -> Self {
+            let mut mock = Self::new();
+            mock.expect_try_bytes_into_domain().returning(|_| {
+                Ok(CreateActivityRequest::new(
                     UserId::default(),
                     Sport::Cycling,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                     vec![1, 2, 3],
-                )))),
-            }
+                ))
+            });
+            mock
         }
     }
 }

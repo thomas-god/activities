@@ -181,7 +181,7 @@ mod tests {
             ports::GetActivityError,
             services::test_utils::{MockActivityService, MockTrainingMetricsService},
         },
-        inbound::parser::test_utils::MockFileParser,
+        inbound::parser::test_utils::MockTestFileParser,
     };
 
     use super::*;
@@ -216,7 +216,7 @@ mod tests {
             ..Default::default()
         };
 
-        let file_parser = MockFileParser::default();
+        let file_parser = MockTestFileParser::test_default();
         let metrics = MockTrainingMetricsService::default();
 
         let state = axum::extract::State(AppState {
@@ -267,7 +267,7 @@ mod tests {
             ..Default::default()
         };
 
-        let file_parser = MockFileParser::default();
+        let file_parser = MockTestFileParser::test_default();
         let metrics = MockTrainingMetricsService::default();
 
         let state = axum::extract::State(AppState {
