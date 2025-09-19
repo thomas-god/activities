@@ -5,6 +5,7 @@ use axum::{
     http::{StatusCode, request::Parts},
 };
 use derive_more::Constructor;
+use thiserror::Error;
 
 use crate::{
     domain::{
@@ -41,16 +42,24 @@ where
     }
 }
 
+#[derive(Debug, Clone, Error)]
+pub enum SessionTokenError {
+    #[error("SessionTokenDoesNotExists")]
+    DoesNotExist,
+}
+
 pub trait ISessionRepository: Clone + Send + Sync + 'static {
-    fn dummy(&self) -> impl Future<Output = Result<(), ()>> + Send;
+    fn check_session_token(
+        &self,
+        token: &str,
+    ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
 pub struct SessionRepository;
 impl ISessionRepository for SessionRepository {
-    async fn dummy(&self) -> Result<(), ()> {
-        tracing::info!("call from dummy repo");
-        Ok(())
+    async fn check_session_token(&self, _token: &str) -> Result<UserId, SessionTokenError> {
+        todo!()
     }
 }
 
@@ -79,9 +88,23 @@ where
 {
     type Rejection = StatusCode;
 
-    async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let jar = axum_extra::extract::CookieJar::from_headers(&parts.headers);
+        let Some(session_token) = jar.get("session_token") else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
         let repository = SessionsRepositoryWrapper::from_ref(state);
-        let _ = repository.0.dummy().await;
+
+        let Ok(user) = repository
+            .0
+            .check_session_token(session_token.value())
+            .await
+        else {
+            return Err(StatusCode::UNAUTHORIZED);
+        };
+
+        parts.extensions.insert(AuthenticatedUser::new(user));
+
         Ok(Self(PhantomData))
     }
 }
@@ -100,7 +123,121 @@ pub mod test_utils {
         }
 
         impl ISessionRepository for SessionRepository {
-            async fn dummy(&self) -> Result<(), ()>;
+            async fn check_session_token(
+                &self,
+                _token: &str
+            ) -> Result<UserId, SessionTokenError>;
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use axum::{
+        Extension, Router,
+        middleware::{from_extractor, from_extractor_with_state},
+        routing::get,
+    };
+    use axum_extra::extract::cookie::Cookie;
+    use axum_test::TestServer;
+
+    use crate::{
+        domain::services::{
+            activity::test_utils::MockActivityService,
+            training_metrics::test_utils::MockTrainingMetricService,
+        },
+        inbound::{
+            http::auth::test_utils::MockSessionRepository, parser::test_utils::MockFileParser,
+        },
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_default_user_extractor() {
+        async fn test_route(
+            Extension(user): Extension<AuthenticatedUser>,
+        ) -> impl axum::response::IntoResponse {
+            user.user().to_string()
+        }
+
+        let app = Router::new()
+            .route("/", get(test_route))
+            .route_layer(from_extractor::<DefaultUserExtractor>());
+        let server = TestServer::new(app).expect("unable to create test server");
+
+        let response = server.get("/").await;
+        response.assert_status(StatusCode::OK);
+        assert_eq!(response.text(), UserId::default().to_string());
+    }
+
+    fn build_test_server(sessions_repository: MockSessionRepository) -> TestServer {
+        let state = AppState {
+            activity_service: Arc::new(MockActivityService::new()),
+            training_metrics_service: Arc::new(MockTrainingMetricService::new()),
+            file_parser: Arc::new(MockFileParser::new()),
+            session_repository: Arc::new(sessions_repository),
+        };
+
+        async fn test_route(
+            Extension(user): Extension<AuthenticatedUser>,
+        ) -> impl axum::response::IntoResponse {
+            user.user().to_string()
+        }
+
+        let app =
+            Router::new()
+                .route("/", get(test_route))
+                .route_layer(from_extractor_with_state::<
+                    CookieUserExtractor<MockSessionRepository>,
+                    AppState<
+                        MockActivityService,
+                        MockFileParser,
+                        MockTrainingMetricService,
+                        MockSessionRepository,
+                    >,
+                >(state));
+        TestServer::new(app).expect("unable to create test server")
+    }
+
+    #[tokio::test]
+    async fn test_cookie_user_extractor_no_sesion_token_cookie() {
+        let sessions = MockSessionRepository::new();
+        let server = build_test_server(sessions);
+
+        let response = server.get("/").await;
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
+        let mut sessions = MockSessionRepository::new();
+        sessions
+            .expect_check_session_token()
+            .returning(|_| Err(SessionTokenError::DoesNotExist));
+        let server = build_test_server(sessions);
+
+        let response = server
+            .get("/")
+            .add_cookie(Cookie::new("session_token", "a value"))
+            .await;
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_cookie_user_extractor_return_user_id() {
+        let mut sessions = MockSessionRepository::new();
+        sessions
+            .expect_check_session_token()
+            .returning(|_| Ok(UserId::from("a user")));
+        let server = build_test_server(sessions);
+
+        let response = server
+            .get("/")
+            .add_cookie(Cookie::new("session_token", "a value"))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(response.text(), UserId::from("a user").to_string());
     }
 }
