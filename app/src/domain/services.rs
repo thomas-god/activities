@@ -318,8 +318,6 @@ where
 
 #[cfg(test)]
 pub mod test_utils {
-    use std::mem;
-    use std::sync::{Arc, Mutex};
 
     use mockall::mock;
 
@@ -421,97 +419,46 @@ pub mod test_utils {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    #[derive(Clone)]
-    pub struct MockActivityRepository {
-        pub similar_activity_result: Arc<Mutex<Result<bool, SimilarActivityError>>>,
-        pub save_activity_result: Arc<Mutex<Result<(), SaveActivityError>>>,
-        pub list_activities_result: Arc<Mutex<Result<Vec<Activity>, ListActivitiesError>>>,
-        pub get_activity_result: Arc<Mutex<Result<Option<Activity>, GetActivityError>>>,
-        pub modify_activity_name_result: Arc<Mutex<Result<(), anyhow::Error>>>,
-        pub modify_activity_name_call_list: Arc<Mutex<Vec<(ActivityId, Option<ActivityName>)>>>,
-        pub delete_activity_result: Arc<Mutex<Result<(), anyhow::Error>>>,
-        pub delete_activity_call_list: Arc<Mutex<Vec<ActivityId>>>,
-    }
+    mock! {
+        pub ActivityRepository {}
 
-    impl ActivityRepository for MockActivityRepository {
-        async fn similar_activity_exists(
-            &self,
-            _natural_key: &ActivityNaturalKey,
-        ) -> Result<bool, SimilarActivityError> {
-            let mut guard = self.similar_activity_result.lock();
-            let mut result = Err(SimilarActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+        impl Clone for ActivityRepository {
+            fn clone(&self) -> Self;
         }
 
-        async fn save_activity(&self, _activity: &Activity) -> Result<(), SaveActivityError> {
-            let mut guard = self.save_activity_result.lock();
-            let mut result = Err(SaveActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
+        impl ActivityRepository for ActivityRepository {
+            async fn similar_activity_exists(
+                &self,
+                natural_key: &ActivityNaturalKey,
+            ) -> Result<bool, SimilarActivityError>;
+
+            async fn save_activity(
+                &self,
+                activity: &Activity,
+            ) -> Result<(), SaveActivityError>;
+
+            async fn list_activities(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<Activity>, ListActivitiesError>;
+
+            async fn get_activity(
+                &self,
+                id: &ActivityId,
+            ) -> Result<Option<Activity>, GetActivityError>;
+
+            async fn modify_activity_name(
+                &self,
+                id: &ActivityId,
+                name: Option<ActivityName>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn delete_activity(
+                &self,
+                activity: &ActivityId,
+            ) -> Result<(), anyhow::Error>;
         }
 
-        async fn list_activities(
-            &self,
-            _user: &UserId,
-        ) -> Result<Vec<Activity>, ListActivitiesError> {
-            let mut guard = self.list_activities_result.lock();
-            let mut result = Err(ListActivitiesError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-
-        async fn get_activity(
-            &self,
-            _id: &ActivityId,
-        ) -> Result<Option<Activity>, GetActivityError> {
-            let mut guard = self.get_activity_result.lock();
-            let mut result = Err(GetActivityError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            result
-        }
-
-        async fn modify_activity_name(
-            &self,
-            id: &ActivityId,
-            name: Option<ActivityName>,
-        ) -> Result<(), anyhow::Error> {
-            let mut guard = self.modify_activity_name_result.lock();
-            let mut result = Err(anyhow!("substitute error"));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            self.modify_activity_name_call_list
-                .lock()
-                .unwrap()
-                .push((id.clone(), name.clone()));
-            result
-        }
-
-        async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
-            let mut guard = self.delete_activity_result.lock();
-            let mut result = Err(anyhow!("substitute error"));
-            mem::swap(guard.as_deref_mut().unwrap(), &mut result);
-            self.delete_activity_call_list
-                .lock()
-                .unwrap()
-                .push(activity.clone());
-            result
-        }
-    }
-
-    impl Default for MockActivityRepository {
-        fn default() -> Self {
-            Self {
-                similar_activity_result: Arc::new(Mutex::new(Ok(false))),
-                save_activity_result: Arc::new(Mutex::new(Ok(()))),
-                list_activities_result: Arc::new(Mutex::new(Ok(vec![]))),
-                get_activity_result: Arc::new(Mutex::new(Ok(None))),
-                modify_activity_name_result: Arc::new(Mutex::new(Ok(()))),
-                modify_activity_name_call_list: Arc::new(Mutex::new(Vec::new())),
-                delete_activity_result: Arc::new(Mutex::new(Ok(()))),
-                delete_activity_call_list: Arc::new(Mutex::new(Vec::new())),
-            }
-        }
     }
 
     mock! {
@@ -628,16 +575,23 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_err_if_similar_activity_exists() {
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository {
-            similar_activity_result: Arc::new(std::sync::Mutex::new(Ok(true))),
-            ..Default::default()
-        }));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(true));
+
+        // let activity_repository = Arc::new(Mutex::new(MockActivityRepository { similar_activity_result: Arc::new(std::sync::Mutex::new(Ok(true))),
+        //     ..Default::default()
+        // }));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = default_activity_request();
 
@@ -653,13 +607,23 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity() {
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(false));
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Ok(()));
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = default_activity_request();
 
@@ -670,18 +634,23 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_save_activity_error() {
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository {
-            save_activity_result: Arc::new(std::sync::Mutex::new(Err(SaveActivityError::Unknown(
-                anyhow!("an error occured"),
-            )))),
-            ..Default::default()
-        }));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(false));
+        activity_repository
+            .expect_save_activity()
+            .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
+
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Ok(()))),
         };
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = default_activity_request();
 
@@ -692,15 +661,26 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_service_create_activity_raw_data_error() {
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(false));
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Ok(()));
+
         let raw_data_repository = MockRawDataRepository {
             save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
                 "an error occured"
             ))))),
         };
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = default_activity_request();
 
@@ -768,14 +748,18 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_modify_activity_not_found() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(None))),
-            ..Default::default()
-        }));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .returning(|_| Ok(None));
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = ModifyActivityRequest::new(UserId::default(), ActivityId::from("test"), None);
 
@@ -789,8 +773,9 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_modify_activity_not_owned_by_user() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
                 None,
@@ -798,13 +783,16 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
-            ))))),
-            ..Default::default()
-        }));
+            )))
+        });
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req =
             ModifyActivityRequest::new("test_user".into(), ActivityId::from("test_activity"), None);
@@ -820,8 +808,9 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_modify_activity_ok() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::default(),
                 None,
@@ -829,13 +818,20 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
-            ))))),
-            ..Default::default()
-        }));
+            )))
+        });
+        activity_repository
+            .expect_modify_activity_name()
+            .withf(|id, name| {
+                *id == ActivityId::from("test")
+                    && *name == Some(ActivityName::new("new name".to_string()))
+            })
+            .returning(|_, __| Ok(()));
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
-            activity_repository.clone(),
+            Arc::new(Mutex::new(activity_repository)),
             raw_data_repository,
             metrics_service,
         );
@@ -848,33 +844,22 @@ mod tests_activity_service {
 
         let res = service.modify_activity(req).await;
         assert!(res.is_ok());
-
-        let call_list = activity_repository
-            .lock()
-            .await
-            .modify_activity_name_call_list
-            .lock()
-            .unwrap()
-            .clone();
-        assert_eq!(
-            call_list,
-            vec![(
-                ActivityId::from("test"),
-                Some(ActivityName::new("new name".to_string()))
-            )]
-        );
     }
 
     #[tokio::test]
     async fn test_activity_service_delete_activity_not_found() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(None))),
-            ..Default::default()
-        }));
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_| Ok(None));
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = DeleteActivityRequest::new(UserId::default(), ActivityId::from("test"));
 
@@ -888,8 +873,9 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_delete_activity_not_owned_by_user() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().return_once(|_| {
+            Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
                 None,
@@ -897,13 +883,16 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
-            ))))),
-            ..Default::default()
-        }));
+            )))
+        });
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
 
         let req = DeleteActivityRequest::new(
             "test_user".to_string().into(),
@@ -921,8 +910,9 @@ mod tests_activity_service {
 
     #[tokio::test]
     async fn test_activity_service_delete_activity_ok() {
-        let activity_repository = Arc::new(tokio::sync::Mutex::new(MockActivityRepository {
-            get_activity_result: Arc::new(std::sync::Mutex::new(Ok(Some(Activity::new(
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::from("test_user".to_string()),
                 None,
@@ -930,13 +920,17 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
-            ))))),
-            ..Default::default()
-        }));
+            )))
+        });
+        activity_repository
+            .expect_delete_activity()
+            .withf(|id| *id == ActivityId::from("test_activity"))
+            .returning(|_| Ok(()));
+
         let raw_data_repository = MockRawDataRepository::default();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
-            activity_repository.clone(),
+            Arc::new(Mutex::new(activity_repository)),
             raw_data_repository,
             metrics_service,
         );
@@ -948,14 +942,6 @@ mod tests_activity_service {
 
         let res = service.delete_activity(req).await;
         assert!(res.is_ok());
-        let call_list = activity_repository
-            .lock()
-            .await
-            .delete_activity_call_list
-            .lock()
-            .unwrap()
-            .clone();
-        assert_eq!(call_list, vec![ActivityId::from("test_activity")]);
     }
 }
 
@@ -1108,8 +1094,13 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_metric_service() {
         let repository = MockTrainingMetricsRepository::default();
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_list_activities()
+            .returning(|_| Ok(vec![]));
+
+        let service =
+            TrainingMetricService::new(repository, Arc::new(Mutex::new(activity_repository)));
         let req = RecomputeMetricRequest::new(UserId::default(), Some(ActivityId::default()));
 
         let res = service.recompute_metric(req).await;

@@ -133,13 +133,13 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Timese
                     .collect(),
             ),
         };
-        return (
+        (
             metric.metric().to_string(),
             TimeseriesBody {
                 unit: unit.to_string(),
                 values,
             },
-        );
+        )
     }))
 }
 
@@ -190,7 +190,7 @@ mod tests {
         let mut service = MockActivityService::new();
         service.expect_get_activity().returning(|_| {
             Ok(Activity::new(
-                ActivityId::from(&"target_id"),
+                ActivityId::from("target_id"),
                 UserId::default(),
                 None,
                 ActivityStartTime::new(
@@ -259,10 +259,10 @@ mod tests {
         let mut service = MockActivityService::new();
         service
             .expect_get_activity()
-            .with(eq(ActivityId::from(&"target_id")))
+            .with(eq(ActivityId::from("target_id")))
             .returning(|_| {
                 Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
-                    &"target_id",
+                    "target_id",
                 )))
             });
 
