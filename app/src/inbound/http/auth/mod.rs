@@ -15,6 +15,8 @@ use crate::{
     inbound::{http::AppState, parser::ParseFile},
 };
 
+pub mod service;
+
 #[derive(Debug, Clone, Constructor)]
 pub struct AuthenticatedUser(UserId);
 
@@ -48,19 +50,11 @@ pub enum SessionTokenError {
     DoesNotExist,
 }
 
-pub trait ISessionRepository: Clone + Send + Sync + 'static {
+pub trait ISessionService: Clone + Send + Sync + 'static {
     fn check_session_token(
         &self,
         token: &str,
     ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct SessionRepository;
-impl ISessionRepository for SessionRepository {
-    async fn check_session_token(&self, _token: &str) -> Result<UserId, SessionTokenError> {
-        todo!()
-    }
 }
 
 impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for Arc<SR>
@@ -68,10 +62,10 @@ where
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 {
     fn from_ref(input: &AppState<AS, PF, TMS, SR>) -> Self {
-        input.session_repository.clone()
+        input.session_service.clone()
     }
 }
 
@@ -81,7 +75,7 @@ pub struct CookieUserExtractor<SR>(PhantomData<SR>);
 impl<S, SR> FromRequestParts<S> for CookieUserExtractor<SR>
 where
     S: Send + Sync,
-    SR: ISessionRepository,
+    SR: ISessionService,
     Arc<SR>: FromRef<S>,
 {
     type Rejection = StatusCode;
@@ -110,13 +104,13 @@ pub mod test_utils {
     use super::*;
 
     mock! {
-        pub SessionRepository {}
+        pub SessionService {}
 
-        impl Clone for SessionRepository {
+        impl Clone for SessionService {
             fn clone(&self) -> Self;
         }
 
-        impl ISessionRepository for SessionRepository {
+        impl ISessionService for SessionService {
             async fn check_session_token(
                 &self,
                 _token: &str
@@ -140,9 +134,7 @@ mod test {
             activity::test_utils::MockActivityService,
             training_metrics::test_utils::MockTrainingMetricService,
         },
-        inbound::{
-            http::auth::test_utils::MockSessionRepository, parser::test_utils::MockFileParser,
-        },
+        inbound::{http::auth::test_utils::MockSessionService, parser::test_utils::MockFileParser},
     };
 
     use super::*;
@@ -165,12 +157,12 @@ mod test {
         assert_eq!(response.text(), UserId::default().to_string());
     }
 
-    fn build_test_server(sessions_repository: MockSessionRepository) -> TestServer {
+    fn build_test_server(sessions_repository: MockSessionService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(MockActivityService::new()),
             training_metrics_service: Arc::new(MockTrainingMetricService::new()),
             file_parser: Arc::new(MockFileParser::new()),
-            session_repository: Arc::new(sessions_repository),
+            session_service: Arc::new(sessions_repository),
         };
 
         async fn test_route(
@@ -183,12 +175,12 @@ mod test {
             Router::new()
                 .route("/", get(test_route))
                 .route_layer(from_extractor_with_state::<
-                    CookieUserExtractor<MockSessionRepository>,
+                    CookieUserExtractor<MockSessionService>,
                     AppState<
                         MockActivityService,
                         MockFileParser,
                         MockTrainingMetricService,
-                        MockSessionRepository,
+                        MockSessionService,
                     >,
                 >(state));
         TestServer::new(app).expect("unable to create test server")
@@ -196,7 +188,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_no_sesion_token_cookie() {
-        let sessions = MockSessionRepository::new();
+        let sessions = MockSessionService::new();
         let server = build_test_server(sessions);
 
         let response = server.get("/").await;
@@ -205,7 +197,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
-        let mut sessions = MockSessionRepository::new();
+        let mut sessions = MockSessionService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Err(SessionTokenError::DoesNotExist));
@@ -220,7 +212,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_return_user_id() {
-        let mut sessions = MockSessionRepository::new();
+        let mut sessions = MockSessionService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Ok(UserId::from("a user")));

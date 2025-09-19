@@ -11,7 +11,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionRepository},
+            auth::{AuthenticatedUser, ISessionService},
         },
         parser::ParseFile,
     },
@@ -32,7 +32,7 @@ pub async fn upload_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, SR>>,
@@ -92,7 +92,7 @@ mod tests {
             training_metrics::test_utils::MockTrainingMetricService,
         },
         inbound::{
-            http::auth::{DefaultUserExtractor, test_utils::MockSessionRepository},
+            http::auth::{DefaultUserExtractor, test_utils::MockSessionService},
             parser::test_utils::MockFileParser,
         },
     };
@@ -108,7 +108,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_repository: Arc::new(MockSessionRepository::new()),
+            session_service: Arc::new(MockSessionService::new()),
         };
 
         let app = Router::new()
@@ -140,7 +140,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_repository: Arc::new(MockSessionRepository::new()),
+            session_service: Arc::new(MockSessionService::new()),
         };
 
         let app = Router::new()

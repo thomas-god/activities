@@ -12,14 +12,14 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
-use crate::inbound::http::auth::{DefaultUserExtractor, ISessionRepository};
+use crate::inbound::http::auth::{DefaultUserExtractor, ISessionService};
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
     get_training_metrics, list_activities, patch_activity, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
-pub use self::auth::SessionRepository;
+pub use self::auth::service::SessionService;
 
 mod auth;
 mod handlers;
@@ -29,12 +29,12 @@ struct AppState<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 > {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
-    session_repository: Arc<SR>,
+    session_service: Arc<SR>,
 }
 
 pub struct HttpServer<AS, PF, TMS, SR> {
@@ -46,7 +46,7 @@ pub struct HttpServer<AS, PF, TMS, SR> {
     _marker_session_repository: PhantomData<SR>,
 }
 
-impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISessionRepository>
+impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISessionService>
     HttpServer<AS, PF, TMS, SR>
 {
     pub async fn new(
@@ -67,7 +67,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISess
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
-            session_repository: Arc::new(session_repository),
+            session_service: Arc::new(session_repository),
         };
 
         let origin = config
@@ -114,7 +114,7 @@ fn api_routes<
     AS: IActivityService,
     FP: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 >() -> Router<AppState<AS, FP, TMS, SR>> {
     Router::new()
         .route("/activity", post(upload_activities::<AS, FP, TMS, SR>))

@@ -20,7 +20,7 @@ use app::{
         services::{activity::ActivityService, training_metrics::TrainingMetricService},
     },
     inbound::{
-        http::{HttpServer, SessionRepository},
+        http::{HttpServer, SessionService},
         parser::{FitParser, ParseFile},
     },
     outbound::memory::{
@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         raw_data_repository,
         training_metrics_service.clone(),
     );
-    let session_repository = SessionRepository::new();
+    let session_repository = SessionService::new();
 
     let parser = FitParser {};
 

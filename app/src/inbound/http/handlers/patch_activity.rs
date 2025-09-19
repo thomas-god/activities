@@ -15,7 +15,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionRepository},
+            auth::{AuthenticatedUser, ISessionService},
         },
         parser::ParseFile,
     },
@@ -39,7 +39,7 @@ pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, SR>>,

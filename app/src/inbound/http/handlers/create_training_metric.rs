@@ -12,7 +12,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionRepository},
+            auth::{AuthenticatedUser, ISessionService},
             handlers::types::{
                 APITrainingMetricAggregate, APITrainingMetricGranularity, APITrainingMetricSource,
             },
@@ -47,7 +47,7 @@ pub async fn create_training_metric<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionRepository,
+    SR: ISessionService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, SR>>,
