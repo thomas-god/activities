@@ -22,7 +22,10 @@ use crate::{
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -129,9 +132,10 @@ pub async fn get_training_metrics<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
+    SR: ISessionRepository,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
     Query(date_range): Query<MetricsDateRange>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state

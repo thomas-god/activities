@@ -13,7 +13,10 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -32,9 +35,14 @@ pub struct PatchActivityQuery {
     name: Option<String>,
 }
 
-pub async fn patch_activity<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+pub async fn patch_activity<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
     Path(activity_id): Path<String>,
     Query(query): Query<PatchActivityQuery>,
 ) -> Result<StatusCode, StatusCode> {

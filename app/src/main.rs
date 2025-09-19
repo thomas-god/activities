@@ -20,7 +20,7 @@ use app::{
         services::{activity::ActivityService, training_metrics::TrainingMetricService},
     },
     inbound::{
-        http::HttpServer,
+        http::{HttpServer, SessionRepository},
         parser::{FitParser, ParseFile},
     },
     outbound::memory::{
@@ -61,14 +61,21 @@ async fn main() -> anyhow::Result<()> {
         raw_data_repository,
         training_metrics_service.clone(),
     );
+    let session_repository = SessionRepository::new();
 
     let parser = FitParser {};
 
     // Load demo activities before starting receiving request
     load_demo_activities(&activity_service, &parser).await;
 
-    let http_server =
-        HttpServer::new(activity_service, parser, training_metrics_service, config).await?;
+    let http_server = HttpServer::new(
+        activity_service,
+        parser,
+        training_metrics_service,
+        session_repository,
+        config,
+    )
+    .await?;
 
     http_server.run().await
 }

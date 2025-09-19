@@ -9,7 +9,10 @@ use serde::Serialize;
 use crate::{
     domain::ports::{CreateActivityError, IActivityService, ITrainingMetricService},
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -25,9 +28,14 @@ struct UnprocessableFilesResponse {
     unprocessable_files: Vec<String>,
 }
 
-pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+pub async fn upload_activities<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
     let mut unprocessable_files = Vec::new();
@@ -83,7 +91,10 @@ mod tests {
             activity::test_utils::MockActivityService,
             training_metrics::test_utils::MockTrainingMetricService,
         },
-        inbound::{http::auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
+        inbound::{
+            http::auth::{DefaultUserExtractor, test_utils::MockSessionRepository},
+            parser::test_utils::MockFileParser,
+        },
     };
 
     use super::*;
@@ -97,6 +108,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
+            session_repository: Arc::new(MockSessionRepository::new()),
         };
 
         let app = Router::new()
@@ -128,6 +140,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
+            session_repository: Arc::new(MockSessionRepository::new()),
         };
 
         let app = Router::new()

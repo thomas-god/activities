@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -11,33 +12,48 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
-use crate::inbound::http::auth::DefaultUserExtractor;
+use crate::inbound::http::auth::{DefaultUserExtractor, ISessionRepository};
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
     get_training_metrics, list_activities, patch_activity, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
+pub use self::auth::SessionRepository;
+
 mod auth;
 mod handlers;
 
 #[derive(Debug, Clone)]
-struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService> {
+struct AppState<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+> {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
+    session_repository: Arc<SR>,
 }
 
-pub struct HttpServer {
+pub struct HttpServer<AS, PF, TMS, SR> {
     router: axum::Router,
     listener: net::TcpListener,
+    _marker_activity: PhantomData<AS>,
+    _marker_paser: PhantomData<PF>,
+    _marker_training_metrics: PhantomData<TMS>,
+    _marker_session_repository: PhantomData<SR>,
 }
 
-impl HttpServer {
+impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISessionRepository>
+    HttpServer<AS, PF, TMS, SR>
+{
     pub async fn new(
-        activity_service: impl IActivityService,
-        file_parser: impl ParseFile,
-        training_metric_service: Arc<impl ITrainingMetricService>,
+        activity_service: AS,
+        file_parser: PF,
+        training_metric_service: Arc<TMS>,
+        session_repository: SR,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -51,6 +67,7 @@ impl HttpServer {
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
+            session_repository: Arc::new(session_repository),
         };
 
         let origin = config
@@ -74,7 +91,14 @@ impl HttpServer {
             .await
             .with_context(|| format!("failed to listen on {}", config.server_port))?;
 
-        Ok(Self { router, listener })
+        Ok(Self {
+            router,
+            listener,
+            _marker_activity: PhantomData,
+            _marker_paser: PhantomData,
+            _marker_training_metrics: PhantomData,
+            _marker_session_repository: PhantomData,
+        })
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
@@ -86,30 +110,37 @@ impl HttpServer {
     }
 }
 
-fn api_routes<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>()
--> Router<AppState<AS, FP, TMS>> {
+fn api_routes<
+    AS: IActivityService,
+    FP: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>() -> Router<AppState<AS, FP, TMS, SR>> {
     Router::new()
-        .route("/activity", post(upload_activities::<AS, FP, TMS>))
-        .route("/activities", get(list_activities::<AS, FP, TMS>))
-        .route("/activity/{activity_id}", get(get_activity::<AS, FP, TMS>))
+        .route("/activity", post(upload_activities::<AS, FP, TMS, SR>))
+        .route("/activities", get(list_activities::<AS, FP, TMS, SR>))
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, FP, TMS>),
+            get(get_activity::<AS, FP, TMS, SR>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, FP, TMS>),
+            patch(patch_activity::<AS, FP, TMS, SR>),
+        )
+        .route(
+            "/activity/{activity_id}",
+            delete(delete_activity::<AS, FP, TMS, SR>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, FP, TMS>),
+            get(get_training_metrics::<AS, FP, TMS, SR>),
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, FP, TMS>),
+            post(create_training_metric::<AS, FP, TMS, SR>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, FP, TMS>),
+            delete(delete_training_metric::<AS, FP, TMS, SR>),
         )
 }

@@ -17,7 +17,10 @@ use crate::{
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -146,9 +149,14 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Timese
     }))
 }
 
-pub async fn get_activity<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
+pub async fn get_activity<
+    AS: IActivityService,
+    FP: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>(
     Extension(_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, FP, TMS>>,
+    State(state): State<AppState<AS, FP, TMS, SR>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {
     let Ok(res) = state
@@ -181,10 +189,14 @@ mod tests {
                 },
             },
             ports::GetActivityError,
-            services::activity::test_utils::MockActivityService,
-            services::training_metrics::test_utils::MockTrainingMetricService,
+            services::{
+                activity::test_utils::MockActivityService,
+                training_metrics::test_utils::MockTrainingMetricService,
+            },
         },
-        inbound::parser::test_utils::MockFileParser,
+        inbound::{
+            http::auth::test_utils::MockSessionRepository, parser::test_utils::MockFileParser,
+        },
     };
 
     use super::*;
@@ -225,6 +237,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
+            session_repository: Arc::new(MockSessionRepository::new()),
         });
         let path = Path("target_id".to_string());
 
@@ -283,6 +296,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
+            session_repository: Arc::new(MockSessionRepository::new()),
         });
         let path = Path("target_id".to_string());
 

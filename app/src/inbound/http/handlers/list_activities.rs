@@ -9,7 +9,10 @@ use crate::{
         ports::{IActivityService, ITrainingMetricService},
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -45,10 +48,16 @@ impl From<&Activity> for ResponseBodyItem {
     }
 }
 
-pub async fn list_activities<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+pub async fn list_activities<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    tracing::info!("{user:?}");
     let Ok(res) = state.activity_service.list_activities(user.user()).await else {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };

@@ -13,7 +13,10 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -32,9 +35,10 @@ pub async fn delete_training_metric<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
+    SR: ISessionRepository,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
     Path(metric_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req =

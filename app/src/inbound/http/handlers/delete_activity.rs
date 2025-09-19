@@ -12,7 +12,10 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::{
+            AppState,
+            auth::{AuthenticatedUser, ISessionRepository},
+        },
         parser::ParseFile,
     },
 };
@@ -27,9 +30,14 @@ impl From<DeleteActivityError> for StatusCode {
     }
 }
 
-pub async fn delete_activity<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+pub async fn delete_activity<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    SR: ISessionRepository,
+>(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS>>,
+    State(state): State<AppState<AS, PF, TMS, SR>>,
     Path(activity_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req = DeleteActivityRequest::new(user.user().clone(), ActivityId::from(&activity_id));
