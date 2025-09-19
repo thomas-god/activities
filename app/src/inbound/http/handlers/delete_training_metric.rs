@@ -1,17 +1,21 @@
 use axum::{
+    Extension,
     extract::{Path, State},
     http::StatusCode,
 };
 
 use crate::{
     domain::{
-        models::{UserId, training_metrics::TrainingMetricId},
+        models::training_metrics::TrainingMetricId,
         ports::{
             DeleteTrainingMetricError, DeleteTrainingMetricRequest, IActivityService,
             ITrainingMetricService,
         },
     },
-    inbound::{http::AppState, parser::ParseFile},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
+    },
 };
 
 impl From<DeleteTrainingMetricError> for StatusCode {
@@ -29,11 +33,12 @@ pub async fn delete_training_metric<
     PF: ParseFile,
     TMS: ITrainingMetricService,
 >(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
     Path(metric_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req =
-        DeleteTrainingMetricRequest::new(UserId::default(), TrainingMetricId::from(&metric_id));
+        DeleteTrainingMetricRequest::new(user.user().clone(), TrainingMetricId::from(&metric_id));
     state
         .training_metrics_service
         .delete_metric(req)

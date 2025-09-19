@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Mul};
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
 };
@@ -16,7 +16,10 @@ use crate::{
         },
         ports::{IActivityService, ITrainingMetricService},
     },
-    inbound::{http::AppState, parser::ParseFile},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
+    },
 };
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -144,6 +147,7 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Timese
 }
 
 pub async fn get_activity<AS: IActivityService, FP: ParseFile, TMS: ITrainingMetricService>(
+    Extension(_user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, FP, TMS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {
@@ -224,7 +228,12 @@ mod tests {
         });
         let path = Path("target_id".to_string());
 
-        let response = get_activity(state, path).await;
+        let response = get_activity(
+            Extension(AuthenticatedUser::new(UserId::test_default())),
+            state,
+            path,
+        )
+        .await;
         assert!(response.is_ok());
         let response = response.unwrap();
         assert_eq!(
@@ -277,7 +286,12 @@ mod tests {
         });
         let path = Path("target_id".to_string());
 
-        let response = get_activity(state, path).await;
+        let response = get_activity(
+            Extension(AuthenticatedUser::new(UserId::test_default())),
+            state,
+            path,
+        )
+        .await;
         assert!(response.is_err());
         let response = response.unwrap_err();
         assert_eq!(response, StatusCode::NOT_FOUND);

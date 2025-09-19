@@ -1,4 +1,4 @@
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
+            auth::AuthenticatedUser,
             handlers::types::{
                 APITrainingMetricAggregate, APITrainingMetricGranularity, APITrainingMetricSource,
             },
@@ -27,15 +28,13 @@ pub struct CreateTrainingMetricBody {
     aggregate: APITrainingMetricAggregate,
 }
 
-impl From<CreateTrainingMetricBody> for CreateTrainingMetricRequest {
-    fn from(body: CreateTrainingMetricBody) -> Self {
-        Self::new(
-            UserId::default(),
-            body.source.into(),
-            body.granularity.into(),
-            body.aggregate.into(),
-        )
-    }
+fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainingMetricRequest {
+    CreateTrainingMetricRequest::new(
+        user.clone(),
+        body.source.into(),
+        body.granularity.into(),
+        body.aggregate.into(),
+    )
 }
 
 impl From<CreateTrainingMetricError> for StatusCode {
@@ -49,10 +48,11 @@ pub async fn create_training_metric<
     PF: ParseFile,
     TMS: ITrainingMetricService,
 >(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
     Json(payload): Json<CreateTrainingMetricBody>,
 ) -> Result<StatusCode, StatusCode> {
-    let req = payload.into();
+    let req = build_request(payload, user.user());
 
     state
         .training_metrics_service

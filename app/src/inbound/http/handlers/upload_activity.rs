@@ -1,5 +1,5 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Multipart, State},
     http::StatusCode,
     response::IntoResponse,
@@ -7,11 +7,11 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    domain::{
-        models::UserId,
-        ports::{CreateActivityError, IActivityService, ITrainingMetricService},
+    domain::ports::{CreateActivityError, IActivityService, ITrainingMetricService},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
     },
-    inbound::{http::AppState, parser::ParseFile},
 };
 
 impl From<CreateActivityError> for StatusCode {
@@ -26,6 +26,7 @@ struct UnprocessableFilesResponse {
 }
 
 pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
@@ -45,7 +46,7 @@ pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITraini
             unprocessable_files.push(name.to_string());
             continue;
         };
-        let create_activity_request = file_content.into_request(&UserId::default());
+        let create_activity_request = file_content.into_request(user.user());
 
         if let Err(_err) = state
             .activity_service
@@ -74,15 +75,15 @@ pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITraini
 mod tests {
     use std::sync::Arc;
 
-    use axum::{Router, routing::post};
+    use axum::{Router, middleware::from_extractor, routing::post};
     use axum_test::TestServer;
 
     use crate::{
-        domain::{
-            services::activity::test_utils::MockActivityService,
-            services::training_metrics::test_utils::MockTrainingMetricService,
+        domain::services::{
+            activity::test_utils::MockActivityService,
+            training_metrics::test_utils::MockTrainingMetricService,
         },
-        inbound::parser::test_utils::MockFileParser,
+        inbound::{http::auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
     };
 
     use super::*;
@@ -100,6 +101,7 @@ mod tests {
 
         let app = Router::new()
             .route("/test_upload", post(upload_activities))
+            .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
         let server = TestServer::new(app).expect("unable to create test server");
 
@@ -130,6 +132,7 @@ mod tests {
 
         let app = Router::new()
             .route("/test_upload", post(upload_activities))
+            .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
         let server = TestServer::new(app).expect("unable to create test server");
 

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, Method};
+use axum::middleware::from_extractor;
 use axum::routing::{delete, get, patch};
 use axum::{Router, routing::post};
 use tokio::net;
@@ -10,12 +11,14 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
+use crate::inbound::http::auth::DefaultUserExtractor;
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
     get_training_metrics, list_activities, patch_activity, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
+mod auth;
 mod handlers;
 
 #[derive(Debug, Clone)]
@@ -64,6 +67,7 @@ impl HttpServer {
                     .allow_origin([origin])
                     .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
             )
+            .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
 
         let listener = net::TcpListener::bind(format!("0.0.0.0:{}", config.server_port))

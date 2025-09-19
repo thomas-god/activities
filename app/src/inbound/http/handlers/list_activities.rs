@@ -1,17 +1,17 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Extension, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 use serde_json::json;
 
 use crate::{
     domain::{
-        models::{
-            UserId,
-            activity::{Activity, ActivityStatistic, Sport},
-        },
+        models::activity::{Activity, ActivityStatistic, Sport},
         ports::{IActivityService, ITrainingMetricService},
     },
-    inbound::{http::AppState, parser::ParseFile},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -46,13 +46,10 @@ impl From<&Activity> for ResponseBodyItem {
 }
 
 pub async fn list_activities<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let Ok(res) = state
-        .activity_service
-        .list_activities(&UserId::default())
-        .await
-    else {
+    let Ok(res) = state.activity_service.list_activities(user.user()).await else {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 

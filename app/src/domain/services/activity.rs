@@ -72,7 +72,7 @@ where
         let id = ActivityId::new();
         let activity = Activity::new(
             id.clone(),
-            UserId::default(),
+            req.user().clone(),
             None,
             *req.start_time(),
             *req.sport(),

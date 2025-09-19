@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use axum::{
+    Extension,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
@@ -12,7 +13,6 @@ use serde_json::json;
 use crate::{
     domain::{
         models::{
-            UserId,
             activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training_metrics::{
                 TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
@@ -21,7 +21,10 @@ use crate::{
         },
         ports::{IActivityService, ITrainingMetricService},
     },
-    inbound::{http::AppState, parser::ParseFile},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -127,12 +130,13 @@ pub async fn get_training_metrics<
     PF: ParseFile,
     TMS: ITrainingMetricService,
 >(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
     Query(date_range): Query<MetricsDateRange>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
         .training_metrics_service
-        .get_training_metrics(&UserId::default())
+        .get_training_metrics(user.user())
         .await;
 
     let body = ResponseBody(

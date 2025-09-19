@@ -1,16 +1,20 @@
 use axum::{
+    Extension,
     extract::{Path, State},
     http::StatusCode,
 };
 
 use crate::{
     domain::{
-        models::{UserId, activity::ActivityId},
+        models::activity::ActivityId,
         ports::{
             DeleteActivityError, DeleteActivityRequest, IActivityService, ITrainingMetricService,
         },
     },
-    inbound::{http::AppState, parser::ParseFile},
+    inbound::{
+        http::{AppState, auth::AuthenticatedUser},
+        parser::ParseFile,
+    },
 };
 
 impl From<DeleteActivityError> for StatusCode {
@@ -24,10 +28,11 @@ impl From<DeleteActivityError> for StatusCode {
 }
 
 pub async fn delete_activity<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService>(
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS>>,
     Path(activity_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    let req = DeleteActivityRequest::new(UserId::default(), ActivityId::from(&activity_id));
+    let req = DeleteActivityRequest::new(user.user().clone(), ActivityId::from(&activity_id));
     state
         .activity_service
         .delete_activity(req)
