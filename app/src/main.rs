@@ -17,7 +17,7 @@ use app::{
             },
         },
         ports::{ActivityRepository, IActivityService, ITrainingMetricService, RawDataRepository},
-        services::{ActivityService, TrainingMetricService},
+        services::{activity::ActivityService, training_metrics::TrainingMetricService},
     },
     inbound::{
         http::HttpServer,

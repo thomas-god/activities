@@ -177,7 +177,8 @@ mod tests {
                 },
             },
             ports::GetActivityError,
-            services::test_utils::{MockActivityService, MockTrainingMetricService},
+            services::activity::test_utils::MockActivityService,
+            services::training_metrics::test_utils::MockTrainingMetricService,
         },
         inbound::parser::test_utils::MockFileParser,
     };

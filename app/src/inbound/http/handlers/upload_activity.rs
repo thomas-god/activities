@@ -74,7 +74,10 @@ mod tests {
     use axum_test::TestServer;
 
     use crate::{
-        domain::services::test_utils::{MockActivityService, MockTrainingMetricService},
+        domain::{
+            services::activity::test_utils::MockActivityService,
+            services::training_metrics::test_utils::MockTrainingMetricService,
+        },
         inbound::parser::test_utils::MockFileParser,
     };
 
