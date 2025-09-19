@@ -63,9 +63,7 @@ impl ISessionRepository for SessionRepository {
     }
 }
 
-pub struct SessionsRepositoryWrapper<SR: ISessionRepository>(Arc<SR>);
-
-impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for SessionsRepositoryWrapper<SR>
+impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for Arc<SR>
 where
     AS: IActivityService,
     PF: ParseFile,
@@ -73,7 +71,7 @@ where
     SR: ISessionRepository,
 {
     fn from_ref(input: &AppState<AS, PF, TMS, SR>) -> Self {
-        Self(input.session_repository.clone())
+        input.session_repository.clone()
     }
 }
 
@@ -84,7 +82,7 @@ impl<S, SR> FromRequestParts<S> for CookieUserExtractor<SR>
 where
     S: Send + Sync,
     SR: ISessionRepository,
-    SessionsRepositoryWrapper<SR>: FromRef<S>,
+    Arc<SR>: FromRef<S>,
 {
     type Rejection = StatusCode;
 
@@ -93,13 +91,9 @@ where
         let Some(session_token) = jar.get("session_token") else {
             return Err(StatusCode::UNAUTHORIZED);
         };
-        let repository = SessionsRepositoryWrapper::from_ref(state);
+        let repository = Arc::from_ref(state);
 
-        let Ok(user) = repository
-            .0
-            .check_session_token(session_token.value())
-            .await
-        else {
+        let Ok(user) = repository.check_session_token(session_token.value()).await else {
             return Err(StatusCode::UNAUTHORIZED);
         };
 
