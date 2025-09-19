@@ -305,7 +305,7 @@ mod tests_training_metrics_service {
                 get_definitions_result: Arc::new(Mutex::new(Ok(vec![
                     TrainingMetricDefinition::new(
                         TrainingMetricId::default(),
-                        UserId::default(),
+                        UserId::test_default(),
                         TrainingMetricSource::Timeseries((
                             TimeseriesMetric::Power,
                             TrainingMetricAggregate::Average,
@@ -319,7 +319,7 @@ mod tests_training_metrics_service {
                 get_definition_result: Arc::new(Mutex::new(Ok(Some(
                     TrainingMetricDefinition::new(
                         TrainingMetricId::default(),
-                        UserId::default(),
+                        UserId::test_default(),
                         TrainingMetricSource::Timeseries((
                             TimeseriesMetric::Power,
                             TrainingMetricAggregate::Average,
@@ -344,7 +344,7 @@ mod tests_training_metrics_service {
 
         let service =
             TrainingMetricService::new(repository, Arc::new(Mutex::new(activity_repository)));
-        let req = RecomputeMetricRequest::new(UserId::default(), Some(ActivityId::default()));
+        let req = RecomputeMetricRequest::new(UserId::test_default(), Some(ActivityId::default()));
 
         let res = service.recompute_metric(req).await;
 
@@ -362,7 +362,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::default()).await;
+        let res = service.get_training_metrics(&UserId::test_default()).await;
         assert!(res.is_empty());
     }
 
@@ -371,7 +371,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
-                UserId::default(),
+                UserId::test_default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -381,7 +381,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::default()).await;
+        let res = service.get_training_metrics(&UserId::test_default()).await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -389,7 +389,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
-                UserId::default(),
+                UserId::test_default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -403,7 +403,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository {
             get_definitions_result: Arc::new(Mutex::new(Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
-                UserId::default(),
+                UserId::test_default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -416,7 +416,7 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingMetricService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::default()).await;
+        let res = service.get_training_metrics(&UserId::test_default()).await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -424,7 +424,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
-                UserId::default(),
+                UserId::test_default(),
                 TrainingMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,

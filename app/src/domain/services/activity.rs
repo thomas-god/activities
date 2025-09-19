@@ -108,8 +108,9 @@ where
         // Dispatch metrics update
         let metric_service = self.training_metrics_service.clone();
         let activity_id = activity.id().clone();
+        let user = activity.user().clone();
         tokio::spawn(async move {
-            let req = RecomputeMetricRequest::new(UserId::default(), Some(activity_id));
+            let req = RecomputeMetricRequest::new(user, Some(activity_id));
             metric_service.recompute_metric(req).await
         });
 
@@ -261,7 +262,7 @@ pub mod test_utils {
             self.expect_create_activity().returning(|_| {
                 Ok(Activity::new(
                     ActivityId::new(),
-                    UserId::default(),
+                    UserId::test_default(),
                     None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
@@ -278,7 +279,7 @@ pub mod test_utils {
             self.expect_get_activity().returning(|_| {
                 Ok(Activity::new(
                     ActivityId::new(),
-                    UserId::default(),
+                    UserId::test_default(),
                     None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
@@ -400,7 +401,7 @@ mod tests_activity_service {
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
         CreateActivityRequest::new(
-            UserId::default(),
+            UserId::test_default(),
             sport,
             start_time,
             statistics,
@@ -561,7 +562,7 @@ mod tests_activity_service {
         );
 
         let req = CreateActivityRequest::new(
-            UserId::default(),
+            UserId::test_default(),
             sport,
             start_time,
             statistics,
@@ -594,7 +595,8 @@ mod tests_activity_service {
             metrics_service,
         );
 
-        let req = ModifyActivityRequest::new(UserId::default(), ActivityId::from("test"), None);
+        let req =
+            ModifyActivityRequest::new(UserId::test_default(), ActivityId::from("test"), None);
 
         let Err(ModifyActivityError::ActivityDoesNotExist(activity)) =
             service.modify_activity(req).await
@@ -645,7 +647,7 @@ mod tests_activity_service {
         activity_repository.expect_get_activity().returning(|_| {
             Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
-                UserId::default(),
+                UserId::test_default(),
                 None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
@@ -670,7 +672,7 @@ mod tests_activity_service {
         );
 
         let req = ModifyActivityRequest::new(
-            UserId::default(),
+            UserId::test_default(),
             ActivityId::from("test"),
             Some(ActivityName::new("new name".to_string())),
         );
@@ -694,7 +696,7 @@ mod tests_activity_service {
             metrics_service,
         );
 
-        let req = DeleteActivityRequest::new(UserId::default(), ActivityId::from("test"));
+        let req = DeleteActivityRequest::new(UserId::test_default(), ActivityId::from("test"));
 
         let Err(DeleteActivityError::ActivityDoesNotExist(activity)) =
             service.delete_activity(req).await

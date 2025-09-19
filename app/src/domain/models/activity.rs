@@ -312,7 +312,7 @@ mod tests {
     fn test_different_activities_different_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
@@ -321,7 +321,7 @@ mod tests {
         );
         let second_activity = Activity::new(
             ActivityId::new(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
@@ -336,7 +336,7 @@ mod tests {
     fn test_similar_activities_same_natural_keys() {
         let first_activity = Activity::new(
             ActivityId::new(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
@@ -345,7 +345,7 @@ mod tests {
         );
         let second_activity = Activity::new(
             ActivityId::new(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
@@ -360,7 +360,7 @@ mod tests {
     fn test_same_activity_different_user_natural_keys_not_equal() {
         let first_activity = Activity::new(
             ActivityId::new(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,

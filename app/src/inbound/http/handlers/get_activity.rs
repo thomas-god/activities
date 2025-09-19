@@ -192,7 +192,7 @@ mod tests {
         service.expect_get_activity().returning(|_| {
             Ok(Activity::new(
                 ActivityId::from("target_id"),
-                UserId::default(),
+                UserId::test_default(),
                 None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"

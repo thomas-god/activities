@@ -304,7 +304,7 @@ mod test_training_metrics {
     fn default_activity() -> Activity {
         Activity::new(
             ActivityId::default(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -343,7 +343,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Average;
         let activity = Activity::new(
             ActivityId::default(),
-            UserId::default(),
+            UserId::test_default(),
             None,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -535,7 +535,7 @@ mod test_training_metrics {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
-            UserId::default(),
+            UserId::test_default(),
             TrainingMetricSource::Timeseries((
                 TimeseriesMetric::Power,
                 TrainingMetricAggregate::Average,

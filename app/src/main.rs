@@ -137,7 +137,10 @@ async fn load_demo_activities<AR, RDR, TMS>(
         if file.path().extension().and_then(OsStr::to_str) == Some("fit") {
             let content = fs::read(file.path()).unwrap();
             let req = parser.try_bytes_into_domain(content).unwrap();
-            activity_service.create_activity(req).await.unwrap();
+            activity_service
+                .create_activity(req.into_request(&UserId::default()))
+                .await
+                .unwrap();
             tracing::info!("Loaded {:?}", file.path());
         }
     }

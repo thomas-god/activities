@@ -7,7 +7,10 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    domain::ports::{CreateActivityError, IActivityService, ITrainingMetricService},
+    domain::{
+        models::UserId,
+        ports::{CreateActivityError, IActivityService, ITrainingMetricService},
+    },
     inbound::{http::AppState, parser::ParseFile},
 };
 
@@ -35,13 +38,14 @@ pub async fn upload_activities<AS: IActivityService, PF: ParseFile, TMS: ITraini
             unprocessable_files.push(name.to_string());
             continue;
         };
-        let Ok(create_activity_request) = state
+        let Ok(file_content) = state
             .file_parser
             .try_bytes_into_domain(file_content.to_vec())
         else {
             unprocessable_files.push(name.to_string());
             continue;
         };
+        let create_activity_request = file_content.into_request(&UserId::default());
 
         if let Err(_err) = state
             .activity_service

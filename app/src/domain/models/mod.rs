@@ -23,6 +23,11 @@ impl UserId {
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
+
+    #[cfg(test)]
+    pub fn test_default() -> Self {
+        Self("test_user".to_string())
+    }
 }
 
 impl Default for UserId {

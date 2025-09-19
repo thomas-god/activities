@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
+use derive_more::Constructor;
 use fit_parser::{
     DataMessage, DataValue, FitEnum, FitField, FitParserError, MesgNum, RecordField, SessionField,
     Sport as FitSport, parse_fit_messages,
@@ -22,11 +23,53 @@ use crate::domain::{
 /// FIT datetimes have 00:00 Dec 31 1989 as their reference instead of January 1, 1970
 const FIT_DATETIME_OFFSET: usize = 631065600;
 
+#[derive(Debug, Clone, Constructor)]
+pub struct ParsedFileContent {
+    sport: Sport,
+    start_time: ActivityStartTime,
+    statistics: ActivityStatistics,
+    timeseries: ActivityTimeseries,
+    raw_content: Vec<u8>,
+}
+
+impl ParsedFileContent {
+    pub fn start_time(&self) -> &ActivityStartTime {
+        &self.start_time
+    }
+
+    pub fn raw_content(&self) -> &[u8] {
+        &self.raw_content
+    }
+
+    pub fn sport(&self) -> &Sport {
+        &self.sport
+    }
+
+    pub fn statistics(&self) -> &ActivityStatistics {
+        &self.statistics
+    }
+
+    pub fn timeseries(&self) -> &ActivityTimeseries {
+        &self.timeseries
+    }
+
+    pub fn into_request(self, user: &UserId) -> CreateActivityRequest {
+        CreateActivityRequest::new(
+            user.clone(),
+            self.sport,
+            self.start_time,
+            self.statistics,
+            self.timeseries,
+            self.raw_content,
+        )
+    }
+}
+
 pub trait ParseFile: Clone + Send + Sync + 'static {
     fn try_bytes_into_domain(
         &self,
         bytes: Vec<u8>,
-    ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError>;
+    ) -> Result<ParsedFileContent, ParseCreateActivityHttpRequestBodyError>;
 }
 
 #[derive(Clone)]
@@ -36,7 +79,7 @@ impl ParseFile for FitParser {
     fn try_bytes_into_domain(
         &self,
         bytes: Vec<u8>,
-    ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError> {
+    ) -> Result<ParsedFileContent, ParseCreateActivityHttpRequestBodyError> {
         let Ok(messages) = parse_fit_messages(bytes.clone().into_iter()) else {
             return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
         };
@@ -50,13 +93,8 @@ impl ParseFile for FitParser {
 
         let statistics = extract_statistics(&messages);
 
-        Ok(CreateActivityRequest::new(
-            UserId::default(),
-            sport,
-            start_time,
-            statistics,
-            timeseries,
-            bytes,
+        Ok(ParsedFileContent::new(
+            sport, start_time, statistics, timeseries, bytes,
         ))
     }
 }
@@ -313,7 +351,7 @@ pub mod test_utils {
             fn try_bytes_into_domain(
                 &self,
                 bytes: Vec<u8>,
-            ) -> Result<CreateActivityRequest, ParseCreateActivityHttpRequestBodyError>;
+            ) -> Result<ParsedFileContent, ParseCreateActivityHttpRequestBodyError>;
         }
 
     }
@@ -322,8 +360,7 @@ pub mod test_utils {
         pub fn test_default() -> Self {
             let mut mock = Self::new();
             mock.expect_try_bytes_into_domain().returning(|_| {
-                Ok(CreateActivityRequest::new(
-                    UserId::default(),
+                Ok(ParsedFileContent::new(
                     Sport::Cycling,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityStatistics::default(),
@@ -354,7 +391,7 @@ mod tests {
         heart_rate: Option<&'a [Option<TimeseriesValue>]>,
         distance: Option<&'a [Option<TimeseriesValue>]>,
     }
-    fn extract_metrics_from_req<'a>(req: &'a CreateActivityRequest) -> TestMetrics<'a> {
+    fn extract_metrics_from_req<'a>(req: &'a ParsedFileContent) -> TestMetrics<'a> {
         extract_metrics(req.timeseries())
     }
 
