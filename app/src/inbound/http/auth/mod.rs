@@ -16,6 +16,7 @@ use crate::{
     inbound::{http::AppState, parser::ParseFile},
 };
 
+pub mod infra;
 pub mod service;
 
 #[derive(Debug, Clone, Constructor)]
@@ -45,7 +46,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+#[derive(Clone, Debug, Constructor, PartialEq, Eq, Hash)]
 pub struct EmailAddress(String);
 
 impl EmailAddress {
@@ -141,11 +142,11 @@ pub enum SessionTokenError {
 
 #[derive(Debug, Clone)]
 pub enum GenerateMagicLinkResult {
-    /// [GenerateMagicLinkResult::Success] covers all functional, regardless of wether the user
-    /// actually existing to not leak that information.
+    /// [GenerateMagicLinkResult::Success] covers all functional cases, regardless of user actually
+    /// existing to not leak that information.
     Success,
     /// [GenerateMagicLinkResult::Retry] only covers infrastructure related issues for which the
-    /// use can actually retry (e.g. we fail to send the email containing the magic link).
+    /// user can actually retry (e.g. we fail to send the email containing the magic link).
     Retry,
 }
 

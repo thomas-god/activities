@@ -108,49 +108,12 @@ pub trait SessionRepository: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), SessionRepositoryError>> + Send;
 }
 
-#[derive(Debug, Clone, Constructor)]
-pub struct InMemorySessionRepository {}
-
-impl SessionRepository for InMemorySessionRepository {
-    async fn get_user_by_email_address(
-        &self,
-        _email: &EmailAddress,
-    ) -> Result<Option<UserId>, SessionRepositoryError> {
-        todo!()
-    }
-
-    async fn store_magic_link(&self, _link: &MagicLink) -> Result<(), SessionRepositoryError> {
-        todo!()
-    }
-
-    async fn delete_magic_link_by_token(
-        &self,
-        _token: &MagicToken,
-    ) -> Result<(), SessionRepositoryError> {
-        todo!()
-    }
-}
-
 pub trait MailProvider: Clone + Send + Sync + 'static {
     fn send_magic_link_email(
         &self,
         email: &EmailAddress,
         magic_link: &MagicLink,
     ) -> impl Future<Output = Result<(), ()>> + Send;
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct DoNothingMailProvider {}
-
-impl MailProvider for DoNothingMailProvider {
-    async fn send_magic_link_email(
-        &self,
-        email: &EmailAddress,
-        _magic_link: &MagicLink,
-    ) -> Result<(), ()> {
-        tracing::info!("Dummy send to {email:?}");
-        Ok(())
-    }
 }
 
 #[cfg(test)]

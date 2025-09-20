@@ -19,7 +19,8 @@ use crate::inbound::http::handlers::{
 };
 use crate::inbound::parser::ParseFile;
 
-pub use self::auth::service::{DoNothingMailProvider, InMemorySessionRepository, SessionService};
+pub use self::auth::infra::{DoNothingMailProvider, InMemorySessionRepository};
+pub use self::auth::service::SessionService;
 
 mod auth;
 mod handlers;
