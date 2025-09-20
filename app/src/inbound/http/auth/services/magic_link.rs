@@ -4,11 +4,9 @@ use derive_more::Constructor;
 use rand::Rng;
 use thiserror::Error;
 
-use crate::{
-    domain::models::UserId,
-    inbound::http::auth::{
-        EmailAddress, GenerateMagicLinkResult, IMagicLinkService, MagicLink, MagicToken,
-    },
+use crate::inbound::http::auth::{
+    EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, IMagicLinkService, MagicLink,
+    MagicToken,
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -26,23 +24,10 @@ where
     SR: MagicLinkRepository,
     MP: MailProvider,
 {
-    async fn generate_magic_link(&self, email: &EmailAddress) -> GenerateMagicLinkResult {
-        let user = match self
-            .magic_link_repository
-            .get_user_by_email_address(email)
-            .await
-        {
-            Ok(Some(user)) => user,
-            Ok(None) => {
-                // To not leak the fact the user does not exist
-                return GenerateMagicLinkResult::Success;
-            }
-            Err(_) => return GenerateMagicLinkResult::Retry,
-        };
-
+    async fn generate_magic_link(&self, req: GenerateMagicLinkRequest) -> GenerateMagicLinkResult {
         let magic_token = self.generate_magic_token();
         let magic_link = MagicLink::new(
-            user,
+            req.user().clone(),
             magic_token.clone(),
             Utc::now() + TimeDelta::minutes(5),
         );
@@ -57,7 +42,7 @@ where
 
         let Ok(()) = self
             .mail_provider
-            .send_magic_link_email(email, &magic_link)
+            .send_magic_link_email(req.email(), &magic_link)
             .await
         else {
             let _ = self
@@ -70,6 +55,7 @@ where
         GenerateMagicLinkResult::Success
     }
 }
+
 impl<SR, MP> MagicLinkService<SR, MP>
 where
     SR: MagicLinkRepository,
@@ -91,11 +77,6 @@ pub enum MagicLinkRepositoryError {
 }
 
 pub trait MagicLinkRepository: Clone + Send + Sync + 'static {
-    fn get_user_by_email_address(
-        &self,
-        email: &EmailAddress,
-    ) -> impl Future<Output = Result<Option<UserId>, MagicLinkRepositoryError>> + Send;
-
     fn store_magic_link(
         &self,
         link: &MagicLink,
@@ -129,11 +110,6 @@ mod test_utils {
         }
 
         impl MagicLinkRepository for SessionRepository {
-            async fn get_user_by_email_address(
-                &self,
-                email: &EmailAddress
-            ) -> Result<Option<UserId>, MagicLinkRepositoryError>;
-
             async fn store_magic_link(
                 &self,
                 link: &MagicLink,
@@ -166,59 +142,32 @@ mod test_utils {
 #[cfg(test)]
 mod test {
 
-    use crate::inbound::http::auth::services::magic_link::test_utils::{
-        MockMailProvider, MockSessionRepository,
+    use crate::{
+        domain::models::UserId,
+        inbound::http::auth::{
+            GenerateMagicLinkRequest,
+            services::magic_link::test_utils::{MockMailProvider, MockSessionRepository},
+        },
     };
 
     use super::*;
 
     #[tokio::test]
-    async fn test_generate_magic_link_return_success_if_user_does_not_match_email() {
-        let mut repository = MockSessionRepository::new();
-        repository
-            .expect_get_user_by_email_address()
-            .returning(|_| Ok(None));
-        let service = MagicLinkService::new(repository, MockMailProvider::new());
-        let email = "test_email".into();
-
-        let res = service.generate_magic_link(&email).await;
-
-        let GenerateMagicLinkResult::Success = res else {
-            unreachable!("Should have return a GenerateMagicLinkResult::Success")
-        };
-    }
-
-    #[tokio::test]
-    async fn test_generate_magic_link_return_failure_if_repository_err() {
-        let mut repository = MockSessionRepository::new();
-        repository
-            .expect_get_user_by_email_address()
-            .returning(|_| Err(MagicLinkRepositoryError::Error));
-        let service = MagicLinkService::new(repository, MockMailProvider::new());
-        let email = "test_email".into();
-
-        let res = service.generate_magic_link(&email).await;
-
-        let GenerateMagicLinkResult::Retry = res else {
-            unreachable!("Should have return a GenerateMagicLinkResult::Retry")
-        };
-    }
-
-    #[tokio::test]
     async fn test_generate_magic_link_return_failure_if_storing_magic_link_err() {
         let mut repository = MockSessionRepository::new();
-        repository
-            .expect_get_user_by_email_address()
-            .returning(|_| Ok(Some(UserId::test_default())));
         repository
             .expect_store_magic_link()
             .returning(|_| Err(MagicLinkRepositoryError::Error));
         let mut email_provider = MockMailProvider::new();
         email_provider.expect_send_magic_link_email().times(0);
         let service = MagicLinkService::new(repository, email_provider);
-        let email = "test_email".into();
 
-        let res = service.generate_magic_link(&email).await;
+        let req = GenerateMagicLinkRequest::new(
+            UserId::test_default(),
+            EmailAddress::new("test_email".to_string()),
+        );
+
+        let res = service.generate_magic_link(req).await;
 
         let GenerateMagicLinkResult::Retry = res else {
             unreachable!("Should have return a GenerateMagicLinkResult::Retry")
@@ -229,9 +178,6 @@ mod test {
     async fn test_generate_magic_link_return_failure_if_sending_magic_link_err_and_delete_magic_link()
      {
         let mut repository = MockSessionRepository::new();
-        repository
-            .expect_get_user_by_email_address()
-            .returning(|_| Ok(Some(UserId::test_default())));
         repository.expect_store_magic_link().returning(|_| Ok(()));
         repository
             .expect_delete_magic_link_by_token()
@@ -242,9 +188,13 @@ mod test {
             .expect_send_magic_link_email()
             .returning(|_, _| Err(()));
         let service = MagicLinkService::new(repository, email_provider);
-        let email = "test_email".into();
 
-        let res = service.generate_magic_link(&email).await;
+        let req = GenerateMagicLinkRequest::new(
+            UserId::test_default(),
+            EmailAddress::new("test_email".to_string()),
+        );
+
+        let res = service.generate_magic_link(req).await;
 
         let GenerateMagicLinkResult::Retry = res else {
             unreachable!("Should have return a GenerateMagicLinkResult::Retry")
@@ -254,9 +204,6 @@ mod test {
     #[tokio::test]
     async fn test_generate_magic_link_ok_store_link_and_send_email() {
         let mut repository = MockSessionRepository::new();
-        repository
-            .expect_get_user_by_email_address()
-            .returning(|_| Ok(Some(UserId::test_default())));
         repository
             .expect_store_magic_link()
             .times(1)
@@ -272,9 +219,14 @@ mod test {
             })
             .returning(|_, _| Ok(()));
 
-        let servide = MagicLinkService::new(repository, email_provider);
+        let service = MagicLinkService::new(repository, email_provider);
 
-        let res = servide.generate_magic_link(&"test_email".into()).await;
+        let req = GenerateMagicLinkRequest::new(
+            UserId::test_default(),
+            EmailAddress::new("test_email".to_string()),
+        );
+
+        let res = service.generate_magic_link(req).await;
 
         let GenerateMagicLinkResult::Success = res else {
             unreachable!("Should have return a GenerateMagicLinkResult::Success")

@@ -147,6 +147,22 @@ pub trait IUserService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct GenerateMagicLinkRequest {
+    user: UserId,
+    email: EmailAddress,
+}
+
+impl GenerateMagicLinkRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn email(&self) -> &EmailAddress {
+        &self.email
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum GenerateMagicLinkResult {
     /// [GenerateMagicLinkResult::Success] covers all functional cases, regardless of user actually
@@ -160,7 +176,7 @@ pub enum GenerateMagicLinkResult {
 pub trait IMagicLinkService: Clone + Send + Sync + 'static {
     fn generate_magic_link(
         &self,
-        email: &EmailAddress,
+        req: GenerateMagicLinkRequest,
     ) -> impl Future<Output = GenerateMagicLinkResult> + Send;
 }
 
@@ -244,7 +260,7 @@ pub mod test_utils {
         impl IMagicLinkService for MagicLinkService {
             async fn generate_magic_link(
                 &self,
-                email: &EmailAddress
+                req: GenerateMagicLinkRequest
             ) -> GenerateMagicLinkResult;
         }
     }
