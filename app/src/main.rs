@@ -20,7 +20,10 @@ use app::{
         services::{activity::ActivityService, training_metrics::TrainingMetricService},
     },
     inbound::{
-        http::{HttpServer, UserService},
+        http::{
+            DoNothingMailProvider, HttpServer, InMemoryMagicLinkRepository, InMemoryUserRepository,
+            MagicLinkService, UserService,
+        },
         parser::{FitParser, ParseFile},
     },
     outbound::memory::{
@@ -61,7 +64,12 @@ async fn main() -> anyhow::Result<()> {
         raw_data_repository,
         training_metrics_service.clone(),
     );
-    let user_service: Option<UserService> = None;
+    let user_service: Option<
+        UserService<
+            MagicLinkService<InMemoryMagicLinkRepository, DoNothingMailProvider>,
+            InMemoryUserRepository,
+        >,
+    > = None;
 
     let parser = FitParser {};
 

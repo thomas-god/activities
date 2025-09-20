@@ -140,7 +140,18 @@ pub enum SessionTokenError {
     SessionTokenDoesNotExistsError(SessionToken),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum UserRegistrationResult {
+    Success,
+    Retry,
+}
+
 pub trait IUserService: Clone + Send + Sync + 'static {
+    fn register_user(
+        &self,
+        email: EmailAddress,
+    ) -> impl Future<Output = UserRegistrationResult> + Send;
+
     fn check_session_token(
         &self,
         token: &str,
@@ -243,6 +254,11 @@ pub mod test_utils {
         }
 
         impl IUserService for UserService {
+            async fn register_user(
+                &self,
+                email: EmailAddress,
+            ) -> UserRegistrationResult;
+
             async fn check_session_token(
                 &self,
                 _token: &str
