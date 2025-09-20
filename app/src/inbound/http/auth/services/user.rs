@@ -7,7 +7,7 @@ use crate::{
     domain::models::UserId,
     inbound::http::auth::{
         EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, IMagicLinkService,
-        IUserService, UserRegistrationResult,
+        IUserService, UserLoginResult, UserRegistrationResult,
     },
 };
 
@@ -48,6 +48,32 @@ where
         match res {
             GenerateMagicLinkResult::Success => UserRegistrationResult::Success,
             GenerateMagicLinkResult::Retry => UserRegistrationResult::Retry,
+        }
+    }
+
+    async fn login_user(&self, email: EmailAddress) -> UserLoginResult {
+        let user = match self
+            .user_repository
+            .lock()
+            .await
+            .get_user_by_email(&email)
+            .await
+        {
+            Ok(Some(user)) => user,
+            Ok(None) => return UserLoginResult::Success,
+            Err(()) => return UserLoginResult::Retry,
+        };
+
+        let req = GenerateMagicLinkRequest::new(user, email);
+        match self
+            .magic_link_service
+            .lock()
+            .await
+            .generate_magic_link(req)
+            .await
+        {
+            GenerateMagicLinkResult::Success => UserLoginResult::Success,
+            GenerateMagicLinkResult::Retry => UserLoginResult::Retry,
         }
     }
 
@@ -218,5 +244,86 @@ mod test_user_service_register_new_user {
             .await;
 
         assert_eq!(res, UserRegistrationResult::Retry);
+    }
+}
+
+#[cfg(test)]
+mod test_user_service_login_user {
+    use crate::inbound::http::auth::{
+        services::user::test_utils::MockUserRepository, test_utils::MockMagicLinkService,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_ok_path() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some(UserId::test_default())));
+        let mut magic_link = MockMagicLinkService::new();
+        magic_link
+            .expect_generate_magic_link()
+            .times(1)
+            .withf(|link| link.email() == &"test@mail.test".into())
+            .returning(|_| GenerateMagicLinkResult::Success);
+        let service =
+            UserService::new(Arc::new(Mutex::new(magic_link)), Arc::new(Mutex::new(user)));
+
+        let res = service
+            .login_user(EmailAddress("test@mail.test".to_string()))
+            .await;
+
+        assert_eq!(res, UserLoginResult::Success);
+    }
+
+    #[tokio::test]
+    async fn test_user_does_not_exist() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email().returning(|_| Ok(None));
+        let mut magic_link = MockMagicLinkService::new();
+        magic_link.expect_generate_magic_link().times(0);
+        let service =
+            UserService::new(Arc::new(Mutex::new(magic_link)), Arc::new(Mutex::new(user)));
+
+        let res = service
+            .login_user(EmailAddress("test@mail.test".to_string()))
+            .await;
+
+        assert_eq!(res, UserLoginResult::Success);
+    }
+
+    #[tokio::test]
+    async fn test_cannot_check_if_user_exist() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email().returning(|_| Err(()));
+        let mut magic_link = MockMagicLinkService::new();
+        magic_link.expect_generate_magic_link().times(0);
+        let service =
+            UserService::new(Arc::new(Mutex::new(magic_link)), Arc::new(Mutex::new(user)));
+
+        let res = service
+            .login_user(EmailAddress("test@mail.test".to_string()))
+            .await;
+
+        assert_eq!(res, UserLoginResult::Retry);
+    }
+
+    #[tokio::test]
+    async fn test_when_magic_link_retry() {
+        let mut user = MockUserRepository::new();
+        user.expect_get_user_by_email()
+            .returning(|_| Ok(Some(UserId::test_default())));
+        let mut magic_link = MockMagicLinkService::new();
+        magic_link
+            .expect_generate_magic_link()
+            .returning(|_| GenerateMagicLinkResult::Retry);
+        let service =
+            UserService::new(Arc::new(Mutex::new(magic_link)), Arc::new(Mutex::new(user)));
+
+        let res = service
+            .login_user(EmailAddress("test@mail.test".to_string()))
+            .await;
+
+        assert_eq!(res, UserLoginResult::Retry);
     }
 }

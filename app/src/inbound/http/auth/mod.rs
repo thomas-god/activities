@@ -146,11 +146,19 @@ pub enum UserRegistrationResult {
     Retry,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum UserLoginResult {
+    Success,
+    Retry,
+}
+
 pub trait IUserService: Clone + Send + Sync + 'static {
     fn register_user(
         &self,
         email: EmailAddress,
     ) -> impl Future<Output = UserRegistrationResult> + Send;
+
+    fn login_user(&self, email: EmailAddress) -> impl Future<Output = UserLoginResult> + Send;
 
     fn check_session_token(
         &self,
@@ -258,6 +266,11 @@ pub mod test_utils {
                 &self,
                 email: EmailAddress,
             ) -> UserRegistrationResult;
+
+            async fn login_user(
+                &self,
+                email: EmailAddress
+            ) -> UserLoginResult;
 
             async fn check_session_token(
                 &self,
