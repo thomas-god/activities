@@ -9,6 +9,13 @@ use crate::{
 pub struct SessionService {}
 
 impl ISessionService for SessionService {
+    async fn generate_session_token(
+        &self,
+        user: &UserId,
+    ) -> Result<crate::inbound::http::auth::SessionToken, ()> {
+        todo!()
+    }
+
     async fn check_session_token(&self, _token: &str) -> Result<UserId, SessionTokenError> {
         todo!()
     }

@@ -152,6 +152,12 @@ pub enum UserLoginResult {
     Retry,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum MagicLinkValidationResult {
+    Success(SessionToken),
+    Invalid,
+}
+
 pub trait IUserService: Clone + Send + Sync + 'static {
     fn register_user(
         &self,
@@ -159,6 +165,11 @@ pub trait IUserService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = UserRegistrationResult> + Send;
 
     fn login_user(&self, email: EmailAddress) -> impl Future<Output = UserLoginResult> + Send;
+
+    fn validate_magic_link(
+        &self,
+        magic_token: MagicToken,
+    ) -> impl Future<Output = Result<MagicLinkValidationResult, ()>> + Send;
 
     fn check_session_token(
         &self,
@@ -197,9 +208,19 @@ pub trait IMagicLinkService: Clone + Send + Sync + 'static {
         &self,
         req: GenerateMagicLinkRequest,
     ) -> impl Future<Output = GenerateMagicLinkResult> + Send;
+
+    fn validate_magic_token(
+        &self,
+        token: &MagicToken,
+    ) -> impl Future<Output = Result<Option<UserId>, ()>> + Send;
 }
 
 pub trait ISessionService: Clone + Send + Sync + 'static {
+    fn generate_session_token(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<SessionToken, ()>> + Send;
+
     fn check_session_token(
         &self,
         token: &str,
@@ -272,6 +293,11 @@ pub mod test_utils {
                 email: EmailAddress
             ) -> UserLoginResult;
 
+            async fn validate_magic_link(
+                &self,
+                magic_token: MagicToken,
+            ) -> Result<MagicLinkValidationResult, ()>;
+
             async fn check_session_token(
                 &self,
                 _token: &str
@@ -291,6 +317,11 @@ pub mod test_utils {
                 &self,
                 req: GenerateMagicLinkRequest
             ) -> GenerateMagicLinkResult;
+
+            async fn validate_magic_token(
+                &self,
+                token: &MagicToken
+            ) -> Result<Option<UserId>, ()>;
         }
     }
 
@@ -302,6 +333,11 @@ pub mod test_utils {
         }
 
         impl ISessionService for SessionService {
+            async fn generate_session_token(
+                &self,
+                user: &UserId,
+            ) ->Result<SessionToken, ()>;
+
             async fn check_session_token(
                 &self,
                 _token: &str

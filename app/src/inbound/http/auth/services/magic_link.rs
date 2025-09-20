@@ -54,6 +54,13 @@ where
 
         GenerateMagicLinkResult::Success
     }
+
+    async fn validate_magic_token(
+        &self,
+        token: &MagicToken,
+    ) -> Result<Option<crate::domain::models::UserId>, ()> {
+        todo!()
+    }
 }
 
 impl<SR, MP> MagicLinkService<SR, MP>

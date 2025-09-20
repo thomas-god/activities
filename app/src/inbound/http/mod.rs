@@ -22,7 +22,7 @@ use crate::inbound::parser::ParseFile;
 pub use self::auth::infra::{
     DoNothingMailProvider, InMemoryMagicLinkRepository, InMemoryUserRepository,
 };
-pub use self::auth::services::{MagicLinkService, UserService};
+pub use self::auth::services::{MagicLinkService, SessionService, UserService};
 
 mod auth;
 mod handlers;
