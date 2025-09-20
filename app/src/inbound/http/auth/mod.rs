@@ -6,7 +6,6 @@ use axum::{
 };
 use chrono::Utc;
 use derive_more::Constructor;
-use thiserror::Error;
 
 use crate::{
     domain::{
@@ -134,12 +133,6 @@ impl From<String> for SessionToken {
     }
 }
 
-#[derive(Debug, Clone, Error)]
-pub enum SessionTokenError {
-    #[error("Session token {0:?} does not exist")]
-    SessionTokenDoesNotExistsError(SessionToken),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserRegistrationResult {
     Success,
@@ -173,8 +166,8 @@ pub trait IUserService: Clone + Send + Sync + 'static {
 
     fn check_session_token(
         &self,
-        token: &str,
-    ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
+        token: &SessionToken,
+    ) -> impl Future<Output = Result<UserId, ()>> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -223,8 +216,8 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
 
     fn check_session_token(
         &self,
-        token: &str,
-    ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
+        token: &SessionToken,
+    ) -> impl Future<Output = Result<UserId, ()>> + Send;
 }
 
 impl<AS, PF, TMS, UR> FromRef<AppState<AS, PF, TMS, UR>> for Option<Arc<UR>>
@@ -259,7 +252,10 @@ where
             return Err(StatusCode::UNAUTHORIZED);
         };
 
-        let Ok(user) = service.check_session_token(session_token.value()).await else {
+        let Ok(user) = service
+            .check_session_token(&SessionToken::new(session_token.value().to_string()))
+            .await
+        else {
             return Err(StatusCode::UNAUTHORIZED);
         };
 
@@ -300,8 +296,8 @@ pub mod test_utils {
 
             async fn check_session_token(
                 &self,
-                _token: &str
-            ) -> Result<UserId, SessionTokenError>;
+                _token: &SessionToken
+            ) -> Result<UserId, ()>;
         }
     }
 
@@ -340,8 +336,8 @@ pub mod test_utils {
 
             async fn check_session_token(
                 &self,
-                _token: &str
-            ) -> Result<UserId, SessionTokenError>;
+                _token: &SessionToken
+            ) -> Result<UserId, ()>;
         }
     }
 }
@@ -434,11 +430,7 @@ mod test {
     #[tokio::test]
     async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
         let mut sessions = MockUserService::new();
-        sessions.expect_check_session_token().returning(|token| {
-            Err(SessionTokenError::SessionTokenDoesNotExistsError(
-                token.into(),
-            ))
-        });
+        sessions.expect_check_session_token().returning(|_| Err(()));
         let server = build_test_server(sessions);
 
         let response = server

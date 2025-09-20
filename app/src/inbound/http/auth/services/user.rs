@@ -7,8 +7,8 @@ use crate::{
     domain::models::UserId,
     inbound::http::auth::{
         EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, IMagicLinkService,
-        ISessionService, IUserService, MagicLinkValidationResult, MagicToken, UserLoginResult,
-        UserRegistrationResult,
+        ISessionService, IUserService, MagicLinkValidationResult, MagicToken, SessionToken,
+        UserLoginResult, UserRegistrationResult,
     },
 };
 
@@ -104,11 +104,12 @@ where
             .map(|token| MagicLinkValidationResult::Success(token))
     }
 
-    async fn check_session_token(
-        &self,
-        _token: &str,
-    ) -> Result<crate::domain::models::UserId, crate::inbound::http::auth::SessionTokenError> {
-        todo!()
+    async fn check_session_token(&self, token: &SessionToken) -> Result<UserId, ()> {
+        self.session_service
+            .lock()
+            .await
+            .check_session_token(token)
+            .await
     }
 }
 
@@ -418,9 +419,7 @@ mod test_user_service_validate_magic_link {
         );
 
         let res = service
-            .validate_magic_link(MagicToken(
-                "a very long and secure magic token token".to_string(),
-            ))
+            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
             .await;
 
         let Ok(MagicLinkValidationResult::Success(token)) = res else {
@@ -446,9 +445,7 @@ mod test_user_service_validate_magic_link {
         );
 
         let res = service
-            .validate_magic_link(MagicToken(
-                "a very long and secure magic token token".to_string(),
-            ))
+            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
             .await;
 
         let Ok(MagicLinkValidationResult::Invalid) = res else {
@@ -473,9 +470,7 @@ mod test_user_service_validate_magic_link {
         );
 
         let res = service
-            .validate_magic_link(MagicToken(
-                "a very long and secure magic token token".to_string(),
-            ))
+            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
             .await;
 
         assert!(res.is_err())
@@ -500,11 +495,62 @@ mod test_user_service_validate_magic_link {
         );
 
         let res = service
-            .validate_magic_link(MagicToken(
-                "a very long and secure magic token token".to_string(),
-            ))
+            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
             .await;
 
         assert!(res.is_err())
+    }
+}
+
+#[cfg(test)]
+mod test_user_service_check_session_token {
+    use crate::inbound::http::auth::{
+        SessionToken,
+        services::user::test_utils::MockUserRepository,
+        test_utils::{MockMagicLinkService, MockSessionService},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_token_valid() {
+        let mut session = MockSessionService::new();
+        session
+            .expect_check_session_token()
+            .returning(|_| Ok(UserId::test_default()));
+
+        let service = UserService::new(
+            Arc::new(Mutex::new(MockMagicLinkService::new())),
+            Arc::new(Mutex::new(MockUserRepository::new())),
+            Arc::new(Mutex::new(session)),
+        );
+
+        let res = service
+            .check_session_token(&SessionToken(
+                "a very long and secure session token".to_string(),
+            ))
+            .await;
+
+        assert_eq!(res.unwrap(), UserId::test_default());
+    }
+
+    #[tokio::test]
+    async fn test_token_invalid_or_does_not_exist_or_else() {
+        let mut session = MockSessionService::new();
+        session.expect_check_session_token().returning(|_| Err(()));
+
+        let service = UserService::new(
+            Arc::new(Mutex::new(MockMagicLinkService::new())),
+            Arc::new(Mutex::new(MockUserRepository::new())),
+            Arc::new(Mutex::new(session)),
+        );
+
+        let res = service
+            .check_session_token(&SessionToken(
+                "a very long and secure session token".to_string(),
+            ))
+            .await;
+
+        assert!(res.is_err());
     }
 }

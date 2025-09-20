@@ -2,7 +2,7 @@ use derive_more::Constructor;
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::{ISessionService, SessionTokenError},
+    inbound::http::auth::{ISessionService, SessionToken},
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -16,7 +16,7 @@ impl ISessionService for SessionService {
         todo!()
     }
 
-    async fn check_session_token(&self, _token: &str) -> Result<UserId, SessionTokenError> {
+    async fn check_session_token(&self, _token: &SessionToken) -> Result<UserId, ()> {
         todo!()
     }
 }
