@@ -108,7 +108,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Arc::new(MockSessionService::new()),
+            session_service: Some(Arc::new(MockSessionService::new())),
         };
 
         let app = Router::new()
@@ -140,7 +140,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Arc::new(MockSessionService::new()),
+            session_service: Some(Arc::new(MockSessionService::new())),
         };
 
         let app = Router::new()

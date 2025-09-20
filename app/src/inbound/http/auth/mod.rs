@@ -4,6 +4,7 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::{StatusCode, request::Parts},
 };
+use chrono::Utc;
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -44,20 +45,123 @@ where
     }
 }
 
+#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+pub struct EmailAddress(String);
+
+impl EmailAddress {
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for EmailAddress {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<String> for EmailAddress {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+pub struct MagicToken(String);
+
+impl MagicToken {
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for MagicToken {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<String> for MagicToken {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Clone, Debug, Constructor)]
+pub struct MagicLink {
+    user: UserId,
+    token: MagicToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl MagicLink {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn token(&self) -> &MagicToken {
+        &self.token
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
+    pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
+        reference >= &self.expire_at
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+pub struct SessionToken(String);
+
+impl SessionToken {
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for SessionToken {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<String> for SessionToken {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum SessionTokenError {
-    #[error("SessionTokenDoesNotExists")]
-    DoesNotExist,
+    #[error("Session token {0:?} does not exist")]
+    SessionTokenDoesNotExistsError(SessionToken),
+}
+
+#[derive(Debug, Clone)]
+pub enum GenerateMagicLinkResult {
+    /// [GenerateMagicLinkResult::Success] covers all functional, regardless of wether the user
+    /// actually existing to not leak that information.
+    Success,
+    /// [GenerateMagicLinkResult::Retry] only covers infrastructure related issues for which the
+    /// use can actually retry (e.g. we fail to send the email containing the magic link).
+    Retry,
 }
 
 pub trait ISessionService: Clone + Send + Sync + 'static {
+    fn generate_magic_link(
+        &self,
+        email: &EmailAddress,
+    ) -> impl Future<Output = GenerateMagicLinkResult> + Send;
+
     fn check_session_token(
         &self,
         token: &str,
     ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
 }
 
-impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for Arc<SR>
+impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for Option<Arc<SR>>
 where
     AS: IActivityService,
     PF: ParseFile,
@@ -76,18 +180,20 @@ impl<S, SR> FromRequestParts<S> for CookieUserExtractor<SR>
 where
     S: Send + Sync,
     SR: ISessionService,
-    Arc<SR>: FromRef<S>,
+    Option<Arc<SR>>: FromRef<S>,
 {
     type Rejection = StatusCode;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let Some(service) = Option::<Arc<SR>>::from_ref(state) else {
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        };
         let jar = axum_extra::extract::CookieJar::from_headers(&parts.headers);
         let Some(session_token) = jar.get("session_token") else {
             return Err(StatusCode::UNAUTHORIZED);
         };
-        let repository = Arc::from_ref(state);
 
-        let Ok(user) = repository.check_session_token(session_token.value()).await else {
+        let Ok(user) = service.check_session_token(session_token.value()).await else {
             return Err(StatusCode::UNAUTHORIZED);
         };
 
@@ -111,6 +217,11 @@ pub mod test_utils {
         }
 
         impl ISessionService for SessionService {
+            async fn generate_magic_link(
+                &self,
+                email: &EmailAddress
+            ) -> GenerateMagicLinkResult;
+
             async fn check_session_token(
                 &self,
                 _token: &str
@@ -128,6 +239,7 @@ mod test {
     };
     use axum_extra::extract::cookie::Cookie;
     use axum_test::TestServer;
+    use chrono::TimeDelta;
 
     use crate::{
         domain::services::{
@@ -157,12 +269,20 @@ mod test {
         assert_eq!(response.text(), UserId::default().to_string());
     }
 
-    fn build_test_server(sessions_repository: MockSessionService) -> TestServer {
+    #[test]
+    fn test_magic_link_expiry() {
+        let expire_at = chrono::Utc::now();
+        let link = MagicLink::new(UserId::test_default(), "a link".into(), expire_at);
+        assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));
+        assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
+    }
+
+    fn build_test_server(session_service: MockSessionService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(MockActivityService::new()),
             training_metrics_service: Arc::new(MockTrainingMetricService::new()),
             file_parser: Arc::new(MockFileParser::new()),
-            session_service: Arc::new(sessions_repository),
+            session_service: Some(Arc::new(session_service)),
         };
 
         async fn test_route(
@@ -198,9 +318,11 @@ mod test {
     #[tokio::test]
     async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
         let mut sessions = MockSessionService::new();
-        sessions
-            .expect_check_session_token()
-            .returning(|_| Err(SessionTokenError::DoesNotExist));
+        sessions.expect_check_session_token().returning(|token| {
+            Err(SessionTokenError::SessionTokenDoesNotExistsError(
+                token.into(),
+            ))
+        });
         let server = build_test_server(sessions);
 
         let response = server

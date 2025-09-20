@@ -7,9 +7,11 @@ edition = "2024"
 anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["macros", "multipart"] }
 axum-extra = { version = "0.10.1", features = ["cookie"] }
+base64 = "0.22.1"
 chrono = { version = "0.4.41", features = ["serde"] }
 derive_more = { version = "2.0.1", features = ["full"] }
 fit-parser = { path = "../fit-parser", features = []}
+rand = "0.9.2"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 thiserror = "2.0.16"

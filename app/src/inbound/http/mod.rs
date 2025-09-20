@@ -19,7 +19,7 @@ use crate::inbound::http::handlers::{
 };
 use crate::inbound::parser::ParseFile;
 
-pub use self::auth::service::SessionService;
+pub use self::auth::service::{DoNothingMailProvider, InMemorySessionRepository, SessionService};
 
 mod auth;
 mod handlers;
@@ -34,7 +34,7 @@ struct AppState<
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
-    session_service: Arc<SR>,
+    session_service: Option<Arc<SR>>,
 }
 
 pub struct HttpServer<AS, PF, TMS, SR> {
@@ -53,7 +53,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISess
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
-        session_repository: SR,
+        session_repository: Option<SR>,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -67,7 +67,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISess
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
-            session_service: Arc::new(session_repository),
+            session_service: session_repository.map(Arc::new),
         };
 
         let origin = config
