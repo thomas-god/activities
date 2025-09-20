@@ -7,29 +7,28 @@ use thiserror::Error;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        EmailAddress, GenerateMagicLinkResult, ISessionService, MagicLink, MagicToken,
-        SessionTokenError,
+        EmailAddress, GenerateMagicLinkResult, IMagicLinkService, MagicLink, MagicToken,
     },
 };
 
 #[derive(Debug, Clone, Constructor)]
-pub struct SessionService<SR, MP>
+pub struct MagicLinkService<SR, MP>
 where
-    SR: SessionRepository,
+    SR: MagicLinkRepository,
     MP: MailProvider,
 {
-    session_repository: SR,
+    magic_link_repository: SR,
     mail_provider: MP,
 }
 
-impl<SR, MP> ISessionService for SessionService<SR, MP>
+impl<SR, MP> IMagicLinkService for MagicLinkService<SR, MP>
 where
-    SR: SessionRepository,
+    SR: MagicLinkRepository,
     MP: MailProvider,
 {
     async fn generate_magic_link(&self, email: &EmailAddress) -> GenerateMagicLinkResult {
         let user = match self
-            .session_repository
+            .magic_link_repository
             .get_user_by_email_address(email)
             .await
         {
@@ -48,7 +47,11 @@ where
             Utc::now() + TimeDelta::minutes(5),
         );
 
-        let Ok(()) = self.session_repository.store_magic_link(&magic_link).await else {
+        let Ok(()) = self
+            .magic_link_repository
+            .store_magic_link(&magic_link)
+            .await
+        else {
             return GenerateMagicLinkResult::Retry;
         };
 
@@ -58,7 +61,7 @@ where
             .await
         else {
             let _ = self
-                .session_repository
+                .magic_link_repository
                 .delete_magic_link_by_token(&magic_token)
                 .await;
             return GenerateMagicLinkResult::Retry;
@@ -66,14 +69,10 @@ where
 
         GenerateMagicLinkResult::Success
     }
-
-    async fn check_session_token(&self, _token: &str) -> Result<UserId, SessionTokenError> {
-        todo!()
-    }
 }
-impl<SR, MP> SessionService<SR, MP>
+impl<SR, MP> MagicLinkService<SR, MP>
 where
-    SR: SessionRepository,
+    SR: MagicLinkRepository,
     MP: MailProvider,
 {
     fn generate_magic_token(&self) -> MagicToken {
@@ -86,26 +85,26 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-pub enum SessionRepositoryError {
+pub enum MagicLinkRepositoryError {
     #[error("An error occured with the session repository")]
     Error,
 }
 
-pub trait SessionRepository: Clone + Send + Sync + 'static {
+pub trait MagicLinkRepository: Clone + Send + Sync + 'static {
     fn get_user_by_email_address(
         &self,
         email: &EmailAddress,
-    ) -> impl Future<Output = Result<Option<UserId>, SessionRepositoryError>> + Send;
+    ) -> impl Future<Output = Result<Option<UserId>, MagicLinkRepositoryError>> + Send;
 
     fn store_magic_link(
         &self,
         link: &MagicLink,
-    ) -> impl Future<Output = Result<(), SessionRepositoryError>> + Send;
+    ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
 
     fn delete_magic_link_by_token(
         &self,
         token: &MagicToken,
-    ) -> impl Future<Output = Result<(), SessionRepositoryError>> + Send;
+    ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
 }
 
 pub trait MailProvider: Clone + Send + Sync + 'static {
@@ -129,21 +128,21 @@ mod test_utils {
             fn clone(&self) -> Self;
         }
 
-        impl SessionRepository for SessionRepository {
+        impl MagicLinkRepository for SessionRepository {
             async fn get_user_by_email_address(
                 &self,
                 email: &EmailAddress
-            ) -> Result<Option<UserId>, SessionRepositoryError>;
+            ) -> Result<Option<UserId>, MagicLinkRepositoryError>;
 
             async fn store_magic_link(
                 &self,
                 link: &MagicLink,
-            ) -> Result<(), SessionRepositoryError>;
+            ) -> Result<(), MagicLinkRepositoryError>;
 
             async fn delete_magic_link_by_token(
                 &self,
                 token: &MagicToken,
-            ) -> Result<(), SessionRepositoryError>;
+            ) -> Result<(), MagicLinkRepositoryError>;
         }
     }
 
@@ -167,7 +166,7 @@ mod test_utils {
 #[cfg(test)]
 mod test {
 
-    use crate::inbound::http::auth::service::test_utils::{
+    use crate::inbound::http::auth::services::magic_link::test_utils::{
         MockMailProvider, MockSessionRepository,
     };
 
@@ -179,7 +178,7 @@ mod test {
         repository
             .expect_get_user_by_email_address()
             .returning(|_| Ok(None));
-        let service = SessionService::new(repository, MockMailProvider::new());
+        let service = MagicLinkService::new(repository, MockMailProvider::new());
         let email = "test_email".into();
 
         let res = service.generate_magic_link(&email).await;
@@ -194,8 +193,8 @@ mod test {
         let mut repository = MockSessionRepository::new();
         repository
             .expect_get_user_by_email_address()
-            .returning(|_| Err(SessionRepositoryError::Error));
-        let service = SessionService::new(repository, MockMailProvider::new());
+            .returning(|_| Err(MagicLinkRepositoryError::Error));
+        let service = MagicLinkService::new(repository, MockMailProvider::new());
         let email = "test_email".into();
 
         let res = service.generate_magic_link(&email).await;
@@ -213,10 +212,10 @@ mod test {
             .returning(|_| Ok(Some(UserId::test_default())));
         repository
             .expect_store_magic_link()
-            .returning(|_| Err(SessionRepositoryError::Error));
+            .returning(|_| Err(MagicLinkRepositoryError::Error));
         let mut email_provider = MockMailProvider::new();
         email_provider.expect_send_magic_link_email().times(0);
-        let service = SessionService::new(repository, email_provider);
+        let service = MagicLinkService::new(repository, email_provider);
         let email = "test_email".into();
 
         let res = service.generate_magic_link(&email).await;
@@ -242,7 +241,7 @@ mod test {
         email_provider
             .expect_send_magic_link_email()
             .returning(|_, _| Err(()));
-        let service = SessionService::new(repository, email_provider);
+        let service = MagicLinkService::new(repository, email_provider);
         let email = "test_email".into();
 
         let res = service.generate_magic_link(&email).await;
@@ -273,7 +272,7 @@ mod test {
             })
             .returning(|_, _| Ok(()));
 
-        let servide = SessionService::new(repository, email_provider);
+        let servide = MagicLinkService::new(repository, email_provider);
 
         let res = servide.generate_magic_link(&"test_email".into()).await;
 

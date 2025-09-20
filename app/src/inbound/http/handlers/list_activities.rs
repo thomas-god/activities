@@ -11,7 +11,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionService},
+            auth::{AuthenticatedUser, IUserService},
         },
         parser::ParseFile,
     },
@@ -52,10 +52,10 @@ pub async fn list_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
+    UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, SR>>,
+    State(state): State<AppState<AS, PF, TMS, UR>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     tracing::info!("{user:?}");
     let Ok(res) = state.activity_service.list_activities(user.user()).await else {

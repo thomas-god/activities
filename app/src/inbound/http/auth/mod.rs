@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub mod infra;
-pub mod service;
+pub mod services;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct AuthenticatedUser(UserId);
@@ -140,6 +140,13 @@ pub enum SessionTokenError {
     SessionTokenDoesNotExistsError(SessionToken),
 }
 
+pub trait IUserService: Clone + Send + Sync + 'static {
+    fn check_session_token(
+        &self,
+        token: &str,
+    ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
+}
+
 #[derive(Debug, Clone)]
 pub enum GenerateMagicLinkResult {
     /// [GenerateMagicLinkResult::Success] covers all functional cases, regardless of user actually
@@ -150,43 +157,45 @@ pub enum GenerateMagicLinkResult {
     Retry,
 }
 
-pub trait ISessionService: Clone + Send + Sync + 'static {
+pub trait IMagicLinkService: Clone + Send + Sync + 'static {
     fn generate_magic_link(
         &self,
         email: &EmailAddress,
     ) -> impl Future<Output = GenerateMagicLinkResult> + Send;
+}
 
+pub trait ISessionService: Clone + Send + Sync + 'static {
     fn check_session_token(
         &self,
         token: &str,
     ) -> impl Future<Output = Result<UserId, SessionTokenError>> + Send;
 }
 
-impl<AS, PF, TMS, SR> FromRef<AppState<AS, PF, TMS, SR>> for Option<Arc<SR>>
+impl<AS, PF, TMS, UR> FromRef<AppState<AS, PF, TMS, UR>> for Option<Arc<UR>>
 where
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
+    UR: IUserService,
 {
-    fn from_ref(input: &AppState<AS, PF, TMS, SR>) -> Self {
-        input.session_service.clone()
+    fn from_ref(input: &AppState<AS, PF, TMS, UR>) -> Self {
+        input.user_service.clone()
     }
 }
 
 /// Extractor that tries to extract user information from the request's session cookie.
 pub struct CookieUserExtractor<SR>(PhantomData<SR>);
 
-impl<S, SR> FromRequestParts<S> for CookieUserExtractor<SR>
+impl<S, UR> FromRequestParts<S> for CookieUserExtractor<UR>
 where
     S: Send + Sync,
-    SR: ISessionService,
-    Option<Arc<SR>>: FromRef<S>,
+    UR: IUserService,
+    Option<Arc<UR>>: FromRef<S>,
 {
     type Rejection = StatusCode;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let Some(service) = Option::<Arc<SR>>::from_ref(state) else {
+        let Some(service) = Option::<Arc<UR>>::from_ref(state) else {
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         };
         let jar = axum_extra::extract::CookieJar::from_headers(&parts.headers);
@@ -211,6 +220,36 @@ pub mod test_utils {
     use super::*;
 
     mock! {
+        pub UserService {}
+
+        impl Clone for UserService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IUserService for UserService {
+            async fn check_session_token(
+                &self,
+                _token: &str
+            ) -> Result<UserId, SessionTokenError>;
+        }
+    }
+
+    mock! {
+        pub MagicLinkService {}
+
+        impl Clone for MagicLinkService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IMagicLinkService for MagicLinkService {
+            async fn generate_magic_link(
+                &self,
+                email: &EmailAddress
+            ) -> GenerateMagicLinkResult;
+        }
+    }
+
+    mock! {
         pub SessionService {}
 
         impl Clone for SessionService {
@@ -218,11 +257,6 @@ pub mod test_utils {
         }
 
         impl ISessionService for SessionService {
-            async fn generate_magic_link(
-                &self,
-                email: &EmailAddress
-            ) -> GenerateMagicLinkResult;
-
             async fn check_session_token(
                 &self,
                 _token: &str
@@ -247,7 +281,7 @@ mod test {
             activity::test_utils::MockActivityService,
             training_metrics::test_utils::MockTrainingMetricService,
         },
-        inbound::{http::auth::test_utils::MockSessionService, parser::test_utils::MockFileParser},
+        inbound::{http::auth::test_utils::MockUserService, parser::test_utils::MockFileParser},
     };
 
     use super::*;
@@ -278,12 +312,12 @@ mod test {
         assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
     }
 
-    fn build_test_server(session_service: MockSessionService) -> TestServer {
+    fn build_test_server(session_service: MockUserService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(MockActivityService::new()),
             training_metrics_service: Arc::new(MockTrainingMetricService::new()),
             file_parser: Arc::new(MockFileParser::new()),
-            session_service: Some(Arc::new(session_service)),
+            user_service: Some(Arc::new(session_service)),
         };
 
         async fn test_route(
@@ -296,12 +330,12 @@ mod test {
             Router::new()
                 .route("/", get(test_route))
                 .route_layer(from_extractor_with_state::<
-                    CookieUserExtractor<MockSessionService>,
+                    CookieUserExtractor<MockUserService>,
                     AppState<
                         MockActivityService,
                         MockFileParser,
                         MockTrainingMetricService,
-                        MockSessionService,
+                        MockUserService,
                     >,
                 >(state));
         TestServer::new(app).expect("unable to create test server")
@@ -309,7 +343,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_no_sesion_token_cookie() {
-        let sessions = MockSessionService::new();
+        let sessions = MockUserService::new();
         let server = build_test_server(sessions);
 
         let response = server.get("/").await;
@@ -318,7 +352,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_sesion_token_cookie_rejected() {
-        let mut sessions = MockSessionService::new();
+        let mut sessions = MockUserService::new();
         sessions.expect_check_session_token().returning(|token| {
             Err(SessionTokenError::SessionTokenDoesNotExistsError(
                 token.into(),
@@ -335,7 +369,7 @@ mod test {
 
     #[tokio::test]
     async fn test_cookie_user_extractor_return_user_id() {
-        let mut sessions = MockSessionService::new();
+        let mut sessions = MockUserService::new();
         sessions
             .expect_check_session_token()
             .returning(|_| Ok(UserId::from("a user")));

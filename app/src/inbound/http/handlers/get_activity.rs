@@ -19,7 +19,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionService},
+            auth::{AuthenticatedUser, IUserService},
         },
         parser::ParseFile,
     },
@@ -151,12 +151,12 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Timese
 
 pub async fn get_activity<
     AS: IActivityService,
-    FP: ParseFile,
+    PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
+    UR: IUserService,
 >(
     Extension(_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, FP, TMS, SR>>,
+    State(state): State<AppState<AS, PF, TMS, UR>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {
     let Ok(res) = state
@@ -194,7 +194,7 @@ mod tests {
                 training_metrics::test_utils::MockTrainingMetricService,
             },
         },
-        inbound::{http::auth::test_utils::MockSessionService, parser::test_utils::MockFileParser},
+        inbound::{http::auth::test_utils::MockUserService, parser::test_utils::MockFileParser},
     };
 
     use super::*;
@@ -235,7 +235,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Some(Arc::new(MockSessionService::new())),
+            user_service: Some(Arc::new(MockUserService::new())),
         });
         let path = Path("target_id".to_string());
 
@@ -294,7 +294,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Some(Arc::new(MockSessionService::new())),
+            user_service: Some(Arc::new(MockUserService::new())),
         });
         let path = Path("target_id".to_string());
 

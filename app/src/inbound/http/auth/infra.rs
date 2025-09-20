@@ -7,7 +7,7 @@ use crate::{
     domain::models::UserId,
     inbound::http::auth::{
         EmailAddress, MagicLink, MagicToken,
-        service::{MailProvider, SessionRepository, SessionRepositoryError},
+        services::magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
     },
 };
 
@@ -17,15 +17,15 @@ pub struct InMemorySessionRepository {
     magic_links: Arc<Mutex<Vec<MagicLink>>>,
 }
 
-impl SessionRepository for InMemorySessionRepository {
+impl MagicLinkRepository for InMemorySessionRepository {
     async fn get_user_by_email_address(
         &self,
         email: &EmailAddress,
-    ) -> Result<Option<UserId>, SessionRepositoryError> {
+    ) -> Result<Option<UserId>, MagicLinkRepositoryError> {
         Ok(self.users_by_emails.lock().await.get(email).cloned())
     }
 
-    async fn store_magic_link(&self, link: &MagicLink) -> Result<(), SessionRepositoryError> {
+    async fn store_magic_link(&self, link: &MagicLink) -> Result<(), MagicLinkRepositoryError> {
         self.magic_links.lock().await.push(link.clone());
         Ok(())
     }
@@ -33,7 +33,7 @@ impl SessionRepository for InMemorySessionRepository {
     async fn delete_magic_link_by_token(
         &self,
         token: &MagicToken,
-    ) -> Result<(), SessionRepositoryError> {
+    ) -> Result<(), MagicLinkRepositoryError> {
         self.magic_links
             .lock()
             .await

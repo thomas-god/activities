@@ -11,7 +11,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionService},
+            auth::{AuthenticatedUser, IUserService},
         },
         parser::ParseFile,
     },
@@ -32,10 +32,10 @@ pub async fn upload_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
+    UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, SR>>,
+    State(state): State<AppState<AS, PF, TMS, UR>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
     let mut unprocessable_files = Vec::new();
@@ -92,7 +92,7 @@ mod tests {
             training_metrics::test_utils::MockTrainingMetricService,
         },
         inbound::{
-            http::auth::{DefaultUserExtractor, test_utils::MockSessionService},
+            http::auth::{DefaultUserExtractor, test_utils::MockUserService},
             parser::test_utils::MockFileParser,
         },
     };
@@ -108,7 +108,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Some(Arc::new(MockSessionService::new())),
+            user_service: Some(Arc::new(MockUserService::new())),
         };
 
         let app = Router::new()
@@ -140,7 +140,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            session_service: Some(Arc::new(MockSessionService::new())),
+            user_service: Some(Arc::new(MockUserService::new())),
         };
 
         let app = Router::new()

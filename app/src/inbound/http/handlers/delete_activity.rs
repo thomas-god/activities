@@ -14,7 +14,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, ISessionService},
+            auth::{AuthenticatedUser, IUserService},
         },
         parser::ParseFile,
     },
@@ -34,10 +34,10 @@ pub async fn delete_activity<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
+    UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, SR>>,
+    State(state): State<AppState<AS, PF, TMS, UR>>,
     Path(activity_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req = DeleteActivityRequest::new(user.user().clone(), ActivityId::from(&activity_id));

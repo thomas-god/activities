@@ -12,7 +12,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
-use crate::inbound::http::auth::{DefaultUserExtractor, ISessionService};
+use crate::inbound::http::auth::{DefaultUserExtractor, IUserService};
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
     get_training_metrics, list_activities, patch_activity, upload_activities,
@@ -20,41 +20,37 @@ use crate::inbound::http::handlers::{
 use crate::inbound::parser::ParseFile;
 
 pub use self::auth::infra::{DoNothingMailProvider, InMemorySessionRepository};
-pub use self::auth::service::SessionService;
+pub use self::auth::services::UserService;
 
 mod auth;
 mod handlers;
 
 #[derive(Debug, Clone)]
-struct AppState<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingMetricService,
-    SR: ISessionService,
-> {
+struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUserService>
+{
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
-    session_service: Option<Arc<SR>>,
+    user_service: Option<Arc<UR>>,
 }
 
-pub struct HttpServer<AS, PF, TMS, SR> {
+pub struct HttpServer<AS, PF, TMS, UR> {
     router: axum::Router,
     listener: net::TcpListener,
     _marker_activity: PhantomData<AS>,
     _marker_paser: PhantomData<PF>,
     _marker_training_metrics: PhantomData<TMS>,
-    _marker_session_repository: PhantomData<SR>,
+    _marker_user_service: PhantomData<UR>,
 }
 
-impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISessionService>
-    HttpServer<AS, PF, TMS, SR>
+impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUserService>
+    HttpServer<AS, PF, TMS, UR>
 {
     pub async fn new(
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
-        session_repository: Option<SR>,
+        session_repository: Option<UR>,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -68,7 +64,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISess
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
-            session_service: session_repository.map(Arc::new),
+            user_service: session_repository.map(Arc::new),
         };
 
         let origin = config
@@ -98,7 +94,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, SR: ISess
             _marker_activity: PhantomData,
             _marker_paser: PhantomData,
             _marker_training_metrics: PhantomData,
-            _marker_session_repository: PhantomData,
+            _marker_user_service: PhantomData,
         })
     }
 
@@ -115,33 +111,33 @@ fn api_routes<
     AS: IActivityService,
     FP: ParseFile,
     TMS: ITrainingMetricService,
-    SR: ISessionService,
->() -> Router<AppState<AS, FP, TMS, SR>> {
+    UR: IUserService,
+>() -> Router<AppState<AS, FP, TMS, UR>> {
     Router::new()
-        .route("/activity", post(upload_activities::<AS, FP, TMS, SR>))
-        .route("/activities", get(list_activities::<AS, FP, TMS, SR>))
+        .route("/activity", post(upload_activities::<AS, FP, TMS, UR>))
+        .route("/activities", get(list_activities::<AS, FP, TMS, UR>))
         .route(
             "/activity/{activity_id}",
-            get(get_activity::<AS, FP, TMS, SR>),
+            get(get_activity::<AS, FP, TMS, UR>),
         )
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, FP, TMS, SR>),
+            patch(patch_activity::<AS, FP, TMS, UR>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, FP, TMS, SR>),
+            delete(delete_activity::<AS, FP, TMS, UR>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, FP, TMS, SR>),
+            get(get_training_metrics::<AS, FP, TMS, UR>),
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, FP, TMS, SR>),
+            post(create_training_metric::<AS, FP, TMS, UR>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, FP, TMS, SR>),
+            delete(delete_training_metric::<AS, FP, TMS, UR>),
         )
 }
