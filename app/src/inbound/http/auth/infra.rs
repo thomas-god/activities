@@ -9,6 +9,7 @@ use crate::{
         EmailAddress, MagicLink, MagicToken,
         services::{
             magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
+            session::SessionRepository,
             user::UserRepository,
         },
     },
@@ -76,5 +77,22 @@ impl UserRepository for InMemoryUserRepository {
             .await
             .insert(email.clone(), user.clone());
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct InMemorySessionRepository {}
+
+impl SessionRepository for InMemorySessionRepository {
+    async fn store_session(&self, session: &super::Session) -> Result<(), ()> {
+        todo!()
+    }
+
+    async fn get_all_sessions(&self) -> Vec<super::Session> {
+        todo!()
+    }
+
+    async fn delete_session_by_token(&self, token: &super::SessionToken) -> Result<(), ()> {
+        todo!()
     }
 }

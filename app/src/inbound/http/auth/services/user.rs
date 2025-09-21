@@ -406,11 +406,13 @@ mod test_user_service_validate_magic_link {
             .expect_validate_magic_token()
             .returning(|_| Ok(Some(UserId::test_default())));
         let mut session = MockSessionService::new();
+        let session_token = SessionToken::new();
+        let session_token_clone = session_token.clone();
         session
             .expect_generate_session_token()
             .times(1)
             .withf(|user| user == &UserId::test_default())
-            .returning(|_| Ok(SessionToken::new("a session token".to_string())));
+            .returning(move |_| Ok(session_token_clone.clone()));
 
         let service = UserService::new(
             Arc::new(Mutex::new(magic_link)),
@@ -425,7 +427,7 @@ mod test_user_service_validate_magic_link {
         let Ok(MagicLinkValidationResult::Success(token)) = res else {
             unreachable!("Should have return a Ok(MagicLinkValidationResult::Success(_))")
         };
-        assert_eq!(token, SessionToken::new("a session token".to_string()));
+        assert!(token.match_token_secure(&session_token));
     }
 
     #[tokio::test]

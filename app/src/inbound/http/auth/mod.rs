@@ -112,12 +112,46 @@ impl MagicLink {
     }
 }
 
-#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+#[derive(Clone, Debug, Constructor)]
+pub struct Session {
+    user: UserId,
+    token: SessionToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl Session {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn token(&self) -> &SessionToken {
+        &self.token
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
+    pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
+        reference >= &self.expire_at
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct SessionToken(String);
 
 impl SessionToken {
-    pub fn value(&self) -> &str {
-        &self.0
+    pub fn new() -> Self {
+        let mut rng = rand::rng();
+        let mut random_bytes = [0u8; 24];
+        rng.fill(&mut random_bytes);
+
+        Self(general_purpose::URL_SAFE_NO_PAD.encode(random_bytes))
+    }
+
+    /// Constant-time comparison between two [SessionToken]
+    pub fn match_token_secure(&self, other: &SessionToken) -> bool {
+        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
     }
 }
 
@@ -145,7 +179,7 @@ pub enum UserLoginResult {
     Retry,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum MagicLinkValidationResult {
     Success(SessionToken),
     Invalid,
@@ -253,7 +287,7 @@ where
         };
 
         let Ok(user) = service
-            .check_session_token(&SessionToken::new(session_token.value().to_string()))
+            .check_session_token(&session_token.value().into())
             .await
         else {
             return Err(StatusCode::UNAUTHORIZED);

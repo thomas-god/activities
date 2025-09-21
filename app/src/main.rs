@@ -21,8 +21,9 @@ use app::{
     },
     inbound::{
         http::{
-            DoNothingMailProvider, HttpServer, InMemoryMagicLinkRepository, InMemoryUserRepository,
-            MagicLinkService, SessionService, UserService,
+            DoNothingMailProvider, HttpServer, InMemoryMagicLinkRepository,
+            InMemorySessionRepository, InMemoryUserRepository, MagicLinkService, SessionService,
+            UserService,
         },
         parser::{FitParser, ParseFile},
     },
@@ -68,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
         UserService<
             MagicLinkService<InMemoryMagicLinkRepository, DoNothingMailProvider>,
             InMemoryUserRepository,
-            SessionService,
+            SessionService<InMemorySessionRepository>,
         >,
     > = None;
 
