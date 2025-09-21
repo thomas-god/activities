@@ -25,6 +25,10 @@ impl MagicLinkRepository for InMemoryMagicLinkRepository {
         Ok(())
     }
 
+    async fn get_all_magic_links(&self) -> Vec<MagicLink> {
+        self.magic_links.lock().await.clone()
+    }
+
     async fn delete_magic_link_by_token(
         &self,
         token: &MagicToken,
@@ -32,7 +36,7 @@ impl MagicLinkRepository for InMemoryMagicLinkRepository {
         self.magic_links
             .lock()
             .await
-            .retain(|link| link.token() != token);
+            .retain(|link| !link.token().match_token_secure(token));
 
         Ok(())
     }

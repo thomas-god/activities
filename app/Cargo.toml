@@ -14,6 +14,7 @@ fit-parser = { path = "../fit-parser", features = []}
 rand = "0.9.2"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
+subtle = "2.6.1"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = "0.5.2"

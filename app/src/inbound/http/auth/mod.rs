@@ -4,8 +4,11 @@ use axum::{
     extract::{FromRef, FromRequestParts},
     http::{StatusCode, request::Parts},
 };
+use base64::{Engine, engine::general_purpose};
 use chrono::Utc;
 use derive_more::Constructor;
+use rand::Rng;
+use subtle::ConstantTimeEq;
 
 use crate::{
     domain::{
@@ -66,24 +69,21 @@ impl From<String> for EmailAddress {
     }
 }
 
-#[derive(Clone, Debug, Constructor, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct MagicToken(String);
 
 impl MagicToken {
-    pub fn value(&self) -> &str {
-        &self.0
-    }
-}
+    pub fn new() -> Self {
+        let mut rng = rand::rng();
+        let mut random_bytes = [0u8; 24];
+        rng.fill(&mut random_bytes);
 
-impl From<&str> for MagicToken {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
+        Self(general_purpose::URL_SAFE_NO_PAD.encode(random_bytes))
     }
-}
 
-impl From<String> for MagicToken {
-    fn from(value: String) -> Self {
-        Self(value)
+    /// Constant-time comparison between two [MagicToken]
+    pub fn match_token_secure(&self, other: &MagicToken) -> bool {
+        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
     }
 }
 
@@ -384,7 +384,7 @@ mod test {
     #[test]
     fn test_magic_link_expiry() {
         let expire_at = chrono::Utc::now();
-        let link = MagicLink::new(UserId::test_default(), "a link".into(), expire_at);
+        let link = MagicLink::new(UserId::test_default(), MagicToken::new(), expire_at);
         assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));
         assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
     }
