@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
 import dayjs from 'dayjs';
+import { goto } from '$app/navigation';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
@@ -20,6 +21,10 @@ const fetchActivities = async (
 		mode: 'cors',
 		credentials: 'include'
 	});
+	if (res.status === 401) {
+		goto('/login');
+	}
+
 	if (res.status === 200) {
 		return ActivityList.parse(await res.json());
 	}
@@ -36,6 +41,9 @@ const fetchMetrics = async (
 		mode: 'cors',
 		credentials: 'include'
 	});
+	if (res.status === 401) {
+		goto('/login');
+	}
 	if (res.status === 200) {
 		return MetricsList.parse(await res.json());
 	}

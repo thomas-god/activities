@@ -41,22 +41,30 @@
 	});
 
 	const createMetricCallback = async (payload: string): Promise<void> => {
-		await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
 			body: payload,
 			method: 'POST',
 			credentials: 'include',
 			mode: 'cors',
 			headers: { 'Content-Type': 'application/json' }
 		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
 		invalidate('app:training-metrics');
 	};
 
 	const deleteMetricCallback = async (metric: string): Promise<void> => {
-		await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
 			method: 'DELETE',
 			credentials: 'include',
 			mode: 'cors'
 		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
 		invalidate('app:training-metrics');
 	};
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 
 	let { activitiesUploadedCallback }: { activitiesUploadedCallback: () => void } = $props();
@@ -29,12 +30,16 @@
 			formData.append(file.name, file);
 		}
 
-		let _res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
+		let res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
 			body: formData,
 			method: 'POST',
 			mode: 'cors',
 			credentials: 'include'
 		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
 
 		file_upload_content = '';
 		activitiesUploadedCallback();

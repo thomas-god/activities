@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import z from 'zod';
 
@@ -36,8 +37,8 @@
 </script>
 
 {#if promise === undefined}
-	<div class="sm:w-sm mx-2 mb-2 sm:mx-auto">
-		<fieldset class="fieldset rounded-box border-base-300 bg-base-100 border p-4">
+	<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
+		<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
 			<legend class="fieldset-legend">Login or register</legend>
 
 			<label class="label" for="login-email">Email</label>
@@ -50,14 +51,14 @@
 				bind:value={email}
 			/>
 
-			<div class="join join-horizontal mx-auto mt-4 gap-4">
+			<div class="mx-auto join-horizontal mt-4 join gap-4">
 				<button
-					class="join-item btn btn-primary rounded-xs"
+					class="btn join-item rounded-xs btn-primary"
 					disabled={!isValid}
 					onclick={callbackLogin}>Login</button
 				>
 				<button
-					class="join-item btn btn-secondary rounded-xs"
+					class="btn join-item rounded-xs btn-secondary"
 					disabled={!isValid}
 					onclick={callbackRegister}>Register</button
 				>
@@ -68,7 +69,7 @@
 	{#await promise}
 		<span class="loading loading-xl loading-spinner"></span>
 	{:then}
-		<div class="card rounded-box bg-base-100 sm:w-sm mx-2 mt-6 p-4 sm:mx-auto">
+		<div class="card mx-2 mt-6 rounded-box bg-base-100 p-4 sm:mx-auto sm:w-sm">
 			<p>You're going to receive an email containing a magic link to login!</p>
 		</div>
 	{/await}

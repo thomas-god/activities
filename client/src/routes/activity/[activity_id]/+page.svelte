@@ -57,21 +57,30 @@
 	});
 
 	const deleteActivityCallback = async (): Promise<void> => {
-		await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
 			method: 'DELETE',
 			mode: 'cors',
 			credentials: 'include'
 		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
+
 		goto('/');
 	};
 
 	const updateActivityNameCallback = async (newName: string) => {
-		await fetch(
+		const res = await fetch(
 			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?name=${encodeURIComponent(newName)}`,
 			{
 				method: 'PATCH'
 			}
 		);
+
+		if (res.status === 401) {
+			goto('/login');
+		}
 	};
 </script>
 

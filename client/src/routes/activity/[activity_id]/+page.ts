@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { redirect } from '@sveltejs/kit';
+import { goto } from '$app/navigation';
 
 export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);
@@ -12,6 +13,9 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 		credentials: 'include',
 		mode: 'cors'
 	});
+	if (res.status === 401) {
+		goto('/login');
+	}
 	if (res.status === 200) {
 		return { activity: ActivityDetails.parse(await res.json()) };
 	}

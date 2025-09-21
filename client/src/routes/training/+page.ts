@@ -3,6 +3,7 @@ import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
 import dayjs from 'dayjs';
+import { goto } from '$app/navigation';
 
 export const load: PageLoad = async ({ fetch, depends, url }) => {
 	depends('app:training-metrics');
@@ -17,6 +18,9 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 		mode: 'cors',
 		credentials: 'include'
 	});
+	if (res.status === 401) {
+		goto('/login');
+	}
 	if (res.status === 200) {
 		return { metrics: MetricsList.parse(await res.json()) };
 	}
