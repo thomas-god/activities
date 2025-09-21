@@ -1,13 +1,16 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use derive_more::Constructor;
 use tokio::sync::Mutex;
 
-use crate::inbound::http::auth::{
-    EmailAddress, MagicLink, MagicToken,
-    services::{
-        magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
-        user::UserRepository,
+use crate::{
+    domain::models::UserId,
+    inbound::http::auth::{
+        EmailAddress, MagicLink, MagicToken,
+        services::{
+            magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
+            user::UserRepository,
+        },
     },
 };
 
@@ -50,14 +53,13 @@ impl MailProvider for DoNothingMailProvider {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct InMemoryUserRepository {}
+pub struct InMemoryUserRepository {
+    users_by_email: Arc<Mutex<HashMap<EmailAddress, UserId>>>,
+}
 
 impl UserRepository for InMemoryUserRepository {
-    async fn get_user_by_email(
-        &self,
-        email: &EmailAddress,
-    ) -> Result<Option<crate::domain::models::UserId>, ()> {
-        todo!()
+    async fn get_user_by_email(&self, email: &EmailAddress) -> Result<Option<UserId>, ()> {
+        Ok(self.users_by_email.lock().await.get(email).cloned())
     }
 
     async fn store_user_with_mail(
@@ -65,6 +67,10 @@ impl UserRepository for InMemoryUserRepository {
         user: &crate::domain::models::UserId,
         email: &EmailAddress,
     ) -> Result<(), ()> {
-        todo!()
+        self.users_by_email
+            .lock()
+            .await
+            .insert(email.clone(), user.clone());
+        Ok(())
     }
 }
