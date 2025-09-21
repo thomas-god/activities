@@ -55,10 +55,6 @@ where
             }
         }
 
-        if found.is_some() {
-            let _ = repository.delete_session_by_token(token).await;
-        }
-
         match found {
             Some(session) => Ok(session.user().clone()),
             None => Err(()),
@@ -156,12 +152,7 @@ mod test_session_service_check_session_token {
                 Utc::now() + TimeDelta::minutes(5),
             )]
         });
-        let cloned_token = token.clone();
-        repository
-            .expect_delete_session_by_token()
-            .times(1)
-            .withf(move |token| token.match_token_secure(&cloned_token))
-            .returning(|_| Ok(()));
+        repository.expect_delete_session_by_token().times(0);
 
         let service = SessionService::new(Arc::new(Mutex::new(repository)));
 
