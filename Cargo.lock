@@ -101,6 +101,7 @@ dependencies = [
  "chrono",
  "cookie",
  "derive_more",
+ "email_address",
  "fit-parser",
  "mockall",
  "rand",
