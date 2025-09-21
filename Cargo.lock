@@ -99,6 +99,7 @@ dependencies = [
  "axum-test",
  "base64",
  "chrono",
+ "cookie",
  "derive_more",
  "fit-parser",
  "mockall",

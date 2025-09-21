@@ -92,7 +92,10 @@ mod tests {
             training_metrics::test_utils::MockTrainingMetricService,
         },
         inbound::{
-            http::auth::{DefaultUserExtractor, test_utils::MockUserService},
+            http::{
+                CookieConfig,
+                auth::{DefaultUserExtractor, test_utils::MockUserService},
+            },
             parser::test_utils::MockFileParser,
         },
     };
@@ -109,6 +112,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Some(Arc::new(MockUserService::new())),
+            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -141,6 +145,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Some(Arc::new(MockUserService::new())),
+            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()

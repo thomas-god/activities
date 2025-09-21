@@ -420,7 +420,10 @@ mod test {
             activity::test_utils::MockActivityService,
             training_metrics::test_utils::MockTrainingMetricService,
         },
-        inbound::{http::auth::test_utils::MockUserService, parser::test_utils::MockFileParser},
+        inbound::{
+            http::{CookieConfig, auth::test_utils::MockUserService},
+            parser::test_utils::MockFileParser,
+        },
     };
 
     use super::*;
@@ -457,6 +460,7 @@ mod test {
             training_metrics_service: Arc::new(MockTrainingMetricService::new()),
             file_parser: Arc::new(MockFileParser::new()),
             user_service: Some(Arc::new(session_service)),
+            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         async fn test_route(

@@ -7,6 +7,7 @@ use axum::http::{HeaderValue, Method};
 use axum::middleware::from_extractor;
 use axum::routing::{delete, get, patch};
 use axum::{Router, routing::post};
+use cookie::SameSite;
 use tokio::net;
 use tower_http::cors::CorsLayer;
 
@@ -15,7 +16,8 @@ use crate::domain::ports::{IActivityService, ITrainingMetricService};
 use crate::inbound::http::auth::{DefaultUserExtractor, IUserService};
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
-    get_training_metrics, list_activities, patch_activity, upload_activities,
+    get_training_metrics, list_activities, login_user, patch_activity, upload_activities,
+    validate_login,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -24,9 +26,29 @@ pub use self::auth::infra::{
     InMemoryUserRepository,
 };
 pub use self::auth::services::{MagicLinkService, SessionService, UserService};
+pub use self::auth::{MagicLinkValidationResult, UserLoginResult};
 
 mod auth;
 mod handlers;
+
+#[derive(Debug, Clone)]
+pub struct CookieConfig {
+    pub secure: bool,
+    pub same_site: SameSite,
+    pub http_only: bool,
+    pub domain: String,
+}
+
+impl Default for CookieConfig {
+    fn default() -> Self {
+        Self {
+            secure: false,
+            same_site: SameSite::Lax,
+            http_only: true,
+            domain: "/".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUserService>
@@ -35,6 +57,7 @@ struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
     user_service: Option<Arc<UR>>,
+    cookie_config: Arc<CookieConfig>,
 }
 
 pub struct HttpServer<AS, PF, TMS, UR> {
@@ -68,6 +91,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUser
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
             user_service: session_repository.map(Arc::new),
+            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let origin = config
@@ -117,6 +141,11 @@ fn api_routes<
     UR: IUserService,
 >() -> Router<AppState<AS, FP, TMS, UR>> {
     Router::new()
+        .route("/login", post(login_user::<AS, FP, TMS, UR>))
+        .route(
+            "/login/validate/{magic_token}",
+            get(validate_login::<AS, FP, TMS, UR>),
+        )
         .route("/activity", post(upload_activities::<AS, FP, TMS, UR>))
         .route("/activities", get(list_activities::<AS, FP, TMS, UR>))
         .route(
