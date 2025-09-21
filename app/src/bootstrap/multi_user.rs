@@ -6,7 +6,11 @@ use crate::{
     config::Config,
     domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
     inbound::{
-        http::{DisabledUserService, HttpServer},
+        http::{
+            DoNothingMailProvider, HttpServer, InMemoryMagicLinkRepository,
+            InMemorySessionRepository, InMemoryUserRepository, MagicLinkService, SessionService,
+            UserService,
+        },
         parser::FitParser,
     },
     outbound::memory::{
@@ -23,7 +27,11 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         >,
         FitParser,
         TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
-        DisabledUserService,
+        UserService<
+            MagicLinkService<InMemoryMagicLinkRepository, DoNothingMailProvider>,
+            InMemoryUserRepository,
+            SessionService<InMemorySessionRepository>,
+        >,
     >,
 > {
     // start tracing
@@ -54,7 +62,22 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         raw_data_repository,
         training_metrics_service.clone(),
     );
-    let user_service = DisabledUserService {};
+    let magic_link_repository = Arc::new(Mutex::new(InMemoryMagicLinkRepository::new(Arc::new(
+        Mutex::new(Vec::new()),
+    ))));
+    let mail_provider = Arc::new(DoNothingMailProvider::new());
+    let magic_link_service = Arc::new(Mutex::new(MagicLinkService::new(
+        magic_link_repository,
+        mail_provider,
+    )));
+    let user_repository = Arc::new(Mutex::new(InMemoryUserRepository::new(Arc::new(
+        Mutex::new(HashMap::new()),
+    ))));
+    let session_repository = Arc::new(Mutex::new(InMemorySessionRepository::new(Arc::new(
+        Mutex::new(Vec::new()),
+    ))));
+    let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
+    let user_service = UserService::new(magic_link_service, user_repository, session_service);
 
     let parser = FitParser {};
 
