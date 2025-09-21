@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        EmailAddress, MagicLink, MagicToken,
+        EmailAddress, MagicLink, MagicToken, Session, SessionToken,
         services::{
             magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
             session::SessionRepository,
@@ -81,18 +81,25 @@ impl UserRepository for InMemoryUserRepository {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct InMemorySessionRepository {}
+pub struct InMemorySessionRepository {
+    sessions: Arc<Mutex<Vec<Session>>>,
+}
 
 impl SessionRepository for InMemorySessionRepository {
-    async fn store_session(&self, session: &super::Session) -> Result<(), ()> {
-        todo!()
+    async fn store_session(&self, session: &Session) -> Result<(), ()> {
+        self.sessions.lock().await.push(session.clone());
+        Ok(())
     }
 
-    async fn get_all_sessions(&self) -> Vec<super::Session> {
-        todo!()
+    async fn get_all_sessions(&self) -> Vec<Session> {
+        self.sessions.lock().await.clone()
     }
 
-    async fn delete_session_by_token(&self, token: &super::SessionToken) -> Result<(), ()> {
-        todo!()
+    async fn delete_session_by_token(&self, token: &SessionToken) -> Result<(), ()> {
+        self.sessions
+            .lock()
+            .await
+            .retain(|session| !session.token().match_token_secure(token));
+        Ok(())
     }
 }
