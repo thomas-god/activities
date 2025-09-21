@@ -16,7 +16,9 @@ const fetchActivities = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<ActivityList> => {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/activities`, {
-		method: 'GET'
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
 	});
 	if (res.status === 200) {
 		return ActivityList.parse(await res.json());
@@ -30,7 +32,9 @@ const fetchMetrics = async (
 	let now = dayjs();
 	let start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DDTHH:mm:ssZ'));
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
-		method: 'GET'
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
 	});
 	if (res.status === 200) {
 		return MetricsList.parse(await res.json());

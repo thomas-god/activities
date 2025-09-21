@@ -13,7 +13,9 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	}
 	const start = encodeURIComponent(dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ'));
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
-		method: 'GET'
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
 	});
 	if (res.status === 200) {
 		return { metrics: MetricsList.parse(await res.json()) };

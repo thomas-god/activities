@@ -40,13 +40,16 @@ pub async fn validate_login<
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             };
 
-            let cookie = Cookie::build(("session_token", session.token().to_string()))
+            let mut builder = Cookie::build(("session_token", session.token().to_string()))
                 .expires(expire_at)
                 .secure(state.cookie_config.secure)
                 .http_only(state.cookie_config.http_only)
-                .domain(state.cookie_config.domain.clone())
                 .same_site(state.cookie_config.same_site)
-                .build();
+                .path("/");
+            if let Some(domain) = state.cookie_config.domain.clone() {
+                builder = builder.domain(domain);
+            }
+            let cookie = builder.build();
 
             let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
             (headers, StatusCode::OK).into_response()

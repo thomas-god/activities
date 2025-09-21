@@ -14,7 +14,9 @@
 		}
 
 		promise = fetch(`${PUBLIC_APP_URL}/api/register?email=${encodeURIComponent(email)}`, {
-			method: 'POST'
+			method: 'POST',
+			credentials: 'include',
+			mode: 'cors'
 		});
 		await promise;
 	};

@@ -44,7 +44,8 @@
 		await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
 			body: payload,
 			method: 'POST',
-
+			credentials: 'include',
+			mode: 'cors',
 			headers: { 'Content-Type': 'application/json' }
 		});
 		invalidate('app:training-metrics');
@@ -52,7 +53,9 @@
 
 	const deleteMetricCallback = async (metric: string): Promise<void> => {
 		await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
-			method: 'DELETE'
+			method: 'DELETE',
+			credentials: 'include',
+			mode: 'cors'
 		});
 		invalidate('app:training-metrics');
 	};

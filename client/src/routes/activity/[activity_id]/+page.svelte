@@ -58,7 +58,9 @@
 
 	const deleteActivityCallback = async (): Promise<void> => {
 		await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
-			method: 'DELETE'
+			method: 'DELETE',
+			mode: 'cors',
+			credentials: 'include'
 		});
 		goto('/');
 	};

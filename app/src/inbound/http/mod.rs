@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use anyhow::Context;
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderValue, Method};
 
 use axum::routing::{delete, get, patch};
@@ -37,7 +37,7 @@ pub struct CookieConfig {
     pub secure: bool,
     pub same_site: SameSite,
     pub http_only: bool,
-    pub domain: String,
+    pub domain: Option<String>,
 }
 
 impl Default for CookieConfig {
@@ -46,7 +46,7 @@ impl Default for CookieConfig {
             secure: false,
             same_site: SameSite::Lax,
             http_only: true,
-            domain: "/".to_string(),
+            domain: None,
         }
     }
 }
@@ -108,9 +108,10 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUser
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()
-                .allow_headers([CONTENT_TYPE])
+                .allow_headers([CONTENT_TYPE, COOKIE, SET_COOKIE])
                 .allow_origin([origin])
-                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
+                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
+                .allow_credentials(true),
         );
 
         let router = router.with_state(state);
@@ -205,6 +206,6 @@ fn login_routes<
         )
         .route(
             "/login/validate/{magic_token}",
-            get(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US>),
+            post(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US>),
         )
 }

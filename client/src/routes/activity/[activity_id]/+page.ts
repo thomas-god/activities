@@ -8,7 +8,9 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);
 
 	let res = await fetch(`${PUBLIC_APP_URL}/api/activity/${params.activity_id}`, {
-		method: 'GET'
+		method: 'GET',
+		credentials: 'include',
+		mode: 'cors'
 	});
 	if (res.status === 200) {
 		return { activity: ActivityDetails.parse(await res.json()) };

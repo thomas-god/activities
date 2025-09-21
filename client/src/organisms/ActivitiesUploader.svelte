@@ -31,7 +31,9 @@
 
 		let _res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
 			body: formData,
-			method: 'POST'
+			method: 'POST',
+			mode: 'cors',
+			credentials: 'include'
 		});
 
 		file_upload_content = '';
