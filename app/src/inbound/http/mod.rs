@@ -194,8 +194,11 @@ fn login_routes<
     TMS: ITrainingMetricService,
     US: IUserService,
 >() -> Router<AppState<AS, PF, TMS, US>> {
-    tracing::info!("loading multi user routes");
     Router::new()
+        .route(
+            "/register",
+            post(crate::inbound::http::handlers::register_user::<AS, PF, TMS, US>),
+        )
         .route(
             "/login",
             post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US>),
