@@ -31,6 +31,7 @@ impl AuthenticatedUser {
 }
 
 /// Dummy extractor that always returns the default [UserId], regardless of the request.
+#[allow(unused)]
 pub struct DefaultUserExtractor;
 
 impl<S> FromRequestParts<S> for DefaultUserExtractor
@@ -72,6 +73,7 @@ impl From<String> for EmailAddress {
 #[derive(Clone, Debug)]
 pub struct MagicToken(String);
 
+#[allow(clippy::new_without_default)]
 impl MagicToken {
     pub fn new() -> Self {
         let mut rng = rand::rng();
@@ -146,6 +148,7 @@ impl Session {
 #[derive(Clone, Debug)]
 pub struct SessionToken(String);
 
+#[allow(clippy::new_without_default)]
 impl SessionToken {
     pub fn new() -> Self {
         let mut rng = rand::rng();
@@ -282,33 +285,33 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<UserId, ()>> + Send;
 }
 
-impl<AS, PF, TMS, UR> FromRef<AppState<AS, PF, TMS, UR>> for Option<Arc<UR>>
+impl<AS, PF, TMS, US> FromRef<AppState<AS, PF, TMS, US>> for Arc<US>
 where
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingMetricService,
-    UR: IUserService,
+    US: IUserService,
 {
-    fn from_ref(input: &AppState<AS, PF, TMS, UR>) -> Self {
+    fn from_ref(input: &AppState<AS, PF, TMS, US>) -> Self {
         input.user_service.clone()
     }
 }
 
 /// Extractor that tries to extract user information from the request's session cookie.
-pub struct CookieUserExtractor<SR>(PhantomData<SR>);
+#[allow(unused)]
+pub struct CookieUserExtractor<US>(PhantomData<US>);
 
-impl<S, UR> FromRequestParts<S> for CookieUserExtractor<UR>
+impl<S, US> FromRequestParts<S> for CookieUserExtractor<US>
 where
     S: Send + Sync,
-    UR: IUserService,
-    Option<Arc<UR>>: FromRef<S>,
+    US: IUserService,
+    Arc<US>: FromRef<S>,
 {
     type Rejection = StatusCode;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let Some(service) = Option::<Arc<UR>>::from_ref(state) else {
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
-        };
+        let service = Arc::<US>::from_ref(state);
+
         let jar = axum_extra::extract::CookieJar::from_headers(&parts.headers);
         let Some(session_token) = jar.get("session_token") else {
             return Err(StatusCode::UNAUTHORIZED);
@@ -459,7 +462,7 @@ mod test {
             activity_service: Arc::new(MockActivityService::new()),
             training_metrics_service: Arc::new(MockTrainingMetricService::new()),
             file_parser: Arc::new(MockFileParser::new()),
-            user_service: Some(Arc::new(session_service)),
+            user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 

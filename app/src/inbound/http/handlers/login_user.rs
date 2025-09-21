@@ -20,6 +20,7 @@ pub struct LoginUserQuery {
     email: String,
 }
 
+#[allow(unused)]
 pub async fn login_user<
     AS: IActivityService,
     PF: ParseFile,
@@ -29,12 +30,9 @@ pub async fn login_user<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Query(query): Query<LoginUserQuery>,
 ) -> StatusCode {
-    let Some(user_service) = state.user_service else {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    };
     let email = EmailAddress::from(query.email);
 
-    match user_service.login_user(email).await {
+    match state.user_service.login_user(email).await {
         UserLoginResult::Success => StatusCode::OK,
         UserLoginResult::Retry => StatusCode::SERVICE_UNAVAILABLE,
     }

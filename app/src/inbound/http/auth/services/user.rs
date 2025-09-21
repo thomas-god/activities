@@ -101,7 +101,7 @@ where
             .await
             .generate_session_token(&user)
             .await
-            .map(|token| MagicLinkValidationResult::Success(token))
+            .map(MagicLinkValidationResult::Success)
     }
 
     async fn check_session_token(&self, token: &SessionToken) -> Result<UserId, ()> {
@@ -388,6 +388,33 @@ mod test_user_service_login_user {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DisabledUserService {}
+
+impl IUserService for DisabledUserService {
+    async fn check_session_token(
+        &self,
+        _token: &SessionToken,
+    ) -> Result<crate::domain::models::UserId, ()> {
+        panic!("User service is disabled")
+    }
+
+    async fn login_user(&self, _email: EmailAddress) -> crate::inbound::http::UserLoginResult {
+        panic!("User service is disabled")
+    }
+
+    async fn register_user(&self, _email: EmailAddress) -> UserRegistrationResult {
+        panic!("User service is disabled")
+    }
+
+    async fn validate_magic_link(
+        &self,
+        _magic_token: MagicToken,
+    ) -> Result<crate::inbound::http::MagicLinkValidationResult, ()> {
+        panic!("User service is disabled")
+    }
+}
+
 #[cfg(test)]
 mod test_user_service_validate_magic_link {
     use chrono::{TimeDelta, Utc};
@@ -411,7 +438,7 @@ mod test_user_service_validate_magic_link {
         let session_token = SessionToken::new();
         let cloned_session_token = session_token.clone();
         let expire_at = Utc::now() + TimeDelta::minutes(5);
-        let cloned_expire_at = expire_at.clone();
+        let cloned_expire_at = expire_at;
         session
             .expect_generate_session_token()
             .times(1)
@@ -419,7 +446,7 @@ mod test_user_service_validate_magic_link {
             .returning(move |_| {
                 Ok(GenerateSessionTokenResult::new(
                     cloned_session_token.clone(),
-                    cloned_expire_at.clone(),
+                    cloned_expire_at,
                 ))
             });
 

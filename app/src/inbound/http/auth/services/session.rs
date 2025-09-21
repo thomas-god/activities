@@ -24,7 +24,7 @@ where
     ) -> Result<GenerateSessionTokenResult, ()> {
         let token = SessionToken::new();
         let expire_at = Utc::now() + TimeDelta::days(30);
-        let session = Session::new(user.clone(), token.clone(), expire_at.clone());
+        let session = Session::new(user.clone(), token.clone(), expire_at);
 
         match self
             .session_repository
@@ -174,9 +174,7 @@ mod test_session_service_check_session_token {
     async fn test_token_does_not_exist() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        repository
-            .expect_get_all_sessions()
-            .returning(move || vec![]);
+        repository.expect_get_all_sessions().returning(Vec::new);
         repository.expect_delete_session_by_token().times(0);
 
         let service = SessionService::new(Arc::new(Mutex::new(repository)));

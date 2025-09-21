@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, Method};
-use axum::middleware::from_extractor;
+
 use axum::routing::{delete, get, patch};
 use axum::{Router, routing::post};
 use cookie::SameSite;
@@ -13,11 +13,10 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingMetricService};
-use crate::inbound::http::auth::{DefaultUserExtractor, IUserService};
+
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
-    get_training_metrics, list_activities, login_user, patch_activity, upload_activities,
-    validate_login,
+    get_training_metrics, list_activities, patch_activity, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -25,8 +24,10 @@ pub use self::auth::infra::{
     DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
     InMemoryUserRepository,
 };
-pub use self::auth::services::{MagicLinkService, SessionService, UserService};
-pub use self::auth::{MagicLinkValidationResult, UserLoginResult};
+pub use self::auth::services::{
+    DisabledUserService, MagicLinkService, SessionService, UserService,
+};
+pub use self::auth::{IUserService, MagicLinkValidationResult, UserLoginResult};
 
 mod auth;
 mod handlers;
@@ -56,7 +57,7 @@ struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
-    user_service: Option<Arc<UR>>,
+    user_service: Arc<UR>,
     cookie_config: Arc<CookieConfig>,
 }
 
@@ -69,14 +70,14 @@ pub struct HttpServer<AS, PF, TMS, UR> {
     _marker_user_service: PhantomData<UR>,
 }
 
-impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUserService>
-    HttpServer<AS, PF, TMS, UR>
+impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUserService>
+    HttpServer<AS, PF, TMS, US>
 {
     pub async fn new(
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
-        session_repository: Option<UR>,
+        session_repository: US,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -90,7 +91,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUser
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
-            user_service: session_repository.map(Arc::new),
+            user_service: Arc::new(session_repository),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -107,9 +108,20 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUser
                     .allow_headers([CONTENT_TYPE])
                     .allow_origin([origin])
                     .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
-            )
-            .route_layer(from_extractor::<DefaultUserExtractor>())
-            .with_state(state);
+            );
+
+        #[cfg(any(feature = "demo", feature = "single-user"))]
+        let router = router.route_layer(axum::middleware::from_extractor::<
+            crate::inbound::http::auth::DefaultUserExtractor,
+        >());
+
+        #[cfg(feature = "multi-user")]
+        let router = router.route_layer(axum::middleware::from_extractor_with_state::<
+            crate::inbound::http::auth::CookieUserExtractor<US>,
+            AppState<AS, PF, TMS, US>,
+        >(state.clone()));
+
+        let router = router.with_state(state);
 
         let listener = net::TcpListener::bind(format!("0.0.0.0:{}", config.server_port))
             .await
@@ -140,12 +152,7 @@ fn api_routes<
     TMS: ITrainingMetricService,
     UR: IUserService,
 >() -> Router<AppState<AS, FP, TMS, UR>> {
-    Router::new()
-        .route("/login", post(login_user::<AS, FP, TMS, UR>))
-        .route(
-            "/login/validate/{magic_token}",
-            get(validate_login::<AS, FP, TMS, UR>),
-        )
+    let router = Router::new()
         .route("/activity", post(upload_activities::<AS, FP, TMS, UR>))
         .route("/activities", get(list_activities::<AS, FP, TMS, UR>))
         .route(
@@ -171,5 +178,18 @@ fn api_routes<
         .route(
             "/training/metric/{metric_id}",
             delete(delete_training_metric::<AS, FP, TMS, UR>),
+        );
+
+    #[cfg(feature = "multi-user")]
+    let router = router
+        .route(
+            "/login",
+            post(crate::inbound::http::login_user::<AS, FP, TMS, UR>),
         )
+        .route(
+            "/login/validate/{magic_token}",
+            get(crate::inbound::http::validate_login::<AS, FP, TMS, UR>),
+        );
+
+    router
 }

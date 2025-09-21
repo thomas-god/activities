@@ -294,9 +294,7 @@ mod test_magic_link_service_validate_magic_link {
     async fn test_no_matching_link_found() {
         let mut repository = MockSessionRepository::new();
         let token = MagicToken::new();
-        repository
-            .expect_get_all_magic_links()
-            .returning(move || vec![]);
+        repository.expect_get_all_magic_links().returning(Vec::new);
         repository.expect_delete_magic_link_by_token().times(0);
 
         let service = MagicLinkService::new(

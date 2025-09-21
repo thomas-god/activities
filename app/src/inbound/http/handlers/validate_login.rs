@@ -17,6 +17,7 @@ use crate::{
     },
 };
 
+#[allow(unused)]
 pub async fn validate_login<
     AS: IActivityService,
     PF: ParseFile,
@@ -26,12 +27,9 @@ pub async fn validate_login<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Path(magic_token): Path<String>,
 ) -> impl IntoResponse {
-    let Some(user_service) = state.user_service else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
     let token = MagicToken::from(magic_token);
 
-    match user_service.validate_magic_link(token).await {
+    match state.user_service.validate_magic_link(token).await {
         Ok(MagicLinkValidationResult::Success(session)) => {
             let Ok(expire_at) =
                 OffsetDateTime::from_unix_timestamp(session.expire_at().timestamp())

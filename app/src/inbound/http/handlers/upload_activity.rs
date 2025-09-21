@@ -111,7 +111,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Some(Arc::new(MockUserService::new())),
+            user_service: Arc::new(MockUserService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -144,7 +144,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Some(Arc::new(MockUserService::new())),
+            user_service: Arc::new(MockUserService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 

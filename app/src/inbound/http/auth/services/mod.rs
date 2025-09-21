@@ -4,4 +4,4 @@ pub mod user;
 
 pub use magic_link::MagicLinkService;
 pub use session::SessionService;
-pub use user::UserService;
+pub use user::{DisabledUserService, UserService};

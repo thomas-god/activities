@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod create_training_metric;
 mod delete_activity;
 mod delete_training_metric;
