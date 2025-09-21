@@ -7,6 +7,7 @@ use axum::{
 use base64::{Engine, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use derive_more::Constructor;
+use email_address::EmailAddress as EmailAddressValidator;
 use rand::Rng;
 use subtle::ConstantTimeEq;
 
@@ -49,7 +50,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Constructor, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EmailAddress(String);
 
 impl EmailAddress {
@@ -58,15 +59,23 @@ impl EmailAddress {
     }
 }
 
-impl From<&str> for EmailAddress {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
+impl TryFrom<&str> for EmailAddress {
+    type Error = ();
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if EmailAddressValidator::is_valid(value) {
+            return Ok(Self(value.to_string()));
+        }
+        Err(())
     }
 }
 
-impl From<String> for EmailAddress {
-    fn from(value: String) -> Self {
-        Self(value)
+impl TryFrom<String> for EmailAddress {
+    type Error = ();
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if EmailAddressValidator::is_valid(&value) {
+            return Ok(Self(value));
+        }
+        Err(())
     }
 }
 

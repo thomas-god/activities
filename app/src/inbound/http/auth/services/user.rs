@@ -173,13 +173,13 @@ mod test_user_service_register_new_user {
         magic_link
             .expect_generate_magic_link()
             .times(1)
-            .withf(|link| link.email() == &EmailAddress::new("test@mail.test".to_string()))
+            .withf(|link| link.email() == &EmailAddress::try_from("test@mail.test").unwrap())
             .returning(|_| GenerateMagicLinkResult::Success);
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Ok(None));
         user.expect_store_user_with_mail()
             .times(1)
-            .withf(|_user, email| email == &"test@mail.test".into())
+            .withf(|_user, email| email == &"test@mail.test".try_into().unwrap())
             .returning(|_, _| Ok(()));
 
         let service = UserService::new(
@@ -308,7 +308,7 @@ mod test_user_service_login_user {
         magic_link
             .expect_generate_magic_link()
             .times(1)
-            .withf(|link| link.email() == &"test@mail.test".into())
+            .withf(|link| link.email() == &"test@mail.test".try_into().unwrap())
             .returning(|_| GenerateMagicLinkResult::Success);
 
         let service = UserService::new(

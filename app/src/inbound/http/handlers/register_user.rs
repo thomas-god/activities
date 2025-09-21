@@ -29,7 +29,9 @@ pub async fn register_user<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Query(query): Query<RegisterUserQuery>,
 ) -> StatusCode {
-    let email = EmailAddress::from(query.email);
+    let Ok(email) = EmailAddress::try_from(query.email) else {
+        return StatusCode::BAD_REQUEST;
+    };
 
     match state.user_service.register_user(email).await {
         UserRegistrationResult::Success => StatusCode::OK,

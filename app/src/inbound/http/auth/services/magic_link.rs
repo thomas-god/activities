@@ -178,7 +178,7 @@ mod test_magic_link_service_generate_magic_link {
 
         let req = GenerateMagicLinkRequest::new(
             UserId::test_default(),
-            EmailAddress::new("test_email".to_string()),
+            EmailAddress::try_from("test@email.test").unwrap(),
         );
 
         let res = service.generate_magic_link(req).await;
@@ -205,7 +205,7 @@ mod test_magic_link_service_generate_magic_link {
 
         let req = GenerateMagicLinkRequest::new(
             UserId::test_default(),
-            EmailAddress::new("test_email".to_string()),
+            EmailAddress::try_from("test@email.com").unwrap(),
         );
 
         let res = service.generate_magic_link(req).await;
@@ -229,7 +229,8 @@ mod test_magic_link_service_generate_magic_link {
             .expect_send_magic_link_email()
             .times(1)
             .withf(|mail, magic_link| {
-                mail == &"test_email".into() && magic_link.user() == &UserId::test_default()
+                mail == &"test@email.test".try_into().unwrap()
+                    && magic_link.user() == &UserId::test_default()
             })
             .returning(|_, _| Ok(()));
 
@@ -238,7 +239,7 @@ mod test_magic_link_service_generate_magic_link {
 
         let req = GenerateMagicLinkRequest::new(
             UserId::test_default(),
-            EmailAddress::new("test_email".to_string()),
+            EmailAddress::try_from("test@email.test").unwrap(),
         );
 
         let res = service.generate_magic_link(req).await;

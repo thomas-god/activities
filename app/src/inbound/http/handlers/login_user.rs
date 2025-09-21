@@ -29,7 +29,9 @@ pub async fn login_user<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Query(query): Query<LoginUserQuery>,
 ) -> StatusCode {
-    let email = EmailAddress::from(query.email);
+    let Ok(email) = EmailAddress::try_from(query.email) else {
+        return StatusCode::BAD_REQUEST;
+    };
 
     match state.user_service.login_user(email).await {
         UserLoginResult::Success => StatusCode::OK,
