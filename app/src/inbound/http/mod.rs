@@ -100,26 +100,18 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUser
             .parse::<HeaderValue>()
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
-        let router = axum::Router::new()
-            .nest("/api", api_routes())
-            .layer(trace_layer)
-            .layer(
-                CorsLayer::new()
-                    .allow_headers([CONTENT_TYPE])
-                    .allow_origin([origin])
-                    .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
-            );
+        let mut router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
-        #[cfg(any(feature = "demo", feature = "single-user"))]
-        let router = router.route_layer(axum::middleware::from_extractor::<
-            crate::inbound::http::auth::DefaultUserExtractor,
-        >());
+        if cfg!(feature = "multi-user") {
+            router = router.nest("/api", login_routes());
+        }
 
-        #[cfg(feature = "multi-user")]
-        let router = router.route_layer(axum::middleware::from_extractor_with_state::<
-            crate::inbound::http::auth::CookieUserExtractor<US>,
-            AppState<AS, PF, TMS, US>,
-        >(state.clone()));
+        router = router.layer(trace_layer).layer(
+            CorsLayer::new()
+                .allow_headers([CONTENT_TYPE])
+                .allow_origin([origin])
+                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH]),
+        );
 
         let router = router.with_state(state);
 
@@ -146,50 +138,70 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUser
     }
 }
 
-fn api_routes<
+fn core_routes<
     AS: IActivityService,
-    FP: ParseFile,
+    PF: ParseFile,
     TMS: ITrainingMetricService,
-    UR: IUserService,
->() -> Router<AppState<AS, FP, TMS, UR>> {
-    let router = Router::new()
-        .route("/activity", post(upload_activities::<AS, FP, TMS, UR>))
-        .route("/activities", get(list_activities::<AS, FP, TMS, UR>))
+    US: IUserService,
+>(
+    state: AppState<AS, PF, TMS, US>,
+) -> Router<AppState<AS, PF, TMS, US>> {
+    let mut router = Router::new()
+        .route("/activity", post(upload_activities::<AS, PF, TMS, US>))
+        .route("/activities", get(list_activities::<AS, PF, TMS, US>))
         .route(
             "/activity/{activity_id}",
-            get(get_activity::<AS, FP, TMS, UR>),
+            get(get_activity::<AS, PF, TMS, US>),
         )
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, FP, TMS, UR>),
+            patch(patch_activity::<AS, PF, TMS, US>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, FP, TMS, UR>),
+            delete(delete_activity::<AS, PF, TMS, US>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, FP, TMS, UR>),
+            get(get_training_metrics::<AS, PF, TMS, US>),
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, FP, TMS, UR>),
+            post(create_training_metric::<AS, PF, TMS, US>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, FP, TMS, UR>),
+            delete(delete_training_metric::<AS, PF, TMS, US>),
         );
 
-    #[cfg(feature = "multi-user")]
-    let router = router
+    if cfg!(any(feature = "demo", feature = "single-user")) {
+        router = router.route_layer(axum::middleware::from_extractor::<
+            crate::inbound::http::auth::DefaultUserExtractor,
+        >());
+    } else {
+        router = router.route_layer(axum::middleware::from_extractor_with_state::<
+            crate::inbound::http::auth::CookieUserExtractor<US>,
+            AppState<AS, PF, TMS, US>,
+        >(state.clone()));
+    }
+
+    router
+}
+
+fn login_routes<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingMetricService,
+    US: IUserService,
+>() -> Router<AppState<AS, PF, TMS, US>> {
+    tracing::info!("loading multi user routes");
+    Router::new()
         .route(
             "/login",
-            post(crate::inbound::http::login_user::<AS, FP, TMS, UR>),
+            post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US>),
         )
         .route(
             "/login/validate/{magic_token}",
-            get(crate::inbound::http::validate_login::<AS, FP, TMS, UR>),
-        );
-
-    router
+            get(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US>),
+        )
 }

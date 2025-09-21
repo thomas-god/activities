@@ -20,7 +20,6 @@ pub struct LoginUserQuery {
     email: String,
 }
 
-#[allow(unused)]
 pub async fn login_user<
     AS: IActivityService,
     PF: ParseFile,

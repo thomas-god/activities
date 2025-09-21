@@ -17,7 +17,6 @@ use crate::{
     },
 };
 
-#[allow(unused)]
 pub async fn validate_login<
     AS: IActivityService,
     PF: ParseFile,
