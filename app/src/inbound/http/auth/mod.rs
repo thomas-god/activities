@@ -5,7 +5,7 @@ use axum::{
     http::{StatusCode, request::Parts},
 };
 use base64::{Engine, engine::general_purpose};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use derive_more::Constructor;
 use rand::Rng;
 use subtle::ConstantTimeEq;
@@ -84,6 +84,12 @@ impl MagicToken {
     /// Constant-time comparison between two [MagicToken]
     pub fn match_token_secure(&self, other: &MagicToken) -> bool {
         self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    }
+}
+
+impl From<String> for MagicToken {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
@@ -167,6 +173,12 @@ impl From<String> for SessionToken {
     }
 }
 
+impl std::fmt::Display for SessionToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserRegistrationResult {
     Success,
@@ -181,7 +193,7 @@ pub enum UserLoginResult {
 
 #[derive(Debug, Clone)]
 pub enum MagicLinkValidationResult {
-    Success(SessionToken),
+    Success(GenerateSessionTokenResult),
     Invalid,
 }
 
@@ -242,11 +254,27 @@ pub trait IMagicLinkService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<Option<UserId>, ()>> + Send;
 }
 
+#[derive(Clone, Debug, Constructor)]
+pub struct GenerateSessionTokenResult {
+    token: SessionToken,
+    expire_at: DateTime<Utc>,
+}
+
+impl GenerateSessionTokenResult {
+    pub fn token(&self) -> &SessionToken {
+        &self.token
+    }
+
+    pub fn expire_at(&self) -> &DateTime<Utc> {
+        &self.expire_at
+    }
+}
+
 pub trait ISessionService: Clone + Send + Sync + 'static {
     fn generate_session_token(
         &self,
         user: &UserId,
-    ) -> impl Future<Output = Result<SessionToken, ()>> + Send;
+    ) -> impl Future<Output = Result<GenerateSessionTokenResult, ()>> + Send;
 
     fn check_session_token(
         &self,
@@ -366,7 +394,7 @@ pub mod test_utils {
             async fn generate_session_token(
                 &self,
                 user: &UserId,
-            ) ->Result<SessionToken, ()>;
+            ) ->Result<GenerateSessionTokenResult, ()>;
 
             async fn check_session_token(
                 &self,

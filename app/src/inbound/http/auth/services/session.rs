@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::{ISessionService, Session, SessionToken},
+    inbound::http::auth::{GenerateSessionTokenResult, ISessionService, Session, SessionToken},
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -18,13 +18,13 @@ impl<SR> ISessionService for SessionService<SR>
 where
     SR: SessionRepository,
 {
-    async fn generate_session_token(&self, user: &UserId) -> Result<SessionToken, ()> {
+    async fn generate_session_token(
+        &self,
+        user: &UserId,
+    ) -> Result<GenerateSessionTokenResult, ()> {
         let token = SessionToken::new();
-        let session = Session::new(
-            user.clone(),
-            token.clone(),
-            Utc::now() + TimeDelta::hours(1),
-        );
+        let expire_at = Utc::now() + TimeDelta::days(30);
+        let session = Session::new(user.clone(), token.clone(), expire_at.clone());
 
         match self
             .session_repository
@@ -33,7 +33,7 @@ where
             .store_session(&session)
             .await
         {
-            Ok(()) => Ok(token),
+            Ok(()) => Ok(GenerateSessionTokenResult::new(token, expire_at)),
             Err(()) => Err(()),
         }
     }

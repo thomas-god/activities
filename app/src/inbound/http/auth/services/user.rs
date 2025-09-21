@@ -390,8 +390,10 @@ mod test_user_service_login_user {
 
 #[cfg(test)]
 mod test_user_service_validate_magic_link {
+    use chrono::{TimeDelta, Utc};
+
     use crate::inbound::http::auth::{
-        MagicLinkValidationResult, MagicToken, SessionToken,
+        GenerateSessionTokenResult, MagicLinkValidationResult, MagicToken, SessionToken,
         services::user::test_utils::MockUserRepository,
         test_utils::{MockMagicLinkService, MockSessionService},
     };
@@ -407,12 +409,19 @@ mod test_user_service_validate_magic_link {
             .returning(|_| Ok(Some(UserId::test_default())));
         let mut session = MockSessionService::new();
         let session_token = SessionToken::new();
-        let session_token_clone = session_token.clone();
+        let cloned_session_token = session_token.clone();
+        let expire_at = Utc::now() + TimeDelta::minutes(5);
+        let cloned_expire_at = expire_at.clone();
         session
             .expect_generate_session_token()
             .times(1)
             .withf(|user| user == &UserId::test_default())
-            .returning(move |_| Ok(session_token_clone.clone()));
+            .returning(move |_| {
+                Ok(GenerateSessionTokenResult::new(
+                    cloned_session_token.clone(),
+                    cloned_expire_at.clone(),
+                ))
+            });
 
         let service = UserService::new(
             Arc::new(Mutex::new(magic_link)),
@@ -424,10 +433,11 @@ mod test_user_service_validate_magic_link {
             .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
             .await;
 
-        let Ok(MagicLinkValidationResult::Success(token)) = res else {
+        let Ok(MagicLinkValidationResult::Success(session)) = res else {
             unreachable!("Should have return a Ok(MagicLinkValidationResult::Success(_))")
         };
-        assert!(token.match_token_secure(&session_token));
+        assert!(session.token().match_token_secure(&session_token));
+        assert_eq!(*session.expire_at(), expire_at);
     }
 
     #[tokio::test]
