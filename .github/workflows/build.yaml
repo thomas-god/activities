@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         feature: ["demo", "single-user", "multi-user"]
+        arch: ["amd64", "arm64"]
         include:
           - arch: amd64
             runs_on: ubuntu-24.04
