@@ -55,9 +55,9 @@ jobs:
             APP_FEATURE=${{ matrix.feature }}
           platforms: ${{ matrix.platform }}
           push: true
-          # tags: |
-          #   ghcr.io/thomas-god/activities:${{ matrix.feature }}-latest
-          #   ghcr.io/thomas-god/activities:${{ matrix.feature }}-${{ github.sha }}
+          tags: |
+            ghcr.io/thomas-god/activities:${{ matrix.feature }}-latest
+            ghcr.io/thomas-god/activities:${{ matrix.feature }}-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
