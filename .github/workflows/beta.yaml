@@ -1,4 +1,4 @@
-name: Deploy demo app
+name: Deploy beta app
 
 on:
   workflow_run:
@@ -8,7 +8,7 @@ on:
 jobs:
 
 
-  deploy-demo-app:
+  deploy-beta-app:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
@@ -18,8 +18,8 @@ jobs:
     - name: Docker Stack Deploy
       uses: cssnr/stack-deploy-action@v1
       with:
-        name: activities-demo
-        file: docker/demo.docker-stack.yaml
-        host: demo.activities.training
+        name: activities-beta
+        file: docker/beta.docker-stack.yaml
+        host: beta.activities.training
         user: deploy
         ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}

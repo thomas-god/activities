@@ -1,0 +1,37 @@
+services:
+  activities:
+    image: ghcr.io/thomas-god/activities:multi-user-latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.activities.loadbalancer.server.port=80"
+      - "traefik.http.routers.activities.rule=Host(`beta.activities.training`)"
+      - "traefik.http.routers.activities.entrypoints=websecure"
+      - "traefik.http.routers.activities.tls.certresolver=myresolver"
+      - "traefik.docker.network=traefik-public"
+    environment:
+      ACTIVITIES_MAILER_FROM_FILE: /run/secrets/activities_mailer_from
+      ACTIVITIES_MAILER_USERNAME_FILE: /run/secrets/activities_mailer_username
+      ACTIVITIES_MAILER_PASSWORD_FILE: /run/secrets/activities_mailer_password
+      ACTIVITIES_MAILER_RELAY_FILE: /run/secrets/activities_mailer_relay
+      ACTIVITIES_MAILER_DOMAIN_FILE: /run/secrets/activities_mailer_domain
+    networks:
+      - traefik-public
+    deploy:
+      update_config:
+        order: start-first
+
+secrets:
+  activities_mailer_from:
+    external: true
+  activities_mailer_username:
+    external: true
+  activities_mailer_password:
+    external: true
+  activities_mailer_relay:
+    external: true
+  activities_mailer_domain:
+    external: true
+
+networks:
+  traefik-public:
+    external: true
