@@ -30,12 +30,12 @@ impl Config {
 /// the file content is not a valid UTF8 string, the function returns an err.
 pub fn load_env(key: &str) -> anyhow::Result<String> {
     // First check the env as a path to a file containing the env value
-    if let Ok(path) = env::var(format!("{key:?}_FILE")) {
+    if let Ok(path) = env::var(format!("{key}_FILE")) {
         let path = Path::new(&path);
 
         if let Ok(content) = fs::read(path) {
             return String::from_utf8(content)
-                .with_context(|| format!("File content of {key:?}_FILE is invalid"));
+                .with_context(|| format!("File content of {key}_FILE is invalid"));
         };
     };
 
