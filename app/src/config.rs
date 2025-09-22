@@ -28,7 +28,7 @@ impl Config {
 /// points to a file that can be loaded into a String (e.g. for Docker secrets), else tries to read
 /// the content of environment variable `key` directly. If `key_FILE` points to a valid file, but
 /// the file content is not a valid UTF8 string, the function returns an err.
-fn load_env(key: &str) -> anyhow::Result<String> {
+pub fn load_env(key: &str) -> anyhow::Result<String> {
     // First check the env as a path to a file containing the env value
     if let Ok(path) = env::var(format!("{key:?}_FILE")) {
         let path = Path::new(&path);

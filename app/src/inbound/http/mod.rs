@@ -20,9 +20,12 @@ use crate::inbound::http::handlers::{
 };
 use crate::inbound::parser::ParseFile;
 
-pub use self::auth::infra::memory::{
-    DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
-    InMemoryUserRepository,
+pub use self::auth::infra::{
+    mailer::SMTPEmailProvider,
+    memory::{
+        DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
+        InMemoryUserRepository,
+    },
 };
 pub use self::auth::services::{
     DisabledUserService, MagicLinkService, SessionService, UserService,

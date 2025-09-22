@@ -6,7 +6,7 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose};
 use chrono::{DateTime, Utc};
-use derive_more::Constructor;
+use derive_more::{Constructor, Display};
 use email_address::EmailAddress as EmailAddressValidator;
 use rand::Rng;
 use subtle::ConstantTimeEq;
@@ -50,7 +50,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Display)]
 pub struct EmailAddress(String);
 
 impl EmailAddress {
@@ -95,6 +95,12 @@ impl MagicToken {
     /// Constant-time comparison between two [MagicToken]
     pub fn match_token_secure(&self, other: &MagicToken) -> bool {
         self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    }
+}
+
+impl std::fmt::Display for MagicToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

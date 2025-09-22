@@ -1,14 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
+use anyhow::Ok;
 use tokio::sync::Mutex;
 
 use crate::{
-    config::Config,
+    config::{Config, load_env},
     domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
     inbound::{
         http::{
-            DoNothingMailProvider, HttpServer, InMemoryMagicLinkRepository,
-            InMemorySessionRepository, InMemoryUserRepository, MagicLinkService, SessionService,
+            HttpServer, InMemoryMagicLinkRepository, InMemorySessionRepository,
+            InMemoryUserRepository, MagicLinkService, SMTPEmailProvider, SessionService,
             UserService,
         },
         parser::FitParser,
@@ -28,7 +29,7 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         FitParser,
         TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
         UserService<
-            MagicLinkService<InMemoryMagicLinkRepository, DoNothingMailProvider>,
+            MagicLinkService<InMemoryMagicLinkRepository, SMTPEmailProvider>,
             InMemoryUserRepository,
             SessionService<InMemorySessionRepository>,
         >,
@@ -65,7 +66,7 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
     let magic_link_repository = Arc::new(Mutex::new(InMemoryMagicLinkRepository::new(Arc::new(
         Mutex::new(Vec::new()),
     ))));
-    let mail_provider = Arc::new(DoNothingMailProvider::new());
+    let mail_provider = Arc::new(build_mailer()?);
     let magic_link_service = Arc::new(Mutex::new(MagicLinkService::new(
         magic_link_repository,
         mail_provider,
@@ -89,6 +90,17 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         config,
     )
     .await?;
-
     Ok(http_server)
+}
+
+fn build_mailer() -> anyhow::Result<SMTPEmailProvider> {
+    let from = load_env("ACTIVITIES_MAILER_FROM")?;
+    let username = load_env("ACTIVITIES_MAILER_USERNAME")?;
+    let password = load_env("ACTIVITIES_MAILER_PASSWORD")?;
+    let relay = load_env("ACTIVITIES_MAILER_RELAY")?;
+    let domain = load_env("ACTIVITIES_MAILER_DOMAIN")?;
+
+    let mailer = SMTPEmailProvider::new(&from, &username, &password, &relay, &domain)?;
+
+    Ok(mailer)
 }
