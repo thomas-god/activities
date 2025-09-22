@@ -41,6 +41,14 @@ impl SMTPEmailProvider {
         relay: &str,
         domain: &str,
     ) -> Result<Self, SMTPEmailProviderCreationError> {
+        tracing::info!("Building mailer for sender address {}", from);
+        tracing::info!(
+            "Username {} on domain {} and relay {}",
+            username,
+            domain,
+            relay
+        );
+
         // Load mails templates
         let mut handlebars = Handlebars::new();
         handlebars
