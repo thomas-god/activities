@@ -95,10 +95,16 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
 
 fn build_mailer() -> anyhow::Result<SMTPEmailProvider> {
     let from = load_env("ACTIVITIES_MAILER_FROM")?;
-    let username = load_env("ACTIVITIES_MAILER_USERNAME")?;
-    let password = load_env("ACTIVITIES_MAILER_PASSWORD")?;
-    let relay = load_env("ACTIVITIES_MAILER_RELAY")?;
-    let domain = load_env("ACTIVITIES_MAILER_DOMAIN")?;
+    tracing::info!("from: {}", from);
+    let username = load_env("ACTIVITIES_MAILER_FROM")?;
+    let password = load_env("ACTIVITIES_MAILER_FROM")?;
+    let relay = load_env("ACTIVITIES_MAILER_FROM")?;
+    let domain = load_env("ACTIVITIES_MAILER_FROM")?;
+
+    // let username = load_env("ACTIVITIES_MAILER_USERNAME")?;
+    // let password = load_env("ACTIVITIES_MAILER_PASSWORD")?;
+    // let relay = load_env("ACTIVITIES_MAILER_RELAY")?;
+    // let domain = load_env("ACTIVITIES_MAILER_DOMAIN")?;
 
     let mailer = SMTPEmailProvider::new(&from, &username, &password, &relay, &domain)?;
 
