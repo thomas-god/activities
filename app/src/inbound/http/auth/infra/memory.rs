@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use derive_more::Constructor;
+
 use tokio::sync::Mutex;
 
 use crate::{
@@ -52,7 +53,11 @@ impl MailProvider for DoNothingMailProvider {
         email: &EmailAddress,
         _magic_link: &MagicLink,
     ) -> Result<(), ()> {
-        tracing::info!("Dummy send to {email:?}");
+        tracing::info!(
+            "Dummy send to {email:?} for token: {:?} to user {:?}",
+            _magic_link.token(),
+            _magic_link.user()
+        );
         Ok(())
     }
 }

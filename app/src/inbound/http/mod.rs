@@ -20,7 +20,7 @@ use crate::inbound::http::handlers::{
 };
 use crate::inbound::parser::ParseFile;
 
-pub use self::auth::infra::{
+pub use self::auth::infra::memory::{
     DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
     InMemoryUserRepository,
 };
