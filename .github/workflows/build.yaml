@@ -119,7 +119,7 @@ jobs:
             type=sha,prefix=${{ matrix.feature }}-
 
       - name: Create manifest list and push
-        working-directory: ${{ runner.temp }}/digests
+        working-directory: ${{ runner.temp }}/digests/${{ matrix.feature }}
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf 'ghcr.io/thomas-god/activities@sha256:%s ' *)
