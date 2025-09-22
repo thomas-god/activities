@@ -3,10 +3,10 @@ services:
     image: ghcr.io/thomas-god/activities:demo-main
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.activities.loadbalancer.server.port=80"
-      - "traefik.http.routers.activities.rule=Host(`demo.activities.training`)"
-      - "traefik.http.routers.activities.entrypoints=websecure"
-      - "traefik.http.routers.activities.tls.certresolver=myresolver"
+      - "traefik.http.services.activities-demo.loadbalancer.server.port=80"
+      - "traefik.http.routers.activities-demo.rule=Host(`demo.activities.training`)"
+      - "traefik.http.routers.activities-demo.entrypoints=websecure"
+      - "traefik.http.routers.activities-demo.tls.certresolver=myresolver"
       - "traefik.docker.network=traefik-public"
     networks:
       - traefik-public

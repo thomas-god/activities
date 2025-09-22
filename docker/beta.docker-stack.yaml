@@ -3,10 +3,10 @@ services:
     image: ghcr.io/thomas-god/activities:multi-user-main
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.activities.loadbalancer.server.port=80"
-      - "traefik.http.routers.activities.rule=Host(`beta.activities.training`)"
-      - "traefik.http.routers.activities.entrypoints=websecure"
-      - "traefik.http.routers.activities.tls.certresolver=myresolver"
+      - "traefik.http.services.activities-beta.loadbalancer.server.port=80"
+      - "traefik.http.routers.activities-beta.rule=Host(`beta.activities.training`)"
+      - "traefik.http.routers.activities-beta.entrypoints=websecure"
+      - "traefik.http.routers.activities-beta.tls.certresolver=myresolver"
       - "traefik.docker.network=traefik-public"
     environment:
       ACTIVITIES_MAILER_FROM_FILE: /run/secrets/activities_mailer_from
