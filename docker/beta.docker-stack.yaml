@@ -16,6 +16,12 @@ services:
       ACTIVITIES_MAILER_DOMAIN_FILE: /run/secrets/activities_mailer_domain
     networks:
       - traefik-public
+    secrets:
+      - activities_mailer_from
+      - activities_mailer_username
+      - activities_mailer_password
+      - activities_mailer_relay
+      - activities_mailer_domain
     deploy:
       update_config:
         order: start-first
