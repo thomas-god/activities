@@ -115,7 +115,7 @@ jobs:
             latest=auto
             prefix=${{ matrix.feature }}
           tags: |
-            type=ref,event=branch
+            type=ref,event=branch,prefix=${{ matrix.feature }}-
             type=sha,prefix=${{ matrix.feature }}-
 
       - name: Create manifest list and push
