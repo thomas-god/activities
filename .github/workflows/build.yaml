@@ -9,6 +9,7 @@ jobs:
   build-docker-image:
     strategy:
       matrix:
+        feature: ["demo", "single-user", "multi-user"]
         include:
           - arch: amd64
             runs_on: ubuntu-24.04
@@ -50,11 +51,13 @@ jobs:
         with:
           context: "{{defaultContext}}"
           file: ./docker/Dockerfile
+          build-args: |
+            APP_FEATURE=${{ matrix.feature }}
           platforms: ${{ matrix.platform }}
           push: true
-          tags: |
-            ghcr.io/thomas-god/activities:latest
-            ghcr.io/thomas-god/activities:${{ github.sha }}
+          # tags: |
+          #   ghcr.io/thomas-god/activities:${{ matrix.feature }}-latest
+          #   ghcr.io/thomas-god/activities:${{ matrix.feature }}-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
@@ -65,28 +68,31 @@ jobs:
 
       - name: Export digest
         run: |
-          mkdir -p ${{ runner.temp }}/digests
+          mkdir -p ${{ runner.temp }}/digests/${{ matrix.feature }}
           digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          touch "${{ runner.temp }}/digests/${{ matrix.feature }}/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/digests/*
+          path: ${{ runner.temp }}/digests/${{ matrix.feature }}/*
           if-no-files-found: error
           retention-days: 1
 
-# Taken from https://docs.docker.com/build/ci/github-actions/multi-platform/#distribute-build-across-multiple-runners
+  # Taken from https://docs.docker.com/build/ci/github-actions/multi-platform/#distribute-build-across-multiple-runners
   merge:
     runs-on: ubuntu-24.04
     needs:
       - build-docker-image
+    strategy:
+      matrix:
+        feature: ["demo", "single-user", "multi-user"]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: ${{ runner.temp }}/digests
+          path: ${{ runner.temp }}/digests/${{ matrix.feature }}
           pattern: digests-*
           merge-multiple: true
 
@@ -105,11 +111,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/thomas-god/activities
+          flavor: |
+            latest=auto
+            prefix=${{ matrix.feature }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=${{ matrix.feature }}-
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests

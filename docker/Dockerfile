@@ -21,13 +21,16 @@ RUN npm run build
 
 # Build stage for Rust backend
 FROM rust:1.89-alpine AS backend-builder
+
+ARG APP_FEATURE
+
 RUN apk add --no-cache musl-dev
 WORKDIR /app/backend
 COPY Cargo.toml Cargo.lock ./
 COPY app/ app/
 COPY fit-parser/ fit-parser/
 COPY fit-codegen/ fit-codegen/
-RUN cargo build --release -p app --features demo
+RUN cargo build --release -p app --features $APP_FEATURE
 
 # Runtime stage
 FROM nginx:alpine
