@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fs, path::Path};
 
 use anyhow::Context;
 
@@ -24,6 +24,21 @@ impl Config {
     }
 }
 
+/// Load a value from environment variable. First checks if the environment variable `key_FILE`
+/// points to a file that can be loaded into a String (e.g. for Docker secrets), else tries to read
+/// the content of environment variable `key` directly. If `key_FILE` points to a valid file, but
+/// the file content is not a valid UTF8 string, the function returns an err.
 fn load_env(key: &str) -> anyhow::Result<String> {
+    // First check the env as a path to a file containing the env value
+    if let Ok(path) = env::var(format!("{key:?}_FILE")) {
+        let path = Path::new(&path);
+
+        if let Ok(content) = fs::read(path) {
+            return String::from_utf8(content)
+                .with_context(|| format!("File content of {key:?}_FILE is invalid"));
+        };
+    };
+
+    // Else try to load the content directly from the env
     env::var(key).with_context(|| format!("failed to load environment variable {}", key))
 }
