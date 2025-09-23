@@ -463,7 +463,12 @@ mod test_user_service_validate_magic_link {
         let Ok(MagicLinkValidationResult::Success(session)) = res else {
             unreachable!("Should have return a Ok(MagicLinkValidationResult::Success(_))")
         };
-        assert!(session.token().match_token_secure(&session_token));
+        assert!(
+            session_token
+                .as_hash()
+                .unwrap()
+                .verify_token(session.token())
+        );
         assert_eq!(*session.expire_at(), expire_at);
     }
 

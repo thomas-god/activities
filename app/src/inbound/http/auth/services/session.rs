@@ -6,7 +6,10 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::{GenerateSessionTokenResult, ISessionService, Session, SessionToken},
+    inbound::http::auth::{
+        GenerateSessionTokenResult, HashedSession, HashedSessionToken, ISessionService, Session,
+        SessionToken,
+    },
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -25,12 +28,15 @@ where
         let token = SessionToken::new();
         let expire_at = Utc::now() + TimeDelta::days(30);
         let session = Session::new(user.clone(), token.clone(), expire_at);
+        let Ok(hashed_session) = session.as_hash() else {
+            return Err(());
+        };
 
         match self
             .session_repository
             .lock()
             .await
-            .store_session(&session)
+            .store_session(&hashed_session)
             .await
         {
             Ok(()) => Ok(GenerateSessionTokenResult::new(token, expire_at)),
@@ -47,10 +53,10 @@ where
         let now = Utc::now();
         for session in sessions {
             if session.is_expired(&now) {
-                let _ = repository.delete_session_by_token(token).await;
+                let _ = repository.delete_session_by_hash(session.hash()).await;
                 continue;
             }
-            if session.token().match_token_secure(token) {
+            if session.hash().verify_token(token) {
                 found = Some(session)
             }
         }
@@ -63,13 +69,14 @@ where
 }
 
 pub trait SessionRepository: Clone + Send + Sync + 'static {
-    fn store_session(&self, session: &Session) -> impl Future<Output = Result<(), ()>> + Send;
+    fn store_session(&self, session: &HashedSession)
+    -> impl Future<Output = Result<(), ()>> + Send;
 
-    fn get_all_sessions(&self) -> impl Future<Output = Vec<Session>> + Send;
+    fn get_all_sessions(&self) -> impl Future<Output = Vec<HashedSession>> + Send;
 
-    fn delete_session_by_token(
+    fn delete_session_by_hash(
         &self,
-        token: &SessionToken,
+        token: &HashedSessionToken,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
@@ -87,9 +94,9 @@ mod test_utils {
         }
 
         impl SessionRepository for SessionRepository {
-            async fn store_session(&self, session: &Session) -> Result<(), ()>;
-            async fn get_all_sessions(&self) -> Vec<Session>;
-            async fn delete_session_by_token(&self, token: &SessionToken) -> Result<(), ()>;
+            async fn store_session(&self, session: &HashedSession) -> Result<(), ()>;
+            async fn get_all_sessions(&self) -> Vec<HashedSession>;
+            async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()>;
         }
     }
 }
@@ -144,15 +151,16 @@ mod test_session_service_check_session_token {
     async fn test_ok_path() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let cloned_token = token.clone();
+        let hased_token = token.as_hash().unwrap();
+        let cloned_hashed_token = hased_token.clone();
         repository.expect_get_all_sessions().returning(move || {
-            vec![Session::new(
+            vec![HashedSession::new(
                 UserId::test_default(),
-                cloned_token.clone(),
+                cloned_hashed_token.clone(),
                 Utc::now() + TimeDelta::minutes(5),
             )]
         });
-        repository.expect_delete_session_by_token().times(0);
+        repository.expect_delete_session_by_hash().times(0);
 
         let service = SessionService::new(Arc::new(Mutex::new(repository)));
 
@@ -166,7 +174,7 @@ mod test_session_service_check_session_token {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
         repository.expect_get_all_sessions().returning(Vec::new);
-        repository.expect_delete_session_by_token().times(0);
+        repository.expect_delete_session_by_hash().times(0);
 
         let service = SessionService::new(Arc::new(Mutex::new(repository)));
 
@@ -179,19 +187,20 @@ mod test_session_service_check_session_token {
     async fn test_token_is_expired() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let cloned_token = token.clone();
+        let hashed_token = token.as_hash().unwrap();
+        let cloned_hashed_token = hashed_token.clone();
         repository.expect_get_all_sessions().returning(move || {
-            vec![Session::new(
+            vec![HashedSession::new(
                 UserId::test_default(),
-                cloned_token.clone(),
+                cloned_hashed_token.clone(),
                 Utc::now() - TimeDelta::minutes(5),
             )]
         });
         let cloned_token = token.clone();
         repository
-            .expect_delete_session_by_token()
+            .expect_delete_session_by_hash()
             .times(1)
-            .withf(move |token| token.match_token_secure(&cloned_token))
+            .withf(move |hash| hash.verify_token(&cloned_token))
             .returning(|_| Ok(()));
 
         let service = SessionService::new(Arc::new(Mutex::new(repository)));

@@ -13,7 +13,6 @@ use chrono::{DateTime, Utc};
 use derive_more::{Constructor, Display};
 use email_address::EmailAddress as EmailAddressValidator;
 use rand::Rng;
-use subtle::ConstantTimeEq;
 
 use crate::{
     domain::{
@@ -164,10 +163,6 @@ impl MagicLink {
         &self.expire_at
     }
 
-    pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
-        reference >= &self.expire_at
-    }
-
     pub fn as_hash(&self) -> Result<HashedMagicLink, ()> {
         let Ok(hash) = self.token().as_hash() else {
             return Err(());
@@ -225,6 +220,38 @@ impl Session {
         &self.expire_at
     }
 
+    pub fn as_hash(&self) -> Result<HashedSession, ()> {
+        let Ok(hash) = self.token().as_hash() else {
+            return Err(());
+        };
+        Ok(HashedSession::new(
+            self.user().clone(),
+            hash,
+            *self.expire_at(),
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Constructor)]
+pub struct HashedSession {
+    user: UserId,
+    hash: HashedSessionToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl HashedSession {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn hash(&self) -> &HashedSessionToken {
+        &self.hash
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
     pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
         reference >= &self.expire_at
     }
@@ -243,9 +270,17 @@ impl SessionToken {
         Self(general_purpose::URL_SAFE_NO_PAD.encode(random_bytes))
     }
 
-    /// Constant-time comparison between two [SessionToken]
-    pub fn match_token_secure(&self, other: &SessionToken) -> bool {
-        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
+    pub fn as_hash(&self) -> Result<HashedSessionToken, ()> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        match argon2.hash_password(self.0.as_bytes(), &salt) {
+            Ok(hash) => Ok(HashedSessionToken::new(hash.to_string())),
+            Err(_err) => Err(()),
+        }
     }
 }
 
@@ -262,6 +297,28 @@ impl From<String> for SessionToken {
 }
 
 impl std::fmt::Display for SessionToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq)]
+pub struct HashedSessionToken(String);
+
+impl HashedSessionToken {
+    pub fn verify_token(&self, token: &SessionToken) -> bool {
+        let Ok(hashed_password) = PasswordHash::new(&self.0) else {
+            return false;
+        };
+        let argon2 = Argon2::default();
+
+        argon2
+            .verify_password(token.as_bytes(), &hashed_password)
+            .is_ok()
+    }
+}
+
+impl std::fmt::Display for HashedSessionToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -537,7 +594,11 @@ mod test {
     #[test]
     fn test_magic_link_expiry() {
         let expire_at = chrono::Utc::now();
-        let link = MagicLink::new(UserId::test_default(), MagicToken::new(), expire_at);
+        let link = HashedMagicLink::new(
+            UserId::test_default(),
+            MagicToken::new().as_hash().unwrap(),
+            expire_at,
+        );
         assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));
         assert!(!link.is_expired(&(expire_at - TimeDelta::seconds(1))));
     }

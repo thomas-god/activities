@@ -7,7 +7,8 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        EmailAddress, HashedMagicLink, HashedMagicToken, MagicLink, Session, SessionToken,
+        EmailAddress, HashedMagicLink, HashedMagicToken, HashedSession, HashedSessionToken,
+        MagicLink,
         services::{
             magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
             session::SessionRepository,
@@ -90,24 +91,24 @@ impl UserRepository for InMemoryUserRepository {
 
 #[derive(Debug, Clone, Constructor)]
 pub struct InMemorySessionRepository {
-    sessions: Arc<Mutex<Vec<Session>>>,
+    sessions: Arc<Mutex<Vec<HashedSession>>>,
 }
 
 impl SessionRepository for InMemorySessionRepository {
-    async fn store_session(&self, session: &Session) -> Result<(), ()> {
+    async fn store_session(&self, session: &HashedSession) -> Result<(), ()> {
         self.sessions.lock().await.push(session.clone());
         Ok(())
     }
 
-    async fn get_all_sessions(&self) -> Vec<Session> {
+    async fn get_all_sessions(&self) -> Vec<HashedSession> {
         self.sessions.lock().await.clone()
     }
 
-    async fn delete_session_by_token(&self, token: &SessionToken) -> Result<(), ()> {
+    async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()> {
         self.sessions
             .lock()
             .await
-            .retain(|session| !session.token().match_token_secure(token));
+            .retain(|session| session.hash() != hash);
         Ok(())
     }
 }
