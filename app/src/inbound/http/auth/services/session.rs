@@ -76,7 +76,7 @@ pub trait SessionRepository: Clone + Send + Sync + 'static {
 
     fn delete_session_by_hash(
         &self,
-        token: &HashedSessionToken,
+        hash: &HashedSessionToken,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
