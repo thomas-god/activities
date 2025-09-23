@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 use anyhow::Ok;
 use tokio::sync::Mutex;
@@ -8,9 +8,8 @@ use crate::{
     domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
     inbound::{
         http::{
-            HttpServer, InMemoryMagicLinkRepository, InMemorySessionRepository,
-            InMemoryUserRepository, MagicLinkService, SMTPEmailProvider, SessionService,
-            UserService,
+            HttpServer, MagicLinkService, SMTPEmailProvider, SessionService,
+            SqliteMagicLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
         },
         parser::FitParser,
     },
@@ -29,9 +28,9 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         FitParser,
         TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
         UserService<
-            MagicLinkService<InMemoryMagicLinkRepository, SMTPEmailProvider>,
-            InMemoryUserRepository,
-            SessionService<InMemorySessionRepository>,
+            MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
+            SqliteUserRepository,
+            SessionService<SqliteSessionRepository>,
         >,
     >,
 > {
@@ -63,22 +62,8 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         raw_data_repository,
         training_metrics_service.clone(),
     );
-    let magic_link_repository = Arc::new(Mutex::new(InMemoryMagicLinkRepository::new(Arc::new(
-        Mutex::new(Vec::new()),
-    ))));
-    let mail_provider = Arc::new(build_mailer()?);
-    let magic_link_service = Arc::new(Mutex::new(MagicLinkService::new(
-        magic_link_repository,
-        mail_provider,
-    )));
-    let user_repository = Arc::new(Mutex::new(InMemoryUserRepository::new(Arc::new(
-        Mutex::new(HashMap::new()),
-    ))));
-    let session_repository = Arc::new(Mutex::new(InMemorySessionRepository::new(Arc::new(
-        Mutex::new(Vec::new()),
-    ))));
-    let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
-    let user_service = UserService::new(magic_link_service, user_repository, session_service);
+
+    let user_service = build_user_service().await?;
 
     let parser = FitParser {};
 
@@ -103,4 +88,38 @@ fn build_mailer() -> anyhow::Result<SMTPEmailProvider> {
     let mailer = SMTPEmailProvider::new(&from, &username, &password, &relay, &domain)?;
 
     Ok(mailer)
+}
+
+async fn build_user_service() -> anyhow::Result<
+    UserService<
+        MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
+        SqliteUserRepository,
+        SessionService<SqliteSessionRepository>,
+    >,
+> {
+    let db_dir = load_env("ACTIVITIES_DB_PATH")?;
+
+    let magic_db = Path::new(&db_dir).join("magic_link.db");
+    let magic_link_repository = Arc::new(Mutex::new(
+        SqliteMagicLinkRepository::new(&format!("sqlite:{}", magic_db.to_string_lossy())).await?,
+    ));
+    let mail_provider = Arc::new(build_mailer()?);
+    let magic_link_service = Arc::new(Mutex::new(MagicLinkService::new(
+        magic_link_repository,
+        mail_provider,
+    )));
+
+    let user_db = Path::new(&db_dir).join("user.db");
+    let user_repository = Arc::new(Mutex::new(
+        SqliteUserRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
+    ));
+
+    let session_db = Path::new(&db_dir).join("user.db");
+    let session_repository = Arc::new(Mutex::new(
+        SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?,
+    ));
+    let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
+    let user_service = UserService::new(magic_link_service, user_repository, session_service);
+
+    Ok(user_service)
 }

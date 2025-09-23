@@ -218,3 +218,5 @@ __marimo__/
 *.xlsx
 
 tmp.txt
+
+data/

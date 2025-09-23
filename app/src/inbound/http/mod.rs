@@ -26,6 +26,10 @@ pub use self::auth::infra::{
         DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
         InMemoryUserRepository,
     },
+    sqlite::{
+        magic_link::SqliteMagicLinkRepository, session::SqliteSessionRepository,
+        user::SqliteUserRepository,
+    },
 };
 pub use self::auth::services::{
     DisabledUserService, MagicLinkService, SessionService, UserService,
