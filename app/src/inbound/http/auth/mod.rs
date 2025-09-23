@@ -1,5 +1,9 @@
 use std::{marker::PhantomData, sync::Arc};
 
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    password_hash::{SaltString, rand_core::OsRng},
+};
 use axum::{
     extract::{FromRef, FromRequestParts},
     http::{StatusCode, request::Parts},
@@ -92,9 +96,17 @@ impl MagicToken {
         Self(general_purpose::URL_SAFE_NO_PAD.encode(random_bytes))
     }
 
-    /// Constant-time comparison between two [MagicToken]
-    pub fn match_token_secure(&self, other: &MagicToken) -> bool {
-        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
+    pub fn as_hash(&self) -> Result<HashedMagicToken, ()> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        match argon2.hash_password(self.0.as_bytes(), &salt) {
+            Ok(hash) => Ok(HashedMagicToken::new(hash.to_string())),
+            Err(_err) => Err(()),
+        }
     }
 }
 
@@ -107,6 +119,28 @@ impl std::fmt::Display for MagicToken {
 impl From<String> for MagicToken {
     fn from(value: String) -> Self {
         Self(value)
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq)]
+pub struct HashedMagicToken(String);
+
+impl HashedMagicToken {
+    pub fn verify_token(&self, token: &MagicToken) -> bool {
+        let Ok(hashed_password) = PasswordHash::new(&self.0) else {
+            return false;
+        };
+        let argon2 = Argon2::default();
+
+        argon2
+            .verify_password(token.as_bytes(), &hashed_password)
+            .is_ok()
+    }
+}
+
+impl std::fmt::Display for HashedMagicToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -124,6 +158,42 @@ impl MagicLink {
 
     pub fn token(&self) -> &MagicToken {
         &self.token
+    }
+
+    pub fn expire_at(&self) -> &chrono::DateTime<Utc> {
+        &self.expire_at
+    }
+
+    pub fn is_expired(&self, reference: &chrono::DateTime<Utc>) -> bool {
+        reference >= &self.expire_at
+    }
+
+    pub fn as_hash(&self) -> Result<HashedMagicLink, ()> {
+        let Ok(hash) = self.token().as_hash() else {
+            return Err(());
+        };
+        Ok(HashedMagicLink::new(
+            self.user().clone(),
+            hash,
+            *self.expire_at(),
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Constructor)]
+pub struct HashedMagicLink {
+    user: UserId,
+    hash: HashedMagicToken,
+    expire_at: chrono::DateTime<Utc>,
+}
+
+impl HashedMagicLink {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn hash(&self) -> &HashedMagicToken {
+        &self.hash
     }
 
     pub fn expire_at(&self) -> &chrono::DateTime<Utc> {

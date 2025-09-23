@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        EmailAddress, MagicLink, MagicToken, Session, SessionToken,
+        EmailAddress, HashedMagicLink, HashedMagicToken, MagicLink, Session, SessionToken,
         services::{
             magic_link::{MagicLinkRepository, MagicLinkRepositoryError, MailProvider},
             session::SessionRepository,
@@ -18,27 +18,30 @@ use crate::{
 
 #[derive(Debug, Clone, Constructor)]
 pub struct InMemoryMagicLinkRepository {
-    magic_links: Arc<Mutex<Vec<MagicLink>>>,
+    magic_links: Arc<Mutex<Vec<HashedMagicLink>>>,
 }
 
 impl MagicLinkRepository for InMemoryMagicLinkRepository {
-    async fn store_magic_link(&self, link: &MagicLink) -> Result<(), MagicLinkRepositoryError> {
+    async fn store_magic_link(
+        &self,
+        link: &HashedMagicLink,
+    ) -> Result<(), MagicLinkRepositoryError> {
         self.magic_links.lock().await.push(link.clone());
         Ok(())
     }
 
-    async fn get_all_magic_links(&self) -> Vec<MagicLink> {
+    async fn get_all_magic_links(&self) -> Vec<HashedMagicLink> {
         self.magic_links.lock().await.clone()
     }
 
-    async fn delete_magic_link_by_token(
+    async fn delete_magic_link_by_hash(
         &self,
-        token: &MagicToken,
+        hash: &HashedMagicToken,
     ) -> Result<(), MagicLinkRepositoryError> {
         self.magic_links
             .lock()
             .await
-            .retain(|link| !link.token().match_token_secure(token));
+            .retain(|link| link.hash() != hash);
 
         Ok(())
     }

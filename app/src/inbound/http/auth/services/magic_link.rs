@@ -6,8 +6,8 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::inbound::http::auth::{
-    EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, IMagicLinkService, MagicLink,
-    MagicToken,
+    EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, HashedMagicLink,
+    HashedMagicToken, IMagicLinkService, MagicLink, MagicToken,
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -32,10 +32,13 @@ where
             magic_token.clone(),
             Utc::now() + TimeDelta::minutes(5),
         );
+        let Ok(hashed_magic_link) = magic_link.as_hash() else {
+            return GenerateMagicLinkResult::Retry;
+        };
 
         let repository = self.magic_link_repository.lock().await;
 
-        let Ok(()) = repository.store_magic_link(&magic_link).await else {
+        let Ok(()) = repository.store_magic_link(&hashed_magic_link).await else {
             return GenerateMagicLinkResult::Retry;
         };
 
@@ -44,7 +47,9 @@ where
             .send_magic_link_email(req.email(), &magic_link)
             .await
         else {
-            let _ = repository.delete_magic_link_by_token(&magic_token).await;
+            let _ = repository
+                .delete_magic_link_by_hash(hashed_magic_link.hash())
+                .await;
             return GenerateMagicLinkResult::Retry;
         };
 
@@ -63,16 +68,16 @@ where
         let now = Utc::now();
         for link in links {
             if link.is_expired(&now) {
-                let _ = repository.delete_magic_link_by_token(token).await;
+                let _ = repository.delete_magic_link_by_hash(link.hash()).await;
                 continue;
             }
-            if link.token().match_token_secure(token) {
+            if link.hash().verify_token(token) {
                 found = Some(link);
             }
         }
 
-        if found.is_some() {
-            let _ = repository.delete_magic_link_by_token(token).await;
+        if let Some(link) = &found {
+            let _ = repository.delete_magic_link_by_hash(link.hash()).await;
         }
 
         Ok(found.map(|link| link.user().clone()))
@@ -88,14 +93,14 @@ pub enum MagicLinkRepositoryError {
 pub trait MagicLinkRepository: Clone + Send + Sync + 'static {
     fn store_magic_link(
         &self,
-        link: &MagicLink,
+        link: &HashedMagicLink,
     ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
 
-    fn get_all_magic_links(&self) -> impl Future<Output = Vec<MagicLink>> + Send;
+    fn get_all_magic_links(&self) -> impl Future<Output = Vec<HashedMagicLink>> + Send;
 
-    fn delete_magic_link_by_token(
+    fn delete_magic_link_by_hash(
         &self,
-        token: &MagicToken,
+        hash: &HashedMagicToken,
     ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
 }
 
@@ -123,14 +128,14 @@ mod test_utils {
         impl MagicLinkRepository for SessionRepository {
             async fn store_magic_link(
                 &self,
-                link: &MagicLink,
+                link: &HashedMagicLink,
             ) -> Result<(), MagicLinkRepositoryError>;
 
-            async fn get_all_magic_links(&self) -> Vec<MagicLink>;
+            async fn get_all_magic_links(&self) -> Vec<HashedMagicLink>;
 
-            async fn delete_magic_link_by_token(
+            async fn delete_magic_link_by_hash(
                 &self,
-                token: &MagicToken,
+                hash: &HashedMagicToken,
             ) -> Result<(), MagicLinkRepositoryError>;
         }
     }
@@ -189,11 +194,11 @@ mod test_magic_link_service_generate_magic_link {
     }
 
     #[tokio::test]
-    async fn test_return_failure_if_sending_magic_link_err_and_delete_magic_link() {
+    async fn test_return_failure_and_delete_magic_link_if_sending_magic_link_err() {
         let mut repository = MockSessionRepository::new();
         repository.expect_store_magic_link().returning(|_| Ok(()));
         repository
-            .expect_delete_magic_link_by_token()
+            .expect_delete_magic_link_by_hash()
             .times(1)
             .returning(|_| Ok(()));
         let mut email_provider = MockMailProvider::new();
@@ -265,19 +270,20 @@ mod test_magic_link_service_validate_magic_link {
     async fn test_ok_matching_link_found() {
         let mut repository = MockSessionRepository::new();
         let token = MagicToken::new();
-        let token_clone = token.clone();
+        let hashed_token = token.as_hash().unwrap();
+        let hashed_token_clone = hashed_token.clone();
         repository.expect_get_all_magic_links().returning(move || {
-            vec![MagicLink::new(
+            vec![HashedMagicLink::new(
                 UserId::test_default(),
-                token_clone.clone(),
+                hashed_token_clone.clone(),
                 Utc::now() + TimeDelta::minutes(5),
             )]
         });
         let token_clone = token.clone();
         repository
-            .expect_delete_magic_link_by_token()
+            .expect_delete_magic_link_by_hash()
             .times(1)
-            .withf(move |token| token.match_token_secure(&token_clone))
+            .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
         let service = MagicLinkService::new(
@@ -296,7 +302,7 @@ mod test_magic_link_service_validate_magic_link {
         let mut repository = MockSessionRepository::new();
         let token = MagicToken::new();
         repository.expect_get_all_magic_links().returning(Vec::new);
-        repository.expect_delete_magic_link_by_token().times(0);
+        repository.expect_delete_magic_link_by_hash().times(0);
 
         let service = MagicLinkService::new(
             Arc::new(Mutex::new(repository)),
@@ -313,19 +319,20 @@ mod test_magic_link_service_validate_magic_link {
     async fn test_matching_link_found_but_expired() {
         let mut repository = MockSessionRepository::new();
         let token = MagicToken::new();
-        let token_clone = token.clone();
+        let hashed_token = token.as_hash().unwrap();
+        let hashed_token_clone = hashed_token.clone();
         repository.expect_get_all_magic_links().returning(move || {
-            vec![MagicLink::new(
+            vec![HashedMagicLink::new(
                 UserId::test_default(),
-                token_clone.clone(),
+                hashed_token_clone.clone(),
                 Utc::now() - TimeDelta::minutes(5),
             )]
         });
         let token_clone = token.clone();
         repository
-            .expect_delete_magic_link_by_token()
+            .expect_delete_magic_link_by_hash()
             .times(1)
-            .withf(move |token| token.match_token_secure(&token_clone))
+            .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
         let service = MagicLinkService::new(

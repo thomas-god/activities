@@ -6,7 +6,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        MagicLink, MagicToken,
+        HashedMagicLink, HashedMagicToken,
         services::magic_link::{MagicLinkRepository, MagicLinkRepositoryError},
     },
 };
@@ -27,7 +27,7 @@ impl SqliteMagicLinkRepository {
             r#"
         CREATE TABLE IF NOT EXISTS t_magic_link (
             user TEXT,
-            token TEXT UNIQUE,
+            token_hash TEXT UNIQUE,
             expire_at TIMESTAMP
         );"#,
         )
@@ -39,7 +39,10 @@ impl SqliteMagicLinkRepository {
 }
 
 impl MagicLinkRepository for SqliteMagicLinkRepository {
-    async fn store_magic_link(&self, link: &MagicLink) -> Result<(), MagicLinkRepositoryError> {
+    async fn store_magic_link(
+        &self,
+        link: &HashedMagicLink,
+    ) -> Result<(), MagicLinkRepositoryError> {
         sqlx::query(
             r#"
         INSERT INTO t_magic_link VALUES (
@@ -47,7 +50,7 @@ impl MagicLinkRepository for SqliteMagicLinkRepository {
         );"#,
         )
         .bind(link.user().to_string())
-        .bind(link.token().to_string())
+        .bind(link.hash().to_string())
         .bind(link.expire_at())
         .execute(&self.pool)
         .await
@@ -55,9 +58,9 @@ impl MagicLinkRepository for SqliteMagicLinkRepository {
         .map_err(|_| MagicLinkRepositoryError::Error)
     }
 
-    async fn get_all_magic_links(&self) -> Vec<MagicLink> {
+    async fn get_all_magic_links(&self) -> Vec<HashedMagicLink> {
         let res: Vec<(String, String, DateTime<Utc>)> =
-            match sqlx::query_as("SELECT user, token, expire_at FROM t_magic_link")
+            match sqlx::query_as("SELECT user, token_hash, expire_at FROM t_magic_link")
                 .fetch_all(&self.pool)
                 .await
             {
@@ -70,21 +73,21 @@ impl MagicLinkRepository for SqliteMagicLinkRepository {
             };
         res.iter()
             .map(|(user, token, expire_at)| {
-                MagicLink::new(
+                HashedMagicLink::new(
                     UserId::from(user.clone()),
-                    MagicToken::from(token.clone()),
+                    HashedMagicToken::new(token.clone()),
                     *expire_at,
                 )
             })
             .collect()
     }
 
-    async fn delete_magic_link_by_token(
+    async fn delete_magic_link_by_hash(
         &self,
-        token: &MagicToken,
+        hash: &HashedMagicToken,
     ) -> Result<(), MagicLinkRepositoryError> {
-        sqlx::query("DELETE FROM t_magic_link WHERE token = ?1;")
-            .bind(token.to_string())
+        sqlx::query("DELETE FROM t_magic_link WHERE token_hash = ?1;")
+            .bind(hash.to_string())
             .execute(&self.pool)
             .await
             .map(|_| ())
@@ -98,7 +101,10 @@ mod test_sqlite_magic_link_repository {
     use chrono::{DateTime, TimeDelta, Utc};
     use tempfile::NamedTempFile;
 
-    use crate::domain::models::UserId;
+    use crate::{
+        domain::models::UserId,
+        inbound::http::auth::{MagicLink, MagicToken},
+    };
 
     use super::*;
 
@@ -128,9 +134,10 @@ mod test_sqlite_magic_link_repository {
             MagicToken::from("test_token".to_string()),
             expire_at,
         );
+        let hashed_magic_link = magic_link.as_hash().unwrap();
 
         repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect("store_magic_link should have succeeded");
 
@@ -141,13 +148,13 @@ mod test_sqlite_magic_link_repository {
         assert_eq!(n_rows, 1);
 
         let res: (String, String, DateTime<Utc>) =
-            sqlx::query_as("select user, token, expire_at from t_magic_link limit 1;")
+            sqlx::query_as("select user, token_hash, expire_at from t_magic_link limit 1;")
                 .fetch_one(&repository.pool)
                 .await
                 .unwrap();
 
         assert_eq!(res.0, UserId::test_default().to_string());
-        assert_eq!(res.1, "test_token".to_string());
+        assert_eq!(res.1, hashed_magic_link.hash().to_string());
         assert_eq!(res.2, expire_at);
     }
 
@@ -165,9 +172,10 @@ mod test_sqlite_magic_link_repository {
             MagicToken::from("test_token".to_string()),
             expire_at,
         );
+        let hashed_magic_link = magic_link.as_hash().unwrap();
 
         repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect("store_magic_link should have succeeded");
 
@@ -178,9 +186,10 @@ mod test_sqlite_magic_link_repository {
             MagicToken::from("another_test_token".to_string()),
             expire_at,
         );
+        let hashed_magic_link = magic_link.as_hash().unwrap();
 
         repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect("store_magic_link should have succeeded");
 
@@ -205,23 +214,16 @@ mod test_sqlite_magic_link_repository {
             MagicToken::from("test_token".to_string()),
             expire_at,
         );
+        let hashed_magic_link = magic_link.as_hash().unwrap();
 
         repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect("store_magic_link should have succeeded");
 
-        // Store a second magic link with the same token value
-        let another_expire_at = Utc::now() + TimeDelta::minutes(5);
-        let magic_link = MagicLink::new(
-            UserId::from("another_user".to_string()),
-            MagicToken::from("test_token".to_string()),
-            another_expire_at,
-        );
-
-        // Store operation should fail
+        // Store operation should fail for same hash
         let _ = repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect_err("Should have returned an err");
 
@@ -233,13 +235,13 @@ mod test_sqlite_magic_link_repository {
 
         // Existing token should not be changed
         let res: (String, String, DateTime<Utc>) =
-            sqlx::query_as("select user, token, expire_at from t_magic_link limit 1;")
+            sqlx::query_as("select user, token_hash, expire_at from t_magic_link limit 1;")
                 .fetch_one(&repository.pool)
                 .await
                 .unwrap();
 
         assert_eq!(res.0, UserId::test_default().to_string());
-        assert_eq!(res.1, "test_token".to_string());
+        assert_eq!(res.1, hashed_magic_link.hash().to_string());
         assert_eq!(res.2, expire_at);
     }
 
@@ -261,21 +263,26 @@ mod test_sqlite_magic_link_repository {
             .expect("repo should init");
 
         let expire_at = Utc::now() + TimeDelta::minutes(5);
+        let magic_link = MagicLink::new(
+            UserId::test_default(),
+            MagicToken::from("a_token".to_string()),
+            expire_at,
+        );
         repository
-            .store_magic_link(&MagicLink::new(
-                UserId::test_default(),
-                MagicToken::from("a_token".to_string()),
-                expire_at,
-            ))
+            .store_magic_link(&magic_link.as_hash().unwrap())
             .await
             .expect("store_magic_link should have succeeded");
 
         repository
-            .store_magic_link(&MagicLink::new(
-                UserId::test_default(),
-                MagicToken::from("another_token".to_string()),
-                expire_at,
-            ))
+            .store_magic_link(
+                &MagicLink::new(
+                    UserId::test_default(),
+                    MagicToken::from("another_token".to_string()),
+                    expire_at,
+                )
+                .as_hash()
+                .unwrap(),
+            )
             .await
             .expect("store_magic_link should have succeeded");
 
@@ -287,8 +294,8 @@ mod test_sqlite_magic_link_repository {
         assert_eq!(first_token.user(), &UserId::test_default());
         assert!(
             first_token
-                .token()
-                .match_token_secure(&MagicToken::from("a_token".to_string()))
+                .hash()
+                .verify_token(&MagicToken::from("a_token".to_string()))
         );
         assert_eq!(first_token.expire_at(), &expire_at);
     }
@@ -306,9 +313,10 @@ mod test_sqlite_magic_link_repository {
             MagicToken::from("test_token".to_string()),
             expire_at,
         );
+        let hashed_magic_link = magic_link.as_hash().unwrap();
 
         repository
-            .store_magic_link(&magic_link)
+            .store_magic_link(&hashed_magic_link)
             .await
             .expect("store_magic_link should have succeeded");
 
@@ -320,7 +328,7 @@ mod test_sqlite_magic_link_repository {
 
         // Delete operation
         repository
-            .delete_magic_link_by_token(&MagicToken::from("test_token".to_string()))
+            .delete_magic_link_by_hash(hashed_magic_link.hash())
             .await
             .unwrap();
 
@@ -340,7 +348,7 @@ mod test_sqlite_magic_link_repository {
 
         // Delete operation
         repository
-            .delete_magic_link_by_token(&MagicToken::from("test_token".to_string()))
+            .delete_magic_link_by_hash(&HashedMagicToken::new("test_token".to_string()))
             .await
             .unwrap();
 
