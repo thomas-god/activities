@@ -46,4 +46,4 @@ networks:
     external: true
 
 volumes:
-  databases
+  databases:
