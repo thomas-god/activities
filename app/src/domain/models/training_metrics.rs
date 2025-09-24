@@ -5,6 +5,7 @@ use std::{
 
 use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFormat};
 use derive_more::{AsRef, Constructor, Display};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::models::{
@@ -68,7 +69,7 @@ impl TrainingMetricDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricSource {
     Statistic(ActivityStatistic),
     Timeseries((TimeseriesMetric, TrainingMetricAggregate)),
@@ -231,7 +232,7 @@ impl TrainingMetricGranularity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
 pub enum TrainingMetricAggregate {
     Min,
     Max,

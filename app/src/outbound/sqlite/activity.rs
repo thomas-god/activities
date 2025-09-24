@@ -72,6 +72,7 @@ impl<R, FP> SqliteActivityRepository<R, FP> {
         })
     }
 }
+
 impl<R, FP> SqliteActivityRepository<R, FP>
 where
     R: RawDataRepository,

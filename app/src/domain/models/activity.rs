@@ -316,7 +316,7 @@ impl Timeseries {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
 pub enum TimeseriesMetric {
     Speed,
     Power,
