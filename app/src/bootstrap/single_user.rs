@@ -1,28 +1,37 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use tokio::sync::Mutex;
 
 use crate::{
-    config::Config,
+    config::{Config, load_env},
     domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
     inbound::{
         http::{DisabledUserService, HttpServer},
         parser::FitParser,
     },
-    outbound::memory::{
-        InMemoryActivityRepository, InMemoryRawDataRepository, InMemoryTrainingMetricsRepository,
+    outbound::{
+        fs::FilesystemRawDataRepository,
+        sqlite::{
+            activity::SqliteActivityRepository, training_metrics::SqliteTrainingMetricsRepository,
+        },
     },
 };
 
 pub async fn bootsrap_single_user() -> anyhow::Result<
     HttpServer<
         ActivityService<
-            InMemoryActivityRepository,
-            InMemoryRawDataRepository,
-            TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
+            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            FilesystemRawDataRepository,
+            TrainingMetricService<
+                SqliteTrainingMetricsRepository,
+                SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            >,
         >,
         FitParser,
-        TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
+        TrainingMetricService<
+            SqliteTrainingMetricsRepository,
+            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+        >,
         DisabledUserService,
     >,
 > {
@@ -40,10 +49,36 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
     };
 
     let config = Config::from_env()?;
+    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let db_dir = root_path.clone().join("db/");
+    if !db_dir.exists() {
+        tokio::fs::create_dir_all(&db_dir).await?;
+    }
+    let raw_data_dir = root_path.clone().join("activities/");
+    if !raw_data_dir.exists() {
+        tokio::fs::create_dir_all(&raw_data_dir).await?;
+    }
 
-    let activity_repository = Arc::new(Mutex::new(InMemoryActivityRepository::new(vec![])));
-    let raw_data_repository = InMemoryRawDataRepository::new(HashMap::new());
-    let training_metrics_repository = InMemoryTrainingMetricsRepository::new(HashMap::new());
+    let parser = FitParser {};
+
+    let raw_data_repository = FilesystemRawDataRepository::new(PathBuf::from(raw_data_dir));
+
+    let activity_db = db_dir.clone().join("activities.db");
+    let activity_repository = Arc::new(Mutex::new(
+        SqliteActivityRepository::new(
+            &format!("sqlite:{}", activity_db.to_string_lossy()),
+            raw_data_repository.clone(),
+            parser.clone(),
+        )
+        .await?,
+    ));
+
+    let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
+    let training_metrics_repository = SqliteTrainingMetricsRepository::new(&format!(
+        "sqlite:{}",
+        trainin_metrics_db.to_string_lossy()
+    ))
+    .await?;
 
     let training_metrics_service = Arc::new(TrainingMetricService::new(
         training_metrics_repository,
@@ -55,8 +90,6 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         training_metrics_service.clone(),
     );
     let user_service = DisabledUserService {};
-
-    let parser = FitParser {};
 
     let http_server = HttpServer::new(
         activity_service,
