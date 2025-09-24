@@ -5,6 +5,7 @@ use std::{
 
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Display, From, Into};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::models::UserId;
@@ -155,6 +156,12 @@ impl fmt::Display for ActivityName {
     }
 }
 
+impl From<&str> for ActivityName {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActivityNaturalKey(String);
 
@@ -182,7 +189,7 @@ pub enum Sport {
     Other,
 }
 
-#[derive(Clone, Debug, Constructor, Default)]
+#[derive(Clone, Debug, Constructor, Default, Serialize, Deserialize, PartialEq)]
 pub struct ActivityStatistics(HashMap<ActivityStatistic, f64>);
 
 impl ActivityStatistics {
@@ -191,7 +198,7 @@ impl ActivityStatistics {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, Serialize, Deserialize)]
 pub enum ActivityStatistic {
     Duration,
     Calories,
