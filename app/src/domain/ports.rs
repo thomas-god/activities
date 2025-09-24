@@ -254,12 +254,25 @@ pub enum SaveRawDataError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum GetRawDataError {
+    #[error("No raw data found for activity {0}")]
+    NoRawDataFound(ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait RawDataRepository: Clone + Send + Sync + 'static {
     fn save_raw_data(
         &self,
         activity_id: &ActivityId,
         content: &[u8],
     ) -> impl Future<Output = Result<(), SaveRawDataError>> + Send;
+
+    fn get_raw_data(
+        &self,
+        activity_id: &ActivityId,
+    ) -> impl Future<Output = Result<Vec<u8>, GetRawDataError>> + Send;
 }
 
 ///////////////////////////////////////////////////////////////////

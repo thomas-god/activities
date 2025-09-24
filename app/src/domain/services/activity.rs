@@ -381,9 +381,10 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests_activity_service {
-    use std::{collections::HashMap, mem, ops::DerefMut, sync::Arc};
+    use std::{collections::HashMap, sync::Arc};
 
     use anyhow::anyhow;
+    use mockall::mock;
     use tokio::sync::Mutex;
 
     use crate::domain::{
@@ -395,8 +396,8 @@ mod tests_activity_service {
             },
         },
         ports::{
-            DeleteActivityError, DeleteActivityRequest, ModifyActivityError, ModifyActivityRequest,
-            SaveActivityError, SaveRawDataError,
+            DeleteActivityError, DeleteActivityRequest, GetRawDataError, ModifyActivityError,
+            ModifyActivityRequest, SaveActivityError, SaveRawDataError,
         },
         services::{
             activity::test_utils::MockActivityRepository,
@@ -406,29 +407,24 @@ mod tests_activity_service {
 
     use super::*;
 
-    #[derive(Clone)]
-    struct MockRawDataRepository {
-        save_raw_data: Arc<Mutex<Result<(), SaveRawDataError>>>,
-    }
+    mock! {
+        pub RawDataRepository {}
 
-    impl RawDataRepository for MockRawDataRepository {
-        async fn save_raw_data(
-            &self,
-            _activity_id: &ActivityId,
-            _content: &[u8],
-        ) -> Result<(), SaveRawDataError> {
-            let mut guard = self.save_raw_data.lock().await;
-            let mut result = Err(SaveRawDataError::Unknown(anyhow!("substitute error")));
-            mem::swap(guard.deref_mut(), &mut result);
-            result
+        impl Clone for RawDataRepository {
+            fn clone(&self) -> Self;
         }
-    }
 
-    impl Default for MockRawDataRepository {
-        fn default() -> Self {
-            Self {
-                save_raw_data: Arc::new(Mutex::new(Ok(()))),
-            }
+        impl RawDataRepository for RawDataRepository {
+            async fn save_raw_data(
+                &self,
+                _activity_id: &ActivityId,
+                _content: &[u8],
+            ) -> Result<(), SaveRawDataError>;
+
+            async fn get_raw_data(
+                &self,
+                _activity_id: &ActivityId,
+            ) -> Result<Vec<u8>, GetRawDataError>;
         }
     }
 
@@ -455,9 +451,8 @@ mod tests_activity_service {
             .expect_similar_activity_exists()
             .returning(|_| Ok(true));
 
-        let raw_data_repository = MockRawDataRepository {
-            save_raw_data: Arc::new(Mutex::new(Ok(()))),
-        };
+        let raw_data_repository = MockRawDataRepository::new();
+
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
@@ -487,9 +482,11 @@ mod tests_activity_service {
             .expect_save_activity()
             .times(1)
             .returning(|_| Ok(()));
-        let raw_data_repository = MockRawDataRepository {
-            save_raw_data: Arc::new(Mutex::new(Ok(()))),
-        };
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_save_raw_data()
+            .returning(|_, __| Ok(()));
+
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
@@ -514,9 +511,7 @@ mod tests_activity_service {
             .expect_save_activity()
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
 
-        let raw_data_repository = MockRawDataRepository {
-            save_raw_data: Arc::new(Mutex::new(Ok(()))),
-        };
+        let raw_data_repository = MockRawDataRepository::new();
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
@@ -542,11 +537,11 @@ mod tests_activity_service {
             .times(1)
             .returning(|_| Ok(()));
 
-        let raw_data_repository = MockRawDataRepository {
-            save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
-                "an error occured"
-            ))))),
-        };
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_save_raw_data()
+            .returning(|_, _| Err(SaveRawDataError::Unknown(anyhow!("an error occured"))));
+
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
@@ -565,11 +560,8 @@ mod tests_activity_service {
     async fn test_create_timeseries_returns_err_when_timeseries_have_different_lenghts_than_time_vec()
      {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let raw_data_repository = MockRawDataRepository {
-            save_raw_data: Arc::new(Mutex::new(Err(SaveRawDataError::Unknown(anyhow!(
-                "an error occured"
-            ))))),
-        };
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository.expect_save_raw_data().times(0);
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service =
             ActivityService::new(activity_repository, raw_data_repository, metrics_service);

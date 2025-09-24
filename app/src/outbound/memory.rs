@@ -14,9 +14,10 @@ use crate::domain::{
     },
     ports::{
         ActivityRepository, DeleteMetricError, GetActivityError, GetDefinitionError,
-        GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
-        RawDataRepository, SaveActivityError, SaveRawDataError, SaveTrainingMetricError,
-        SimilarActivityError, TrainingMetricsRepository, UpdateMetricError,
+        GetRawDataError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
+        ListActivitiesError, RawDataRepository, SaveActivityError, SaveRawDataError,
+        SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
+        UpdateMetricError,
     },
 };
 
@@ -167,6 +168,15 @@ impl RawDataRepository for InMemoryRawDataRepository {
             .deref_mut()
             .insert(activity_id.clone(), content.into());
         Ok(())
+    }
+
+    async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<Vec<u8>, GetRawDataError> {
+        self.raw_data
+            .lock()
+            .await
+            .get(activity_id)
+            .ok_or(GetRawDataError::NoRawDataFound(activity_id.clone()))
+            .cloned()
     }
 }
 
