@@ -136,7 +136,7 @@ where
         match repository.get_activity(activity_id).await {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
-            Err(err) => Err(err),
+            Err(err) => Err(GetActivityError::Unknown(err)),
         }
     }
 
@@ -357,7 +357,7 @@ pub mod test_utils {
             async fn get_activity(
                 &self,
                 id: &ActivityId,
-            ) -> Result<Option<Activity>, GetActivityError>;
+            ) -> Result<Option<Activity>, anyhow::Error>;
 
             async fn get_activity_with_timeseries(
                 &self,

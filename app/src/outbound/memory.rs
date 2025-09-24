@@ -85,7 +85,7 @@ impl ActivityRepository for InMemoryActivityRepository {
             .collect())
     }
 
-    async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
+    async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
         let activities = self.activities.lock().await;
         Ok(activities.iter().find_map(|activity| {
             if activity.id() == id {

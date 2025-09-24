@@ -229,7 +229,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn get_activity(
         &self,
         id: &ActivityId,
-    ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
+    ) -> impl Future<Output = Result<Option<Activity>, anyhow::Error>> + Send;
 
     fn get_activity_with_timeseries(
         &self,
