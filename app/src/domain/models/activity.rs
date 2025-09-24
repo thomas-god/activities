@@ -165,6 +165,12 @@ impl From<&str> for ActivityName {
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ActivityNaturalKey(String);
 
+impl From<&str> for ActivityNaturalKey {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash, From, Into, Copy)]
 pub struct ActivityStartTime(DateTime<FixedOffset>);
 
