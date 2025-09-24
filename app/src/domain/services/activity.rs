@@ -77,7 +77,6 @@ where
             *req.start_time(),
             *req.sport(),
             req.statistics().clone(),
-            req.timeseries().clone(),
         );
         let activity_with_timeseries =
             ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
@@ -124,9 +123,29 @@ where
         repository.list_activities(user).await
     }
 
+    async fn list_activities_with_timeseries(
+        &self,
+        user: &UserId,
+    ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
+        let repository = self.activity_repository.lock().await;
+        repository.list_activities_with_timeseries(user).await
+    }
+
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
         let repository = self.activity_repository.lock().await;
         match repository.get_activity(activity_id).await {
+            Ok(Some(activity)) => Ok(activity),
+            Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
+            Err(err) => Err(err),
+        }
+    }
+
+    async fn get_activity_with_timeseries(
+        &self,
+        activity_id: &ActivityId,
+    ) -> Result<ActivityWithTimeseries, GetActivityError> {
+        let repository = self.activity_repository.lock().await;
+        match repository.get_activity_with_timeseries(activity_id).await {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
             Err(err) => Err(err),
@@ -205,8 +224,7 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
-        ActivityTimeseries, Sport,
+        ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics, Sport,
     };
     use crate::domain::ports::{
         DeleteActivityError, ListActivitiesError, ModifyActivityError, SaveActivityError,
@@ -231,10 +249,20 @@ pub mod test_utils {
                 user: &UserId,
             ) -> Result<Vec<Activity>, ListActivitiesError>;
 
+            async fn list_activities_with_timeseries(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
+
             async fn get_activity(
                 &self,
                 activity_id: &ActivityId,
             ) -> Result<Activity, GetActivityError>;
+
+            async fn get_activity_with_timeseries(
+                &self,
+                activity_id: &ActivityId,
+            ) -> Result<ActivityWithTimeseries, GetActivityError>;
 
             async fn modify_activity(
                 &self,
@@ -269,7 +297,6 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    ActivityTimeseries::default(),
                 ))
             });
         }
@@ -286,7 +313,6 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    ActivityTimeseries::default(),
                 ))
             });
         }
@@ -629,7 +655,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
             )))
         });
 
@@ -664,7 +689,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
             )))
         });
         activity_repository
@@ -729,7 +753,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
             )))
         });
 
@@ -766,7 +789,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                ActivityTimeseries::new(TimeseriesTime::new(Vec::new()), Vec::new()),
             )))
         });
         activity_repository

@@ -149,10 +149,20 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
+    fn list_activities_with_timeseries(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+
     fn get_activity(
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
+
+    fn get_activity_with_timeseries(
+        &self,
+        activity_id: &ActivityId,
+    ) -> impl Future<Output = Result<ActivityWithTimeseries, GetActivityError>> + Send;
 
     fn modify_activity(
         &self,

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::domain::models::{
     UserId,
-    activity::{Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+    activity::{ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit, Unit},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
@@ -77,7 +77,7 @@ pub enum TrainingMetricSource {
 impl TrainingMetricSource {
     pub fn extract_from_activity(
         &self,
-        activity: &Activity,
+        activity: &ActivityWithTimeseries,
     ) -> Option<(DateTime<FixedOffset>, f64)> {
         match self {
             Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
@@ -99,7 +99,7 @@ impl ToUnit for TrainingMetricSource {
 }
 
 impl TrainingMetricDefinition {
-    pub fn compute_values(&self, activities: &[Activity]) -> TrainingMetricValues {
+    pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
         let metrics_per_activity = activities
             .iter()
             .filter_map(|activity| self.source.extract_from_activity(activity))
@@ -115,7 +115,7 @@ impl TrainingMetricDefinition {
 fn extract_aggregated_activity_metric(
     aggregate: &TrainingMetricAggregate,
     metric: &TimeseriesMetric,
-    activity: &Activity,
+    activity: &ActivityWithTimeseries,
 ) -> Option<f64> {
     let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
         if m.metric() == metric {
@@ -301,18 +301,20 @@ mod test_training_metrics {
 
     use super::*;
 
-    fn default_activity() -> Activity {
-        Activity::new(
-            ActivityId::default(),
-            UserId::test_default(),
-            None,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+    fn default_activity() -> ActivityWithTimeseries {
+        ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Cycling,
+                ActivityStatistics::default(),
             ),
-            Sport::Cycling,
-            ActivityStatistics::default(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
                 vec![Timeseries::new(
@@ -341,17 +343,19 @@ mod test_training_metrics {
     fn test_extract_aggregated_activity_metric_metric_is_empty() {
         let metric = TimeseriesMetric::Power;
         let aggregate = TrainingMetricAggregate::Average;
-        let activity = Activity::new(
-            ActivityId::default(),
-            UserId::test_default(),
-            None,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Cycling,
+                ActivityStatistics::default(),
             ),
-            Sport::Cycling,
-            ActivityStatistics::default(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],

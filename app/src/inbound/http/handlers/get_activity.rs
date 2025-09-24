@@ -11,8 +11,8 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::activity::{
-            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, Sport, Timeseries,
-            TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, ActivityWithTimeseries,
+            Sport, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
         },
         ports::{IActivityService, ITrainingMetricService},
     },
@@ -74,8 +74,8 @@ impl From<&TimeseriesValue> for TimeseriesValueBody {
     }
 }
 
-impl From<&Activity> for ResponseBody {
-    fn from(activity: &Activity) -> Self {
+impl From<&ActivityWithTimeseries> for ResponseBody {
+    fn from(activity: &ActivityWithTimeseries) -> Self {
         Self {
             id: activity.id().to_string(),
             name: activity.name().map(|name| name.to_string()),
@@ -161,7 +161,7 @@ pub async fn get_activity<
 ) -> Result<Json<ResponseBody>, StatusCode> {
     let Ok(res) = state
         .activity_service
-        .get_activity(&ActivityId::from(&activity_id))
+        .get_activity_with_timeseries(&ActivityId::from(&activity_id))
         .await
     else {
         return Err(StatusCode::NOT_FOUND);
@@ -206,31 +206,38 @@ mod tests {
     async fn test_get_activity_exists() {
         let target_id = "target_id".to_string();
         let mut service = MockActivityService::new();
-        service.expect_get_activity().returning(|_| {
-            Ok(Activity::new(
-                ActivityId::from("target_id"),
-                UserId::test_default(),
-                None,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Sport::Cycling,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
-                ActivityTimeseries::new(
-                    TimeseriesTime::new(vec![0, 1, 2]),
-                    vec![Timeseries::new(
-                        TimeseriesMetric::Power,
-                        vec![
-                            Some(TimeseriesValue::Int(120)),
-                            None,
-                            Some(TimeseriesValue::Int(130)),
-                        ],
-                    )],
-                ),
-            ))
-        });
+        service
+            .expect_get_activity_with_timeseries()
+            .returning(|_| {
+                Ok(ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::from("target_id"),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::new(
+                            "2025-09-03T00:00:00Z"
+                                .parse::<DateTime<FixedOffset>>()
+                                .unwrap(),
+                        ),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Duration,
+                            1200.,
+                        )])),
+                    ),
+                    ActivityTimeseries::new(
+                        TimeseriesTime::new(vec![0, 1, 2]),
+                        vec![Timeseries::new(
+                            TimeseriesMetric::Power,
+                            vec![
+                                Some(TimeseriesValue::Int(120)),
+                                None,
+                                Some(TimeseriesValue::Int(130)),
+                            ],
+                        )],
+                    ),
+                ))
+            });
         let file_parser = MockFileParser::test_default();
         let metrics = MockTrainingMetricService::test_default();
 
@@ -283,7 +290,7 @@ mod tests {
     async fn test_get_activity_does_not_exist() {
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity()
+            .expect_get_activity_with_timeseries()
             .with(eq(ActivityId::from("target_id")))
             .returning(|_| {
                 Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(

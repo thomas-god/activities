@@ -21,7 +21,6 @@ pub struct Activity {
     start_time: ActivityStartTime,
     sport: Sport,
     statistics: ActivityStatistics,
-    timeseries: ActivityTimeseries,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -34,7 +33,6 @@ impl Activity {
         start_time: ActivityStartTime,
         sport: Sport,
         statistics: ActivityStatistics,
-        timeseries: ActivityTimeseries,
     ) -> Self {
         Self {
             id,
@@ -43,7 +41,6 @@ impl Activity {
             start_time,
             sport,
             statistics,
-            timeseries,
         }
     }
 
@@ -83,10 +80,6 @@ impl Activity {
 
     pub fn statistics(&self) -> &ActivityStatistics {
         &self.statistics
-    }
-
-    pub fn timeseries(&self) -> &ActivityTimeseries {
-        &self.timeseries
     }
 }
 
@@ -360,7 +353,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -369,7 +361,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -384,7 +375,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -393,7 +383,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());
@@ -408,7 +397,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -417,7 +405,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            ActivityTimeseries::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());

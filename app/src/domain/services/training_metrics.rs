@@ -67,7 +67,7 @@ where
             .activity_repository
             .lock()
             .await
-            .list_activities(req.user())
+            .list_activities_with_timeseries(req.user())
             .await
             .unwrap();
 
@@ -339,7 +339,7 @@ mod tests_training_metrics_service {
         let repository = MockTrainingMetricsRepository::default();
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
-            .expect_list_activities()
+            .expect_list_activities_with_timeseries()
             .returning(|_| Ok(vec![]));
 
         let service =

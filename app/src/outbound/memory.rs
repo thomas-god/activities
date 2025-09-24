@@ -123,7 +123,6 @@ impl ActivityRepository for InMemoryActivityRepository {
                     *activity.start_time(),
                     *activity.sport(),
                     activity.statistics().clone(),
-                    activity.timeseries().clone(),
                 );
                 let new_activity_with_timeseries =
                     ActivityWithTimeseries::new(new_activity, activity.timeseries().clone());
@@ -266,7 +265,6 @@ mod tests_activities_repository {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
             ),
             ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
         )
