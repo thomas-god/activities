@@ -101,6 +101,33 @@ impl ActivityWithTimeseries {
         &self.activity
     }
 
+    pub fn id(&self) -> &ActivityId {
+        self.activity.id()
+    }
+
+    pub fn natural_key(&self) -> ActivityNaturalKey {
+        self.activity.natural_key()
+    }
+
+    pub fn user(&self) -> &UserId {
+        self.activity.user()
+    }
+
+    pub fn name(&self) -> Option<&ActivityName> {
+        self.activity.name()
+    }
+
+    pub fn start_time(&self) -> &ActivityStartTime {
+        self.activity.start_time()
+    }
+
+    pub fn sport(&self) -> &Sport {
+        self.activity.sport()
+    }
+
+    pub fn statistics(&self) -> &ActivityStatistics {
+        self.activity.statistics()
+    }
     pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
     }

@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId},
+        activity::{Activity, ActivityId, ActivityWithTimeseries},
     },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
@@ -79,6 +79,8 @@ where
             req.statistics().clone(),
             req.timeseries().clone(),
         );
+        let activity_with_timeseries =
+            ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
 
         let activity_repository = self.activity_repository.lock().await;
         if activity_repository
@@ -93,7 +95,7 @@ where
 
         // Persist activity
         activity_repository
-            .save_activity(&activity)
+            .save_activity(&activity_with_timeseries)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
 
@@ -313,7 +315,7 @@ pub mod test_utils {
 
             async fn save_activity(
                 &self,
-                activity: &Activity,
+                activity: &ActivityWithTimeseries,
             ) -> Result<(), SaveActivityError>;
 
             async fn list_activities(
@@ -321,10 +323,20 @@ pub mod test_utils {
                 user: &UserId,
             ) -> Result<Vec<Activity>, ListActivitiesError>;
 
+            async fn list_activities_with_timeseries(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
+
             async fn get_activity(
                 &self,
                 id: &ActivityId,
             ) -> Result<Option<Activity>, GetActivityError>;
+
+            async fn get_activity_with_timeseries(
+                &self,
+                id: &ActivityId,
+            ) -> Result<Option<ActivityWithTimeseries>, GetActivityError>;
 
             async fn modify_activity_name(
                 &self,

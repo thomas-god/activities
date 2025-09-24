@@ -7,7 +7,9 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityName, ActivityNaturalKey},
+        activity::{
+            Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityWithTimeseries,
+        },
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
@@ -20,11 +22,11 @@ use crate::domain::{
 
 #[derive(Clone)]
 pub struct InMemoryActivityRepository {
-    activities: Arc<Mutex<Vec<Activity>>>,
+    activities: Arc<Mutex<Vec<ActivityWithTimeseries>>>,
 }
 
 impl InMemoryActivityRepository {
-    pub fn new(activities: Vec<Activity>) -> Self {
+    pub fn new(activities: Vec<ActivityWithTimeseries>) -> Self {
         Self {
             activities: Arc::new(Mutex::new(activities)),
         }
@@ -42,7 +44,10 @@ impl ActivityRepository for InMemoryActivityRepository {
             .any(|activity| activity.natural_key() == *natural_key))
     }
 
-    async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
+    async fn save_activity(
+        &self,
+        activity: &ActivityWithTimeseries,
+    ) -> Result<(), SaveActivityError> {
         let mut guard = self.activities.lock().await;
         guard.deref_mut().push(activity.clone());
         Ok(())
@@ -52,17 +57,56 @@ impl ActivityRepository for InMemoryActivityRepository {
         let activities = self.activities.lock().await;
         Ok(activities
             .iter()
-            .filter(|activity| activity.user() == user)
-            .cloned()
+            .filter_map(|activity| {
+                if activity.user() == user {
+                    Some(activity.activity().clone())
+                } else {
+                    None
+                }
+            })
+            .collect())
+    }
+
+    async fn list_activities_with_timeseries(
+        &self,
+        user: &UserId,
+    ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
+        let activities = self.activities.lock().await;
+        Ok(activities
+            .iter()
+            .filter_map(|activity| {
+                if activity.user() == user {
+                    Some(activity.clone())
+                } else {
+                    None
+                }
+            })
             .collect())
     }
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
         let activities = self.activities.lock().await;
-        Ok(activities
-            .iter()
-            .find(|activity| activity.id() == id)
-            .cloned())
+        Ok(activities.iter().find_map(|activity| {
+            if activity.id() == id {
+                Some(activity.activity().clone())
+            } else {
+                None
+            }
+        }))
+    }
+
+    async fn get_activity_with_timeseries(
+        &self,
+        id: &ActivityId,
+    ) -> Result<Option<ActivityWithTimeseries>, GetActivityError> {
+        let activities = self.activities.lock().await;
+        Ok(activities.iter().find_map(|activity| {
+            if activity.id() == id {
+                Some(activity.clone())
+            } else {
+                None
+            }
+        }))
     }
 
     async fn modify_activity_name(
@@ -81,7 +125,9 @@ impl ActivityRepository for InMemoryActivityRepository {
                     activity.statistics().clone(),
                     activity.timeseries().clone(),
                 );
-                let _ = std::mem::replace(activity, new_activity);
+                let new_activity_with_timeseries =
+                    ActivityWithTimeseries::new(new_activity, activity.timeseries().clone());
+                let _ = std::mem::replace(activity, new_activity_with_timeseries);
                 return Ok(());
             }
         }
@@ -93,7 +139,7 @@ impl ActivityRepository for InMemoryActivityRepository {
         self.activities
             .lock()
             .await
-            .retain(|ac| ac.id() != activity);
+            .retain(|ac| ac.activity().id() != activity);
         Ok(())
     }
 }
@@ -211,14 +257,17 @@ mod tests_activities_repository {
 
     use super::*;
 
-    fn default_activity(user: Option<String>) -> Activity {
-        Activity::new(
-            ActivityId::default(),
-            user.unwrap_or_default().into(),
-            None,
-            ActivityStartTime::from_timestamp(0).unwrap(),
-            Sport::Cycling,
-            ActivityStatistics::new(HashMap::new()),
+    fn default_activity(user: Option<String>) -> ActivityWithTimeseries {
+        ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                user.unwrap_or_default().into(),
+                None,
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::new()),
+                ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
+            ),
             ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
         )
     }

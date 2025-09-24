@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
     Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
-    ActivityTimeseries, Sport,
+    ActivityTimeseries, ActivityWithTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
     TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
@@ -203,7 +203,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn save_activity(
         &self,
-        activity: &Activity,
+        activity: &ActivityWithTimeseries,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
     fn list_activities(
@@ -211,10 +211,20 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
+    fn list_activities_with_timeseries(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+
     fn get_activity(
         &self,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
+
+    fn get_activity_with_timeseries(
+        &self,
+        id: &ActivityId,
+    ) -> impl Future<Output = Result<Option<ActivityWithTimeseries>, GetActivityError>> + Send;
 
     fn modify_activity_name(
         &self,
