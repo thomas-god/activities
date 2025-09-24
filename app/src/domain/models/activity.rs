@@ -90,6 +90,22 @@ impl Activity {
     }
 }
 
+#[derive(Clone, Debug, Constructor)]
+pub struct ActivityWithTimeseries {
+    activity: Activity,
+    timeseries: ActivityTimeseries,
+}
+
+impl ActivityWithTimeseries {
+    pub fn activity(&self) -> &Activity {
+        &self.activity
+    }
+
+    pub fn timeseries(&self) -> &ActivityTimeseries {
+        &self.timeseries
+    }
+}
+
 /// Technical ID of an [Activity].
 #[derive(Clone, Debug, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
 pub struct ActivityId(String);
