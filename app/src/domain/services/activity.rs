@@ -540,7 +540,7 @@ mod tests_activity_service {
         let mut raw_data_repository = MockRawDataRepository::new();
         raw_data_repository
             .expect_save_raw_data()
-            .returning(|_, _| Err(SaveRawDataError::Unknown(anyhow!("an error occured"))));
+            .returning(|_, _| Err(SaveRawDataError::Unknown));
 
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(

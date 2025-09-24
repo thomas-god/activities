@@ -250,16 +250,18 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
 #[derive(Debug, Error)]
 pub enum SaveRawDataError {
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    #[error("Raw data already exist for activity {0}")]
+    ActivityRawDataExist(ActivityId),
+    #[error("Unknown error")]
+    Unknown,
 }
 
 #[derive(Debug, Error)]
 pub enum GetRawDataError {
     #[error("No raw data found for activity {0}")]
     NoRawDataFound(ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    #[error("Unknown error")]
+    Unknown,
 }
 
 pub trait RawDataRepository: Clone + Send + Sync + 'static {
