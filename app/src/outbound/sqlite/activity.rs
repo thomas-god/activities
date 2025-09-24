@@ -3,18 +3,21 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 
-use crate::domain::{
-    models::{
-        UserId,
-        activity::{
-            Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime,
-            ActivityStatistics, ActivityWithTimeseries, Sport,
+use crate::{
+    domain::{
+        models::{
+            UserId,
+            activity::{
+                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime,
+                ActivityStatistics, ActivityWithTimeseries, Sport,
+            },
+        },
+        ports::{
+            ActivityRepository, ListActivitiesError, RawDataRepository, SaveActivityError,
+            SimilarActivityError,
         },
     },
-    ports::{
-        ActivityRepository, GetActivityError, ListActivitiesError, SaveActivityError,
-        SimilarActivityError,
-    },
+    inbound::parser::ParseFile,
 };
 
 type ActivityRow = (
@@ -27,12 +30,18 @@ type ActivityRow = (
 );
 
 #[derive(Debug, Clone)]
-pub struct SqliteActivityRepository {
+pub struct SqliteActivityRepository<R, FP> {
     pool: SqlitePool,
+    raw_data_repository: R,
+    file_parser: FP,
 }
 
-impl SqliteActivityRepository {
-    pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
+impl<R, FP> SqliteActivityRepository<R, FP> {
+    pub async fn new(
+        url: &str,
+        raw_data_repository: R,
+        file_parser: FP,
+    ) -> Result<Self, sqlx::Error> {
         let options = SqliteConnectOptions::from_str(url)?.create_if_missing(true);
 
         let pool = SqlitePool::connect_with(options).await?;
@@ -56,11 +65,45 @@ impl SqliteActivityRepository {
         .execute(&pool)
         .await?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            raw_data_repository,
+            file_parser,
+        })
+    }
+}
+impl<R, FP> SqliteActivityRepository<R, FP>
+where
+    R: RawDataRepository,
+    FP: ParseFile,
+{
+    async fn load_timeseries(
+        &self,
+        id: &ActivityId,
+        activity: Activity,
+    ) -> Result<ActivityWithTimeseries, anyhow::Error> {
+        let raw_data = match self.raw_data_repository.get_raw_data(id).await {
+            Ok(raw_data) => raw_data,
+            Err(err) => return Err(anyhow!(err)),
+        };
+
+        let parsed_content = match self.file_parser.try_bytes_into_domain(raw_data) {
+            Ok(parsed_content) => parsed_content,
+            Err(err) => return Err(anyhow!(err)),
+        };
+
+        Ok(ActivityWithTimeseries::new(
+            activity,
+            parsed_content.timeseries().clone(),
+        ))
     }
 }
 
-impl ActivityRepository for SqliteActivityRepository {
+impl<R, FP> ActivityRepository for SqliteActivityRepository<R, FP>
+where
+    R: RawDataRepository,
+    FP: ParseFile,
+{
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
         sqlx::query("DELETE FROM t_activities WHERE id = ?1")
             .bind(activity)
@@ -91,9 +134,20 @@ impl ActivityRepository for SqliteActivityRepository {
 
     async fn get_activity_with_timeseries(
         &self,
-        _id: &ActivityId,
-    ) -> Result<Option<ActivityWithTimeseries>, GetActivityError> {
-        todo!()
+        id: &ActivityId,
+    ) -> Result<Option<ActivityWithTimeseries>, anyhow::Error> {
+        let activity = match self.get_activity(id).await {
+            Ok(Some(activity)) => activity,
+            Ok(None) => return Ok(None),
+            Err(err) => return Err(anyhow!(err)),
+        };
+
+        let activity_with_timeseries = match self.load_timeseries(id, activity).await {
+            Ok(value) => value,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Some(activity_with_timeseries))
     }
 
     async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
@@ -117,9 +171,27 @@ impl ActivityRepository for SqliteActivityRepository {
 
     async fn list_activities_with_timeseries(
         &self,
-        _user: &UserId,
+        user: &UserId,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
-        todo!()
+        let rows = sqlx::query_as::<_, ActivityRow>(
+            "SELECT id, user_id, name, start_time, sport, statistics
+            FROM t_activities
+            WHERE user_id = ?1;",
+        )
+        .bind(user)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?;
+
+        let mut res = vec![];
+        for (id, user_id, name, start_time, sport, statistics) in rows {
+            let activity = Activity::new(id.clone(), user_id, name, start_time, sport, statistics);
+            if let Ok(activitiy_with_timeseries) = self.load_timeseries(&id, activity).await {
+                res.push(activitiy_with_timeseries);
+            }
+        }
+
+        Ok(res)
     }
 
     async fn modify_activity_name(
@@ -188,11 +260,19 @@ mod test_sqlite_activity_repository {
     use rand::random_range;
     use tempfile::NamedTempFile;
 
-    use crate::domain::models::{
-        UserId,
-        activity::{
-            ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
-            Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+    use crate::{
+        domain::{
+            models::{
+                UserId,
+                activity::{
+                    ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+                    Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                },
+            },
+            ports::{GetRawDataError, test_utils::MockRawDataRepository},
+        },
+        inbound::parser::{
+            ParseCreateActivityHttpRequestBodyError, ParsedFileContent, test_utils::MockFileParser,
         },
     };
 
@@ -201,9 +281,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_init_table() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
 
         sqlx::query("select count(*) from t_activities;")
             .fetch_one(&repository.pool)
@@ -243,9 +327,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_save_activity() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         repository
@@ -265,9 +353,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_does_not_save_duplicated_activity_id() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         repository
@@ -292,9 +384,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_delete_activity() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         repository
@@ -327,9 +423,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_delete_activity_does_not_exist_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         repository
@@ -341,9 +441,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_activity() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         repository
@@ -376,9 +480,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_activity_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
 
         let res = repository
@@ -392,9 +500,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_list_activities() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
         repository
             .save_activity(&activity)
@@ -418,9 +530,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_list_activities_ignore_other_users() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
         repository
             .save_activity(&activity)
@@ -444,9 +560,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_modify_activity_name() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
         repository
             .save_activity(&activity)
@@ -485,9 +605,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_natural_key_exists() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
         let activity = build_activity_with_timeseries();
         repository
             .save_activity(&activity)
@@ -505,9 +629,13 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_natural_key_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteActivityRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
 
         let activity = build_activity_with_timeseries();
         repository
@@ -521,5 +649,213 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should not have err")
         );
+    }
+
+    fn build_parsed_file_content() -> ParsedFileContent {
+        ParsedFileContent::new(
+            Sport::Cycling,
+            ActivityStartTime::from_timestamp(120).unwrap(),
+            ActivityStatistics::new(HashMap::new()),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2, 3]),
+                vec![Timeseries::new(
+                    TimeseriesMetric::Altitude,
+                    vec![Some(TimeseriesValue::Float(12.3))],
+                )],
+            ),
+            vec![],
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_timeseries_ok() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .returning(|_| Ok(vec![]));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .times(1)
+            .returning(|_| Ok(build_parsed_file_content()));
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .get_activity_with_timeseries(activity.id())
+            .await
+            .expect("Should have succeeded")
+            .expect("Should not be none");
+
+        assert_eq!(
+            res.timeseries().metrics().first().unwrap(),
+            &Timeseries::new(
+                TimeseriesMetric::Altitude,
+                vec![Some(TimeseriesValue::Float(12.3))],
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_timeseries_get_raw_data_fails() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .returning(|_| Err(GetRawDataError::Unknown));
+        let mut file_parser = MockFileParser::new();
+        file_parser.expect_try_bytes_into_domain().times(0);
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        repository
+            .get_activity_with_timeseries(activity.id())
+            .await
+            .expect_err("Should have failed");
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_timeseries_raw_data_parsing_fails() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .returning(|_| Ok(vec![]));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .times(1)
+            .returning(|_| Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent));
+
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        repository
+            .get_activity_with_timeseries(activity.id())
+            .await
+            .expect_err("Should have failed");
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_timeseries_ok() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(2)
+            .returning(|_| Ok(vec![]));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .times(2)
+            .returning(|_| Ok(build_parsed_file_content()));
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        // Insert 2 activities
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .list_activities_with_timeseries(activity.user())
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(res.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_timeseries_ok_ignore_failed_activities() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .return_once(|_| Ok(vec![]));
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .return_once(|_| Err(GetRawDataError::Unknown));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .times(1)
+            .returning(|_| Ok(build_parsed_file_content()));
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        // Insert 2 activities
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .list_activities_with_timeseries(activity.user())
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(res.len(), 1);
     }
 }

@@ -148,7 +148,7 @@ where
         match repository.get_activity_with_timeseries(activity_id).await {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
-            Err(err) => Err(err),
+            Err(err) => Err(GetActivityError::Unknown(err)),
         }
     }
 
@@ -362,7 +362,7 @@ pub mod test_utils {
             async fn get_activity_with_timeseries(
                 &self,
                 id: &ActivityId,
-            ) -> Result<Option<ActivityWithTimeseries>, GetActivityError>;
+            ) -> Result<Option<ActivityWithTimeseries>, anyhow::Error>;
 
             async fn modify_activity_name(
                 &self,

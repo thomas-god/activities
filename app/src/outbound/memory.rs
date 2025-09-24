@@ -13,11 +13,10 @@ use crate::domain::{
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
-        ActivityRepository, DeleteMetricError, GetActivityError, GetDefinitionError,
-        GetRawDataError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
-        ListActivitiesError, RawDataRepository, SaveActivityError, SaveRawDataError,
-        SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
-        UpdateMetricError,
+        ActivityRepository, DeleteMetricError, GetDefinitionError, GetRawDataError,
+        GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
+        RawDataRepository, SaveActivityError, SaveRawDataError, SaveTrainingMetricError,
+        SimilarActivityError, TrainingMetricsRepository, UpdateMetricError,
     },
 };
 
@@ -99,7 +98,7 @@ impl ActivityRepository for InMemoryActivityRepository {
     async fn get_activity_with_timeseries(
         &self,
         id: &ActivityId,
-    ) -> Result<Option<ActivityWithTimeseries>, GetActivityError> {
+    ) -> Result<Option<ActivityWithTimeseries>, anyhow::Error> {
         let activities = self.activities.lock().await;
         Ok(activities.iter().find_map(|activity| {
             if activity.id() == id {

@@ -234,7 +234,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn get_activity_with_timeseries(
         &self,
         id: &ActivityId,
-    ) -> impl Future<Output = Result<Option<ActivityWithTimeseries>, GetActivityError>> + Send;
+    ) -> impl Future<Output = Result<Option<ActivityWithTimeseries>, anyhow::Error>> + Send;
 
     fn modify_activity_name(
         &self,
@@ -458,4 +458,32 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         &self,
         metric: &TrainingMetricId,
     ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
+}
+
+#[cfg(test)]
+pub mod test_utils {
+    use mockall::mock;
+
+    use super::*;
+
+    mock! {
+        pub RawDataRepository {}
+
+        impl Clone for RawDataRepository {
+            fn clone(&self) -> Self;
+        }
+
+        impl RawDataRepository for RawDataRepository {
+            async fn save_raw_data(
+                &self,
+                activity_id: &ActivityId,
+                content: &[u8],
+            ) -> Result<(), SaveRawDataError>;
+
+            async fn get_raw_data(
+                &self,
+                activity_id: &ActivityId,
+            ) -> Result<Vec<u8>, GetRawDataError>;
+        }
+    }
 }
