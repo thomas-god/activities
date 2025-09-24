@@ -92,12 +92,6 @@ where
             return Err(CreateActivityError::SimilarActivityExistsError);
         }
 
-        // Persist activity
-        activity_repository
-            .save_activity(&activity_with_timeseries)
-            .await
-            .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
-
         // Persist raw data
         self.raw_data_repository
             .save_raw_data(&id, req.raw_content())
@@ -105,6 +99,12 @@ where
             .map_err(|err| {
                 anyhow!(err).context(format!("Failed to persist raw data for activity {}", id))
             })?;
+
+        // Persist activity
+        activity_repository
+            .save_activity(&activity_with_timeseries)
+            .await
+            .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
 
         // Dispatch metrics update
         let metric_service = self.training_metrics_service.clone();
@@ -511,7 +511,10 @@ mod tests_activity_service {
             .expect_save_activity()
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
 
-        let raw_data_repository = MockRawDataRepository::new();
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_save_raw_data()
+            .returning(|_, _| Ok(()));
         let metrics_service = Arc::new(MockTrainingMetricService::test_default());
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
@@ -527,15 +530,12 @@ mod tests_activity_service {
     }
 
     #[tokio::test]
-    async fn test_service_create_activity_raw_data_error() {
+    async fn test_service_create_activity_raw_data_error_do_not_save_activity() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_similar_activity_exists()
             .returning(|_| Ok(false));
-        activity_repository
-            .expect_save_activity()
-            .times(1)
-            .returning(|_| Ok(()));
+        activity_repository.expect_save_activity().times(0);
 
         let mut raw_data_repository = MockRawDataRepository::new();
         raw_data_repository
