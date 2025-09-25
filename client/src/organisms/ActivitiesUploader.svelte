@@ -46,13 +46,13 @@
 	};
 </script>
 
-<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
+<fieldset class="fieldset rounded-box border-base-300 bg-base-100 border p-4">
 	<legend class="fieldset-legend">Upload new activities</legend>
 	<div class="join gap-3">
 		<input
 			type="file"
 			class="file-input"
-			accept=".fit"
+			accept=".fit,.fit.gz"
 			multiple
 			bind:files
 			bind:value={file_upload_content}

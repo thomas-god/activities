@@ -122,6 +122,7 @@ dependencies = [
  "derive_more",
  "email_address",
  "fit-parser",
+ "flate2",
  "handlebars",
  "lettre",
  "mockall",

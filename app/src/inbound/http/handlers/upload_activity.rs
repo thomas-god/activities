@@ -1,9 +1,13 @@
+use std::io::Read;
+
+use anyhow::anyhow;
 use axum::{
     Extension, Json,
-    extract::{Multipart, State},
+    extract::{Multipart, State, multipart::Field},
     http::StatusCode,
     response::IntoResponse,
 };
+use flate2::read::GzDecoder;
 use serde::Serialize;
 
 use crate::{
@@ -62,14 +66,11 @@ pub async fn upload_activities<
         let Some(name) = field.name().map(|n| n.to_string()) else {
             continue;
         };
-        let Ok(file_content) = field.bytes().await else {
+        let Ok(file_content) = extract_content(&name, field).await else {
             unprocessable_files.push((name.to_string(), RejectionReason::CannotReadContent));
             continue;
         };
-        let Ok(file_content) = state
-            .file_parser
-            .try_bytes_into_domain(file_content.to_vec())
-        else {
+        let Ok(file_content) = state.file_parser.try_bytes_into_domain(file_content) else {
             unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
             continue;
         };
@@ -96,6 +97,25 @@ pub async fn upload_activities<
         )
             .into_response())
     }
+}
+
+async fn extract_content(filename: &str, field: Field<'_>) -> Result<Vec<u8>, anyhow::Error> {
+    let content = match field.bytes().await {
+        Ok(content) => content,
+        Err(err) => return Err(anyhow!(err)),
+    };
+
+    if filename.ends_with(".gz") {
+        let mut gz = GzDecoder::new(&content[..]);
+        let mut content = Vec::new();
+        if let Err(err) = gz.read_to_end(&mut content) {
+            return Err(anyhow!(err));
+        };
+
+        return Ok(content);
+    }
+
+    Ok(content.to_vec())
 }
 
 #[cfg(test)]
