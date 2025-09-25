@@ -54,7 +54,7 @@ impl Activity {
             .get(&ActivityStatistic::Duration)
             .unwrap_or(&0.);
         ActivityNaturalKey(format!(
-            "{:?}{:?}:{:?}:{:?}",
+            "{}:{}:{}:{}",
             self.user, self.sport, self.start_time, duration
         ))
     }
@@ -188,7 +188,7 @@ impl ActivityStartTime {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Display)]
 pub enum Sport {
     Running,
     Cycling,
