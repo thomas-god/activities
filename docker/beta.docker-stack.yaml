@@ -14,7 +14,7 @@ services:
       ACTIVITIES_MAILER_PASSWORD_FILE: /run/secrets/activities_mailer_password
       ACTIVITIES_MAILER_RELAY_FILE: /run/secrets/activities_mailer_relay
       ACTIVITIES_MAILER_DOMAIN_FILE: /run/secrets/activities_mailer_domain
-      ACTIVITIES_DB_PATH: /app/data
+      ACTIVITIES_DATA_PATH: /app/data
     networks:
       - traefik-public
     secrets:
