@@ -25,7 +25,26 @@ impl From<CreateActivityError> for StatusCode {
 
 #[derive(Serialize)]
 struct UnprocessableFilesResponse {
-    unprocessable_files: Vec<String>,
+    unprocessable_files: Vec<(String, RejectionReason)>,
+}
+
+#[derive(Debug, Serialize)]
+enum RejectionReason {
+    CannotReadContent,
+    CannotProcessFile,
+    DuplicatedActivity,
+    IncoherentTimeseries,
+    Unknown,
+}
+
+impl From<CreateActivityError> for RejectionReason {
+    fn from(value: CreateActivityError) -> Self {
+        match value {
+            CreateActivityError::SimilarActivityExistsError => Self::DuplicatedActivity,
+            CreateActivityError::TimeseriesMetricsNotSameLength => Self::IncoherentTimeseries,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 pub async fn upload_activities<
@@ -44,24 +63,24 @@ pub async fn upload_activities<
             continue;
         };
         let Ok(file_content) = field.bytes().await else {
-            unprocessable_files.push(name.to_string());
+            unprocessable_files.push((name.to_string(), RejectionReason::CannotReadContent));
             continue;
         };
         let Ok(file_content) = state
             .file_parser
             .try_bytes_into_domain(file_content.to_vec())
         else {
-            unprocessable_files.push(name.to_string());
+            unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
             continue;
         };
         let create_activity_request = file_content.into_request(user.user());
 
-        if let Err(_err) = state
+        if let Err(err) = state
             .activity_service
             .create_activity(create_activity_request)
             .await
         {
-            unprocessable_files.push(name.to_string());
+            unprocessable_files.push((name.to_string(), err.into()));
         }
     }
 
@@ -173,7 +192,6 @@ mod tests {
             .await;
 
         response.assert_status(StatusCode::CREATED);
-        dbg!(response.text());
         assert!(response.as_bytes().is_empty());
     }
 }

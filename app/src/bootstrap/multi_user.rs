@@ -114,7 +114,7 @@ async fn build_activity_service() -> anyhow::Result<(
 
     let parser = FitParser {};
 
-    let raw_data_repository = FilesystemRawDataRepository::new(PathBuf::from(raw_data_dir));
+    let raw_data_repository = FilesystemRawDataRepository::new(raw_data_dir);
 
     let activity_db = db_dir.clone().join("activities.db");
     let activity_repository = Arc::new(Mutex::new(
