@@ -328,6 +328,11 @@ impl From<&FitSport> for Sport {
         match value {
             FitSport::Running => Self::Running,
             FitSport::Cycling => Self::Cycling,
+            FitSport::AlpineSkiing => Self::AlpineSKi,
+            FitSport::Swimming => Self::Swimming,
+            FitSport::FitnessEquipment => Self::StrengthTraining,
+            FitSport::Training => Self::StrengthTraining,
+            FitSport::Hiit => Self::StrengthTraining,
             _ => Self::Other,
         }
     }

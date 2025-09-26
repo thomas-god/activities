@@ -36,6 +36,9 @@ impl From<&Activity> for ResponseBodyItem {
             sport: match *activity.sport() {
                 Sport::Running => "Running".to_string(),
                 Sport::Cycling => "Cycling".to_string(),
+                Sport::AlpineSKi => "Ski".to_string(),
+                Sport::StrengthTraining => "Strenght training".to_string(),
+                Sport::Swimming => "Swimming".to_string(),
                 Sport::Other => "Other".to_string(),
             },
             name: activity.name().map(|name| name.to_string()),

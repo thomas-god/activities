@@ -149,6 +149,9 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Sport {
         let s = match self {
             Self::Running => "running",
             Self::Cycling => "cycling",
+            Self::AlpineSKi => "alpine_ski",
+            Self::StrengthTraining => "strength_training",
+            Self::Swimming => "swimming",
             Self::Other => "other",
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
@@ -162,6 +165,9 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Sport {
         match s {
             "running" => Ok(Sport::Running),
             "cycling" => Ok(Sport::Cycling),
+            "alpine_ski" => Ok(Sport::AlpineSKi),
+            "strength_training" => Ok(Sport::StrengthTraining),
+            "swimming" => Ok(Sport::Swimming),
             "other" => Ok(Sport::Other),
             _ => Err(format!("Unknown Sport: {}", s).into()),
         }

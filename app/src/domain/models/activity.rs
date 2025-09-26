@@ -192,6 +192,9 @@ impl ActivityStartTime {
 pub enum Sport {
     Running,
     Cycling,
+    Swimming,
+    AlpineSKi,
+    StrengthTraining,
     Other,
 }
 

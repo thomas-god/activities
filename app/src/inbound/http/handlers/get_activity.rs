@@ -82,6 +82,9 @@ impl From<&ActivityWithTimeseries> for ResponseBody {
             sport: match *activity.sport() {
                 Sport::Running => "Running".to_string(),
                 Sport::Cycling => "Cycling".to_string(),
+                Sport::AlpineSKi => "Ski".to_string(),
+                Sport::StrengthTraining => "Strenght training".to_string(),
+                Sport::Swimming => "Swimming".to_string(),
                 Sport::Other => "Other".to_string(),
             },
             start_time: *activity.start_time().date(),
