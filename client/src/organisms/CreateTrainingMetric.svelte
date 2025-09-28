@@ -56,26 +56,34 @@
 					<option value="NormalizedPower">Normalized power</option>
 				</select>
 			{:else}
-				<div class="join">
-					<label class="label" for="source-timeseries-metric">Timeseries metric</label>
-					<select class="select" bind:value={sourceTimeseriesMetric} id="source-timeseries-metric">
-						<option value="Altitude">Altitude</option>
-						<option value="Speed">Speed</option>
-						<option value="Power">Power</option>
-						<option value="HeartRate">Heart rate</option>
-					</select>
+				<div class="ml-3 flex flex-row gap-3">
+					<div>
+						<label class="label" for="source-timeseries-metric">Timeseries metric</label>
+						<select
+							class="select"
+							bind:value={sourceTimeseriesMetric}
+							id="source-timeseries-metric"
+						>
+							<option value="Altitude">Altitude</option>
+							<option value="Speed">Speed</option>
+							<option value="Power">Power</option>
+							<option value="HeartRate">Heart rate</option>
+						</select>
+					</div>
 
-					<label class="label" for="source-timeseries-aggregate">Timeseries aggregate</label>
-					<select
-						class="select"
-						bind:value={sourceTimeseriesAggregate}
-						id="source-timeseries-aggregate"
-					>
-						<option value="Max">Maximum value</option>
-						<option value="Min">Minimum value</option>
-						<option value="Sum">Total</option>
-						<option value="Average">Average</option>
-					</select>
+					<div>
+						<label class="label" for="source-timeseries-aggregate">Timeseries aggregate</label>
+						<select
+							class="select"
+							bind:value={sourceTimeseriesAggregate}
+							id="source-timeseries-aggregate"
+						>
+							<option value="Max">Maximum value</option>
+							<option value="Min">Minimum value</option>
+							<option value="Sum">Total</option>
+							<option value="Average">Average</option>
+						</select>
+					</div>
 				</div>
 			{/if}
 
