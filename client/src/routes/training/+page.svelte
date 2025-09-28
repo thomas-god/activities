@@ -89,34 +89,33 @@
 	};
 </script>
 
-<div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl">
-	<CreateTrainingMetric callback={createMetricCallback} />
-</div>
-
-<div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl">
-	<DateRange bind:dates={() => dates, datesUpdateCallback} />
-</div>
-
-{#each metricsProps as metric}
-	<div
-		bind:clientWidth={chartWidth}
-		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"
-	>
-		<div class="relative p-4 text-center">
-			<div>
-				{metric.title}
-			</div>
-			<button
-				class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
-				onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
-			>
-		</div>
-		<TrainingMetricsChart
-			height={250}
-			width={chartWidth}
-			values={metric.values}
-			unit={metric.unit}
-			granularity={metric.granularity}
-		/>
+<div class="mx-auto mt-4 flex max-w-2xl flex-col gap-4 px-4 sm:mt-8">
+	<div class="rounded-box bg-base-100 shadow-md">
+		<CreateTrainingMetric callback={createMetricCallback} />
 	</div>
-{/each}
+
+	<div class="rounded-box bg-base-100 shadow-md">
+		<DateRange bind:dates={() => dates, datesUpdateCallback} />
+	</div>
+
+	{#each metricsProps as metric}
+		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 shadow-md">
+			<div class="relative p-4 text-center">
+				<div>
+					{metric.title}
+				</div>
+				<button
+					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
+					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
+				>
+			</div>
+			<TrainingMetricsChart
+				height={250}
+				width={chartWidth}
+				values={metric.values}
+				unit={metric.unit}
+				granularity={metric.granularity}
+			/>
+		</div>
+	{/each}
+</div>

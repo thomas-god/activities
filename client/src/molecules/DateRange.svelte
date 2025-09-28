@@ -9,7 +9,7 @@
 	};
 </script>
 
-<div class="flex justify-start gap-2 p-2 sm:px-4">
+<div class="flex justify-start gap-2 p-2 px-4">
 	<label class="label">
 		From
 		<input type="date" class="input" bind:value={start} max={end} oninput={callback} />
