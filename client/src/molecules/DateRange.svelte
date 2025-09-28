@@ -9,13 +9,13 @@
 	};
 </script>
 
-<div class="flex justify-around p-2">
+<div class="flex justify-start gap-2 p-2 sm:px-4">
 	<label class="label">
-		start
+		From
 		<input type="date" class="input" bind:value={start} max={end} oninput={callback} />
 	</label>
 	<label class="label">
-		end
+		to
 		<input type="date" class="input" bind:value={end} min={start} oninput={callback} />
 	</label>
 </div>
