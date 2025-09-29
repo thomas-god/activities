@@ -84,32 +84,42 @@
 	};
 </script>
 
-<h1 class="m-3 text-xl">
-	<EditableString content={summary?.title} editCallback={updateActivityNameCallback} />
-</h1>
+<div class="mx-auto mt-1 flex max-w-2xl flex-col gap-4 sm:mt-8 sm:px-4">
+	<div class="rounded-box bg-base-100 p-4 pt-3 shadow-md">
+		<h1 class="text-xl">
+			<EditableString content={summary?.title} editCallback={updateActivityNameCallback} />
+		</h1>
 
-<div class="m-3">
-	<Chip text={summary?.sport} />
-	<Chip text={`⌛ ${summary?.duration}`} />
-	<Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
-	<button onclick={deleteActivityCallback}>🗑️</button>
-</div>
+		<div class="chip-container flex flex-row gap-1 overflow-auto pt-1 pl-2">
+			<Chip text={summary?.sport} />
+			<Chip text={`⌛ ${summary?.duration}`} />
+			<Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
+			<button onclick={deleteActivityCallback}>🗑️</button>
+		</div>
+	</div>
 
-<div class="m-3">
-	{#if data.activity}
-		<fieldset class="fieldset">
-			<legend class="fieldset-legend">Metrics</legend>
-			<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
-		</fieldset>
-		{#if selectedMetrics}
-			<div bind:clientWidth={chartWidth}>
-				<TimeseriesChart
-					time={data.activity.timeseries.time}
-					metrics={selectedMetrics}
-					height={400}
-					width={chartWidth}
-				/>
-			</div>
+	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">
+		{#if data.activity}
+			<fieldset class="fieldset">
+				<legend class="fieldset-legend text-lg">Metrics</legend>
+				<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
+			</fieldset>
+			{#if selectedMetrics}
+				<div bind:clientWidth={chartWidth}>
+					<TimeseriesChart
+						time={data.activity.timeseries.time}
+						metrics={selectedMetrics}
+						height={400}
+						width={chartWidth}
+					/>
+				</div>
+			{/if}
 		{/if}
-	{/if}
+	</div>
 </div>
+
+<style>
+	.chip-container > :global(div) {
+		flex-shrink: 0;
+	}
+</style>

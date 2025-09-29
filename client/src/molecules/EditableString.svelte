@@ -16,12 +16,16 @@
 			onclick={() => {
 				editMode = false;
 				editCallback(content);
-			}}>save</button
+			}}>💾</button
 		>
 	</div>
 {:else}
-	<div class="join">
-		<div class="join-item">{content}</div>
-		<button class="btn join-item rounded-r-full" onclick={() => (editMode = true)}>edit</button>
+	<div class="join items-center">
+		<span class="join-item">{content}</span>
+		<button
+			class="btn join-item border-0 bg-transparent opacity-75 btn-sm"
+			onclick={() => (editMode = true)}
+			>✏️
+		</button>
 	</div>
 {/if}
