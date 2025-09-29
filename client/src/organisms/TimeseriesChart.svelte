@@ -3,6 +3,7 @@
 	import { formatDuration } from '$lib/duration';
 	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
 	import { matchMetric, textColors } from '$lib/colors';
+	import { untrack } from 'svelte';
 
 	export interface Metric {
 		name: string;
@@ -74,6 +75,17 @@
 	);
 	$effect(() => {
 		d3.select(gx).call(xAxis, xScale);
+		untrack(() => {
+			// Use of untrack to prevent svelte infinite loop, as zooming updates zoomedDomain
+			d3.select(svgElement).call(zoom.translateTo, zoomedXScale(zoomedDomain[0] - x_min), 0, [
+				timeScale[0],
+				0
+			]);
+			d3.select(svgElement).call(
+				zoom.scaleTo,
+				(x_max - x_min) / (zoomedDomain[1] - zoomedDomain[0])
+			);
+		});
 	});
 
 	// Compute line props for each metric
@@ -132,7 +144,13 @@
 			.on('zoom', zoomed)
 	);
 
+	let zoomedDomain = $state([x_min, x_max]);
+
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
+		zoomedDomain = [
+			xScale.invert(event.transform.invertX(xScale.range()[0])),
+			xScale.invert(event.transform.invertX(xScale.range()[1]))
+		];
 		zoomedXScale = event.transform.rescaleX(xScale);
 		d3.select(gx).call(xAxis, zoomedXScale);
 	}
