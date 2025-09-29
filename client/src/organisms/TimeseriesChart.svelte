@@ -47,7 +47,7 @@
 	let x_min = $derived(time.at(0)!);
 	let x_max = $derived(time.at(-1)!);
 	let max_zoom = $derived((x_max - x_min) / 60);
-	let xScale = d3.scaleLinear([x_min, x_max], timeScale);
+	let xScale = $derived(d3.scaleLinear([x_min, x_max], timeScale));
 	let zoomedXScale = $derived(xScale);
 	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
 	const generateTicks = (x: d3.ScaleLinear<number, number, never>, nTicks: number) => {
