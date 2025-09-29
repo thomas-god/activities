@@ -54,7 +54,9 @@ impl SqliteTrainingMetricsRepository {
             definition_id TEXT,
             granule TEXT,
             value REAL,
-            FOREIGN KEY(definition_id) REFERENCES t_training_metrics_definitions(id),
+            FOREIGN KEY(definition_id)
+                REFERENCES t_training_metrics_definitions(id)
+                ON DELETE CASCADE,
             CONSTRAINT
                 t_training_metrics_values_unique_id_granule
                 UNIQUE(definition_id, granule)
@@ -388,6 +390,60 @@ mod test_sqlite_activity_repository {
             unreachable!("Should have been an err")
         };
         assert_eq!(err_id, id);
+    }
+
+    #[tokio::test]
+    async fn test_delete_definition_with_values_cascade() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create definition
+        let definition = build_metric_definition();
+        repository
+            .save_definitions(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        // Insert a value for this definition
+        let new_value = ("2025-09-24", 12.3);
+        repository
+            .update_metric_values(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "
+            select count(value)
+            from t_training_metrics_values
+            where definition_id = ?1;"
+            )
+            .bind(definition.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            1
+        );
+
+        // Delete the parent definition: should succeed and delete the inserted value
+        repository
+            .delete_definition(definition.id())
+            .await
+            .expect("Should have returned OK");
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "
+            select count(value)
+            from t_training_metrics_values
+            where definition_id = ?1;"
+            )
+            .bind(definition.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            0
+        );
     }
 
     #[tokio::test]
