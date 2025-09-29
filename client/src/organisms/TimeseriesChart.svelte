@@ -185,10 +185,12 @@
 		});
 		return { time: zoomedXScale.invert(tooltipXOffset), values };
 	});
+
+	let smoothing = $state(5);
 </script>
 
 <button class="btn" onclick={resetZoom}>Reset zoom</button>
-
+<!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
 {#if nearestValues}
 	<p class="flex justify-center pt-2 text-sm sm:text-base">
 		<span class="px-1.5">
@@ -228,6 +230,7 @@
 			order={props.order}
 			yMargin={axisWidth}
 			metric={props.name}
+			{smoothing}
 			{width}
 		/>
 	{/each}
