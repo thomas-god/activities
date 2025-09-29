@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { strokeColors, textColors, type Metric } from '$lib/colors';
 	import * as d3 from 'd3';
 
 	export type LineOrder = 'first' | 'second' | 'third';
@@ -6,12 +7,13 @@
 		values: Array<[number, number]>;
 		xScale: d3.ScaleLinear<number, number, never>;
 		range: Array<number>;
+		metric: Metric;
 		order: LineOrder;
 		yMargin: number;
 		width: number;
 	}
 
-	let { values, xScale, range, yMargin, order, width }: TimseriesLineProps = $props();
+	let { values, xScale, range, yMargin, order, width, metric }: TimseriesLineProps = $props();
 	let path: SVGPathElement;
 	let gy: SVGGElement;
 
@@ -40,19 +42,13 @@
 			return `translate(${yMargin} 0)`;
 		}
 	});
-
-	export const colors: Record<LineOrder, string> = {
-		first: 'stroke-first-chart',
-		second: 'stroke-second-chart',
-		third: 'stroke-third-chart'
-	};
 </script>
 
-<g bind:this={gy} transform={axisTranslate} class={colors[order]} fill={null} />
+<g bind:this={gy} transform={axisTranslate} class={textColors[metric]} fill={null} />
 <path
 	bind:this={path}
 	clip-path="url(#clip-path)"
 	fill="none"
-	class={colors[order]}
+	class={strokeColors[metric]}
 	stroke-width="1.5"
 />

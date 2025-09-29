@@ -1,11 +1,13 @@
 <script lang="ts">
+	import { type Metric } from '$lib/colors';
+
 	let {
 		availableOptions,
 		selectedOptions = $bindable(),
 		maxSelected
 	}: {
-		availableOptions: Array<{ option: string; display: string }>;
-		selectedOptions: Array<{ option: string; display: string }>;
+		availableOptions: Array<{ option: Metric; display: string }>;
+		selectedOptions: Array<{ option: Metric; display: string }>;
 		maxSelected: number;
 	} = $props();
 
@@ -30,7 +32,7 @@
 <div class="flex gap-1">
 	{#each options as option}
 		<input
-			class="btn"
+			class={`btn ${option.option.toLocaleLowerCase()}`}
 			type="checkbox"
 			bind:checked={option.selected}
 			disabled={(!option.selected && numberSelectedOptions >= maxSelected) ||
@@ -43,8 +45,31 @@
 </div>
 
 <style>
-	.btn:disabled:checked {
-		background-color: var(--color-primary);
+	.btn.heartrate:disabled:checked,
+	.btn.heartrate:checked {
+		background-color: var(--color-heart-rate-chart);
 		color: var(--color-primary-content);
+		border-color: transparent;
+	}
+
+	.btn.power:disabled:checked,
+	.btn.power:checked {
+		background-color: var(--color-power-chart);
+		color: var(--color-primary-content);
+		border-color: transparent;
+	}
+
+	.btn.speed:disabled:checked,
+	.btn.speed:checked {
+		background-color: var(--color-speed-chart);
+		color: var(--color-primary-content);
+		border-color: transparent;
+	}
+
+	.btn.altitude:disabled:checked,
+	.btn.altitude:checked {
+		background-color: var(--color-elevation-chart);
+		color: var(--color-primary-content);
+		border-color: transparent;
 	}
 </style>

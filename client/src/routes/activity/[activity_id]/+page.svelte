@@ -7,6 +7,7 @@
 	import { goto } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
+	import type { Metric } from '$lib/colors';
 
 	let { data }: PageProps = $props();
 
@@ -24,10 +25,10 @@
 		};
 	});
 
-	let metricOptions = [
-		{ option: 'Power', display: 'Power' },
-		{ option: 'Speed', display: 'Speed' },
+	let metricOptions: { option: Metric; display: string }[] = [
 		{ option: 'HeartRate', display: 'Heart rate' },
+		{ option: 'Speed', display: 'Speed' },
+		{ option: 'Power', display: 'Power' },
 		{ option: 'Altitude', display: 'Altitude' }
 	];
 

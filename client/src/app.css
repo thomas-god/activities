@@ -4,7 +4,9 @@
 }
 
 @theme {
-	--color-first-chart: #e07a5f;
-	--color-second-chart: #3d405b;
-	--color-third-chart: #81b29a;
+	--color-heart-rate-chart: #d00000;
+	--color-power-chart: #136f63;
+	--color-speed-chart: #3f88c5;
+	--color-elevation-chart: #032b43;
+	--color-other-chart: #ffba08;
 }

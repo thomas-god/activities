@@ -2,6 +2,7 @@
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
 	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
+	import { matchMetric, textColors } from '$lib/colors';
 
 	export interface Metric {
 		name: string;
@@ -95,7 +96,7 @@
 				values,
 				range: yRange,
 				order,
-				name: metric.name,
+				name: matchMetric(metric.name),
 				unit: metric.unit
 			});
 		}
@@ -166,12 +167,6 @@
 		});
 		return { time: zoomedXScale.invert(tooltipXOffset), values };
 	});
-
-	const tooltipColors: Record<LineOrder, string> = {
-		first: 'text-first-chart',
-		second: 'text-second-chart',
-		third: 'text-third-chart'
-	};
 </script>
 
 <button class="btn" onclick={resetZoom}>Reset zoom</button>
@@ -182,7 +177,7 @@
 			⌚ {formatDuration(nearestValues.time)} :
 		</span>
 		{#each nearestValues.values as value}
-			<span class={`px-1.5 ${tooltipColors[value.order]}`}>
+			<span class={`px-1.5 ${textColors[value.metric]}`}>
 				{value.metric}: {value.value.toFixed(2)}
 				{value.unit}
 			</span>
@@ -214,6 +209,7 @@
 			xScale={zoomedXScale}
 			order={props.order}
 			yMargin={axisWidth}
+			metric={props.name}
 			{width}
 		/>
 	{/each}
