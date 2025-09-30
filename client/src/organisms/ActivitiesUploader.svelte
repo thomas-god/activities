@@ -18,6 +18,7 @@
 		return checkCanUpload(files);
 	});
 
+	let pending = $state(false);
 	const postActivity = async (fileList: FileList | undefined) => {
 		if (!checkCanUpload(fileList)) {
 			return;
@@ -30,12 +31,14 @@
 			formData.append(file.name, file);
 		}
 
+		pending = true;
 		let res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
 			body: formData,
 			method: 'POST',
 			mode: 'cors',
 			credentials: 'include'
 		});
+		pending = false;
 
 		if (res.status === 401) {
 			goto('/login');
@@ -62,8 +65,14 @@
 		<button
 			class="btn bg-accent text-accent-content disabled:bg-base-200/10 disabled:text-base-content/20"
 			disabled={!can_upload}
-			onclick={() => postActivity(files)}>Upload</button
+			onclick={() => postActivity(files)}
 		>
+			{#if pending}
+				<span class="loading loading-spinner"></span>
+			{:else}
+				Upload
+			{/if}
+		</button>
 	</div>
 	<p class="label">.fit files are supported</p>
 </fieldset>
