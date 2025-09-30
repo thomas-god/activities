@@ -312,7 +312,7 @@ pub fn parse_string(
         bytes.push(content.next_u8()?)
     }
 
-    let string = String::from_utf8(bytes).map_err(|_| DataTypeError::InvalidUtf8)?;
+    let string = String::from_utf8_lossy(&bytes);
     let string = string.trim_matches(char::from(0));
 
     Ok(vec![DataValue::String(string.to_string())])
