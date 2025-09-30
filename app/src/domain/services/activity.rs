@@ -12,7 +12,7 @@ use crate::domain::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, IActivityService, ITrainingMetricService,
         ListActivitiesError, ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest,
-        RawDataRepository, RecomputeMetricRequest,
+        RawDataRepository, UpdateMetricsValuesRequest,
     },
 };
 
@@ -108,11 +108,11 @@ where
 
         // Dispatch metrics update
         let metric_service = self.training_metrics_service.clone();
-        let activity_id = activity.id().clone();
+        let cloned_activity = activity.clone();
         let user = activity.user().clone();
         tokio::spawn(async move {
-            let req = RecomputeMetricRequest::new(user, Some(activity_id));
-            metric_service.recompute_metric(req).await
+            let req = UpdateMetricsValuesRequest::new(user, vec![cloned_activity]);
+            metric_service.update_metrics_values(req).await
         });
 
         Ok(activity)

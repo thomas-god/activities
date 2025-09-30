@@ -334,15 +334,15 @@ pub enum CreateTrainingMetricError {
     SaveMetricError(#[from] SaveTrainingMetricError),
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct RecomputeMetricRequest {
+#[derive(Debug, Clone, Constructor)]
+pub struct UpdateMetricsValuesRequest {
     user: UserId,
-    new_activity: Option<ActivityId>,
+    new_activities: Vec<Activity>,
 }
 
-impl RecomputeMetricRequest {
-    pub fn new_activity(&self) -> &Option<ActivityId> {
-        &self.new_activity
+impl UpdateMetricsValuesRequest {
+    pub fn new_activities(&self) -> &[Activity] {
+        &self.new_activities
     }
 
     pub fn user(&self) -> &UserId {
@@ -386,9 +386,9 @@ pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
         req: CreateTrainingMetricRequest,
     ) -> impl Future<Output = Result<TrainingMetricId, CreateTrainingMetricError>> + Send;
 
-    fn recompute_metric(
+    fn update_metrics_values(
         &self,
-        req: RecomputeMetricRequest,
+        req: UpdateMetricsValuesRequest,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 
     fn get_training_metrics(
@@ -460,7 +460,7 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
     fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        values: (&str, f64),
+        values: (String, f64),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
     fn get_metric_values(

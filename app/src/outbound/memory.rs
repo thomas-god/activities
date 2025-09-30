@@ -240,7 +240,7 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
     async fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        new_value: (&str, f64),
+        new_value: (String, f64),
     ) -> Result<(), UpdateMetricError> {
         let mut metrics = self.values.lock().await;
         let (key, value) = new_value;

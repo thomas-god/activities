@@ -156,7 +156,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
     async fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        values: (&str, f64),
+        values: (String, f64),
     ) -> Result<(), UpdateMetricError> {
         sqlx::query("INSERT INTO t_training_metrics_values VALUES (?1, ?2, ?3);")
             .bind(id)
@@ -407,7 +407,7 @@ mod test_sqlite_activity_repository {
             .expect("Should have return Ok");
 
         // Insert a value for this definition
-        let new_value = ("2025-09-24", 12.3);
+        let new_value = ("2025-09-24".to_string(), 12.3);
         repository
             .update_metric_values(definition.id(), new_value)
             .await
@@ -459,7 +459,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24", 12.3);
+        let new_value = ("2025-09-24".to_string(), 12.3);
 
         repository
             .update_metric_values(definition.id(), new_value)
@@ -495,13 +495,13 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24", 12.3);
+        let new_value = ("2025-09-24".to_string(), 12.3);
         repository
             .update_metric_values(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-24", 1342.8);
+        let new_value = ("2025-09-24".to_string(), 1342.8);
         repository
             .update_metric_values(definition.id(), new_value)
             .await
@@ -530,7 +530,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-        let new_value = ("2025-09-24", 12.3);
+        let new_value = ("2025-09-24".to_string(), 12.3);
         let id = TrainingMetricId::new();
         let err = repository.update_metric_values(&id, new_value).await;
 
@@ -553,13 +553,13 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24", 12.3);
+        let new_value = ("2025-09-24".to_string(), 12.3);
         repository
             .update_metric_values(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-25", 10.1);
+        let new_value = ("2025-09-25".to_string(), 10.1);
         repository
             .update_metric_values(definition.id(), new_value)
             .await
