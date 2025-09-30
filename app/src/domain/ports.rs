@@ -138,6 +138,21 @@ pub enum DeleteActivityError {
     UserDoesNotOwnActivity(UserId, ActivityId),
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct ListActivitiesFilters {
+    limit: Option<usize>,
+}
+
+impl ListActivitiesFilters {
+    pub fn empty() -> Self {
+        Self { limit: None }
+    }
+
+    pub fn limit(&self) -> &Option<usize> {
+        &self.limit
+    }
+}
+
 pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
@@ -147,11 +162,13 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
     fn list_activities(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
     fn list_activities_with_timeseries(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
 
     fn get_activity(
@@ -219,11 +236,13 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn list_activities(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
     fn list_activities_with_timeseries(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
 
     fn get_activity(

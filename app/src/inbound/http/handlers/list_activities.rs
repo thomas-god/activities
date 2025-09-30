@@ -1,12 +1,17 @@
-use axum::{Extension, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{
+    Extension,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use chrono::{DateTime, FixedOffset};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     domain::{
         models::activity::{Activity, ActivityStatistic, Sport},
-        ports::{IActivityService, ITrainingMetricService},
+        ports::{IActivityService, ITrainingMetricService, ListActivitiesFilters},
     },
     inbound::{
         http::{
@@ -16,6 +21,17 @@ use crate::{
         parser::ParseFile,
     },
 };
+
+#[derive(Debug, Deserialize)]
+pub struct Filters {
+    limit: Option<usize>,
+}
+
+impl From<Filters> for ListActivitiesFilters {
+    fn from(value: Filters) -> Self {
+        Self::new(value.limit)
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<ResponseBodyItem>);
@@ -59,9 +75,14 @@ pub async fn list_activities<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR>>,
+    Query(filters): Query<Filters>,
 ) -> Result<impl IntoResponse, StatusCode> {
     tracing::info!("{user:?}");
-    let Ok(res) = state.activity_service.list_activities(user.user()).await else {
+    let Ok(res) = state
+        .activity_service
+        .list_activities(user.user(), &filters.into())
+        .await
+    else {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 

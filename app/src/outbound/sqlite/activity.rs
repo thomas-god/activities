@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::{
     domain::{
@@ -13,8 +13,8 @@ use crate::{
             },
         },
         ports::{
-            ActivityRepository, ListActivitiesError, RawDataRepository, SaveActivityError,
-            SimilarActivityError,
+            ActivityRepository, ListActivitiesError, ListActivitiesFilters, RawDataRepository,
+            SaveActivityError, SimilarActivityError,
         },
     },
     inbound::parser::ParseFile,
@@ -151,38 +151,57 @@ where
         Ok(Some(activity_with_timeseries))
     }
 
-    async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
-        sqlx::query_as::<_, ActivityRow>(
+    async fn list_activities(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> Result<Vec<Activity>, ListActivitiesError> {
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
             "SELECT id, user_id, name, start_time, sport, statistics
-            FROM t_activities
-            WHERE user_id = ?1;",
-        )
-        .bind(user)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
-        .map(|rows| {
-            rows.into_iter()
-                .map(|(id, user_id, name, start_time, sport, statistics)| {
-                    Activity::new(id, user_id, name, start_time, sport, statistics)
-                })
-                .collect()
-        })
+            FROM t_activities ",
+        );
+        builder.push("WHERE user_id = ").push_bind(user);
+
+        if let Some(limit) = *filters.limit() {
+            builder.push("LIMIT ").push_bind(limit as i64);
+        }
+
+        let query = builder.build_query_as::<'_, ActivityRow>();
+
+        query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
+            .map(|rows| {
+                rows.into_iter()
+                    .map(|(id, user_id, name, start_time, sport, statistics)| {
+                        Activity::new(id, user_id, name, start_time, sport, statistics)
+                    })
+                    .collect()
+            })
     }
 
     async fn list_activities_with_timeseries(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
-        let rows = sqlx::query_as::<_, ActivityRow>(
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
             "SELECT id, user_id, name, start_time, sport, statistics
-            FROM t_activities
-            WHERE user_id = ?1;",
-        )
-        .bind(user)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?;
+            FROM t_activities ",
+        );
+        builder.push("WHERE user_id = ").push_bind(user);
+
+        if let Some(limit) = *filters.limit() {
+            builder.push("LIMIT ").push_bind(limit as i64);
+        }
+
+        let query = builder.build_query_as::<'_, ActivityRow>();
+
+        let rows = query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?;
 
         let mut res = vec![];
         for (id, user_id, name, start_time, sport, statistics) in rows {
@@ -521,11 +540,44 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(&UserId::test_default())
+            .list_activities(&UserId::test_default(), &ListActivitiesFilters::empty())
             .await
             .expect("Get should have succeeded");
 
         assert_eq!(res.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_limit() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .list_activities(
+                &UserId::test_default(),
+                &ListActivitiesFilters::new(Some(1)),
+            )
+            .await
+            .expect("Get should have succeeded");
+
+        assert_eq!(res.len(), 1);
     }
 
     #[tokio::test]
@@ -551,7 +603,10 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(&UserId::from("another_user"))
+            .list_activities(
+                &UserId::from("another_user"),
+                &ListActivitiesFilters::empty(),
+            )
             .await
             .expect("Get should have succeeded");
 
@@ -808,11 +863,50 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         let res = repository
-            .list_activities_with_timeseries(activity.user())
+            .list_activities_with_timeseries(activity.user(), &ListActivitiesFilters::empty())
             .await
             .expect("Should have succeeded");
 
         assert_eq!(res.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_timeseries_with_limit() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .returning(|_| Ok(vec![]));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .returning(|_| Ok(build_parsed_file_content()));
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+        )
+        .await
+        .expect("repo should init");
+
+        // Insert 2 activities
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .list_activities_with_timeseries(activity.user(), &ListActivitiesFilters::new(Some(1)))
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(res.len(), 1);
     }
 
     #[tokio::test]
@@ -853,7 +947,7 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         let res = repository
-            .list_activities_with_timeseries(activity.user())
+            .list_activities_with_timeseries(activity.user(), &ListActivitiesFilters::empty())
             .await
             .expect("Should have succeeded");
 

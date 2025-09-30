@@ -15,8 +15,9 @@ use crate::domain::{
     ports::{
         ActivityRepository, DeleteMetricError, GetDefinitionError, GetRawDataError,
         GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
-        RawDataRepository, SaveActivityError, SaveRawDataError, SaveTrainingMetricError,
-        SimilarActivityError, TrainingMetricsRepository, UpdateMetricError,
+        ListActivitiesFilters, RawDataRepository, SaveActivityError, SaveRawDataError,
+        SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
+        UpdateMetricError,
     },
 };
 
@@ -53,7 +54,11 @@ impl ActivityRepository for InMemoryActivityRepository {
         Ok(())
     }
 
-    async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
+    async fn list_activities(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> Result<Vec<Activity>, ListActivitiesError> {
         let activities = self.activities.lock().await;
         Ok(activities
             .iter()
@@ -64,12 +69,14 @@ impl ActivityRepository for InMemoryActivityRepository {
                     None
                 }
             })
+            .take(filters.limit().unwrap_or_else(|| activities.len()))
             .collect())
     }
 
     async fn list_activities_with_timeseries(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
         let activities = self.activities.lock().await;
         Ok(activities
@@ -81,6 +88,7 @@ impl ActivityRepository for InMemoryActivityRepository {
                     None
                 }
             })
+            .take(filters.limit().unwrap_or_else(|| activities.len()))
             .collect())
     }
 
@@ -289,7 +297,7 @@ mod tests_activities_repository {
         let repository = InMemoryActivityRepository::new(activities);
 
         let res = repository
-            .list_activities(&"user1".to_string().into())
+            .list_activities(&"user1".to_string().into(), &ListActivitiesFilters::empty())
             .await;
 
         let res = res.expect("Res should be Ok");

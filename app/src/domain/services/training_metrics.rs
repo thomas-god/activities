@@ -11,7 +11,7 @@ use crate::domain::{
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingMetricService,
-        RecomputeMetricRequest, TrainingMetricsRepository,
+        ListActivitiesFilters, RecomputeMetricRequest, TrainingMetricsRepository,
     },
 };
 
@@ -67,7 +67,7 @@ where
             .activity_repository
             .lock()
             .await
-            .list_activities_with_timeseries(req.user())
+            .list_activities_with_timeseries(req.user(), &ListActivitiesFilters::empty())
             .await
             .unwrap();
 
@@ -340,7 +340,7 @@ mod tests_training_metrics_service {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_list_activities_with_timeseries()
-            .returning(|_| Ok(vec![]));
+            .returning(|_, _| Ok(vec![]));
 
         let service =
             TrainingMetricService::new(repository, Arc::new(Mutex::new(activity_repository)));

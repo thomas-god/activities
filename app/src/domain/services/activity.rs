@@ -11,8 +11,8 @@ use crate::domain::{
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, IActivityService, ITrainingMetricService,
-        ListActivitiesError, ModifyActivityError, ModifyActivityRequest, RawDataRepository,
-        RecomputeMetricRequest,
+        ListActivitiesError, ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest,
+        RawDataRepository, RecomputeMetricRequest,
     },
 };
 
@@ -118,17 +118,24 @@ where
         Ok(activity)
     }
 
-    async fn list_activities(&self, user: &UserId) -> Result<Vec<Activity>, ListActivitiesError> {
+    async fn list_activities(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> Result<Vec<Activity>, ListActivitiesError> {
         let repository = self.activity_repository.lock().await;
-        repository.list_activities(user).await
+        repository.list_activities(user, filters).await
     }
 
     async fn list_activities_with_timeseries(
         &self,
         user: &UserId,
+        filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
         let repository = self.activity_repository.lock().await;
-        repository.list_activities_with_timeseries(user).await
+        repository
+            .list_activities_with_timeseries(user, filters)
+            .await
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
@@ -247,11 +254,13 @@ pub mod test_utils {
             async fn list_activities(
                 &self,
                 user: &UserId,
+                filters: &ListActivitiesFilters
             ) -> Result<Vec<Activity>, ListActivitiesError>;
 
             async fn list_activities_with_timeseries(
                 &self,
                 user: &UserId,
+                filters: &ListActivitiesFilters
             ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
 
             async fn get_activity(
@@ -301,7 +310,7 @@ pub mod test_utils {
             });
         }
         pub fn default_list_activities(&mut self) {
-            self.expect_list_activities().returning(|_| Ok(vec![]));
+            self.expect_list_activities().returning(|_, _| Ok(vec![]));
         }
 
         pub fn default_get_activity(&mut self) {
@@ -347,11 +356,13 @@ pub mod test_utils {
             async fn list_activities(
                 &self,
                 user: &UserId,
+                filters: &ListActivitiesFilters
             ) -> Result<Vec<Activity>, ListActivitiesError>;
 
             async fn list_activities_with_timeseries(
                 &self,
                 user: &UserId,
+                filters: &ListActivitiesFilters
             ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
 
             async fn get_activity(
