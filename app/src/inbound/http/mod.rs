@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use anyhow::Context;
+use axum::extract::DefaultBodyLimit;
 use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderValue, Method};
 
@@ -155,7 +156,11 @@ fn core_routes<
     state: AppState<AS, PF, TMS, US>,
 ) -> Router<AppState<AS, PF, TMS, US>> {
     let mut router = Router::new()
-        .route("/activity", post(upload_activities::<AS, PF, TMS, US>))
+        .route(
+            "/activity",
+            post(upload_activities::<AS, PF, TMS, US>)
+                .route_layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
+        )
         .route("/activities", get(list_activities::<AS, PF, TMS, US>))
         .route(
             "/activity/{activity_id}",

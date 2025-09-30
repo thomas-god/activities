@@ -74,5 +74,5 @@
 			{/if}
 		</button>
 	</div>
-	<p class="label">.fit files are supported</p>
+	<p class="label">.fit files are supported, max 1 GB</p>
 </fieldset>
