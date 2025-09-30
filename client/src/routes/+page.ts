@@ -16,7 +16,7 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 const fetchActivities = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<ActivityList> => {
-	const res = await fetch(`${PUBLIC_APP_URL}/api/activities`, {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/activities?limit=10`, {
 		method: 'GET',
 		mode: 'cors',
 		credentials: 'include'

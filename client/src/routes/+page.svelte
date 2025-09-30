@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
-	import ActivityList from '../organisms/ActivityList.svelte';
+	import { goto, invalidate } from '$app/navigation';
+	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
 	import ActivitiesUploader from '../organisms/ActivitiesUploader.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
-	import { union } from 'zod';
 
 	let { data }: PageProps = $props();
 
@@ -35,6 +34,10 @@
 			granularity: metric.granularity
 		};
 	});
+
+	const moreActivitiesCallback = () => {
+		goto('/history');
+	};
 </script>
 
 <div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
@@ -58,5 +61,5 @@
 {/if}
 
 <div class="mx-2 mt-5 sm:mx-auto sm:w-md">
-	<ActivityList activityList={sorted_activities} />
+	<PastActivitiesList activityList={sorted_activities} moreCallback={moreActivitiesCallback} />
 </div>
