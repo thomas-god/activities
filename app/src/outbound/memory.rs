@@ -203,7 +203,7 @@ impl InMemoryTrainingMetricsRepository {
 }
 
 impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
-    async fn save_definitions(
+    async fn save_definition(
         &self,
         definition: TrainingMetricDefinition,
     ) -> Result<(), SaveTrainingMetricError> {

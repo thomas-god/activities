@@ -39,7 +39,7 @@ where
         req: CreateTrainingMetricRequest,
     ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
         let id = TrainingMetricId::new();
-        let metric_definition = TrainingMetricDefinition::new(
+        let definition = TrainingMetricDefinition::new(
             id.clone(),
             req.user().clone(),
             req.source().clone(),
@@ -47,15 +47,24 @@ where
             req.aggregate().clone(),
         );
         self.metrics_repository
-            .save_definitions(metric_definition)
+            .save_definition(definition.clone())
             .await?;
 
-        let _ = self
-            .update_metrics_values(UpdateMetricsValuesRequest::new(
-                req.user().clone(),
-                Vec::new(),
-            ))
-            .await;
+        // Compute initial values
+        let activities = self
+            .activity_repository
+            .lock()
+            .await
+            .list_activities_with_timeseries(req.user(), &ListActivitiesFilters::empty())
+            .await
+            .unwrap();
+        let values = definition.compute_values(&activities);
+        for (key, value) in values.iter() {
+            let _ = self
+                .metrics_repository
+                .update_metric_values(definition.id(), (key.clone(), *value))
+                .await;
+        }
 
         Ok(id)
     }
@@ -77,7 +86,6 @@ where
 
         for metric in metrics {
             let values = metric.compute_values(&activities);
-            tracing::info!("New value {:?} for metric {:?}", values, metric);
             for (key, value) in values.iter() {
                 let _ = self
                     .metrics_repository
@@ -203,7 +211,7 @@ pub mod test_utils {
         }
 
         impl TrainingMetricsRepository for TrainingMetricsRepository {
-            async fn save_definitions(
+            async fn save_definition(
                 &self,
                 definition: TrainingMetricDefinition,
             ) -> Result<(), SaveTrainingMetricError>;
@@ -246,13 +254,16 @@ mod tests_training_metrics_service {
 
     use crate::domain::{
         models::{
-            activity::ActivityStatistic,
+            activity::{
+                Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+                ActivityTimeseries, ActivityWithTimeseries, Sport, Timeseries, TimeseriesTime,
+            },
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricId, TrainingMetricSource, TrainingMetricValues,
             },
         },
-        ports::GetTrainingMetricsDefinitionsError,
+        ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::{
             activity::test_utils::MockActivityRepository,
             training_metrics::test_utils::MockTrainingMetricsRepository,
@@ -260,6 +271,97 @@ mod tests_training_metrics_service {
     };
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_create_metric_ok() {
+        let mut repository = MockTrainingMetricsRepository::new();
+        repository.expect_save_definition().returning(|_| Ok(()));
+
+        let mut activities = MockActivityRepository::new();
+        activities
+            .expect_list_activities_with_timeseries()
+            .returning(|_, _| Ok(vec![]));
+        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Activity,
+            TrainingMetricAggregate::Average,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_compute_initial_values() {
+        let mut repository = MockTrainingMetricsRepository::new();
+        repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_update_metric_values()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let mut activities = MockActivityRepository::new();
+        activities
+            .expect_list_activities_with_timeseries()
+            .returning(|_, _| {
+                Ok(vec![ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::new(),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::from_timestamp(1200).unwrap(),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Calories,
+                            12.,
+                        )])),
+                    ),
+                    ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
+                )])
+            });
+        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Activity,
+            TrainingMetricAggregate::Average,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_fails_to_save_definition() {
+        let mut repository = MockTrainingMetricsRepository::new();
+        repository
+            .expect_save_definition()
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
+        repository.expect_update_metric_values().times(0);
+        let mut activities = MockActivityRepository::new();
+        activities.expect_list_activities_with_timeseries().times(0);
+        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Activity,
+            TrainingMetricAggregate::Average,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect_err("Should have return an err");
+    }
 
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_when_get_definitions_err() {

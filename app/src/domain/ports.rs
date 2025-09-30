@@ -445,10 +445,20 @@ pub enum GetDefinitionError {
 }
 
 pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
-    fn save_definitions(
+    fn save_definition(
         &self,
         definition: TrainingMetricDefinition,
     ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
+
+    fn get_definition(
+        &self,
+        metric: &TrainingMetricId,
+    ) -> impl Future<Output = Result<Option<TrainingMetricDefinition>, GetDefinitionError>> + Send;
+
+    fn delete_definition(
+        &self,
+        metric: &TrainingMetricId,
+    ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
 
     fn get_definitions(
         &self,
@@ -467,16 +477,6 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         &self,
         id: &TrainingMetricId,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
-
-    fn get_definition(
-        &self,
-        metric: &TrainingMetricId,
-    ) -> impl Future<Output = Result<Option<TrainingMetricDefinition>, GetDefinitionError>> + Send;
-
-    fn delete_definition(
-        &self,
-        metric: &TrainingMetricId,
-    ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
 }
 
 #[cfg(test)]

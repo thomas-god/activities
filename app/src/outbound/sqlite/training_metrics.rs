@@ -71,7 +71,7 @@ impl SqliteTrainingMetricsRepository {
 }
 
 impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
-    async fn save_definitions(
+    async fn save_definition(
         &self,
         definition: TrainingMetricDefinition,
     ) -> Result<(), SaveTrainingMetricError> {
@@ -247,7 +247,7 @@ mod test_sqlite_activity_repository {
         let definition = build_metric_definition();
 
         repository
-            .save_definitions(definition)
+            .save_definition(definition)
             .await
             .expect("Should have return Ok");
     }
@@ -262,11 +262,11 @@ mod test_sqlite_activity_repository {
         let definition = build_metric_definition();
 
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
         repository
-            .save_definitions(definition)
+            .save_definition(definition)
             .await
             .expect_err("Should have return Err");
     }
@@ -281,7 +281,7 @@ mod test_sqlite_activity_repository {
         let definition = build_metric_definition();
 
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -317,12 +317,12 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -343,7 +343,7 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -364,7 +364,7 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -402,7 +402,7 @@ mod test_sqlite_activity_repository {
         // Create definition
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -455,7 +455,7 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -491,7 +491,7 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -549,7 +549,7 @@ mod test_sqlite_activity_repository {
 
         let definition = build_metric_definition();
         repository
-            .save_definitions(definition.clone())
+            .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
