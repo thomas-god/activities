@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, hash_map::Iter},
     fmt,
+    hash::Hash,
 };
 
 use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFormat};
@@ -79,7 +80,7 @@ impl TrainingMetricDefinition {
             .filter_map(|activity| self.source.extract_from_activity(activity))
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
-        TrainingMetricValues(aggregate_metrics(
+        TrainingMetricValues::from(aggregate_metrics(
             &self.granularity_aggregate,
             grouped_metrics,
         ))
@@ -156,19 +157,19 @@ impl ToUnit for TrainingMetricSource {
 fn group_metrics_by_granularity(
     granularity: &TrainingMetricGranularity,
     metrics: Vec<TrainingMetricActivityValue>,
-) -> HashMap<String, Vec<f64>> {
-    let mut grouped_values: HashMap<String, Vec<f64>> = HashMap::new();
+) -> HashMap<String, Vec<TrainingMetricActivityValue>> {
+    let mut grouped_values: HashMap<String, Vec<TrainingMetricActivityValue>> = HashMap::new();
     for value in metrics {
         let key = granularity.datetime_key(&value.activity_start_time.date());
-        grouped_values.entry(key).or_default().push(value.value);
+        grouped_values.entry(key).or_default().push(value);
     }
     grouped_values
 }
 
 fn aggregate_metrics(
     aggregate: &TrainingMetricAggregate,
-    metrics: HashMap<String, Vec<f64>>,
-) -> HashMap<String, f64> {
+    metrics: HashMap<String, Vec<TrainingMetricActivityValue>>,
+) -> HashMap<String, TrainingMetricAggregateValue> {
     let mut res = HashMap::new();
 
     for (key, values) in metrics.into_iter() {
@@ -287,25 +288,47 @@ pub enum TrainingMetricAggregateValue {
     Average {
         value: f64,
         sum: f64,
-        total_time: f64,
+        number_of_elements: usize,
     },
 }
 
 impl TrainingMetricAggregate {
-    fn aggregate(&self, values: Vec<f64>) -> Option<f64> {
+    fn aggregate(
+        &self,
+        values: Vec<TrainingMetricActivityValue>,
+    ) -> Option<TrainingMetricAggregateValue> {
         if values.is_empty() {
             return None;
         }
-        let length = values.len();
-        match self {
-            TrainingMetricAggregate::Min => values.into_iter().reduce(f64::min),
-            TrainingMetricAggregate::Max => values.into_iter().reduce(f64::max),
-            TrainingMetricAggregate::Average => values
-                .into_iter()
-                .reduce(|acc, e| acc + e)
-                .map(|val| val / length as f64),
-            TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
-        }
+        Some(match self {
+            TrainingMetricAggregate::Min => TrainingMetricAggregateValue::Min(
+                values
+                    .into_iter()
+                    .fold(f64::MAX, |min_val, curr_val| min_val.min(curr_val.value)),
+            ),
+            TrainingMetricAggregate::Max => TrainingMetricAggregateValue::Max(
+                values
+                    .into_iter()
+                    .fold(f64::MIN, |max_val, curr_val| max_val.max(curr_val.value)),
+            ),
+            TrainingMetricAggregate::Average => {
+                let number_of_elements = values.len();
+                let sum = values
+                    .into_iter()
+                    .fold(0., |sum, curr_val| sum + curr_val.value);
+
+                TrainingMetricAggregateValue::Average {
+                    value: sum / number_of_elements as f64,
+                    sum,
+                    number_of_elements,
+                }
+            }
+            TrainingMetricAggregate::Sum => TrainingMetricAggregateValue::Sum(
+                values
+                    .into_iter()
+                    .fold(0., |sum, curr_val| sum + curr_val.value),
+            ),
+        })
     }
 
     fn from_activity_timeseries(
@@ -350,7 +373,7 @@ impl TrainingMetricAggregateValue {
             Self::Average {
                 value,
                 sum: _,
-                total_time: _,
+                number_of_elements: _,
             } => value,
         }
     }
@@ -358,6 +381,16 @@ impl TrainingMetricAggregateValue {
 
 #[derive(Debug, Clone, Constructor, Default)]
 pub struct TrainingMetricValues(HashMap<String, f64>);
+
+impl From<HashMap<String, TrainingMetricAggregateValue>> for TrainingMetricValues {
+    fn from(value: HashMap<String, TrainingMetricAggregateValue>) -> Self {
+        let mut map = HashMap::new();
+        for (key, val) in value {
+            map.insert(key, *val.value());
+        }
+        Self(map)
+    }
+}
 
 impl TrainingMetricValues {
     pub fn insert(&mut self, key: String, value: f64) -> Option<f64> {
@@ -511,159 +544,181 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_activity() {
-        let metrics = vec![
-            TrainingMetricActivityValue::new(
-                12.3,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(120.),
+        let metric_1 = TrainingMetricActivityValue::new(
+            12.3,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                18.1,
-                ActivityStartTime::new(
-                    "2025-09-03T02:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(120.),
+            Some(120.),
+        );
+        let metric_2 = TrainingMetricActivityValue::new(
+            18.1,
+            ActivityStartTime::new(
+                "2025-09-03T02:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-        ];
+            Some(120.),
+        );
+        let metrics = vec![metric_1.clone(), metric_2.clone()];
         let granularity = TrainingMetricGranularity::Activity;
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-03T00:00:00Z").unwrap(), &vec![12.3]);
-        assert_eq!(res.get("2025-09-03T02:00:00Z").unwrap(), &vec![18.1]);
+        assert_eq!(res.get("2025-09-03T00:00:00Z").unwrap(), &vec![metric_1]);
+        assert_eq!(res.get("2025-09-03T02:00:00Z").unwrap(), &vec![metric_2]);
     }
 
     #[test]
     fn test_group_metric_by_granularity_daily() {
-        let metrics = vec![
-            TrainingMetricActivityValue::new(
-                12.3,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(120.),
+        let metric_1 = TrainingMetricActivityValue::new(
+            12.3,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                18.1,
-                ActivityStartTime::new(
-                    "2025-09-03T02:00:00+03:00"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(120.),
+            Some(120.),
+        );
+        let metric_2 = TrainingMetricActivityValue::new(
+            18.1,
+            ActivityStartTime::new(
+                "2025-09-03T02:00:00+03:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                67.1,
-                ActivityStartTime::new(
-                    "2025-09-04T02:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(120.),
+            Some(120.),
+        );
+
+        let metric_3 = TrainingMetricActivityValue::new(
+            67.1,
+            ActivityStartTime::new(
+                "2025-09-04T02:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-        ];
+            Some(120.),
+        );
+        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Daily;
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-03").unwrap(), &vec![12.3, 18.1]);
-        assert_eq!(res.get("2025-09-04").unwrap(), &vec![67.1]);
+        assert_eq!(res.get("2025-09-03").unwrap(), &vec![metric_1, metric_2]);
+        assert_eq!(res.get("2025-09-04").unwrap(), &vec![metric_3]);
     }
 
     #[test]
     fn test_group_metric_by_granularity_weekly() {
-        let metrics = vec![
-            TrainingMetricActivityValue::new(
-                12.3,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(12.),
+        let metric_1 = TrainingMetricActivityValue::new(
+            12.3,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                18.1,
-                ActivityStartTime::new(
-                    "2025-09-05T02:00:00+03:00"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(12.),
+            Some(12.),
+        );
+        let metric_2 = TrainingMetricActivityValue::new(
+            18.1,
+            ActivityStartTime::new(
+                "2025-09-05T02:00:00+03:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                67.1,
-                ActivityStartTime::new(
-                    "2025-09-14T02:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Some(12.),
+            Some(12.),
+        );
+        let metric_3 = TrainingMetricActivityValue::new(
+            67.1,
+            ActivityStartTime::new(
+                "2025-09-14T02:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-        ];
+            Some(12.),
+        );
+        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Weekly;
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-01").unwrap(), &vec![12.3, 18.1]);
-        assert_eq!(res.get("2025-09-08").unwrap(), &vec![67.1]);
+        assert_eq!(res.get("2025-09-01").unwrap(), &vec![metric_1, metric_2]);
+        assert_eq!(res.get("2025-09-08").unwrap(), &vec![metric_3]);
     }
 
     #[test]
     fn test_group_metric_by_granularity_monthly() {
-        let metrics = vec![
-            TrainingMetricActivityValue::new(
-                12.3,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                None,
+        let metric_1 = TrainingMetricActivityValue::new(
+            12.3,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                18.1,
-                ActivityStartTime::new(
-                    "2025-09-05T02:00:00+03:00"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                None,
+            None,
+        );
+        let metric_2 = TrainingMetricActivityValue::new(
+            18.1,
+            ActivityStartTime::new(
+                "2025-09-05T02:00:00+03:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-            TrainingMetricActivityValue::new(
-                67.1,
-                ActivityStartTime::new(
-                    "2025-08-14T02:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                None,
+            None,
+        );
+        let metric_3 = TrainingMetricActivityValue::new(
+            67.1,
+            ActivityStartTime::new(
+                "2025-08-14T02:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
             ),
-        ];
+            None,
+        );
+        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Monthly;
 
         let res = group_metrics_by_granularity(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-01").unwrap(), &vec![12.3, 18.1]);
-        assert_eq!(res.get("2025-08-01").unwrap(), &vec![67.1]);
+        assert_eq!(res.get("2025-09-01").unwrap(), &vec![metric_1, metric_2]);
+        assert_eq!(res.get("2025-08-01").unwrap(), &vec![metric_3]);
     }
 
     #[test]
     fn test_aggregate_metrics_min() {
-        let metrics = HashMap::from([("2025-09-01".to_string(), vec![1., 2., 3.])]);
+        let metrics = HashMap::from([(
+            "2025-09-01".to_string(),
+            vec![
+                TrainingMetricActivityValue::new(
+                    12.3,
+                    ActivityStartTime::new(
+                        "2025-09-03T00:00:00Z"
+                            .parse::<DateTime<FixedOffset>>()
+                            .unwrap(),
+                    ),
+                    None,
+                ),
+                TrainingMetricActivityValue::new(
+                    1.3,
+                    ActivityStartTime::new(
+                        "2025-09-03T00:00:00Z"
+                            .parse::<DateTime<FixedOffset>>()
+                            .unwrap(),
+                    ),
+                    None,
+                ),
+            ],
+        )]);
         let aggregate = TrainingMetricAggregate::Min;
 
         let res = aggregate_metrics(&aggregate, metrics);
 
-        assert_eq!(*res.get("2025-09-01").unwrap(), 1.);
+        assert_eq!(
+            *res.get("2025-09-01").unwrap(),
+            TrainingMetricAggregateValue::Min(1.3)
+        );
     }
 
     #[test]
