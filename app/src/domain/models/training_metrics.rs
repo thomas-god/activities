@@ -128,7 +128,7 @@ impl TrainingMetricSource {
         match self {
             Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
             Self::Timeseries((metric, aggregate)) => {
-                extract_aggregated_activity_metric(aggregate, metric, activity)
+                aggregate.from_activity_timeseries(metric, activity)
             }
         }
         .map(|value| {
@@ -151,26 +151,6 @@ impl ToUnit for TrainingMetricSource {
             Self::Timeseries((metric, _)) => metric.unit(),
         }
     }
-}
-
-fn extract_aggregated_activity_metric(
-    aggregate: &TrainingMetricAggregate,
-    metric: &TimeseriesMetric,
-    activity: &ActivityWithTimeseries,
-) -> Option<f64> {
-    let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
-        if m.metric() == metric {
-            Some(
-                m.values()
-                    .iter()
-                    .filter_map(|val| val.as_ref().map(f64::from))
-                    .collect(),
-            )
-        } else {
-            None
-        }
-    })?;
-    aggregate.aggregate(values)
 }
 
 fn group_metrics_by_granularity(
@@ -299,6 +279,18 @@ pub enum TrainingMetricAggregate {
     Sum,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TrainingMetricAggregateValue {
+    Min(f64),
+    Max(f64),
+    Sum(f64),
+    Average {
+        value: f64,
+        sum: f64,
+        total_time: f64,
+    },
+}
+
 impl TrainingMetricAggregate {
     fn aggregate(&self, values: Vec<f64>) -> Option<f64> {
         if values.is_empty() {
@@ -313,6 +305,53 @@ impl TrainingMetricAggregate {
                 .reduce(|acc, e| acc + e)
                 .map(|val| val / length as f64),
             TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
+        }
+    }
+
+    fn from_activity_timeseries(
+        &self,
+        metric: &TimeseriesMetric,
+        activity: &ActivityWithTimeseries,
+    ) -> Option<f64> {
+        let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
+            if m.metric() == metric {
+                Some(
+                    m.values()
+                        .iter()
+                        .filter_map(|val| val.as_ref().map(f64::from))
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        })?;
+        if values.is_empty() {
+            return None;
+        }
+        let length = values.len();
+        match self {
+            TrainingMetricAggregate::Min => values.into_iter().reduce(f64::min),
+            TrainingMetricAggregate::Max => values.into_iter().reduce(f64::max),
+            TrainingMetricAggregate::Average => values
+                .into_iter()
+                .reduce(|acc, e| acc + e)
+                .map(|val| val / length as f64),
+            TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
+        }
+    }
+}
+
+impl TrainingMetricAggregateValue {
+    pub fn value(&self) -> &f64 {
+        match self {
+            Self::Max(max) => max,
+            Self::Min(min) => min,
+            Self::Sum(sum) => sum,
+            Self::Average {
+                value,
+                sum: _,
+                total_time: _,
+            } => value,
         }
     }
 }
@@ -395,7 +434,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Min;
         let activity = default_activity();
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_none());
     }
 
@@ -422,7 +461,7 @@ mod test_training_metrics {
             ),
         );
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_none());
     }
 
@@ -432,7 +471,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Min;
         let activity = default_activity();
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 10.)
     }
@@ -443,7 +482,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Max;
         let activity = default_activity();
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 30.)
     }
@@ -454,7 +493,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Average;
         let activity = default_activity();
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 20.)
     }
@@ -465,7 +504,7 @@ mod test_training_metrics {
         let aggregate = TrainingMetricAggregate::Sum;
         let activity = default_activity();
 
-        let res = extract_aggregated_activity_metric(&aggregate, &metric, &activity);
+        let res = aggregate.from_activity_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 60.)
     }
