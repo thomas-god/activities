@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityId, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit, Unit,
+        ActivityId, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric,
+        ToUnit, Unit,
     },
 };
 
@@ -103,6 +104,16 @@ pub struct DateGranule {
     end: NaiveDate,
 }
 
+/// A [TrainingMetricActivityValue] represents the value of a [TrainingMetricSource] extracted from
+/// a single [ActivityWithTimeseries]. On top of the metric value, it contains metadata like
+/// the activity start time and duration that can be used in later computations.
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricActivityValue {
+    value: f64,
+    activity_start_time: ActivityStartTime,
+    activity_duration: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricSource {
     Statistic(ActivityStatistic),
@@ -113,14 +124,23 @@ impl TrainingMetricSource {
     pub fn extract_from_activity(
         &self,
         activity: &ActivityWithTimeseries,
-    ) -> Option<(DateTime<FixedOffset>, f64)> {
+    ) -> Option<TrainingMetricActivityValue> {
         match self {
             Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
             Self::Timeseries((metric, aggregate)) => {
                 extract_aggregated_activity_metric(aggregate, metric, activity)
             }
         }
-        .map(|value| (*activity.start_time().date(), value))
+        .map(|value| {
+            TrainingMetricActivityValue::new(
+                value,
+                *activity.start_time(),
+                activity
+                    .statistics()
+                    .get(&ActivityStatistic::Duration)
+                    .cloned(),
+            )
+        })
     }
 }
 
@@ -155,12 +175,12 @@ fn extract_aggregated_activity_metric(
 
 fn group_metrics_by_granularity(
     granularity: &TrainingMetricGranularity,
-    metrics: Vec<(DateTime<FixedOffset>, f64)>,
+    metrics: Vec<TrainingMetricActivityValue>,
 ) -> HashMap<String, Vec<f64>> {
     let mut grouped_values: HashMap<String, Vec<f64>> = HashMap::new();
-    for (date, value) in metrics {
-        let key = granularity.datetime_key(&date);
-        grouped_values.entry(key).or_default().push(value);
+    for value in metrics {
+        let key = granularity.datetime_key(&value.activity_start_time.date());
+        grouped_values.entry(key).or_default().push(value.value);
     }
     grouped_values
 }
@@ -453,17 +473,23 @@ mod test_training_metrics {
     #[test]
     fn test_group_metric_by_granularity_activity() {
         let metrics = vec![
-            (
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 12.3,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(120.),
             ),
-            (
-                "2025-09-03T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 18.1,
+                ActivityStartTime::new(
+                    "2025-09-03T02:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(120.),
             ),
         ];
         let granularity = TrainingMetricGranularity::Activity;
@@ -477,23 +503,32 @@ mod test_training_metrics {
     #[test]
     fn test_group_metric_by_granularity_daily() {
         let metrics = vec![
-            (
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 12.3,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(120.),
             ),
-            (
-                "2025-09-03T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 18.1,
+                ActivityStartTime::new(
+                    "2025-09-03T02:00:00+03:00"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(120.),
             ),
-            (
-                "2025-09-04T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 67.1,
+                ActivityStartTime::new(
+                    "2025-09-04T02:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(120.),
             ),
         ];
         let granularity = TrainingMetricGranularity::Daily;
@@ -507,23 +542,32 @@ mod test_training_metrics {
     #[test]
     fn test_group_metric_by_granularity_weekly() {
         let metrics = vec![
-            (
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 12.3,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(12.),
             ),
-            (
-                "2025-09-05T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 18.1,
+                ActivityStartTime::new(
+                    "2025-09-05T02:00:00+03:00"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(12.),
             ),
-            (
-                "2025-09-14T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 67.1,
+                ActivityStartTime::new(
+                    "2025-09-14T02:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Some(12.),
             ),
         ];
         let granularity = TrainingMetricGranularity::Weekly;
@@ -537,23 +581,32 @@ mod test_training_metrics {
     #[test]
     fn test_group_metric_by_granularity_monthly() {
         let metrics = vec![
-            (
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 12.3,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                None,
             ),
-            (
-                "2025-09-05T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 18.1,
+                ActivityStartTime::new(
+                    "2025-09-05T02:00:00+03:00"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                None,
             ),
-            (
-                "2025-08-14T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
+            TrainingMetricActivityValue::new(
                 67.1,
+                ActivityStartTime::new(
+                    "2025-08-14T02:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                None,
             ),
         ];
         let granularity = TrainingMetricGranularity::Monthly;
