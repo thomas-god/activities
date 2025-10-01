@@ -10,7 +10,9 @@ use uuid::Uuid;
 
 use crate::domain::models::{
     UserId,
-    activity::{ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit, Unit},
+    activity::{
+        ActivityId, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit, Unit,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
@@ -69,6 +71,38 @@ impl TrainingMetricDefinition {
     }
 }
 
+impl TrainingMetricDefinition {
+    pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
+        let metrics_per_activity = activities
+            .iter()
+            .filter_map(|activity| self.source.extract_from_activity(activity))
+            .collect();
+        let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
+        TrainingMetricValues(aggregate_metrics(
+            &self.granularity_aggregate,
+            grouped_metrics,
+        ))
+    }
+
+    pub fn get_corresponding_granule(&self, activity: &ActivityWithTimeseries) -> Option<Granule> {
+        self.granularity.granule(activity)
+    }
+}
+
+/// A [Granule] represents a set on which a definition will yield a single value. It can represent
+/// a single activity with [Granule::Activity], or a temporal range with [Granule::Date].
+#[derive(Debug, Clone, PartialEq)]
+pub enum Granule {
+    Activity(ActivityId),
+    Date(DateGranule),
+}
+
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct DateGranule {
+    start: NaiveDate,
+    end: NaiveDate,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricSource {
     Statistic(ActivityStatistic),
@@ -96,20 +130,6 @@ impl ToUnit for TrainingMetricSource {
             Self::Statistic(stat) => stat.unit(),
             Self::Timeseries((metric, _)) => metric.unit(),
         }
-    }
-}
-
-impl TrainingMetricDefinition {
-    pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
-        let metrics_per_activity = activities
-            .iter()
-            .filter_map(|activity| self.source.extract_from_activity(activity))
-            .collect();
-        let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
-        TrainingMetricValues(aggregate_metrics(
-            &self.granularity_aggregate,
-            grouped_metrics,
-        ))
     }
 }
 
@@ -181,6 +201,25 @@ impl TrainingMetricGranularity {
                 .to_string(),
             TrainingMetricGranularity::Monthly => dt.date_naive().with_day(1).unwrap().to_string(),
         }
+    }
+
+    pub fn granule(&self, activity: &ActivityWithTimeseries) -> Option<Granule> {
+        let start = activity.start_time().date().date_naive();
+        Some(match self {
+            TrainingMetricGranularity::Activity => Granule::Activity(activity.id().clone()),
+            TrainingMetricGranularity::Daily => Granule::Date(DateGranule::new(
+                start,
+                start.checked_add_days(Days::new(1))?,
+            )),
+            TrainingMetricGranularity::Weekly => Granule::Date(DateGranule::new(
+                start.week(chrono::Weekday::Mon).first_day(),
+                start.week(chrono::Weekday::Mon).last_day(),
+            )),
+            TrainingMetricGranularity::Monthly => Granule::Date(DateGranule::new(
+                start.with_day(1)?,
+                start.with_day(start.num_days_in_month().into())?,
+            )),
+        })
     }
 
     /// Computes the bins values for the [TrainingMetricGranularity] for the given range [start,
@@ -636,5 +675,83 @@ mod test_training_metrics {
                 "2025-09-01".to_string(),
             ]
         )
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_definition_extract_granule {
+    use crate::domain::models::activity::{
+        Activity, ActivityId, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+        Timeseries, TimeseriesTime, TimeseriesValue,
+    };
+
+    use super::*;
+
+    fn default_activity() -> ActivityWithTimeseries {
+        ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2]),
+                vec![Timeseries::new(
+                    TimeseriesMetric::Power,
+                    vec![
+                        Some(TimeseriesValue::Int(10)),
+                        Some(TimeseriesValue::Int(20)),
+                        Some(TimeseriesValue::Int(30)),
+                    ],
+                )],
+            ),
+        )
+    }
+
+    #[test]
+    fn test_granularity_datetime_granule() {
+        let activity = default_activity();
+
+        assert_eq!(
+            TrainingMetricGranularity::Activity.granule(&activity),
+            Some(Granule::Activity(activity.id().clone()))
+        );
+
+        assert_eq!(
+            TrainingMetricGranularity::Daily
+                .granule(&activity)
+                .expect("Shoule be Some"),
+            Granule::Date(DateGranule::new(
+                NaiveDate::from_ymd_opt(2025, 09, 3).unwrap(),
+                NaiveDate::from_ymd_opt(2025, 09, 4).unwrap(),
+            ))
+        );
+
+        assert_eq!(
+            TrainingMetricGranularity::Weekly
+                .granule(&activity)
+                .expect("Should be Some"),
+            Granule::Date(DateGranule::new(
+                NaiveDate::from_ymd_opt(2025, 09, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2025, 09, 7).unwrap(),
+            ))
+        );
+
+        assert_eq!(
+            TrainingMetricGranularity::Monthly
+                .granule(&activity)
+                .expect("Should be Some"),
+            Granule::Date(DateGranule::new(
+                NaiveDate::from_ymd_opt(2025, 09, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2025, 09, 30).unwrap(),
+            ))
+        );
     }
 }

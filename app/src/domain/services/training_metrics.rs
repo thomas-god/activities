@@ -256,7 +256,7 @@ mod tests_training_metrics_service {
         models::{
             activity::{
                 Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                ActivityTimeseries, ActivityWithTimeseries, Sport, Timeseries, TimeseriesTime,
+                ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesTime,
             },
             training_metrics::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
