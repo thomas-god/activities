@@ -8,7 +8,7 @@ use crate::domain::{
         UserId,
         training_metrics::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricGranularity, TrainingMetricId, TrainingMetricValues,
+            TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
         },
     },
     ports::{
@@ -53,7 +53,7 @@ impl SqliteTrainingMetricsRepository {
         CREATE TABLE IF NOT EXISTS t_training_metrics_values (
             definition_id TEXT,
             granule TEXT,
-            value REAL,
+            value BLOB,
             FOREIGN KEY(definition_id)
                 REFERENCES t_training_metrics_definitions(id)
                 ON DELETE CASCADE,
@@ -156,7 +156,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
     async fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        values: (String, f64),
+        values: (String, TrainingMetricValue),
     ) -> Result<(), UpdateMetricError> {
         sqlx::query("INSERT INTO t_training_metrics_values VALUES (?1, ?2, ?3);")
             .bind(id)
@@ -177,7 +177,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         &self,
         id: &TrainingMetricId,
     ) -> Result<TrainingMetricValues, GetTrainingMetricValueError> {
-        sqlx::query_as::<_, (String, f64)>(
+        sqlx::query_as::<_, (String, TrainingMetricValue)>(
             "
         SELECT granule, value FROM t_training_metrics_values
         WHERE definition_id = ?1;",
@@ -408,7 +408,7 @@ mod test_sqlite_activity_repository {
             .expect("Should have return Ok");
 
         // Insert a value for this definition
-        let new_value = ("2025-09-24".to_string(), 12.3);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
         repository
             .update_metric_values(definition.id(), new_value)
             .await
@@ -460,7 +460,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), 12.3);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
 
         repository
             .update_metric_values(definition.id(), new_value)
@@ -468,7 +468,7 @@ mod test_sqlite_activity_repository {
             .expect("Should have return an err");
 
         assert_eq!(
-            sqlx::query_scalar::<_, f64>(
+            sqlx::query_scalar::<_, TrainingMetricValue>(
                 "
             select value
             from t_training_metrics_values
@@ -479,7 +479,7 @@ mod test_sqlite_activity_repository {
             .fetch_one(&repository.pool)
             .await
             .unwrap(),
-            12.3
+            TrainingMetricValue::Max(12.3)
         );
     }
 
@@ -496,22 +496,22 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), 12.3);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
         repository
             .update_metric_values(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-24".to_string(), 1342.8);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(1342.8));
         repository
             .update_metric_values(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
         assert_eq!(
-            sqlx::query_scalar::<_, f64>(
+            sqlx::query_scalar::<_, TrainingMetricValue>(
                 "
-            select sum(value)
+            select value
             from t_training_metrics_values
             where definition_id = ?1 and granule = ?2;"
             )
@@ -520,7 +520,7 @@ mod test_sqlite_activity_repository {
             .fetch_one(&repository.pool)
             .await
             .unwrap(),
-            1342.8
+            TrainingMetricValue::Max(1342.8)
         );
     }
 
@@ -531,7 +531,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-        let new_value = ("2025-09-24".to_string(), 12.3);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
         let id = TrainingMetricId::new();
         let err = repository.update_metric_values(&id, new_value).await;
 
@@ -554,13 +554,13 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), 12.3);
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
         repository
             .update_metric_values(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-25".to_string(), 10.1);
+        let new_value = ("2025-09-25".to_string(), TrainingMetricValue::Max(10.1));
         repository
             .update_metric_values(definition.id(), new_value)
             .await
@@ -573,8 +573,8 @@ mod test_sqlite_activity_repository {
                 .expect("Should have returned OK")
                 .as_hash_map(),
             HashMap::from_iter(vec![
-                ("2025-09-24".to_string(), 12.3),
-                ("2025-09-25".to_string(), 10.1)
+                ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3)),
+                ("2025-09-25".to_string(), TrainingMetricValue::Max(10.1))
             ])
         );
     }

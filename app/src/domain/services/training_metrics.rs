@@ -59,10 +59,10 @@ where
             .await
             .unwrap();
         let values = definition.compute_values(&activities);
-        for (key, value) in values.iter() {
+        for (key, value) in values.into_iter() {
             let _ = self
                 .metrics_repository
-                .update_metric_values(definition.id(), (key.clone(), *value))
+                .update_metric_values(definition.id(), (key, value))
                 .await;
         }
 
@@ -86,10 +86,10 @@ where
 
         for metric in metrics {
             let values = metric.compute_values(&activities);
-            for (key, value) in values.iter() {
+            for (key, value) in values.into_iter() {
                 let _ = self
                     .metrics_repository
-                    .update_metric_values(metric.id(), (key.clone(), *value))
+                    .update_metric_values(metric.id(), (key, value))
                     .await;
             }
         }
@@ -151,9 +151,12 @@ pub mod test_utils {
 
     use mockall::mock;
 
-    use crate::domain::ports::{
-        DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, UpdateMetricError,
+    use crate::domain::{
+        models::training_metrics::TrainingMetricValue,
+        ports::{
+            DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
+            GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, UpdateMetricError,
+        },
     };
 
     use super::*;
@@ -224,7 +227,7 @@ pub mod test_utils {
             async fn update_metric_values(
                 &self,
                 id: &TrainingMetricId,
-                values: (String, f64),
+                values: (String, TrainingMetricValue),
             ) -> Result<(), UpdateMetricError>;
 
             async fn get_metric_values(
@@ -260,7 +263,8 @@ mod tests_training_metrics_service {
             },
             training_metrics::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricId, TrainingMetricValues,
+                TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue,
+                TrainingMetricValues,
             },
         },
         ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -430,7 +434,7 @@ mod tests_training_metrics_service {
         repository.expect_get_metric_values().returning(|_| {
             Ok(TrainingMetricValues::new(HashMap::from([(
                 "toto".to_string(),
-                0.3,
+                TrainingMetricValue::Max(0.3),
             )])))
         });
 
@@ -451,7 +455,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
             )
         );
-        assert_eq!(*value.get("toto").unwrap(), 0.3);
+        assert_eq!(*value.get("toto").unwrap(), TrainingMetricValue::Max(0.3));
     }
 
     #[tokio::test]

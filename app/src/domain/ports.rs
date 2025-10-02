@@ -7,8 +7,8 @@ use crate::domain::models::activity::{
     ActivityTimeseries, ActivityWithTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
-    TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
-    ActivityMetricSource, TrainingMetricValues,
+    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
+    TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -470,7 +470,7 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
     fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        values: (String, f64),
+        values: (String, TrainingMetricValue),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
     fn get_metric_values(

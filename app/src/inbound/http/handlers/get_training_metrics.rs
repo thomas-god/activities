@@ -76,11 +76,17 @@ fn fill_metric_values(
         &range.start,
         &range.end.unwrap_or(Local::now().fixed_offset()),
     ) {
-        Some(bins) => HashMap::from_iter(
-            bins.iter()
-                .map(|bin| (bin.to_string(), values.get(bin).cloned().unwrap_or(0.))),
-        ),
-        None => values.as_hash_map(),
+        Some(bins) => HashMap::from_iter(bins.iter().map(|bin| {
+            (
+                bin.to_string(),
+                values
+                    .get(bin)
+                    .cloned()
+                    .map(|value| *value.value())
+                    .unwrap_or(0.),
+            )
+        })),
+        None => values.as_float_hash_map(),
     }
 }
 

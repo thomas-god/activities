@@ -10,7 +10,9 @@ use crate::domain::{
         activity::{
             Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityWithTimeseries,
         },
-        training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
+        training_metrics::{
+            TrainingMetricDefinition, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
+        },
     },
     ports::{
         ActivityRepository, DeleteMetricError, GetDefinitionError, GetRawDataError,
@@ -240,7 +242,7 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
     async fn update_metric_values(
         &self,
         id: &TrainingMetricId,
-        new_value: (String, f64),
+        new_value: (String, TrainingMetricValue),
     ) -> Result<(), UpdateMetricError> {
         let mut metrics = self.values.lock().await;
         let (key, value) = new_value;
@@ -316,7 +318,7 @@ mod tests_training_metrics_repository {
     use crate::domain::models::{
         activity::ActivityStatistic,
         training_metrics::{
-            TrainingMetricAggregate, TrainingMetricGranularity, ActivityMetricSource,
+            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricGranularity,
         },
     };
 

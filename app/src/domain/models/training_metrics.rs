@@ -80,7 +80,7 @@ impl TrainingMetricDefinition {
             .filter_map(|activity| self.source.from_activity(activity))
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
-        TrainingMetricValues::from(aggregate_metrics(
+        TrainingMetricValues::new(aggregate_metrics(
             &self.granularity_aggregate,
             grouped_metrics,
         ))
@@ -166,14 +166,14 @@ fn group_metrics_by_granularity(
 fn aggregate_metrics(
     aggregate: &TrainingMetricAggregate,
     metrics: HashMap<String, Vec<ActivityMetric>>,
-) -> HashMap<String, TrainingMetricAggregateValue> {
+) -> HashMap<String, TrainingMetricValue> {
     let mut res = HashMap::new();
 
     for (key, values) in metrics.into_iter() {
-        let Some(aggregated_value) = aggregate.aggregate(values) else {
+        let Some(training_metric_value) = aggregate.aggregate(values) else {
             continue;
         };
-        res.insert(key, aggregated_value);
+        res.insert(key, training_metric_value);
     }
 
     res
@@ -319,8 +319,45 @@ pub enum TrainingMetricAggregate {
     Sum,
 }
 
+impl TrainingMetricAggregate {
+    fn aggregate(&self, activity_metrics: Vec<ActivityMetric>) -> Option<TrainingMetricValue> {
+        if activity_metrics.is_empty() {
+            return None;
+        }
+        Some(match self {
+            TrainingMetricAggregate::Min => TrainingMetricValue::Min(
+                activity_metrics
+                    .into_iter()
+                    .fold(f64::MAX, |min, metric| min.min(metric.value)),
+            ),
+            TrainingMetricAggregate::Max => TrainingMetricValue::Max(
+                activity_metrics
+                    .into_iter()
+                    .fold(f64::MIN, |max, metric| max.max(metric.value)),
+            ),
+            TrainingMetricAggregate::Average => {
+                let number_of_metrics = activity_metrics.len();
+                let sum = activity_metrics
+                    .into_iter()
+                    .fold(0., |sum, metric| sum + metric.value);
+
+                TrainingMetricValue::Average {
+                    value: sum / number_of_metrics as f64,
+                    sum,
+                    number_of_elements: number_of_metrics,
+                }
+            }
+            TrainingMetricAggregate::Sum => TrainingMetricValue::Sum(
+                activity_metrics
+                    .into_iter()
+                    .fold(0., |sum, metric| sum + metric.value),
+            ),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TrainingMetricAggregateValue {
+pub enum TrainingMetricValue {
     Min(f64),
     Max(f64),
     Sum(f64),
@@ -331,44 +368,7 @@ pub enum TrainingMetricAggregateValue {
     },
 }
 
-impl TrainingMetricAggregate {
-    fn aggregate(&self, values: Vec<ActivityMetric>) -> Option<TrainingMetricAggregateValue> {
-        if values.is_empty() {
-            return None;
-        }
-        Some(match self {
-            TrainingMetricAggregate::Min => TrainingMetricAggregateValue::Min(
-                values
-                    .into_iter()
-                    .fold(f64::MAX, |min_val, curr_val| min_val.min(curr_val.value)),
-            ),
-            TrainingMetricAggregate::Max => TrainingMetricAggregateValue::Max(
-                values
-                    .into_iter()
-                    .fold(f64::MIN, |max_val, curr_val| max_val.max(curr_val.value)),
-            ),
-            TrainingMetricAggregate::Average => {
-                let number_of_elements = values.len();
-                let sum = values
-                    .into_iter()
-                    .fold(0., |sum, curr_val| sum + curr_val.value);
-
-                TrainingMetricAggregateValue::Average {
-                    value: sum / number_of_elements as f64,
-                    sum,
-                    number_of_elements,
-                }
-            }
-            TrainingMetricAggregate::Sum => TrainingMetricAggregateValue::Sum(
-                values
-                    .into_iter()
-                    .fold(0., |sum, curr_val| sum + curr_val.value),
-            ),
-        })
-    }
-}
-
-impl TrainingMetricAggregateValue {
+impl TrainingMetricValue {
     pub fn value(&self) -> &f64 {
         match self {
             Self::Max(max) => max,
@@ -384,24 +384,18 @@ impl TrainingMetricAggregateValue {
 }
 
 #[derive(Debug, Clone, Constructor, Default)]
-pub struct TrainingMetricValues(HashMap<String, f64>);
-
-impl From<HashMap<String, TrainingMetricAggregateValue>> for TrainingMetricValues {
-    fn from(value: HashMap<String, TrainingMetricAggregateValue>) -> Self {
-        let mut map = HashMap::new();
-        for (key, val) in value {
-            map.insert(key, *val.value());
-        }
-        Self(map)
-    }
-}
+pub struct TrainingMetricValues(HashMap<String, TrainingMetricValue>);
 
 impl TrainingMetricValues {
-    pub fn insert(&mut self, key: String, value: f64) -> Option<f64> {
+    pub fn insert(
+        &mut self,
+        key: String,
+        value: TrainingMetricValue,
+    ) -> Option<TrainingMetricValue> {
         self.0.insert(key, value)
     }
 
-    pub fn get(&self, key: &str) -> Option<&f64> {
+    pub fn get(&self, key: &str) -> Option<&TrainingMetricValue> {
         self.0.get(key)
     }
 
@@ -413,14 +407,31 @@ impl TrainingMetricValues {
         self.len() == 0
     }
 
-    pub fn iter(&self) -> Iter<'_, String, f64> {
+    pub fn iter(&self) -> Iter<'_, String, TrainingMetricValue> {
         self.0.iter()
     }
 }
 
 impl TrainingMetricValues {
-    pub fn as_hash_map(self) -> HashMap<String, f64> {
+    pub fn as_hash_map(self) -> HashMap<String, TrainingMetricValue> {
         self.0
+    }
+
+    pub fn as_float_hash_map(&self) -> HashMap<String, f64> {
+        HashMap::from_iter(
+            self.0
+                .iter()
+                .map(|(bin, value)| (bin.clone(), *value.value())),
+        )
+    }
+}
+
+impl std::iter::IntoIterator for TrainingMetricValues {
+    type Item = (String, TrainingMetricValue);
+    type IntoIter = std::collections::hash_map::IntoIter<String, TrainingMetricValue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -721,7 +732,7 @@ mod test_training_metrics {
 
         assert_eq!(
             *res.get("2025-09-01").unwrap(),
-            TrainingMetricAggregateValue::Min(1.3)
+            TrainingMetricValue::Min(1.3)
         );
     }
 
@@ -741,7 +752,10 @@ mod test_training_metrics {
 
         let metrics = metric_definition.compute_values(&activities);
 
-        assert_eq!(*metrics.get("2025-09-01").unwrap(), 20.);
+        assert_eq!(
+            *metrics.get("2025-09-01").unwrap(),
+            TrainingMetricValue::Max(20.)
+        );
     }
 
     #[test]
