@@ -354,6 +354,48 @@ impl TrainingMetricAggregate {
             ),
         })
     }
+
+    pub fn update_value(
+        &self,
+        previous_value: &TrainingMetricValue,
+        new_metric: &ActivityMetric,
+    ) -> Option<TrainingMetricValue> {
+        match self {
+            Self::Min => {
+                let TrainingMetricValue::Min(min) = previous_value else {
+                    return None;
+                };
+                Some(TrainingMetricValue::Min(min.min(new_metric.value)))
+            }
+            Self::Max => {
+                let TrainingMetricValue::Max(max) = previous_value else {
+                    return None;
+                };
+                Some(TrainingMetricValue::Max(max.max(new_metric.value)))
+            }
+            Self::Sum => {
+                let TrainingMetricValue::Sum(sum) = previous_value else {
+                    return None;
+                };
+                Some(TrainingMetricValue::Sum(sum + new_metric.value))
+            }
+            Self::Average => {
+                let TrainingMetricValue::Average {
+                    sum,
+                    value: _,
+                    number_of_elements,
+                } = previous_value
+                else {
+                    return None;
+                };
+                Some(TrainingMetricValue::Average {
+                    sum: *sum + new_metric.value,
+                    number_of_elements: *number_of_elements + 1,
+                    value: (*sum + new_metric.value) / (*number_of_elements as f64 + 1.),
+                })
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -918,5 +960,210 @@ mod test_training_metric_definition_extract_granule {
                 NaiveDate::from_ymd_opt(2025, 09, 30).unwrap(),
             ))
         );
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_aggregate_update_value {
+
+    use super::*;
+
+    use assert_approx_eq::assert_approx_eq;
+
+    #[test]
+    fn test_update_min_value() {
+        let aggregate = TrainingMetricAggregate::Min;
+        let previous = TrainingMetricValue::Min(12.2);
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.update_value(&previous, &new_metric),
+            Some(TrainingMetricValue::Min(10.1))
+        );
+    }
+
+    #[test]
+    fn test_do_not_update_min_value() {
+        let aggregate = TrainingMetricAggregate::Min;
+        let previous = TrainingMetricValue::Min(12.2);
+        let new_metric = ActivityMetric::new(
+            13.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.update_value(&previous, &new_metric),
+            Some(TrainingMetricValue::Min(12.2))
+        );
+    }
+
+    #[test]
+    fn test_update_min_value_wrong_previous_value_variant() {
+        let previous_values_wrong_variant = vec![
+            TrainingMetricValue::Max(12.),
+            TrainingMetricValue::Sum(12.),
+            TrainingMetricValue::Average {
+                value: 12.,
+                sum: 12.,
+                number_of_elements: 2,
+            },
+        ];
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        let aggregate = TrainingMetricAggregate::Min;
+
+        for previous in previous_values_wrong_variant {
+            assert!(aggregate.update_value(&previous, &new_metric).is_none());
+        }
+    }
+
+    #[test]
+    fn test_update_max_value() {
+        let aggregate = TrainingMetricAggregate::Max;
+        let previous = TrainingMetricValue::Max(12.2);
+        let new_metric = ActivityMetric::new(
+            13.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.update_value(&previous, &new_metric),
+            Some(TrainingMetricValue::Max(13.1))
+        );
+    }
+
+    #[test]
+    fn test_do_not_update_max_value() {
+        let aggregate = TrainingMetricAggregate::Max;
+        let previous = TrainingMetricValue::Max(12.2);
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.update_value(&previous, &new_metric),
+            Some(TrainingMetricValue::Max(12.2))
+        );
+    }
+
+    #[test]
+    fn test_update_max_value_wrong_previous_value_variant() {
+        let aggregate = TrainingMetricAggregate::Max;
+        let previous_values_wrong_variant = vec![
+            TrainingMetricValue::Min(12.),
+            TrainingMetricValue::Sum(12.),
+            TrainingMetricValue::Average {
+                value: 12.,
+                sum: 12.,
+                number_of_elements: 2,
+            },
+        ];
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        for previous in previous_values_wrong_variant {
+            assert!(aggregate.update_value(&previous, &new_metric).is_none());
+        }
+    }
+
+    #[test]
+    fn test_update_sum_value() {
+        let aggregate = TrainingMetricAggregate::Sum;
+        let previous = TrainingMetricValue::Sum(12.2);
+        let new_metric = ActivityMetric::new(
+            13.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        let Some(TrainingMetricValue::Sum(sum)) = aggregate.update_value(&previous, &new_metric)
+        else {
+            unreachable!("Should have returned Some(TrainingMetricValue::Sum(sum))");
+        };
+        assert_approx_eq!(sum, 25.3);
+    }
+
+    #[test]
+    fn test_update_sum_value_wrong_previous_value_variant() {
+        let aggregate = TrainingMetricAggregate::Sum;
+        let previous_values_wrong_variant = vec![
+            TrainingMetricValue::Min(12.),
+            TrainingMetricValue::Max(12.),
+            TrainingMetricValue::Average {
+                value: 12.,
+                sum: 12.,
+                number_of_elements: 2,
+            },
+        ];
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        for previous in previous_values_wrong_variant {
+            assert!(aggregate.update_value(&previous, &new_metric).is_none());
+        }
+    }
+
+    #[test]
+    fn test_update_average_value() {
+        let aggregate = TrainingMetricAggregate::Average;
+        let previous = TrainingMetricValue::Average {
+            value: 12.,
+            sum: 12.,
+            number_of_elements: 2,
+        };
+        let new_metric = ActivityMetric::new(
+            13.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        let Some(TrainingMetricValue::Average {
+            sum,
+            value,
+            number_of_elements,
+        }) = aggregate.update_value(&previous, &new_metric)
+        else {
+            unreachable!("Should have returned Some(TrainingMetricValue::Average)");
+        };
+        assert_approx_eq!(sum, 25.1);
+        assert_approx_eq!(value, 25.1 / 3.);
+        assert_eq!(number_of_elements, 3);
+    }
+
+    #[test]
+    fn test_update_average_value_wrong_previous_value_variant() {
+        let aggregate = TrainingMetricAggregate::Average;
+        let previous_values_wrong_variant = vec![
+            TrainingMetricValue::Min(12.),
+            TrainingMetricValue::Max(12.),
+            TrainingMetricValue::Sum(12.),
+        ];
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        for previous in previous_values_wrong_variant {
+            assert!(aggregate.update_value(&previous, &new_metric).is_none());
+        }
     }
 }
