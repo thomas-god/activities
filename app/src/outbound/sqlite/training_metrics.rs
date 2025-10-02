@@ -7,8 +7,8 @@ use crate::domain::{
     models::{
         UserId,
         training_metrics::{
-            TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-            TrainingMetricId, TrainingMetricSource, TrainingMetricValues,
+            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
+            TrainingMetricGranularity, TrainingMetricId, TrainingMetricValues,
         },
     },
     ports::{
@@ -21,7 +21,7 @@ use crate::domain::{
 type DefinitionRow = (
     TrainingMetricId,
     UserId,
-    TrainingMetricSource,
+    ActivityMetricSource,
     TrainingMetricGranularity,
     TrainingMetricAggregate,
 );
@@ -200,7 +200,8 @@ mod test_sqlite_activity_repository {
     use crate::domain::models::{
         activity::TimeseriesMetric,
         training_metrics::{
-            TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricSource,
+            ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
+            TrainingMetricGranularity,
         },
     };
 
@@ -228,9 +229,9 @@ mod test_sqlite_activity_repository {
         TrainingMetricDefinition::new(
             TrainingMetricId::new(),
             UserId::test_default(),
-            TrainingMetricSource::Timeseries((
+            ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Altitude,
-                TrainingMetricAggregate::Max,
+                TimeseriesAggregate::Max,
             )),
             TrainingMetricGranularity::Activity,
             TrainingMetricAggregate::Max,

@@ -9,8 +9,8 @@ use crate::{
             UserId,
             activity::{ActivityStatistic, TimeseriesMetric},
             training_metrics::{
-                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricId, TrainingMetricSource,
+                ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
+                TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
             },
         },
         ports::{ActivityRepository, IActivityService, ITrainingMetricService, RawDataRepository},
@@ -96,7 +96,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         TrainingMetricDefinition::new(
             id.clone(),
             UserId::default(),
-            TrainingMetricSource::Statistic(ActivityStatistic::Distance),
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
         ),
@@ -109,7 +109,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         TrainingMetricDefinition::new(
             id.clone(),
             UserId::default(),
-            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
         ),
@@ -122,9 +122,9 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
         TrainingMetricDefinition::new(
             id.clone(),
             UserId::default(),
-            TrainingMetricSource::Timeseries((
+            ActivityMetricSource::Timeseries((
                 TimeseriesMetric::HeartRate,
-                TrainingMetricAggregate::Max,
+                TimeseriesAggregate::Max,
             )),
             TrainingMetricGranularity::Activity,
             TrainingMetricAggregate::Max,

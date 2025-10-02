@@ -46,7 +46,7 @@ impl Default for TrainingMetricId {
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
     user: UserId,
-    source: TrainingMetricSource,
+    source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
 }
@@ -60,7 +60,7 @@ impl TrainingMetricDefinition {
         &self.user
     }
 
-    pub fn source(&self) -> &TrainingMetricSource {
+    pub fn source(&self) -> &ActivityMetricSource {
         &self.source
     }
 
@@ -75,11 +75,11 @@ impl TrainingMetricDefinition {
 
 impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
-        let metrics_per_activity = activities
+        let activity_metrics = activities
             .iter()
-            .filter_map(|activity| self.source.extract_from_activity(activity))
+            .filter_map(|activity| self.source.from_activity(activity))
             .collect();
-        let grouped_metrics = group_metrics_by_granularity(&self.granularity, metrics_per_activity);
+        let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
         TrainingMetricValues::from(aggregate_metrics(
             &self.granularity_aggregate,
             grouped_metrics,
@@ -105,35 +105,32 @@ pub struct DateGranule {
     end: NaiveDate,
 }
 
-/// A [TrainingMetricActivityValue] represents the value of a [TrainingMetricSource] extracted from
+/// An [ActivityMetric] represents the value of an [ActivityMetricSource] extracted from
 /// a single [ActivityWithTimeseries]. On top of the metric value, it contains metadata like
 /// the activity start time and duration that can be used in later computations.
 #[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct TrainingMetricActivityValue {
+pub struct ActivityMetric {
     value: f64,
     activity_start_time: ActivityStartTime,
     activity_duration: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TrainingMetricSource {
+pub enum ActivityMetricSource {
     Statistic(ActivityStatistic),
-    Timeseries((TimeseriesMetric, TrainingMetricAggregate)),
+    Timeseries((TimeseriesMetric, TimeseriesAggregate)),
 }
 
-impl TrainingMetricSource {
-    pub fn extract_from_activity(
-        &self,
-        activity: &ActivityWithTimeseries,
-    ) -> Option<TrainingMetricActivityValue> {
+impl ActivityMetricSource {
+    pub fn from_activity(&self, activity: &ActivityWithTimeseries) -> Option<ActivityMetric> {
         match self {
             Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
             Self::Timeseries((metric, aggregate)) => {
-                aggregate.from_activity_timeseries(metric, activity)
+                aggregate.value_from_timeseries(metric, activity)
             }
         }
         .map(|value| {
-            TrainingMetricActivityValue::new(
+            ActivityMetric::new(
                 value,
                 *activity.start_time(),
                 activity
@@ -145,7 +142,7 @@ impl TrainingMetricSource {
     }
 }
 
-impl ToUnit for TrainingMetricSource {
+impl ToUnit for ActivityMetricSource {
     fn unit(&self) -> Unit {
         match self {
             Self::Statistic(stat) => stat.unit(),
@@ -156,11 +153,11 @@ impl ToUnit for TrainingMetricSource {
 
 fn group_metrics_by_granularity(
     granularity: &TrainingMetricGranularity,
-    metrics: Vec<TrainingMetricActivityValue>,
-) -> HashMap<String, Vec<TrainingMetricActivityValue>> {
-    let mut grouped_values: HashMap<String, Vec<TrainingMetricActivityValue>> = HashMap::new();
+    metrics: Vec<ActivityMetric>,
+) -> HashMap<String, Vec<ActivityMetric>> {
+    let mut grouped_values: HashMap<String, Vec<ActivityMetric>> = HashMap::new();
     for value in metrics {
-        let key = granularity.datetime_key(&value.activity_start_time.date());
+        let key = granularity.datetime_key(value.activity_start_time.date());
         grouped_values.entry(key).or_default().push(value);
     }
     grouped_values
@@ -168,7 +165,7 @@ fn group_metrics_by_granularity(
 
 fn aggregate_metrics(
     aggregate: &TrainingMetricAggregate,
-    metrics: HashMap<String, Vec<TrainingMetricActivityValue>>,
+    metrics: HashMap<String, Vec<ActivityMetric>>,
 ) -> HashMap<String, TrainingMetricAggregateValue> {
     let mut res = HashMap::new();
 
@@ -273,6 +270,48 @@ impl TrainingMetricGranularity {
 }
 
 #[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
+pub enum TimeseriesAggregate {
+    Min,
+    Max,
+    Average,
+    Sum,
+}
+
+impl TimeseriesAggregate {
+    fn value_from_timeseries(
+        &self,
+        metric: &TimeseriesMetric,
+        activity: &ActivityWithTimeseries,
+    ) -> Option<f64> {
+        let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
+            if m.metric() == metric {
+                Some(
+                    m.values()
+                        .iter()
+                        .filter_map(|val| val.as_ref().map(f64::from))
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        })?;
+        if values.is_empty() {
+            return None;
+        }
+        let length = values.len();
+        match self {
+            Self::Min => values.into_iter().reduce(f64::min),
+            Self::Max => values.into_iter().reduce(f64::max),
+            Self::Average => values
+                .into_iter()
+                .reduce(|acc, e| acc + e)
+                .map(|val| val / length as f64),
+            Self::Sum => values.into_iter().reduce(|acc, e| acc + e),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
 pub enum TrainingMetricAggregate {
     Min,
     Max,
@@ -293,10 +332,7 @@ pub enum TrainingMetricAggregateValue {
 }
 
 impl TrainingMetricAggregate {
-    fn aggregate(
-        &self,
-        values: Vec<TrainingMetricActivityValue>,
-    ) -> Option<TrainingMetricAggregateValue> {
+    fn aggregate(&self, values: Vec<ActivityMetric>) -> Option<TrainingMetricAggregateValue> {
         if values.is_empty() {
             return None;
         }
@@ -329,38 +365,6 @@ impl TrainingMetricAggregate {
                     .fold(0., |sum, curr_val| sum + curr_val.value),
             ),
         })
-    }
-
-    fn from_activity_timeseries(
-        &self,
-        metric: &TimeseriesMetric,
-        activity: &ActivityWithTimeseries,
-    ) -> Option<f64> {
-        let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
-            if m.metric() == metric {
-                Some(
-                    m.values()
-                        .iter()
-                        .filter_map(|val| val.as_ref().map(f64::from))
-                        .collect(),
-                )
-            } else {
-                None
-            }
-        })?;
-        if values.is_empty() {
-            return None;
-        }
-        let length = values.len();
-        match self {
-            TrainingMetricAggregate::Min => values.into_iter().reduce(f64::min),
-            TrainingMetricAggregate::Max => values.into_iter().reduce(f64::max),
-            TrainingMetricAggregate::Average => values
-                .into_iter()
-                .reduce(|acc, e| acc + e)
-                .map(|val| val / length as f64),
-            TrainingMetricAggregate::Sum => values.into_iter().reduce(|acc, e| acc + e),
-        }
     }
 }
 
@@ -464,17 +468,17 @@ mod test_training_metrics {
     #[test]
     fn test_extract_aggregated_activity_metric_no_metric_found() {
         let metric = TimeseriesMetric::Speed;
-        let aggregate = TrainingMetricAggregate::Min;
+        let aggregate = TimeseriesAggregate::Min;
         let activity = default_activity();
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_none());
     }
 
     #[test]
     fn test_extract_aggregated_activity_metric_metric_is_empty() {
         let metric = TimeseriesMetric::Power;
-        let aggregate = TrainingMetricAggregate::Average;
+        let aggregate = TimeseriesAggregate::Average;
         let activity = ActivityWithTimeseries::new(
             Activity::new(
                 ActivityId::default(),
@@ -494,17 +498,17 @@ mod test_training_metrics {
             ),
         );
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_none());
     }
 
     #[test]
     fn test_extract_aggregated_activity_metric_min_value() {
         let metric = TimeseriesMetric::Power;
-        let aggregate = TrainingMetricAggregate::Min;
+        let aggregate = TimeseriesAggregate::Min;
         let activity = default_activity();
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 10.)
     }
@@ -512,10 +516,10 @@ mod test_training_metrics {
     #[test]
     fn test_extract_aggregated_activity_metric_max_value() {
         let metric = TimeseriesMetric::Power;
-        let aggregate = TrainingMetricAggregate::Max;
+        let aggregate = TimeseriesAggregate::Max;
         let activity = default_activity();
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 30.)
     }
@@ -523,10 +527,10 @@ mod test_training_metrics {
     #[test]
     fn test_extract_aggregated_activity_metric_average_value() {
         let metric = TimeseriesMetric::Power;
-        let aggregate = TrainingMetricAggregate::Average;
+        let aggregate = TimeseriesAggregate::Average;
         let activity = default_activity();
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 20.)
     }
@@ -534,17 +538,17 @@ mod test_training_metrics {
     #[test]
     fn test_extract_aggregated_activity_metric_total_value() {
         let metric = TimeseriesMetric::Power;
-        let aggregate = TrainingMetricAggregate::Sum;
+        let aggregate = TimeseriesAggregate::Sum;
         let activity = default_activity();
 
-        let res = aggregate.from_activity_timeseries(&metric, &activity);
+        let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 60.)
     }
 
     #[test]
     fn test_group_metric_by_granularity_activity() {
-        let metric_1 = TrainingMetricActivityValue::new(
+        let metric_1 = ActivityMetric::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -553,7 +557,7 @@ mod test_training_metrics {
             ),
             Some(120.),
         );
-        let metric_2 = TrainingMetricActivityValue::new(
+        let metric_2 = ActivityMetric::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-03T02:00:00Z"
@@ -573,7 +577,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_daily() {
-        let metric_1 = TrainingMetricActivityValue::new(
+        let metric_1 = ActivityMetric::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -582,7 +586,7 @@ mod test_training_metrics {
             ),
             Some(120.),
         );
-        let metric_2 = TrainingMetricActivityValue::new(
+        let metric_2 = ActivityMetric::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-03T02:00:00+03:00"
@@ -592,7 +596,7 @@ mod test_training_metrics {
             Some(120.),
         );
 
-        let metric_3 = TrainingMetricActivityValue::new(
+        let metric_3 = ActivityMetric::new(
             67.1,
             ActivityStartTime::new(
                 "2025-09-04T02:00:00Z"
@@ -612,7 +616,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_weekly() {
-        let metric_1 = TrainingMetricActivityValue::new(
+        let metric_1 = ActivityMetric::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -621,7 +625,7 @@ mod test_training_metrics {
             ),
             Some(12.),
         );
-        let metric_2 = TrainingMetricActivityValue::new(
+        let metric_2 = ActivityMetric::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-05T02:00:00+03:00"
@@ -630,7 +634,7 @@ mod test_training_metrics {
             ),
             Some(12.),
         );
-        let metric_3 = TrainingMetricActivityValue::new(
+        let metric_3 = ActivityMetric::new(
             67.1,
             ActivityStartTime::new(
                 "2025-09-14T02:00:00Z"
@@ -650,7 +654,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_monthly() {
-        let metric_1 = TrainingMetricActivityValue::new(
+        let metric_1 = ActivityMetric::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -659,7 +663,7 @@ mod test_training_metrics {
             ),
             None,
         );
-        let metric_2 = TrainingMetricActivityValue::new(
+        let metric_2 = ActivityMetric::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-05T02:00:00+03:00"
@@ -668,7 +672,7 @@ mod test_training_metrics {
             ),
             None,
         );
-        let metric_3 = TrainingMetricActivityValue::new(
+        let metric_3 = ActivityMetric::new(
             67.1,
             ActivityStartTime::new(
                 "2025-08-14T02:00:00Z"
@@ -691,7 +695,7 @@ mod test_training_metrics {
         let metrics = HashMap::from([(
             "2025-09-01".to_string(),
             vec![
-                TrainingMetricActivityValue::new(
+                ActivityMetric::new(
                     12.3,
                     ActivityStartTime::new(
                         "2025-09-03T00:00:00Z"
@@ -700,7 +704,7 @@ mod test_training_metrics {
                     ),
                     None,
                 ),
-                TrainingMetricActivityValue::new(
+                ActivityMetric::new(
                     1.3,
                     ActivityStartTime::new(
                         "2025-09-03T00:00:00Z"
@@ -727,9 +731,9 @@ mod test_training_metrics {
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
             UserId::test_default(),
-            TrainingMetricSource::Timeseries((
+            ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Power,
-                TrainingMetricAggregate::Average,
+                TimeseriesAggregate::Average,
             )),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,

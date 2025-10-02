@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::domain::models::{
     activity::{ActivityStatistic, TimeseriesMetric},
-    training_metrics::{TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricSource},
+    training_metrics::{
+        ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
+        TrainingMetricGranularity,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
@@ -51,21 +54,40 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub enum APITrainingMetricSource {
     Statistic(APIActivityStatistic),
-    Timeseries((APITimeseriesMetric, APITrainingMetricAggregate)),
+    Timeseries((APITimeseriesMetric, APITimeseriesAggregate)),
 }
 
-impl From<APITrainingMetricSource> for TrainingMetricSource {
+impl From<APITrainingMetricSource> for ActivityMetricSource {
     fn from(value: APITrainingMetricSource) -> Self {
         match value {
             APITrainingMetricSource::Statistic(stat) => {
-                TrainingMetricSource::Statistic(ActivityStatistic::from(stat))
+                ActivityMetricSource::Statistic(ActivityStatistic::from(stat))
             }
             APITrainingMetricSource::Timeseries((metric, aggregate)) => {
-                TrainingMetricSource::Timeseries((
+                ActivityMetricSource::Timeseries((
                     TimeseriesMetric::from(metric),
-                    TrainingMetricAggregate::from(aggregate),
+                    TimeseriesAggregate::from(aggregate),
                 ))
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITimeseriesAggregate {
+    Min,
+    Max,
+    Average,
+    Sum,
+}
+
+impl From<APITimeseriesAggregate> for TimeseriesAggregate {
+    fn from(value: APITimeseriesAggregate) -> Self {
+        match value {
+            APITimeseriesAggregate::Min => Self::Min,
+            APITimeseriesAggregate::Max => Self::Max,
+            APITimeseriesAggregate::Average => Self::Average,
+            APITimeseriesAggregate::Sum => Self::Sum,
         }
     }
 }

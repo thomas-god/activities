@@ -15,7 +15,7 @@ use crate::{
         models::{
             activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training_metrics::{
-                TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricSource,
+                ActivityMetricSource, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricValues,
             },
         },
@@ -86,10 +86,10 @@ fn fill_metric_values(
 
 fn convert_metric_values(
     values: HashMap<String, f64>,
-    source: &TrainingMetricSource,
+    source: &ActivityMetricSource,
 ) -> (Unit, HashMap<String, f64>) {
     match source {
-        TrainingMetricSource::Statistic(stat) => match stat {
+        ActivityMetricSource::Statistic(stat) => match stat {
             ActivityStatistic::Distance => (
                 Unit::Kilometer,
                 values
@@ -99,7 +99,7 @@ fn convert_metric_values(
             ),
             _ => (stat.unit(), values),
         },
-        TrainingMetricSource::Timeseries((metric, _)) => match metric {
+        ActivityMetricSource::Timeseries((metric, _)) => match metric {
             TimeseriesMetric::Distance => (
                 Unit::Kilometer,
                 values
@@ -119,10 +119,10 @@ fn convert_metric_values(
     }
 }
 
-fn format_source(source: &TrainingMetricSource) -> String {
+fn format_source(source: &ActivityMetricSource) -> String {
     match source {
-        TrainingMetricSource::Statistic(stat) => stat.to_string(),
-        TrainingMetricSource::Timeseries((metric, aggregate)) => {
+        ActivityMetricSource::Statistic(stat) => stat.to_string(),
+        ActivityMetricSource::Timeseries((metric, aggregate)) => {
             format!("{aggregate:?} {metric:?}")
         }
     }
@@ -156,7 +156,7 @@ pub async fn get_training_metrics<
 mod tests {
     use crate::domain::models::{
         activity::{ActivityStatistic, TimeseriesMetric},
-        training_metrics::TrainingMetricAggregate,
+        training_metrics::{TimeseriesAggregate, TrainingMetricAggregate},
     };
 
     use super::*;
@@ -164,15 +164,15 @@ mod tests {
     #[test]
     fn test_format_definition_source() {
         assert_eq!(
-            format_source(&TrainingMetricSource::Statistic(
+            format_source(&ActivityMetricSource::Statistic(
                 ActivityStatistic::Calories
             )),
             "Calories".to_string()
         );
         assert_eq!(
-            format_source(&TrainingMetricSource::Timeseries((
+            format_source(&ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Distance,
-                TrainingMetricAggregate::Max
+                TimeseriesAggregate::Max
             ))),
             "Max Distance".to_string()
         );

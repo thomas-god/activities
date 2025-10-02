@@ -259,8 +259,8 @@ mod tests_training_metrics_service {
                 ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesTime,
             },
             training_metrics::{
-                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricId, TrainingMetricSource, TrainingMetricValues,
+                ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
+                TrainingMetricGranularity, TrainingMetricId, TrainingMetricValues,
             },
         },
         ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -285,7 +285,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
-            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Activity,
             TrainingMetricAggregate::Average,
         );
@@ -328,7 +328,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
-            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Activity,
             TrainingMetricAggregate::Average,
         );
@@ -352,7 +352,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
-            TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Activity,
             TrainingMetricAggregate::Average,
         );
@@ -386,7 +386,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 UserId::test_default(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )])
@@ -407,7 +407,7 @@ mod tests_training_metrics_service {
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 UserId::test_default(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )
@@ -422,7 +422,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 UserId::test_default(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )])
@@ -446,7 +446,7 @@ mod tests_training_metrics_service {
             &TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 UserId::test_default(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )
@@ -482,7 +482,7 @@ mod tests_training_metrics_service {
             Ok(Some(TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 "other_user".to_string().into(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )))
@@ -512,7 +512,7 @@ mod tests_training_metrics_service {
             Ok(Some(TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
                 "user".to_string().into(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
             )))

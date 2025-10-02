@@ -8,7 +8,7 @@ use crate::domain::models::activity::{
 };
 use crate::domain::models::training_metrics::{
     TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricId,
-    TrainingMetricSource, TrainingMetricValues,
+    ActivityMetricSource, TrainingMetricValues,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -303,7 +303,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingMetricRequest {
     user: UserId,
-    source: TrainingMetricSource,
+    source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
 }
@@ -313,7 +313,7 @@ impl CreateTrainingMetricRequest {
         &self.user
     }
 
-    pub fn source(&self) -> &TrainingMetricSource {
+    pub fn source(&self) -> &ActivityMetricSource {
         &self.source
     }
 

@@ -316,7 +316,7 @@ mod tests_training_metrics_repository {
     use crate::domain::models::{
         activity::ActivityStatistic,
         training_metrics::{
-            TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricSource,
+            TrainingMetricAggregate, TrainingMetricGranularity, ActivityMetricSource,
         },
     };
 
@@ -329,7 +329,7 @@ mod tests_training_metrics_repository {
             TrainingMetricDefinition::new(
                 id.clone(),
                 user.unwrap_or_default().into(),
-                TrainingMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Max,
             ),
