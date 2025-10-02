@@ -337,11 +337,11 @@ pub enum CreateTrainingMetricError {
 #[derive(Debug, Clone, Constructor)]
 pub struct UpdateMetricsValuesRequest {
     user: UserId,
-    new_activities: Vec<Activity>,
+    new_activities: Vec<ActivityWithTimeseries>,
 }
 
 impl UpdateMetricsValuesRequest {
-    pub fn new_activities(&self) -> &[Activity] {
+    pub fn new_activities(&self) -> &[ActivityWithTimeseries] {
         &self.new_activities
     }
 

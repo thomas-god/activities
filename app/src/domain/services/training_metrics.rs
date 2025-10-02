@@ -70,29 +70,49 @@ where
     }
 
     async fn update_metrics_values(&self, req: UpdateMetricsValuesRequest) -> Result<(), ()> {
-        let metrics = self
+        let definitions = self
             .metrics_repository
             .get_definitions(req.user())
             .await
             .unwrap();
 
-        let activities = self
-            .activity_repository
-            .lock()
-            .await
-            .list_activities_with_timeseries(req.user(), &ListActivitiesFilters::empty())
-            .await
-            .unwrap();
-
-        for metric in metrics {
-            let values = metric.compute_values(&activities);
-            for (key, value) in values.into_iter() {
+        for definition in definitions {
+            for activity in req.new_activities() {
+                let Some(metric) = definition.source().from_activity(activity) else {
+                    continue;
+                };
+                let bin_key = definition
+                    .granularity()
+                    .datetime_key(activity.start_time().date());
+                let new_value = match self
+                    .metrics_repository
+                    .get_metric_value(definition.id(), &bin_key)
+                    .await
+                {
+                    Ok(Some(previous_value)) => {
+                        let Some(new_value) = definition
+                            .aggregate()
+                            .update_value(&previous_value, &metric)
+                        else {
+                            continue;
+                        };
+                        new_value
+                    }
+                    Ok(None) => {
+                        let Some(new_value) = definition.aggregate().initial_value(&metric) else {
+                            continue;
+                        };
+                        new_value
+                    }
+                    Err(_err) => continue,
+                };
                 let _ = self
                     .metrics_repository
-                    .update_metric_values(metric.id(), (key, value))
+                    .update_metric_values(definition.id(), (bin_key, new_value))
                     .await;
             }
         }
+
         Ok(())
     }
 

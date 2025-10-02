@@ -108,7 +108,7 @@ where
 
         // Dispatch metrics update
         let metric_service = self.training_metrics_service.clone();
-        let cloned_activity = activity.clone();
+        let cloned_activity = activity_with_timeseries.clone();
         let user = activity.user().clone();
         tokio::spawn(async move {
             let req = UpdateMetricsValuesRequest::new(user, vec![cloned_activity]);
