@@ -226,6 +226,19 @@ impl TrainingMetricsRepository for InMemoryTrainingMetricsRepository {
             .collect())
     }
 
+    async fn get_metric_value(
+        &self,
+        id: &TrainingMetricId,
+        bin_key: &str,
+    ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError> {
+        Ok(self
+            .values
+            .lock()
+            .await
+            .get(id)
+            .and_then(|values| values.get(bin_key).cloned()))
+    }
+
     async fn get_metric_values(
         &self,
         id: &TrainingMetricId,

@@ -230,6 +230,12 @@ pub mod test_utils {
                 values: (String, TrainingMetricValue),
             ) -> Result<(), UpdateMetricError>;
 
+            async fn get_metric_value(
+                &self,
+                id: &TrainingMetricId,
+                bin_key: &str
+            ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>;
+
             async fn get_metric_values(
                 &self,
                 id: &TrainingMetricId,

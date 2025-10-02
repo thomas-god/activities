@@ -473,6 +473,12 @@ pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
         values: (String, TrainingMetricValue),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
+    fn get_metric_value(
+        &self,
+        id: &TrainingMetricId,
+        bin_key: &str,
+    ) -> impl Future<Output = Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>> + Send;
+
     fn get_metric_values(
         &self,
         id: &TrainingMetricId,

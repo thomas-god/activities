@@ -173,6 +173,26 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
             })
     }
 
+    async fn get_metric_value(
+        &self,
+        id: &TrainingMetricId,
+        bin_key: &str,
+    ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError> {
+        match sqlx::query_as::<_, (TrainingMetricValue,)>(
+            "SELECT value FROM t_training_metrics_values
+            WHERE definition_id = ?1 AND granule = ?2;",
+        )
+        .bind(id)
+        .bind(bin_key)
+        .fetch_one(&self.pool)
+        .await
+        {
+            Ok(row) => Ok(Some(row.0)),
+            Err(sqlx::Error::RowNotFound) => Ok(None),
+            Err(err) => Err(GetTrainingMetricValueError::Unknown(anyhow!(err))),
+        }
+    }
+
     async fn get_metric_values(
         &self,
         id: &TrainingMetricId,
@@ -576,6 +596,63 @@ mod test_sqlite_activity_repository {
                 ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3)),
                 ("2025-09-25".to_string(), TrainingMetricValue::Max(10.1))
             ])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_value() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        repository
+            .update_metric_values(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        assert_eq!(
+            repository
+                .get_metric_value(definition.id(), "2025-09-24")
+                .await
+                .expect("Should have returned OK")
+                .expect("Should have returned Some"),
+            TrainingMetricValue::Max(12.3)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_value_does_not_exist_for_bin() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        repository
+            .update_metric_values(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        assert!(
+            repository
+                .get_metric_value(definition.id(), "2025-09-01")
+                .await
+                .expect("Should have returned OK")
+                .is_none()
         );
     }
 }
