@@ -355,6 +355,19 @@ impl TrainingMetricAggregate {
         })
     }
 
+    pub fn initial_value(&self, new_metric: &ActivityMetric) -> Option<TrainingMetricValue> {
+        Some(match self {
+            Self::Max => TrainingMetricValue::Max(new_metric.value),
+            Self::Min => TrainingMetricValue::Min(new_metric.value),
+            Self::Sum => TrainingMetricValue::Sum(new_metric.value),
+            Self::Average => TrainingMetricValue::Average {
+                value: new_metric.value,
+                sum: new_metric.value,
+                number_of_elements: 1,
+            },
+        })
+    }
+
     pub fn update_value(
         &self,
         previous_value: &TrainingMetricValue,
@@ -959,6 +972,76 @@ mod test_training_metric_definition_extract_granule {
                 NaiveDate::from_ymd_opt(2025, 09, 1).unwrap(),
                 NaiveDate::from_ymd_opt(2025, 09, 30).unwrap(),
             ))
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_aggregate_initial_value {
+
+    use super::*;
+
+    #[test]
+    fn test_min_value() {
+        let aggregate = TrainingMetricAggregate::Min;
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.initial_value(&new_metric),
+            Some(TrainingMetricValue::Min(10.1))
+        );
+    }
+
+    #[test]
+    fn test_max_value() {
+        let aggregate = TrainingMetricAggregate::Max;
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.initial_value(&new_metric),
+            Some(TrainingMetricValue::Max(10.1))
+        );
+    }
+
+    #[test]
+    fn test_sum_value() {
+        let aggregate = TrainingMetricAggregate::Sum;
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.initial_value(&new_metric),
+            Some(TrainingMetricValue::Sum(10.1))
+        );
+    }
+
+    #[test]
+    fn test_average_value() {
+        let aggregate = TrainingMetricAggregate::Average;
+        let new_metric = ActivityMetric::new(
+            10.1,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Some(1200.),
+        );
+
+        assert_eq!(
+            aggregate.initial_value(&new_metric),
+            Some(TrainingMetricValue::Average {
+                value: 10.1,
+                sum: 10.1,
+                number_of_elements: 1
+            })
         );
     }
 }
