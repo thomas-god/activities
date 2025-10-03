@@ -39,6 +39,7 @@ pub enum FitParserError {
 
 pub fn parse_fit_messages(
     content: std::vec::IntoIter<u8>,
+    enforce_crc: bool,
 ) -> Result<Vec<DataMessage>, FitParserError> {
     let mut header_reader = Reader::new(HEADER_SIZE_WITH_CRC as u32, content);
     let header = FileHeader::from_bytes(&mut header_reader)?;
@@ -83,16 +84,16 @@ pub fn parse_fit_messages(
     let mut crc_reader = Reader::new(2, reader.remaining_content());
     let expected_crc = crc_reader.next_u16(&Endianness::Little)?;
 
-    if body_crc != expected_crc {
+    if enforce_crc && body_crc != expected_crc {
         return Err(FitParserError::InvalidBodyCRC(expected_crc, body_crc));
     }
 
     Ok(messages)
 }
 
-pub fn parse_fit_file(file: &str) -> Result<Vec<DataMessage>, FitParserError> {
+pub fn parse_fit_file(file: &str, enforce_crc: bool) -> Result<Vec<DataMessage>, FitParserError> {
     let content = fs::read(file)?.into_iter();
-    parse_fit_messages(content)
+    parse_fit_messages(content, enforce_crc)
 }
 
 #[cfg(test)]
@@ -102,6 +103,6 @@ mod tests {
 
     #[test]
     fn test_no_error() {
-        let _ = parse_fit_file("test.fit");
+        let _ = parse_fit_file("test.fit", false);
     }
 }

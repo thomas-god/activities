@@ -4,7 +4,7 @@ use fit_parser::{
 };
 
 fn main() {
-    let messages = parse_fit_file("fit-parser/examples/example.fit").unwrap();
+    let messages = parse_fit_file("fit-parser/examples/example.fit", false).unwrap();
 
     let device = find_fied_value_as_string(
         &messages,

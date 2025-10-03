@@ -19,7 +19,7 @@ pub fn run_cli() -> Result<(), Box<dyn std::error::Error>> {
 
     let file = cli.file;
 
-    let messages = parse_fit_file(&file).unwrap();
+    let messages = parse_fit_file(&file, false).unwrap();
 
     for message in messages {
         println!("{message:?}");

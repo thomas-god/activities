@@ -80,7 +80,7 @@ impl ParseFile for FitParser {
         &self,
         bytes: Vec<u8>,
     ) -> Result<ParsedFileContent, ParseCreateActivityHttpRequestBodyError> {
-        let Ok(messages) = parse_fit_messages(bytes.clone().into_iter()) else {
+        let Ok(messages) = parse_fit_messages(bytes.clone().into_iter(), false) else {
             return Err(ParseCreateActivityHttpRequestBodyError::InvalidFitContent);
         };
 
