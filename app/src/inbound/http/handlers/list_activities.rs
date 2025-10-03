@@ -77,7 +77,6 @@ pub async fn list_activities<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Query(filters): Query<Filters>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    tracing::info!("{user:?}");
     let Ok(res) = state
         .activity_service
         .list_activities(user.user(), &filters.into())
