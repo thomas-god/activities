@@ -131,15 +131,23 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
             DataValue::DateTime(dt) => Some(dt),
             _ => None,
         })
-    })?;
+    })
+    .unwrap_or(&0);
 
     let offset = *activity_local_timestamp as isize - *activity_timestamp as isize;
 
     let start_datetime =
         DateTime::from_timestamp((*start_timestamp as usize + FIT_DATETIME_OFFSET) as i64, 0)?;
-    let start_datetime = start_datetime.with_timezone(&FixedOffset::east_opt(offset as i32)?);
 
-    Some((ActivityStartTime::new(start_datetime), *start_timestamp))
+    let start_datetime_with_offset = match FixedOffset::east_opt(offset as i32) {
+        Some(offset) => start_datetime.with_timezone(&offset),
+        None => start_datetime.fixed_offset(),
+    };
+
+    Some((
+        ActivityStartTime::new(start_datetime_with_offset),
+        *start_timestamp,
+    ))
 }
 
 fn extract_sport(messages: &[DataMessage]) -> Sport {
@@ -384,7 +392,7 @@ mod tests {
 
     use assert_approx_eq::assert_approx_eq;
     use chrono::{DateTime, FixedOffset, Utc};
-    use fit_parser::DataMessageField;
+    use fit_parser::{ActivityField, DataMessageField};
 
     use crate::domain::models::activity::{TimeseriesMetric, TimeseriesValue};
 
@@ -805,5 +813,122 @@ mod tests {
 
         assert_eq!(*timeseries.time().values().first().unwrap(), 0);
         assert_eq!(*speed.first().unwrap(), Some(TimeseriesValue::Float(12.)));
+    }
+
+    #[test]
+    fn test_extract_start_time_ok_with_timezone() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Session,
+                fields: vec![DataMessageField {
+                    kind: FitField::Session(SessionField::StartTime),
+                    values: vec![DataValue::DateTime(983185076)],
+                }],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Activity,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::Timestamp),
+                        values: vec![DataValue::DateTime(983187416)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::LocalTimestamp),
+                        values: vec![DataValue::DateTime(983191016)],
+                    },
+                ],
+            },
+        ];
+
+        let (start, reference_timestamp) =
+            extract_start_time(&messages).expect("Should have returned Some");
+
+        assert_eq!(reference_timestamp, 983185076);
+        assert_eq!(
+            start,
+            ActivityStartTime::new(
+                "2021-02-25T11:57:56+01:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap()
+            )
+        )
+    }
+
+    #[test]
+    fn test_extract_start_time_ok_with_invalid_local_timestamp() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Session,
+                fields: vec![DataMessageField {
+                    kind: FitField::Session(SessionField::StartTime),
+                    values: vec![DataValue::DateTime(983185076)],
+                }],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Activity,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::Timestamp),
+                        values: vec![DataValue::DateTime(983187416)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::LocalTimestamp),
+                        values: vec![DataValue::DateTime(0)],
+                    },
+                ],
+            },
+        ];
+
+        let (start, reference_timestamp) =
+            extract_start_time(&messages).expect("Should have returned Some");
+
+        assert_eq!(reference_timestamp, 983185076);
+        assert_eq!(
+            start,
+            ActivityStartTime::new(
+                "2021-02-25T10:57:56Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap()
+            )
+        )
+    }
+
+    #[test]
+    fn test_extract_start_time_ok_without_local_timestamp() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Session,
+                fields: vec![DataMessageField {
+                    kind: FitField::Session(SessionField::StartTime),
+                    values: vec![DataValue::DateTime(983185076)],
+                }],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Activity,
+                fields: vec![DataMessageField {
+                    kind: FitField::Activity(ActivityField::Timestamp),
+                    values: vec![DataValue::DateTime(983187416)],
+                }],
+            },
+        ];
+
+        let (start, reference_timestamp) =
+            extract_start_time(&messages).expect("Should have returned Some");
+
+        assert_eq!(reference_timestamp, 983185076);
+        assert_eq!(
+            start,
+            ActivityStartTime::new(
+                "2021-02-25T10:57:56Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap()
+            )
+        )
     }
 }
