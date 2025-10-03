@@ -1,3 +1,4 @@
+use chrono::{DateTime, FixedOffset};
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -218,6 +219,22 @@ pub enum GetActivityError {
     ActivityDoesNotExist(ActivityId),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct DateRange {
+    start: DateTime<FixedOffset>,
+    end: Option<DateTime<FixedOffset>>,
+}
+
+impl DateRange {
+    pub fn start(&self) -> &DateTime<FixedOffset> {
+        &self.start
+    }
+
+    pub fn end(&self) -> &Option<DateTime<FixedOffset>> {
+        &self.end
+    }
+}
+
 ///////////////////////////////////////////////////////////////////
 // ACTIVITY AND RAW DATA REPOSITORIES
 ///////////////////////////////////////////////////////////////////
@@ -265,6 +282,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         activity: &ActivityId,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn get_user_history_date_range(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Option<DateRange>, anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Error)]

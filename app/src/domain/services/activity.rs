@@ -385,6 +385,11 @@ pub mod test_utils {
                 &self,
                 activity: &ActivityId,
             ) -> Result<(), anyhow::Error>;
+
+            async fn get_user_history_date_range(
+                &self,
+                user: &UserId,
+            ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error>;
         }
 
     }

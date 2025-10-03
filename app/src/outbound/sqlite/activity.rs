@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
+use chrono::{DateTime, FixedOffset};
 use sqlx::{Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::{
@@ -13,8 +14,8 @@ use crate::{
             },
         },
         ports::{
-            ActivityRepository, ListActivitiesError, ListActivitiesFilters, RawDataRepository,
-            SaveActivityError, SimilarActivityError,
+            ActivityRepository, DateRange, ListActivitiesError, ListActivitiesFilters,
+            RawDataRepository, SaveActivityError, SimilarActivityError,
         },
     },
     inbound::parser::ParseFile,
@@ -111,7 +112,7 @@ where
             .execute(&self.pool)
             .await
             .map(|_| ())
-            .map_err(|err| anyhow!("Unanble to delete activity {}. {err}", activity))
+            .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))
     }
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
@@ -269,6 +270,33 @@ where
                 Err(SimilarActivityError::Unknown(anyhow!(err)))
             }
         }
+    }
+
+    async fn get_user_history_date_range(
+        &self,
+        user: &UserId,
+    ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error> {
+        // Option<DateTime<FixedOffset>> because MIN/MAX(...) return NULL if the set is empty
+        match sqlx::query_as::<_, (Option<DateTime<FixedOffset>>, Option<DateTime<FixedOffset>>)>(
+            "
+        SELECT MIN(start_time), MAX(start_time)
+        FROM t_activities
+        WHERE user_id = ?1;",
+        )
+        .bind(user)
+        .fetch_optional(&self.pool)
+        .await
+        {
+            Ok(Some((Some(start), Some(end)))) => Ok(Some(DateRange::new(start, Some(end)))),
+            Ok(Some(_)) => Ok(None),
+            Ok(None) => Ok(None),
+            Err(err) => Err(anyhow!(
+                "Unable to get history date range for user {}. {err}",
+                user
+            )),
+        }
+
+        // todo!()
     }
 }
 
@@ -952,5 +980,66 @@ mod test_sqlite_activity_repository {
             .expect("Should have succeeded");
 
         assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_user_history_date_range_when_no_activities() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        assert!(
+            repository
+                .get_user_history_date_range(&UserId::test_default())
+                .await
+                .expect("Should be Ok")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_user_history_date_range() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let another_activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&another_activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let date_range = repository
+            .get_user_history_date_range(&UserId::test_default())
+            .await
+            .expect("Should be Ok")
+            .expect("Should be Some");
+        let expected_start = activity
+            .start_time()
+            .date()
+            .min(another_activity.start_time().date());
+        let expected_end = activity
+            .start_time()
+            .date()
+            .max(another_activity.start_time().date());
+
+        assert_eq!(date_range.start(), expected_start);
+        assert_eq!(date_range.end().expect("End should be some"), *expected_end);
     }
 }

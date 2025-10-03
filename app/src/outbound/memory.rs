@@ -15,7 +15,7 @@ use crate::domain::{
         },
     },
     ports::{
-        ActivityRepository, DeleteMetricError, GetDefinitionError, GetRawDataError,
+        ActivityRepository, DateRange, DeleteMetricError, GetDefinitionError, GetRawDataError,
         GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
         ListActivitiesFilters, RawDataRepository, SaveActivityError, SaveRawDataError,
         SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
@@ -150,6 +150,34 @@ impl ActivityRepository for InMemoryActivityRepository {
             .await
             .retain(|ac| ac.activity().id() != activity);
         Ok(())
+    }
+
+    async fn get_user_history_date_range(
+        &self,
+        user: &UserId,
+    ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error> {
+        let Some(start) = self
+            .activities
+            .lock()
+            .await
+            .iter()
+            .filter(|activity| activity.user() == user)
+            .min_by(|a, b| a.start_time().date().cmp(b.start_time().date()))
+            .map(|activity| *activity.start_time().date())
+        else {
+            return Ok(None);
+        };
+
+        let end = self
+            .activities
+            .lock()
+            .await
+            .iter()
+            .filter(|activity| activity.user() == user)
+            .max_by(|a, b| a.start_time().date().cmp(b.start_time().date()))
+            .map(|activity| *activity.start_time().date());
+
+        Ok(Some(DateRange::new(start, end)))
     }
 }
 
