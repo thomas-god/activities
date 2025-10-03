@@ -32,38 +32,49 @@ pub fn find_field_value_as_uint(
     target_field: &FitField,
 ) -> Option<usize> {
     find_field_value_by_kind(messages, target_field).and_then(|values| {
-        values.iter().find_map(|val| match val {
-            DataValue::Uint8(val) => Some(*val as usize),
-            DataValue::Uint16(val) => Some(*val as usize),
-            DataValue::Uint32(val) => Some(*val as usize),
-            DataValue::Uint64(val) => Some(*val as usize),
-            DataValue::Uint8z(val) => Some(*val as usize),
-            DataValue::Uint16z(val) => Some(*val as usize),
-            DataValue::Uint32z(val) => Some(*val as usize),
-            DataValue::Uint64z(val) => Some(*val as usize),
-            _ => None,
+        values.iter().find_map(|val| {
+            if val.is_invalid() {
+                return None;
+            }
+
+            match val {
+                DataValue::Uint8(val) => Some(*val as usize),
+                DataValue::Uint16(val) => Some(*val as usize),
+                DataValue::Uint32(val) => Some(*val as usize),
+                DataValue::Uint64(val) => Some(*val as usize),
+                DataValue::Uint8z(val) => Some(*val as usize),
+                DataValue::Uint16z(val) => Some(*val as usize),
+                DataValue::Uint32z(val) => Some(*val as usize),
+                DataValue::Uint64z(val) => Some(*val as usize),
+                _ => None,
+            }
         })
     })
 }
 
 pub fn find_field_value_as_float(messages: &[DataMessage], target_field: &FitField) -> Option<f64> {
     find_field_value_by_kind(messages, target_field).and_then(|values| {
-        values.iter().find_map(|val| match val {
-            DataValue::Uint8(val) => Some(*val as f64),
-            DataValue::Uint16(val) => Some(*val as f64),
-            DataValue::Uint32(val) => Some(*val as f64),
-            DataValue::Uint64(val) => Some(*val as f64),
-            DataValue::Uint8z(val) => Some(*val as f64),
-            DataValue::Uint16z(val) => Some(*val as f64),
-            DataValue::Uint32z(val) => Some(*val as f64),
-            DataValue::Uint64z(val) => Some(*val as f64),
-            DataValue::Sint8(val) => Some(*val as f64),
-            DataValue::Sint16(val) => Some(*val as f64),
-            DataValue::Sint32(val) => Some(*val as f64),
-            DataValue::Sint64(val) => Some(*val as f64),
-            DataValue::Float32(val) => Some(*val as f64),
-            DataValue::Float64(val) => Some(*val),
-            _ => None,
+        values.iter().find_map(|val| {
+            if val.is_invalid() {
+                return None;
+            }
+            match val {
+                DataValue::Uint8(val) => Some(*val as f64),
+                DataValue::Uint16(val) => Some(*val as f64),
+                DataValue::Uint32(val) => Some(*val as f64),
+                DataValue::Uint64(val) => Some(*val as f64),
+                DataValue::Uint8z(val) => Some(*val as f64),
+                DataValue::Uint16z(val) => Some(*val as f64),
+                DataValue::Uint32z(val) => Some(*val as f64),
+                DataValue::Uint64z(val) => Some(*val as f64),
+                DataValue::Sint8(val) => Some(*val as f64),
+                DataValue::Sint16(val) => Some(*val as f64),
+                DataValue::Sint32(val) => Some(*val as f64),
+                DataValue::Sint64(val) => Some(*val as f64),
+                DataValue::Float32(val) => Some(*val as f64),
+                DataValue::Float64(val) => Some(*val),
+                _ => None,
+            }
         })
     })
 }
@@ -216,6 +227,14 @@ mod tests {
             (DataValue::Uint32z(12), Some(12)),
             (DataValue::Uint64z(12), Some(12)),
             // Invalid values
+            (DataValue::Uint8(0xFF), None),
+            (DataValue::Uint16(0xFFFF), None),
+            (DataValue::Uint32(0xFFFFFFFF), None),
+            (DataValue::Uint64(0xFFFFFFFFFFFFFFFF), None),
+            (DataValue::Uint8z(0x00), None),
+            (DataValue::Uint16z(0x0000), None),
+            (DataValue::Uint32z(0x00000000), None),
+            (DataValue::Uint64z(0x0000000000000000), None),
             (DataValue::Sint8(12), None),
             (DataValue::Sint16(12), None),
             (DataValue::Sint32(12), None),
@@ -270,6 +289,28 @@ mod tests {
             (DataValue::Float32(12.), Some(12.)),
             (DataValue::Float64(12.), Some(12.)),
             // Invalid values
+            (DataValue::Uint8(0xFF), None),
+            (DataValue::Uint16(0xFFFF), None),
+            (DataValue::Uint32(0xFFFFFFFF), None),
+            (DataValue::Uint64(0xFFFFFFFFFFFFFFFF), None),
+            (DataValue::Uint8z(0x00), None),
+            (DataValue::Uint16z(0x0000), None),
+            (DataValue::Uint32z(0x00000000), None),
+            (DataValue::Uint64z(0x0000000000000000), None),
+            (DataValue::Sint8(0x7F), None),
+            (DataValue::Sint16(0x7FFF), None),
+            (DataValue::Sint32(0x7FFFFFFF), None),
+            (DataValue::Sint64(0x7FFFFFFFFFFFFFFF), None),
+            (
+                DataValue::Float32(f32::from_le_bytes([0xFF, 0xFF, 0xFF, 0xFF])),
+                None,
+            ),
+            (
+                DataValue::Float64(f64::from_le_bytes([
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                ])),
+                None,
+            ),
             (DataValue::String("toto".to_string()), None),
             (DataValue::Enum(FitEnum::Sport(Sport::Running)), None),
             (DataValue::Byte(vec![]), None),
