@@ -50,20 +50,41 @@ where
             .save_definition(definition.clone())
             .await?;
 
-        // Compute initial values
-        let activities = self
+        // Compute initial values over the user history
+        let Ok(Some(history_range)) = self
             .activity_repository
             .lock()
             .await
-            .list_activities_with_timeseries(req.user(), &ListActivitiesFilters::empty())
+            .get_user_history_date_range(req.user())
             .await
-            .unwrap();
-        let values = definition.compute_values(&activities);
-        for (key, value) in values.into_iter() {
-            let _ = self
-                .metrics_repository
-                .update_metric_values(definition.id(), (key, value))
-                .await;
+        else {
+            return Ok(id);
+        };
+
+        let bins = definition.granularity().bins(&history_range);
+
+        // Iterate in reverse so that the most recent bins' values are available first
+        for bin in bins.iter().rev() {
+            let Ok(activities) = self
+                .activity_repository
+                .lock()
+                .await
+                .list_activities_with_timeseries(
+                    req.user(),
+                    &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
+                )
+                .await
+            else {
+                continue;
+            };
+
+            let values = definition.compute_values(&activities);
+            for (key, value) in values.into_iter() {
+                let _ = self
+                    .metrics_repository
+                    .update_metric_values(definition.id(), (key, value))
+                    .await;
+            }
         }
 
         Ok(id)
