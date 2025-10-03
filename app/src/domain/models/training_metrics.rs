@@ -270,7 +270,7 @@ impl TrainingMetricGranularity {
             let Some(new_start) = next_start(start) else {
                 return dates;
             };
-            dates.push(DateRange::new(start, Some(new_start)));
+            dates.push(DateRange::new(start, new_start));
             start = new_start;
             if new_start > last_start {
                 break;
@@ -1157,11 +1157,11 @@ mod test_granularity_bins {
             vec![
                 DateRange::new(
                     "2025-07-23".parse::<NaiveDate>().unwrap(),
-                    Some("2025-07-24".parse::<NaiveDate>().unwrap(),),
+                    "2025-07-24".parse::<NaiveDate>().unwrap(),
                 ),
                 DateRange::new(
                     "2025-07-24".parse::<NaiveDate>().unwrap(),
-                    Some("2025-07-25".parse::<NaiveDate>().unwrap(),),
+                    "2025-07-25".parse::<NaiveDate>().unwrap(),
                 )
             ]
         );
@@ -1186,7 +1186,7 @@ mod test_granularity_bins {
             bins,
             vec![DateRange::new(
                 "2025-07-23".parse::<NaiveDate>().unwrap(),
-                Some("2025-07-24".parse::<NaiveDate>().unwrap(),),
+                "2025-07-24".parse::<NaiveDate>().unwrap(),
             ),]
         );
     }
@@ -1211,11 +1211,11 @@ mod test_granularity_bins {
             vec![
                 DateRange::new(
                     "2025-09-29".parse::<NaiveDate>().unwrap(),
-                    Some("2025-10-06".parse::<NaiveDate>().unwrap(),),
+                    "2025-10-06".parse::<NaiveDate>().unwrap(),
                 ),
                 DateRange::new(
                     "2025-10-06".parse::<NaiveDate>().unwrap(),
-                    Some("2025-10-13".parse::<NaiveDate>().unwrap(),),
+                    "2025-10-13".parse::<NaiveDate>().unwrap(),
                 )
             ]
         );
@@ -1240,7 +1240,7 @@ mod test_granularity_bins {
             bins,
             vec![DateRange::new(
                 "2025-09-29".parse::<NaiveDate>().unwrap(),
-                Some("2025-10-06".parse::<NaiveDate>().unwrap(),),
+                "2025-10-06".parse::<NaiveDate>().unwrap(),
             ),]
         );
     }
@@ -1265,11 +1265,11 @@ mod test_granularity_bins {
             vec![
                 DateRange::new(
                     "2025-09-01".parse::<NaiveDate>().unwrap(),
-                    Some("2025-10-01".parse::<NaiveDate>().unwrap(),),
+                    "2025-10-01".parse::<NaiveDate>().unwrap()
                 ),
                 DateRange::new(
                     "2025-10-01".parse::<NaiveDate>().unwrap(),
-                    Some("2025-11-01".parse::<NaiveDate>().unwrap(),),
+                    "2025-11-01".parse::<NaiveDate>().unwrap(),
                 )
             ]
         );
@@ -1294,7 +1294,7 @@ mod test_granularity_bins {
             bins,
             vec![DateRange::new(
                 "2025-10-01".parse::<NaiveDate>().unwrap(),
-                Some("2025-11-01".parse::<NaiveDate>().unwrap(),),
+                "2025-11-01".parse::<NaiveDate>().unwrap(),
             ),]
         );
     }

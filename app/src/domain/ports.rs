@@ -238,7 +238,7 @@ impl DateTimeRange {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct DateRange {
     start: NaiveDate,
-    end: Option<NaiveDate>,
+    end: NaiveDate,
 }
 
 impl DateRange {
@@ -246,7 +246,7 @@ impl DateRange {
         &self.start
     }
 
-    pub fn end(&self) -> &Option<NaiveDate> {
+    pub fn end(&self) -> &NaiveDate {
         &self.end
     }
 }
