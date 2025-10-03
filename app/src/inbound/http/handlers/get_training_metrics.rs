@@ -72,7 +72,7 @@ fn fill_metric_values(
     values: TrainingMetricValues,
     range: &MetricsDateRange,
 ) -> HashMap<String, f64> {
-    let bins = granularity.bins(
+    let bins = granularity.bins_keys(
         &range.start,
         &range.end.unwrap_or(Local::now().fixed_offset()),
     );

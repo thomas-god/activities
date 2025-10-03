@@ -4,17 +4,20 @@ use std::{
     hash::Hash,
 };
 
-use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate};
+use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, Utc};
 use derive_more::{AsRef, Constructor, Display};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::models::{
-    UserId,
-    activity::{
-        ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit,
-        Unit,
+use crate::domain::{
+    models::{
+        UserId,
+        activity::{
+            ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit,
+            Unit,
+        },
     },
+    ports::{DateRange, DateTimeRange},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
@@ -187,9 +190,13 @@ impl TrainingMetricGranularity {
         }
     }
 
-    /// Computes the bins values for the [TrainingMetricGranularity] for the given range [start,
+    /// Computes the bins' keys for the [TrainingMetricGranularity] over the given range [start,
     /// end].
-    pub fn bins(&self, start: &DateTime<FixedOffset>, end: &DateTime<FixedOffset>) -> Vec<String> {
+    pub fn bins_keys(
+        &self,
+        start: &DateTime<FixedOffset>,
+        end: &DateTime<FixedOffset>,
+    ) -> Vec<String> {
         let mut dates = vec![];
 
         #[allow(clippy::type_complexity)]
@@ -222,6 +229,50 @@ impl TrainingMetricGranularity {
             };
             start = new_start;
             if new_start > end {
+                break;
+            }
+        }
+        dates
+    }
+
+    pub fn bins(&self, range: &DateTimeRange) -> Vec<DateRange> {
+        let start = range.start().date_naive();
+        let end = range
+            .end()
+            .map(|date| date.date_naive())
+            .unwrap_or(Utc::now().fixed_offset().date_naive());
+
+        #[allow(clippy::type_complexity)]
+        let (mut start, last_start, next_start): (
+            NaiveDate,
+            NaiveDate,
+            Box<dyn Fn(NaiveDate) -> Option<NaiveDate>>,
+        ) = match self {
+            Self::Daily => (
+                start,
+                end,
+                Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(1))),
+            ),
+            Self::Weekly => (
+                start.week(chrono::Weekday::Mon).first_day(),
+                end.week(chrono::Weekday::Mon).first_day(),
+                Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(7))),
+            ),
+            Self::Monthly => (
+                start.with_day(1).unwrap(),
+                end.with_day(1).unwrap(),
+                Box::new(|dt: NaiveDate| dt.checked_add_months(Months::new(1))),
+            ),
+        };
+
+        let mut dates = vec![];
+        loop {
+            let Some(new_start) = next_start(start) else {
+                return dates;
+            };
+            dates.push(DateRange::new(start, Some(new_start)));
+            start = new_start;
+            if new_start > last_start {
                 break;
             }
         }
@@ -746,7 +797,7 @@ mod test_training_metrics {
             .unwrap();
         let granularity = TrainingMetricGranularity::Daily;
 
-        let res = granularity.bins(&start, &end);
+        let res = granularity.bins_keys(&start, &end);
 
         assert_eq!(
             res,
@@ -769,7 +820,7 @@ mod test_training_metrics {
             .unwrap();
         let granularity = TrainingMetricGranularity::Weekly;
 
-        let res = granularity.bins(&start, &end);
+        let res = granularity.bins_keys(&start, &end);
 
         assert_eq!(
             res,
@@ -792,7 +843,7 @@ mod test_training_metrics {
             .unwrap();
         let granularity = TrainingMetricGranularity::Monthly;
 
-        let res = granularity.bins(&start, &end);
+        let res = granularity.bins_keys(&start, &end);
 
         assert_eq!(
             res,
@@ -1077,5 +1128,174 @@ mod test_training_metric_aggregate_update_value {
         for previous in previous_values_wrong_variant {
             assert!(aggregate.update_value(&previous, &new_metric).is_none());
         }
+    }
+}
+
+#[cfg(test)]
+mod test_granularity_bins {
+    use crate::domain::ports::DateRange;
+
+    use super::*;
+
+    #[test]
+    fn test_daily_granularity() {
+        let range = DateTimeRange::new(
+            "2025-07-23T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-07-24T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Daily.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![
+                DateRange::new(
+                    "2025-07-23".parse::<NaiveDate>().unwrap(),
+                    Some("2025-07-24".parse::<NaiveDate>().unwrap(),),
+                ),
+                DateRange::new(
+                    "2025-07-24".parse::<NaiveDate>().unwrap(),
+                    Some("2025-07-25".parse::<NaiveDate>().unwrap(),),
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn test_daily_granularity_same_day() {
+        let range = DateTimeRange::new(
+            "2025-07-23T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-07-23T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Daily.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![DateRange::new(
+                "2025-07-23".parse::<NaiveDate>().unwrap(),
+                Some("2025-07-24".parse::<NaiveDate>().unwrap(),),
+            ),]
+        );
+    }
+
+    #[test]
+    fn test_weekly_granularity() {
+        let range = DateTimeRange::new(
+            "2025-10-01T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-10-09T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Weekly.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![
+                DateRange::new(
+                    "2025-09-29".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-06".parse::<NaiveDate>().unwrap(),),
+                ),
+                DateRange::new(
+                    "2025-10-06".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-13".parse::<NaiveDate>().unwrap(),),
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn test_weekly_granularity_same_week() {
+        let range = DateTimeRange::new(
+            "2025-10-01T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-10-05T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Weekly.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![DateRange::new(
+                "2025-09-29".parse::<NaiveDate>().unwrap(),
+                Some("2025-10-06".parse::<NaiveDate>().unwrap(),),
+            ),]
+        );
+    }
+
+    #[test]
+    fn test_monthly_granularity() {
+        let range = DateTimeRange::new(
+            "2025-09-14T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-10-09T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Monthly.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![
+                DateRange::new(
+                    "2025-09-01".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-01".parse::<NaiveDate>().unwrap(),),
+                ),
+                DateRange::new(
+                    "2025-10-01".parse::<NaiveDate>().unwrap(),
+                    Some("2025-11-01".parse::<NaiveDate>().unwrap(),),
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn test_monthly_granularity_same_month() {
+        let range = DateTimeRange::new(
+            "2025-10-01T12:03:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+            Some(
+                "2025-10-05T17:03:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+        );
+
+        let bins = TrainingMetricGranularity::Monthly.bins(&range);
+
+        assert_eq!(
+            bins,
+            vec![DateRange::new(
+                "2025-10-01".parse::<NaiveDate>().unwrap(),
+                Some("2025-11-01".parse::<NaiveDate>().unwrap(),),
+            ),]
+        );
     }
 }

@@ -14,7 +14,7 @@ use crate::{
             },
         },
         ports::{
-            ActivityRepository, DateRange, ListActivitiesError, ListActivitiesFilters,
+            ActivityRepository, DateTimeRange, ListActivitiesError, ListActivitiesFilters,
             RawDataRepository, SaveActivityError, SimilarActivityError,
         },
     },
@@ -275,7 +275,7 @@ where
     async fn get_user_history_date_range(
         &self,
         user: &UserId,
-    ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error> {
+    ) -> Result<Option<crate::domain::ports::DateTimeRange>, anyhow::Error> {
         // Option<DateTime<FixedOffset>> because MIN/MAX(...) return NULL if the set is empty
         match sqlx::query_as::<_, (Option<DateTime<FixedOffset>>, Option<DateTime<FixedOffset>>)>(
             "
@@ -287,7 +287,7 @@ where
         .fetch_optional(&self.pool)
         .await
         {
-            Ok(Some((Some(start), Some(end)))) => Ok(Some(DateRange::new(start, Some(end)))),
+            Ok(Some((Some(start), Some(end)))) => Ok(Some(DateTimeRange::new(start, Some(end)))),
             Ok(Some(_)) => Ok(None),
             Ok(None) => Ok(None),
             Err(err) => Err(anyhow!(

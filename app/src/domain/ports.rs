@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -220,17 +220,33 @@ pub enum GetActivityError {
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct DateRange {
+pub struct DateTimeRange {
     start: DateTime<FixedOffset>,
     end: Option<DateTime<FixedOffset>>,
 }
 
-impl DateRange {
+impl DateTimeRange {
     pub fn start(&self) -> &DateTime<FixedOffset> {
         &self.start
     }
 
     pub fn end(&self) -> &Option<DateTime<FixedOffset>> {
+        &self.end
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct DateRange {
+    start: NaiveDate,
+    end: Option<NaiveDate>,
+}
+
+impl DateRange {
+    pub fn start(&self) -> &NaiveDate {
+        &self.start
+    }
+
+    pub fn end(&self) -> &Option<NaiveDate> {
         &self.end
     }
 }
@@ -286,7 +302,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn get_user_history_date_range(
         &self,
         user: &UserId,
-    ) -> impl Future<Output = Result<Option<DateRange>, anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<DateTimeRange>, anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Error)]

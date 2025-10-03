@@ -15,7 +15,7 @@ use crate::domain::{
         },
     },
     ports::{
-        ActivityRepository, DateRange, DeleteMetricError, GetDefinitionError, GetRawDataError,
+        ActivityRepository, DateTimeRange, DeleteMetricError, GetDefinitionError, GetRawDataError,
         GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
         ListActivitiesFilters, RawDataRepository, SaveActivityError, SaveRawDataError,
         SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
@@ -155,7 +155,7 @@ impl ActivityRepository for InMemoryActivityRepository {
     async fn get_user_history_date_range(
         &self,
         user: &UserId,
-    ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error> {
+    ) -> Result<Option<crate::domain::ports::DateTimeRange>, anyhow::Error> {
         let Some(start) = self
             .activities
             .lock()
@@ -177,7 +177,7 @@ impl ActivityRepository for InMemoryActivityRepository {
             .max_by(|a, b| a.start_time().date().cmp(b.start_time().date()))
             .map(|activity| *activity.start_time().date());
 
-        Ok(Some(DateRange::new(start, end)))
+        Ok(Some(DateTimeRange::new(start, end)))
     }
 }
 

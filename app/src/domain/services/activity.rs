@@ -389,7 +389,7 @@ pub mod test_utils {
             async fn get_user_history_date_range(
                 &self,
                 user: &UserId,
-            ) -> Result<Option<crate::domain::ports::DateRange>, anyhow::Error>;
+            ) -> Result<Option<crate::domain::ports::DateTimeRange>, anyhow::Error>;
         }
 
     }
