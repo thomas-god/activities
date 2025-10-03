@@ -12,7 +12,7 @@
 		| 'NormalizedPower' = $state('Calories');
 	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' | 'Altitude' = $state('Power');
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
-	let granularity: 'Activity' | 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
+	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 
 	let statisticSource = $derived.by(() => {
@@ -89,7 +89,6 @@
 
 			<label class="label" for="metric-granularity">Metric granularity</label>
 			<select class="select" bind:value={granularity} id="metric-granularity">
-				<option value="Activity">Activity</option>
 				<option value="Daily">Daily</option>
 				<option value="Weekly">Weekly</option>
 				<option value="Monthly">Monthly</option>

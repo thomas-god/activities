@@ -4,7 +4,7 @@ use std::{
     hash::Hash,
 };
 
-use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, SecondsFormat};
+use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate};
 use derive_more::{AsRef, Constructor, Display};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityId, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric,
-        ToUnit, Unit,
+        ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit,
+        Unit,
     },
 };
 
@@ -85,18 +85,6 @@ impl TrainingMetricDefinition {
             grouped_metrics,
         ))
     }
-
-    pub fn get_corresponding_granule(&self, activity: &ActivityWithTimeseries) -> Option<Granule> {
-        self.granularity.granule(activity)
-    }
-}
-
-/// A [Granule] represents a set on which a definition will yield a single value. It can represent
-/// a single activity with [Granule::Activity], or a temporal range with [Granule::Date].
-#[derive(Debug, Clone, PartialEq)]
-pub enum Granule {
-    Activity(ActivityId),
-    Date(DateGranule),
 }
 
 #[derive(Debug, Clone, Constructor, PartialEq)]
@@ -181,7 +169,6 @@ fn aggregate_metrics(
 
 #[derive(Debug, Clone, PartialEq, Display)]
 pub enum TrainingMetricGranularity {
-    Activity,
     Daily,
     Weekly,
     Monthly,
@@ -190,7 +177,6 @@ pub enum TrainingMetricGranularity {
 impl TrainingMetricGranularity {
     pub fn datetime_key(&self, dt: &DateTime<FixedOffset>) -> String {
         match self {
-            TrainingMetricGranularity::Activity => dt.to_rfc3339_opts(SecondsFormat::Secs, true),
             TrainingMetricGranularity::Daily => dt.date_naive().to_string(),
             TrainingMetricGranularity::Weekly => dt
                 .date_naive()
@@ -201,34 +187,9 @@ impl TrainingMetricGranularity {
         }
     }
 
-    pub fn granule(&self, activity: &ActivityWithTimeseries) -> Option<Granule> {
-        let start = activity.start_time().date().date_naive();
-        Some(match self {
-            TrainingMetricGranularity::Activity => Granule::Activity(activity.id().clone()),
-            TrainingMetricGranularity::Daily => Granule::Date(DateGranule::new(
-                start,
-                start.checked_add_days(Days::new(1))?,
-            )),
-            TrainingMetricGranularity::Weekly => Granule::Date(DateGranule::new(
-                start.week(chrono::Weekday::Mon).first_day(),
-                start.week(chrono::Weekday::Mon).last_day(),
-            )),
-            TrainingMetricGranularity::Monthly => Granule::Date(DateGranule::new(
-                start.with_day(1)?,
-                start.with_day(start.num_days_in_month().into())?,
-            )),
-        })
-    }
-
     /// Computes the bins values for the [TrainingMetricGranularity] for the given range [start,
     /// end].
-    /// If the results is [None] that means all datetimes are valid within the range
-    /// ([TrainingMetricGranularity::Activity]).
-    pub fn bins(
-        &self,
-        start: &DateTime<FixedOffset>,
-        end: &DateTime<FixedOffset>,
-    ) -> Option<Vec<String>> {
+    pub fn bins(&self, start: &DateTime<FixedOffset>, end: &DateTime<FixedOffset>) -> Vec<String> {
         let mut dates = vec![];
 
         #[allow(clippy::type_complexity)]
@@ -252,20 +213,19 @@ impl TrainingMetricGranularity {
                 end.date_naive().with_day(1).unwrap(),
                 Box::new(|dt: NaiveDate| dt.checked_add_months(Months::new(1))),
             ),
-            Self::Activity => return None,
         };
 
         loop {
             dates.push(start.to_string());
             let Some(new_start) = next_dt(start) else {
-                return Some(dates);
+                return dates;
             };
             start = new_start;
             if new_start > end {
                 break;
             }
         }
-        Some(dates)
+        dates
     }
 }
 
@@ -471,14 +431,6 @@ impl TrainingMetricValues {
     pub fn as_hash_map(self) -> HashMap<String, TrainingMetricValue> {
         self.0
     }
-
-    pub fn as_float_hash_map(&self) -> HashMap<String, f64> {
-        HashMap::from_iter(
-            self.0
-                .iter()
-                .map(|(bin, value)| (bin.clone(), *value.value())),
-        )
-    }
 }
 
 impl std::iter::IntoIterator for TrainingMetricValues {
@@ -610,35 +562,6 @@ mod test_training_metrics {
         let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 60.)
-    }
-
-    #[test]
-    fn test_group_metric_by_granularity_activity() {
-        let metric_1 = ActivityMetric::new(
-            12.3,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            Some(120.),
-        );
-        let metric_2 = ActivityMetric::new(
-            18.1,
-            ActivityStartTime::new(
-                "2025-09-03T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            Some(120.),
-        );
-        let metrics = vec![metric_1.clone(), metric_2.clone()];
-        let granularity = TrainingMetricGranularity::Activity;
-
-        let res = group_metrics_by_granularity(&granularity, metrics);
-        assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-03T00:00:00Z").unwrap(), &vec![metric_1]);
-        assert_eq!(res.get("2025-09-03T02:00:00Z").unwrap(), &vec![metric_2]);
     }
 
     #[test]
@@ -814,19 +737,6 @@ mod test_training_metrics {
     }
 
     #[test]
-    fn test_granularity_bins_activity_is_none() {
-        let start = "2025-07-23T12:03:00+02:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
-        let end = "2025-09-09T12:03:00+10:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
-        let granularity = TrainingMetricGranularity::Activity;
-
-        assert!(granularity.bins(&start, &end).is_none())
-    }
-
-    #[test]
     fn test_granularity_bins_daily() {
         let start = "2025-09-03T12:03:00+02:00"
             .parse::<DateTime<FixedOffset>>()
@@ -838,9 +748,8 @@ mod test_training_metrics {
 
         let res = granularity.bins(&start, &end);
 
-        assert!(res.is_some());
         assert_eq!(
-            res.unwrap(),
+            res,
             vec![
                 "2025-09-03".to_string(),
                 "2025-09-04".to_string(),
@@ -862,9 +771,8 @@ mod test_training_metrics {
 
         let res = granularity.bins(&start, &end);
 
-        assert!(res.is_some());
         assert_eq!(
-            res.unwrap(),
+            res,
             vec![
                 "2025-08-18".to_string(),
                 "2025-08-25".to_string(),
@@ -886,93 +794,14 @@ mod test_training_metrics {
 
         let res = granularity.bins(&start, &end);
 
-        assert!(res.is_some());
         assert_eq!(
-            res.unwrap(),
+            res,
             vec![
                 "2025-07-01".to_string(),
                 "2025-08-01".to_string(),
                 "2025-09-01".to_string(),
             ]
         )
-    }
-}
-
-#[cfg(test)]
-mod test_training_metric_definition_extract_granule {
-    use crate::domain::models::activity::{
-        Activity, ActivityId, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-        Timeseries, TimeseriesTime, TimeseriesValue,
-    };
-
-    use super::*;
-
-    fn default_activity() -> ActivityWithTimeseries {
-        ActivityWithTimeseries::new(
-            Activity::new(
-                ActivityId::default(),
-                UserId::test_default(),
-                None,
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Sport::Cycling,
-                ActivityStatistics::default(),
-            ),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2]),
-                vec![Timeseries::new(
-                    TimeseriesMetric::Power,
-                    vec![
-                        Some(TimeseriesValue::Int(10)),
-                        Some(TimeseriesValue::Int(20)),
-                        Some(TimeseriesValue::Int(30)),
-                    ],
-                )],
-            ),
-        )
-    }
-
-    #[test]
-    fn test_granularity_datetime_granule() {
-        let activity = default_activity();
-
-        assert_eq!(
-            TrainingMetricGranularity::Activity.granule(&activity),
-            Some(Granule::Activity(activity.id().clone()))
-        );
-
-        assert_eq!(
-            TrainingMetricGranularity::Daily
-                .granule(&activity)
-                .expect("Shoule be Some"),
-            Granule::Date(DateGranule::new(
-                NaiveDate::from_ymd_opt(2025, 09, 3).unwrap(),
-                NaiveDate::from_ymd_opt(2025, 09, 4).unwrap(),
-            ))
-        );
-
-        assert_eq!(
-            TrainingMetricGranularity::Weekly
-                .granule(&activity)
-                .expect("Should be Some"),
-            Granule::Date(DateGranule::new(
-                NaiveDate::from_ymd_opt(2025, 09, 1).unwrap(),
-                NaiveDate::from_ymd_opt(2025, 09, 7).unwrap(),
-            ))
-        );
-
-        assert_eq!(
-            TrainingMetricGranularity::Monthly
-                .granule(&activity)
-                .expect("Should be Some"),
-            Granule::Date(DateGranule::new(
-                NaiveDate::from_ymd_opt(2025, 09, 1).unwrap(),
-                NaiveDate::from_ymd_opt(2025, 09, 30).unwrap(),
-            ))
-        );
     }
 }
 

@@ -30,11 +30,6 @@
 	});
 
 	let tooltipTimeFormater = $derived.by(() => {
-		if (granularity === 'Activity') {
-			return (date: string) => {
-				return dayjs(date).format('YYYY-MM-DD');
-			};
-		}
 		if (granularity === 'Monthly') {
 			return (date: string) => {
 				return dayjs(date).format('MMM YYYY');
@@ -45,11 +40,6 @@
 	});
 
 	let tickAxisTimeFormater = $derived.by(() => {
-		if (granularity === 'Activity') {
-			return (date: string, _idx: number) => {
-				return dayjs(date).format('YYYY-MM-DD');
-			};
-		}
 		if (granularity === 'Monthly') {
 			return (date: string, _idx: number) => {
 				return dayjs(date).format('MMM YYYY');

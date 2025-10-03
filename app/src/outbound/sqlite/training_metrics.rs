@@ -253,7 +253,7 @@ mod test_sqlite_activity_repository {
                 TimeseriesMetric::Altitude,
                 TimeseriesAggregate::Max,
             )),
-            TrainingMetricGranularity::Activity,
+            TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
         )
     }

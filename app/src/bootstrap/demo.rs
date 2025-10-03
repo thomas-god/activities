@@ -126,7 +126,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
                 TimeseriesMetric::HeartRate,
                 TimeseriesAggregate::Max,
             )),
-            TrainingMetricGranularity::Activity,
+            TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
         ),
     ));

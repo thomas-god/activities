@@ -260,7 +260,6 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricGranularity {
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
     ) -> Result<IsNull, BoxDynError> {
         let s = match self {
-            Self::Activity => "activity",
             Self::Daily => "daily",
             Self::Weekly => "weekly",
             Self::Monthly => "monthly",
@@ -274,7 +273,6 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricGranularity {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         match s {
-            "activity" => Ok(Self::Activity),
             "daily" => Ok(Self::Daily),
             "weekly" => Ok(Self::Weekly),
             "monthly" => Ok(Self::Monthly),

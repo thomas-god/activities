@@ -113,7 +113,6 @@ impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub enum APITrainingMetricGranularity {
-    Activity,
     Daily,
     Weekly,
     Monthly,
@@ -122,7 +121,6 @@ pub enum APITrainingMetricGranularity {
 impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
     fn from(value: APITrainingMetricGranularity) -> Self {
         match value {
-            APITrainingMetricGranularity::Activity => Self::Activity,
             APITrainingMetricGranularity::Daily => Self::Daily,
             APITrainingMetricGranularity::Weekly => Self::Weekly,
             APITrainingMetricGranularity::Monthly => Self::Monthly,

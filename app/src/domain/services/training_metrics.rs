@@ -316,7 +316,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Activity,
+            TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
         );
 
@@ -359,7 +359,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Activity,
+            TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
         );
 
@@ -383,7 +383,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Activity,
+            TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
         );
 
