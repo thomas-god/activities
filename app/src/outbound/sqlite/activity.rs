@@ -163,6 +163,15 @@ where
         );
         builder.push("WHERE user_id = ").push_bind(user);
 
+        if let Some(date_range) = filters.date_range() {
+            builder
+                .push(" AND start_time >= ")
+                .push_bind(date_range.start());
+            builder
+                .push(" AND start_time < ")
+                .push_bind(date_range.end());
+        }
+
         if let Some(limit) = *filters.limit() {
             builder.push("LIMIT ").push_bind(limit as i64);
         }
@@ -187,31 +196,17 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
-        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics
-            FROM t_activities ",
-        );
-        builder.push("WHERE user_id = ").push_bind(user);
-
-        if let Some(limit) = *filters.limit() {
-            builder.push("LIMIT ").push_bind(limit as i64);
-        }
-
-        let query = builder.build_query_as::<'_, ActivityRow>();
-
-        let rows = query
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?;
+        let activities = self.list_activities(user, filters).await?;
 
         let mut res = vec![];
-        for (id, user_id, name, start_time, sport, statistics) in rows {
-            let activity = Activity::new(id.clone(), user_id, name, start_time, sport, statistics);
-            if let Ok(activitiy_with_timeseries) = self.load_timeseries(&id, activity).await {
-                res.push(activitiy_with_timeseries);
-            }
+        for activity in activities.into_iter() {
+            let Ok(activity_with_timeseries) =
+                self.load_timeseries(&activity.id().clone(), activity).await
+            else {
+                continue;
+            };
+            res.push(activity_with_timeseries);
         }
-
         Ok(res)
     }
 
@@ -295,8 +290,6 @@ where
                 user
             )),
         }
-
-        // todo!()
     }
 }
 
@@ -305,6 +298,7 @@ mod test_sqlite_activity_repository {
 
     use std::collections::HashMap;
 
+    use chrono::NaiveDate;
     use rand::random_range;
     use tempfile::NamedTempFile;
 
@@ -317,7 +311,7 @@ mod test_sqlite_activity_repository {
                     Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
-            ports::{GetRawDataError, test_utils::MockRawDataRepository},
+            ports::{DateRange, GetRawDataError, test_utils::MockRawDataRepository},
         },
         inbound::parser::{
             ParseCreateActivityHttpRequestBodyError, ParsedFileContent, test_utils::MockFileParser,
@@ -354,9 +348,40 @@ mod test_sqlite_activity_repository {
         )
     }
 
+    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> Activity {
+        Activity::new(
+            ActivityId::new(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(*start),
+            Sport::Cycling,
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+        )
+    }
+
     fn build_activity_with_timeseries() -> ActivityWithTimeseries {
         ActivityWithTimeseries::new(
             build_activity(),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2, 3]),
+                vec![Timeseries::new(
+                    TimeseriesMetric::Speed,
+                    vec![
+                        Some(TimeseriesValue::Float(1.3)),
+                        Some(TimeseriesValue::Float(1.45)),
+                        Some(TimeseriesValue::Float(1.15)),
+                        Some(TimeseriesValue::Float(2.45)),
+                    ],
+                )],
+            ),
+        )
+    }
+
+    fn build_activity_with_timeseries_starting_at(
+        start: &DateTime<FixedOffset>,
+    ) -> ActivityWithTimeseries {
+        ActivityWithTimeseries::new(
+            build_activity_starting_at(start),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
                 vec![Timeseries::new(
@@ -600,7 +625,85 @@ mod test_sqlite_activity_repository {
         let res = repository
             .list_activities(
                 &UserId::test_default(),
-                &ListActivitiesFilters::new(Some(1)),
+                &ListActivitiesFilters::empty().set_limit(Some(1)),
+            )
+            .await
+            .expect("Get should have succeeded");
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_date_range() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries_starting_at(
+            &"2025-09-29T12:34:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+        );
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let activity = build_activity_with_timeseries_starting_at(
+            &"2025-10-03T12:34:00+02:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+        );
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .list_activities(
+                &UserId::test_default(),
+                &ListActivitiesFilters::empty().set_date_range(Some(DateRange::new(
+                    "2025-09-10".parse::<NaiveDate>().unwrap(),
+                    "2025-10-01".parse::<NaiveDate>().unwrap(),
+                ))),
+            )
+            .await
+            .expect("Get should have succeeded");
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_with_date_range_timezone() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries_starting_at(
+            &"2025-09-10T08:34:00-10:00"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+        );
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .list_activities(
+                &UserId::test_default(),
+                &ListActivitiesFilters::empty().set_date_range(Some(DateRange::new(
+                    "2025-09-10".parse::<NaiveDate>().unwrap(),
+                    "2025-09-11".parse::<NaiveDate>().unwrap(),
+                ))),
             )
             .await
             .expect("Get should have succeeded");
@@ -930,7 +1033,10 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         let res = repository
-            .list_activities_with_timeseries(activity.user(), &ListActivitiesFilters::new(Some(1)))
+            .list_activities_with_timeseries(
+                activity.user(),
+                &ListActivitiesFilters::empty().set_limit(Some(1)),
+            )
             .await
             .expect("Should have succeeded");
 

@@ -142,15 +142,31 @@ pub enum DeleteActivityError {
 #[derive(Debug, Clone, Constructor)]
 pub struct ListActivitiesFilters {
     limit: Option<usize>,
+    date_range: Option<DateRange>,
 }
 
 impl ListActivitiesFilters {
     pub fn empty() -> Self {
-        Self { limit: None }
+        Self {
+            limit: None,
+            date_range: None,
+        }
     }
 
     pub fn limit(&self) -> &Option<usize> {
         &self.limit
+    }
+
+    pub fn set_limit(self, limit: Option<usize>) -> Self {
+        Self { limit, ..self }
+    }
+
+    pub fn date_range(&self) -> &Option<DateRange> {
+        &self.date_range
+    }
+
+    pub fn set_date_range(self, date_range: Option<DateRange>) -> Self {
+        Self { date_range, ..self }
     }
 }
 

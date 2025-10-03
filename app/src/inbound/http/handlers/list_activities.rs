@@ -29,7 +29,7 @@ pub struct Filters {
 
 impl From<Filters> for ListActivitiesFilters {
     fn from(value: Filters) -> Self {
-        Self::new(value.limit)
+        Self::empty().set_limit(value.limit)
     }
 }
 
