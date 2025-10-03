@@ -14,7 +14,8 @@ pub enum FileHeaderError {
     InvalidCRC(u16, u16),
 }
 
-pub const HEADER_SIZE: u8 = 14;
+pub const HEADER_SIZE_WITH_CRC: u8 = 14;
+pub const HEADER_SIZE_WITHOUT_CRC: u8 = 12;
 
 #[derive(Debug)]
 pub struct FileHeader {
@@ -29,9 +30,11 @@ impl FileHeader {
             .next_u8()
             .map_err(|_| FileHeaderError::HeaderMalformed)?;
 
-        if header_size != HEADER_SIZE {
-            return Err(FileHeaderError::InvalidHeaderSize(header_size));
-        }
+        let crc_present = match header_size {
+            size if size == HEADER_SIZE_WITH_CRC => true,
+            size if size == HEADER_SIZE_WITHOUT_CRC => false,
+            _ => return Err(FileHeaderError::InvalidHeaderSize(header_size)),
+        };
 
         let protocol = reader
             .next_u8()
@@ -65,14 +68,16 @@ impl FileHeader {
         if data_type != ".FIT" {
             return Err(FileHeaderError::InvalidHeaderType);
         }
-        let crc = reader.current_crc();
+        if crc_present {
+            let crc = reader.current_crc();
 
-        let expected_crc = reader
-            .next_u16(&Endianness::Little) // bytes 12 and 13
-            .map_err(|_| FileHeaderError::HeaderMalformed)?;
+            let expected_crc = reader
+                .next_u16(&Endianness::Little) // bytes 12 and 13
+                .map_err(|_| FileHeaderError::HeaderMalformed)?;
 
-        if crc != expected_crc {
-            return Err(FileHeaderError::InvalidCRC(expected_crc, crc));
+            if crc != expected_crc {
+                return Err(FileHeaderError::InvalidCRC(expected_crc, crc));
+            }
         }
 
         Ok(Self {
@@ -111,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_parse_returns_err_if_no_protocol_byte_in_position_1() {
-        let mut reader = Reader::new(14, vec![HEADER_SIZE].into_iter());
+        let mut reader = Reader::new(14, vec![HEADER_SIZE_WITH_CRC].into_iter());
 
         let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
@@ -120,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_parse_returns_err_if_no_protocol_version_in_positions_2_3() {
-        let mut reader = Reader::new(14, vec![HEADER_SIZE, 0].into_iter());
+        let mut reader = Reader::new(14, vec![HEADER_SIZE_WITH_CRC, 0].into_iter());
 
         let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
@@ -129,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_parse_returns_err_if_no_data_size_in_positions_4_7() {
-        let mut reader = Reader::new(14, vec![HEADER_SIZE, 0, 0, 12].into_iter());
+        let mut reader = Reader::new(14, vec![HEADER_SIZE_WITH_CRC, 0, 0, 12].into_iter());
 
         let Err(FileHeaderError::HeaderMalformed) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Err(FileHeaderError::HeaderMalformed)")
@@ -138,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_parse_returns_err_if_data_type_is_not_dot_fit() {
-        let mut content = vec![HEADER_SIZE, 0, 0, 12, 0, 0, 0, 1];
+        let mut content = vec![HEADER_SIZE_WITH_CRC, 0, 0, 12, 0, 0, 0, 1];
         let mut data_type = String::from("tFIT").as_bytes().to_vec();
         content.append(&mut data_type);
         let mut reader = Reader::new(14, content.into_iter());
@@ -150,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_parse_returns_err_if_crc_not_2_bytes() {
-        let mut content = vec![HEADER_SIZE, 0, 0, 12, 0, 0, 0, 1];
+        let mut content = vec![HEADER_SIZE_WITH_CRC, 0, 0, 12, 0, 0, 0, 1];
         let mut data_type = String::from(".FIT").as_bytes().to_vec();
         content.append(&mut data_type);
         content.append(&mut vec![0]);
@@ -163,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_parse_header_crc_is_invalid() {
-        let mut content = vec![HEADER_SIZE, 0, 13, 0, 1, 0, 0, 0];
+        let mut content = vec![HEADER_SIZE_WITH_CRC, 0, 13, 0, 1, 0, 0, 0];
         let mut data_type = String::from(".FIT").as_bytes().to_vec();
         content.append(&mut data_type);
         content.append(&mut vec![103, 114]); // CRC value for bytes 0-11
@@ -178,11 +183,29 @@ mod tests {
 
     #[test]
     fn test_parse_returns_header() {
-        let mut content = vec![HEADER_SIZE, 0, 13, 0, 1, 0, 0, 0];
+        let mut content = vec![HEADER_SIZE_WITH_CRC, 0, 13, 0, 1, 0, 0, 0];
         let mut data_type = String::from(".FIT").as_bytes().to_vec();
         content.append(&mut data_type);
         content.append(&mut vec![103, 115]); // CRC value for bytes 0-11
         let mut reader = Reader::new(14, content.into_iter());
+
+        let Ok(header) = FileHeader::from_bytes(&mut reader) else {
+            unreachable!("Should have return an Ok(FileHeader)")
+        };
+
+        assert_eq!(header._protocol, 0);
+        assert_eq!(header._profile_version, 13);
+        assert_eq!(header.data_size, 1);
+    }
+
+    #[test]
+    fn test_parse_12bytes_header() {
+        let mut content = vec![12, 0, 13, 0, 1, 0, 0, 0];
+        let mut data_type = String::from(".FIT").as_bytes().to_vec();
+        content.append(&mut data_type);
+        // No header CRC for 12 bytes headers
+
+        let mut reader = Reader::new(12, content.into_iter());
 
         let Ok(header) = FileHeader::from_bytes(&mut reader) else {
             unreachable!("Should have return an Ok(FileHeader)")

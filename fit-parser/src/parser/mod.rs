@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::parser::{
     definition::custom::{CustomDescription, parse_custom_definition_description},
-    header::{FileHeader, FileHeaderError, HEADER_SIZE},
+    header::{FileHeader, FileHeaderError, HEADER_SIZE_WITH_CRC},
     reader::{Reader, ReaderError},
     records::{CompressedTimestamp, RecordError},
 };
@@ -40,7 +40,7 @@ pub enum FitParserError {
 pub fn parse_fit_messages(
     content: std::vec::IntoIter<u8>,
 ) -> Result<Vec<DataMessage>, FitParserError> {
-    let mut header_reader = Reader::new(HEADER_SIZE as u32, content);
+    let mut header_reader = Reader::new(HEADER_SIZE_WITH_CRC as u32, content);
     let header = FileHeader::from_bytes(&mut header_reader)?;
 
     let mut reader = Reader::new(header.data_size, header_reader.remaining_content());
