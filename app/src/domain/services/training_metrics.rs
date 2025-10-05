@@ -300,6 +300,7 @@ mod tests_training_metrics_service {
     use std::{collections::HashMap, sync::Arc};
 
     use anyhow::anyhow;
+    use chrono::{DateTime, FixedOffset};
     use tokio::sync::Mutex;
 
     use crate::domain::{
@@ -314,7 +315,7 @@ mod tests_training_metrics_service {
                 TrainingMetricValues,
             },
         },
-        ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
+        ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::{
             activity::test_utils::MockActivityRepository,
             training_metrics::test_utils::MockTrainingMetricsRepository,
@@ -329,6 +330,20 @@ mod tests_training_metrics_service {
         repository.expect_save_definition().returning(|_| Ok(()));
 
         let mut activities = MockActivityRepository::new();
+        activities
+            .expect_get_user_history_date_range()
+            .returning(|_| {
+                Ok(Some(DateTimeRange::new(
+                    "2025-09-05T00:00:00+02:00"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                    Some(
+                        "2025-09-05T00:00:00+02:00"
+                            .parse::<DateTime<FixedOffset>>()
+                            .unwrap(),
+                    ),
+                )))
+            });
         activities
             .expect_list_activities_with_timeseries()
             .returning(|_, _| Ok(vec![]));
@@ -357,6 +372,20 @@ mod tests_training_metrics_service {
             .returning(|_, _| Ok(()));
 
         let mut activities = MockActivityRepository::new();
+        activities
+            .expect_get_user_history_date_range()
+            .returning(|_| {
+                Ok(Some(DateTimeRange::new(
+                    "2025-09-05T00:00:00+02:00"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                    Some(
+                        "2025-09-05T00:00:00+02:00"
+                            .parse::<DateTime<FixedOffset>>()
+                            .unwrap(),
+                    ),
+                )))
+            });
         activities
             .expect_list_activities_with_timeseries()
             .returning(|_, _| {
