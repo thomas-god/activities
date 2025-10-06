@@ -12,8 +12,13 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	if (startDate === null) {
 		return { metrics: [] };
 	}
-	const start = encodeURIComponent(dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ'));
-	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
+	const endDate = url.searchParams.get('end');
+	let fetchUrl = `${PUBLIC_APP_URL}/api/training/metrics?start=${encodeURIComponent(dayjs(startDate).format('YYYY-MM-DDTHH:mm:ssZ'))}`;
+	if (endDate !== null) {
+		fetchUrl =
+			fetchUrl + `&end=${encodeURIComponent(dayjs(endDate).format('YYYY-MM-DDTHH:mm:ssZ'))}`;
+	}
+	const res = await fetch(fetchUrl, {
 		method: 'GET',
 		mode: 'cors',
 		credentials: 'include'
