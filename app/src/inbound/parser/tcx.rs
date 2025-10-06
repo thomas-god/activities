@@ -18,8 +18,8 @@ pub fn try_tcx_bytes_into_domain(
     let content =
         String::from_utf8(bytes.clone()).map_err(|_err| ParseBytesError::InvalidContent)?;
 
-    let doc =
-        roxmltree::Document::parse(&content).map_err(|_err| ParseBytesError::InvalidContent)?;
+    let doc = roxmltree::Document::parse(content.trim())
+        .map_err(|_err| ParseBytesError::InvalidContent)?;
 
     let start_time = find_activity_start_time(&doc).ok_or(ParseBytesError::NoStartTimeFound)?;
     let sport = find_sport(&doc);
@@ -204,6 +204,14 @@ mod test_txc_parser {
     fn test_parse_file_ok() {
         let file = fs::read("src/inbound/parser/test.tcx").expect("Unable to load tcx test file");
 
+        try_tcx_bytes_into_domain(file).expect("Should have returned Ok");
+    }
+
+    #[test]
+    fn test_parse_file_content_with_trailing_whitespaces() {
+        let file = "    <root StartTime=\"2017-01-05T09:29:35.000Z\"/>   "
+            .to_string()
+            .into_bytes();
         try_tcx_bytes_into_domain(file).expect("Should have returned Ok");
     }
 
