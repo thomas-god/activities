@@ -18,7 +18,7 @@ use crate::{
             RawDataRepository, SaveActivityError, SimilarActivityError,
         },
     },
-    inbound::parser::{ParseFile, SupportedExtension},
+    inbound::parser::ParseFile,
 };
 
 type ActivityRow = (
@@ -89,9 +89,14 @@ where
             Err(err) => return Err(anyhow!(err)),
         };
 
+        let extension = raw_data
+            .extension()
+            .try_into()
+            .map_err(|_| anyhow!("Unsupported file format: {}", raw_data.extension()))?;
+
         let parsed_content = match self
             .file_parser
-            .try_bytes_into_domain(&SupportedExtension::FIT, raw_data)
+            .try_bytes_into_domain(&extension, raw_data.raw_content())
         {
             Ok(parsed_content) => parsed_content,
             Err(err) => return Err(anyhow!(err)),
@@ -314,7 +319,7 @@ mod test_sqlite_activity_repository {
                     Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
-            ports::{DateRange, GetRawDataError, test_utils::MockRawDataRepository},
+            ports::{DateRange, GetRawDataError, RawContent, test_utils::MockRawDataRepository},
         },
         inbound::parser::{ParseBytesError, ParsedFileContent, test_utils::MockFileParser},
     };
@@ -862,7 +867,7 @@ mod test_sqlite_activity_repository {
         raw_data_repo
             .expect_get_raw_data()
             .times(1)
-            .returning(|_| Ok(vec![]));
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
         let mut file_parser = MockFileParser::new();
         file_parser
             .expect_try_bytes_into_domain()
@@ -934,7 +939,7 @@ mod test_sqlite_activity_repository {
         raw_data_repo
             .expect_get_raw_data()
             .times(1)
-            .returning(|_| Ok(vec![]));
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
         let mut file_parser = MockFileParser::new();
         file_parser
             .expect_try_bytes_into_domain()
@@ -968,7 +973,7 @@ mod test_sqlite_activity_repository {
         raw_data_repo
             .expect_get_raw_data()
             .times(2)
-            .returning(|_| Ok(vec![]));
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
         let mut file_parser = MockFileParser::new();
         file_parser
             .expect_try_bytes_into_domain()
@@ -1008,7 +1013,7 @@ mod test_sqlite_activity_repository {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
-            .returning(|_| Ok(vec![]));
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
         let mut file_parser = MockFileParser::new();
         file_parser
             .expect_try_bytes_into_domain()
@@ -1051,7 +1056,7 @@ mod test_sqlite_activity_repository {
         raw_data_repo
             .expect_get_raw_data()
             .times(1)
-            .return_once(|_| Ok(vec![]));
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
         raw_data_repo
             .expect_get_raw_data()
             .times(1)

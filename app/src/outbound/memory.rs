@@ -183,11 +183,11 @@ impl ActivityRepository for InMemoryActivityRepository {
 
 #[derive(Clone)]
 pub struct InMemoryRawDataRepository {
-    raw_data: Arc<Mutex<HashMap<ActivityId, Vec<u8>>>>,
+    raw_data: Arc<Mutex<HashMap<ActivityId, RawContent>>>,
 }
 
 impl InMemoryRawDataRepository {
-    pub fn new(raw_data: HashMap<ActivityId, Vec<u8>>) -> Self {
+    pub fn new(raw_data: HashMap<ActivityId, RawContent>) -> Self {
         Self {
             raw_data: Arc::new(Mutex::new(raw_data)),
         }
@@ -201,13 +201,11 @@ impl RawDataRepository for InMemoryRawDataRepository {
         content: RawContent,
     ) -> Result<(), SaveRawDataError> {
         let mut guard = self.raw_data.lock().await;
-        guard
-            .deref_mut()
-            .insert(activity_id.clone(), content.raw_content());
+        guard.deref_mut().insert(activity_id.clone(), content);
         Ok(())
     }
 
-    async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<Vec<u8>, GetRawDataError> {
+    async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<RawContent, GetRawDataError> {
         self.raw_data
             .lock()
             .await

@@ -84,7 +84,7 @@ pub enum CreateActivityError {
 
 /// Represents the content of the initial activity file needed for later reuse/reparsing, namely
 /// the file's bytes and its extension (fit, tcx, etc.).
-#[derive(Debug, Clone, Constructor)]
+#[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct RawContent {
     extension: String,
     content: Vec<u8>,
@@ -365,7 +365,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
     fn get_raw_data(
         &self,
         activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<Vec<u8>, GetRawDataError>> + Send;
+    ) -> impl Future<Output = Result<RawContent, GetRawDataError>> + Send;
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -580,7 +580,7 @@ pub mod test_utils {
             async fn get_raw_data(
                 &self,
                 activity_id: &ActivityId,
-            ) -> Result<Vec<u8>, GetRawDataError>;
+            ) -> Result<RawContent, GetRawDataError>;
         }
     }
 }

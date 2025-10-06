@@ -73,6 +73,24 @@ impl SupportedExtension {
     }
 }
 
+impl TryFrom<&str> for SupportedExtension {
+    type Error = ();
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "fit" => Ok(Self::FIT),
+            "tcx" => Ok(Self::TCX),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<String> for SupportedExtension {
+    type Error = ();
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
 #[derive(Debug, Clone, Error, PartialEq)]
 pub enum ParseBytesError {
     #[error("File content is not a valid activity file")]

@@ -440,7 +440,7 @@ mod tests_activity_service {
             async fn get_raw_data(
                 &self,
                 _activity_id: &ActivityId,
-            ) -> Result<Vec<u8>, GetRawDataError>;
+            ) -> Result<RawContent, GetRawDataError>;
         }
     }
 

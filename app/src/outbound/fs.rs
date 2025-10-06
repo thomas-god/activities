@@ -56,37 +56,36 @@ impl RawDataRepository for FilesystemRawDataRepository {
         Ok(())
     }
 
-    async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<Vec<u8>, GetRawDataError> {
-        let mut file = match tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .create(false)
-            .open(self.target_path(activity_id, SupportedExtension::FIT.suffix()))
-            .await
-        {
-            Ok(file) => file,
-            Err(err) => {
+    async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<RawContent, GetRawDataError> {
+        for ext in [SupportedExtension::FIT, SupportedExtension::TCX] {
+            let mut file = match tokio::fs::OpenOptions::new()
+                .read(true)
+                .write(false)
+                .create(false)
+                .open(self.target_path(activity_id, ext.suffix()))
+                .await
+            {
+                Ok(file) => file,
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        continue;
+                    }
+                    return Err(GetRawDataError::Unknown);
+                }
+            };
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer).await.map_err(|err| {
                 tracing::warn!(
-                    "Error while trying to save raw data for activity {}",
+                    "Error while trying to read raw data for activity {}",
                     activity_id
                 );
                 tracing::warn!("{}", err);
-                if err.kind() == std::io::ErrorKind::NotFound {
-                    return Err(GetRawDataError::NoRawDataFound(activity_id.clone()));
-                }
-                return Err(GetRawDataError::Unknown);
-            }
-        };
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).await.map_err(|err| {
-            tracing::warn!(
-                "Error while trying to read raw data for activity {}",
-                activity_id
-            );
-            tracing::warn!("{}", err);
-            GetRawDataError::Unknown
-        })?;
-        Ok(buffer)
+                GetRawDataError::Unknown
+            })?;
+
+            return Ok(RawContent::new(ext.suffix().to_string(), buffer));
+        }
+        Err(GetRawDataError::NoRawDataFound(activity_id.clone()))
     }
 }
 
@@ -139,7 +138,7 @@ mod test_filesystem_raw_data_repository {
     }
 
     #[tokio::test]
-    async fn test_get_raw_data() {
+    async fn test_get_raw_data_fit_file() {
         let tmp_dir = tempfile::tempdir().expect("Unable to create temporary directory");
         let repository = FilesystemRawDataRepository::new(tmp_dir.path().to_path_buf());
 
@@ -155,7 +154,27 @@ mod test_filesystem_raw_data_repository {
             .get_raw_data(&activity)
             .await
             .expect("Should have returned OK");
-        assert_eq!(res, vec![0, 1, 2, 3]);
+        assert_eq!(res, RawContent::new("fit".to_string(), vec![0, 1, 2, 3]));
+    }
+
+    #[tokio::test]
+    async fn test_get_raw_data_tcx_file() {
+        let tmp_dir = tempfile::tempdir().expect("Unable to create temporary directory");
+        let repository = FilesystemRawDataRepository::new(tmp_dir.path().to_path_buf());
+
+        let activity = ActivityId::new();
+        let raw_content = RawContent::new("tcx".to_string(), vec![0, 1, 2, 3]);
+
+        repository
+            .save_raw_data(&activity, raw_content)
+            .await
+            .expect("Should have return OK");
+
+        let res = repository
+            .get_raw_data(&activity)
+            .await
+            .expect("Should have returned OK");
+        assert_eq!(res, RawContent::new("tcx".to_string(), vec![0, 1, 2, 3]));
     }
 
     #[tokio::test]
