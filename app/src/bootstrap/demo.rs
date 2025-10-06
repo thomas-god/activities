@@ -18,7 +18,7 @@ use crate::{
     },
     inbound::{
         http::{DisabledUserService, HttpServer},
-        parser::{FitParser, ParseFile},
+        parser::{ParseFile, Parser, SupportedExtension},
     },
     outbound::memory::{
         InMemoryActivityRepository, InMemoryRawDataRepository, InMemoryTrainingMetricsRepository,
@@ -32,7 +32,7 @@ pub async fn bootsrap_demo() -> anyhow::Result<
             InMemoryRawDataRepository,
             TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
         >,
-        FitParser,
+        Parser,
         TrainingMetricService<InMemoryTrainingMetricsRepository, InMemoryActivityRepository>,
         DisabledUserService,
     >,
@@ -69,7 +69,7 @@ pub async fn bootsrap_demo() -> anyhow::Result<
     );
     let user_service = DisabledUserService {};
 
-    let parser = FitParser {};
+    let parser = Parser {};
 
     // Load demo activities before starting receiving request
     load_demo_activities(&activity_service, &parser).await;
@@ -136,7 +136,7 @@ fn default_training_metrics_definitions() -> Vec<(TrainingMetricId, TrainingMetr
 
 async fn load_demo_activities<AR, RDR, TMS>(
     activity_service: &ActivityService<AR, RDR, TMS>,
-    parser: &FitParser,
+    parser: &Parser,
 ) where
     AR: ActivityRepository,
     RDR: RawDataRepository,
@@ -149,7 +149,9 @@ async fn load_demo_activities<AR, RDR, TMS>(
     for file in dir.flatten() {
         if file.path().extension().and_then(OsStr::to_str) == Some("fit") {
             let content = fs::read(file.path()).unwrap();
-            let req = parser.try_bytes_into_domain(content).unwrap();
+            let req = parser
+                .try_bytes_into_domain(&SupportedExtension::FIT, content)
+                .unwrap();
             activity_service
                 .create_activity(req.into_request(&UserId::default()))
                 .await

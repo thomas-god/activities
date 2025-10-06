@@ -11,7 +11,7 @@ use crate::{
             HttpServer, MagicLinkService, SMTPEmailProvider, SessionService,
             SqliteMagicLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
         },
-        parser::FitParser,
+        parser::Parser,
     },
     outbound::{
         fs::FilesystemRawDataRepository,
@@ -24,17 +24,17 @@ use crate::{
 pub async fn bootsrap_multi_user() -> anyhow::Result<
     HttpServer<
         ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             FilesystemRawDataRepository,
             TrainingMetricService<
                 SqliteTrainingMetricsRepository,
-                SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             >,
         >,
-        FitParser,
+        Parser,
         TrainingMetricService<
             SqliteTrainingMetricsRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
         UserService<
             MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
@@ -87,18 +87,18 @@ fn build_mailer() -> anyhow::Result<SMTPEmailProvider> {
 
 async fn build_activity_service() -> anyhow::Result<(
     ActivityService<
-        SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+        SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         FilesystemRawDataRepository,
         TrainingMetricService<
             SqliteTrainingMetricsRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
     >,
-    FitParser,
+    Parser,
     Arc<
         TrainingMetricService<
             SqliteTrainingMetricsRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
     >,
 )> {
@@ -112,7 +112,7 @@ async fn build_activity_service() -> anyhow::Result<(
         tokio::fs::create_dir_all(&raw_data_dir).await?;
     }
 
-    let parser = FitParser {};
+    let parser = Parser {};
 
     let raw_data_repository = FilesystemRawDataRepository::new(raw_data_dir);
 

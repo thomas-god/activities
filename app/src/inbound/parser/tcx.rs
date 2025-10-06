@@ -9,32 +9,26 @@ use crate::{
         ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
         Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
-    inbound::parser::{ParseBytesError, ParseFile, ParsedFileContent},
+    inbound::parser::{ParseBytesError, ParsedFileContent},
 };
 
-#[derive(Clone)]
-pub struct TcxParser {}
+pub fn try_tcx_bytes_into_domain(
+    bytes: Vec<u8>,
+) -> Result<super::ParsedFileContent, super::ParseBytesError> {
+    let content =
+        String::from_utf8(bytes.clone()).map_err(|_err| ParseBytesError::InvalidContent)?;
 
-impl ParseFile for TcxParser {
-    fn try_bytes_into_domain(
-        &self,
-        bytes: Vec<u8>,
-    ) -> Result<super::ParsedFileContent, super::ParseBytesError> {
-        let content =
-            String::from_utf8(bytes.clone()).map_err(|_err| ParseBytesError::InvalidContent)?;
+    let doc =
+        roxmltree::Document::parse(&content).map_err(|_err| ParseBytesError::InvalidContent)?;
 
-        let doc =
-            roxmltree::Document::parse(&content).map_err(|_err| ParseBytesError::InvalidContent)?;
+    let start_time = find_activity_start_time(&doc).ok_or(ParseBytesError::NoStartTimeFound)?;
+    let sport = find_sport(&doc);
+    let statistics = find_activity_statistics(&doc);
+    let timeseries = parse_timeseries(&doc, start_time.date());
 
-        let start_time = find_activity_start_time(&doc).ok_or(ParseBytesError::NoStartTimeFound)?;
-        let sport = find_sport(&doc);
-        let statistics = find_activity_statistics(&doc);
-        let timeseries = parse_timeseries(&doc, start_time.date());
-
-        Ok(ParsedFileContent::new(
-            sport, start_time, statistics, timeseries, bytes,
-        ))
-    }
+    Ok(ParsedFileContent::new(
+        sport, start_time, statistics, timeseries, bytes,
+    ))
 }
 
 fn find_sport(doc: &Document) -> Sport {
@@ -204,20 +198,16 @@ mod test_txc_parser {
     #[test]
     fn test_parse_file_ok() {
         let file = fs::read("src/inbound/parser/test.tcx").expect("Unable to load tcx test file");
-        let parser = TcxParser {};
 
-        parser
-            .try_bytes_into_domain(file)
-            .expect("Should have returned Ok");
+        try_tcx_bytes_into_domain(file).expect("Should have returned Ok");
     }
 
     #[test]
     fn test_parse_file_content_is_not_a_valid_string() {
         let file = vec![0xFF, 0xFE, 0xFD];
-        let parser = TcxParser {};
 
         assert_eq!(
-            parser.try_bytes_into_domain(file).unwrap_err(),
+            try_tcx_bytes_into_domain(file).unwrap_err(),
             ParseBytesError::InvalidContent
         );
     }
@@ -225,10 +215,9 @@ mod test_txc_parser {
     #[test]
     fn test_parse_file_content_is_not_a_valid_xml() {
         let file = "blabla".to_string().into_bytes();
-        let parser = TcxParser {};
 
         assert_eq!(
-            parser.try_bytes_into_domain(file).unwrap_err(),
+            try_tcx_bytes_into_domain(file).unwrap_err(),
             ParseBytesError::InvalidContent
         );
     }
@@ -236,10 +225,9 @@ mod test_txc_parser {
     #[test]
     fn test_parse_file_content_does_not_have_a_start_time() {
         let file = "<root/>".to_string().into_bytes();
-        let parser = TcxParser {};
 
         assert_eq!(
-            parser.try_bytes_into_domain(file).unwrap_err(),
+            try_tcx_bytes_into_domain(file).unwrap_err(),
             ParseBytesError::NoStartTimeFound
         );
     }

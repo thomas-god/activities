@@ -17,7 +17,7 @@ use crate::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
         },
-        parser::ParseFile,
+        parser::{ParseFile, SupportedExtension},
     },
 };
 
@@ -70,7 +70,10 @@ pub async fn upload_activities<
             unprocessable_files.push((name.to_string(), RejectionReason::CannotReadContent));
             continue;
         };
-        let Ok(file_content) = state.file_parser.try_bytes_into_domain(file_content) else {
+        let Ok(file_content) = state
+            .file_parser
+            .try_bytes_into_domain(&SupportedExtension::FIT, file_content)
+        else {
             unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
             continue;
         };

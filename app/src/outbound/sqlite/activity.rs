@@ -18,7 +18,7 @@ use crate::{
             RawDataRepository, SaveActivityError, SimilarActivityError,
         },
     },
-    inbound::parser::ParseFile,
+    inbound::parser::{ParseFile, SupportedExtension},
 };
 
 type ActivityRow = (
@@ -89,7 +89,10 @@ where
             Err(err) => return Err(anyhow!(err)),
         };
 
-        let parsed_content = match self.file_parser.try_bytes_into_domain(raw_data) {
+        let parsed_content = match self
+            .file_parser
+            .try_bytes_into_domain(&SupportedExtension::FIT, raw_data)
+        {
             Ok(parsed_content) => parsed_content,
             Err(err) => return Err(anyhow!(err)),
         };
@@ -863,7 +866,7 @@ mod test_sqlite_activity_repository {
         file_parser
             .expect_try_bytes_into_domain()
             .times(1)
-            .returning(|_| Ok(build_parsed_file_content()));
+            .returning(|_, __| Ok(build_parsed_file_content()));
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),
@@ -935,7 +938,7 @@ mod test_sqlite_activity_repository {
         file_parser
             .expect_try_bytes_into_domain()
             .times(1)
-            .returning(|_| Err(ParseBytesError::InvalidContent));
+            .returning(|_, __| Err(ParseBytesError::InvalidContent));
 
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
@@ -969,7 +972,7 @@ mod test_sqlite_activity_repository {
         file_parser
             .expect_try_bytes_into_domain()
             .times(2)
-            .returning(|_| Ok(build_parsed_file_content()));
+            .returning(|_, __| Ok(build_parsed_file_content()));
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),
@@ -1008,7 +1011,7 @@ mod test_sqlite_activity_repository {
         let mut file_parser = MockFileParser::new();
         file_parser
             .expect_try_bytes_into_domain()
-            .returning(|_| Ok(build_parsed_file_content()));
+            .returning(|_, __| Ok(build_parsed_file_content()));
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),
@@ -1056,7 +1059,7 @@ mod test_sqlite_activity_repository {
         file_parser
             .expect_try_bytes_into_domain()
             .times(1)
-            .returning(|_| Ok(build_parsed_file_content()));
+            .returning(|_, __| Ok(build_parsed_file_content()));
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),

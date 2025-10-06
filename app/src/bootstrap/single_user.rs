@@ -7,7 +7,7 @@ use crate::{
     domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
     inbound::{
         http::{DisabledUserService, HttpServer},
-        parser::FitParser,
+        parser::Parser,
     },
     outbound::{
         fs::FilesystemRawDataRepository,
@@ -20,17 +20,17 @@ use crate::{
 pub async fn bootsrap_single_user() -> anyhow::Result<
     HttpServer<
         ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             FilesystemRawDataRepository,
             TrainingMetricService<
                 SqliteTrainingMetricsRepository,
-                SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             >,
         >,
-        FitParser,
+        Parser,
         TrainingMetricService<
             SqliteTrainingMetricsRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, FitParser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
         DisabledUserService,
     >,
@@ -59,7 +59,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         tokio::fs::create_dir_all(&raw_data_dir).await?;
     }
 
-    let parser = FitParser {};
+    let parser = Parser {};
 
     let raw_data_repository = FilesystemRawDataRepository::new(raw_data_dir);
 

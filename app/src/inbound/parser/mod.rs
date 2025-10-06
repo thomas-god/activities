@@ -1,19 +1,19 @@
 use derive_more::Constructor;
 use thiserror::Error;
 
-use crate::domain::{
-    models::{
-        UserId,
-        activity::{ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport},
+use crate::{
+    domain::{
+        models::{
+            UserId,
+            activity::{ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport},
+        },
+        ports::CreateActivityRequest,
     },
-    ports::CreateActivityRequest,
+    inbound::parser::fit::try_fit_bytes_into_domain,
 };
 
 pub mod fit;
 pub mod tcx;
-
-pub use fit::FitParser;
-pub use tcx::TcxParser;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct ParsedFileContent {
@@ -57,6 +57,21 @@ impl ParsedFileContent {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SupportedExtension {
+    FIT,
+    TCX,
+}
+
+impl SupportedExtension {
+    pub fn suffix(&self) -> &str {
+        match self {
+            Self::FIT => ".fit",
+            Self::TCX => ".tcx",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Error, PartialEq)]
 pub enum ParseBytesError {
     #[error("File content is not a valid activity file")]
@@ -66,7 +81,27 @@ pub enum ParseBytesError {
 }
 
 pub trait ParseFile: Clone + Send + Sync + 'static {
-    fn try_bytes_into_domain(&self, bytes: Vec<u8>) -> Result<ParsedFileContent, ParseBytesError>;
+    fn try_bytes_into_domain(
+        &self,
+        extention: &SupportedExtension,
+        bytes: Vec<u8>,
+    ) -> Result<ParsedFileContent, ParseBytesError>;
+}
+
+#[derive(Clone)]
+pub struct Parser {}
+
+impl ParseFile for Parser {
+    fn try_bytes_into_domain(
+        &self,
+        extension: &SupportedExtension,
+        bytes: Vec<u8>,
+    ) -> Result<ParsedFileContent, ParseBytesError> {
+        match extension {
+            SupportedExtension::FIT => try_fit_bytes_into_domain(bytes),
+            SupportedExtension::TCX => todo!(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -86,6 +121,7 @@ pub mod test_utils {
         impl ParseFile for FileParser {
             fn try_bytes_into_domain(
                 &self,
+                extention: &SupportedExtension,
                 bytes: Vec<u8>,
             ) -> Result<ParsedFileContent, ParseBytesError>;
         }
@@ -95,7 +131,7 @@ pub mod test_utils {
     impl MockFileParser {
         pub fn test_default() -> Self {
             let mut mock = Self::new();
-            mock.expect_try_bytes_into_domain().returning(|_| {
+            mock.expect_try_bytes_into_domain().returning(|_, __| {
                 Ok(ParsedFileContent::new(
                     Sport::Cycling,
                     ActivityStartTime::from_timestamp(1000).unwrap(),

@@ -12,34 +12,29 @@ use crate::{
         ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
         Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
-    inbound::parser::{ParseBytesError, ParseFile, ParsedFileContent},
+    inbound::parser::{ParseBytesError, ParsedFileContent},
 };
 
 /// FIT datetimes have 00:00 Dec 31 1989 as their reference instead of January 1, 1970
 const FIT_DATETIME_OFFSET: usize = 631065600;
 
-#[derive(Clone)]
-pub struct FitParser {}
+pub fn try_fit_bytes_into_domain(bytes: Vec<u8>) -> Result<ParsedFileContent, ParseBytesError> {
+    let Ok(messages) = parse_fit_messages(bytes.clone().into_iter(), false) else {
+        return Err(ParseBytesError::InvalidContent);
+    };
 
-impl ParseFile for FitParser {
-    fn try_bytes_into_domain(&self, bytes: Vec<u8>) -> Result<ParsedFileContent, ParseBytesError> {
-        let Ok(messages) = parse_fit_messages(bytes.clone().into_iter(), false) else {
-            return Err(ParseBytesError::InvalidContent);
-        };
+    let (start_time, reference_timestamp) =
+        extract_start_time(&messages).ok_or(ParseBytesError::NoStartTimeFound)?;
 
-        let (start_time, reference_timestamp) =
-            extract_start_time(&messages).ok_or(ParseBytesError::NoStartTimeFound)?;
+    let sport = extract_sport(&messages);
 
-        let sport = extract_sport(&messages);
+    let timeseries = extract_timeseries(reference_timestamp, &messages)?;
 
-        let timeseries = extract_timeseries(reference_timestamp, &messages)?;
+    let statistics = extract_statistics(&messages);
 
-        let statistics = extract_statistics(&messages);
-
-        Ok(ParsedFileContent::new(
-            sport, start_time, statistics, timeseries, bytes,
-        ))
-    }
+    Ok(ParsedFileContent::new(
+        sport, start_time, statistics, timeseries, bytes,
+    ))
 }
 
 fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u32)> {
@@ -350,9 +345,8 @@ mod tests {
     #[test]
     fn test_parse_fit_timestamp() {
         let content = fs::read("../test.fit").unwrap();
-        let parser = FitParser {};
 
-        let res = parser.try_bytes_into_domain(content).unwrap();
+        let res = try_fit_bytes_into_domain(content).unwrap();
 
         // Check for same point in time
         let expected_time = "2025-08-08T19:14:54+02:00"
@@ -370,9 +364,8 @@ mod tests {
     #[test]
     fn test_parsing_of_timeseries() {
         let content = fs::read("../test.fit").unwrap();
-        let parser = FitParser {};
 
-        let res = parser.try_bytes_into_domain(content).unwrap();
+        let res = try_fit_bytes_into_domain(content).unwrap();
 
         assert_eq!(res.timeseries().time().len(), 3602);
 
