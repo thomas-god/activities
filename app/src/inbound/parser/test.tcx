@@ -30,14 +30,14 @@
               <LatitudeDegrees>0</LatitudeDegrees>
               <LongitudeDegrees>0</LongitudeDegrees>
             </Position>
-            <AltitudeMeters>1399.4000244140625</AltitudeMeters>
+            <AltitudeMeters>1399.40</AltitudeMeters>
             <DistanceMeters>0.0</DistanceMeters>
             <HeartRateBpm>
               <Value>98</Value>
             </HeartRateBpm>
             <Extensions>
               <ns3:TPX>
-                <ns3:Speed>1.8380000591278076</ns3:Speed>
+                <ns3:Speed>1.83</ns3:Speed>
                 <ns3:Watts>0</ns3:Watts>
               </ns3:TPX>
             </Extensions>
@@ -48,14 +48,14 @@
               <LatitudeDegrees>0</LatitudeDegrees>
               <LongitudeDegrees>0</LongitudeDegrees>
             </Position>
-            <AltitudeMeters>1399.199951171875</AltitudeMeters>
-            <DistanceMeters>2.509999990463257</DistanceMeters>
+            <AltitudeMeters>1399.19</AltitudeMeters>
+            <DistanceMeters>2.50</DistanceMeters>
             <HeartRateBpm>
               <Value>99</Value>
             </HeartRateBpm>
             <Extensions>
               <ns3:TPX>
-                <ns3:Speed>2.1089999675750732</ns3:Speed>
+                <ns3:Speed>2.10</ns3:Speed>
                 <ns3:Watts>24</ns3:Watts>
               </ns3:TPX>
             </Extensions>
@@ -67,7 +67,7 @@
               <LongitudeDegrees>0</LongitudeDegrees>
             </Position>
             <AltitudeMeters>1386.0</AltitudeMeters>
-            <DistanceMeters>105420.046875</DistanceMeters>
+            <DistanceMeters>105420.04</DistanceMeters>
             <HeartRateBpm>
               <Value>113</Value>
             </HeartRateBpm>

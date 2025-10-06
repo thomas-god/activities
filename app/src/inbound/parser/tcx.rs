@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use itertools::Itertools;
 use roxmltree::Document;
 
 use crate::{
-    domain::models::activity::{ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport},
+    domain::models::activity::{
+        ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
+        Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+    },
     inbound::parser::ParseFile,
 };
 
@@ -98,6 +101,83 @@ fn find_activity_statistics(doc: &Document) -> ActivityStatistics {
     ActivityStatistics::new(stats)
 }
 
+fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> ActivityTimeseries {
+    let mut time_values = Vec::new();
+    let mut speed_values = vec![];
+    let mut power_values = vec![];
+    let mut distance_values = vec![];
+    let mut altitude_values = vec![];
+    let mut heart_rate_values = vec![];
+
+    for node in doc.descendants() {
+        if !node.has_tag_name("Trackpoint") {
+            continue;
+        }
+
+        let Some(time) = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("Time"))
+            .and_then(|elem| {
+                elem.text()
+                    .and_then(|txt| txt.parse::<DateTime<FixedOffset>>().ok())
+                    .map(|time| (time - reference_time).num_seconds() as usize)
+            })
+        else {
+            continue;
+        };
+        time_values.push(time);
+
+        let speed = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("Speed"))
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        speed_values.push(speed);
+
+        let distance = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("DistanceMeters"))
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        distance_values.push(distance);
+
+        let heart_rate = node
+            .descendants()
+            .find_map(|elem| {
+                if !elem.has_tag_name("HeartRateBpm") {
+                    return None;
+                }
+                elem.children().find(|child| child.has_tag_name("Value"))
+            })
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        heart_rate_values.push(heart_rate);
+
+        let power = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("Watts"))
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        power_values.push(power);
+
+        let altitude = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("AltitudeMeters"))
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        altitude_values.push(altitude);
+    }
+
+    let metrics = vec![
+        Timeseries::new(TimeseriesMetric::Speed, speed_values),
+        Timeseries::new(TimeseriesMetric::Distance, distance_values),
+        Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
+        Timeseries::new(TimeseriesMetric::Power, power_values),
+        Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
+    ];
+    ActivityTimeseries::new(TimeseriesTime::new(time_values), metrics)
+}
+
 #[cfg(test)]
 mod test_txc_parser {
 
@@ -109,22 +189,15 @@ mod test_txc_parser {
 
     use super::*;
 
-    // #[test]
-    // fn test() {
-    //     let file = fs::read(".test.tcx").expect("Unable to load tcx test file");
-    //     let parser = TcxParser {};
+    #[test]
+    fn test() {
+        let file = fs::read("src/inbound/parser/test.tcx").expect("Unable to load tcx test file");
+        let parser = TcxParser {};
 
-    //     let parsed_file = parser
-    //         .try_bytes_into_domain(file)
-    //         .expect("Should have returned Ok");
-
-    //     assert_eq!(
-    //         parsed_file.start_time().date(),
-    //         &"2024-08-28T07:12:54.000+00:00"
-    //             .parse::<DateTime<FixedOffset>>()
-    //             .unwrap()
-    //     );
-    // }
+        parser
+            .try_bytes_into_domain(file)
+            .expect("Should have returned Ok");
+    }
 
     #[test]
     fn test_find_sport() {
@@ -259,8 +332,88 @@ mod test_txc_parser {
             *statistics
                 .get(&ActivityStatistic::Elevation)
                 .expect("Stats should have an elevation"),
-            f64::min(1386.0 - 1399.199951171875, 0.)
-                + f64::min(1399.199951171875 - 1399.4000244140625, 0.)
+            f64::min(1386.0 - 1399.19, 0.) + f64::min(1399.19 - 1399.40, 0.)
+        );
+    }
+
+    #[test]
+    fn test_parse_timeseries() {
+        let content = String::from_utf8(
+            fs::read("src/inbound/parser/test.tcx").expect("Unable to load tcx test file"),
+        )
+        .unwrap();
+        let doc = roxmltree::Document::parse(&content).unwrap();
+        let start_time = find_activity_start_time(&doc).expect("Should have a start time");
+
+        let timeseries = parse_timeseries(&doc, start_time.date());
+
+        assert_eq!(timeseries.time().len(), 3);
+
+        assert_eq!(timeseries.time().values(), &vec![0, 1, 29707]);
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Speed)
+                .expect("Should have a speed timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(1.83)),
+                Some(TimeseriesValue::Float(2.10)),
+                Some(TimeseriesValue::Float(0.0))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Distance)
+                .expect("Should have a distance timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(2.50)),
+                Some(TimeseriesValue::Float(105420.04))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::HeartRate)
+                .expect("Should have a heartrate timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(98.)),
+                Some(TimeseriesValue::Float(99.)),
+                Some(TimeseriesValue::Float(113.))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Power)
+                .expect("Should have a Power timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(24.)),
+                Some(TimeseriesValue::Float(0.0))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Altitude)
+                .expect("Should have a Power timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(1399.4)),
+                Some(TimeseriesValue::Float(1399.19)),
+                Some(TimeseriesValue::Float(1386.0))
+            ]
         );
     }
 }
