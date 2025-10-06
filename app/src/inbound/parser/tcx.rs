@@ -64,32 +64,34 @@ fn find_activity_start_time(doc: &Document) -> Option<ActivityStartTime> {
     Some(ActivityStartTime::new(start_time))
 }
 
+fn accumulate_lap_tag_values(doc: &Document, tag: &str) -> Option<f64> {
+    doc.descendants()
+        .filter(|node| node.has_tag_name("Lap"))
+        .filter_map(|lap| {
+            lap.children().find_map(|node| {
+                if !node.has_tag_name(tag) {
+                    return None;
+                }
+                node.text()?.parse::<f64>().ok()
+            })
+        })
+        .reduce(|acc, current| acc + current)
+}
+
 fn find_activity_statistics(doc: &Document) -> ActivityStatistics {
     let mut stats = HashMap::new();
 
-    if let Some(duration) = doc
-        .descendants()
-        .find(|node| node.has_tag_name("TotalTimeSeconds"))
-        .and_then(|node| node.text()?.parse::<f64>().ok())
-    {
-        stats.insert(ActivityStatistic::Duration, duration);
-    };
+    let tags = [
+        ("TotalTimeSeconds", ActivityStatistic::Duration),
+        ("DistanceMeters", ActivityStatistic::Distance),
+        ("Calories", ActivityStatistic::Calories),
+    ];
 
-    if let Some(distance) = doc
-        .descendants()
-        .find(|node| node.has_tag_name("DistanceMeters"))
-        .and_then(|node| node.text()?.parse::<f64>().ok())
-    {
-        stats.insert(ActivityStatistic::Distance, distance);
-    };
-
-    if let Some(calories) = doc
-        .descendants()
-        .find(|node| node.has_tag_name("Calories"))
-        .and_then(|node| node.text()?.parse::<f64>().ok())
-    {
-        stats.insert(ActivityStatistic::Calories, calories);
-    };
+    for (tag, metric) in tags {
+        if let Some(value) = accumulate_lap_tag_values(doc, tag) {
+            stats.insert(metric, value);
+        }
+    }
 
     let elevation_gain = doc
         .descendants()
@@ -379,6 +381,48 @@ mod test_txc_parser {
                 .get(&ActivityStatistic::Elevation)
                 .expect("Stats should have an elevation"),
             f64::min(1386.0 - 1399.19, 0.) + f64::min(1399.19 - 1399.40, 0.)
+        );
+    }
+
+    #[test]
+    fn test_find_activity_statistics_multi_laps() {
+        let content = String::from(
+            "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\">
+                    <TotalTimeSeconds>10</TotalTimeSeconds>
+                    <DistanceMeters>120</DistanceMeters>
+                    <Calories>33</Calories>
+                </Lap>
+                <Lap StartTime=\"2024-08-28T07:13:54.000Z\">
+                    <TotalTimeSeconds>12</TotalTimeSeconds>
+                    <DistanceMeters>10</DistanceMeters>
+                    <Calories>30</Calories>
+                </Lap>
+            </root>",
+        );
+        let doc = roxmltree::Document::parse(&content).unwrap();
+
+        let statistics = find_activity_statistics(&doc);
+
+        assert_eq!(
+            *statistics
+                .get(&ActivityStatistic::Duration)
+                .expect("Stats should have a duration"),
+            10. + 12.
+        );
+
+        assert_eq!(
+            *statistics
+                .get(&ActivityStatistic::Distance)
+                .expect("Stats should have a distance"),
+            120. + 10.
+        );
+
+        assert_eq!(
+            *statistics
+                .get(&ActivityStatistic::Calories)
+                .expect("Stats should have a calories"),
+            33. + 30.
         );
     }
 
