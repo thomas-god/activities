@@ -180,6 +180,8 @@ where
                 .push_bind(date_range.end());
         }
 
+        builder.push("ORDER BY start_time DESC ");
+
         if let Some(limit) = *filters.limit() {
             builder.push("LIMIT ").push_bind(limit as i64);
         }
