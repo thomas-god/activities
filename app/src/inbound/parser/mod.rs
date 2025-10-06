@@ -10,8 +10,10 @@ use crate::domain::{
 };
 
 pub mod fit;
+pub mod tcx;
 
 pub use fit::FitParser;
+pub use tcx::TcxParser;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct ParsedFileContent {

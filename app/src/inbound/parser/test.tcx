@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase
+  xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
+  xmlns:ns5="http://www.garmin.com/xmlschemas/ActivityGoals/v1"
+  xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2"
+  xmlns:ns2="http://www.garmin.com/xmlschemas/UserProfile/v2"
+  xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns4="http://www.garmin.com/xmlschemas/ProfileExtension/v1">
+  <Activities>
+    <Activity Sport="Biking">
+      <Id>2024-08-28T07:12:54.000Z</Id>
+      <Lap StartTime="2024-08-28T07:12:54.000Z">
+        <TotalTimeSeconds>22574.324</TotalTimeSeconds>
+        <DistanceMeters>105420.05</DistanceMeters>
+        <MaximumSpeed>15.918000221252441</MaximumSpeed>
+        <Calories>3359</Calories>
+        <AverageHeartRateBpm>
+          <Value>113</Value>
+        </AverageHeartRateBpm>
+        <MaximumHeartRateBpm>
+          <Value>138</Value>
+        </MaximumHeartRateBpm>
+        <Intensity>Active</Intensity>
+        <Cadence>100</Cadence>
+        <TriggerMethod>Manual</TriggerMethod>
+        <Track>
+          <Trackpoint>
+            <Time>2024-08-28T07:12:54.000Z</Time>
+            <Position>
+              <LatitudeDegrees>0</LatitudeDegrees>
+              <LongitudeDegrees>0</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>1399.4000244140625</AltitudeMeters>
+            <DistanceMeters>0.0</DistanceMeters>
+            <HeartRateBpm>
+              <Value>98</Value>
+            </HeartRateBpm>
+            <Extensions>
+              <ns3:TPX>
+                <ns3:Speed>1.8380000591278076</ns3:Speed>
+                <ns3:Watts>0</ns3:Watts>
+              </ns3:TPX>
+            </Extensions>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2024-08-28T07:12:55.000Z</Time>
+            <Position>
+              <LatitudeDegrees>0</LatitudeDegrees>
+              <LongitudeDegrees>0</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>1399.199951171875</AltitudeMeters>
+            <DistanceMeters>2.509999990463257</DistanceMeters>
+            <HeartRateBpm>
+              <Value>99</Value>
+            </HeartRateBpm>
+            <Extensions>
+              <ns3:TPX>
+                <ns3:Speed>2.1089999675750732</ns3:Speed>
+                <ns3:Watts>24</ns3:Watts>
+              </ns3:TPX>
+            </Extensions>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2024-08-28T15:28:01.000Z</Time>
+            <Position>
+              <LatitudeDegrees>0</LatitudeDegrees>
+              <LongitudeDegrees>0</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>1386.0</AltitudeMeters>
+            <DistanceMeters>105420.046875</DistanceMeters>
+            <HeartRateBpm>
+              <Value>113</Value>
+            </HeartRateBpm>
+            <Extensions>
+              <ns3:TPX>
+                <ns3:Speed>0.0</ns3:Speed>
+                <ns3:Watts>0</ns3:Watts>
+              </ns3:TPX>
+            </Extensions>
+          </Trackpoint>
+        </Track>
+        <Extensions>
+          <ns3:LX>
+            <ns3:AvgSpeed>4.670000076293945</ns3:AvgSpeed>
+            <ns3:MaxBikeCadence>100</ns3:MaxBikeCadence>
+            <ns3:Steps>21420</ns3:Steps>
+            <ns3:AvgWatts>126</ns3:AvgWatts>
+            <ns3:MaxWatts>602</ns3:MaxWatts>
+          </ns3:LX>
+        </Extensions>
+      </Lap>
+      <Creator xsi:type="Device_t">
+        <Name>Test Device</Name>
+        <UnitId>0</UnitId>
+        <ProductID>0</ProductID>
+        <Version>
+          <VersionMajor>21</VersionMajor>
+          <VersionMinor>18</VersionMinor>
+          <BuildMajor>0</BuildMajor>
+          <BuildMinor>0</BuildMinor>
+        </Version>
+      </Creator>
+    </Activity>
+  </Activities>
+  <Author xsi:type="Application_t">
+    <Name>Connect Api</Name>
+    <Build>
+      <Version>
+        <VersionMajor>0</VersionMajor>
+        <VersionMinor>0</VersionMinor>
+        <BuildMajor>0</BuildMajor>
+        <BuildMinor>0</BuildMinor>
+      </Version>
+    </Build>
+    <LangID>en</LangID>
+    <PartNumber>000-X0000-00</PartNumber>
+  </Author>
+</TrainingCenterDatabase>

@@ -124,10 +124,12 @@ dependencies = [
  "fit-parser",
  "flate2",
  "handlebars",
+ "itertools",
  "lettre",
  "mockall",
  "rand 0.9.2",
  "rand_core 0.6.4",
+ "roxmltree",
  "serde",
  "serde_json",
  "sqlx",
@@ -2204,6 +2206,15 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "roxmltree"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "963e3e7a0795e975f0a57b8a3caf100a2d4ced3758a5d18e6bd6b9aea854f53f"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
