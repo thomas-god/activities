@@ -17,7 +17,7 @@ use crate::domain::{
     ports::{
         ActivityRepository, DateTimeRange, DeleteMetricError, GetDefinitionError, GetRawDataError,
         GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, ListActivitiesError,
-        ListActivitiesFilters, RawDataRepository, SaveActivityError, SaveRawDataError,
+        ListActivitiesFilters, RawContent, RawDataRepository, SaveActivityError, SaveRawDataError,
         SaveTrainingMetricError, SimilarActivityError, TrainingMetricsRepository,
         UpdateMetricError,
     },
@@ -198,12 +198,12 @@ impl RawDataRepository for InMemoryRawDataRepository {
     async fn save_raw_data(
         &self,
         activity_id: &ActivityId,
-        content: &[u8],
+        content: RawContent,
     ) -> Result<(), SaveRawDataError> {
         let mut guard = self.raw_data.lock().await;
         guard
             .deref_mut()
-            .insert(activity_id.clone(), content.into());
+            .insert(activity_id.clone(), content.raw_content());
         Ok(())
     }
 

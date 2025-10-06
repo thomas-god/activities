@@ -12,7 +12,7 @@ use crate::{
         ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
         Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
-    inbound::parser::{ParseBytesError, ParsedFileContent},
+    inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
 
 /// FIT datetimes have 00:00 Dec 31 1989 as their reference instead of January 1, 1970
@@ -33,7 +33,12 @@ pub fn try_fit_bytes_into_domain(bytes: Vec<u8>) -> Result<ParsedFileContent, Pa
     let statistics = extract_statistics(&messages);
 
     Ok(ParsedFileContent::new(
-        sport, start_time, statistics, timeseries, bytes,
+        sport,
+        start_time,
+        statistics,
+        timeseries,
+        SupportedExtension::FIT.suffix().to_string(),
+        bytes,
     ))
 }
 

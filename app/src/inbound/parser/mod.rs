@@ -7,7 +7,7 @@ use crate::{
             UserId,
             activity::{ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport},
         },
-        ports::CreateActivityRequest,
+        ports::{CreateActivityRequest, RawContent},
     },
     inbound::parser::fit::try_fit_bytes_into_domain,
 };
@@ -21,6 +21,7 @@ pub struct ParsedFileContent {
     start_time: ActivityStartTime,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
+    extension: String,
     raw_content: Vec<u8>,
 }
 
@@ -52,7 +53,7 @@ impl ParsedFileContent {
             self.start_time,
             self.statistics,
             self.timeseries,
-            self.raw_content,
+            RawContent::new(self.extension, self.raw_content),
         )
     }
 }
@@ -66,8 +67,8 @@ pub enum SupportedExtension {
 impl SupportedExtension {
     pub fn suffix(&self) -> &str {
         match self {
-            Self::FIT => ".fit",
-            Self::TCX => ".tcx",
+            Self::FIT => "fit",
+            Self::TCX => "tcx",
         }
     }
 }
@@ -137,6 +138,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
+                    "fit".to_string(),
                     vec![1, 2, 3],
                 ))
             });

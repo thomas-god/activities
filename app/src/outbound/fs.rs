@@ -3,9 +3,12 @@ use std::path::PathBuf;
 use derive_more::Constructor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::domain::{
-    models::activity::ActivityId,
-    ports::{GetRawDataError, RawDataRepository, SaveRawDataError},
+use crate::{
+    domain::{
+        models::activity::ActivityId,
+        ports::{GetRawDataError, RawContent, RawDataRepository, SaveRawDataError},
+    },
+    inbound::parser::SupportedExtension,
 };
 
 #[derive(Debug, Clone, Constructor)]
@@ -17,12 +20,12 @@ impl RawDataRepository for FilesystemRawDataRepository {
     async fn save_raw_data(
         &self,
         activity_id: &ActivityId,
-        content: &[u8],
+        content: RawContent,
     ) -> Result<(), SaveRawDataError> {
         let mut file = match tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(self.target_path(activity_id))
+            .open(self.target_path(activity_id, content.extension()))
             .await
         {
             Ok(file) => file,
@@ -38,14 +41,16 @@ impl RawDataRepository for FilesystemRawDataRepository {
                 return Err(SaveRawDataError::Unknown);
             }
         };
-        file.write_all(content).await.map_err(|err| {
-            tracing::warn!(
-                "Error while trying to save raw data for activity {}",
-                activity_id
-            );
-            tracing::warn!("{}", err);
-            SaveRawDataError::Unknown
-        })?;
+        file.write_all(&content.raw_content())
+            .await
+            .map_err(|err| {
+                tracing::warn!(
+                    "Error while trying to save raw data for activity {}",
+                    activity_id
+                );
+                tracing::warn!("{}", err);
+                SaveRawDataError::Unknown
+            })?;
         let _ = file.flush().await;
 
         Ok(())
@@ -56,7 +61,7 @@ impl RawDataRepository for FilesystemRawDataRepository {
             .read(true)
             .write(false)
             .create(false)
-            .open(self.target_path(activity_id))
+            .open(self.target_path(activity_id, SupportedExtension::FIT.suffix()))
             .await
         {
             Ok(file) => file,
@@ -86,9 +91,9 @@ impl RawDataRepository for FilesystemRawDataRepository {
 }
 
 impl FilesystemRawDataRepository {
-    fn target_path(&self, activity_id: &ActivityId) -> PathBuf {
+    fn target_path(&self, activity_id: &ActivityId, extension: &str) -> PathBuf {
         let mut path = self.base_path.clone();
-        path.push(format!("{}.fit", activity_id));
+        path.push(format!("{}.{}", activity_id, extension));
         path.to_path_buf()
     }
 }
@@ -104,10 +109,10 @@ mod test_filesystem_raw_data_repository {
         let repository = FilesystemRawDataRepository::new(tmp_dir.path().to_path_buf());
 
         let activity = ActivityId::new();
-        let raw_content = vec![0, 1, 2, 3];
+        let raw_content = RawContent::new("fit".to_string(), vec![0, 1, 2, 3]);
 
         repository
-            .save_raw_data(&activity, &raw_content)
+            .save_raw_data(&activity, raw_content)
             .await
             .expect("Should have return OK");
     }
@@ -118,14 +123,14 @@ mod test_filesystem_raw_data_repository {
         let repository = FilesystemRawDataRepository::new(tmp_dir.path().to_path_buf());
 
         let activity = ActivityId::new();
-        let raw_content = vec![0, 1, 2, 3];
+        let raw_content = RawContent::new("fit".to_string(), vec![0, 1, 2, 3]);
 
         // Create the target activity file
         let mut path = tmp_dir.path().to_path_buf();
         path.push(format!("{}.fit", activity));
         tokio::fs::File::create(path).await.unwrap();
 
-        let res = repository.save_raw_data(&activity, &raw_content).await;
+        let res = repository.save_raw_data(&activity, raw_content).await;
 
         match res {
             Err(SaveRawDataError::ActivityRawDataExist(id)) => assert_eq!(activity, id),
@@ -139,10 +144,10 @@ mod test_filesystem_raw_data_repository {
         let repository = FilesystemRawDataRepository::new(tmp_dir.path().to_path_buf());
 
         let activity = ActivityId::new();
-        let raw_content = vec![0, 1, 2, 3];
+        let raw_content = RawContent::new("fit".to_string(), vec![0, 1, 2, 3]);
 
         repository
-            .save_raw_data(&activity, &raw_content)
+            .save_raw_data(&activity, raw_content)
             .await
             .expect("Should have return OK");
 
@@ -150,7 +155,7 @@ mod test_filesystem_raw_data_repository {
             .get_raw_data(&activity)
             .await
             .expect("Should have returned OK");
-        assert_eq!(res, raw_content);
+        assert_eq!(res, vec![0, 1, 2, 3]);
     }
 
     #[tokio::test]

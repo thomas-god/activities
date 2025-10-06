@@ -9,7 +9,7 @@ use crate::{
         ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
         Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
-    inbound::parser::{ParseBytesError, ParsedFileContent},
+    inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
 
 pub fn try_tcx_bytes_into_domain(
@@ -27,7 +27,12 @@ pub fn try_tcx_bytes_into_domain(
     let timeseries = parse_timeseries(&doc, start_time.date());
 
     Ok(ParsedFileContent::new(
-        sport, start_time, statistics, timeseries, bytes,
+        sport,
+        start_time,
+        statistics,
+        timeseries,
+        SupportedExtension::TCX.suffix().to_string(),
+        bytes,
     ))
 }
 

@@ -413,7 +413,7 @@ mod tests_activity_service {
         },
         ports::{
             DeleteActivityError, DeleteActivityRequest, GetRawDataError, ModifyActivityError,
-            ModifyActivityRequest, SaveActivityError, SaveRawDataError,
+            ModifyActivityRequest, RawContent, SaveActivityError, SaveRawDataError,
         },
         services::{
             activity::test_utils::MockActivityRepository,
@@ -434,7 +434,7 @@ mod tests_activity_service {
             async fn save_raw_data(
                 &self,
                 _activity_id: &ActivityId,
-                _content: &[u8],
+                _content: RawContent,
             ) -> Result<(), SaveRawDataError>;
 
             async fn get_raw_data(
@@ -447,7 +447,7 @@ mod tests_activity_service {
     fn default_activity_request() -> CreateActivityRequest {
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
-        let content = vec![1, 2, 3];
+        let content = RawContent::new("fit".to_string(), vec![1, 2, 3]);
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
         CreateActivityRequest::new(
@@ -584,7 +584,7 @@ mod tests_activity_service {
 
         let sport = Sport::Running;
         let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
-        let content = vec![1, 2, 3];
+        let content = RawContent::new("fit".to_string(), vec![1, 2, 3]);
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::new(
             TimeseriesTime::new(vec![0, 1, 2]),

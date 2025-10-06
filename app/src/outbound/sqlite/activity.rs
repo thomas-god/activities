@@ -851,6 +851,7 @@ mod test_sqlite_activity_repository {
                     vec![Some(TimeseriesValue::Float(12.3))],
                 )],
             ),
+            "fit".to_string(),
             vec![],
         )
     }

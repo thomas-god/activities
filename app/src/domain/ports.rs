@@ -23,7 +23,7 @@ pub struct CreateActivityRequest {
     start_time: ActivityStartTime,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
-    raw_content: Vec<u8>,
+    raw_content: RawContent,
 }
 
 impl CreateActivityRequest {
@@ -33,7 +33,7 @@ impl CreateActivityRequest {
         start_time: ActivityStartTime,
         statistics: ActivityStatistics,
         timeseries: ActivityTimeseries,
-        raw_content: Vec<u8>,
+        raw_content: RawContent,
     ) -> Self {
         Self {
             user,
@@ -53,8 +53,8 @@ impl CreateActivityRequest {
         &self.start_time
     }
 
-    pub fn raw_content(&self) -> &[u8] {
-        &self.raw_content
+    pub fn raw_content(self) -> RawContent {
+        self.raw_content
     }
 
     pub fn sport(&self) -> &Sport {
@@ -80,6 +80,24 @@ pub enum CreateActivityError {
     TimeseriesMetricsNotSameLength,
     #[error("User {0} does not exists")]
     UserDoesNotExist(UserId),
+}
+
+/// Represents the content of the initial activity file needed for later reuse/reparsing, namely
+/// the file's bytes and its extension (fit, tcx, etc.).
+#[derive(Debug, Clone, Constructor)]
+pub struct RawContent {
+    extension: String,
+    content: Vec<u8>,
+}
+
+impl RawContent {
+    pub fn extension(&self) -> &str {
+        &self.extension
+    }
+
+    pub fn raw_content(self) -> Vec<u8> {
+        self.content
+    }
 }
 
 #[derive(Debug, Clone, Constructor, Default)]
@@ -341,7 +359,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
     fn save_raw_data(
         &self,
         activity_id: &ActivityId,
-        content: &[u8],
+        content: RawContent,
     ) -> impl Future<Output = Result<(), SaveRawDataError>> + Send;
 
     fn get_raw_data(
@@ -556,7 +574,7 @@ pub mod test_utils {
             async fn save_raw_data(
                 &self,
                 activity_id: &ActivityId,
-                content: &[u8],
+                content: RawContent,
             ) -> Result<(), SaveRawDataError>;
 
             async fn get_raw_data(
