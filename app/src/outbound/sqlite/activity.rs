@@ -313,9 +313,7 @@ mod test_sqlite_activity_repository {
             },
             ports::{DateRange, GetRawDataError, test_utils::MockRawDataRepository},
         },
-        inbound::parser::{
-            ParseBytesError, ParsedFileContent, test_utils::MockFileParser,
-        },
+        inbound::parser::{ParseBytesError, ParsedFileContent, test_utils::MockFileParser},
     };
 
     use super::*;
@@ -937,7 +935,7 @@ mod test_sqlite_activity_repository {
         file_parser
             .expect_try_bytes_into_domain()
             .times(1)
-            .returning(|_| Err(ParseBytesError::InvalidFitContent));
+            .returning(|_| Err(ParseBytesError::InvalidContent));
 
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(

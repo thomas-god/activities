@@ -24,7 +24,7 @@ pub struct FitParser {}
 impl ParseFile for FitParser {
     fn try_bytes_into_domain(&self, bytes: Vec<u8>) -> Result<ParsedFileContent, ParseBytesError> {
         let Ok(messages) = parse_fit_messages(bytes.clone().into_iter(), false) else {
-            return Err(ParseBytesError::InvalidFitContent);
+            return Err(ParseBytesError::InvalidContent);
         };
 
         let (start_time, reference_timestamp) =
@@ -260,7 +260,7 @@ fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
 
 impl From<FitParserError> for ParseBytesError {
     fn from(_value: FitParserError) -> Self {
-        Self::InvalidFitContent
+        Self::InvalidContent
     }
 }
 

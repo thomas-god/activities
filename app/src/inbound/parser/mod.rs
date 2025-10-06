@@ -57,14 +57,12 @@ impl ParsedFileContent {
     }
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum ParseBytesError {
-    #[error("Error when parsing FIT content")]
-    InvalidFitContent,
+    #[error("File content is not a valid activity file")]
+    InvalidContent,
     #[error("No start time data found in activity file")]
     NoStartTimeFound,
-    #[error("No activity duration data found in activity file")]
-    NoDurationFound,
 }
 
 pub trait ParseFile: Clone + Send + Sync + 'static {
