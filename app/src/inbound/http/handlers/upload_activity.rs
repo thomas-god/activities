@@ -38,6 +38,7 @@ enum RejectionReason {
     CannotProcessFile,
     DuplicatedActivity,
     IncoherentTimeseries,
+    UnsupportedFileExtension,
     Unknown,
 }
 
@@ -66,13 +67,17 @@ pub async fn upload_activities<
         let Some(name) = field.name().map(|n| n.to_string()) else {
             continue;
         };
+        let Some(extension) = extract_extension(&name) else {
+            unprocessable_files.push((name.to_string(), RejectionReason::UnsupportedFileExtension));
+            continue;
+        };
         let Ok(file_content) = extract_content(&name, field).await else {
             unprocessable_files.push((name.to_string(), RejectionReason::CannotReadContent));
             continue;
         };
         let Ok(file_content) = state
             .file_parser
-            .try_bytes_into_domain(&SupportedExtension::FIT, file_content)
+            .try_bytes_into_domain(&extension, file_content)
         else {
             unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
             continue;
@@ -119,6 +124,17 @@ async fn extract_content(filename: &str, field: Field<'_>) -> Result<Vec<u8>, an
     }
 
     Ok(content.to_vec())
+}
+
+fn extract_extension(filename: &str) -> Option<SupportedExtension> {
+    let mut parts = filename.split('.').rev();
+    let mut part = parts.next();
+
+    if let Some("gz") = part {
+        part = parts.next();
+    }
+
+    part.and_then(|p| SupportedExtension::try_from(p).ok())
 }
 
 #[cfg(test)]
@@ -216,5 +232,20 @@ mod tests {
 
         response.assert_status(StatusCode::CREATED);
         assert!(response.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn test_extract_file_extension() {
+        assert_eq!(extract_extension("toto.fit"), Some(SupportedExtension::FIT));
+        assert_eq!(
+            extract_extension("toto.fit.gz"),
+            Some(SupportedExtension::FIT)
+        );
+        assert_eq!(extract_extension("toto.tcx"), Some(SupportedExtension::TCX));
+        assert_eq!(
+            extract_extension("toto.tcx.gz"),
+            Some(SupportedExtension::TCX)
+        );
+        assert_eq!(extract_extension("toto"), None);
     }
 }

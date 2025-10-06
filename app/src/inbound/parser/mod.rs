@@ -9,7 +9,7 @@ use crate::{
         },
         ports::{CreateActivityRequest, RawContent},
     },
-    inbound::parser::fit::try_fit_bytes_into_domain,
+    inbound::parser::{fit::try_fit_bytes_into_domain, tcx::try_tcx_bytes_into_domain},
 };
 
 pub mod fit;
@@ -118,7 +118,7 @@ impl ParseFile for Parser {
     ) -> Result<ParsedFileContent, ParseBytesError> {
         match extension {
             SupportedExtension::FIT => try_fit_bytes_into_domain(bytes),
-            SupportedExtension::TCX => todo!(),
+            SupportedExtension::TCX => try_tcx_bytes_into_domain(bytes),
         }
     }
 }
