@@ -22,11 +22,7 @@ use crate::inbound::http::handlers::{
 use crate::inbound::parser::ParseFile;
 
 pub use self::auth::infra::{
-    mailer::SMTPEmailProvider,
-    memory::{
-        DoNothingMailProvider, InMemoryMagicLinkRepository, InMemorySessionRepository,
-        InMemoryUserRepository,
-    },
+    mailer::{DoNothingMailProvider, SMTPEmailProvider},
     sqlite::{
         magic_link::SqliteMagicLinkRepository, session::SqliteSessionRepository,
         user::SqliteUserRepository,
