@@ -37,6 +37,7 @@ pub enum APITimeseriesMetric {
     HeartRate,
     Distance,
     Altitude,
+    Cadence,
 }
 
 impl From<APITimeseriesMetric> for TimeseriesMetric {
@@ -47,6 +48,7 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
             APITimeseriesMetric::HeartRate => Self::HeartRate,
             APITimeseriesMetric::Distance => Self::Distance,
             APITimeseriesMetric::Altitude => Self::Altitude,
+            APITimeseriesMetric::Cadence => Self::Cadence,
         }
     }
 }

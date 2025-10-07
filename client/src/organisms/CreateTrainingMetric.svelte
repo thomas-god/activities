@@ -10,7 +10,8 @@
 		| 'Distance'
 		| 'Duration'
 		| 'NormalizedPower' = $state('Calories');
-	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' | 'Altitude' = $state('Power');
+	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' | 'Altitude' | 'Cadence' =
+		$state('Power');
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
@@ -32,7 +33,7 @@
 	});
 </script>
 
-<details class="collapse border border-base-300 bg-base-100" bind:open={formOpen}>
+<details class="border-base-300 bg-base-100 collapse border" bind:open={formOpen}>
 	<summary class="collapse-title font-semibold">Add a new training metric</summary>
 	<div class="collapse-content text-sm">
 		<fieldset class="fieldset rounded-box bg-base-100 p-2">
@@ -68,6 +69,7 @@
 							<option value="Speed">Speed</option>
 							<option value="Power">Power</option>
 							<option value="HeartRate">Heart rate</option>
+							<option value="Cadence">Cadence</option>
 						</select>
 					</div>
 
@@ -103,7 +105,7 @@
 			</select>
 
 			<button
-				class="btn mt-4 btn-neutral"
+				class="btn btn-neutral mt-4"
 				onclick={async () => {
 					await callback(JSON.stringify(metricRequest));
 					formOpen = false;
