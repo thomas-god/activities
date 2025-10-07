@@ -242,6 +242,7 @@ pub enum Unit {
     KilometerPerHour,
     Watt,
     BeatPerMinute,
+    RevolutionPerMinute,
     Second,
 }
 
@@ -255,6 +256,7 @@ impl fmt::Display for Unit {
             Self::KilometerPerHour => "km/h",
             Self::Watt => "W",
             Self::BeatPerMinute => "bpm",
+            Self::RevolutionPerMinute => "rpm",
             Self::Second => "s",
         };
 
@@ -325,6 +327,7 @@ pub enum TimeseriesMetric {
     Power,
     HeartRate,
     Distance,
+    Cadence,
     Altitude,
 }
 
@@ -336,6 +339,7 @@ impl ToUnit for TimeseriesMetric {
             Self::HeartRate => Unit::BeatPerMinute,
             Self::Speed => Unit::MeterPerSecond,
             Self::Altitude => Unit::Meter,
+            Self::Cadence => Unit::RevolutionPerMinute,
         }
     }
 }

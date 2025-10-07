@@ -115,6 +115,7 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
     let mut time_values = Vec::new();
     let mut speed_values = vec![];
     let mut power_values = vec![];
+    let mut cadence_values = vec![];
     let mut distance_values = vec![];
     let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
@@ -170,6 +171,13 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
             .map(TimeseriesValue::Float);
         power_values.push(power);
 
+        let cadence = node
+            .descendants()
+            .find(|elem| elem.has_tag_name("Cadence"))
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        cadence_values.push(cadence);
+
         let altitude = node
             .descendants()
             .find(|elem| elem.has_tag_name("AltitudeMeters"))
@@ -183,6 +191,7 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
         Timeseries::new(TimeseriesMetric::Distance, distance_values),
         Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
         Timeseries::new(TimeseriesMetric::Power, power_values),
+        Timeseries::new(TimeseriesMetric::Cadence, cadence_values),
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
     ActivityTimeseries::new(TimeseriesTime::new(time_values), metrics)
@@ -503,6 +512,19 @@ mod test_txc_parser {
                 Some(TimeseriesValue::Float(1399.4)),
                 Some(TimeseriesValue::Float(1399.19)),
                 Some(TimeseriesValue::Float(1386.0))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Cadence)
+                .expect("Should have a Cadence timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(100.)),
+                Some(TimeseriesValue::Float(100.)),
+                Some(TimeseriesValue::Float(100.))
             ]
         );
     }

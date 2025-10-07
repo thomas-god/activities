@@ -35,6 +35,7 @@
             <HeartRateBpm>
               <Value>98</Value>
             </HeartRateBpm>
+            <Cadence>100</Cadence>
             <Extensions>
               <ns3:TPX>
                 <ns3:Speed>1.83</ns3:Speed>
@@ -53,6 +54,7 @@
             <HeartRateBpm>
               <Value>99</Value>
             </HeartRateBpm>
+            <Cadence>100</Cadence>
             <Extensions>
               <ns3:TPX>
                 <ns3:Speed>2.10</ns3:Speed>
@@ -71,6 +73,7 @@
             <HeartRateBpm>
               <Value>113</Value>
             </HeartRateBpm>
+            <Cadence>100</Cadence>
             <Extensions>
               <ns3:TPX>
                 <ns3:Speed>0.0</ns3:Speed>
