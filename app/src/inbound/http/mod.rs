@@ -187,7 +187,7 @@ fn core_routes<
             delete(delete_training_metric::<AS, PF, TMS, US>),
         );
 
-    if cfg!(any(feature = "demo", feature = "single-user")) {
+    if cfg!(feature = "single-user") {
         router = router.route_layer(axum::middleware::from_extractor::<
             crate::inbound::http::auth::DefaultUserExtractor,
         >());

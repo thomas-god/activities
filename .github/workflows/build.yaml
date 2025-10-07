@@ -9,7 +9,7 @@ jobs:
   build-docker-image:
     strategy:
       matrix:
-        feature: ["demo", "single-user", "multi-user"]
+        feature: ["single-user", "multi-user"]
         arch: ["amd64", "arm64"]
         include:
           - arch: amd64
@@ -88,7 +88,7 @@ jobs:
       - build-docker-image
     strategy:
       matrix:
-        feature: ["demo", "single-user", "multi-user"]
+        feature: ["single-user", "multi-user"]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4

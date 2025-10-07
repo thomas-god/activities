@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if cfg!(feature = "single-user") {
@@ -11,6 +13,8 @@ async fn main() -> anyhow::Result<()> {
             .run()
             .await
     } else {
-        app::bootstrap::demo::bootsrap_demo().await?.run().await
+        Err(anyhow!(
+            "No feature selected, should be either single-user or mutli-user"
+        ))
     }
 }

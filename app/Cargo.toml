@@ -45,6 +45,5 @@ mockall = "0.13.1"
 tempfile = "3.23.0"
 
 [features]
-demo = []
 single-user = []
 multi-user = []
