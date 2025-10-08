@@ -4,7 +4,7 @@ _Date:_ 2025-09-18
 
 ## Context
 
-The _multi-user_ version of the applications needs to support user
+The _multi-user_ version of the _activities_ needs to support user
 authentication. We want to keep the authentication flow simple to setup in order
 to make self-hosting the application easy, while maintaining a good user
 experience.
@@ -29,4 +29,5 @@ is fully managed on the server side.
 ## Benefits and trade-offs
 
 **Benefits**: No password storage, simple deployment, reduced attack surface
+
 **Trade-offs**: Dependency on email delivery, slight UX friction on first access

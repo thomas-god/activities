@@ -97,3 +97,7 @@ good to go!
 - Because the appplication is designed to be self-hosted, and since sport device
   ecosystems are mostly closed, there is sadly no feature to automatically
   import your activities from your devices.
+
+## Design decisions
+
+Key design decisions are documented [here](adr/README.md).
