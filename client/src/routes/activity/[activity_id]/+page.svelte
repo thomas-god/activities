@@ -29,7 +29,8 @@
 		{ option: 'HeartRate', display: 'Heart rate' },
 		{ option: 'Speed', display: 'Speed' },
 		{ option: 'Power', display: 'Power' },
-		{ option: 'Altitude', display: 'Altitude' }
+		{ option: 'Altitude', display: 'Altitude' },
+		{ option: 'Cadence', display: 'Cadence' }
 	];
 
 	let availableOptions = $derived.by(() => {

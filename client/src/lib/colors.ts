@@ -1,11 +1,11 @@
-export type Metric = 'HeartRate' | 'Power' | 'Speed' | 'Altitude' | 'Other';
+export type Metric = 'HeartRate' | 'Power' | 'Speed' | 'Altitude' | 'Cadence';
 
 export const colors: Record<Metric, string> = {
 	HeartRate: 'color-heart-rate-chart',
 	Power: 'color-power-chart',
 	Speed: 'color-speed-chart',
 	Altitude: 'color-elevation-chart',
-	Other: 'color-other-chart'
+	Cadence: 'color-cadence-chart'
 };
 
 export const strokeColors: Record<Metric, string> = {
@@ -13,7 +13,7 @@ export const strokeColors: Record<Metric, string> = {
 	Power: 'stroke-power-chart',
 	Speed: 'stroke-speed-chart',
 	Altitude: 'stroke-elevation-chart',
-	Other: 'stroke-other-chart'
+	Cadence: 'stroke-cadence-chart'
 };
 
 export const textColors: Record<Metric, string> = {
@@ -21,7 +21,7 @@ export const textColors: Record<Metric, string> = {
 	Power: 'text-power-chart',
 	Speed: 'text-speed-chart',
 	Altitude: 'text-elevation-chart',
-	Other: 'text-other-chart'
+	Cadence: 'text-cadence-chart'
 };
 
 export const matchMetric = (name: string): Metric => {
@@ -34,5 +34,5 @@ export const matchMetric = (name: string): Metric => {
 	} else if (name === 'Altitude') {
 		return 'Altitude';
 	}
-	return 'Other';
+	return 'Cadence';
 };

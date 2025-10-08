@@ -33,7 +33,7 @@
 	});
 </script>
 
-<details class="border-base-300 bg-base-100 collapse border" bind:open={formOpen}>
+<details class="collapse border border-base-300 bg-base-100" bind:open={formOpen}>
 	<summary class="collapse-title font-semibold">Add a new training metric</summary>
 	<div class="collapse-content text-sm">
 		<fieldset class="fieldset rounded-box bg-base-100 p-2">
@@ -105,7 +105,7 @@
 			</select>
 
 			<button
-				class="btn btn-neutral mt-4"
+				class="btn mt-4 btn-neutral"
 				onclick={async () => {
 					await callback(JSON.stringify(metricRequest));
 					formOpen = false;

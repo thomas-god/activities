@@ -48,28 +48,35 @@
 	.btn.heartrate:disabled:checked,
 	.btn.heartrate:checked {
 		background-color: var(--color-heart-rate-chart);
-		color: var(--color-primary-content);
+		color: white;
 		border-color: transparent;
 	}
 
 	.btn.power:disabled:checked,
 	.btn.power:checked {
 		background-color: var(--color-power-chart);
-		color: var(--color-primary-content);
+		color: white;
 		border-color: transparent;
 	}
 
 	.btn.speed:disabled:checked,
 	.btn.speed:checked {
 		background-color: var(--color-speed-chart);
-		color: var(--color-primary-content);
+		color: white;
 		border-color: transparent;
 	}
 
 	.btn.altitude:disabled:checked,
 	.btn.altitude:checked {
 		background-color: var(--color-elevation-chart);
-		color: var(--color-primary-content);
+		color: white;
+		border-color: transparent;
+	}
+
+	.btn.cadence:disabled:checked,
+	.btn.cadence:checked {
+		background-color: var(--color-cadence-chart);
+		color: white;
 		border-color: transparent;
 	}
 </style>
