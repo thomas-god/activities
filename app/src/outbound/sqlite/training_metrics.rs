@@ -102,7 +102,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         .await
         {
             Ok((id, user_id, source, granularity, aggregate)) => Ok(Some(
-                TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate),
+                TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, None),
             )),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(GetDefinitionError::Unknown(anyhow!(err))),
@@ -125,7 +125,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         .map(|rows| {
             rows.into_iter()
                 .map(|(id, user_id, source, granularity, aggregate)| {
-                    TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate)
+                    TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, None)
                 })
                 .collect()
         })
@@ -255,6 +255,7 @@ mod test_sqlite_activity_repository {
             )),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
+            None,
         )
     }
 

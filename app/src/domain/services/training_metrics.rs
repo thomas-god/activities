@@ -107,6 +107,7 @@ where
             req.source().clone(),
             req.granularity().clone(),
             req.aggregate().clone(),
+            None,
         );
         self.metrics_repository
             .save_definition(definition.clone())
@@ -632,6 +633,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None,
             )])
         });
         repository
@@ -653,6 +655,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None
             )
         );
         assert!(value.is_empty());
@@ -668,6 +671,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None,
             )])
         });
         repository.expect_get_metric_values().returning(|_| {
@@ -692,6 +696,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None
             )
         );
         assert_eq!(*value.get("toto").unwrap(), TrainingMetricValue::Max(0.3));
@@ -728,6 +733,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None,
             )))
         });
 
@@ -758,6 +764,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
+                None,
             )))
         });
         repository

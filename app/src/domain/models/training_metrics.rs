@@ -14,7 +14,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries,
+            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, Sport,
             TimeseriesMetric, ToUnit, Unit,
         },
     },
@@ -46,6 +46,19 @@ impl Default for TrainingMetricId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrainingMetricFilter {
+    Sports(Vec<Sport>),
+}
+
+impl TrainingMetricFilter {
+    pub fn matches(&self, activity: &Activity) -> bool {
+        match self {
+            Self::Sports(sports) => sports.contains(activity.sport()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
@@ -53,6 +66,7 @@ pub struct TrainingMetricDefinition {
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
+    filters: Option<Vec<TrainingMetricFilter>>,
 }
 
 impl TrainingMetricDefinition {
@@ -76,6 +90,10 @@ impl TrainingMetricDefinition {
         &self.granularity_aggregate
     }
 
+    pub fn filters(&self) -> &Option<Vec<TrainingMetricFilter>> {
+        &self.filters
+    }
+
     pub fn source_requirement(&self) -> ComputeMetricRequirement {
         self.source.input_min_requirement()
     }
@@ -88,20 +106,41 @@ impl TrainingMetricDefinition {
     ) -> TrainingMetricValues {
         let activity_metrics = activities
             .iter()
-            .filter_map(|activity| self.source.metric_from_activity_with_timeseries(activity))
+            .filter_map(|activity| match &self.filters {
+                Some(filters) => {
+                    if filters
+                        .iter()
+                        .all(|filter| filter.matches(activity.activity()))
+                    {
+                        self.source.metric_from_activity_with_timeseries(activity)
+                    } else {
+                        None
+                    }
+                }
+                None => self.source.metric_from_activity_with_timeseries(activity),
+            })
             .collect();
-        let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
-        TrainingMetricValues::new(aggregate_metrics(
-            &self.granularity_aggregate,
-            grouped_metrics,
-        ))
+        self.aggregate_metrics(activity_metrics)
     }
 
     pub fn compute_values(&self, activities: &[Activity]) -> TrainingMetricValues {
         let activity_metrics = activities
             .iter()
-            .filter_map(|activity| self.source.metric_from_activity(activity).ok().flatten())
+            .filter_map(|activity| match &self.filters {
+                Some(filters) => {
+                    if filters.iter().all(|filter| filter.matches(activity)) {
+                        self.source.metric_from_activity(activity).ok().flatten()
+                    } else {
+                        None
+                    }
+                }
+                None => self.source.metric_from_activity(activity).ok().flatten(),
+            })
             .collect();
+        self.aggregate_metrics(activity_metrics)
+    }
+
+    fn aggregate_metrics(&self, activity_metrics: Vec<ActivityMetric>) -> TrainingMetricValues {
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
         TrainingMetricValues::new(aggregate_metrics(
             &self.granularity_aggregate,
@@ -587,7 +626,7 @@ mod test_training_metrics {
                         .unwrap(),
                 ),
                 Sport::Cycling,
-                ActivityStatistics::default(),
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -835,7 +874,7 @@ mod test_training_metrics {
     }
 
     #[test]
-    fn test_compute_training_metrics() {
+    fn test_compute_training_metrics_from_timeseries() {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
             TrainingMetricId::default(),
@@ -846,6 +885,7 @@ mod test_training_metrics {
             )),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
+            None,
         );
 
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
@@ -854,6 +894,46 @@ mod test_training_metrics {
             *metrics.get("2025-09-01").unwrap(),
             TrainingMetricValue::Max(20.)
         );
+    }
+
+    #[test]
+    fn test_compute_training_metrics_from_timeseries_with_filters() {
+        let activities = vec![default_activity()];
+        let metric_definition = TrainingMetricDefinition::new(
+            TrainingMetricId::default(),
+            UserId::test_default(),
+            ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Power,
+                TimeseriesAggregate::Average,
+            )),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+            Some(vec![TrainingMetricFilter::Sports(vec![Sport::Running])]),
+        );
+
+        let metrics = metric_definition.compute_values_from_timeseries(&activities);
+
+        assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn test_compute_training_metrics_with_filters() {
+        let activities: Vec<Activity> = vec![default_activity()]
+            .iter()
+            .map(|activity| activity.activity().clone())
+            .collect();
+        let metric_definition = TrainingMetricDefinition::new(
+            TrainingMetricId::default(),
+            UserId::test_default(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+            Some(vec![TrainingMetricFilter::Sports(vec![Sport::Running])]),
+        );
+
+        let metrics = metric_definition.compute_values(&activities);
+
+        assert!(metrics.is_empty());
     }
 
     #[test]
@@ -1366,5 +1446,35 @@ mod test_granularity_bins {
                 "2025-11-01".parse::<NaiveDate>().unwrap(),
             ),]
         );
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_filters {
+    use crate::domain::models::activity::{ActivityId, ActivityStatistics};
+
+    use super::*;
+
+    #[test]
+    fn test_filter_by_sport() {
+        let activity = Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            Sport::Cycling,
+            ActivityStatistics::default(),
+        );
+
+        assert!(TrainingMetricFilter::Sports(vec![Sport::Cycling]).matches(&activity));
+        assert!(
+            TrainingMetricFilter::Sports(vec![Sport::Cycling, Sport::Running]).matches(&activity)
+        );
+        assert!(!TrainingMetricFilter::Sports(vec![Sport::Running]).matches(&activity));
+        assert!(!TrainingMetricFilter::Sports(vec![]).matches(&activity));
     }
 }
