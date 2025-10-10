@@ -188,7 +188,7 @@ impl ActivityStartTime {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Display)]
+#[derive(Clone, Debug, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum Sport {
     Running,
     Cycling,

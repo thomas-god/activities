@@ -8,7 +8,8 @@ use crate::domain::{
         UserId,
         training_metrics::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
+            TrainingMetricValue, TrainingMetricValues,
         },
     },
     ports::{
@@ -24,6 +25,7 @@ type DefinitionRow = (
     ActivityMetricSource,
     TrainingMetricGranularity,
     TrainingMetricAggregate,
+    Option<TrainingMetricFilters>,
 );
 
 #[derive(Debug, Clone)]
@@ -47,7 +49,8 @@ impl SqliteTrainingMetricsRepository {
             user_id TEXT,
             source BLOB,
             granularity TEXT,
-            aggregate TEXT
+            aggregate TEXT,
+            filters BLOB
         );
 
         CREATE TABLE IF NOT EXISTS t_training_metrics_values (
@@ -75,12 +78,13 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         &self,
         definition: TrainingMetricDefinition,
     ) -> Result<(), SaveTrainingMetricError> {
-        sqlx::query("INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5);")
+        sqlx::query("INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5, ?6);")
             .bind(definition.id())
             .bind(definition.user())
             .bind(definition.source())
             .bind(definition.granularity())
             .bind(definition.aggregate())
+            .bind(definition.filters())
             .execute(&self.pool)
             .await
             .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
@@ -93,7 +97,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
     ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
-        SELECT id, user_id, source, granularity, aggregate
+        SELECT id, user_id, source, granularity, aggregate, filters
         FROM t_training_metrics_definitions
         WHERE id = ?1 LIMIT 1;",
         )
@@ -101,8 +105,8 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, source, granularity, aggregate)) => Ok(Some(
-                TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, None),
+            Ok((id, user_id, source, granularity, aggregate, filters)) => Ok(Some(
+                TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, filters),
             )),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(GetDefinitionError::Unknown(anyhow!(err))),
@@ -114,7 +118,7 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT id, user_id, source, granularity, aggregate
+            "SELECT id, user_id, source, granularity, aggregate, filters
             FROM t_training_metrics_definitions
             WHERE user_id = ?1;",
         )
@@ -124,8 +128,15 @@ impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
         .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
         .map(|rows| {
             rows.into_iter()
-                .map(|(id, user_id, source, granularity, aggregate)| {
-                    TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, None)
+                .map(|(id, user_id, source, granularity, aggregate, filters)| {
+                    TrainingMetricDefinition::new(
+                        id,
+                        user_id,
+                        source,
+                        granularity,
+                        aggregate,
+                        filters,
+                    )
                 })
                 .collect()
         })
@@ -218,10 +229,10 @@ mod test_sqlite_activity_repository {
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
-        activity::TimeseriesMetric,
+        activity::{Sport, TimeseriesMetric},
         training_metrics::{
             ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
-            TrainingMetricGranularity,
+            TrainingMetricFilter, TrainingMetricFilters, TrainingMetricGranularity,
         },
     };
 
@@ -256,6 +267,22 @@ mod test_sqlite_activity_repository {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
             None,
+        )
+    }
+
+    fn build_metric_definition_with_filters() -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            TrainingMetricId::new(),
+            UserId::test_default(),
+            ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Max,
+            )),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Max,
+            Some(TrainingMetricFilters::new(vec![
+                TrainingMetricFilter::Sports(vec![Sport::Running]),
+            ])),
         )
     }
 
@@ -317,6 +344,29 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
+    async fn test_get_definition_with_filters() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_filters();
+
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let res = repository
+            .get_definition(definition.id())
+            .await
+            .expect("Should have returned OK")
+            .expect("Should have returned Some");
+
+        assert_eq!(res, definition);
+    }
+
+    #[tokio::test]
     async fn test_get_definition_not_found() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
@@ -342,9 +392,9 @@ mod test_sqlite_activity_repository {
             .save_definition(definition.clone())
             .await
             .expect("Should have return Ok");
-        let definition = build_metric_definition();
+        let definition_with_filters = build_metric_definition_with_filters();
         repository
-            .save_definition(definition.clone())
+            .save_definition(definition_with_filters.clone())
             .await
             .expect("Should have return Ok");
 
@@ -354,6 +404,8 @@ mod test_sqlite_activity_repository {
             .expect("Should have returned OK");
 
         assert_eq!(res.len(), 2);
+        assert!(res.contains(&definition));
+        assert!(res.contains(&definition_with_filters));
     }
 
     #[tokio::test]

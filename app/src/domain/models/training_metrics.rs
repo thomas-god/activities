@@ -46,7 +46,16 @@ impl Default for TrainingMetricId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
+pub struct TrainingMetricFilters(Vec<TrainingMetricFilter>);
+
+impl TrainingMetricFilters {
+    pub fn matches(&self, activity: &Activity) -> bool {
+        self.0.iter().all(|filter| filter.matches(activity))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricFilter {
     Sports(Vec<Sport>),
 }
@@ -66,7 +75,7 @@ pub struct TrainingMetricDefinition {
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
-    filters: Option<Vec<TrainingMetricFilter>>,
+    filters: Option<TrainingMetricFilters>,
 }
 
 impl TrainingMetricDefinition {
@@ -90,7 +99,7 @@ impl TrainingMetricDefinition {
         &self.granularity_aggregate
     }
 
-    pub fn filters(&self) -> &Option<Vec<TrainingMetricFilter>> {
+    pub fn filters(&self) -> &Option<TrainingMetricFilters> {
         &self.filters
     }
 
@@ -108,10 +117,7 @@ impl TrainingMetricDefinition {
             .iter()
             .filter_map(|activity| match &self.filters {
                 Some(filters) => {
-                    if filters
-                        .iter()
-                        .all(|filter| filter.matches(activity.activity()))
-                    {
+                    if filters.matches(activity.activity()) {
                         self.source.metric_from_activity_with_timeseries(activity)
                     } else {
                         None
@@ -128,7 +134,7 @@ impl TrainingMetricDefinition {
             .iter()
             .filter_map(|activity| match &self.filters {
                 Some(filters) => {
-                    if filters.iter().all(|filter| filter.matches(activity)) {
+                    if filters.matches(activity) {
                         self.source.metric_from_activity(activity).ok().flatten()
                     } else {
                         None
@@ -908,7 +914,9 @@ mod test_training_metrics {
             )),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
-            Some(vec![TrainingMetricFilter::Sports(vec![Sport::Running])]),
+            Some(TrainingMetricFilters::new(vec![
+                TrainingMetricFilter::Sports(vec![Sport::Running]),
+            ])),
         );
 
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
@@ -928,7 +936,9 @@ mod test_training_metrics {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
-            Some(vec![TrainingMetricFilter::Sports(vec![Sport::Running])]),
+            Some(TrainingMetricFilters::new(vec![
+                TrainingMetricFilter::Sports(vec![Sport::Running]),
+            ])),
         );
 
         let metrics = metric_definition.compute_values(&activities);
