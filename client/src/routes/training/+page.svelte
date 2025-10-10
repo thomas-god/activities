@@ -40,9 +40,10 @@
 		return metrics;
 	});
 
-	const createMetricCallback = async (payload: string): Promise<void> => {
+	const createMetricCallback = async (payload: Object): Promise<void> => {
+		const body = JSON.stringify({ initial_date_range: dates, ...payload });
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
-			body: payload,
+			body,
 			method: 'POST',
 			credentials: 'include',
 			mode: 'cors',

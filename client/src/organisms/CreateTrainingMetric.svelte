@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { callback }: { callback: (payload: string) => Promise<void> } = $props();
+	let { callback }: { callback: (payload: Object) => Promise<void> } = $props();
 
 	let formOpen = $state(false);
 
@@ -23,6 +23,8 @@
 			return { Timeseries: [sourceTimeseriesMetric, sourceTimeseriesAggregate] };
 		}
 	});
+
+	let requestPending = $state(false);
 
 	let metricRequest = $derived.by(() => {
 		return {
@@ -107,10 +109,17 @@
 			<button
 				class="btn mt-4 btn-neutral"
 				onclick={async () => {
-					await callback(JSON.stringify(metricRequest));
+					requestPending = true;
+					await callback(metricRequest);
+					requestPending = false;
 					formOpen = false;
-				}}>Create metric</button
-			>
+				}}
+				disabled={requestPending}
+				>Create metric
+				{#if requestPending}
+					<span class="loading loading-spinner"></span>
+				{/if}
+			</button>
 		</fieldset>
 	</div>
 </details>
