@@ -9,7 +9,7 @@ use crate::domain::{
         training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
     },
     ports::{
-        ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
+        ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingMetricService,
         ListActivitiesFilters, TrainingMetricsRepository, UpdateMetricsValuesRequest,
     },
@@ -34,6 +34,10 @@ where
     TMR: TrainingMetricsRepository,
     AR: ActivityRepository,
 {
+    /// Create a new training metric and compute its values on the user's activity history.
+    /// If [CreateTrainingMetricRequest::initial_date_range] is not None, this function computes the
+    /// metric value on that range before returning. The rest of the history is processed in the
+    /// background and may take some time depending on the history size.
     async fn create_metric(
         &self,
         req: CreateTrainingMetricRequest,
@@ -50,9 +54,38 @@ where
             .save_definition(definition.clone())
             .await?;
 
+        let mut initial_bins = Vec::new();
+        if let Some(initial_range) = req.initial_date_range() {
+            initial_bins = definition.granularity().bins(initial_range);
+            for bin in initial_bins.iter() {
+                let Ok(activities) = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities_with_timeseries(
+                        req.user(),
+                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
+                    )
+                    .await
+                else {
+                    continue;
+                };
+
+                let values = definition.compute_values(&activities);
+                for (key, value) in values.into_iter() {
+                    let _ = self
+                        .metrics_repository
+                        .update_metric_values(definition.id(), (key, value))
+                        .await;
+                }
+            }
+        }
+
         let this = self.clone();
         tokio::spawn(async move {
-            let _ = this.compute_initial_values(req, definition).await;
+            let _ = this
+                .compute_initial_values(req, definition, initial_bins)
+                .await;
         });
 
         Ok(id)
@@ -160,6 +193,7 @@ where
         &self,
         req: CreateTrainingMetricRequest,
         definition: TrainingMetricDefinition,
+        initial_bins: Vec<DateRange>,
     ) {
         // Compute initial values over the user history
         let Ok(Some(history_range)) = self
@@ -172,10 +206,13 @@ where
             return;
         };
 
-        let bins = definition.granularity().bins(&history_range);
+        let bins = definition.granularity().bins_from_datetime(&history_range);
 
         // Iterate in reverse so that the most recent bins' values are available first
         for bin in bins.iter().rev() {
+            if initial_bins.contains(bin) {
+                continue;
+            }
             let Ok(activities) = self
                 .activity_repository
                 .lock()
@@ -317,7 +354,7 @@ mod tests_training_metrics_service {
     use std::{collections::HashMap, sync::Arc};
 
     use anyhow::anyhow;
-    use chrono::{DateTime, FixedOffset};
+    use chrono::{DateTime, Days, FixedOffset, Utc};
     use tokio::sync::Mutex;
 
     use crate::domain::{
@@ -344,10 +381,15 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_create_metric_ok() {
         let mut repository = MockTrainingMetricsRepository::new();
+        let background_repository = MockTrainingMetricsRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_clone()
+            .return_once(move || background_repository);
 
         let mut activities = MockActivityRepository::new();
-        activities
+        let mut background_activities = MockActivityRepository::new();
+        background_activities
             .expect_get_user_history_date_range()
             .returning(|_| {
                 Ok(Some(DateTimeRange::new(
@@ -361,9 +403,12 @@ mod tests_training_metrics_service {
                     ),
                 )))
             });
-        activities
+        background_activities
             .expect_list_activities_with_timeseries()
             .returning(|_, _| Ok(vec![]));
+        activities
+            .expect_clone()
+            .return_once(move || background_activities);
         let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
@@ -371,6 +416,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
+            None,
         );
 
         let _ = service
@@ -382,14 +428,19 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_create_metric_compute_initial_values() {
         let mut repository = MockTrainingMetricsRepository::new();
+        let mut background_repository = MockTrainingMetricsRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
-        repository
+        background_repository
             .expect_update_metric_values()
             .times(1)
             .returning(|_, _| Ok(()));
+        repository
+            .expect_clone()
+            .return_once(move || background_repository);
 
         let mut activities = MockActivityRepository::new();
-        activities
+        let mut background_activities = MockActivityRepository::new();
+        background_activities
             .expect_get_user_history_date_range()
             .returning(|_| {
                 Ok(Some(DateTimeRange::new(
@@ -400,6 +451,79 @@ mod tests_training_metrics_service {
                         "2025-09-05T00:00:00+02:00"
                             .parse::<DateTime<FixedOffset>>()
                             .unwrap(),
+                    ),
+                )))
+            });
+        background_activities
+            .expect_list_activities_with_timeseries()
+            .returning(|_, _| {
+                Ok(vec![ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::new(),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::from_timestamp(1200).unwrap(),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Calories,
+                            12.,
+                        )])),
+                    ),
+                    ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
+                )])
+            });
+        activities
+            .expect_clone()
+            .return_once(move || background_activities);
+        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            None,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_compute_initial_values_with_initial_date_range() {
+        let now = Utc::now();
+        let mut repository = MockTrainingMetricsRepository::new();
+        let mut background_repository = MockTrainingMetricsRepository::new();
+        repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_update_metric_values()
+            .times(2) // 2 day fron initial range
+            .returning(|_, _| Ok(()));
+        background_repository
+            .expect_update_metric_values()
+            .times(1) // 3 days in user history - 2 days fron initial range
+            .returning(|_, _| Ok(()));
+        repository
+            .expect_clone()
+            .return_once(move || background_repository);
+
+        let mut activities = MockActivityRepository::new();
+        let cloned_now = now.clone();
+        activities
+            .expect_get_user_history_date_range()
+            .returning(move |_| {
+                Ok(Some(DateTimeRange::new(
+                    cloned_now
+                        .checked_sub_days(Days::new(1))
+                        .unwrap()
+                        .fixed_offset(),
+                    Some(
+                        cloned_now
+                            .checked_add_days(Days::new(1))
+                            .unwrap()
+                            .fixed_offset(),
                     ),
                 )))
             });
@@ -428,6 +552,10 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
+            Some(DateRange::new(
+                now.date_naive(),
+                now.date_naive().checked_add_days(Days::new(1)).unwrap(),
+            )),
         );
 
         let _ = service
@@ -452,6 +580,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
+            None,
         );
 
         let _ = service

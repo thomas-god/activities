@@ -235,13 +235,17 @@ impl TrainingMetricGranularity {
         dates
     }
 
-    pub fn bins(&self, range: &DateTimeRange) -> Vec<DateRange> {
+    pub fn bins_from_datetime(&self, range: &DateTimeRange) -> Vec<DateRange> {
         let start = range.start().date_naive();
         let end = range
             .end()
             .map(|date| date.date_naive())
             .unwrap_or(Utc::now().fixed_offset().date_naive());
 
+        self.bins(&DateRange::new(start, end))
+    }
+
+    pub fn bins(&self, range: &DateRange) -> Vec<DateRange> {
         #[allow(clippy::type_complexity)]
         let (mut start, last_start, next_start): (
             NaiveDate,
@@ -249,18 +253,18 @@ impl TrainingMetricGranularity {
             Box<dyn Fn(NaiveDate) -> Option<NaiveDate>>,
         ) = match self {
             Self::Daily => (
-                start,
-                end,
+                *range.start(),
+                *range.end(),
                 Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(1))),
             ),
             Self::Weekly => (
-                start.week(chrono::Weekday::Mon).first_day(),
-                end.week(chrono::Weekday::Mon).first_day(),
+                range.start().week(chrono::Weekday::Mon).first_day(),
+                range.end().week(chrono::Weekday::Mon).first_day(),
                 Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(7))),
             ),
             Self::Monthly => (
-                start.with_day(1).unwrap(),
-                end.with_day(1).unwrap(),
+                range.start().with_day(1).unwrap(),
+                range.end().with_day(1).unwrap(),
                 Box::new(|dt: NaiveDate| dt.checked_add_months(Months::new(1))),
             ),
         };
@@ -1150,7 +1154,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Daily.bins(&range);
+        let bins = TrainingMetricGranularity::Daily.bins_from_datetime(&range);
 
         assert_eq!(
             bins,
@@ -1180,7 +1184,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Daily.bins(&range);
+        let bins = TrainingMetricGranularity::Daily.bins_from_datetime(&range);
 
         assert_eq!(
             bins,
@@ -1204,7 +1208,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Weekly.bins(&range);
+        let bins = TrainingMetricGranularity::Weekly.bins_from_datetime(&range);
 
         assert_eq!(
             bins,
@@ -1234,7 +1238,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Weekly.bins(&range);
+        let bins = TrainingMetricGranularity::Weekly.bins_from_datetime(&range);
 
         assert_eq!(
             bins,
@@ -1258,7 +1262,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Monthly.bins(&range);
+        let bins = TrainingMetricGranularity::Monthly.bins_from_datetime(&range);
 
         assert_eq!(
             bins,
@@ -1288,7 +1292,7 @@ mod test_granularity_bins {
             ),
         );
 
-        let bins = TrainingMetricGranularity::Monthly.bins(&range);
+        let bins = TrainingMetricGranularity::Monthly.bins_from_datetime(&range);
 
         assert_eq!(
             bins,

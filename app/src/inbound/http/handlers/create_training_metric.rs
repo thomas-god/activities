@@ -5,7 +5,7 @@ use crate::{
     domain::{
         models::UserId,
         ports::{
-            CreateTrainingMetricError, CreateTrainingMetricRequest, IActivityService,
+            CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
             ITrainingMetricService,
         },
     },
@@ -26,6 +26,7 @@ pub struct CreateTrainingMetricBody {
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
+    initial_date_range: Option<DateRange>,
 }
 
 fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainingMetricRequest {
@@ -34,6 +35,7 @@ fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainin
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
+        body.initial_date_range,
     )
 }
 

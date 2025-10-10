@@ -1,5 +1,6 @@
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use derive_more::Constructor;
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::domain::models::UserId;
@@ -269,7 +270,7 @@ impl DateTimeRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq, Constructor, Deserialize)]
 pub struct DateRange {
     start: NaiveDate,
     end: NaiveDate,
@@ -378,6 +379,7 @@ pub struct CreateTrainingMetricRequest {
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
+    initial_date_range: Option<DateRange>,
 }
 
 impl CreateTrainingMetricRequest {
@@ -395,6 +397,10 @@ impl CreateTrainingMetricRequest {
 
     pub fn aggregate(&self) -> &TrainingMetricAggregate {
         &self.aggregate
+    }
+
+    pub fn initial_date_range(&self) -> &Option<DateRange> {
+        &self.initial_date_range
     }
 }
 
