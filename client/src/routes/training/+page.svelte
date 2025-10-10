@@ -116,6 +116,7 @@
 				values={metric.values}
 				unit={metric.unit}
 				granularity={metric.granularity}
+				format={metric.unit === 's' ? 'duration' : 'number'}
 			/>
 		</div>
 	{/each}

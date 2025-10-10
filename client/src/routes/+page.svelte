@@ -56,6 +56,7 @@
 			values={topMetric.values}
 			unit={topMetric.unit}
 			granularity={topMetric.granularity}
+			format={topMetric.unit === 's' ? 'duration' : 'number'}
 		/>
 	</div>
 {/if}

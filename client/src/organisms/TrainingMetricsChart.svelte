@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDuration, formatDurationCompactWithUnits } from '$lib/duration';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
 
@@ -8,9 +9,10 @@
 		height: number;
 		unit: string;
 		granularity: string;
+		format: 'number' | 'duration';
 	}
 
-	let { values, height, width, unit, granularity }: TimeseriesChartProps = $props();
+	let { values, height, width, unit, granularity, format }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -39,7 +41,7 @@
 		return (date: string) => date;
 	});
 
-	let tickAxisTimeFormater = $derived.by(() => {
+	let timeAxisTickFormater = $derived.by(() => {
 		if (granularity === 'Monthly') {
 			return (date: string, _idx: number) => {
 				return dayjs(date).format('MMM YYYY');
@@ -48,6 +50,35 @@
 
 		return (date: string, _idx: number) => date;
 	});
+
+	let yAxisTickFormater = $derived.by(() => {
+		if (format === 'duration') {
+			return (value: d3.NumberValue, _idx: number) => {
+				return formatDurationCompactWithUnits(value.valueOf());
+			};
+		}
+
+		return (value: d3.NumberValue, _idx: number) => value.toString();
+	});
+
+	let yAxisTickValues = (): null | number[] => {
+		if (format === 'duration') {
+			const dt = 600;
+			const roundedUpMaxDuration = Math.ceil(d3.max(values, (d) => d.value)! / dt) * dt;
+			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
+			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
+
+			if (intervalDuration !== 0) {
+				const ticks = [];
+				for (let i = 0; i < roundedUpMaxDuration; i += intervalDuration) {
+					ticks.push(i);
+				}
+				return ticks;
+			}
+			return null;
+		}
+		return null; // To use default ticks
+	};
 
 	let x = $derived(
 		d3
@@ -69,7 +100,7 @@
 			sel.call(
 				d3
 					.axisBottom(x)
-					.tickFormat(tickAxisTimeFormater)
+					.tickFormat(timeAxisTickFormater)
 					.tickValues(
 						x.domain().filter((val, idx, arr) => {
 							return idx % (arr.length > maxTicks ? Math.ceil(arr.length / maxTicks) : 1) === 0
@@ -79,7 +110,14 @@
 					)
 			)
 		);
-		d3.select(gy).call((sel) => sel.call(d3.axisLeft(y)));
+		d3.select(gy).call((sel) =>
+			sel.call(
+				d3
+					.axisLeft(y)
+					.tickFormat(yAxisTickFormater)
+					.tickValues(yAxisTickValues() as any)
+			)
+		);
 	});
 
 	let selectedMetric: { time: string; value: number; x: number; y: number } | undefined =
@@ -94,6 +132,13 @@
 		if (selectedMetric !== undefined) {
 			selectedMetric = { ...selectedMetric, x: event.offsetX, y: event.offsetY };
 		}
+	};
+
+	const formatTooltipValue = (value: number): string => {
+		if (format === 'duration') {
+			return formatDuration(value);
+		}
+		return `${value.toFixed(2)} ${unit}`;
 	};
 </script>
 
@@ -130,7 +175,7 @@
 						>
 							<rect x="-30" width="60" y="-30" height="30" class="fill-base-100" rx="3" />
 							<text y="-18">{tooltipTimeFormater(selectedMetric.time)}</text>
-							<text y="-6">{selectedMetric.value.toFixed(2)} {unit}</text>
+							<text y="-6">{formatTooltipValue(selectedMetric.value)} </text>
 						</g>
 					{/if}
 				</g>
