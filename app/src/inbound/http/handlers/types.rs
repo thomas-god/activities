@@ -2,10 +2,10 @@
 use serde::Deserialize;
 
 use crate::domain::models::{
-    activity::{ActivityStatistic, TimeseriesMetric},
+    activity::{ActivityStatistic, Sport, TimeseriesMetric},
     training_metrics::{
-        ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
-        TrainingMetricGranularity,
+        ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate, TrainingMetricFilter,
+        TrainingMetricFilters, TrainingMetricGranularity,
     },
 };
 
@@ -127,5 +127,24 @@ impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
             APITrainingMetricGranularity::Weekly => Self::Weekly,
             APITrainingMetricGranularity::Monthly => Self::Monthly,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITrainingMetricFilter {
+    Sports(Vec<Sport>),
+}
+
+impl From<&APITrainingMetricFilter> for TrainingMetricFilter {
+    fn from(value: &APITrainingMetricFilter) -> Self {
+        match value {
+            APITrainingMetricFilter::Sports(sports) => Self::Sports(sports.clone()),
+        }
+    }
+}
+
+impl From<Vec<APITrainingMetricFilter>> for TrainingMetricFilters {
+    fn from(value: Vec<APITrainingMetricFilter>) -> Self {
+        Self::new(value.iter().map(|filter| filter.into()).collect())
     }
 }

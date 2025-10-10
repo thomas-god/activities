@@ -9,7 +9,7 @@ use crate::domain::models::activity::{
     ActivityTimeseries, ActivityWithTimeseries, Sport,
 };
 use crate::domain::models::training_metrics::{
-    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
+    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
     TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
 };
 
@@ -379,6 +379,7 @@ pub struct CreateTrainingMetricRequest {
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
+    filters: Option<TrainingMetricFilters>,
     initial_date_range: Option<DateRange>,
 }
 
@@ -397,6 +398,10 @@ impl CreateTrainingMetricRequest {
 
     pub fn aggregate(&self) -> &TrainingMetricAggregate {
         &self.aggregate
+    }
+
+    pub fn filters(&self) -> &Option<TrainingMetricFilters> {
+        &self.filters
     }
 
     pub fn initial_date_range(&self) -> &Option<DateRange> {

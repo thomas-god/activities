@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::UserId,
+        models::{UserId, training_metrics::TrainingMetricFilters},
         ports::{
             CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
             ITrainingMetricService,
@@ -14,7 +14,8 @@ use crate::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
             handlers::types::{
-                APITrainingMetricAggregate, APITrainingMetricGranularity, APITrainingMetricSource,
+                APITrainingMetricAggregate, APITrainingMetricFilter, APITrainingMetricGranularity,
+                APITrainingMetricSource,
             },
         },
         parser::ParseFile,
@@ -26,6 +27,7 @@ pub struct CreateTrainingMetricBody {
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
+    filters: Option<Vec<APITrainingMetricFilter>>,
     initial_date_range: Option<DateRange>,
 }
 
@@ -35,6 +37,7 @@ fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainin
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
+        body.filters.map(TrainingMetricFilters::from),
         body.initial_date_range,
     )
 }

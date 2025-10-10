@@ -107,7 +107,7 @@ where
             req.source().clone(),
             req.granularity().clone(),
             req.aggregate().clone(),
-            None,
+            req.filters().clone(),
         );
         self.metrics_repository
             .save_definition(definition.clone())
@@ -443,6 +443,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             None,
+            None,
         );
 
         let _ = service
@@ -509,6 +510,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             None,
+            None,
         );
 
         let _ = service
@@ -570,6 +572,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
+            None,
             Some(DateRange::new(
                 now.date_naive(),
                 now.date_naive().checked_add_days(Days::new(1)).unwrap(),
@@ -598,6 +601,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
+            None,
             None,
         );
 
