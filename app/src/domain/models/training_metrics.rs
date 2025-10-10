@@ -7,14 +7,15 @@ use std::{
 use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, Utc};
 use derive_more::{AsRef, Constructor, Display};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::{
     models::{
         UserId,
         activity::{
-            ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, TimeseriesMetric, ToUnit,
-            Unit,
+            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries,
+            TimeseriesMetric, ToUnit, Unit,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -80,7 +81,7 @@ impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
         let activity_metrics = activities
             .iter()
-            .filter_map(|activity| self.source.from_activity(activity))
+            .filter_map(|activity| self.source.metric_from_activity_with_timeseries(activity))
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
         TrainingMetricValues::new(aggregate_metrics(
@@ -112,8 +113,33 @@ pub enum ActivityMetricSource {
     Timeseries((TimeseriesMetric, TimeseriesAggregate)),
 }
 
+#[derive(Debug, Clone)]
+pub enum ComputeMetricRequirement {
+    Activity,
+    ActivityWithTimeseries,
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum ComputeMetricError {
+    #[error(
+        "Trying to compute a timseries-based metric without supplying the activity's timeseries"
+    )]
+    MissingTimeseries,
+}
+
 impl ActivityMetricSource {
-    pub fn from_activity(&self, activity: &ActivityWithTimeseries) -> Option<ActivityMetric> {
+    /// What is the minimum required to compute this metric activity values.
+    pub fn compute_metric_min_requirement(&self) -> ComputeMetricRequirement {
+        match self {
+            Self::Statistic(_) => ComputeMetricRequirement::Activity,
+            Self::Timeseries(_) => ComputeMetricRequirement::ActivityWithTimeseries,
+        }
+    }
+
+    pub fn metric_from_activity_with_timeseries(
+        &self,
+        activity: &ActivityWithTimeseries,
+    ) -> Option<ActivityMetric> {
         match self {
             Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
             Self::Timeseries((metric, aggregate)) => {
@@ -130,6 +156,26 @@ impl ActivityMetricSource {
                     .cloned(),
             )
         })
+    }
+
+    pub fn metric_from_activity(
+        &self,
+        activity: &Activity,
+    ) -> Result<Option<ActivityMetric>, ComputeMetricError> {
+        Ok(match self {
+            Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
+            Self::Timeseries(_) => return Err(ComputeMetricError::MissingTimeseries),
+        }
+        .map(|value| {
+            ActivityMetric::new(
+                value,
+                *activity.start_time(),
+                activity
+                    .statistics()
+                    .get(&ActivityStatistic::Duration)
+                    .cloned(),
+            )
+        }))
     }
 }
 

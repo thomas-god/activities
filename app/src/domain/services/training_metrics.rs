@@ -100,7 +100,10 @@ where
 
         for definition in definitions {
             for activity in req.new_activities() {
-                let Some(metric) = definition.source().from_activity(activity) else {
+                let Some(metric) = definition
+                    .source()
+                    .metric_from_activity_with_timeseries(activity)
+                else {
                     continue;
                 };
                 let bin_key = definition
