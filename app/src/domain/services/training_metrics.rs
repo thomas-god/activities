@@ -6,7 +6,10 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         UserId,
-        training_metrics::{TrainingMetricDefinition, TrainingMetricId, TrainingMetricValues},
+        training_metrics::{
+            ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricId,
+            TrainingMetricValues,
+        },
     },
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange,
@@ -27,6 +30,61 @@ where
 {
     metrics_repository: TMR,
     activity_repository: Arc<Mutex<AR>>,
+}
+
+impl<TMR, AR> TrainingMetricService<TMR, AR>
+where
+    TMR: TrainingMetricsRepository,
+    AR: ActivityRepository,
+{
+    async fn compute_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        bin: &DateRange,
+        user: &UserId,
+    ) {
+        let values = match definition.source_requirement() {
+            ComputeMetricRequirement::ActivityWithTimeseries => {
+                let Ok(activities) = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities_with_timeseries(
+                        user,
+                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
+                    )
+                    .await
+                else {
+                    return;
+                };
+
+                definition.compute_values_from_timeseries(&activities)
+            }
+            ComputeMetricRequirement::Activity => {
+                let Ok(activities) = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities(
+                        user,
+                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
+                    )
+                    .await
+                else {
+                    return;
+                };
+
+                definition.compute_values(&activities)
+            }
+        };
+
+        for (key, value) in values.into_iter() {
+            let _ = self
+                .metrics_repository
+                .update_metric_values(definition.id(), (key, value))
+                .await;
+        }
+    }
 }
 
 impl<TMR, AR> ITrainingMetricService for TrainingMetricService<TMR, AR>
@@ -58,26 +116,8 @@ where
         if let Some(initial_range) = req.initial_date_range() {
             initial_bins = definition.granularity().bins(initial_range);
             for bin in initial_bins.iter() {
-                let Ok(activities) = self
-                    .activity_repository
-                    .lock()
-                    .await
-                    .list_activities_with_timeseries(
-                        req.user(),
-                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
-                    )
-                    .await
-                else {
-                    continue;
-                };
-
-                let values = definition.compute_values(&activities);
-                for (key, value) in values.into_iter() {
-                    let _ = self
-                        .metrics_repository
-                        .update_metric_values(definition.id(), (key, value))
-                        .await;
-                }
+                self.compute_metric_values(&definition, bin, req.user())
+                    .await;
             }
         }
 
@@ -216,26 +256,8 @@ where
             if initial_bins.contains(bin) {
                 continue;
             }
-            let Ok(activities) = self
-                .activity_repository
-                .lock()
-                .await
-                .list_activities_with_timeseries(
-                    req.user(),
-                    &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
-                )
-                .await
-            else {
-                continue;
-            };
-
-            let values = definition.compute_values(&activities);
-            for (key, value) in values.into_iter() {
-                let _ = self
-                    .metrics_repository
-                    .update_metric_values(definition.id(), (key, value))
-                    .await;
-            }
+            self.compute_metric_values(&definition, bin, req.user())
+                .await;
         }
     }
 }
@@ -530,24 +552,16 @@ mod tests_training_metrics_service {
                     ),
                 )))
             });
-        activities
-            .expect_list_activities_with_timeseries()
-            .returning(|_, _| {
-                Ok(vec![ActivityWithTimeseries::new(
-                    Activity::new(
-                        ActivityId::new(),
-                        UserId::test_default(),
-                        None,
-                        ActivityStartTime::from_timestamp(1200).unwrap(),
-                        Sport::Cycling,
-                        ActivityStatistics::new(HashMap::from([(
-                            ActivityStatistic::Calories,
-                            12.,
-                        )])),
-                    ),
-                    ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
-                )])
-            });
+        activities.expect_list_activities().returning(|_, _| {
+            Ok(vec![Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(1200).unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 12.)])),
+            )])
+        });
         let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(

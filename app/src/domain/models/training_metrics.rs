@@ -75,13 +75,32 @@ impl TrainingMetricDefinition {
     pub fn aggregate(&self) -> &TrainingMetricAggregate {
         &self.granularity_aggregate
     }
+
+    pub fn source_requirement(&self) -> ComputeMetricRequirement {
+        self.source.input_min_requirement()
+    }
 }
 
 impl TrainingMetricDefinition {
-    pub fn compute_values(&self, activities: &[ActivityWithTimeseries]) -> TrainingMetricValues {
+    pub fn compute_values_from_timeseries(
+        &self,
+        activities: &[ActivityWithTimeseries],
+    ) -> TrainingMetricValues {
         let activity_metrics = activities
             .iter()
             .filter_map(|activity| self.source.metric_from_activity_with_timeseries(activity))
+            .collect();
+        let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
+        TrainingMetricValues::new(aggregate_metrics(
+            &self.granularity_aggregate,
+            grouped_metrics,
+        ))
+    }
+
+    pub fn compute_values(&self, activities: &[Activity]) -> TrainingMetricValues {
+        let activity_metrics = activities
+            .iter()
+            .filter_map(|activity| self.source.metric_from_activity(activity).ok().flatten())
             .collect();
         let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
         TrainingMetricValues::new(aggregate_metrics(
@@ -129,7 +148,7 @@ pub enum ComputeMetricError {
 
 impl ActivityMetricSource {
     /// What is the minimum required to compute this metric activity values.
-    pub fn compute_metric_min_requirement(&self) -> ComputeMetricRequirement {
+    pub fn input_min_requirement(&self) -> ComputeMetricRequirement {
         match self {
             Self::Statistic(_) => ComputeMetricRequirement::Activity,
             Self::Timeseries(_) => ComputeMetricRequirement::ActivityWithTimeseries,
@@ -829,7 +848,7 @@ mod test_training_metrics {
             TrainingMetricAggregate::Max,
         );
 
-        let metrics = metric_definition.compute_values(&activities);
+        let metrics = metric_definition.compute_values_from_timeseries(&activities);
 
         assert_eq!(
             *metrics.get("2025-09-01").unwrap(),
