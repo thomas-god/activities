@@ -53,7 +53,7 @@ impl From<&Activity> for ResponseBodyItem {
                 Sport::Running => "Running".to_string(),
                 Sport::Cycling => "Cycling".to_string(),
                 Sport::AlpineSKi => "Ski".to_string(),
-                Sport::StrengthTraining => "Strenght training".to_string(),
+                Sport::StrengthTraining => "Strength training".to_string(),
                 Sport::Swimming => "Swimming".to_string(),
                 Sport::Other => "Other".to_string(),
             },

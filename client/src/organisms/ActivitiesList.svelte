@@ -17,14 +17,14 @@
 	{#each activityList as activity}
 		<a href={`/activity/${activity.id}`} class="block">
 			<li class="grid grid-cols-3 justify-self-auto bg-base-100 p-3 hover:bg-base-200">
-				<div class="italic">
+				<div class="">
 					{activityTitle(activity)}
 				</div>
 				<div class="justify-self-start">
-					⌛ <span class="font-mono font-medium italic">{formatDuration(activity.duration)}</span>
+					⌛ <span class="font-mono font-medium">{formatDuration(activity.duration)}</span>
 				</div>
 				<div class="justify-self-end">
-					📅 <span class="italic">{localiseDate(activity.start_time)}</span>
+					📅 <span>{localiseDate(activity.start_time)}</span>
 				</div>
 			</li>
 		</a>
