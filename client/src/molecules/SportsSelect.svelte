@@ -23,12 +23,12 @@
 	};
 </script>
 
-<div class="flex flex-row gap-1 p-1">
+<div class="flex flex-row items-start gap-1 p-1">
 	<label class="label" for="metric-sport-filter"> Sports: </label>
 	<span>{selectedAsString}</span>
 </div>
 
-<div class="flex flex-row gap-2 p-1">
+<div class="flex flex-row flex-wrap gap-2 p-1">
 	{#each values as value}
 		<input
 			type="checkbox"
