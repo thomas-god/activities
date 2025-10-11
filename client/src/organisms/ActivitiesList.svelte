@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { formatDuration, formatRelativeDuration } from '$lib/duration';
-	import dayjs from 'dayjs';
+	import { formatDuration, localise } from '$lib/duration';
 	import type { ActivityList, ActivityListItem } from '../routes/+page';
 
 	let { activityList }: { activityList: ActivityList } = $props();
@@ -25,9 +24,7 @@
 					⌛ <span class="font-mono font-medium italic">{formatDuration(activity.duration)}</span>
 				</div>
 				<div class="justify-self-end">
-					📅 <span class="italic"
-						>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
-					>
+					📅 <span class="italic">{localise(activity.start_time)}</span>
 				</div>
 			</li>
 		</a>
