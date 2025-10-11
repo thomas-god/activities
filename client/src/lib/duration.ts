@@ -77,6 +77,10 @@ export const formatDateTime = (
 	return dayjs(value).tz(timezone).format(format);
 };
 
-export const localise = (value: number | string): string => {
+export const localiseDate = (value: number | string): string => {
 	return dayjs(value).format('ll');
+};
+
+export const localiseDateTime = (value: number | string): string => {
+	return dayjs(value).format('llll');
 };

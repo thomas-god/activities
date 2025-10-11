@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDuration, localise } from '$lib/duration';
+	import { formatDuration, localiseDate } from '$lib/duration';
 	import type { ActivityList, ActivityListItem } from '../routes/+page';
 
 	let { activityList }: { activityList: ActivityList } = $props();
@@ -24,7 +24,7 @@
 					⌛ <span class="font-mono font-medium italic">{formatDuration(activity.duration)}</span>
 				</div>
 				<div class="justify-self-end">
-					📅 <span class="italic">{localise(activity.start_time)}</span>
+					📅 <span class="italic">{localiseDate(activity.start_time)}</span>
 				</div>
 			</li>
 		</a>

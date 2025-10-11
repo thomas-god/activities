@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDuration, formatDateTime } from '$lib/duration';
+	import { formatDuration, formatDateTime, localiseDateTime } from '$lib/duration';
 	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import Chip from '../../../molecules/Chip.svelte';
@@ -95,7 +95,7 @@
 		<div class="chip-container flex flex-row gap-1 overflow-auto pt-1 pl-2">
 			<Chip text={summary?.sport} />
 			<Chip text={`⌛ ${summary?.duration}`} />
-			<Chip text={`📅 ${formatDateTime(summary?.start_time ?? '')}`} />
+			<Chip text={`📅 ${localiseDateTime(summary?.start_time ?? '')}`} />
 			<button onclick={deleteActivityCallback}>🗑️</button>
 		</div>
 	</div>
