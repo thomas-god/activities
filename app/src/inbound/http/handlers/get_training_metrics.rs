@@ -7,7 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::{DateTime, FixedOffset, Local};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 use serde_json::json;
 
 use crate::{
@@ -46,6 +46,7 @@ pub struct ResponseBodyItem {
     unit: String,
     granularity: String,
     aggregate: String,
+    sports: Vec<String>,
     values: HashMap<String, f64>,
 }
 
@@ -63,6 +64,12 @@ fn to_response_body_item(
         unit: unit.to_string(),
         granularity: def.granularity().to_string(),
         aggregate: def.aggregate().to_string(),
+        sports: def
+            .filters()
+            .sports()
+            .as_ref()
+            .map(|sports| sports.iter().map(|sport| sport.to_string()).collect())
+            .unwrap_or_default(),
         values,
     }
 }

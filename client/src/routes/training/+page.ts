@@ -40,6 +40,7 @@ const MetricsListItem = z.object({
 	unit: z.string(),
 	granularity: z.string(),
 	aggregate: z.string(),
+	sports: z.array(z.string()),
 	values: z.record(z.string(), z.number())
 });
 

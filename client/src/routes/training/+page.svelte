@@ -31,7 +31,7 @@
 
 			metrics.push({
 				values: values,
-				title: `${metric.metric} (${metric.granularity})`,
+				title: `${metric.metric} (${metric.granularity}) ${metric.sports.length > 0 ? '[' + metric.sports.join(', ') + ']' : ''}`,
 				unit: metric.unit,
 				id: metric.id,
 				granularity: metric.granularity
