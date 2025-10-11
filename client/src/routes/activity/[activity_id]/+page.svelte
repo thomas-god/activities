@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDuration, formatDateTime, localiseDateTime } from '$lib/duration';
+	import { formatDuration, localiseDateTime } from '$lib/duration';
 	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import Chip from '../../../molecules/Chip.svelte';
@@ -8,6 +8,7 @@
 	import EditableString from '../../../molecules/EditableString.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
+	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -98,6 +99,10 @@
 			<Chip text={`📅 ${localiseDateTime(summary?.start_time ?? '')}`} />
 			<button onclick={deleteActivityCallback}>🗑️</button>
 		</div>
+	</div>
+
+	<div class="rounded-box bg-base-100 p-4 pt-2 shadow-md">
+		<ActivityStatistics activity={data.activity} />
 	</div>
 
 	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">

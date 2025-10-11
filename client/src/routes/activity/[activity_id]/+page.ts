@@ -31,6 +31,7 @@ const ActivityDetails = z.object({
 	name: z.string().nullable(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
+	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),
 		metrics: z.record(

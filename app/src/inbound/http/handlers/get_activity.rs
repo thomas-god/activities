@@ -32,6 +32,7 @@ pub struct ResponseBody {
     name: Option<String>,
     duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
+    statistics: HashMap<String, f64>,
     timeseries: ActivityTimeseriesBody,
 }
 
@@ -92,6 +93,7 @@ impl From<&ActivityWithTimeseries> for ResponseBody {
                 .statistics()
                 .get(&ActivityStatistic::Duration)
                 .cloned(),
+            statistics: activity.statistics().items(),
             timeseries: activity.timeseries().into(),
         }
     }
@@ -177,7 +179,7 @@ pub async fn get_activity<
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, vec};
+    use std::{hash::Hash, sync::Arc, vec};
 
     use axum::extract::Path;
     use mockall::predicate::eq;
@@ -271,6 +273,7 @@ mod tests {
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
+                statistics: HashMap::from([("Duration".to_string(), 1200.)]),
                 timeseries: ActivityTimeseriesBody {
                     time: vec![0, 1, 2],
                     metrics: HashMap::from([(

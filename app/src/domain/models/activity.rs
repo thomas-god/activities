@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::{self},
+    hash::Hash,
 };
 
 use chrono::{DateTime, FixedOffset};
@@ -204,6 +205,14 @@ pub struct ActivityStatistics(HashMap<ActivityStatistic, f64>);
 impl ActivityStatistics {
     pub fn get(&self, stat: &ActivityStatistic) -> Option<&f64> {
         self.0.get(stat)
+    }
+
+    pub fn items(&self) -> HashMap<String, f64> {
+        HashMap::from_iter(
+            self.0
+                .iter()
+                .map(|(stat, value)| (stat.to_string(), *value)),
+        )
     }
 }
 
