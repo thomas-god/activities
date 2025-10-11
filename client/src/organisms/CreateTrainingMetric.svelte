@@ -1,5 +1,9 @@
 <script lang="ts">
+	import SportsSelect from '../molecules/SportsSelect.svelte';
+
 	let { callback }: { callback: (payload: Object) => Promise<void> } = $props();
+
+	const availableSports = ['Running', 'Cycling', 'Swimming', 'AlpineSki', 'StrengthTraining'];
 
 	let formOpen = $state(false);
 
@@ -16,6 +20,8 @@
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 
+	let sports: string[] = $state([]);
+
 	let statisticSource = $derived.by(() => {
 		if (sourceType === 'activity-statistics') {
 			return { Statistic: sourceActivityStatistics };
@@ -30,7 +36,8 @@
 		return {
 			source: statisticSource,
 			granularity,
-			aggregate
+			aggregate,
+			filters: [{ Sports: sports }]
 		};
 	});
 </script>
@@ -61,7 +68,7 @@
 			{:else}
 				<div class="ml-3 flex flex-row gap-3">
 					<div>
-						<label class="label" for="source-timeseries-metric">Timeseries metric</label>
+						<label class="label p-1" for="source-timeseries-metric">Timeseries metric</label>
 						<select
 							class="select"
 							bind:value={sourceTimeseriesMetric}
@@ -76,7 +83,7 @@
 					</div>
 
 					<div>
-						<label class="label" for="source-timeseries-aggregate">Timeseries aggregate</label>
+						<label class="label p-1" for="source-timeseries-aggregate">Timeseries aggregate</label>
 						<select
 							class="select"
 							bind:value={sourceTimeseriesAggregate}
@@ -91,20 +98,27 @@
 				</div>
 			{/if}
 
-			<label class="label" for="metric-granularity">Metric granularity</label>
+			<label class="label" for="metric-granularity">Granularity</label>
 			<select class="select" bind:value={granularity} id="metric-granularity">
 				<option value="Daily">Daily</option>
 				<option value="Weekly">Weekly</option>
 				<option value="Monthly">Monthly</option>
 			</select>
 
-			<label class="label" for="metric-aggregate">Metric aggregate</label>
+			<label class="label" for="metric-aggregate">Aggregate function</label>
 			<select class="select" bind:value={aggregate} id="metric-aggregate">
 				<option value="Max">Maximum value</option>
 				<option value="Min">Minimum value</option>
 				<option value="Sum">Total</option>
 				<option value="Average">Average</option>
 			</select>
+
+			<details class="collapse border border-base-300 bg-base-100" open={true}>
+				<summary class="collapse-title font-semibold">Filters</summary>
+				<div class="collapse-content text-sm">
+					<SportsSelect options={availableSports} bind:selectedOptions={sports} />
+				</div>
+			</details>
 
 			<button
 				class="btn mt-4 btn-neutral"

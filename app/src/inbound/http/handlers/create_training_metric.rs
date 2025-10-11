@@ -96,5 +96,17 @@ mod tests {
             )
             .is_ok()
         );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Timeseries": ["Distance", "Average"]},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": [ { "Sports": ["Running", "Cycling"] } ]
+        }"#,
+            )
+            .is_ok()
+        );
     }
 }
