@@ -33,12 +33,13 @@
 	let requestPending = $state(false);
 
 	let metricRequest = $derived.by(() => {
-		return {
-			source: statisticSource,
-			granularity,
-			aggregate,
-			filters: [{ Sports: sports }]
-		};
+		let basePayload = { source: statisticSource, granularity, aggregate, filters: {} };
+
+		if (sports.length > 0) {
+			basePayload = { ...basePayload, filters: { sports } };
+		}
+
+		return basePayload;
 	});
 </script>
 

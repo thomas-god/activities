@@ -14,7 +14,7 @@ use crate::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
             handlers::types::{
-                APITrainingMetricAggregate, APITrainingMetricFilter, APITrainingMetricGranularity,
+                APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
                 APITrainingMetricSource,
             },
         },
@@ -27,7 +27,7 @@ pub struct CreateTrainingMetricBody {
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
-    filters: Option<Vec<APITrainingMetricFilter>>,
+    filters: APITrainingMetricFilters,
     initial_date_range: Option<DateRange>,
 }
 
@@ -37,7 +37,7 @@ fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainin
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
-        body.filters.map(TrainingMetricFilters::from),
+        body.filters.into(),
         body.initial_date_range,
     )
 }
@@ -80,18 +80,8 @@ mod tests {
                 r#"{
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
-            "aggregate": "Min"
-        }"#,
-            )
-            .is_ok()
-        );
-
-        assert!(
-            serde_json::from_str::<CreateTrainingMetricBody>(
-                r#"{
-            "source": { "Timeseries": ["Distance", "Average"]},
-            "granularity": "Weekly",
-            "aggregate": "Min"
+            "aggregate": "Min",
+            "filters": {}
         }"#,
             )
             .is_ok()
@@ -103,7 +93,19 @@ mod tests {
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": [ { "Sports": ["Running", "Cycling"] } ]
+            "filters": {}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Timeseries": ["Distance", "Average"]},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": { "sports": ["Running", "Cycling"] }
         }"#,
             )
             .is_ok()

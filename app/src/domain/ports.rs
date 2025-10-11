@@ -379,7 +379,7 @@ pub struct CreateTrainingMetricRequest {
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
-    filters: Option<TrainingMetricFilters>,
+    filters: TrainingMetricFilters,
     initial_date_range: Option<DateRange>,
 }
 
@@ -400,7 +400,7 @@ impl CreateTrainingMetricRequest {
         &self.aggregate
     }
 
-    pub fn filters(&self) -> &Option<TrainingMetricFilters> {
+    pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
     }
 

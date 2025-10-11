@@ -391,8 +391,8 @@ mod tests_training_metrics_service {
             },
             training_metrics::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue,
-                TrainingMetricValues,
+                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
+                TrainingMetricValue, TrainingMetricValues,
             },
         },
         ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -442,7 +442,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
+            TrainingMetricFilters::empty(),
             None,
         );
 
@@ -509,7 +509,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
+            TrainingMetricFilters::empty(),
             None,
         );
 
@@ -572,7 +572,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
+            TrainingMetricFilters::empty(),
             Some(DateRange::new(
                 now.date_naive(),
                 now.date_naive().checked_add_days(Days::new(1)).unwrap(),
@@ -601,7 +601,7 @@ mod tests_training_metrics_service {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
+            TrainingMetricFilters::empty(),
             None,
         );
 
@@ -637,7 +637,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None,
+                TrainingMetricFilters::empty(),
             )])
         });
         repository
@@ -659,7 +659,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None
+                TrainingMetricFilters::empty(),
             )
         );
         assert!(value.is_empty());
@@ -675,7 +675,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None,
+                TrainingMetricFilters::empty(),
             )])
         });
         repository.expect_get_metric_values().returning(|_| {
@@ -700,7 +700,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None
+                TrainingMetricFilters::empty(),
             )
         );
         assert_eq!(*value.get("toto").unwrap(), TrainingMetricValue::Max(0.3));
@@ -737,7 +737,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None,
+                TrainingMetricFilters::empty(),
             )))
         });
 
@@ -768,7 +768,7 @@ mod tests_training_metrics_service {
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
-                None,
+                TrainingMetricFilters::empty(),
             )))
         });
         repository

@@ -25,7 +25,7 @@ type DefinitionRow = (
     ActivityMetricSource,
     TrainingMetricGranularity,
     TrainingMetricAggregate,
-    Option<TrainingMetricFilters>,
+    TrainingMetricFilters,
 );
 
 #[derive(Debug, Clone)]
@@ -232,7 +232,7 @@ mod test_sqlite_activity_repository {
         activity::{Sport, TimeseriesMetric},
         training_metrics::{
             ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
-            TrainingMetricFilter, TrainingMetricFilters, TrainingMetricGranularity,
+            TrainingMetricFilters, TrainingMetricGranularity,
         },
     };
 
@@ -266,7 +266,7 @@ mod test_sqlite_activity_repository {
             )),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
-            None,
+            TrainingMetricFilters::empty(),
         )
     }
 
@@ -280,9 +280,7 @@ mod test_sqlite_activity_repository {
             )),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
-            Some(TrainingMetricFilters::new(vec![
-                TrainingMetricFilter::Sports(vec![Sport::Running]),
-            ])),
+            TrainingMetricFilters::new(Some(vec![Sport::Running])),
         )
     }
 
