@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
-    DataMessage, DataValue, EventField, EventType, FitEnum, FitField, FitParserError, MesgNum,
-    RecordField, SessionField, Sport as FitSport, parse_fit_messages,
+    DataMessage, DataValue, Event, EventField, EventType, FitEnum, FitField, FitParserError,
+    MesgNum, RecordField, SessionField, Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 
@@ -132,14 +132,20 @@ fn extract_timeseries(
 
             match event {
                 PauseEvent::Start => {
-                    paused = false;
-                    let pause_duration = timestamp - last_paused_timestamp.unwrap_or(0);
-                    pauses_duration += pause_duration;
-                    last_paused_timestamp = None;
+                    if paused {
+                        paused = false;
+                        if let Some(last_dt) = last_paused_timestamp {
+                            let pause_duration = timestamp - last_dt;
+                            pauses_duration += pause_duration;
+                        }
+                        last_paused_timestamp = None;
+                    }
                 }
                 PauseEvent::Stop => {
-                    paused = true;
-                    last_paused_timestamp = Some(timestamp);
+                    if !paused {
+                        paused = true;
+                        last_paused_timestamp = Some(timestamp);
+                    }
                 }
             }
         }
@@ -284,13 +290,22 @@ fn extract_pause_event(
     message: &DataMessage,
     reference_timestamp: u32,
 ) -> Option<(PauseEvent, u32)> {
-    let event = message.fields.iter().find_map(|field| match field.kind {
+    let event_type = message.fields.iter().find_map(|field| match field.kind {
         FitField::Event(EventField::EventType) => {
             field.values.iter().find_map(|value| match value {
-                DataValue::Enum(FitEnum::EventType(event)) => Some(event.clone()),
+                DataValue::Enum(FitEnum::EventType(event_type)) => Some(event_type.clone()),
                 _ => None,
             })
         }
+        _ => None,
+    })?;
+
+    // Only timer related events
+    message.fields.iter().find_map(|field| match field.kind {
+        FitField::Event(EventField::Event) => field.values.iter().find_map(|value| match value {
+            DataValue::Enum(FitEnum::Event(Event::Timer)) => Some(()),
+            _ => None,
+        }),
         _ => None,
     })?;
 
@@ -304,13 +319,13 @@ fn extract_pause_event(
         _ => None,
     })?;
 
-    let event = match event {
+    let pause_event = match event_type {
         EventType::Start => PauseEvent::Start,
         EventType::Stop | EventType::StopAll => PauseEvent::Stop,
         _ => return None,
     };
 
-    Some((event, timestamp))
+    Some((pause_event, timestamp))
 }
 
 fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
