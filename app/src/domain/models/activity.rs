@@ -325,6 +325,10 @@ impl ActivityTimeseries {
         &self.active_time
     }
 
+    pub fn laps(&self) -> &[Lap] {
+        &self.laps
+    }
+
     pub fn metrics(&self) -> &[Timeseries] {
         &self.metrics
     }

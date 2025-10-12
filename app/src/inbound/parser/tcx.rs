@@ -7,7 +7,8 @@ use roxmltree::Document;
 use crate::{
     domain::models::activity::{
         ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+        TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -207,11 +208,42 @@ fn parse_timeseries(
             .collect(),
     );
 
-    // TODO
-    let laps = vec![];
+    let laps = parse_laps(doc, reference_time);
 
     ActivityTimeseries::new(TimeseriesTime::new(time_values), active_time, laps, metrics)
         .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
+}
+
+fn parse_laps(doc: &Document, reference_time: &DateTime<FixedOffset>) -> Vec<Lap> {
+    let mut laps = Vec::new();
+
+    for node in doc.descendants() {
+        if !node.has_tag_name("Lap") || !node.has_attribute("StartTime") {
+            continue;
+        }
+
+        let Some(start_timestamp) = node.attribute("StartTime").and_then(|content| {
+            content
+                .parse::<DateTime<Utc>>()
+                .map(|dt| dt.fixed_offset())
+                .ok()
+        }) else {
+            continue;
+        };
+        let start = (start_timestamp - reference_time).num_seconds() as usize;
+
+        let Some(duration) = node
+            .descendants()
+            .find(|child| child.has_tag_name("TotalTimeSeconds"))
+            .and_then(|node| node.text().and_then(|txt| txt.parse::<usize>().ok()))
+        else {
+            continue;
+        };
+
+        laps.push(Lap::new(start, start + duration));
+    }
+
+    laps
 }
 
 #[cfg(test)]
@@ -222,7 +254,7 @@ mod test_txc_parser {
     use chrono::{DateTime, FixedOffset};
 
     use crate::{
-        domain::models::activity::{ActivityStartTime, ActivityStatistic},
+        domain::models::activity::{ActivityStartTime, ActivityStatistic, Lap},
         inbound::parser::ParseBytesError,
     };
 
@@ -544,5 +576,29 @@ mod test_txc_parser {
                 Some(TimeseriesValue::Float(100.))
             ]
         );
+    }
+
+    #[test]
+    fn test_parse_timeseries_laps() {
+        let content = String::from(
+            "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\">
+                    <TotalTimeSeconds>10</TotalTimeSeconds>
+                    <DistanceMeters>120</DistanceMeters>
+                    <Calories>33</Calories>
+                </Lap>
+                <Lap StartTime=\"2024-08-28T07:13:54.000Z\">
+                    <TotalTimeSeconds>12</TotalTimeSeconds>
+                    <DistanceMeters>10</DistanceMeters>
+                    <Calories>30</Calories>
+                </Lap>
+            </root>",
+        );
+        let doc = roxmltree::Document::parse(&content).unwrap();
+        let start_time = find_activity_start_time(&doc).expect("Should have a start time");
+
+        let timeseries = parse_timeseries(&doc, start_time.date()).unwrap();
+
+        assert_eq!(timeseries.laps(), &vec![Lap::new(0, 10), Lap::new(60, 72)])
     }
 }
