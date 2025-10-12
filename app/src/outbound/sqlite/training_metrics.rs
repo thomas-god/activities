@@ -456,8 +456,6 @@ mod test_sqlite_activity_repository {
         let id = TrainingMetricId::new();
         let err = repository.delete_definition(&id).await;
 
-        dbg!(&err);
-
         let Err(DeleteMetricError::TrainingMetricDoesNotExists(err_id)) = err else {
             unreachable!("Should have been an err")
         };

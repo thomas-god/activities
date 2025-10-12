@@ -271,7 +271,6 @@ where
             Err(sqlx::Error::RowNotFound) => Ok(false),
             Err(err) => {
                 tracing::warn!("hello?");
-                dbg!(&err);
                 Err(SimilarActivityError::Unknown(anyhow!(err)))
             }
         }

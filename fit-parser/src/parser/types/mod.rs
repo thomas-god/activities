@@ -45,7 +45,7 @@ pub enum DataTypeError {
 }
 
 fn number_of_values(type_size: u8, bytes_to_read: u8) -> Result<u8, DataTypeError> {
-    if bytes_to_read % type_size != 0 {
+    if !bytes_to_read.is_multiple_of(type_size) {
         return Err(DataTypeError::DataNotAligned(bytes_to_read, type_size));
     }
     Ok(bytes_to_read / type_size)
