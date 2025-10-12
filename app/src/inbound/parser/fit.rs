@@ -365,12 +365,12 @@ mod tests {
 
     #[test]
     fn test_parse_fit_timestamp() {
-        let content = fs::read("../test.fit").unwrap();
+        let content = fs::read("src/inbound/parser/test.fit").unwrap();
 
         let res = try_fit_bytes_into_domain(content).unwrap();
 
         // Check for same point in time
-        let expected_time = "2025-08-08T19:14:54+02:00"
+        let expected_time = "2025-10-11T11:43:33+02:00"
             .parse::<DateTime<FixedOffset>>()
             .unwrap();
         assert_eq!(*res.start_time().date(), expected_time);
@@ -378,17 +378,17 @@ mod tests {
         // Check for correct offset to UTC
         assert_eq!(
             (*res.start_time().date()).to_rfc3339(),
-            "2025-08-08T19:14:54+02:00".to_string()
+            "2025-10-11T11:43:33+02:00".to_string()
         );
     }
 
     #[test]
     fn test_parsing_of_timeseries() {
-        let content = fs::read("../test.fit").unwrap();
+        let content = fs::read("src/inbound/parser/test.fit").unwrap();
 
         let res = try_fit_bytes_into_domain(content).unwrap();
 
-        assert_eq!(res.timeseries().time().len(), 3602);
+        assert_eq!(res.timeseries().time().len(), 3901);
 
         let TestMetrics {
             speed,
@@ -412,19 +412,19 @@ mod tests {
         assert_eq!(*res.timeseries().time().values().get(3).unwrap(), 3);
         assert_eq!(
             *distance.unwrap().get(3).unwrap(),
-            Some(TimeseriesValue::Float(0.0))
+            Some(TimeseriesValue::Float(7.0))
         );
         match speed.unwrap().get(3).unwrap().as_ref().unwrap() {
-            TimeseriesValue::Float(val) => assert_approx_eq!(val, 3.969),
+            TimeseriesValue::Float(val) => assert_approx_eq!(val, 3.831),
             _ => unreachable!("Should be a float"),
         }
         assert_eq!(
             power.unwrap().get(3).unwrap().as_ref().unwrap(),
-            &TimeseriesValue::Int(74)
+            &TimeseriesValue::Int(140)
         );
         assert_eq!(
             heart_rate.unwrap().get(3).unwrap().as_ref().unwrap(),
-            &TimeseriesValue::Int(77)
+            &TimeseriesValue::Int(109)
         );
     }
 

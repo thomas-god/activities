@@ -209,6 +209,10 @@ __marimo__/
 *.fit
 *.fit.gz
 
+# .tcx files
+*.tcx
+*.tcx.gz
+
 # Added by cargo
 
 /target
