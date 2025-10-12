@@ -318,6 +318,10 @@ impl ActivityTimeseries {
         &self.time
     }
 
+    pub fn active_time(&self) -> &TimeseriesActiveTime {
+        &self.active_time
+    }
+
     pub fn metrics(&self) -> &[Timeseries] {
         &self.metrics
     }
@@ -346,6 +350,19 @@ impl TimeseriesTime {
 pub enum ActiveTime {
     Running(usize),
     Paused,
+}
+
+impl ActiveTime {
+    pub fn is_paused(&self) -> bool {
+        matches!(self, Self::Paused)
+    }
+
+    pub fn value(&self) -> Option<usize> {
+        match self {
+            Self::Paused => None,
+            Self::Running(dt) => Some(*dt),
+        }
+    }
 }
 
 /// [TimeseriesTime] represents the active time of a timeseries, i.e. it does not increase

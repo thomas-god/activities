@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
-    DataMessage, DataValue, FitEnum, FitField, FitParserError, MesgNum, RecordField, SessionField,
-    Sport as FitSport, parse_fit_messages,
+    DataMessage, DataValue, EventField, EventType, FitEnum, FitField, FitParserError, MesgNum,
+    RecordField, SessionField, Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 
@@ -112,6 +112,7 @@ fn extract_timeseries(
     messages: &[DataMessage],
 ) -> Result<ActivityTimeseries, ParseBytesError> {
     let mut time = vec![];
+    let mut active_time = vec![];
     let mut speed_values = vec![];
     let mut power_values = vec![];
     let mut cadence_values = vec![];
@@ -119,7 +120,30 @@ fn extract_timeseries(
     let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
 
+    let mut pauses_duration = 0;
+    let mut paused = false;
+    let mut last_paused_timestamp = None;
+
     for message in messages {
+        if message.message_kind == MesgNum::Event {
+            let Some((event, timestamp)) = extract_pause_event(message, reference_timestamp) else {
+                continue;
+            };
+
+            match event {
+                PauseEvent::Start => {
+                    paused = false;
+                    let pause_duration = timestamp - last_paused_timestamp.unwrap_or(0);
+                    pauses_duration += pause_duration;
+                    last_paused_timestamp = None;
+                }
+                PauseEvent::Stop => {
+                    paused = true;
+                    last_paused_timestamp = Some(timestamp);
+                }
+            }
+        }
+
         if message.message_kind != MesgNum::Record {
             continue;
         }
@@ -136,6 +160,11 @@ fn extract_timeseries(
             continue;
         };
         time.push(timestamp as usize);
+        active_time.push(if paused {
+            ActiveTime::Paused
+        } else {
+            ActiveTime::Running((timestamp - pauses_duration) as usize)
+        });
 
         let heart_rate = message.fields.iter().find_map(|field| match field.kind {
             FitField::Record(RecordField::HeartRate) => field.values.iter().find_map(|val| {
@@ -238,12 +267,50 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
 
-    // TODO
-    let active_time =
-        TimeseriesActiveTime::new(time.iter().cloned().map(ActiveTime::Running).collect());
+    ActivityTimeseries::new(
+        TimeseriesTime::new(time),
+        TimeseriesActiveTime::new(active_time),
+        metrics,
+    )
+    .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
+}
 
-    ActivityTimeseries::new(TimeseriesTime::new(time), active_time, metrics)
-        .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
+enum PauseEvent {
+    Start,
+    Stop,
+}
+
+fn extract_pause_event(
+    message: &DataMessage,
+    reference_timestamp: u32,
+) -> Option<(PauseEvent, u32)> {
+    let event = message.fields.iter().find_map(|field| match field.kind {
+        FitField::Event(EventField::EventType) => {
+            field.values.iter().find_map(|value| match value {
+                DataValue::Enum(FitEnum::EventType(event)) => Some(event.clone()),
+                _ => None,
+            })
+        }
+        _ => None,
+    })?;
+
+    let timestamp = message.fields.iter().find_map(|field| match field.kind {
+        FitField::Event(EventField::Timestamp) => {
+            field.values.iter().find_map(|value| match value {
+                DataValue::DateTime(dt) => dt.checked_sub(reference_timestamp),
+                _ => None,
+            })
+        }
+        _ => None,
+    })?;
+
+    let event = match event {
+        EventType::Start => PauseEvent::Start,
+        EventType::Stop | EventType::StopAll => PauseEvent::Stop,
+        _ => return None,
+    };
+
+    Some((event, timestamp))
 }
 
 fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
@@ -843,5 +910,24 @@ mod tests {
                     .unwrap()
             )
         )
+    }
+
+    #[test]
+    fn test_takes_pauses_into_account() {
+        let content = fs::read("src/inbound/parser/test.fit").unwrap();
+
+        let res = try_fit_bytes_into_domain(content).unwrap();
+
+        // Last active time should be different from last absolute time
+        assert_ne!(
+            res.timeseries
+                .active_time()
+                .values()
+                .iter()
+                .rev()
+                .next()
+                .map(|val| val.value().unwrap()),
+            res.timeseries.time().values().iter().rev().next().cloned()
+        );
     }
 }
