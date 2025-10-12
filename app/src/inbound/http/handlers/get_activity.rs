@@ -245,6 +245,7 @@ mod tests {
                             ActiveTime::Running(1),
                             ActiveTime::Running(2),
                         ]),
+                        vec![],
                         vec![Timeseries::new(
                             TimeseriesMetric::Power,
                             vec![

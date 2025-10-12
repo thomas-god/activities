@@ -207,7 +207,10 @@ fn parse_timeseries(
             .collect(),
     );
 
-    ActivityTimeseries::new(TimeseriesTime::new(time_values), active_time, metrics)
+    // TODO
+    let laps = vec![];
+
+    ActivityTimeseries::new(TimeseriesTime::new(time_values), active_time, laps, metrics)
         .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
 }
 

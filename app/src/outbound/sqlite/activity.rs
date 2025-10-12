@@ -378,6 +378,7 @@ mod test_sqlite_activity_repository {
                     ActiveTime::Running(2),
                     ActiveTime::Running(3),
                 ]),
+                vec![],
                 vec![Timeseries::new(
                     TimeseriesMetric::Speed,
                     vec![
@@ -405,6 +406,7 @@ mod test_sqlite_activity_repository {
                     ActiveTime::Running(2),
                     ActiveTime::Running(3),
                 ]),
+                vec![],
                 vec![Timeseries::new(
                     TimeseriesMetric::Speed,
                     vec![
@@ -873,6 +875,7 @@ mod test_sqlite_activity_repository {
                     ActiveTime::Running(2),
                     ActiveTime::Running(3),
                 ]),
+                vec![],
                 vec![Timeseries::new(
                     TimeseriesMetric::Altitude,
                     vec![

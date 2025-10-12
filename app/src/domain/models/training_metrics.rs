@@ -641,6 +641,7 @@ mod test_training_metrics {
                     ActiveTime::Running(1),
                     ActiveTime::Running(2),
                 ]),
+                vec![],
                 vec![Timeseries::new(
                     TimeseriesMetric::Power,
                     vec![
@@ -684,6 +685,7 @@ mod test_training_metrics {
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
                 TimeseriesActiveTime::new(vec![]),
+                vec![],
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
             )
             .unwrap(),

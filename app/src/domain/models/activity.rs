@@ -285,6 +285,7 @@ pub struct ActivityTimeseries {
     time: TimeseriesTime,
     active_time: TimeseriesActiveTime,
     metrics: Vec<Timeseries>,
+    laps: Vec<Lap>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -297,6 +298,7 @@ impl ActivityTimeseries {
     pub fn new(
         time: TimeseriesTime,
         active_time: TimeseriesActiveTime,
+        laps: Vec<Lap>,
         metrics: Vec<Timeseries>,
     ) -> Result<Self, NewTimeseriesError> {
         if time.len() != active_time.len() {
@@ -310,6 +312,7 @@ impl ActivityTimeseries {
         Ok(Self {
             time,
             active_time,
+            laps,
             metrics,
         })
     }
@@ -382,6 +385,12 @@ impl TimeseriesActiveTime {
     pub fn values(&self) -> &[ActiveTime] {
         &self.0
     }
+}
+
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct Lap {
+    start: usize,
+    end: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -531,6 +540,7 @@ mod test_timeseries {
             ActiveTime::Running(2),
             ActiveTime::Running(3),
         ]);
+        let laps = vec![];
         let metrics = vec![Timeseries::new(
             TimeseriesMetric::Power,
             vec![
@@ -540,7 +550,7 @@ mod test_timeseries {
             ],
         )];
 
-        assert!(ActivityTimeseries::new(time, active_time, metrics).is_ok());
+        assert!(ActivityTimeseries::new(time, active_time, laps, metrics).is_ok());
     }
 
     #[test]
@@ -548,6 +558,8 @@ mod test_timeseries {
         let time = TimeseriesTime::new(vec![1, 2, 3]);
         let active_time =
             TimeseriesActiveTime::new(vec![ActiveTime::Running(1), ActiveTime::Running(2)]);
+
+        let laps = vec![];
         let metrics = vec![Timeseries::new(
             TimeseriesMetric::Power,
             vec![
@@ -557,7 +569,7 @@ mod test_timeseries {
             ],
         )];
 
-        assert!(ActivityTimeseries::new(time, active_time, metrics).is_err());
+        assert!(ActivityTimeseries::new(time, active_time, laps, metrics).is_err());
     }
 
     #[test]
@@ -568,6 +580,7 @@ mod test_timeseries {
             ActiveTime::Running(2),
             ActiveTime::Running(3),
         ]);
+        let laps = vec![];
         let metrics = vec![Timeseries::new(
             TimeseriesMetric::Power,
             vec![
@@ -576,6 +589,6 @@ mod test_timeseries {
             ],
         )];
 
-        assert!(ActivityTimeseries::new(time, active_time, metrics).is_err());
+        assert!(ActivityTimeseries::new(time, active_time, laps, metrics).is_err());
     }
 }

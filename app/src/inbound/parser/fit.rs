@@ -273,9 +273,13 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
 
+    // TODO
+    let laps = vec![];
+
     ActivityTimeseries::new(
         TimeseriesTime::new(time),
         TimeseriesActiveTime::new(active_time),
+        laps,
         metrics,
     )
     .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
