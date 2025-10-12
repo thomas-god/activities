@@ -3,14 +3,15 @@ use std::collections::HashMap;
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
     DataMessage, DataValue, Event, EventField, EventType, FitEnum, FitField, FitParserError,
-    MesgNum, RecordField, SessionField, Sport as FitSport, parse_fit_messages,
+    LapField, MesgNum, RecordField, SessionField, Sport as FitSport, parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 
 use crate::{
     domain::models::activity::{
         ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+        TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -120,6 +121,8 @@ fn extract_timeseries(
     let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
 
+    let mut laps = vec![];
+
     let mut pauses_duration = 0;
     let mut paused = false;
     let mut last_paused_timestamp = None;
@@ -147,6 +150,14 @@ fn extract_timeseries(
                         last_paused_timestamp = Some(timestamp);
                     }
                 }
+            }
+        }
+
+        if message.message_kind == MesgNum::Lap {
+            if let Some(lap) = extract_lap(message, reference_timestamp) {
+                laps.push(lap);
+            } else {
+                continue;
             }
         }
 
@@ -273,9 +284,6 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
 
-    // TODO
-    let laps = vec![];
-
     ActivityTimeseries::new(
         TimeseriesTime::new(time),
         TimeseriesActiveTime::new(active_time),
@@ -330,6 +338,35 @@ fn extract_pause_event(
     };
 
     Some((pause_event, timestamp))
+}
+
+fn extract_lap(message: &DataMessage, reference_timestamp: u32) -> Option<Lap> {
+    let start_timestamp = message
+        .fields
+        .iter()
+        .find(|field| field.kind == FitField::Lap(LapField::StartTime))
+        .and_then(|field| {
+            field.values.iter().find_map(|value| match value {
+                DataValue::DateTime(dt) => Some(*dt),
+                _ => None,
+            })
+        })?;
+
+    let end_timestamp = message
+        .fields
+        .iter()
+        .find(|field| field.kind == FitField::Lap(LapField::Timestamp))
+        .and_then(|field| {
+            field.values.iter().find_map(|value| match value {
+                DataValue::DateTime(dt) => Some(*dt),
+                _ => None,
+            })
+        })?;
+
+    Some(Lap::new(
+        (start_timestamp - reference_timestamp) as usize,
+        (end_timestamp - reference_timestamp) as usize,
+    ))
 }
 
 fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {
@@ -947,6 +984,30 @@ mod tests {
                 .next()
                 .map(|val| val.value().unwrap()),
             res.timeseries.time().values().iter().rev().next().cloned()
+        );
+    }
+
+    #[test]
+    fn test_parse_timeseries_laps() {
+        let content = fs::read("src/inbound/parser/test.fit").unwrap();
+
+        let res = try_fit_bytes_into_domain(content).unwrap();
+
+        assert_eq!(
+            res.timeseries.laps(),
+            &vec![
+                Lap::new(0, 300),
+                Lap::new(300, 1763),
+                Lap::new(1763, 2063),
+                Lap::new(2063, 2243),
+                Lap::new(2243, 2543),
+                Lap::new(2543, 2723),
+                Lap::new(2723, 3023),
+                Lap::new(3023, 3203),
+                Lap::new(3203, 3503),
+                Lap::new(3503, 3683),
+                Lap::new(3683, 3983),
+            ]
         );
     }
 }
