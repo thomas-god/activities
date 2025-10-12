@@ -24,7 +24,7 @@ pub fn try_tcx_bytes_into_domain(
     let start_time = find_activity_start_time(&doc).ok_or(ParseBytesError::NoStartTimeFound)?;
     let sport = find_sport(&doc);
     let statistics = find_activity_statistics(&doc);
-    let timeseries = parse_timeseries(&doc, start_time.date());
+    let timeseries = parse_timeseries(&doc, start_time.date())?;
 
     Ok(ParsedFileContent::new(
         sport,
@@ -111,7 +111,10 @@ fn find_activity_statistics(doc: &Document) -> ActivityStatistics {
     ActivityStatistics::new(stats)
 }
 
-fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> ActivityTimeseries {
+fn parse_timeseries(
+    doc: &Document,
+    reference_time: &DateTime<FixedOffset>,
+) -> Result<ActivityTimeseries, super::ParseBytesError> {
     let mut time_values = Vec::new();
     let mut speed_values = vec![];
     let mut power_values = vec![];
@@ -195,7 +198,7 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
 
-    // TCX does not support pause, so active time = time
+    // TCX does not support pauses, so active time = time
     let active_time = TimeseriesActiveTime::new(
         time_values
             .iter()
@@ -205,6 +208,7 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
     );
 
     ActivityTimeseries::new(TimeseriesTime::new(time_values), active_time, metrics)
+        .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
 }
 
 #[cfg(test)]
@@ -454,7 +458,7 @@ mod test_txc_parser {
         let doc = roxmltree::Document::parse(&content).unwrap();
         let start_time = find_activity_start_time(&doc).expect("Should have a start time");
 
-        let timeseries = parse_timeseries(&doc, start_time.date());
+        let timeseries = parse_timeseries(&doc, start_time.date()).unwrap();
 
         assert_eq!(timeseries.time().len(), 3);
 

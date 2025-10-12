@@ -501,7 +501,8 @@ mod tests_training_metrics_service {
                         TimeseriesTime::new(vec![]),
                         TimeseriesActiveTime::new(vec![]),
                         vec![],
-                    ),
+                    )
+                    .unwrap(),
                 )])
             });
         activities

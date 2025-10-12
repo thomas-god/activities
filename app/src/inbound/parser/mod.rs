@@ -97,6 +97,8 @@ pub enum ParseBytesError {
     InvalidContent,
     #[error("No start time data found in activity file")]
     NoStartTimeFound,
+    #[error("Activity has timeseries with different lengths")]
+    IncoherentTimeseriesLengths,
 }
 
 pub trait ParseFile: Clone + Send + Sync + 'static {

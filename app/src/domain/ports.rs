@@ -77,8 +77,6 @@ pub enum CreateActivityError {
     Unknown(#[from] anyhow::Error),
     #[error("An activity with similar data already exists")]
     SimilarActivityExistsError,
-    #[error("Timeseries metrics do not have the same length")]
-    TimeseriesMetricsNotSameLength,
     #[error("User {0} does not exists")]
     UserDoesNotExist(UserId),
 }

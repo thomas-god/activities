@@ -649,7 +649,8 @@ mod test_training_metrics {
                         Some(TimeseriesValue::Int(30)),
                     ],
                 )],
-            ),
+            )
+            .unwrap(),
         )
     }
 
@@ -684,7 +685,8 @@ mod test_training_metrics {
                 TimeseriesTime::new(vec![]),
                 TimeseriesActiveTime::new(vec![]),
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
-            ),
+            )
+            .unwrap(),
         );
 
         let res = aggregate.value_from_timeseries(&metric, &activity);

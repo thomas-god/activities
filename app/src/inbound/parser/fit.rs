@@ -242,11 +242,8 @@ fn extract_timeseries(
     let active_time =
         TimeseriesActiveTime::new(time.iter().cloned().map(ActiveTime::Running).collect());
 
-    Ok(ActivityTimeseries::new(
-        TimeseriesTime::new(time),
-        active_time,
-        metrics,
-    ))
+    ActivityTimeseries::new(TimeseriesTime::new(time), active_time, metrics)
+        .map_err(|_err| ParseBytesError::IncoherentTimeseriesLengths)
 }
 
 fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {

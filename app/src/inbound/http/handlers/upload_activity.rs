@@ -17,7 +17,7 @@ use crate::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
         },
-        parser::{ParseFile, SupportedExtension},
+        parser::{ParseBytesError, ParseFile, SupportedExtension},
     },
 };
 
@@ -46,7 +46,6 @@ impl From<CreateActivityError> for RejectionReason {
     fn from(value: CreateActivityError) -> Self {
         match value {
             CreateActivityError::SimilarActivityExistsError => Self::DuplicatedActivity,
-            CreateActivityError::TimeseriesMetricsNotSameLength => Self::IncoherentTimeseries,
             _ => Self::Unknown,
         }
     }
@@ -75,14 +74,23 @@ pub async fn upload_activities<
             unprocessable_files.push((name.to_string(), RejectionReason::CannotReadContent));
             continue;
         };
-        let Ok(file_content) = state
+
+        let parsed_content = match state
             .file_parser
             .try_bytes_into_domain(&extension, file_content)
-        else {
-            unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
-            continue;
+        {
+            Ok(parsed_content) => parsed_content,
+            Err(ParseBytesError::IncoherentTimeseriesLengths) => {
+                unprocessable_files.push((name.to_string(), RejectionReason::IncoherentTimeseries));
+                continue;
+            }
+            Err(_) => {
+                unprocessable_files.push((name.to_string(), RejectionReason::CannotProcessFile));
+                continue;
+            }
         };
-        let create_activity_request = file_content.into_request(user.user());
+
+        let create_activity_request = parsed_content.into_request(user.user());
 
         if let Err(err) = state
             .activity_service

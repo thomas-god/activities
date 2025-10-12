@@ -246,7 +246,8 @@ mod tests {
                                 Some(TimeseriesValue::Int(130)),
                             ],
                         )],
-                    ),
+                    )
+                    .unwrap(),
                 ))
             });
         let file_parser = MockFileParser::test_default();

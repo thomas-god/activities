@@ -388,7 +388,8 @@ mod test_sqlite_activity_repository {
                         Some(TimeseriesValue::Float(2.45)),
                     ],
                 )],
-            ),
+            )
+            .unwrap(),
         )
     }
 
@@ -414,7 +415,8 @@ mod test_sqlite_activity_repository {
                         Some(TimeseriesValue::Float(2.45)),
                     ],
                 )],
-            ),
+            )
+            .unwrap(),
         )
     }
 
@@ -874,9 +876,15 @@ mod test_sqlite_activity_repository {
                 ]),
                 vec![Timeseries::new(
                     TimeseriesMetric::Altitude,
-                    vec![Some(TimeseriesValue::Float(12.3))],
+                    vec![
+                        Some(TimeseriesValue::Float(12.3)),
+                        Some(TimeseriesValue::Float(12.3)),
+                        Some(TimeseriesValue::Float(12.3)),
+                        Some(TimeseriesValue::Float(12.3)),
+                    ],
                 )],
-            ),
+            )
+            .unwrap(),
             "fit".to_string(),
             vec![],
         )
@@ -919,7 +927,12 @@ mod test_sqlite_activity_repository {
             res.timeseries().metrics().first().unwrap(),
             &Timeseries::new(
                 TimeseriesMetric::Altitude,
-                vec![Some(TimeseriesValue::Float(12.3))],
+                vec![
+                    Some(TimeseriesValue::Float(12.3)),
+                    Some(TimeseriesValue::Float(12.3)),
+                    Some(TimeseriesValue::Float(12.3)),
+                    Some(TimeseriesValue::Float(12.3)),
+                ],
             )
         );
     }

@@ -57,17 +57,6 @@ where
         &self,
         req: CreateActivityRequest,
     ) -> Result<Activity, CreateActivityError> {
-        // Check candidate timeseries metrics have the same lenghts
-        let time_len = req.timeseries().time().len();
-        if req
-            .timeseries()
-            .metrics()
-            .iter()
-            .any(|metric| metric.values().len() != time_len)
-        {
-            return Err(CreateActivityError::TimeseriesMetricsNotSameLength);
-        }
-
         // Create activity from request
         let id = ActivityId::new();
         let activity = Activity::new(
@@ -407,9 +396,7 @@ mod tests_activity_service {
         models::{
             UserId,
             activity::{
-                ActiveTime, ActivityName, ActivityStartTime, ActivityStatistics,
-                ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
-                TimeseriesTime, TimeseriesValue,
+                ActivityName, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
             },
         },
         ports::{
@@ -571,65 +558,6 @@ mod tests_activity_service {
         let res = service.create_activity(req).await;
 
         assert!(res.is_err())
-    }
-
-    #[tokio::test]
-    async fn test_create_timeseries_returns_err_when_timeseries_have_different_lenghts_than_time_vec()
-     {
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let mut raw_data_repository = MockRawDataRepository::new();
-        raw_data_repository.expect_save_raw_data().times(0);
-        let metrics_service = Arc::new(MockTrainingMetricService::test_default());
-        let service =
-            ActivityService::new(activity_repository, raw_data_repository, metrics_service);
-
-        let sport = Sport::Running;
-        let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
-        let content = RawContent::new("fit".to_string(), vec![1, 2, 3]);
-        let statistics = ActivityStatistics::default();
-        let timeseries = ActivityTimeseries::new(
-            TimeseriesTime::new(vec![0, 1, 2]),
-            TimeseriesActiveTime::new(vec![
-                ActiveTime::Running(0),
-                ActiveTime::Running(1),
-                ActiveTime::Running(2),
-            ]),
-            vec![
-                Timeseries::new(
-                    TimeseriesMetric::Power,
-                    vec![
-                        Some(TimeseriesValue::Int(0)),
-                        Some(TimeseriesValue::Int(100)),
-                    ],
-                ),
-                Timeseries::new(
-                    TimeseriesMetric::Speed,
-                    vec![
-                        Some(TimeseriesValue::Float(0.)),
-                        Some(TimeseriesValue::Float(100.)),
-                        None,
-                    ],
-                ),
-            ],
-        );
-
-        let req = CreateActivityRequest::new(
-            UserId::test_default(),
-            sport,
-            start_time,
-            statistics,
-            timeseries,
-            content,
-        );
-
-        let res = service.create_activity(req).await;
-
-        match res {
-            Err(CreateActivityError::TimeseriesMetricsNotSameLength) => {}
-            _ => unreachable!(
-                "Should have returned an Err(CreateActivityError::TimeseriesNotSameLength) "
-            ),
-        }
     }
 
     #[tokio::test]

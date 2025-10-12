@@ -7,6 +7,7 @@ use std::{
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Display, From, Into};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::models::UserId;
@@ -279,14 +280,40 @@ impl fmt::Display for Unit {
 
 /// An [ActivityTimeseries] is a coherent set of time dependant [TimeseriesMetric] (plural)
 /// from the same [Activity].
-#[derive(Debug, Clone, PartialEq, Constructor, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityTimeseries {
     time: TimeseriesTime,
     active_time: TimeseriesActiveTime,
     metrics: Vec<Timeseries>,
 }
 
+#[derive(Debug, Clone, Error)]
+pub enum NewTimeseriesError {
+    #[error("Different lengths for time/metrics")]
+    InvalidLengths,
+}
+
 impl ActivityTimeseries {
+    pub fn new(
+        time: TimeseriesTime,
+        active_time: TimeseriesActiveTime,
+        metrics: Vec<Timeseries>,
+    ) -> Result<Self, NewTimeseriesError> {
+        if time.len() != active_time.len() {
+            return Err(NewTimeseriesError::InvalidLengths);
+        }
+
+        if metrics.iter().any(|metric| metric.len() != time.len()) {
+            return Err(NewTimeseriesError::InvalidLengths);
+        }
+
+        Ok(Self {
+            time,
+            active_time,
+            metrics,
+        })
+    }
+
     pub fn time(&self) -> &TimeseriesTime {
         &self.time
     }
@@ -326,6 +353,20 @@ pub enum ActiveTime {
 #[derive(Debug, Clone, PartialEq, Constructor, Default)]
 pub struct TimeseriesActiveTime(Vec<ActiveTime>);
 
+impl TimeseriesActiveTime {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn values(&self) -> &[ActiveTime] {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct Timeseries {
     metric: TimeseriesMetric,
@@ -335,6 +376,14 @@ pub struct Timeseries {
 impl Timeseries {
     pub fn metric(&self) -> &TimeseriesMetric {
         &self.metric
+    }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 
     pub fn values(&self) -> &[Option<TimeseriesValue>] {
@@ -449,5 +498,67 @@ mod tests {
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
+    }
+}
+
+#[cfg(test)]
+mod test_timeseries {
+
+    use super::*;
+
+    #[test]
+    fn test_new_timeseries_ok() {
+        let time = TimeseriesTime::new(vec![1, 2, 3]);
+        let active_time = TimeseriesActiveTime::new(vec![
+            ActiveTime::Running(1),
+            ActiveTime::Running(2),
+            ActiveTime::Running(3),
+        ]);
+        let metrics = vec![Timeseries::new(
+            TimeseriesMetric::Power,
+            vec![
+                Some(TimeseriesValue::Float(1.)),
+                Some(TimeseriesValue::Float(1.)),
+                Some(TimeseriesValue::Float(1.)),
+            ],
+        )];
+
+        assert!(ActivityTimeseries::new(time, active_time, metrics).is_ok());
+    }
+
+    #[test]
+    fn test_new_timeseries_invalid_active_time_len() {
+        let time = TimeseriesTime::new(vec![1, 2, 3]);
+        let active_time =
+            TimeseriesActiveTime::new(vec![ActiveTime::Running(1), ActiveTime::Running(2)]);
+        let metrics = vec![Timeseries::new(
+            TimeseriesMetric::Power,
+            vec![
+                Some(TimeseriesValue::Float(1.)),
+                Some(TimeseriesValue::Float(1.)),
+                Some(TimeseriesValue::Float(1.)),
+            ],
+        )];
+
+        assert!(ActivityTimeseries::new(time, active_time, metrics).is_err());
+    }
+
+    #[test]
+    fn test_new_timeseries_invalid_metric_len() {
+        let time = TimeseriesTime::new(vec![1, 2, 3]);
+        let active_time = TimeseriesActiveTime::new(vec![
+            ActiveTime::Running(1),
+            ActiveTime::Running(2),
+            ActiveTime::Running(3),
+        ]);
+        let metrics = vec![Timeseries::new(
+            TimeseriesMetric::Power,
+            vec![
+                Some(TimeseriesValue::Float(1.)),
+                Some(TimeseriesValue::Float(1.)),
+            ],
+        )];
+
+        assert!(ActivityTimeseries::new(time, active_time, metrics).is_err());
     }
 }
