@@ -387,7 +387,8 @@ mod tests_training_metrics_service {
         models::{
             activity::{
                 Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesTime,
+                ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesActiveTime,
+                TimeseriesTime,
             },
             training_metrics::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
@@ -496,7 +497,11 @@ mod tests_training_metrics_service {
                             12.,
                         )])),
                     ),
-                    ActivityTimeseries::new(TimeseriesTime::new(vec![]), vec![]),
+                    ActivityTimeseries::new(
+                        TimeseriesTime::new(vec![]),
+                        TimeseriesActiveTime::new(vec![]),
+                        vec![],
+                    ),
                 )])
             });
         activities

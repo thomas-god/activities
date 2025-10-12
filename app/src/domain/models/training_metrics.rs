@@ -612,8 +612,9 @@ mod test_training_metrics {
     use crate::domain::models::{
         UserId,
         activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-            Timeseries, TimeseriesTime, TimeseriesValue,
+            ActiveTime, Activity, ActivityId, ActivityStartTime, ActivityStatistics,
+            ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesTime,
+            TimeseriesValue,
         },
     };
 
@@ -635,6 +636,11 @@ mod test_training_metrics {
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                ]),
                 vec![Timeseries::new(
                     TimeseriesMetric::Power,
                     vec![
@@ -676,6 +682,7 @@ mod test_training_metrics {
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
+                TimeseriesActiveTime::new(vec![]),
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
             ),
         );

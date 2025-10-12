@@ -6,8 +6,8 @@ use roxmltree::Document;
 
 use crate::{
     domain::models::activity::{
-        ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
-        Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -194,7 +194,17 @@ fn parse_timeseries(doc: &Document, reference_time: &DateTime<FixedOffset>) -> A
         Timeseries::new(TimeseriesMetric::Cadence, cadence_values),
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
-    ActivityTimeseries::new(TimeseriesTime::new(time_values), metrics)
+
+    // TCX does not support pause, so active time = time
+    let active_time = TimeseriesActiveTime::new(
+        time_values
+            .iter()
+            .cloned()
+            .map(ActiveTime::Running)
+            .collect(),
+    );
+
+    ActivityTimeseries::new(TimeseriesTime::new(time_values), active_time, metrics)
 }
 
 #[cfg(test)]

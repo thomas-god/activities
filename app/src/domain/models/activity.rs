@@ -282,6 +282,7 @@ impl fmt::Display for Unit {
 #[derive(Debug, Clone, PartialEq, Constructor, Default)]
 pub struct ActivityTimeseries {
     time: TimeseriesTime,
+    active_time: TimeseriesActiveTime,
     metrics: Vec<Timeseries>,
 }
 
@@ -296,7 +297,7 @@ impl ActivityTimeseries {
 }
 
 /// [TimeseriesTime] represents the relative timestamp of a timeseries, starting from the
-/// [Activity::start_time].
+/// [Activity::start_time]. This time is strictly increasing, i.e. event when the activity is paused.
 #[derive(Debug, Clone, PartialEq, Constructor, AsRef, Default)]
 pub struct TimeseriesTime(Vec<usize>);
 
@@ -313,6 +314,17 @@ impl TimeseriesTime {
         &self.0
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActiveTime {
+    Running(usize),
+    Paused,
+}
+
+/// [TimeseriesTime] represents the active time of a timeseries, i.e. it does not increase
+/// when the activity is paused.
+#[derive(Debug, Clone, PartialEq, Constructor, Default)]
+pub struct TimeseriesActiveTime(Vec<ActiveTime>);
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct Timeseries {

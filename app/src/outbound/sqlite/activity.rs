@@ -317,8 +317,9 @@ mod test_sqlite_activity_repository {
             models::{
                 UserId,
                 activity::{
-                    ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-                    Sport, Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+                    ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
+                    TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::{DateRange, GetRawDataError, RawContent, test_utils::MockRawDataRepository},
@@ -372,6 +373,12 @@ mod test_sqlite_activity_repository {
             build_activity(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
                 vec![Timeseries::new(
                     TimeseriesMetric::Speed,
                     vec![
@@ -392,6 +399,12 @@ mod test_sqlite_activity_repository {
             build_activity_starting_at(start),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
                 vec![Timeseries::new(
                     TimeseriesMetric::Speed,
                     vec![
@@ -853,6 +866,12 @@ mod test_sqlite_activity_repository {
             ActivityStatistics::new(HashMap::new()),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
                 vec![Timeseries::new(
                     TimeseriesMetric::Altitude,
                     vec![Some(TimeseriesValue::Float(12.3))],

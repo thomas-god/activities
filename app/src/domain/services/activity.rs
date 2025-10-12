@@ -407,8 +407,9 @@ mod tests_activity_service {
         models::{
             UserId,
             activity::{
-                ActivityName, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
-                Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                ActiveTime, ActivityName, ActivityStartTime, ActivityStatistics,
+                ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
+                TimeseriesTime, TimeseriesValue,
             },
         },
         ports::{
@@ -588,6 +589,11 @@ mod tests_activity_service {
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::new(
             TimeseriesTime::new(vec![0, 1, 2]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+            ]),
             vec![
                 Timeseries::new(
                     TimeseriesMetric::Power,

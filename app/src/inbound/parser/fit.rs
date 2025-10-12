@@ -9,8 +9,8 @@ use fit_parser::{
 
 use crate::{
     domain::models::activity::{
-        ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries, Sport,
-        Timeseries, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -237,7 +237,16 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Cadence, cadence_values),
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
     ];
-    Ok(ActivityTimeseries::new(TimeseriesTime::new(time), metrics))
+
+    // TODO
+    let active_time =
+        TimeseriesActiveTime::new(time.iter().cloned().map(ActiveTime::Running).collect());
+
+    Ok(ActivityTimeseries::new(
+        TimeseriesTime::new(time),
+        active_time,
+        metrics,
+    ))
 }
 
 fn extract_statistics(messages: &[DataMessage]) -> ActivityStatistics {

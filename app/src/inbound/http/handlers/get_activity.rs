@@ -189,8 +189,9 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActivityStartTime, ActivityStatistics, ActivityTimeseries, Timeseries,
-                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue,
                 },
             },
             ports::GetActivityError,
@@ -232,6 +233,11 @@ mod tests {
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![0, 1, 2]),
+                        TimeseriesActiveTime::new(vec![
+                            ActiveTime::Running(0),
+                            ActiveTime::Running(1),
+                            ActiveTime::Running(2),
+                        ]),
                         vec![Timeseries::new(
                             TimeseriesMetric::Power,
                             vec![
