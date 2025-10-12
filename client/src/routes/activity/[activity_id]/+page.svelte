@@ -9,6 +9,7 @@
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
+	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 
 	let { data }: PageProps = $props();
 
@@ -26,6 +27,8 @@
 		};
 	});
 
+	let active_metrics = $derived(convertTimeseriesToActiveTime(data.activity.timeseries));
+
 	let metricOptions: { option: Metric; display: string }[] = [
 		{ option: 'HeartRate', display: 'Heart rate' },
 		{ option: 'Speed', display: 'Speed' },
@@ -38,8 +41,8 @@
 		let options = [];
 		for (const option of metricOptions) {
 			if (
-				option.option in data.activity.timeseries.metrics &&
-				data.activity.timeseries.metrics[option.option].values.some((value) => value !== null)
+				option.option in active_metrics.metrics &&
+				active_metrics.metrics[option.option].values.some((value) => value !== null)
 			) {
 				options.push(option);
 			}
@@ -52,9 +55,9 @@
 	let selectedMetrics = $derived.by(() => {
 		return selectedOptions.map((option) => {
 			return {
-				values: data.activity.timeseries.metrics[option.option!].values,
+				values: active_metrics.metrics[option.option!].values,
 				name: option.option,
-				unit: data.activity.timeseries.metrics[option.option!].unit
+				unit: active_metrics.metrics[option.option!].unit
 			};
 		});
 	});
@@ -114,7 +117,7 @@
 			{#if selectedMetrics}
 				<div bind:clientWidth={chartWidth}>
 					<TimeseriesChart
-						time={data.activity.timeseries.time}
+						time={active_metrics.time}
 						metrics={selectedMetrics}
 						height={400}
 						width={chartWidth}

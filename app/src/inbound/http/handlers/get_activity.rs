@@ -39,6 +39,7 @@ pub struct ResponseBody {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ActivityTimeseriesBody {
     time: Vec<usize>,
+    active_time: Vec<Option<usize>>,
     metrics: HashMap<String, TimeseriesBody>,
 }
 
@@ -103,6 +104,12 @@ impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
     fn from(value: &ActivityTimeseries) -> Self {
         Self {
             time: value.time().values().into(),
+            active_time: value
+                .active_time()
+                .values()
+                .iter()
+                .map(|value| value.value())
+                .collect(),
             metrics: extract_and_convert_metrics(value.metrics()),
         }
     }
@@ -283,6 +290,7 @@ mod tests {
                 statistics: HashMap::from([("Duration".to_string(), 1200.)]),
                 timeseries: ActivityTimeseriesBody {
                     time: vec![0, 1, 2],
+                    active_time: vec![Some(0), Some(1), Some(2)],
                     metrics: HashMap::from([(
                         "Power".to_string(),
                         TimeseriesBody {
