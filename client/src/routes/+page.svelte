@@ -24,7 +24,7 @@
 
 		return {
 			values: values,
-			title: `${metric.metric} (${metric.granularity})`,
+			title: `${metric.granularity} ${metric.metric.toLowerCase()}`,
 			unit: metric.unit,
 			granularity: metric.granularity
 		};
@@ -37,7 +37,7 @@
 
 {#if topMetric}
 	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
-		<p class="mx-2 pt-4">{topMetric.title}</p>
+		<p class="mx-3 pt-4">{topMetric.title} over the last 4 weeks</p>
 		<TrainingMetricsChart
 			height={300}
 			width={chartWidth}

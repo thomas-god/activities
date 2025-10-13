@@ -1,39 +1,65 @@
 <script lang="ts">
-	import { formatDuration, formatRelativeDuration } from '$lib/duration';
-	import dayjs from 'dayjs';
+	import { dayjs } from '$lib/duration';
 	import type { ActivityList, ActivityListItem } from '../routes/+page';
+	import PastActivitiesListItem from './PastActivitiesListItem.svelte';
 
 	let { activityList, moreCallback }: { activityList: ActivityList; moreCallback: () => void } =
 		$props();
 
-	const activityTitle = (activity: ActivityListItem) => {
-		if (activity.name === null || activity.name === '') {
-			return activity.sport;
+	let groupedActivities = $derived.by(() => {
+		const now = dayjs();
+		const activities = {
+			thisWeek: [] as ActivityListItem[],
+			thisMonth: [] as ActivityListItem[],
+			earlier: [] as ActivityListItem[]
+		};
+
+		for (const activity of activityList) {
+			const start = dayjs(activity.start_time);
+			if (start > now.startOf('isoWeek')) {
+				activities.thisWeek.push(activity);
+			} else if (start > now.startOf('month')) {
+				activities.thisMonth.push(activity);
+			} else {
+				activities.earlier.push(activity);
+			}
 		}
-		return activity.name;
-	};
+
+		return activities;
+	});
+	const containerClass = 'text-base-content/60 my-3 text-xs font-semibold uppercase tracking-wide';
 </script>
 
-<ul class="rounded-box bg-base-100 shadow-md">
-	<li class="p-4 pb-2 text-xs tracking-wide opacity-60">Past activities</li>
-	{#each activityList as activity}
-		<a href={`/activity/${activity.id}`} class="block">
-			<li class="grid grid-cols-3 justify-self-auto bg-base-100 p-3 hover:bg-base-200">
-				<div>
-					{activityTitle(activity)}
-				</div>
-				<div class="justify-self-start">
-					⌛ <span class="font-mono font-medium">{formatDuration(activity.duration)}</span>
-				</div>
-				<div class="justify-self-end">
-					📅 <span>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span>
-				</div>
-			</li>
-		</a>
-	{:else}
-		<li class="p-4 pb-2 text-sm italic text-center tracking-wide opacity-60">No activities</li>
-	{/each}
-	<li class="px-4 pt-0 pb-2 text-xs tracking-wide opacity-60">
-		<button class="btn btn-link btn-sm" onclick={moreCallback}> + more </button>
-	</li>
-</ul>
+<div class="rounded-box bg-base-100 p-4 shadow-md">
+	<div class="flex items-center justify-between pb-2 text-lg font-semibold tracking-wide">
+		<span> Recent activities </span>
+		<button class="btn btn-link btn-sm" onclick={moreCallback}> view all →</button>
+	</div>
+
+	{#if groupedActivities.thisWeek.length > 0}
+		<p class={containerClass}>This week</p>
+		<div class="flex flex-col gap-2">
+			{#each groupedActivities.thisWeek as activity}
+				<PastActivitiesListItem {activity} />
+			{/each}
+		</div>
+	{/if}
+
+	{#if groupedActivities.thisMonth.length > 0}
+		<p class={containerClass}>This month</p>
+		<div class="flex flex-col gap-2">
+			{#each groupedActivities.thisMonth as activity}
+				<PastActivitiesListItem {activity} />
+			{/each}
+		</div>
+	{/if}
+
+	{#if groupedActivities.earlier.length > 0}
+		<p class={containerClass}>Earlier</p>
+		<div class="flex flex-col gap-2">
+			{#each groupedActivities.earlier as activity}
+				<PastActivitiesListItem {activity} />
+			{/each}
+		</div>
+	{/if}
+</div>

@@ -106,7 +106,7 @@
 			.scaleBand()
 			.domain(time)
 			.range([marginLeft, width - marginRight])
-			.padding(0.2)
+			.padding(0.6)
 	);
 	let y = $derived(
 		d3
