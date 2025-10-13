@@ -17,38 +17,46 @@
 	let activitiesUploadDialog: HTMLDialogElement;
 </script>
 
-<div class="mt-4 flex flex-col justify-between gap-3 px-4 sm:flex-row sm:items-center">
-	<div class="flex gap-6">
-		<a class={`btn px-0 text-xl font-bold btn-ghost ${activeClass('/')}`} href="/">Activities</a>
-		<a class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/history')}`} href="/history"
-			>History</a
-		>
-		<a class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/training')}`} href="/training"
-			>Metrics</a
-		>
-	</div>
-	{#if page.url.pathname === '/'}
-		<div class="mx-3">
-			<button
-				class="btn w-full rounded-lg btn-primary"
-				onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
+<div class="container">
+	<div class=" flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+		<div class="flex gap-6">
+			<a class={`btn px-0 text-xl font-bold btn-ghost ${activeClass('/')}`} href="/">Activities</a>
+			<a class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/history')}`} href="/history"
+				>History</a
+			>
+			<a
+				class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/training')}`}
+				href="/training">Metrics</a
 			>
 		</div>
-	{/if}
+		{#if page.url.pathname === '/'}
+			<div class="">
+				<button
+					class="btn w-full rounded-lg btn-primary"
+					onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
+				>
+			</div>
+		{/if}
+	</div>
+
+	<dialog class="modal" id="activity-upload-modal" bind:this={activitiesUploadDialog}>
+		<div class="modal-box">
+			<ActivitiesUploader {activitiesUploadedCallback} />
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+	{@render children?.()}
 </div>
 
-<dialog class="modal" id="activity-upload-modal" bind:this={activitiesUploadDialog}>
-	<div class="modal-box">
-		<ActivitiesUploader {activitiesUploadedCallback} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-{@render children?.()}
-
 <style>
+	.container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 20px;
+	}
+
 	.active {
 		border-bottom-color: var(--color-primary);
 		border-bottom-width: 2px;

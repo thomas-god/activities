@@ -36,13 +36,10 @@
 </script>
 
 {#if topMetric}
-	<div
-		bind:clientWidth={chartWidth}
-		class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto sm:w-2xl"
-	>
+	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
 		<p class="pt-4 text-center">{topMetric.title}</p>
 		<TrainingMetricsChart
-			height={250}
+			height={300}
 			width={chartWidth}
 			values={topMetric.values}
 			unit={topMetric.unit}
@@ -52,6 +49,6 @@
 	</div>
 {/if}
 
-<div class="mx-2 mt-5 sm:mx-auto sm:w-md">
+<div class=" mx-2 mt-5 sm:mx-auto">
 	<PastActivitiesList activityList={sorted_activities} moreCallback={moreActivitiesCallback} />
 </div>
