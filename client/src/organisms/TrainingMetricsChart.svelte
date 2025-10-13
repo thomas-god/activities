@@ -20,6 +20,7 @@
 
 	let gx: SVGGElement;
 	let gy: SVGGElement;
+	let gyGrid: SVGGElement;
 
 	let noValues = $derived(values.every((val) => val.value === 0));
 
@@ -118,6 +119,18 @@
 					.tickValues(yAxisTickValues() as any)
 			)
 		);
+		const yValues = yAxisTickValues() === null ? y.ticks() : yAxisTickValues();
+
+		d3.select(gyGrid).call((sel) =>
+			sel
+				.selectAll('line')
+				.data(yValues as any)
+				.join('line')
+				.attr('x1', 0)
+				.attr('x2', width - marginRight - marginLeft)
+				.attr('y1', (d) => y(d))
+				.attr('y2', (d) => y(d))
+		);
 	});
 
 	let selectedMetric: { time: string; value: number; x: number; y: number } | undefined =
@@ -148,6 +161,12 @@
 	</p>
 {:else}
 	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
+		<g
+			bind:this={gyGrid}
+			transform="translate({marginLeft} 0)"
+			stroke="currentColor"
+			opacity="0.3"
+		/>
 		<g>
 			{#each values as value (value.time)}
 				<g
@@ -161,8 +180,7 @@
 						y={y(value.value)}
 						height={y(0) - y(value.value)}
 						width={x.bandwidth()}
-						rx={2}
-						class="fill-accent"
+						class="fill-primary"
 					/>
 					{#if selectedMetric !== undefined}
 						<g
