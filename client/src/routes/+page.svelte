@@ -1,17 +1,12 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
-	import ActivitiesUploader from '../organisms/ActivitiesUploader.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
 
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
-
-	const activitiesUploadedCallback = () => {
-		invalidate('app:activities');
-	};
 
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
@@ -39,10 +34,6 @@
 		goto('/history');
 	};
 </script>
-
-<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
-	<ActivitiesUploader {activitiesUploadedCallback} />
-</div>
 
 {#if topMetric}
 	<div

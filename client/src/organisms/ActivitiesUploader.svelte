@@ -6,6 +6,7 @@
 
 	let files: FileList | undefined = $state(undefined);
 	let file_upload_content = $state('');
+	let success = $state(false);
 
 	const checkCanUpload = (files: FileList | undefined): files is FileList => {
 		if (files) {
@@ -44,13 +45,14 @@
 			goto('/login');
 		}
 
+		success = true;
 		file_upload_content = '';
 		activitiesUploadedCallback();
 	};
 </script>
 
-<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
-	<legend class="fieldset-legend">Upload new activities</legend>
+<fieldset class="fieldset rounded-box border-base-300 bg-base-100 p-2">
+	<legend class="fieldset-legend text-base">Upload new activities</legend>
 	<div class="join gap-3">
 		<input
 			type="file"
@@ -63,7 +65,7 @@
 			name="activity file"
 		/>
 		<button
-			class="btn bg-accent text-accent-content disabled:bg-base-200/10 disabled:text-base-content/20"
+			class="btn rounded-lg btn-primary"
 			disabled={!can_upload}
 			onclick={() => postActivity(files)}
 		>
@@ -75,4 +77,9 @@
 		</button>
 	</div>
 	<p class="label">.fit and .tcx files are supported, max 1 GB</p>
+	{#if success}
+		<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
+			Files successfully uploaded !
+		</div>
+	{/if}
 </fieldset>
