@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
 	import type { ActivityList, ActivityListItem } from '../routes/+page';
-	import PastActivitiesListItem from './PastActivitiesListItem.svelte';
+	import ActivitiesListItem from './ActivitiesListItem.svelte';
 
 	let { activityList, moreCallback }: { activityList: ActivityList; moreCallback: () => void } =
 		$props();
@@ -40,7 +40,7 @@
 		<p class={containerClass}>This week</p>
 		<div class="flex flex-col gap-2">
 			{#each groupedActivities.thisWeek as activity}
-				<PastActivitiesListItem {activity} />
+				<ActivitiesListItem {activity} />
 			{/each}
 		</div>
 	{/if}
@@ -49,7 +49,7 @@
 		<p class={containerClass}>This month</p>
 		<div class="flex flex-col gap-2">
 			{#each groupedActivities.thisMonth as activity}
-				<PastActivitiesListItem {activity} />
+				<ActivitiesListItem {activity} />
 			{/each}
 		</div>
 	{/if}
@@ -58,7 +58,7 @@
 		<p class={containerClass}>Earlier</p>
 		<div class="flex flex-col gap-2">
 			{#each groupedActivities.earlier as activity}
-				<PastActivitiesListItem {activity} />
+				<ActivitiesListItem {activity} />
 			{/each}
 		</div>
 	{/if}

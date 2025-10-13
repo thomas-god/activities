@@ -49,6 +49,6 @@
 	</div>
 {/if}
 
-<div class=" mx-2 mt-5 sm:mx-auto">
+<div class="mx-2 mt-5 sm:mx-auto">
 	<PastActivitiesList activityList={sorted_activities} moreCallback={moreActivitiesCallback} />
 </div>

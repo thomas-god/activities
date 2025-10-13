@@ -9,6 +9,6 @@
 	);
 </script>
 
-<div class="mx-2 mt-5 sm:mx-auto sm:w-md">
+<div class="mx-2 mt-5 sm:mx-auto">
 	<ActivitiesList activityList={sorted_activities} />
 </div>
