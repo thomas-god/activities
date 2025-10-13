@@ -1,5 +1,10 @@
-import { expect, it } from 'vitest';
-import { formatDuration, formatRelativeDuration, formatDateTime } from './duration';
+import { describe, expect, it } from 'vitest';
+import {
+	formatDuration,
+	formatRelativeDuration,
+	formatDateTime,
+	formatWeekInterval
+} from './duration';
 import dayjs from 'dayjs';
 
 it('Should format a number of seconds into hh:mm:ss', () => {
@@ -55,4 +60,30 @@ it('Should format a date string in a custom format', () => {
 
 it('Should handle empty string gracefully', () => {
 	expect(formatDateTime('')).toEqual(dayjs('').tz('Europe/Paris').format('DD-MM-YYYY HH:mm:ss'));
+});
+
+describe('Formating a week-based time interval', () => {
+	it('Should return the first and last dates of the week', () => {
+		let date = '2025-10-13'; // a monday
+
+		expect(formatWeekInterval(date)).toEqual('Oct 13-19');
+	});
+
+	it('Should align to the start of the week', () => {
+		let date = '2025-10-14'; // not a monday
+
+		expect(formatWeekInterval(date)).toEqual('Oct 13-19');
+	});
+
+	it('Should handle week over two months', () => {
+		let date = '2025-10-02'; // end of september and start of october
+
+		expect(formatWeekInterval(date)).toEqual('Sep 29-Oct 5');
+	});
+
+	it('Should work when year changes', () => {
+		let date = '2026-01-02'; // end of september and start of october
+
+		expect(formatWeekInterval(date)).toEqual('Dec 29-Jan 4');
+	});
 });

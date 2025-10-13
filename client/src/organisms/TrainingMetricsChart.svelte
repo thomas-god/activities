@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { formatDuration, formatDurationCompactWithUnits } from '$lib/duration';
+	import {
+		formatDuration,
+		formatDurationCompactWithUnits,
+		formatWeekInterval
+	} from '$lib/duration';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
 
@@ -39,6 +43,12 @@
 			};
 		}
 
+		if (granularity === 'Weekly') {
+			return (date: string) => {
+				return formatWeekInterval(date);
+			};
+		}
+
 		return (date: string) => date;
 	});
 
@@ -46,6 +56,12 @@
 		if (granularity === 'Monthly') {
 			return (date: string, _idx: number) => {
 				return dayjs(date).format('MMM YYYY');
+			};
+		}
+
+		if (granularity === 'Weekly') {
+			return (date: string) => {
+				return formatWeekInterval(date);
 			};
 		}
 
@@ -159,7 +175,7 @@
 		No activities found for this metric over the selected period
 	</p>
 {:else}
-	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
+	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="select-none p-1">
 		<g
 			bind:this={gyGrid}
 			transform="translate({marginLeft} 0)"

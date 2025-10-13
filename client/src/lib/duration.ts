@@ -4,12 +4,14 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
+import isoWeek from 'dayjs/plugin/isoWeek';
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(localizedFormat);
+dayjs.extend(isoWeek);
 
 const ONE_MINUTE_IN_SECONDS = 60;
 const ONE_HOUR_IN_SECONDS = ONE_MINUTE_IN_SECONDS * 60;
@@ -83,4 +85,15 @@ export const localiseDate = (value: number | string): string => {
 
 export const localiseDateTime = (value: number | string): string => {
 	return dayjs(value).format('llll');
+};
+
+export const formatWeekInterval = (start: number | string): string => {
+	const startDate = dayjs(start).startOf('isoWeek');
+	const endDate = startDate.endOf('isoWeek');
+
+	if (startDate.month() === endDate.month()) {
+		return `${startDate.format('MMM D')}-${endDate.format('D')}`;
+	}
+
+	return `${startDate.format('MMM D')}-${endDate.format('MMM D')}`;
 };
