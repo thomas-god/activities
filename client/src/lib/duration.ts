@@ -13,6 +13,8 @@ dayjs.extend(timezone);
 dayjs.extend(localizedFormat);
 dayjs.extend(isoWeek);
 
+export { dayjs };
+
 const ONE_MINUTE_IN_SECONDS = 60;
 const ONE_HOUR_IN_SECONDS = ONE_MINUTE_IN_SECONDS * 60;
 const ONE_DAY_IN_SECONDS = 24 * ONE_HOUR_IN_SECONDS;

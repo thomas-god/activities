@@ -2,7 +2,7 @@ import type { PageLoad } from './$types';
 import * as z from 'zod';
 
 import { PUBLIC_APP_URL } from '$env/static/public';
-import dayjs from 'dayjs';
+import { dayjs } from '$lib/duration';
 import { goto } from '$app/navigation';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
@@ -34,9 +34,9 @@ const fetchActivities = async (
 const fetchMetrics = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 ): Promise<MetricsList> => {
-	let now = dayjs();
-	let start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DDTHH:mm:ssZ'));
-	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${start}`, {
+	let start = dayjs().startOf('isoWeek').subtract(3, 'week');
+	let startUri = encodeURIComponent(start.format('YYYY-MM-DDTHH:mm:ssZ'));
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics?start=${startUri}`, {
 		method: 'GET',
 		mode: 'cors',
 		credentials: 'include'

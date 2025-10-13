@@ -175,7 +175,7 @@
 		No activities found for this metric over the selected period
 	</p>
 {:else}
-	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="select-none p-1">
+	<svg {width} {height} viewBox={`0 0 ${width} ${height}`} role="img" class="p-1 select-none">
 		<g
 			bind:this={gyGrid}
 			transform="translate({marginLeft} 0)"

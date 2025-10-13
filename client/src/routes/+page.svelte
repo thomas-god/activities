@@ -37,7 +37,7 @@
 
 {#if topMetric}
 	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
-		<p class="pt-4 text-center">{topMetric.title}</p>
+		<p class="mx-2 pt-4">{topMetric.title}</p>
 		<TrainingMetricsChart
 			height={300}
 			width={chartWidth}
