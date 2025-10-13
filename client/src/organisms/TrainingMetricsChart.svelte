@@ -62,7 +62,11 @@
 		return (value: d3.NumberValue, _idx: number) => value.toString();
 	});
 
-	let yAxisTickValues = (): null | number[] => {
+	let yAxisDefaultTickValues = (): number[] => {
+		return d3.ticks(0, d3.max(values, (d) => d.value)!, 6);
+	};
+
+	let yAxisTickValues = (): number[] => {
 		if (format === 'duration') {
 			const dt = 600;
 			const roundedUpMaxDuration = Math.ceil(d3.max(values, (d) => d.value)! / dt) * dt;
@@ -76,9 +80,9 @@
 				}
 				return ticks;
 			}
-			return null;
+			return yAxisDefaultTickValues();
 		}
-		return null; // To use default ticks
+		return yAxisDefaultTickValues();
 	};
 
 	let x = $derived(
@@ -112,19 +116,14 @@
 			)
 		);
 		d3.select(gy).call((sel) =>
-			sel.call(
-				d3
-					.axisLeft(y)
-					.tickFormat(yAxisTickFormater)
-					.tickValues(yAxisTickValues() as any)
-			)
+			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
 		);
 		const yValues = yAxisTickValues() === null ? y.ticks() : yAxisTickValues();
 
 		d3.select(gyGrid).call((sel) =>
 			sel
 				.selectAll('line')
-				.data(yValues as any)
+				.data(yValues)
 				.join('line')
 				.attr('x1', 0)
 				.attr('x2', width - marginRight - marginLeft)
