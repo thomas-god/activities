@@ -12,16 +12,19 @@
 	} = $props();
 </script>
 
-<div class="stats shadow">
-	<div class="stat place-items-center">
+<div class="stats bg-base-100 shadow">
+	<div class="stat place-items-start">
 		<div class="stat-title">{title}</div>
 		<div class="stat-value">
 			{#if value === undefined}
 				-
 			{:else}
 				{value.toFixed(round)}
+
 				{#if unit !== undefined}
-					{unit}
+					<span class="stat-value-unit">
+						{unit}
+					</span>
 				{/if}
 			{/if}
 		</div>
@@ -30,7 +33,13 @@
 
 <style>
 	.stat-value {
-		font-size: 1rem;
+		font-size: x-large;
 		font-weight: 600;
+	}
+
+	.stat-value-unit {
+		font-size: small;
+		font-weight: 400;
+		opacity: 60%;
 	}
 </style>

@@ -23,9 +23,7 @@
 	let weightedAveragePower = $derived(timeseriesQuarticAvg(activity.timeseries.metrics, 'Power'));
 </script>
 
-<div class="pb-1 text-lg">Statistics</div>
-
-<div class="flex flex-row flex-wrap gap-2">
+<div class="grid gap-2">
 	<Statistic title="Distance" value={distance} unit="km" round={3} />
 	<Statistic title="Calories" value={calories} unit="kcal" />
 	<Statistic title="Elevation gained" value={elevation} unit="m" />
@@ -35,3 +33,9 @@
 	<Statistic title="Average power" value={averagePower} unit="W" />
 	<Statistic title="Weighted average power" value={weightedAveragePower} unit="W" />
 </div>
+
+<style>
+	.grid {
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	}
+</style>

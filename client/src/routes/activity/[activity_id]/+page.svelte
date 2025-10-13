@@ -90,7 +90,7 @@
 	};
 </script>
 
-<div class="mx-auto mt-1 flex max-w-2xl flex-col gap-4 sm:mt-8 sm:px-4">
+<div class="mx-auto mt-1 flex flex-col gap-4 sm:mt-8 sm:px-4">
 	<div class="rounded-box bg-base-100 p-4 pt-3 shadow-md">
 		<h1 class="text-xl">
 			<EditableString content={summary?.title} editCallback={updateActivityNameCallback} />
@@ -104,7 +104,7 @@
 		</div>
 	</div>
 
-	<div class="rounded-box bg-base-100 p-4 pt-2 shadow-md">
+	<div>
 		<ActivityStatistics activity={data.activity} />
 	</div>
 
