@@ -11,7 +11,7 @@
 		{#each activityList as activity}
 			<ActivitiesListItem {activity} />
 		{:else}
-			<li class="p-4 pb-2 text-sm italic text-center tracking-wide opacity-60">No activities</li>
+			<div class="p-4 pb-2 text-sm italic text-center tracking-wide opacity-60">No activities</div>
 		{/each}
 	</div>
 </div>

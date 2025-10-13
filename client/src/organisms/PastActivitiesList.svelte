@@ -62,4 +62,8 @@
 			{/each}
 		</div>
 	{/if}
+
+	{#if activityList.length === 0}
+		<div class="p-4 pb-2 text-center text-sm tracking-wide italic opacity-60">No activities</div>
+	{/if}
 </div>
