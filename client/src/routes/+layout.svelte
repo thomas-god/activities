@@ -20,12 +20,12 @@
 <div class="container">
 	<div class=" flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
 		<div class="flex gap-6">
-			<a class={`btn px-0 text-xl font-bold btn-ghost ${activeClass('/')}`} href="/">Activities</a>
-			<a class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/history')}`} href="/history"
+			<a class={`btn px-2 text-xl font-bold btn-ghost ${activeClass('/')}`} href="/">Activities</a>
+			<a class={`btn px-2 text-lg font-medium btn-ghost ${activeClass('/history')}`} href="/history"
 				>History</a
 			>
 			<a
-				class={`btn px-0 text-lg font-medium btn-ghost ${activeClass('/training')}`}
+				class={`btn px-2 text-lg font-medium btn-ghost ${activeClass('/training')}`}
 				href="/training">Metrics</a
 			>
 		</div>
