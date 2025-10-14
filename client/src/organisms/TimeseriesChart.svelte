@@ -145,6 +145,7 @@
 	);
 
 	let zoomedDomain = $state([x_min, x_max]);
+	let zoomedIn = $derived(zoomedDomain[0] !== x_min || zoomedDomain[1] !== x_max);
 
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
 		zoomedDomain = [
@@ -157,6 +158,7 @@
 
 	const resetZoom = () => {
 		d3.select(svgElement).call(zoom.scaleTo, 1);
+		zoomedIn = false;
 	};
 
 	$effect(() => {
@@ -189,10 +191,12 @@
 	let smoothing = $state(5);
 </script>
 
-<button class="btn" onclick={resetZoom}>Reset zoom</button>
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
 {#if nearestValues}
 	<p class="flex justify-center pt-2 text-sm sm:text-base">
+		{#if zoomedIn}
+			<button onclick={resetZoom}>🔄</button>
+		{/if}
 		<span class="px-1.5">
 			⌚ {formatDuration(nearestValues.time)} :
 		</span>

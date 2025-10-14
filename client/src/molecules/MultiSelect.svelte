@@ -29,7 +29,7 @@
 	};
 </script>
 
-<div class="flex gap-1">
+<div class="flex flex-wrap gap-1">
 	{#each options as option}
 		<input
 			class={`btn ${option.option.toLocaleLowerCase()}`}
