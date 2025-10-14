@@ -49,14 +49,7 @@ impl From<&Activity> for ResponseBodyItem {
     fn from(activity: &Activity) -> Self {
         Self {
             id: activity.id().to_string(),
-            sport: match *activity.sport() {
-                Sport::Running => "Running".to_string(),
-                Sport::Cycling => "Cycling".to_string(),
-                Sport::AlpineSKi => "Ski".to_string(),
-                Sport::StrengthTraining => "Strength training".to_string(),
-                Sport::Swimming => "Swimming".to_string(),
-                Sport::Other => "Other".to_string(),
-            },
+            sport: activity.sport().to_string(),
             name: activity.name().map(|name| name.to_string()),
             start_time: *activity.start_time().date(),
             duration: activity

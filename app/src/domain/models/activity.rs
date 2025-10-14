@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt::{self},
     hash::Hash,
+    str::FromStr,
 };
 
 use chrono::{DateTime, FixedOffset};
@@ -193,11 +194,242 @@ impl ActivityStartTime {
 #[derive(Clone, Debug, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum Sport {
     Running,
+    TrailRunning,
+    IndoorRunning,
+    TrackRunning,
+
+    Hiking,
+    Mountaineering,
+    IndoorWalking,
+    Snowshoeing,
+
+    Cycling,
+    IndoorCycling,
+    MountainBiking,
+    Cyclocross,
+    TrackCycling,
+    EBiking,
+    GravelCycling,
+
+    Rowing,
+    IndoorRowing,
+
+    Swimming,
+    OpenWaterSwimming,
+
+    StandUpPaddleboarding,
+    Surfing,
+    Wakeboarding,
+    WaterSkiing,
+    Windsurfing,
+    Kitesurfing,
+    Wakesurfing,
+    Sailing,
+
+    Paddling,
+    Kayaking,
+    Rafting,
+
+    AlpineSki,
+    CrossCountrySkiing,
+
+    InlineSkating,
+
+    Hiit,
+    CardioTraining,
+    StrengthTraining,
+    Yoga,
+    Pilates,
+
+    Climbing,
+    IndoorClimbing,
+    Bouldering,
+
+    Soccer,
+    Baseball,
+    Basketball,
+    Rugby,
+    Hockey,
+    Lacrosse,
+    Volleyball,
+
+    Racket,
+    Tennis,
+    Pickleball,
+    Padel,
+    Squash,
+    Badminton,
+    Racquetball,
+    TableTennis,
+
+    Other,
+}
+
+pub struct InvalidSport {}
+
+impl FromStr for Sport {
+    type Err = InvalidSport;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Running" => Ok(Self::Running),
+            "TrailRunning" => Ok(Self::TrailRunning),
+            "IndoorRunning" => Ok(Self::IndoorRunning),
+            "TrackRunning" => Ok(Self::TrackRunning),
+
+            "Hiking" => Ok(Self::Hiking),
+            "Mountaineering" => Ok(Self::Mountaineering),
+            "IndoorWalking" => Ok(Self::IndoorWalking),
+            "Snowshoeing" => Ok(Self::Snowshoeing),
+
+            "Cycling" => Ok(Self::Cycling),
+            "IndoorCycling" => Ok(Self::IndoorCycling),
+            "MountainBiking" => Ok(Self::MountainBiking),
+            "Cyclocross" => Ok(Self::Cyclocross),
+            "TrackCycling" => Ok(Self::TrackCycling),
+            "EBiking" => Ok(Self::EBiking),
+            "GravelCycling" => Ok(Self::GravelCycling),
+
+            "Rowing" => Ok(Self::Rowing),
+            "IndoorRowing" => Ok(Self::IndoorRowing),
+
+            "Swimming" => Ok(Self::Swimming),
+            "OpenWaterSwimming" => Ok(Self::OpenWaterSwimming),
+
+            "StandUpPaddleboarding" => Ok(Self::StandUpPaddleboarding),
+            "Surfing" => Ok(Self::Surfing),
+            "Wakeboarding" => Ok(Self::Wakeboarding),
+            "WaterSkiing" => Ok(Self::WaterSkiing),
+            "Windsurfing" => Ok(Self::Windsurfing),
+            "Kitesurfing" => Ok(Self::Kitesurfing),
+            "Wakesurfing" => Ok(Self::Wakesurfing),
+            "Sailing" => Ok(Self::Sailing),
+
+            "Paddling" => Ok(Self::Paddling),
+            "Kayaking" => Ok(Self::Kayaking),
+            "Rafting" => Ok(Self::Rafting),
+
+            "AlpineSki" => Ok(Self::AlpineSki),
+            "CrossCountrySkiing" => Ok(Self::CrossCountrySkiing),
+
+            "InlineSkating" => Ok(Self::InlineSkating),
+
+            "Hiit" => Ok(Self::Hiit),
+            "CardioTraining" => Ok(Self::CardioTraining),
+            "StrengthTraining" => Ok(Self::StrengthTraining),
+            "Yoga" => Ok(Self::Yoga),
+            "Pilates" => Ok(Self::Pilates),
+
+            "Climbing" => Ok(Self::Climbing),
+            "IndoorClimbing" => Ok(Self::IndoorClimbing),
+            "Bouldering" => Ok(Self::Bouldering),
+
+            "Soccer" => Ok(Self::Soccer),
+            "Baseball" => Ok(Self::Baseball),
+            "Basketball" => Ok(Self::Basketball),
+            "Rugby" => Ok(Self::Rugby),
+            "Hockey" => Ok(Self::Hockey),
+            "Lacrosse" => Ok(Self::Lacrosse),
+            "Volleyball" => Ok(Self::Volleyball),
+
+            "Racket" => Ok(Self::Racket),
+            "Tennis" => Ok(Self::Tennis),
+            "Pickleball" => Ok(Self::Pickleball),
+            "Padel" => Ok(Self::Padel),
+            "Squash" => Ok(Self::Squash),
+            "Badminton" => Ok(Self::Badminton),
+            "Racquetball" => Ok(Self::Racquetball),
+            "TableTennis" => Ok(Self::TableTennis),
+
+            "Other" => Ok(Self::Other),
+            _ => Err(InvalidSport {}),
+        }
+    }
+}
+
+impl Sport {
+    pub fn category(&self) -> Option<SportCategory> {
+        match self {
+            Self::Running | Self::TrailRunning | Self::IndoorRunning | Self::TrackRunning => {
+                Some(SportCategory::Running)
+            }
+
+            Self::Hiking | Self::Mountaineering | Self::IndoorWalking | Self::Snowshoeing => {
+                Some(SportCategory::Walking)
+            }
+
+            Self::Cycling
+            | Self::IndoorCycling
+            | Self::MountainBiking
+            | Self::Cyclocross
+            | Self::TrackCycling
+            | Self::EBiking
+            | Self::GravelCycling => Some(SportCategory::Cycling),
+
+            Self::Rowing | Self::IndoorRowing => Some(SportCategory::Rowing),
+
+            Self::Swimming | Self::OpenWaterSwimming => Some(SportCategory::Swimming),
+
+            Self::StandUpPaddleboarding
+            | Self::Surfing
+            | Self::Wakeboarding
+            | Self::WaterSkiing
+            | Self::Windsurfing
+            | Self::Kitesurfing
+            | Self::Wakesurfing
+            | Self::Sailing => Some(SportCategory::WaterSports),
+
+            Self::Paddling | Self::Kayaking | Self::Rafting => Some(SportCategory::WaterSports),
+
+            Self::AlpineSki | Self::CrossCountrySkiing => Some(SportCategory::Ski),
+
+            Self::InlineSkating => None,
+
+            Self::Hiit
+            | Self::CardioTraining
+            | Self::StrengthTraining
+            | Self::Yoga
+            | Self::Pilates => Some(SportCategory::Cardio),
+
+            Self::Climbing | Self::IndoorClimbing | Self::Bouldering => {
+                Some(SportCategory::Climbing)
+            }
+
+            Self::Soccer
+            | Self::Baseball
+            | Self::Basketball
+            | Self::Rugby
+            | Self::Hockey
+            | Self::Lacrosse
+            | Self::Volleyball => Some(SportCategory::TeamSports),
+
+            Self::Racket
+            | Self::Tennis
+            | Self::Pickleball
+            | Self::Padel
+            | Self::Squash
+            | Self::Badminton
+            | Self::Racquetball
+            | Self::TableTennis => Some(SportCategory::Racket),
+
+            Self::Other => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Copy, PartialEq, Display, Serialize, Deserialize)]
+pub enum SportCategory {
+    Running,
     Cycling,
     Swimming,
-    AlpineSKi,
-    StrengthTraining,
-    Other,
+    Walking,
+    Rowing,
+    WaterSports,
+    Ski,
+    Cardio,
+    Climbing,
+    TeamSports,
+    Racket,
 }
 
 #[derive(Clone, Debug, Constructor, Default, Serialize, Deserialize, PartialEq)]

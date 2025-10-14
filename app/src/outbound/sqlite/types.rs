@@ -147,15 +147,9 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Sport {
         &self,
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
     ) -> Result<IsNull, BoxDynError> {
-        let s = match self {
-            Self::Running => "running",
-            Self::Cycling => "cycling",
-            Self::AlpineSKi => "alpine_ski",
-            Self::StrengthTraining => "strength_training",
-            Self::Swimming => "swimming",
-            Self::Other => "other",
-        };
-        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(
+            self.to_string().into(),
+        ));
         Ok(IsNull::No)
     }
 }
@@ -163,15 +157,8 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Sport {
 impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Sport {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        match s {
-            "running" => Ok(Sport::Running),
-            "cycling" => Ok(Sport::Cycling),
-            "alpine_ski" => Ok(Sport::AlpineSKi),
-            "strength_training" => Ok(Sport::StrengthTraining),
-            "swimming" => Ok(Sport::Swimming),
-            "other" => Ok(Sport::Other),
-            _ => Err(format!("Unknown Sport: {}", s).into()),
-        }
+        s.parse::<Sport>()
+            .map_err(|_| format!("Unknown Sport: {}", s).into())
     }
 }
 
