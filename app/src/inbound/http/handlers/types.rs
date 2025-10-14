@@ -132,16 +132,11 @@ impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct APITrainingMetricFilters {
-    sports: Option<Vec<Sport>>,
+    sports: Option<Vec<SportFilter>>,
 }
 
 impl From<APITrainingMetricFilters> for TrainingMetricFilters {
     fn from(value: APITrainingMetricFilters) -> Self {
-        Self::new(value.sports.map(|sports| {
-            sports
-                .iter()
-                .map(|sport| SportFilter::Sport(*sport))
-                .collect()
-        }))
+        Self::new(value.sports)
     }
 }

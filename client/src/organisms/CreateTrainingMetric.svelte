@@ -1,9 +1,8 @@
 <script lang="ts">
+	import { type Sport, type SportCategory } from '$lib/sport';
 	import SportsSelect from '../molecules/SportsSelect.svelte';
 
 	let { callback }: { callback: (payload: Object) => Promise<void> } = $props();
-
-	const availableSports = ['Running', 'Cycling', 'Swimming', 'AlpineSki', 'StrengthTraining'];
 
 	let formOpen = $state(false);
 
@@ -20,7 +19,8 @@
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 
-	let sports: string[] = $state([]);
+	let selectedSports: Sport[] = $state([]);
+	let selectedSportCategories: SportCategory[] = $state([]);
 
 	let statisticSource = $derived.by(() => {
 		if (sourceType === 'activity-statistics') {
@@ -35,8 +35,15 @@
 	let metricRequest = $derived.by(() => {
 		let basePayload = { source: statisticSource, granularity, aggregate, filters: {} };
 
-		if (sports.length > 0) {
-			basePayload = { ...basePayload, filters: { sports } };
+		if (selectedSports.length > 0 || selectedSportCategories.length > 0) {
+			const sportFilter = selectedSports.map((sport) => ({
+				Sport: sport
+			}));
+			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
+				SportCategory: category
+			}));
+			const filters = sportFilter.concat(sportCategoriesFilter);
+			basePayload = { ...basePayload, filters: { sports: filters } };
 		}
 
 		return basePayload;
@@ -117,7 +124,7 @@
 			<details class="collapse border border-base-300 bg-base-100" open={true}>
 				<summary class="collapse-title font-semibold">Filters</summary>
 				<div class="collapse-content text-sm">
-					<SportsSelect options={availableSports} bind:selectedOptions={sports} />
+					<SportsSelect bind:selectedSports bind:selectedSportCategories />
 				</div>
 			</details>
 

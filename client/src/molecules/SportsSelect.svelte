@@ -1,45 +1,126 @@
 <script lang="ts">
-	let { options, selectedOptions = $bindable() }: { options: string[]; selectedOptions: string[] } =
-		$props();
+	import {
+		SportCategories,
+		sportsPerCategory,
+		sportsWithoutCategory,
+		type Sport,
+		type SportCategory
+	} from '$lib/sport';
+	import SportSelectCategory from './SportSelectCategory.svelte';
 
-	let values = $state(
-		options.map((option) => {
-			return { option, selected: false };
-		})
-	);
+	let {
+		selectedSports = $bindable(),
+		selectedSportCategories = $bindable()
+	}: { selectedSports: Sport[]; selectedSportCategories: SportCategory[] } = $props();
 
-	let selectedAsString = $derived(
-		selectedOptions.length > 0 ? selectedOptions.join(', ') : 'All sports'
-	);
+	const sportIsSelected = (sport: Sport): boolean => {
+		return selectedSports.includes(sport);
+	};
 
-	const updateSelectedOptions = (value: { option: string; selected: boolean }) => {
-		if (value.selected) {
-			value.selected = false;
-			selectedOptions = selectedOptions.filter((option) => option !== value.option);
+	const categoryIsSelected = (category: SportCategory): boolean => {
+		return selectedSportCategories.includes(category);
+	};
+
+	const toggleSport = (sport: Sport, category: SportCategory) => {
+		const sportIsSelected = selectedSports.includes(sport);
+		const categoryIsSelected = selectedSportCategories.includes(category);
+
+		if (!categoryIsSelected) {
+			// We just toggle the sport from the selectedSports list
+			if (sportIsSelected) {
+				selectedSports = selectedSports.filter((current_sport) => current_sport !== sport);
+			} else {
+				selectedSports.push(sport);
+			}
 		} else {
-			value.selected = true;
-			selectedOptions.push(value.option);
+			// We toggle the category OFF and add the other sport of the category (excluding this one)
+			// to the list of selected sports
+			selectedSportCategories = selectedSportCategories.filter(
+				(current_category) => current_category !== category
+			);
+			const otherSports = sportsPerCategory[category].filter(
+				(current_sport) => current_sport !== sport
+			);
+			selectedSports = selectedSports.concat(otherSports);
+		}
+	};
+
+	const toggleSportWithoutCategory = (sport: Sport) => {
+		const sportIsSelected = selectedSports.includes(sport);
+		if (sportIsSelected) {
+			selectedSports = selectedSports.filter((current_sport) => current_sport !== sport);
+		} else {
+			selectedSports.push(sport);
+		}
+	};
+	const toggleCategory = (category: SportCategory) => {
+		const categoryIsSelected = selectedSportCategories.includes(category);
+
+		if (!categoryIsSelected) {
+			// Toggle the category ON and remove its sports from the list of selected sports
+			selectedSportCategories.push(category);
+			selectedSports = selectedSports.filter(
+				(current_sport) => !sportsPerCategory[category].includes(current_sport)
+			);
+		} else {
+			// Just toggle the category OFF
+			selectedSportCategories = selectedSportCategories.filter(
+				(current_category) => current_category !== category
+			);
 		}
 	};
 </script>
 
-<div class="flex flex-row items-start gap-1 p-1">
-	<label class="label" for="metric-sport-filter"> Sports: </label>
-	<span>{selectedAsString}</span>
-</div>
-
-<div class="flex flex-row flex-wrap gap-2 p-1">
-	{#each values as value}
-		<input
-			type="checkbox"
-			class="btn btn-sm"
-			aria-label={value.option}
-			onclick={() => updateSelectedOptions(value)}
+<div class="flex h-max flex-col p-1">
+	{#each SportCategories as category}
+		<SportSelectCategory
+			{category}
+			sports={sportsPerCategory[category]}
+			{categoryIsSelected}
+			{sportIsSelected}
+			{toggleCategory}
+			{toggleSport}
 		/>
+		<div class="divider"></div>
 	{/each}
+
+	<div class="sport-category">
+		<div class="sport-category-title">Other sports</div>
+		<div class="sport-category-items">
+			{#each sportsWithoutCategory.toSorted() as sport}
+				<input
+					type="checkbox"
+					class="btn btn-sm"
+					aria-label={sport}
+					checked={sportIsSelected(sport)}
+					onclick={() => toggleSportWithoutCategory(sport)}
+				/>
+			{/each}
+		</div>
+	</div>
 </div>
 
 <style>
+	.sport-category {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.sport-category-title {
+		font-weight: 600;
+		display: flex;
+		flex-direction: row;
+		gap: 8px;
+	}
+
+	.sport-category-items {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
 	.btn {
 		background-color: var(--color-base-100);
 		color: var(--color-base-content);

@@ -90,7 +90,7 @@
 	};
 </script>
 
-<div class="mx-auto mt-4 flex max-w-2xl flex-col gap-4 px-4 sm:mt-8">
+<div class="mx-auto mt-4 flex max-w-2xl flex-col gap-4 sm:mt-8">
 	<div class="rounded-box bg-base-100 shadow-md">
 		<CreateTrainingMetric callback={createMetricCallback} />
 	</div>

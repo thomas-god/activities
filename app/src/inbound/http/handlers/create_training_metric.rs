@@ -105,7 +105,7 @@ mod tests {
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": { "sports": ["Running", "Cycling"] }
+            "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] }
         }"#,
             )
             .is_ok()
