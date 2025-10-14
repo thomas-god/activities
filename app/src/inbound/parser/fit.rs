@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use chrono::{DateTime, FixedOffset};
 use fit_parser::{
     DataMessage, DataValue, Event, EventField, EventType, FitEnum, FitField, FitParserError,
-    LapField, MesgNum, RecordField, SessionField, Sport as FitSport, parse_fit_messages,
+    LapField, MesgNum, RecordField, SessionField, Sport as FitSport, SubSport as FitSubSport,
+    parse_fit_messages,
     utils::{find_field_value_as_float, find_field_value_by_kind},
 };
 
@@ -95,17 +96,31 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
 }
 
 fn extract_sport(messages: &[DataMessage]) -> Sport {
-    find_field_value_by_kind(
+    let Some(sport) = find_field_value_by_kind(
         messages,
         &fit_parser::FitField::Session(fit_parser::SessionField::Sport),
     )
     .and_then(|field| {
         field.iter().find_map(|value| match value {
-            fit_parser::DataValue::Enum(FitEnum::Sport(sport)) => Some(sport.into()),
+            fit_parser::DataValue::Enum(FitEnum::Sport(sport)) => Some(sport),
             _ => None,
         })
-    })
-    .unwrap_or(Sport::Other)
+    }) else {
+        return Sport::Other;
+    };
+
+    let sub_sport = find_field_value_by_kind(
+        messages,
+        &fit_parser::FitField::Session(fit_parser::SessionField::SubSport),
+    )
+    .and_then(|field| {
+        field.iter().find_map(|value| match value {
+            fit_parser::DataValue::Enum(FitEnum::SubSport(sub_sport)) => Some(sub_sport),
+            _ => None,
+        })
+    });
+
+    Sport::from((sport, sub_sport))
 }
 
 fn extract_timeseries(
@@ -409,17 +424,131 @@ impl From<FitParserError> for ParseBytesError {
     }
 }
 
-impl From<&FitSport> for Sport {
-    fn from(value: &FitSport) -> Self {
-        match value {
+impl From<(&FitSport, Option<&FitSubSport>)> for Sport {
+    fn from(value: (&FitSport, Option<&FitSubSport>)) -> Self {
+        // Try to parse existing FIT sub sport first
+        if let Some(sport) = match value.1 {
+            Some(FitSubSport::Treadmill) => Some(Sport::IndoorRunning),
+            Some(FitSubSport::IndoorRunning) => Some(Sport::IndoorRunning),
+            Some(FitSubSport::Trail) => Some(Sport::TrailRunning),
+            Some(FitSubSport::Track) => Some(Sport::TrackRunning),
+
+            Some(FitSubSport::IndoorCycling) => Some(Sport::IndoorCycling),
+            Some(FitSubSport::Road) => Some(Sport::Cycling),
+            Some(FitSubSport::Mountain) => Some(Sport::MountainBiking),
+            Some(FitSubSport::Downhill) => Some(Sport::MountainBiking),
+            Some(FitSubSport::Cyclocross) => Some(Sport::Cyclocross),
+            Some(FitSubSport::TrackCycling) => Some(Sport::TrackCycling),
+            Some(FitSubSport::GravelCycling) => Some(Sport::GravelCycling),
+            Some(FitSubSport::EBikeMountain) => Some(Sport::EBiking),
+
+            Some(FitSubSport::IndoorRowing) => Some(Sport::IndoorRowing),
+            Some(FitSubSport::Elliptical) => Some(Sport::CardioTraining),
+            Some(FitSubSport::StairClimbing) => Some(Sport::CardioTraining),
+            Some(FitSubSport::Hiit) => Some(Sport::Hiit),
+
+            Some(FitSubSport::LapSwimming) => Some(Sport::Swimming),
+            Some(FitSubSport::OpenWater) => Some(Sport::OpenWaterSwimming),
+
+            Some(FitSubSport::FlexibilityTraining) => Some(Sport::CardioTraining),
+            Some(FitSubSport::StrengthTraining) => Some(Sport::StrengthTraining),
+            Some(FitSubSport::CardioTraining) => Some(Sport::CardioTraining),
+            Some(FitSubSport::IndoorWalking) => Some(Sport::CardioTraining),
+
+            Some(FitSubSport::CasualWalking) => Some(Sport::Walking),
+            Some(FitSubSport::SpeedWalking) => Some(Sport::Walking),
+
+            Some(FitSubSport::Whitewater) => Some(Sport::Whitewater),
+
+            Some(FitSubSport::Yoga) => Some(Sport::Yoga),
+            Some(FitSubSport::Pilates) => Some(Sport::Pilates),
+
+            Some(FitSubSport::IndoorClimbing) => Some(Sport::IndoorClimbing),
+            Some(FitSubSport::Bouldering) => Some(Sport::Bouldering),
+
+            Some(FitSubSport::Pickleball) => Some(Sport::Pickleball),
+            Some(FitSubSport::Padel) => Some(Sport::Padel),
+            Some(FitSubSport::Squash) => Some(Sport::Squash),
+            Some(FitSubSport::Badminton) => Some(Sport::Badminton),
+            Some(FitSubSport::Racquetball) => Some(Sport::Racquetball),
+            Some(FitSubSport::TableTennis) => Some(Sport::TableTennis),
+            _ => None,
+        } {
+            return sport;
+        }
+
+        match value.0 {
             FitSport::Running => Self::Running,
             FitSport::Cycling => Self::Cycling,
-            FitSport::AlpineSkiing => Self::AlpineSki,
+            FitSport::FitnessEquipment => Self::CardioTraining,
             FitSport::Swimming => Self::Swimming,
-            FitSport::FitnessEquipment => Self::StrengthTraining,
-            FitSport::Training => Self::StrengthTraining,
-            FitSport::Hiit => Self::StrengthTraining,
-            _ => Self::Other,
+            FitSport::Basketball => Self::Basketball,
+            FitSport::Soccer => Self::Soccer,
+            FitSport::Cricket => Self::Cricket,
+            FitSport::Rugby => Self::Rugby,
+            FitSport::Hockey => Self::Hockey,
+            FitSport::Lacrosse => Self::Lacrosse,
+            FitSport::Volleyball => Self::Volleyball,
+            FitSport::Baseball => Self::Baseball,
+            FitSport::AmericanFootball => Self::AmericanFootball,
+            FitSport::Tennis => Self::Tennis,
+            FitSport::Training => Self::CardioTraining,
+            FitSport::Hiit => Self::CardioTraining,
+            FitSport::Walking => Self::Walking,
+            FitSport::Hiking => Self::Hiking,
+            FitSport::AlpineSkiing => Self::AlpineSki,
+            FitSport::Snowboarding => Self::Snowboarding,
+            FitSport::CrossCountrySkiing => Self::CrossCountrySkiing,
+            FitSport::Rowing => Self::Rowing,
+            FitSport::Mountaineering => Self::Mountaineering,
+            FitSport::EBiking => Self::EBiking,
+            FitSport::Paddling => Self::Paddling,
+            FitSport::RockClimbing => Self::Climbing,
+            FitSport::Sailing => Self::Sailing,
+            FitSport::Snowshoeing => Self::Snowshoeing,
+            FitSport::StandUpPaddleboarding => Self::StandUpPaddleboarding,
+            FitSport::Surfing => Self::Surfing,
+            FitSport::Wakeboarding => Self::Wakeboarding,
+            FitSport::WaterSkiing => Self::WaterSkiing,
+            FitSport::Kayaking => Self::Kayaking,
+            FitSport::Rafting => Self::Rafting,
+            FitSport::Windsurfing => Self::Windsurfing,
+            FitSport::Kitesurfing => Self::Kitesurfing,
+            FitSport::FloorClimbing => Self::IndoorClimbing,
+            FitSport::Racket => Self::Racket,
+            FitSport::Wakesurfing => Self::Wakesurfing,
+            FitSport::InlineSkating => Self::InlineSkating,
+            FitSport::JumpRope => Self::CardioTraining,
+            FitSport::Jumpmaster => Self::CardioTraining,
+            FitSport::Golf => Self::Golf,
+            FitSport::Boxing => Self::Boxing,
+            FitSport::MixedMartialArts => Self::MixedMartialArts,
+            FitSport::WaterTubing => Self::Whitewater,
+            FitSport::Dance => Self::CardioTraining,
+            FitSport::Snorkeling => Self::Snorkeling,
+
+            FitSport::Generic => Self::Other,
+            FitSport::Transition => Self::Other,
+            FitSport::Multisport => Self::Other,
+            FitSport::Flying => Self::Other,
+            FitSport::Motorcycling => Self::Other,
+            FitSport::Boating => Self::Other,
+            FitSport::Driving => Self::Other,
+            FitSport::HangGliding => Self::Other,
+            FitSport::HorsebackRiding => Self::Other,
+            FitSport::Hunting => Self::Other,
+            FitSport::Fishing => Self::Other,
+            FitSport::IceSkating => Self::Other,
+            FitSport::Snowmobiling => Self::Other,
+            FitSport::SkyDiving => Self::Other,
+            FitSport::Tactical => Self::Other,
+            FitSport::Diving => Self::Other,
+            FitSport::WheelchairPushRun => Self::Other,
+            FitSport::WheelchairPushWalk => Self::Other,
+            FitSport::Meditation => Self::Other,
+            FitSport::DiscGolf => Self::Other,
+            FitSport::All => Self::Other,
+            FitSport::UnknownVariant(_) => Self::Other,
         }
     }
 }

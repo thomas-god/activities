@@ -198,6 +198,7 @@ pub enum Sport {
     IndoorRunning,
     TrackRunning,
 
+    Walking,
     Hiking,
     Mountaineering,
     IndoorWalking,
@@ -225,13 +226,16 @@ pub enum Sport {
     Kitesurfing,
     Wakesurfing,
     Sailing,
+    Snorkeling,
 
+    Whitewater,
     Paddling,
     Kayaking,
     Rafting,
 
     AlpineSki,
     CrossCountrySkiing,
+    Snowboarding,
 
     InlineSkating,
 
@@ -247,6 +251,8 @@ pub enum Sport {
 
     Soccer,
     Baseball,
+    Cricket,
+    AmericanFootball,
     Basketball,
     Rugby,
     Hockey,
@@ -261,6 +267,10 @@ pub enum Sport {
     Badminton,
     Racquetball,
     TableTennis,
+
+    Boxing,
+    MixedMartialArts,
+    Golf,
 
     Other,
 }
@@ -277,6 +287,7 @@ impl FromStr for Sport {
             "IndoorRunning" => Ok(Self::IndoorRunning),
             "TrackRunning" => Ok(Self::TrackRunning),
 
+            "Walking" => Ok(Self::Walking),
             "Hiking" => Ok(Self::Hiking),
             "Mountaineering" => Ok(Self::Mountaineering),
             "IndoorWalking" => Ok(Self::IndoorWalking),
@@ -304,13 +315,16 @@ impl FromStr for Sport {
             "Kitesurfing" => Ok(Self::Kitesurfing),
             "Wakesurfing" => Ok(Self::Wakesurfing),
             "Sailing" => Ok(Self::Sailing),
+            "Snorkeling" => Ok(Self::Snorkeling),
 
+            "Whitewater" => Ok(Self::Whitewater),
             "Paddling" => Ok(Self::Paddling),
             "Kayaking" => Ok(Self::Kayaking),
             "Rafting" => Ok(Self::Rafting),
 
             "AlpineSki" => Ok(Self::AlpineSki),
             "CrossCountrySkiing" => Ok(Self::CrossCountrySkiing),
+            "Snowboarding" => Ok(Self::Snowboarding),
 
             "InlineSkating" => Ok(Self::InlineSkating),
 
@@ -331,6 +345,8 @@ impl FromStr for Sport {
             "Hockey" => Ok(Self::Hockey),
             "Lacrosse" => Ok(Self::Lacrosse),
             "Volleyball" => Ok(Self::Volleyball),
+            "Cricket" => Ok(Self::Cricket),
+            "AmericanFootball" => Ok(Self::AmericanFootball),
 
             "Racket" => Ok(Self::Racket),
             "Tennis" => Ok(Self::Tennis),
@@ -340,6 +356,10 @@ impl FromStr for Sport {
             "Badminton" => Ok(Self::Badminton),
             "Racquetball" => Ok(Self::Racquetball),
             "TableTennis" => Ok(Self::TableTennis),
+
+            "Boxing" => Ok(Self::Boxing),
+            "MixedMartialArts" => Ok(Self::MixedMartialArts),
+            "Golf" => Ok(Self::Golf),
 
             "Other" => Ok(Self::Other),
             _ => Err(InvalidSport {}),
@@ -354,9 +374,11 @@ impl Sport {
                 Some(SportCategory::Running)
             }
 
-            Self::Hiking | Self::Mountaineering | Self::IndoorWalking | Self::Snowshoeing => {
-                Some(SportCategory::Walking)
-            }
+            Self::Walking
+            | Self::Hiking
+            | Self::Mountaineering
+            | Self::IndoorWalking
+            | Self::Snowshoeing => Some(SportCategory::Walking),
 
             Self::Cycling
             | Self::IndoorCycling
@@ -377,11 +399,16 @@ impl Sport {
             | Self::Windsurfing
             | Self::Kitesurfing
             | Self::Wakesurfing
-            | Self::Sailing => Some(SportCategory::WaterSports),
+            | Self::Sailing
+            | Self::Snorkeling => Some(SportCategory::WaterSports),
 
-            Self::Paddling | Self::Kayaking | Self::Rafting => Some(SportCategory::WaterSports),
+            Self::Whitewater | Self::Paddling | Self::Kayaking | Self::Rafting => {
+                Some(SportCategory::WaterSports)
+            }
 
-            Self::AlpineSki | Self::CrossCountrySkiing => Some(SportCategory::Ski),
+            Self::AlpineSki | Self::CrossCountrySkiing | Self::Snowboarding => {
+                Some(SportCategory::Ski)
+            }
 
             Self::InlineSkating => None,
 
@@ -401,7 +428,9 @@ impl Sport {
             | Self::Rugby
             | Self::Hockey
             | Self::Lacrosse
-            | Self::Volleyball => Some(SportCategory::TeamSports),
+            | Self::Volleyball
+            | Self::AmericanFootball
+            | Self::Cricket => Some(SportCategory::TeamSports),
 
             Self::Racket
             | Self::Tennis
@@ -411,6 +440,10 @@ impl Sport {
             | Self::Badminton
             | Self::Racquetball
             | Self::TableTennis => Some(SportCategory::Racket),
+
+            Self::Boxing => None,
+            Self::MixedMartialArts => None,
+            Self::Golf => None,
 
             Self::Other => None,
         }
