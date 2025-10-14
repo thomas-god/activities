@@ -21,6 +21,7 @@
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
+	let sportFilterSelected = $state(false);
 
 	let statisticSource = $derived.by(() => {
 		if (sourceType === 'activity-statistics') {
@@ -35,7 +36,7 @@
 	let metricRequest = $derived.by(() => {
 		let basePayload = { source: statisticSource, granularity, aggregate, filters: {} };
 
-		if (selectedSports.length > 0 || selectedSportCategories.length > 0) {
+		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
 				Sport: sport
 			}));
@@ -122,9 +123,15 @@
 			</select>
 
 			<details class="collapse border border-base-300 bg-base-100" open={true}>
-				<summary class="collapse-title font-semibold">Filters</summary>
+				<summary class="collapse-title font-light">Filters</summary>
 				<div class="collapse-content text-sm">
-					<SportsSelect bind:selectedSports bind:selectedSportCategories />
+					<div class="mb-2 font-semibold">
+						Sports
+						<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
+					</div>
+					{#if sportFilterSelected}
+						<SportsSelect bind:selectedSports bind:selectedSportCategories />
+					{/if}
 				</div>
 			</details>
 

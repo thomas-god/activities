@@ -51,6 +51,7 @@
 	}
 
 	.sport-category-title {
+		font-size: 12px;
 		font-weight: 600;
 		display: flex;
 		flex-direction: row;
