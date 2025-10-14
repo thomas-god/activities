@@ -29,6 +29,7 @@ use crate::{
 pub struct ResponseBody {
     id: String,
     sport: String,
+    sport_category: Option<String>,
     name: Option<String>,
     duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
@@ -82,6 +83,7 @@ impl From<&ActivityWithTimeseries> for ResponseBody {
             id: activity.id().to_string(),
             name: activity.name().map(|name| name.to_string()),
             sport: activity.sport().to_string(),
+            sport_category: activity.sport().category().map(|cat| cat.to_string()),
             start_time: *activity.start_time().date(),
             duration: activity
                 .statistics()
@@ -225,7 +227,7 @@ mod tests {
                                 .parse::<DateTime<FixedOffset>>()
                                 .unwrap(),
                         ),
-                        Sport::Cycling,
+                        Sport::IndoorCycling,
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Duration,
                             1200.,
@@ -277,7 +279,8 @@ mod tests {
                 duration: Some(1200.),
                 id: target_id,
                 name: None,
-                sport: "Cycling".to_string(),
+                sport: "IndoorCycling".to_string(),
+                sport_category: Some("Cycling".to_string()),
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),

@@ -40,6 +40,7 @@ pub struct ResponseBody(Vec<ResponseBodyItem>);
 pub struct ResponseBodyItem {
     id: String,
     sport: String,
+    sport_category: Option<String>,
     name: Option<String>,
     duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
@@ -50,6 +51,7 @@ impl From<&Activity> for ResponseBodyItem {
         Self {
             id: activity.id().to_string(),
             sport: activity.sport().to_string(),
+            sport_category: activity.sport().category().map(|cat| cat.to_string()),
             name: activity.name().map(|name| name.to_string()),
             start_time: *activity.start_time().date(),
             duration: activity

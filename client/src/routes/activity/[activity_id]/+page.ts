@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { redirect } from '@sveltejs/kit';
 import { goto } from '$app/navigation';
+import { SportCategories } from '$lib/sport';
 
 export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);
@@ -28,6 +29,7 @@ export const ssr = false;
 const ActivityDetails = z.object({
 	id: z.string(),
 	sport: z.string(),
+	sport_category: z.enum(SportCategories).nullable(),
 	name: z.string().nullable(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),

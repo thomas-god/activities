@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { dayjs } from '$lib/duration';
 import { goto } from '$app/navigation';
+import { SportCategories } from '$lib/sport';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
@@ -56,6 +57,7 @@ const ActivityListItem = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	sport: z.string(),
+	sport_category: z.enum(SportCategories).nullable(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true })
 });

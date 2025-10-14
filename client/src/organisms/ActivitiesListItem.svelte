@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
+	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import type { ActivityListItem } from '../routes/+page';
 
 	let { activity }: { activity: ActivityListItem } = $props();
@@ -7,17 +8,25 @@
 	let title = $derived(
 		activity.name === null || activity.name === '' ? activity.sport : activity.name
 	);
-	let sport = $derived(activity.sport.split(' ').join('').toLowerCase());
 
-	const icons = {
-		running: '🏃',
-		cycling: '🚴',
-		strengthtraining: '💪'
+	const categoryClass = (category: SportCategory | null): string => {
+		if (category === 'Running') {
+			return 'running';
+		}
+		if (category === 'Cycling') {
+			return 'cycling';
+		}
+		return 'other';
 	};
 </script>
 
-<a href={`/activity/${activity.id}`} class={`item flex flex-1 items-center p-3 ${sport}`}>
-	<div class={`icon ${sport}`}>{icons[sport]}</div>
+<a
+	href={`/activity/${activity.id}`}
+	class={`item flex flex-1 items-center p-3 ${categoryClass(activity.sport_category)}`}
+>
+	<div class={`icon ${categoryClass(activity.sport_category)}`}>
+		{getSportCategoryIcon(activity.sport_category)}
+	</div>
 	<div class="flex-1">
 		<div class="flex flex-col">
 			<div class="mb-1 font-semibold">{title}</div>
@@ -45,15 +54,15 @@
 	}
 
 	.item.cycling {
-		border-left-color: #4299e1;
+		border-left-color: var(--color-cycling);
 	}
 
 	.item.running {
-		border-left-color: #ed8936;
+		border-left-color: var(--color-running);
 	}
 
-	.item.strengthtraining {
-		border-left-color: #48bb78;
+	.item.other {
+		border-left-color: var(--color-other);
 	}
 
 	.icon {
@@ -69,17 +78,17 @@
 	}
 
 	.icon.cycling {
-		background: #ebf8ff;
-		color: #4299e1;
+		background: var(--color-cycling-background);
+		color: var(--color-cycling);
 	}
 
 	.icon.running {
-		background: #feebc8;
-		color: #ed8936;
+		background: var(--color-running-background);
+		color: var(--color-running);
 	}
 
-	.icon.strengthtraining {
-		background: #c6f6d5;
-		color: #48bb78;
+	.icon.other {
+		background: var(--color-other-background);
+		color: var(--color-other);
 	}
 </style>
