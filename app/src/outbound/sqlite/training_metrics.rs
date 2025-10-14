@@ -231,7 +231,7 @@ mod test_sqlite_activity_repository {
     use crate::domain::models::{
         activity::{Sport, TimeseriesMetric},
         training_metrics::{
-            ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate,
+            ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
             TrainingMetricFilters, TrainingMetricGranularity,
         },
     };
@@ -280,7 +280,7 @@ mod test_sqlite_activity_repository {
             )),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![Sport::Running])),
+            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
         )
     }
 

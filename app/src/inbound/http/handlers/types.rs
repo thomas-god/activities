@@ -4,8 +4,8 @@ use serde::Deserialize;
 use crate::domain::models::{
     activity::{ActivityStatistic, Sport, TimeseriesMetric},
     training_metrics::{
-        ActivityMetricSource, TimeseriesAggregate, TrainingMetricAggregate, TrainingMetricFilters,
-        TrainingMetricGranularity,
+        ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
+        TrainingMetricFilters, TrainingMetricGranularity,
     },
 };
 
@@ -137,6 +137,11 @@ pub struct APITrainingMetricFilters {
 
 impl From<APITrainingMetricFilters> for TrainingMetricFilters {
     fn from(value: APITrainingMetricFilters) -> Self {
-        Self::new(value.sports)
+        Self::new(value.sports.map(|sports| {
+            sports
+                .iter()
+                .map(|sport| SportFilter::Sport(*sport))
+                .collect()
+        }))
     }
 }

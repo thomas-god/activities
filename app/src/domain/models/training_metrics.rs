@@ -15,7 +15,7 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, Sport,
-            TimeseriesMetric, ToUnit, Unit,
+            SportCategory, TimeseriesMetric, ToUnit, Unit,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -46,9 +46,24 @@ impl Default for TrainingMetricId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display)]
+pub enum SportFilter {
+    Sport(Sport),
+    SportCategory(SportCategory),
+}
+
+impl SportFilter {
+    pub fn matches(&self, activity: &Activity) -> bool {
+        match self {
+            Self::Sport(sport) => activity.sport() == sport,
+            Self::SportCategory(category) => activity.sport().category() == Some(*category),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
 pub struct TrainingMetricFilters {
-    sports: Option<Vec<Sport>>,
+    sports: Option<Vec<SportFilter>>,
 }
 
 impl TrainingMetricFilters {
@@ -56,16 +71,16 @@ impl TrainingMetricFilters {
         Self { sports: None }
     }
 
-    pub fn sports(&self) -> &Option<Vec<Sport>> {
+    pub fn sports(&self) -> &Option<Vec<SportFilter>> {
         &self.sports
     }
 
     pub fn matches(&self, activity: &Activity) -> bool {
-        let sport_matches = if let Some(sports) = &self.sports {
-            sports.iter().any(|sport| sport == activity.sport())
-        } else {
-            true
-        };
+        let sport_matches = self
+            .sports
+            .as_ref()
+            .map(|sports| sports.iter().any(|filter| filter.matches(activity)))
+            .unwrap_or(true);
 
         // More explicit with multiple filters
         #[allow(clippy::let_and_return)]
@@ -924,7 +939,7 @@ mod test_training_metrics {
             )),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![Sport::Running])),
+            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
         );
 
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
@@ -944,7 +959,7 @@ mod test_training_metrics {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![Sport::Running])),
+            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1472,6 +1487,28 @@ mod test_training_metric_filters {
     use super::*;
 
     #[test]
+    fn test_sport_filter_matches_activity() {
+        let activity = Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            Sport::IndoorCycling,
+            ActivityStatistics::default(),
+        );
+
+        assert!(SportFilter::Sport(Sport::IndoorCycling).matches(&activity));
+        assert!(!SportFilter::Sport(Sport::Cycling).matches(&activity));
+
+        assert!(SportFilter::SportCategory(SportCategory::Cycling).matches(&activity));
+        assert!(!SportFilter::SportCategory(SportCategory::Running).matches(&activity));
+    }
+
+    #[test]
     fn test_filter_by_sport() {
         let activity = Activity::new(
             ActivityId::default(),
@@ -1486,12 +1523,21 @@ mod test_training_metric_filters {
             ActivityStatistics::default(),
         );
 
-        assert!(TrainingMetricFilters::new(Some(vec![Sport::Cycling])).matches(&activity));
         assert!(
-            TrainingMetricFilters::new(Some(vec![Sport::Cycling, Sport::Running]))
+            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Cycling)]))
                 .matches(&activity)
         );
-        assert!(!TrainingMetricFilters::new(Some(vec![Sport::Running])).matches(&activity));
+        assert!(
+            TrainingMetricFilters::new(Some(vec![
+                SportFilter::Sport(Sport::Cycling),
+                SportFilter::Sport(Sport::Running)
+            ]))
+            .matches(&activity)
+        );
+        assert!(
+            !TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)]))
+                .matches(&activity)
+        );
         assert!(!TrainingMetricFilters::new(Some(vec![])).matches(&activity));
     }
 }
