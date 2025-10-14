@@ -86,7 +86,7 @@ export const localiseDate = (value: number | string): string => {
 };
 
 export const localiseDateTime = (value: number | string): string => {
-	return dayjs(value).format('llll');
+	return dayjs(value).format('ddd, MMM D, YYYY H:mm');
 };
 
 export const formatWeekInterval = (start: number | string): string => {

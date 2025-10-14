@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
 	import Statistic from '../molecules/Statistic.svelte';
+	import StatisticMulti from '../molecules/StatisticMulti.svelte';
 	import type { ActivityDetails } from '../routes/activity/[activity_id]/proxy+page';
 
 	let { activity }: { activity: ActivityDetails } = $props();
@@ -25,17 +26,30 @@
 
 <div class="grid gap-2">
 	<Statistic title="Distance" value={distance} unit="km" round={3} />
-	<Statistic title="Calories" value={calories} unit="kcal" />
-	<Statistic title="Elevation gained" value={elevation} unit="m" />
-	<Statistic title="Average heart rate" value={avgHeartRate} unit="bpm" />
-	<Statistic title="Maximum heart rate" value={maxHeartRate} unit="bpm" />
 	<Statistic title="Average speed" value={averageSpeed} unit="km/h" round={2} />
-	<Statistic title="Average power" value={averagePower} unit="W" />
-	<Statistic title="Weighted average power" value={weightedAveragePower} unit="W" />
+	<Statistic title="Elevation gained" value={elevation} unit="m" />
+	<Statistic title="Calories" value={calories} unit="kcal" />
+	{#if avgHeartRate && maxHeartRate}
+		<StatisticMulti
+			title="Heart rate"
+			values={[avgHeartRate, maxHeartRate]}
+			legends={['avg', 'max']}
+			unit="bpm"
+		/>
+	{/if}
+
+	{#if averagePower && weightedAveragePower}
+		<StatisticMulti
+			title="Power"
+			values={[averagePower, weightedAveragePower]}
+			legends={['avg', 'weighted avg.']}
+			unit="W"
+		/>
+	{/if}
 </div>
 
 <style>
 	.grid {
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	}
 </style>

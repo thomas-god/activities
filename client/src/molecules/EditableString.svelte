@@ -10,9 +10,9 @@
 
 {#if editMode}
 	<div class="join">
-		<input class="input join-item" autofocus bind:value={content} />
+		<input class="input input-sm join-item" autofocus bind:value={content} />
 		<button
-			class="btn join-item rounded-r-full"
+			class="btn input-sm join-item rounded-r-full"
 			onclick={() => {
 				editMode = false;
 				editCallback(content);
