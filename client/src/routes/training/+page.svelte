@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import DateRange from '../../molecules/DateRange.svelte';
-	import CreateTrainingMetric from '../../organisms/CreateTrainingMetric.svelte';
 	import TrainingMetricsChart from '../../organisms/TrainingMetricsChart.svelte';
 	import type { PageProps } from './$types';
 	import dayjs from 'dayjs';
@@ -40,22 +39,6 @@
 		return metrics;
 	});
 
-	const createMetricCallback = async (payload: Object): Promise<void> => {
-		const body = JSON.stringify({ initial_date_range: dates, ...payload });
-		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
-			body,
-			method: 'POST',
-			credentials: 'include',
-			mode: 'cors',
-			headers: { 'Content-Type': 'application/json' }
-		});
-
-		if (res.status === 401) {
-			goto('/login');
-		}
-		invalidate('app:training-metrics');
-	};
-
 	const deleteMetricCallback = async (metric: string): Promise<void> => {
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
 			method: 'DELETE',
@@ -91,10 +74,6 @@
 </script>
 
 <div class="mx-auto mt-4 flex max-w-2xl flex-col gap-4 sm:mt-8">
-	<div class="rounded-box bg-base-100 shadow-md">
-		<CreateTrainingMetric callback={createMetricCallback} />
-	</div>
-
 	<div class="rounded-box bg-base-100 shadow-md">
 		<DateRange bind:dates={() => dates, datesUpdateCallback} />
 	</div>
