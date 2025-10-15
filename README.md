@@ -12,18 +12,23 @@ activities from sport devices (sport watches, bike computers, etc.):
 The application comes in two versions depending on how many users you plan to
 give access to your instance:
 
-- [multi-user](ghcr.io/thomas-god/activities:multi-user-main): allows multiple
-  users to use your instance using an email-based password-less authentication
-  process. You will need a valid SMTP server for sending emails containing magic
-  link to users.
-- [single-user](ghcr.io/thomas-god/activities:single-user-main): allows a single
-  user to use the instance without an authentication step, and thus does not
-  require an external email server to work. Note that there is **NO
-  authentication process** for this version, so be careful where you plan to
-  host it, as your activities will be accessible to anyone that can reach your
-  instance.
+- _multi-user_: allows multiple users to use your instance using an email-based
+  password-less authentication process. You will need a valid SMTP server for
+  sending emails containing magic link to users.
+- _single-user_: allows a single user to use the instance without an
+  authentication step, and thus does not require an external email server to
+  work. Note that there is **NO authentication process** for this version, so be
+  careful where you plan to host it, as your activities will be accessible to
+  anyone that can reach your instance.
 
 Beside the authentication process, both versions offer the same set of features.
+
+### Available images
+
+- multi-user: `ghcr.io/thomas-god/activities:multi-user-main`,
+- single-user: `ghcr.io/thomas-god/activities:single-user-main`.
+
+All images are available for both `amd64` and `arm64`.
 
 ### Using _docker-compose_ or _docker-stack_
 
