@@ -5,7 +5,7 @@
 	import DateRange from '../../molecules/DateRange.svelte';
 	import TrainingMetricsChart from '../../organisms/TrainingMetricsChart.svelte';
 	import type { PageProps } from './$types';
-	import dayjs from 'dayjs';
+	import { dayjs } from '$lib/duration';
 
 	let { data }: PageProps = $props();
 
@@ -71,11 +71,28 @@
 		}
 		goto(url);
 	};
+
+	const pastXWeeks = (numberOfWeek: number) => {
+		const now = dayjs().startOf('day');
+		const start = now.subtract(numberOfWeek, 'week');
+		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
+	};
+
+	const thisYear = () => {
+		const now = dayjs().startOf('day');
+		const start = now.startOf('year');
+		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
+	};
 </script>
 
-<div class="mx-auto mt-4 flex max-w-2xl flex-col gap-4 sm:mt-8">
+<div class="mx-auto mt-4 flex flex-col gap-4 sm:mt-8">
 	<div class="rounded-box bg-base-100 shadow-md">
 		<DateRange bind:dates={() => dates, datesUpdateCallback} />
+		<div class="flex flex-row flex-wrap gap-2 p-2">
+			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(4)}>Last 4 weeks</button>
+			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(12)}>Last 12 weeks</button>
+			<button class="btn btn-sm sm:btn-md" onclick={thisYear}>This year</button>
+		</div>
 	</div>
 
 	{#each metricsProps as metric}
@@ -85,7 +102,7 @@
 					{metric.title}
 				</div>
 				<button
-					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
+					class="btn bg-base-100 hover:outline-base-300 absolute bottom-[8px] right-4 border-0 p-0 shadow-none hover:outline-2"
 					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
 				>
 			</div>
