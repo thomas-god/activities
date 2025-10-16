@@ -14,7 +14,7 @@ use crate::{
             Activity, ActivityId, ActivityStatistic, ActivityTimeseries, ActivityWithTimeseries,
             Sport, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
         },
-        ports::{IActivityService, ITrainingMetricService},
+        ports::{IActivityService, ITrainingService},
     },
     inbound::{
         http::{
@@ -159,7 +159,7 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Timese
 pub async fn get_activity<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(_user): Extension<AuthenticatedUser>,
@@ -199,7 +199,7 @@ mod tests {
             ports::GetActivityError,
             services::{
                 activity::test_utils::MockActivityService,
-                training_metrics::test_utils::MockTrainingMetricService,
+                training::test_utils::MockTrainingService,
             },
         },
         inbound::{
@@ -254,7 +254,7 @@ mod tests {
                 ))
             });
         let file_parser = MockFileParser::test_default();
-        let metrics = MockTrainingMetricService::test_default();
+        let metrics = MockTrainingService::test_default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),
@@ -317,7 +317,7 @@ mod tests {
             });
 
         let file_parser = MockFileParser::test_default();
-        let metrics = MockTrainingMetricService::test_default();
+        let metrics = MockTrainingService::test_default();
 
         let state = axum::extract::State(AppState {
             activity_service: Arc::new(service),

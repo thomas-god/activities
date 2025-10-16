@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     config::{Config, load_env},
-    domain::services::{activity::ActivityService, training_metrics::TrainingMetricService},
+    domain::services::{activity::ActivityService, training::TrainingService},
     inbound::{
         http::{
             HttpServer, MagicLinkService, SMTPEmailProvider, SessionService,
@@ -15,9 +15,7 @@ use crate::{
     },
     outbound::{
         fs::FilesystemRawDataRepository,
-        sqlite::{
-            activity::SqliteActivityRepository, training_metrics::SqliteTrainingMetricsRepository,
-        },
+        sqlite::{activity::SqliteActivityRepository, training::SqliteTrainingRepository},
     },
 };
 
@@ -26,14 +24,14 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         ActivityService<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             FilesystemRawDataRepository,
-            TrainingMetricService<
-                SqliteTrainingMetricsRepository,
+            TrainingService<
+                SqliteTrainingRepository,
                 SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             >,
         >,
         Parser,
-        TrainingMetricService<
-            SqliteTrainingMetricsRepository,
+        TrainingService<
+            SqliteTrainingRepository,
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
         UserService<
@@ -89,15 +87,15 @@ async fn build_activity_service() -> anyhow::Result<(
     ActivityService<
         SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         FilesystemRawDataRepository,
-        TrainingMetricService<
-            SqliteTrainingMetricsRepository,
+        TrainingService<
+            SqliteTrainingRepository,
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
     >,
     Parser,
     Arc<
-        TrainingMetricService<
-            SqliteTrainingMetricsRepository,
+        TrainingService<
+            SqliteTrainingRepository,
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
     >,
@@ -127,13 +125,11 @@ async fn build_activity_service() -> anyhow::Result<(
     ));
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
-    let training_metrics_repository = SqliteTrainingMetricsRepository::new(&format!(
-        "sqlite:{}",
-        trainin_metrics_db.to_string_lossy()
-    ))
-    .await?;
+    let training_metrics_repository =
+        SqliteTrainingRepository::new(&format!("sqlite:{}", trainin_metrics_db.to_string_lossy()))
+            .await?;
 
-    let training_metrics_service = Arc::new(TrainingMetricService::new(
+    let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
         activity_repository.clone(),
     ));

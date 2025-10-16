@@ -3,7 +3,7 @@ use std::fmt;
 use derive_more::Constructor;
 
 pub mod activity;
-pub mod training_metrics;
+pub mod training;
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct User {

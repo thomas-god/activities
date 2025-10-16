@@ -5,7 +5,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    domain::ports::{IActivityService, ITrainingMetricService},
+    domain::ports::{IActivityService, ITrainingService},
     inbound::{
         http::{
             AppState, UserLoginResult,
@@ -23,7 +23,7 @@ pub struct LoginUserQuery {
 pub async fn login_user<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     State(state): State<AppState<AS, PF, TMS, UR>>,

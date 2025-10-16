@@ -6,35 +6,35 @@ use tokio::sync::Mutex;
 use crate::domain::{
     models::{
         UserId,
-        training_metrics::{
+        training::{
             ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricId,
             TrainingMetricValues,
         },
     },
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange,
-        DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingMetricService,
-        ListActivitiesFilters, TrainingMetricsRepository, UpdateMetricsValuesRequest,
+        DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService,
+        ListActivitiesFilters, TrainingRepository, UpdateMetricsValuesRequest,
     },
 };
 
 ///////////////////////////////////////////////////////////////////
-/// TRAINING METRICS SERVICE
+/// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Constructor)]
-pub struct TrainingMetricService<TMR, AR>
+pub struct TrainingService<TMR, AR>
 where
-    TMR: TrainingMetricsRepository,
+    TMR: TrainingRepository,
     AR: ActivityRepository,
 {
     metrics_repository: TMR,
     activity_repository: Arc<Mutex<AR>>,
 }
 
-impl<TMR, AR> TrainingMetricService<TMR, AR>
+impl<TMR, AR> TrainingService<TMR, AR>
 where
-    TMR: TrainingMetricsRepository,
+    TMR: TrainingRepository,
     AR: ActivityRepository,
 {
     async fn compute_metric_values(
@@ -87,9 +87,9 @@ where
     }
 }
 
-impl<TMR, AR> ITrainingMetricService for TrainingMetricService<TMR, AR>
+impl<TMR, AR> ITrainingService for TrainingService<TMR, AR>
 where
-    TMR: TrainingMetricsRepository,
+    TMR: TrainingRepository,
     AR: ActivityRepository,
 {
     /// Create a new training metric and compute its values on the user's activity history.
@@ -228,9 +228,9 @@ where
     }
 }
 
-impl<TMR, AR> TrainingMetricService<TMR, AR>
+impl<TMR, AR> TrainingService<TMR, AR>
 where
-    TMR: TrainingMetricsRepository,
+    TMR: TrainingRepository,
     AR: ActivityRepository,
 {
     async fn compute_initial_values(
@@ -273,7 +273,7 @@ pub mod test_utils {
     use mockall::mock;
 
     use crate::domain::{
-        models::training_metrics::TrainingMetricValue,
+        models::training::TrainingMetricValue,
         ports::{
             DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
             GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, UpdateMetricError,
@@ -283,13 +283,13 @@ pub mod test_utils {
     use super::*;
 
     mock! {
-        pub TrainingMetricService {}
+        pub TrainingService {}
 
-        impl Clone for TrainingMetricService {
+        impl Clone for TrainingService {
             fn clone(&self) -> Self;
         }
 
-        impl ITrainingMetricService for TrainingMetricService {
+        impl ITrainingService for TrainingService {
 
             async fn create_metric(
                 &self,
@@ -313,7 +313,7 @@ pub mod test_utils {
         }
     }
 
-    impl MockTrainingMetricService {
+    impl MockTrainingService {
         pub fn test_default() -> Self {
             let mut mock = Self::new();
 
@@ -328,13 +328,13 @@ pub mod test_utils {
     }
 
     mock! {
-        pub TrainingMetricsRepository {}
+        pub TrainingRepository {}
 
-        impl Clone for TrainingMetricsRepository {
+        impl Clone for TrainingRepository {
             fn clone(&self) -> Self;
         }
 
-        impl TrainingMetricsRepository for TrainingMetricsRepository {
+        impl TrainingRepository for TrainingRepository {
             async fn save_definition(
                 &self,
                 definition: TrainingMetricDefinition,
@@ -390,7 +390,7 @@ mod tests_training_metrics_service {
                 ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesActiveTime,
                 TimeseriesTime,
             },
-            training_metrics::{
+            training::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
                 TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
                 TrainingMetricValue, TrainingMetricValues,
@@ -399,7 +399,7 @@ mod tests_training_metrics_service {
         ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::{
             activity::test_utils::MockActivityRepository,
-            training_metrics::test_utils::MockTrainingMetricsRepository,
+            training::test_utils::MockTrainingRepository,
         },
     };
 
@@ -407,8 +407,8 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_create_metric_ok() {
-        let mut repository = MockTrainingMetricsRepository::new();
-        let background_repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
+        let background_repository = MockTrainingRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
         repository
             .expect_clone()
@@ -436,7 +436,7 @@ mod tests_training_metrics_service {
         activities
             .expect_clone()
             .return_once(move || background_activities);
-        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -455,8 +455,8 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_create_metric_compute_initial_values() {
-        let mut repository = MockTrainingMetricsRepository::new();
-        let mut background_repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
+        let mut background_repository = MockTrainingRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
         background_repository
             .expect_update_metric_values()
@@ -509,7 +509,7 @@ mod tests_training_metrics_service {
         activities
             .expect_clone()
             .return_once(move || background_activities);
-        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -529,8 +529,8 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_create_metric_compute_initial_values_with_initial_date_range() {
         let now = Utc::now();
-        let mut repository = MockTrainingMetricsRepository::new();
-        let mut background_repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
+        let mut background_repository = MockTrainingRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
         repository
             .expect_update_metric_values()
@@ -572,7 +572,7 @@ mod tests_training_metrics_service {
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 12.)])),
             )])
         });
-        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -594,14 +594,14 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_create_metric_fails_to_save_definition() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository
             .expect_save_definition()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         repository.expect_update_metric_values().times(0);
         let mut activities = MockActivityRepository::new();
         activities.expect_list_activities_with_timeseries().times(0);
-        let service = TrainingMetricService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -620,7 +620,7 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_when_get_definitions_err() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definitions().returning(|_| {
             Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
                 "an error"
@@ -628,7 +628,7 @@ mod tests_training_metrics_service {
         });
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let res = service.get_training_metrics(&UserId::test_default()).await;
         assert!(res.is_empty());
@@ -636,7 +636,7 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_def_without_values() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definitions().returning(|_| {
             Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
@@ -652,7 +652,7 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(TrainingMetricValues::new(HashMap::new())));
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let res = service.get_training_metrics(&UserId::test_default()).await;
 
@@ -674,7 +674,7 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definitions().returning(|_| {
             Ok(vec![TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
@@ -693,7 +693,7 @@ mod tests_training_metrics_service {
         });
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let res = service.get_training_metrics(&UserId::test_default()).await;
 
@@ -715,11 +715,11 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_service_delete_metric_does_not_exist() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| Ok(None));
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let req = DeleteTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -736,7 +736,7 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_service_delete_metric_wrong_user() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
@@ -749,7 +749,7 @@ mod tests_training_metrics_service {
         });
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let req = DeleteTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -767,7 +767,7 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_service_delete_metric() {
-        let mut repository = MockTrainingMetricsRepository::new();
+        let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 TrainingMetricId::from("test"),
@@ -785,7 +785,7 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingMetricService::new(repository, activity_repository);
+        let service = TrainingService::new(repository, activity_repository);
 
         let req = DeleteTrainingMetricRequest::new(
             "user".to_string().into(),

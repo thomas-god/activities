@@ -11,7 +11,7 @@ use flate2::read::GzDecoder;
 use serde::Serialize;
 
 use crate::{
-    domain::ports::{CreateActivityError, IActivityService, ITrainingMetricService},
+    domain::ports::{CreateActivityError, IActivityService, ITrainingService},
     inbound::{
         http::{
             AppState,
@@ -54,7 +54,7 @@ impl From<CreateActivityError> for RejectionReason {
 pub async fn upload_activities<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
@@ -154,8 +154,7 @@ mod tests {
 
     use crate::{
         domain::services::{
-            activity::test_utils::MockActivityService,
-            training_metrics::test_utils::MockTrainingMetricService,
+            activity::test_utils::MockActivityService, training::test_utils::MockTrainingService,
         },
         inbound::{
             http::{
@@ -171,7 +170,7 @@ mod tests {
     #[tokio::test]
     async fn test_upload_single_activity() {
         let service = MockActivityService::test_default();
-        let metrics = MockTrainingMetricService::test_default();
+        let metrics = MockTrainingService::test_default();
         let file_parser = MockFileParser::test_default();
         let state = AppState {
             activity_service: Arc::new(service),
@@ -204,7 +203,7 @@ mod tests {
     #[tokio::test]
     async fn test_upload_multiple_activities() {
         let service = MockActivityService::test_default();
-        let metrics = MockTrainingMetricService::test_default();
+        let metrics = MockTrainingService::test_default();
         let file_parser = MockFileParser::test_default();
         let state = AppState {
             activity_service: Arc::new(service),

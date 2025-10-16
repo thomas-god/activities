@@ -8,9 +8,7 @@ use serde::Deserialize;
 use crate::{
     domain::{
         models::activity::{ActivityId, ActivityName},
-        ports::{
-            IActivityService, ITrainingMetricService, ModifyActivityError, ModifyActivityRequest,
-        },
+        ports::{IActivityService, ITrainingService, ModifyActivityError, ModifyActivityRequest},
     },
     inbound::{
         http::{
@@ -38,7 +36,7 @@ pub struct PatchActivityQuery {
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,

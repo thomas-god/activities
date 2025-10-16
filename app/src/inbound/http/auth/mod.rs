@@ -17,7 +17,7 @@ use rand::Rng;
 use crate::{
     domain::{
         models::UserId,
-        ports::{IActivityService, ITrainingMetricService},
+        ports::{IActivityService, ITrainingService},
     },
     inbound::{http::AppState, parser::ParseFile},
 };
@@ -431,7 +431,7 @@ impl<AS, PF, TMS, US> FromRef<AppState<AS, PF, TMS, US>> for Arc<US>
 where
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     US: IUserService,
 {
     fn from_ref(input: &AppState<AS, PF, TMS, US>) -> Self {
@@ -562,8 +562,7 @@ mod test {
 
     use crate::{
         domain::services::{
-            activity::test_utils::MockActivityService,
-            training_metrics::test_utils::MockTrainingMetricService,
+            activity::test_utils::MockActivityService, training::test_utils::MockTrainingService,
         },
         inbound::{
             http::{CookieConfig, auth::test_utils::MockUserService},
@@ -606,7 +605,7 @@ mod test {
     fn build_test_server(session_service: MockUserService) -> TestServer {
         let state = AppState {
             activity_service: Arc::new(MockActivityService::new()),
-            training_metrics_service: Arc::new(MockTrainingMetricService::new()),
+            training_metrics_service: Arc::new(MockTrainingService::new()),
             file_parser: Arc::new(MockFileParser::new()),
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -626,7 +625,7 @@ mod test {
                     AppState<
                         MockActivityService,
                         MockFileParser,
-                        MockTrainingMetricService,
+                        MockTrainingService,
                         MockUserService,
                     >,
                 >(state));

@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::domain::models::{
     activity::{ActivityStatistic, Sport, TimeseriesMetric},
-    training_metrics::{
+    training::{
         ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
         TrainingMetricFilters, TrainingMetricGranularity,
     },

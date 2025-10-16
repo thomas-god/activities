@@ -8,7 +8,7 @@ use crate::{
     domain::{
         models::activity::ActivityId,
         ports::{
-            DeleteActivityError, DeleteActivityRequest, IActivityService, ITrainingMetricService,
+            DeleteActivityError, DeleteActivityRequest, IActivityService, ITrainingService,
         },
     },
     inbound::{
@@ -33,7 +33,7 @@ impl From<DeleteActivityError> for StatusCode {
 pub async fn delete_activity<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,

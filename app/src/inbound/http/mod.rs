@@ -13,7 +13,7 @@ use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
-use crate::domain::ports::{IActivityService, ITrainingMetricService};
+use crate::domain::ports::{IActivityService, ITrainingService};
 
 use crate::inbound::http::handlers::{
     create_training_metric, delete_activity, delete_training_metric, get_activity,
@@ -56,8 +56,7 @@ impl Default for CookieConfig {
 }
 
 #[derive(Debug, Clone)]
-struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, UR: IUserService>
-{
+struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, UR: IUserService> {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
@@ -74,7 +73,7 @@ pub struct HttpServer<AS, PF, TMS, UR> {
     _marker_user_service: PhantomData<UR>,
 }
 
-impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUserService>
+impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>
     HttpServer<AS, PF, TMS, US>
 {
     pub async fn new(
@@ -143,12 +142,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingMetricService, US: IUser
     }
 }
 
-fn core_routes<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingMetricService,
-    US: IUserService,
->(
+fn core_routes<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>(
     state: AppState<AS, PF, TMS, US>,
 ) -> Router<AppState<AS, PF, TMS, US>> {
     let mut router = Router::new()
@@ -197,12 +191,8 @@ fn core_routes<
     router
 }
 
-fn login_routes<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingMetricService,
-    US: IUserService,
->() -> Router<AppState<AS, PF, TMS, US>> {
+fn login_routes<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>()
+-> Router<AppState<AS, PF, TMS, US>> {
     Router::new()
         .route(
             "/register",

@@ -9,7 +9,7 @@ use crate::domain::models::{
         ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistic,
         ActivityStatistics, Sport,
     },
-    training_metrics::{
+    training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue,
     },

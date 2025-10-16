@@ -6,7 +6,7 @@ use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 use crate::domain::{
     models::{
         UserId,
-        training_metrics::{
+        training::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
             TrainingMetricValue, TrainingMetricValues,
@@ -14,7 +14,7 @@ use crate::domain::{
     },
     ports::{
         DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, TrainingMetricsRepository,
+        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, TrainingRepository,
         UpdateMetricError,
     },
 };
@@ -29,11 +29,11 @@ type DefinitionRow = (
 );
 
 #[derive(Debug, Clone)]
-pub struct SqliteTrainingMetricsRepository {
+pub struct SqliteTrainingRepository {
     pool: SqlitePool,
 }
 
-impl SqliteTrainingMetricsRepository {
+impl SqliteTrainingRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
         let options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
@@ -50,7 +50,7 @@ impl SqliteTrainingMetricsRepository {
     }
 }
 
-impl TrainingMetricsRepository for SqliteTrainingMetricsRepository {
+impl TrainingRepository for SqliteTrainingRepository {
     async fn save_definition(
         &self,
         definition: TrainingMetricDefinition,
@@ -207,7 +207,7 @@ mod test_sqlite_activity_repository {
 
     use crate::domain::models::{
         activity::{Sport, TimeseriesMetric},
-        training_metrics::{
+        training::{
             ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
             TrainingMetricFilters, TrainingMetricGranularity,
         },
@@ -218,7 +218,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_init_table() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -264,7 +264,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_save_training_metrics() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -279,7 +279,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_save_training_metrics_fails_if_duplicate() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -298,7 +298,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_definition() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -321,7 +321,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_definition_with_filters() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -344,7 +344,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_definition_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -358,7 +358,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_definitions_for_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -386,7 +386,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_definitions_for_user_only() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -407,7 +407,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_delete_definition_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -426,7 +426,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_delete_definition_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -442,7 +442,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_delete_definition_with_values_cascade() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -496,7 +496,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_insert_value() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -532,7 +532,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_insert_value_already_exist_replace() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -573,7 +573,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_insert_value_definition_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -590,7 +590,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_metric_values() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -628,7 +628,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_metric_value() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
@@ -657,7 +657,7 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_get_metric_value_does_not_exist_for_bin() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingMetricsRepository::new(&db_file.path().to_string_lossy())
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 

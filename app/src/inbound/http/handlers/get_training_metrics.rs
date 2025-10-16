@@ -14,12 +14,12 @@ use crate::{
     domain::{
         models::{
             activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
-            training_metrics::{
+            training::{
                 ActivityMetricSource, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricValues,
             },
         },
-        ports::{IActivityService, ITrainingMetricService},
+        ports::{IActivityService, ITrainingService},
     },
     inbound::{
         http::{
@@ -142,7 +142,7 @@ fn format_source(source: &ActivityMetricSource) -> String {
 pub async fn get_training_metrics<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
@@ -167,7 +167,7 @@ pub async fn get_training_metrics<
 mod tests {
     use crate::domain::models::{
         activity::{ActivityStatistic, TimeseriesMetric},
-        training_metrics::{TimeseriesAggregate, TrainingMetricAggregate},
+        training::{TimeseriesAggregate, TrainingMetricAggregate},
     };
 
     use super::*;

@@ -8,7 +8,7 @@ use crate::domain::models::activity::{
     Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
     ActivityTimeseries, ActivityWithTimeseries, Sport,
 };
-use crate::domain::models::training_metrics::{
+use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
     TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
 };
@@ -368,7 +368,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 }
 
 ///////////////////////////////////////////////////////////////////
-/// TRAINING METRICS SERVICE
+/// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -461,7 +461,7 @@ pub enum DeleteTrainingMetricError {
     Unknown(#[from] anyhow::Error),
 }
 
-pub trait ITrainingMetricService: Clone + Send + Sync + 'static {
+pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
         req: CreateTrainingMetricRequest,
@@ -525,7 +525,7 @@ pub enum GetDefinitionError {
     Unknown(#[from] anyhow::Error),
 }
 
-pub trait TrainingMetricsRepository: Clone + Send + Sync + 'static {
+pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_definition(
         &self,
         definition: TrainingMetricDefinition,

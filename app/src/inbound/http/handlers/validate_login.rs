@@ -7,7 +7,7 @@ use axum_extra::extract::cookie::Cookie;
 use cookie::time::OffsetDateTime;
 
 use crate::{
-    domain::ports::{IActivityService, ITrainingMetricService},
+    domain::ports::{IActivityService, ITrainingService},
     inbound::{
         http::{
             AppState, MagicLinkValidationResult,
@@ -20,7 +20,7 @@ use crate::{
 pub async fn validate_login<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     State(state): State<AppState<AS, PF, TMS, UR>>,

@@ -3,10 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::{UserId, training_metrics::TrainingMetricFilters},
+        models::{UserId, training::TrainingMetricFilters},
         ports::{
             CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
-            ITrainingMetricService,
+            ITrainingService,
         },
     },
     inbound::{
@@ -51,7 +51,7 @@ impl From<CreateTrainingMetricError> for StatusCode {
 pub async fn create_training_metric<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,

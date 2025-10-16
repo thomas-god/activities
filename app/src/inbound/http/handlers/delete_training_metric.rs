@@ -6,10 +6,10 @@ use axum::{
 
 use crate::{
     domain::{
-        models::training_metrics::TrainingMetricId,
+        models::training::TrainingMetricId,
         ports::{
             DeleteTrainingMetricError, DeleteTrainingMetricRequest, IActivityService,
-            ITrainingMetricService,
+            ITrainingService,
         },
     },
     inbound::{
@@ -34,7 +34,7 @@ impl From<DeleteTrainingMetricError> for StatusCode {
 pub async fn delete_training_metric<
     AS: IActivityService,
     PF: ParseFile,
-    TMS: ITrainingMetricService,
+    TMS: ITrainingService,
     UR: IUserService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
