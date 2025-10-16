@@ -102,7 +102,7 @@
 					{metric.title}
 				</div>
 				<button
-					class="btn bg-base-100 hover:outline-base-300 absolute bottom-[8px] right-4 border-0 p-0 shadow-none hover:outline-2"
+					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
 					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
 				>
 			</div>
