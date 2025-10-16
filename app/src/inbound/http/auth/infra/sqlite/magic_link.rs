@@ -22,17 +22,10 @@ impl SqliteMagicLinkRepository {
 
         let pool = SqlitePool::connect_with(options).await?;
 
-        // Run migration here for now
-        sqlx::query(
-            r#"
-        CREATE TABLE IF NOT EXISTS t_magic_links (
-            user TEXT,
-            token_hash TEXT UNIQUE,
-            expire_at TIMESTAMP
-        );"#,
-        )
-        .execute(&pool)
-        .await?;
+        // Run migrations
+        sqlx::migrate!("migrations/auth/magic_links")
+            .run(&pool)
+            .await?;
 
         Ok(Self { pool })
     }

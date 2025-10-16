@@ -19,16 +19,8 @@ impl SqliteUserRepository {
 
         let pool = SqlitePool::connect_with(options).await?;
 
-        // Run migration here for now
-        sqlx::query(
-            r#"
-        CREATE TABLE IF NOT EXISTS t_users (
-            email TEXT UNIQUE,
-            user_id TEXT
-        );"#,
-        )
-        .execute(&pool)
-        .await?;
+        // Run migrations
+        sqlx::migrate!("migrations/auth/users").run(&pool).await?;
 
         Ok(Self { pool })
     }
