@@ -7,8 +7,12 @@
 
 	let { children } = $props();
 
-	const activeClass = (targetPath: string): string => {
+	const classExactPath = (targetPath: string): string => {
 		return page.url.pathname === targetPath ? 'active' : '';
+	};
+
+	const classPathStartWith = (targetPath: string): string => {
+		return page.url.pathname.startsWith(targetPath) ? 'active' : '';
 	};
 
 	const activitiesUploadedCallback = () => {
@@ -27,13 +31,16 @@
 <div class="container">
 	<div class=" flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
 		<div class="flex gap-6">
-			<a class={`btn px-2 text-xl font-bold btn-ghost ${activeClass('/')}`} href="/">Activities</a>
-			<a class={`btn px-2 text-lg font-medium btn-ghost ${activeClass('/history')}`} href="/history"
-				>History</a
+			<a class={`btn px-2 text-xl font-bold btn-ghost ${classExactPath('/')}`} href="/"
+				>Activities</a
 			>
 			<a
-				class={`btn px-2 text-lg font-medium btn-ghost ${activeClass('/training')}`}
-				href="/training">Training</a
+				class={`btn px-2 text-lg font-medium btn-ghost ${classExactPath('/history')}`}
+				href="/history">History</a
+			>
+			<a
+				class={`btn px-2 text-lg font-medium btn-ghost ${classPathStartWith('/training')}`}
+				href="/training/metrics">Training</a
 			>
 		</div>
 		{#if page.url.pathname === '/'}
@@ -43,7 +50,7 @@
 					onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
 				>
 			</div>
-		{:else if page.url.pathname === '/training'}
+		{:else if page.url.pathname === '/training/metrics'}
 			<div class="">
 				<button
 					class="btn w-full rounded-lg btn-primary"

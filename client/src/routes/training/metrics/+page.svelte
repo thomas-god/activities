@@ -2,9 +2,9 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import DateRange from '../../molecules/DateRange.svelte';
-	import TrainingMetricsChart from '../../organisms/TrainingMetricsChart.svelte';
-	import type { PageProps } from './$types';
+	import DateRange from '../../../molecules/DateRange.svelte';
+	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
+	import type { PageProps } from '../$types';
 	import { dayjs } from '$lib/duration';
 
 	let { data }: PageProps = $props();
