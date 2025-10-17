@@ -11,6 +11,7 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
     TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
+    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -481,6 +482,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
+
+    fn create_training_period(
+        &self,
+        req: CreateTrainingPeriodRequest,
+    ) -> impl Future<Output = Result<TrainingPeriodId, CreateTrainingPeriodError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -525,6 +531,71 @@ pub enum GetDefinitionError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct CreateTrainingPeriodRequest {
+    user: UserId,
+    start: NaiveDate,
+    end: Option<NaiveDate>,
+    name: String,
+    sports: TrainingPeriodSports,
+    note: Option<String>,
+}
+
+impl CreateTrainingPeriodRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn start(&self) -> &NaiveDate {
+        &self.start
+    }
+
+    pub fn end(&self) -> &Option<NaiveDate> {
+        &self.end
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn sports(&self) -> &TrainingPeriodSports {
+        &self.sports
+    }
+
+    pub fn note(&self) -> &Option<String> {
+        &self.note
+    }
+
+    pub fn to_period(
+        self,
+        id: &TrainingPeriodId,
+    ) -> Result<TrainingPeriod, TrainingPeriodCreationError> {
+        TrainingPeriod::new(
+            id.clone(),
+            self.user,
+            self.start,
+            self.end,
+            self.name,
+            self.sports,
+            self.note,
+        )
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SaveTrainingPeriodError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CreateTrainingPeriodError {
+    #[error("Invalid period")]
+    InvalidPeriod(#[from] TrainingPeriodCreationError),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_definition(
         &self,
@@ -564,6 +635,11 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         id: &TrainingMetricId,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
+
+    fn save_training_period(
+        &self,
+        period: TrainingPeriod,
+    ) -> impl Future<Output = Result<(), SaveTrainingPeriodError>> + Send;
 }
 
 #[cfg(test)]

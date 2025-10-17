@@ -8,11 +8,12 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricId,
-            TrainingMetricValues,
+            TrainingMetricValues, TrainingPeriodId,
         },
     },
     ports::{
-        ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange,
+        ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
+        CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService,
         ListActivitiesFilters, TrainingRepository, UpdateMetricsValuesRequest,
     },
@@ -23,18 +24,18 @@ use crate::domain::{
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Constructor)]
-pub struct TrainingService<TMR, AR>
+pub struct TrainingService<TR, AR>
 where
-    TMR: TrainingRepository,
+    TR: TrainingRepository,
     AR: ActivityRepository,
 {
-    metrics_repository: TMR,
+    training_repository: TR,
     activity_repository: Arc<Mutex<AR>>,
 }
 
-impl<TMR, AR> TrainingService<TMR, AR>
+impl<TR, AR> TrainingService<TR, AR>
 where
-    TMR: TrainingRepository,
+    TR: TrainingRepository,
     AR: ActivityRepository,
 {
     async fn compute_metric_values(
@@ -80,7 +81,7 @@ where
 
         for (key, value) in values.into_iter() {
             let _ = self
-                .metrics_repository
+                .training_repository
                 .update_metric_values(definition.id(), (key, value))
                 .await;
         }
@@ -109,7 +110,7 @@ where
             req.aggregate().clone(),
             req.filters().clone(),
         );
-        self.metrics_repository
+        self.training_repository
             .save_definition(definition.clone())
             .await?;
 
@@ -134,7 +135,7 @@ where
 
     async fn update_metrics_values(&self, req: UpdateMetricsValuesRequest) -> Result<(), ()> {
         let definitions = self
-            .metrics_repository
+            .training_repository
             .get_definitions(req.user())
             .await
             .unwrap();
@@ -151,7 +152,7 @@ where
                     .granularity()
                     .datetime_key(activity.start_time().date());
                 let new_value = match self
-                    .metrics_repository
+                    .training_repository
                     .get_metric_value(definition.id(), &bin_key)
                     .await
                 {
@@ -173,7 +174,7 @@ where
                     Err(_err) => continue,
                 };
                 let _ = self
-                    .metrics_repository
+                    .training_repository
                     .update_metric_values(definition.id(), (bin_key, new_value))
                     .await;
             }
@@ -186,14 +187,14 @@ where
         &self,
         user: &UserId,
     ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
-        let Ok(definitions) = self.metrics_repository.get_definitions(user).await else {
+        let Ok(definitions) = self.training_repository.get_definitions(user).await else {
             return vec![];
         };
 
         let mut res = vec![];
         for definition in definitions {
             let values = self
-                .metrics_repository
+                .training_repository
                 .get_metric_values(definition.id())
                 .await
                 .unwrap_or_default();
@@ -207,7 +208,11 @@ where
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> Result<(), DeleteTrainingMetricError> {
-        let Some(definition) = self.metrics_repository.get_definition(req.metric()).await? else {
+        let Some(definition) = self
+            .training_repository
+            .get_definition(req.metric())
+            .await?
+        else {
             return Err(DeleteTrainingMetricError::MetricDoesNotExist(
                 req.metric().clone(),
             ));
@@ -220,11 +225,28 @@ where
             ));
         }
 
-        self.metrics_repository
+        self.training_repository
             .delete_definition(req.metric())
             .await?;
 
         Ok(())
+    }
+
+    async fn create_training_period(
+        &self,
+        req: CreateTrainingPeriodRequest,
+    ) -> Result<TrainingPeriodId, CreateTrainingPeriodError> {
+        let id = TrainingPeriodId::new();
+        let period = req
+            .to_period(&id)
+            .map_err(CreateTrainingPeriodError::InvalidPeriod)?;
+
+        self.training_repository
+            .save_training_period(period)
+            .await
+            .map_err(|err| CreateTrainingPeriodError::Unknown(err.into()))?;
+
+        Ok(id)
     }
 }
 
@@ -273,10 +295,11 @@ pub mod test_utils {
     use mockall::mock;
 
     use crate::domain::{
-        models::training::TrainingMetricValue,
+        models::training::{TrainingMetricValue, TrainingPeriod},
         ports::{
-            DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-            GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, UpdateMetricError,
+            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
+            GetDefinitionError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
+            SaveTrainingMetricError, SaveTrainingPeriodError, UpdateMetricError,
         },
     };
 
@@ -310,6 +333,11 @@ pub mod test_utils {
                 &self,
                 req: DeleteTrainingMetricRequest,
             ) -> Result<(), DeleteTrainingMetricError>;
+
+            async fn create_training_period(
+                &self,
+                req: CreateTrainingPeriodRequest,
+            ) -> Result<TrainingPeriodId, CreateTrainingPeriodError>;
         }
     }
 
@@ -371,6 +399,11 @@ pub mod test_utils {
                 &self,
                 metric: &TrainingMetricId,
             ) -> Result<(), DeleteMetricError>;
+
+            async fn save_training_period(
+                &self,
+                period: TrainingPeriod,
+            ) -> Result<(), SaveTrainingPeriodError>;
         }
     }
 }
@@ -795,5 +828,70 @@ mod tests_training_metrics_service {
         let res = service.delete_metric(req).await;
 
         assert!(res.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_period {
+    use anyhow::anyhow;
+    use chrono::NaiveDate;
+
+    use crate::domain::{
+        models::training::TrainingPeriodSports,
+        ports::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
+        services::{
+            activity::test_utils::MockActivityRepository,
+            training::test_utils::MockTrainingRepository,
+        },
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_training_service_create_training_period_ok() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_training_period()
+            .times(1)
+            .returning(|_| Ok(()));
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = CreateTrainingPeriodRequest::new(
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            None,
+            "test_period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        );
+
+        let res = service.create_training_period(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_training_service_create_training_period_save_period_err() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_training_period()
+            .times(1)
+            .returning(|_| Err(SaveTrainingPeriodError::Unknown(anyhow!("repo error"))));
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = CreateTrainingPeriodRequest::new(
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            None,
+            "test_period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        );
+
+        let res = service.create_training_period(req).await;
+
+        assert!(res.is_err());
     }
 }

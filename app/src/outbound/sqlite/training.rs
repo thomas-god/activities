@@ -14,8 +14,8 @@ use crate::domain::{
     },
     ports::{
         DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, TrainingRepository,
-        UpdateMetricError,
+        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, SaveTrainingPeriodError,
+        TrainingRepository, UpdateMetricError,
     },
 };
 
@@ -42,9 +42,7 @@ impl SqliteTrainingRepository {
         let pool = SqlitePool::connect_with(options).await?;
 
         // Run migrations
-        sqlx::migrate!("migrations/training_metrics")
-            .run(&pool)
-            .await?;
+        sqlx::migrate!("migrations/training").run(&pool).await?;
 
         Ok(Self { pool })
     }
@@ -196,6 +194,24 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map_err(|err| GetTrainingMetricValueError::Unknown(anyhow!(err)))
         .map(|rows| TrainingMetricValues::new(HashMap::from_iter(rows)))
     }
+
+    async fn save_training_period(
+        &self,
+        period: crate::domain::models::training::TrainingPeriod,
+    ) -> Result<(), crate::domain::ports::SaveTrainingPeriodError> {
+        sqlx::query("INSERT INTO t_training_periods VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);")
+            .bind(period.id())
+            .bind(period.user())
+            .bind(period.start())
+            .bind(period.end())
+            .bind(period.name())
+            .bind(period.sports())
+            .bind(period.note())
+            .execute(&self.pool)
+            .await
+            .map_err(|err| SaveTrainingPeriodError::Unknown(anyhow!(err)))
+            .map(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -203,13 +219,15 @@ mod test_sqlite_activity_repository {
 
     use std::collections::HashMap;
 
+    use chrono::NaiveDate;
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
         activity::{Sport, TimeseriesMetric},
         training::{
             ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
-            TrainingMetricFilters, TrainingMetricGranularity,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     };
 
@@ -679,6 +697,41 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have returned OK")
                 .is_none()
+        );
+    }
+
+    fn build_training_period() -> TrainingPeriod {
+        TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-01".parse::<NaiveDate>().unwrap(),
+            None,
+            "test period".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap()
+    }
+    #[tokio::test]
+    async fn test_save_training_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should have return Ok");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("select count(*) from t_training_periods where id = ?1")
+                .bind(period.id())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            1
         );
     }
 }

@@ -621,12 +621,51 @@ impl std::iter::IntoIterator for TrainingMetricValues {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
+pub struct TrainingPeriodId(String);
+
+impl TrainingPeriodId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_string())
+    }
+
+    pub fn from(id: &str) -> Self {
+        Self(id.to_string())
+    }
+}
+
+impl fmt::Display for TrainingPeriodId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Default for TrainingPeriodId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone, Constructor, PartialEq, Serialize, Deserialize)]
+pub struct TrainingPeriodSports(Option<Vec<SportFilter>>);
+
+impl TrainingPeriodSports {
+    pub fn matches(&self, activity: &Activity) -> bool {
+        self.0
+            .as_ref()
+            .map(|sports| sports.iter().any(|sport| sport.matches(activity)))
+            .unwrap_or(true)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct TrainingPeriod {
+    id: TrainingPeriodId,
+    user: UserId,
     start: NaiveDate,
     end: Option<NaiveDate>,
     name: String,
-    sports: Option<Vec<SportFilter>>,
+    sports: TrainingPeriodSports,
     note: Option<String>,
 }
 
@@ -638,10 +677,12 @@ pub enum TrainingPeriodCreationError {
 
 impl TrainingPeriod {
     pub fn new(
+        id: TrainingPeriodId,
+        user: UserId,
         start: NaiveDate,
         end: Option<NaiveDate>,
         name: String,
-        sports: Option<Vec<SportFilter>>,
+        sports: TrainingPeriodSports,
         note: Option<String>,
     ) -> Result<Self, TrainingPeriodCreationError> {
         if let Some(end_date) = end
@@ -651,12 +692,22 @@ impl TrainingPeriod {
         }
 
         Ok(Self {
+            id,
+            user,
             start,
             end,
             name,
             sports,
             note,
         })
+    }
+
+    pub fn id(&self) -> &TrainingPeriodId {
+        &self.id
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
     }
 
     pub fn start(&self) -> &NaiveDate {
@@ -683,17 +734,14 @@ impl TrainingPeriod {
             return false;
         }
 
-        self.sports
-            .as_ref()
-            .map(|sports| sports.iter().any(|sport| sport.matches(activity)))
-            .unwrap_or(true)
+        self.sports.matches(activity)
     }
 
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn sports(&self) -> &Option<Vec<SportFilter>> {
+    pub fn sports(&self) -> &TrainingPeriodSports {
         &self.sports
     }
 
@@ -1632,24 +1680,53 @@ mod test_training_period {
 
     #[test]
     fn test_create_training_period() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let start = "2025-10-17".parse::<NaiveDate>().unwrap();
         let name = "test period".to_string();
-        let sports = None;
+        let sports = TrainingPeriodSports::new(None);
         let note = None;
 
         let end = None;
         assert!(
-            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_ok()
+            TrainingPeriod::new(
+                id.clone(),
+                user.clone(),
+                start,
+                end,
+                name.clone(),
+                sports.clone(),
+                note.clone()
+            )
+            .is_ok()
         );
 
         let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
         assert!(
-            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_ok()
+            TrainingPeriod::new(
+                id.clone(),
+                user.clone(),
+                start,
+                end,
+                name.clone(),
+                sports.clone(),
+                note.clone()
+            )
+            .is_ok()
         );
 
         let end = Some("2025-10-16".parse::<NaiveDate>().unwrap());
         assert!(
-            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_err()
+            TrainingPeriod::new(
+                id.clone(),
+                user.clone(),
+                start,
+                end,
+                name.clone(),
+                sports.clone(),
+                note.clone()
+            )
+            .is_err()
         );
     }
 
@@ -1681,12 +1758,16 @@ mod test_training_period {
 
     #[test]
     fn test_closed_period_match_activity() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
         let period = TrainingPeriod::new(
+            id.clone(),
+            user.clone(),
             "2025-09-17".parse::<NaiveDate>().unwrap(),
             end,
             "test period".to_string(),
-            None,
+            TrainingPeriodSports::new(None),
             None,
         )
         .unwrap();
@@ -1698,12 +1779,16 @@ mod test_training_period {
 
     #[test]
     fn test_open_period_match_activity() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let end = None;
         let period = TrainingPeriod::new(
+            id.clone(),
+            user.clone(),
             "2025-09-17".parse::<NaiveDate>().unwrap(),
             end,
             "test period".to_string(),
-            None,
+            TrainingPeriodSports::new(None),
             None,
         )
         .unwrap();
@@ -1715,12 +1800,16 @@ mod test_training_period {
 
     #[test]
     fn test_no_sport_period_match_activity_sport() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
         let period = TrainingPeriod::new(
+            id.clone(),
+            user.clone(),
             "2025-09-17".parse::<NaiveDate>().unwrap(),
             end,
             "test period".to_string(),
-            None,
+            TrainingPeriodSports::new(None),
             None,
         )
         .unwrap();
@@ -1732,12 +1821,16 @@ mod test_training_period {
 
     #[test]
     fn test_period_with_sport_match_activity_sport() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
         let period = TrainingPeriod::new(
+            id.clone(),
+            user.clone(),
             "2025-09-17".parse::<NaiveDate>().unwrap(),
             end,
             "test period".to_string(),
-            Some(vec![SportFilter::Sport(Sport::Running)]),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
             None,
         )
         .unwrap();
@@ -1750,12 +1843,18 @@ mod test_training_period {
 
     #[test]
     fn test_period_with_sport_category_match_activity_sport() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
         let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
         let period = TrainingPeriod::new(
+            id.clone(),
+            user.clone(),
             "2025-09-17".parse::<NaiveDate>().unwrap(),
             end,
             "test period".to_string(),
-            Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
+            TrainingPeriodSports::new(Some(vec![SportFilter::SportCategory(
+                SportCategory::Running,
+            )])),
             None,
         )
         .unwrap();
