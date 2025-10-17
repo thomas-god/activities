@@ -20,6 +20,7 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 	if (res.status === 200) {
 		return { activity: ActivityDetails.parse(await res.json()) };
 	}
+
 	redirect(307, '/');
 };
 

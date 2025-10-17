@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { dayjs, formatDuration, formatRelativeDuration, localiseDateTime } from '$lib/duration';
+	import { formatDuration, localiseDateTime } from '$lib/duration';
 	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
-	import Chip from '../../../molecules/Chip.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';

@@ -9,7 +9,7 @@
 	};
 </script>
 
-<div class="flex flex-row flex-wrap justify-start gap-2 p-2 px-4">
+<div class="flex flex-row flex-wrap justify-start gap-2">
 	<label class="label">
 		From
 		<input

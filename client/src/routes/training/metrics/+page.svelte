@@ -4,8 +4,8 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import DateRange from '../../../molecules/DateRange.svelte';
 	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
-	import type { PageProps } from '../$types';
 	import { dayjs } from '$lib/duration';
+	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
@@ -85,9 +85,11 @@
 	};
 </script>
 
-<div class="mx-auto mt-4 flex flex-col gap-4 sm:mt-8">
-	<div class="rounded-box bg-base-100 shadow-md">
-		<DateRange bind:dates={() => dates, datesUpdateCallback} />
+<div class="mx-auto flex flex-col gap-4">
+	<div class="rounded-box rounded-t-none border-base-300 bg-base-100 shadow-md">
+		<div class="px-2 pl-4">
+			<DateRange bind:dates={() => dates, datesUpdateCallback} />
+		</div>
 		<div class="flex flex-row flex-wrap items-center gap-2 p-2">
 			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(4)}>Last 4 weeks</button>
 			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(12)}>Last 12 weeks</button>
