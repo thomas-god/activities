@@ -33,7 +33,7 @@
 			>
 			<a
 				class={`btn px-2 text-lg font-medium btn-ghost ${activeClass('/training')}`}
-				href="/training">Metrics</a
+				href="/training">Training</a
 			>
 		</div>
 		{#if page.url.pathname === '/'}
