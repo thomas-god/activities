@@ -487,6 +487,17 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: CreateTrainingPeriodRequest,
     ) -> impl Future<Output = Result<TrainingPeriodId, CreateTrainingPeriodError>> + Send;
+
+    fn get_training_periods(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
+
+    fn get_training_period(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> impl Future<Output = Option<TrainingPeriod>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -640,6 +651,17 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         period: TrainingPeriod,
     ) -> impl Future<Output = Result<(), SaveTrainingPeriodError>> + Send;
+
+    fn get_training_periods(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
+
+    fn get_training_period(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> impl Future<Output = Option<TrainingPeriod>> + Send;
 }
 
 #[cfg(test)]

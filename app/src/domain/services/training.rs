@@ -248,6 +248,23 @@ where
 
         Ok(id)
     }
+
+    async fn get_training_period(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> Option<crate::domain::models::training::TrainingPeriod> {
+        self.training_repository
+            .get_training_period(user, period)
+            .await
+    }
+
+    async fn get_training_periods(
+        &self,
+        user: &UserId,
+    ) -> Vec<crate::domain::models::training::TrainingPeriod> {
+        self.training_repository.get_training_periods(user).await
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -338,6 +355,17 @@ pub mod test_utils {
                 &self,
                 req: CreateTrainingPeriodRequest,
             ) -> Result<TrainingPeriodId, CreateTrainingPeriodError>;
+
+            async fn get_training_periods(
+                &self,
+                user: &UserId,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_training_period(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Option<TrainingPeriod>;
         }
     }
 
@@ -404,6 +432,17 @@ pub mod test_utils {
                 &self,
                 period: TrainingPeriod,
             ) -> Result<(), SaveTrainingPeriodError>;
+
+            async fn get_training_periods(
+                &self,
+                user: &UserId,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_training_period(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Option<TrainingPeriod>;
         }
     }
 }

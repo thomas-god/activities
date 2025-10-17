@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use anyhow::anyhow;
+use chrono::NaiveDate;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::domain::{
@@ -9,7 +10,8 @@ use crate::domain::{
         training::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
-            TrainingMetricValue, TrainingMetricValues,
+            TrainingMetricValue, TrainingMetricValues, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     },
     ports::{
@@ -26,6 +28,16 @@ type DefinitionRow = (
     TrainingMetricGranularity,
     TrainingMetricAggregate,
     TrainingMetricFilters,
+);
+
+type TrainingPeriodRow = (
+    TrainingPeriodId,
+    UserId,
+    NaiveDate,
+    Option<NaiveDate>,
+    String,
+    TrainingPeriodSports,
+    Option<String>,
 );
 
 #[derive(Debug, Clone)]
@@ -212,10 +224,56 @@ impl TrainingRepository for SqliteTrainingRepository {
             .map_err(|err| SaveTrainingPeriodError::Unknown(anyhow!(err)))
             .map(|_| ())
     }
+
+    async fn get_training_period(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> Option<TrainingPeriod> {
+        match sqlx::query_as::<_, TrainingPeriodRow>(
+            "
+        SELECT id, user_id, start, end, name, sports, note
+        FROM t_training_periods
+        WHERE id = ?1 AND user_id = ?2 LIMIT 1;",
+        )
+        .bind(period)
+        .bind(user)
+        .fetch_one(&self.pool)
+        .await
+        {
+            Ok((id, user_id, start, end, name, sports, note)) => {
+                TrainingPeriod::new(id, user_id, start, end, name, sports, note).ok()
+            }
+            Err(sqlx::Error::RowNotFound) => None,
+            Err(_err) => None,
+        }
+    }
+
+    async fn get_training_periods(
+        &self,
+        user: &UserId,
+    ) -> Vec<crate::domain::models::training::TrainingPeriod> {
+        sqlx::query_as::<_, TrainingPeriodRow>(
+            "SELECT id, user_id, start, end, name, sports, note
+            FROM t_training_periods
+            WHERE user_id = ?1;",
+        )
+        .bind(user)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .filter_map(|(id, user_id, start, end, name, sports, note)| {
+                    TrainingPeriod::new(id, user_id, start, end, name, sports, note).ok()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
-mod test_sqlite_activity_repository {
+mod test_sqlite_training_repository {
 
     use std::collections::HashMap;
 
@@ -712,6 +770,7 @@ mod test_sqlite_activity_repository {
         )
         .unwrap()
     }
+
     #[tokio::test]
     async fn test_save_training_period() {
         let db_file = NamedTempFile::new().unwrap();
@@ -733,5 +792,119 @@ mod test_sqlite_activity_repository {
                 .unwrap(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let expected_period = build_training_period();
+        repository
+            .save_training_period(expected_period.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let period = repository
+            .get_training_period(expected_period.user(), expected_period.id())
+            .await
+            .unwrap();
+
+        assert_eq!(period, expected_period);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_does_not_exist() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        assert!(
+            repository
+                .get_training_period(&&UserId::test_default(), &TrainingPeriodId::new())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_does_not_match_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let initial_period = build_training_period();
+        repository
+            .save_training_period(initial_period.clone())
+            .await
+            .expect("Should have return Ok");
+
+        assert!(
+            repository
+                .get_training_period(
+                    &UserId::from("another_user".to_string()),
+                    initial_period.id()
+                )
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_periods_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let expected_period = build_training_period();
+        repository
+            .save_training_period(expected_period.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let periods = repository
+            .get_training_periods(expected_period.user())
+            .await;
+
+        assert_eq!(periods, vec![expected_period]);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_periods_empty() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let periods = repository
+            .get_training_periods(&UserId::test_default())
+            .await;
+
+        assert!(periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_periods_exclude_periods_from_other_users() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let expected_period = build_training_period();
+        repository
+            .save_training_period(expected_period.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let periods = repository
+            .get_training_periods(&UserId::from("another_user".to_string()))
+            .await;
+
+        assert!(periods.is_empty());
     }
 }
