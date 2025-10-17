@@ -4,6 +4,7 @@
 	import '../app.css';
 	import ActivitiesUploader from '../organisms/ActivitiesUploader.svelte';
 	import CreateTrainingMetric from '../organisms/CreateTrainingMetric.svelte';
+	import CreateTrainingPeriod from '../organisms/CreateTrainingPeriod.svelte';
 
 	let { children } = $props();
 
@@ -24,8 +25,13 @@
 		invalidate('app:activities');
 	};
 
+	const createTrainingPeriodCallback = () => {
+		createTrainingPeriodDialog.close();
+	};
+
 	let activitiesUploadDialog: HTMLDialogElement;
 	let createTrainingMetricDialog: HTMLDialogElement;
+	let createTrainingPeriodDialog: HTMLDialogElement;
 </script>
 
 <div class="container">
@@ -57,6 +63,13 @@
 					onclick={() => createTrainingMetricDialog.showModal()}>+ New training metric</button
 				>
 			</div>
+		{:else if page.url.pathname === '/training/periods'}
+			<div class="">
+				<button
+					class="btn w-full rounded-lg btn-primary"
+					onclick={() => createTrainingPeriodDialog.showModal()}>+ New training period</button
+				>
+			</div>
 		{/if}
 	</div>
 
@@ -77,6 +90,16 @@
 			<button>close</button>
 		</form>
 	</dialog>
+
+	<dialog class="modal" id="create-training-period-modal" bind:this={createTrainingPeriodDialog}>
+		<div class="modal-box">
+			<CreateTrainingPeriod callback={createTrainingPeriodCallback} />
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
 	{@render children?.()}
 </div>
 
