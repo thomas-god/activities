@@ -88,10 +88,24 @@
 <div class="mx-auto mt-4 flex flex-col gap-4 sm:mt-8">
 	<div class="rounded-box bg-base-100 shadow-md">
 		<DateRange bind:dates={() => dates, datesUpdateCallback} />
-		<div class="flex flex-row flex-wrap gap-2 p-2">
+		<div class="flex flex-row flex-wrap items-center gap-2 p-2">
 			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(4)}>Last 4 weeks</button>
 			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(12)}>Last 12 weeks</button>
 			<button class="btn btn-sm sm:btn-md" onclick={thisYear}>This year</button>
+			<select class="select select-sm">
+				<option disabled selected>Training period</option>
+				{#each data.periods as period}
+					<option
+						onclick={() =>
+							datesUpdateCallback({
+								start: period.start,
+								end: period.end === null ? dayjs().toISOString() : period.end
+							})}>{period.name}</option
+					>
+				{:else}
+					<option disabled class="italic">No training periods</option>
+				{/each}
+			</select>
 		</div>
 	</div>
 
