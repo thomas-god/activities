@@ -16,8 +16,9 @@ use crate::config::Config;
 use crate::domain::ports::{IActivityService, ITrainingService};
 
 use crate::inbound::http::handlers::{
-    create_training_metric, delete_activity, delete_training_metric, get_activity,
-    get_training_metrics, list_activities, patch_activity, upload_activities,
+    create_training_metric, create_training_period, delete_activity, delete_training_metric,
+    get_activity, get_training_metrics, get_training_periods, list_activities, patch_activity,
+    upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -142,39 +143,47 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserServic
     }
 }
 
-fn core_routes<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>(
-    state: AppState<AS, PF, TMS, US>,
-) -> Router<AppState<AS, PF, TMS, US>> {
+fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IUserService>(
+    state: AppState<AS, PF, TS, US>,
+) -> Router<AppState<AS, PF, TS, US>> {
     let mut router = Router::new()
         .route(
             "/activity",
-            post(upload_activities::<AS, PF, TMS, US>)
+            post(upload_activities::<AS, PF, TS, US>)
                 .route_layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
         )
-        .route("/activities", get(list_activities::<AS, PF, TMS, US>))
+        .route("/activities", get(list_activities::<AS, PF, TS, US>))
         .route(
             "/activity/{activity_id}",
-            get(get_activity::<AS, PF, TMS, US>),
+            get(get_activity::<AS, PF, TS, US>),
         )
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, PF, TMS, US>),
+            patch(patch_activity::<AS, PF, TS, US>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, PF, TMS, US>),
+            delete(delete_activity::<AS, PF, TS, US>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, PF, TMS, US>),
+            get(get_training_metrics::<AS, PF, TS, US>),
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, PF, TMS, US>),
+            post(create_training_metric::<AS, PF, TS, US>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, PF, TMS, US>),
+            delete(delete_training_metric::<AS, PF, TS, US>),
+        )
+        .route(
+            "/training/period",
+            post(create_training_period::<AS, PF, TS, US>),
+        )
+        .route(
+            "/training/periods",
+            get(get_training_periods::<AS, PF, TS, US>),
         );
 
     if cfg!(feature = "single-user") {
@@ -184,7 +193,7 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: I
     } else {
         router = router.route_layer(axum::middleware::from_extractor_with_state::<
             crate::inbound::http::auth::CookieUserExtractor<US>,
-            AppState<AS, PF, TMS, US>,
+            AppState<AS, PF, TS, US>,
         >(state.clone()));
     }
 

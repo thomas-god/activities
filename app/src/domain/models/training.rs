@@ -656,6 +656,10 @@ impl TrainingPeriodSports {
             .map(|sports| sports.iter().any(|sport| sport.matches(activity)))
             .unwrap_or(true)
     }
+
+    pub fn items(&self) -> Option<&Vec<SportFilter>> {
+        self.0.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
