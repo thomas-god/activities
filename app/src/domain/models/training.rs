@@ -621,6 +621,87 @@ impl std::iter::IntoIterator for TrainingMetricValues {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TrainingPeriod {
+    start: NaiveDate,
+    end: Option<NaiveDate>,
+    name: String,
+    sports: Option<Vec<SportFilter>>,
+    note: Option<String>,
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum TrainingPeriodCreationError {
+    #[error("End date must be None or after start date")]
+    EndDateBeforeStartDate,
+}
+
+impl TrainingPeriod {
+    pub fn new(
+        start: NaiveDate,
+        end: Option<NaiveDate>,
+        name: String,
+        sports: Option<Vec<SportFilter>>,
+        note: Option<String>,
+    ) -> Result<Self, TrainingPeriodCreationError> {
+        if let Some(end_date) = end
+            && start > end_date
+        {
+            return Err(TrainingPeriodCreationError::EndDateBeforeStartDate);
+        }
+
+        Ok(Self {
+            start,
+            end,
+            name,
+            sports,
+            note,
+        })
+    }
+
+    pub fn start(&self) -> &NaiveDate {
+        &self.start
+    }
+
+    pub fn end(&self) -> &Option<NaiveDate> {
+        &self.end
+    }
+
+    pub fn range(&self) -> DateRange {
+        DateRange::new(self.start, self.end.unwrap_or(Utc::now().date_naive()))
+    }
+
+    pub fn matches(&self, activity: &Activity) -> bool {
+        let activity_start_date = activity.start_time().date().date_naive();
+        if activity_start_date < self.start {
+            return false;
+        }
+
+        if let Some(end) = self.end
+            && activity_start_date > end
+        {
+            return false;
+        }
+
+        self.sports
+            .as_ref()
+            .map(|sports| sports.iter().any(|sport| sport.matches(activity)))
+            .unwrap_or(true)
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn sports(&self) -> &Option<Vec<SportFilter>> {
+        &self.sports
+    }
+
+    pub fn note(&self) -> &Option<String> {
+        &self.note
+    }
+}
+
 #[cfg(test)]
 mod test_training_metrics {
 
@@ -1539,5 +1620,149 @@ mod test_training_metric_filters {
                 .matches(&activity)
         );
         assert!(!TrainingMetricFilters::new(Some(vec![])).matches(&activity));
+    }
+}
+
+#[cfg(test)]
+mod test_training_period {
+
+    use crate::domain::models::activity::{ActivityId, ActivityStatistics};
+
+    use super::*;
+
+    #[test]
+    fn test_create_training_period() {
+        let start = "2025-10-17".parse::<NaiveDate>().unwrap();
+        let name = "test period".to_string();
+        let sports = None;
+        let note = None;
+
+        let end = None;
+        assert!(
+            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_ok()
+        );
+
+        let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
+        assert!(
+            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_ok()
+        );
+
+        let end = Some("2025-10-16".parse::<NaiveDate>().unwrap());
+        assert!(
+            TrainingPeriod::new(start, end, name.clone(), sports.clone(), note.clone()).is_err()
+        );
+    }
+
+    fn activity_with_start_time(start: &str) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(start.parse::<DateTime<FixedOffset>>().unwrap()),
+            Sport::Running,
+            ActivityStatistics::new(HashMap::new()),
+        )
+    }
+
+    fn activity_with_sport(sport: Sport) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(
+                "2025-10-01T12:00:00+02:00"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            sport,
+            ActivityStatistics::new(HashMap::new()),
+        )
+    }
+
+    #[test]
+    fn test_closed_period_match_activity() {
+        let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
+        let period = TrainingPeriod::new(
+            "2025-09-17".parse::<NaiveDate>().unwrap(),
+            end,
+            "test period".to_string(),
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(!period.matches(&activity_with_start_time("2025-09-16T12:00:00+02:00")));
+        assert!(period.matches(&activity_with_start_time("2025-10-01T12:00:00+02:00")));
+        assert!(!period.matches(&activity_with_start_time("2025-10-19T12:00:00+02:00")));
+    }
+
+    #[test]
+    fn test_open_period_match_activity() {
+        let end = None;
+        let period = TrainingPeriod::new(
+            "2025-09-17".parse::<NaiveDate>().unwrap(),
+            end,
+            "test period".to_string(),
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(!period.matches(&activity_with_start_time("2025-09-16T12:00:00+02:00")));
+        assert!(period.matches(&activity_with_start_time("2025-10-01T12:00:00+02:00")));
+        assert!(period.matches(&activity_with_start_time("2025-10-19T12:00:00+02:00")));
+    }
+
+    #[test]
+    fn test_no_sport_period_match_activity_sport() {
+        let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
+        let period = TrainingPeriod::new(
+            "2025-09-17".parse::<NaiveDate>().unwrap(),
+            end,
+            "test period".to_string(),
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(period.matches(&activity_with_sport(Sport::Running)));
+        assert!(period.matches(&activity_with_sport(Sport::Cycling)));
+        assert!(period.matches(&activity_with_sport(Sport::StrengthTraining)));
+    }
+
+    #[test]
+    fn test_period_with_sport_match_activity_sport() {
+        let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
+        let period = TrainingPeriod::new(
+            "2025-09-17".parse::<NaiveDate>().unwrap(),
+            end,
+            "test period".to_string(),
+            Some(vec![SportFilter::Sport(Sport::Running)]),
+            None,
+        )
+        .unwrap();
+
+        assert!(period.matches(&activity_with_sport(Sport::Running)));
+        assert!(!period.matches(&activity_with_sport(Sport::TrackRunning)));
+        assert!(!period.matches(&activity_with_sport(Sport::Cycling)));
+        assert!(!period.matches(&activity_with_sport(Sport::StrengthTraining)));
+    }
+
+    #[test]
+    fn test_period_with_sport_category_match_activity_sport() {
+        let end = Some("2025-10-18".parse::<NaiveDate>().unwrap());
+        let period = TrainingPeriod::new(
+            "2025-09-17".parse::<NaiveDate>().unwrap(),
+            end,
+            "test period".to_string(),
+            Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
+            None,
+        )
+        .unwrap();
+
+        assert!(period.matches(&activity_with_sport(Sport::Running)));
+        assert!(period.matches(&activity_with_sport(Sport::TrackRunning)));
+        assert!(!period.matches(&activity_with_sport(Sport::Cycling)));
+        assert!(!period.matches(&activity_with_sport(Sport::StrengthTraining)));
     }
 }
