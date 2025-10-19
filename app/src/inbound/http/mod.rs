@@ -17,8 +17,8 @@ use crate::domain::ports::{IActivityService, ITrainingService};
 
 use crate::inbound::http::handlers::{
     create_training_metric, create_training_period, delete_activity, delete_training_metric,
-    get_activity, get_training_metrics, get_training_period, get_training_periods, list_activities,
-    patch_activity, upload_activities,
+    delete_training_period, get_activity, get_training_metrics, get_training_period,
+    get_training_periods, list_activities, patch_activity, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -183,7 +183,8 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IU
         )
         .route(
             "/training/period/{period_id}",
-            get(get_training_period::<AS, PF, TS, US>),
+            get(get_training_period::<AS, PF, TS, US>)
+                .delete(delete_training_period::<AS, PF, TS, US>),
         )
         .route(
             "/training/periods",
