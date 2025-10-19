@@ -6,6 +6,7 @@
 	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
+	import { aggregateFunctionDisplay } from '$lib/metric';
 
 	let { data }: PageProps = $props();
 
@@ -16,6 +17,11 @@
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
 
+	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
+
+	const formatMetricTitle = (metric: (typeof data.metrics)[number]): string => {
+		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports'}]`;
+	};
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
 		for (let i = 0; i < data.metrics.length; i++) {
@@ -30,7 +36,7 @@
 
 			metrics.push({
 				values: values,
-				title: `${metric.metric} (${metric.granularity}) ${metric.sports.length > 0 ? '[' + metric.sports.join(', ') + ']' : ''}`,
+				title: formatMetricTitle(metric),
 				unit: metric.unit,
 				id: metric.id,
 				granularity: metric.granularity

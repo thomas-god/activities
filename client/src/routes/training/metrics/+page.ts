@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import dayjs from 'dayjs';
 import { goto } from '$app/navigation';
+import { metricAggregateFunctions } from '$lib/metric';
 
 export const load: PageLoad = async ({ fetch, depends, url }) => {
 	depends('app:training-metrics');
@@ -48,7 +49,7 @@ const MetricsListItem = z.object({
 	metric: z.string(),
 	unit: z.string(),
 	granularity: z.string(),
-	aggregate: z.string(),
+	aggregate: z.enum(metricAggregateFunctions),
 	sports: z.array(z.string()),
 	values: z.record(z.string(), z.number())
 });

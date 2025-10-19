@@ -3,6 +3,7 @@
 	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
+	import { aggregateFunctionDisplay } from '$lib/metric';
 
 	let { data }: PageProps = $props();
 
@@ -24,7 +25,7 @@
 
 		return {
 			values: values,
-			title: `${metric.granularity} ${metric.metric.toLowerCase()}`,
+			title: `${metric.granularity} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  `,
 			unit: metric.unit,
 			granularity: metric.granularity
 		};
