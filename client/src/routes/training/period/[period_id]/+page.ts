@@ -4,8 +4,9 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { redirect } from '@sveltejs/kit';
 import { goto } from '$app/navigation';
+import { SportCategories, sports } from '$lib/sport';
 
-export const load: PageLoad = async ({ fetch, depends, params }) => {
+export const load: PageLoad = async ({ fetch,  params }) => {
 	let res = await fetch(`${PUBLIC_APP_URL}/api/training/period/${params.period_id}`, {
 		method: 'GET',
 		credentials: 'include',
@@ -30,8 +31,8 @@ const TrainingPeriodDetails = z.object({
 	end: z.string().nullable(),
 	name: z.string(),
 	sports: z.object({
-		sports: z.array(z.string()),
-		categories: z.array(z.string())
+		sports: z.array(z.enum(sports)),
+		categories: z.array(z.enum(SportCategories))
 	}),
 	note: z.string().nullable()
 });

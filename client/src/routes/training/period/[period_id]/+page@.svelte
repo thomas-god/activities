@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
-	import { getSportCategory, sportCategoryIcons, type SportCategory } from '$lib/sport';
+	import {
+		getSportCategory,
+		sportCategoryIcons,
+		getSportCategoryIcon,
+		type SportCategory
+	} from '$lib/sport';
 	import type { PageProps } from './$types';
 	import type { TrainingPeriodDetails } from './+page';
 
@@ -13,7 +18,7 @@
 
 		for (const category of sports.categories) {
 			if (category in sportCategoryIcons) {
-				icons.add(sportCategoryIcons[category as SportCategory]);
+				icons.add(sportCategoryIcons[category]);
 			}
 		}
 
@@ -26,6 +31,64 @@
 
 		return Array.from(icons);
 	};
+
+	const sportsByCategory = $derived.by(() => {
+		const sports = period.sports;
+		// Map category -> { category, icon, sports[], showAll }
+		const categorySet: Set<SportCategory | 'Other'> = new Set(sports.categories);
+		const map = new Map<
+			string,
+			{ category: SportCategory | 'Other'; icon: string; sports: string[]; showAll: boolean }
+		>();
+
+		// First, seed with explicit categories (these mean "all sports")
+		for (const category of sports.categories) {
+			map.set(category, {
+				category: category,
+				icon: getSportCategoryIcon(category),
+				sports: [],
+				showAll: true
+			});
+		}
+
+		// Then, process individual sports
+		for (const sport of sports.sports) {
+			const category = getSportCategory(sport);
+			if (category !== null) {
+				const key = category;
+				// If category is already present in categories list, skip individual sport
+				if (categorySet.has(key)) {
+					continue;
+				}
+				// Otherwise, add sport to its category group
+				if (!map.has(key)) {
+					map.set(key, {
+						category: key,
+						icon: getSportCategoryIcon(category),
+						sports: [],
+						showAll: false
+					});
+				}
+				map.get(key)!.sports.push(sport);
+			} else {
+				// Sports without category go to "Other"
+				const other = 'Other';
+				if (!categorySet.has(other)) {
+					if (!map.has(other)) {
+						map.set(other, {
+							category: other,
+							icon: getSportCategoryIcon(null),
+							sports: [],
+							showAll: false
+						});
+					}
+					map.get(other)!.sports.push(sport);
+				}
+			}
+		}
+
+		return Array.from(map.values());
+	});
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
@@ -54,11 +117,39 @@
 		{/if}
 	</div>
 
-	<!-- Placeholder for future charts or aggregated metrics -->
+	<!-- Sports details section -->
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
-		<div class="text-sm italic opacity-60">
-			Training period summary and metrics will be shown here.
-		</div>
+		<details class="collapse-arrow collapse" open={false}>
+			<summary class="collapse-title font-semibold">Sports</summary>
+			<div class="collapse-content text-sm">
+				{#if period.sports.categories.length || period.sports.sports.length}
+					{#each sportsByCategory as group}
+						<div class="mb-4">
+							<div class="mb-2 flex items-center gap-3">
+								<div class="text-2xl">{group.icon}</div>
+								<div class="font-semibold">{group.category}</div>
+								{#if group.showAll}
+									<span class="text-sm italic opacity-70">all sub-sports</span>
+								{:else}
+									<div class="text-sm italic opacity-70">
+										{group.sports.length} sub-sports
+									</div>
+								{/if}
+							</div>
+							<div class="ml-11 flex flex-wrap gap-2">
+								{#if !group.showAll}
+									{#each group.sports as sport}
+										<div class="badge badge-outline">{sport}</div>
+									{/each}
+								{/if}
+							</div>
+						</div>
+					{/each}
+				{:else}
+					<div class="italic opacity-70">All sports</div>
+				{/if}
+			</div>
+		</details>
 	</div>
 </div>
 

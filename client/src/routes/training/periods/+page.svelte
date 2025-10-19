@@ -34,8 +34,8 @@
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
-	<div class="rounded-box bg-base-100 rounded-t-none shadow-md">
-		<div class="p-2 px-4 text-sm italic tracking-wide opacity-60">
+	<div class="rounded-box rounded-t-none bg-base-100 shadow-md">
+		<div class="p-2 px-4 text-sm tracking-wide italic opacity-60">
 			Training periods are spans of time with a specific training focus (base training, race, etc.)
 		</div>
 		<div>
