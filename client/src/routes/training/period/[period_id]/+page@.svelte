@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
+	import { dayjs, formatDurationCompactWithUnits } from '$lib/duration';
 	import {
 		getSportCategory,
 		sportCategoryIcons,
@@ -118,6 +118,37 @@
 
 		return Array.from(map.values());
 	});
+
+	// Calculate summary statistics
+	const summary = $derived.by(() => {
+		const total = {
+			count: period.activities.length,
+			duration: 0,
+			distance: 0,
+			elevation: 0
+		};
+
+		for (const activity of period.activities) {
+			total.duration += activity.duration ?? 0;
+			total.distance += activity.distance ?? 0;
+			total.elevation += activity.elevation ?? 0;
+		}
+
+		return total;
+	});
+
+	// Helper function to format distance
+	const formatDistance = (meters: number): string => {
+		if (meters === 0) return '0 km';
+		const km = meters / 1000;
+		return `${Math.round(km).toLocaleString('fr-fr')} km`;
+	};
+
+	// Helper function to format elevation
+	const formatElevation = (meters: number): string => {
+		if (meters === 0) return '0 m';
+		return `${Math.round(meters).toLocaleString('fr-fr')} m`;
+	};
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
@@ -194,6 +225,28 @@
 		</div>
 
 		{#if period.activities.length > 0}
+			<!-- Summary statistics -->
+			<div class="mb-4 grid grid-cols-2 gap-3 rounded bg-base-200 p-4 md:grid-cols-4">
+				<div class="flex flex-col">
+					<div class="text-xs opacity-70">Total Activities</div>
+					<div class="text-xl font-semibold">{summary.count}</div>
+				</div>
+				<div class="flex flex-col">
+					<div class="text-xs opacity-70">Total Duration</div>
+					<div class="text-xl font-semibold">
+						{formatDurationCompactWithUnits(summary.duration)}
+					</div>
+				</div>
+				<div class="flex flex-col">
+					<div class="text-xs opacity-70">Total Distance</div>
+					<div class="text-xl font-semibold">{formatDistance(summary.distance)}</div>
+				</div>
+				<div class="flex flex-col">
+					<div class="text-xs opacity-70">Total Elevation</div>
+					<div class="text-xl font-semibold">{formatElevation(summary.elevation)}</div>
+				</div>
+			</div>
+
 			<div class="flex flex-col gap-2">
 				{#each period.activities as activity}
 					<ActivitiesListItem {activity} />

@@ -34,6 +34,8 @@ const ActivityItem = z.object({
 		.number()
 		.nullable()
 		.transform((val) => val ?? 0), // Transform null to 0 for compatibility
+	distance: z.number().nullable(),
+	elevation: z.number().nullable(),
 	start_time: z.string().transform((val) => {
 		// The backend returns RFC3339 format, ensure it's compatible with ISO datetime
 		return val;

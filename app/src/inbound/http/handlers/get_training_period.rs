@@ -49,6 +49,8 @@ pub struct ActivityItem {
     sport_category: Option<String>,
     name: Option<String>,
     duration: Option<f64>,
+    distance: Option<f64>,
+    elevation: Option<f64>,
     start_time: DateTime<FixedOffset>,
 }
 
@@ -63,6 +65,14 @@ impl From<&Activity> for ActivityItem {
             duration: activity
                 .statistics()
                 .get(&ActivityStatistic::Duration)
+                .cloned(),
+            distance: activity
+                .statistics()
+                .get(&ActivityStatistic::Distance)
+                .cloned(),
+            elevation: activity
+                .statistics()
+                .get(&ActivityStatistic::Elevation)
                 .cloned(),
         }
     }
