@@ -6,11 +6,39 @@
 		getSportCategoryIcon,
 		type SportCategory
 	} from '$lib/sport';
+	import { goto } from '$app/navigation';
 	import type { PageProps } from './$types';
 	import type { TrainingPeriodDetails } from './+page';
 	import ActivitiesListItem from '../../../../organisms/ActivitiesListItem.svelte';
+	import { PUBLIC_APP_URL } from '$env/static/public';
 
 	let { data }: PageProps = $props();
+
+	let showDeleteModal = $state(false);
+	let isDeleting = $state(false);
+
+	async function handleDelete() {
+		isDeleting = true;
+		try {
+			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+				method: 'DELETE',
+				credentials: 'include',
+				mode: 'cors'
+			});
+
+			if (response.ok) {
+				await goto('/training/periods');
+			} else {
+				alert('Failed to delete training period');
+			}
+		} catch (error) {
+			alert('Error deleting training period');
+			console.error(error);
+		} finally {
+			isDeleting = false;
+			showDeleteModal = false;
+		}
+	}
 
 	const period = data.periodDetails;
 
@@ -111,6 +139,13 @@
 					<div class="italic opacity-70">All sports</div>
 				{/each}
 			</div>
+			<button
+				class="btn btn-sm btn-error"
+				onclick={() => (showDeleteModal = true)}
+				aria-label="Delete training period"
+			>
+				🗑️
+			</button>
 		</div>
 
 		{#if period.note}
@@ -173,6 +208,36 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Delete confirmation modal -->
+{#if showDeleteModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Delete Training Period</h3>
+			<p class="py-4">
+				Are you sure you want to delete "<strong>{period.name}</strong>"?
+				<br />
+				This action cannot be undone.
+			</p>
+			<div class="modal-action">
+				<button class="btn" onclick={() => (showDeleteModal = false)} disabled={isDeleting}>
+					Cancel
+				</button>
+				<button class="btn btn-error" onclick={handleDelete} disabled={isDeleting}>
+					{#if isDeleting}
+						<span class="loading loading-sm loading-spinner"></span>
+						Deleting...
+					{:else}
+						Delete
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={() => (showDeleteModal = false)}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <style>
 	.rounded-box {

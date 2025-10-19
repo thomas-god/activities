@@ -183,8 +183,11 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IU
         )
         .route(
             "/training/period/{period_id}",
-            get(get_training_period::<AS, PF, TS, US>)
-                .delete(delete_training_period::<AS, PF, TS, US>),
+            get(get_training_period::<AS, PF, TS, US>),
+        )
+        .route(
+            "/training/period/{period_id}",
+            delete(delete_training_period::<AS, PF, TS, US>),
         )
         .route(
             "/training/periods",
