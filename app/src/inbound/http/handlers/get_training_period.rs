@@ -13,7 +13,7 @@ use serde_json::json;
 use crate::{
     domain::{
         models::{
-            activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+            activity::{Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training::{
                 ActivityMetricSource, SportFilter, TrainingMetricDefinition,
                 TrainingMetricGranularity, TrainingMetricValues, TrainingPeriod, TrainingPeriodId,
@@ -39,6 +39,33 @@ pub struct ResponseBody {
     name: String,
     sports: ResponseSports,
     note: Option<String>,
+    activities: Vec<ActivityItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ActivityItem {
+    id: String,
+    sport: String,
+    sport_category: Option<String>,
+    name: Option<String>,
+    duration: Option<f64>,
+    start_time: DateTime<FixedOffset>,
+}
+
+impl From<&Activity> for ActivityItem {
+    fn from(activity: &Activity) -> Self {
+        Self {
+            id: activity.id().to_string(),
+            sport: activity.sport().to_string(),
+            sport_category: activity.sport().category().map(|cat| cat.to_string()),
+            name: activity.name().map(|name| name.to_string()),
+            start_time: *activity.start_time().date(),
+            duration: activity
+                .statistics()
+                .get(&ActivityStatistic::Duration)
+                .cloned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,19 +97,6 @@ impl From<&TrainingPeriodSports> for ResponseSports {
     }
 }
 
-impl From<TrainingPeriod> for ResponseBody {
-    fn from(value: TrainingPeriod) -> Self {
-        Self {
-            id: value.id().to_string(),
-            start: *value.start(),
-            end: *value.end(),
-            name: value.name().to_string(),
-            sports: ResponseSports::from(value.sports()),
-            note: value.note().clone(),
-        }
-    }
-}
-
 pub async fn get_training_period<
     AS: IActivityService,
     PF: ParseFile,
@@ -93,15 +107,30 @@ pub async fn get_training_period<
     State(state): State<AppState<AS, PF, TMS, UR>>,
     Path(period_id): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    match state
+    let Some(period_with_activities) = state
         .training_metrics_service
-        .get_training_period(user.user(), &TrainingPeriodId::from(&period_id))
+        .get_training_period_with_activities(user.user(), &TrainingPeriodId::from(&period_id))
         .await
-    {
-        Some(period) => {
-            let body = ResponseBody::from(period);
-            Ok(json!(body).to_string())
-        }
-        None => Err(StatusCode::NOT_FOUND),
-    }
+    else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+
+    let period = period_with_activities.period();
+    let activities: Vec<ActivityItem> = period_with_activities
+        .activities()
+        .iter()
+        .map(ActivityItem::from)
+        .collect();
+
+    let body = ResponseBody {
+        id: period.id().to_string(),
+        start: *period.start(),
+        end: *period.end(),
+        name: period.name().to_string(),
+        sports: ResponseSports::from(period.sports()),
+        note: period.note().clone(),
+        activities,
+    };
+
+    Ok(json!(body).to_string())
 }

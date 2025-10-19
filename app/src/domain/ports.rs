@@ -12,6 +12,7 @@ use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
     TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
     TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+    TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -498,6 +499,12 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         user: &UserId,
         period: &TrainingPeriodId,
     ) -> impl Future<Output = Option<TrainingPeriod>> + Send;
+
+    fn get_training_period_with_activities(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> impl Future<Output = Option<TrainingPeriodWithActivities>> + Send;
 }
 
 #[derive(Debug, Error)]

@@ -754,6 +754,26 @@ impl TrainingPeriod {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TrainingPeriodWithActivities {
+    period: TrainingPeriod,
+    activities: Vec<Activity>,
+}
+
+impl TrainingPeriodWithActivities {
+    pub fn new(period: TrainingPeriod, activities: Vec<Activity>) -> Self {
+        Self { period, activities }
+    }
+
+    pub fn period(&self) -> &TrainingPeriod {
+        &self.period
+    }
+
+    pub fn activities(&self) -> &[Activity] {
+        &self.activities
+    }
+}
+
 #[cfg(test)]
 mod test_training_metrics {
 

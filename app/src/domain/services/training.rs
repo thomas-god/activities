@@ -265,6 +265,43 @@ where
     ) -> Vec<crate::domain::models::training::TrainingPeriod> {
         self.training_repository.get_training_periods(user).await
     }
+
+    async fn get_training_period_with_activities(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> Option<crate::domain::models::training::TrainingPeriodWithActivities> {
+        use crate::domain::models::training::TrainingPeriodWithActivities;
+
+        let period = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await?;
+
+        // Query activities within the period's date range
+        let filters = ListActivitiesFilters::empty().set_date_range(Some(period.range()));
+
+        let Ok(activities) = self
+            .activity_repository
+            .lock()
+            .await
+            .list_activities(user, &filters)
+            .await
+        else {
+            return None;
+        };
+
+        // Filter activities by the period's sport filters
+        let matching_activities: Vec<_> = activities
+            .into_iter()
+            .filter(|activity| period.matches(activity))
+            .collect();
+
+        Some(TrainingPeriodWithActivities::new(
+            period,
+            matching_activities,
+        ))
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -312,7 +349,7 @@ pub mod test_utils {
     use mockall::mock;
 
     use crate::domain::{
-        models::training::{TrainingMetricValue, TrainingPeriod},
+        models::training::{TrainingMetricValue, TrainingPeriod, TrainingPeriodWithActivities},
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
             GetDefinitionError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
@@ -366,6 +403,12 @@ pub mod test_utils {
                 user: &UserId,
                 period: &TrainingPeriodId,
             ) -> Option<TrainingPeriod>;
+
+            async fn get_training_period_with_activities(
+                &self,
+                user: &UserId,
+                period: &TrainingPeriodId,
+            ) -> Option<TrainingPeriodWithActivities>;
         }
     }
 
@@ -876,8 +919,8 @@ mod test_training_service_period {
     use chrono::NaiveDate;
 
     use crate::domain::{
-        models::training::TrainingPeriodSports,
-        ports::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
+        models::training::{TrainingPeriod, TrainingPeriodSports},
+        ports::{CreateTrainingPeriodRequest, ListActivitiesError, SaveTrainingPeriodError},
         services::{
             activity::test_utils::MockActivityRepository,
             training::test_utils::MockTrainingRepository,
@@ -932,5 +975,472 @@ mod test_training_service_period {
         let res = service.create_training_period(req).await;
 
         assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_not_found() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_no_sport_filter() {
+        use crate::domain::models::activity::{
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        };
+
+        // Create test activities with different sports and dates
+        let activities = vec![
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-18T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-19T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-20T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Swimming,
+                ActivityStatistics::default(),
+            ),
+        ];
+
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None), // No sport filter = all sports
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activities_clone = activities.clone();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        assert_eq!(period_with_activities.activities().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_with_sport_filter() {
+        use crate::domain::models::activity::{
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        };
+        use crate::domain::models::training::SportFilter;
+
+        // Create test activities with different sports
+        let activities = vec![
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-18T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-19T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-20T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Swimming,
+                ActivityStatistics::default(),
+            ),
+        ];
+
+        // Period with only Running filter
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Running Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activities_clone = activities.clone();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should only include Running activity
+        assert_eq!(period_with_activities.activities().len(), 1);
+        assert_eq!(
+            period_with_activities.activities()[0].sport(),
+            &Sport::Running
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_with_category_filter() {
+        use crate::domain::models::activity::{
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport, SportCategory,
+        };
+        use crate::domain::models::training::SportFilter;
+
+        // Create test activities with different sports in the Running category
+        let activities = vec![
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-18T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-19T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::TrailRunning,
+                ActivityStatistics::default(),
+            ),
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-20T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+            ),
+        ];
+
+        // Period with Running category filter (should match Running and TrailRunning)
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Running Category Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::SportCategory(
+                SportCategory::Running,
+            )])),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activities_clone = activities.clone();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should include Running and TrailRunning, but not Cycling
+        assert_eq!(period_with_activities.activities().len(), 2);
+        assert!(
+            period_with_activities
+                .activities()
+                .iter()
+                .any(|a| a.sport() == &Sport::Running)
+        );
+        assert!(
+            period_with_activities
+                .activities()
+                .iter()
+                .any(|a| a.sport() == &Sport::TrailRunning)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_date_filtering() {
+        use crate::domain::models::activity::{
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        };
+
+        // Create activities with dates both inside and outside the period
+        let activities = vec![
+            // Before period
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-16T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            // Inside period
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-18T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            // After period
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    "2025-10-22T10:00:00Z"
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+        ];
+
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activities_clone = activities.clone();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+        // Should only include the activity inside the period (2025-10-18)
+        assert_eq!(period_with_activities.activities().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_repository_error() {
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(|_, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        // Should return None when repository fails
+        assert!(result.is_none());
     }
 }
