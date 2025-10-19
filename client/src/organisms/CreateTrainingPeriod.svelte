@@ -20,7 +20,7 @@
 	let missingInformation = $derived(!datesValid || name === '');
 
 	let periodRequest = $derived.by(() => {
-		let basePayload = { start: dates.start, end: dates.end, name, sports: [] };
+		let basePayload = { start: dates.start, end: dates.end, name, sports: null };
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
