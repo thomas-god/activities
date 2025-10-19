@@ -35,6 +35,16 @@ export const getSportCategoryIcon = (category: SportCategory | null): string => 
 	return sportCategoryIcons[category];
 };
 
+export const getSportCategory = (sport: Sport): SportCategory | null => {
+	for (const [category, sports] of Object.entries(sportsPerCategory)) {
+		if (sports.includes(sport)) {
+			return category as SportCategory;
+		}
+	}
+
+	return null;
+};
+
 export const sportsPerCategory: Record<SportCategory, Sport[]> = {
 	Running: ['Running', 'TrailRunning', 'IndoorRunning', 'TrackRunning'],
 	Walking: ['Walking', 'Hiking', 'Mountaineering', 'IndoorWalking', 'Snowshoeing'],

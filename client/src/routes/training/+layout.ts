@@ -38,7 +38,10 @@ const TrainingPeriodListItem = z.object({
 	start: z.string(),
 	end: z.string().nullable(),
 	name: z.string(),
-	sports: z.array(z.string()),
+	sports: z.object({
+		sports: z.array(z.string()),
+		categories: z.array(z.string())
+	}),
 	note: z.string().nullable()
 });
 
