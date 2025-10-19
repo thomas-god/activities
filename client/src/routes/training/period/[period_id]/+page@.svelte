@@ -154,11 +154,11 @@
 	</div>
 
 	<!-- Sports details section -->
-	<div class="rounded-box bg-base-100 p-4 shadow-md">
-		<details class="collapse-arrow collapse" open={false}>
-			<summary class="collapse-title font-semibold">Sports</summary>
-			<div class="collapse-content text-sm">
-				{#if period.sports.categories.length || period.sports.sports.length}
+	{#if period.sports.categories.length > 0 || period.sports.sports.length > 0}
+		<div class="rounded-box bg-base-100 p-4 shadow-md">
+			<details class="collapse-arrow collapse" open={false}>
+				<summary class="collapse-title font-semibold">Sports</summary>
+				<div class="collapse-content text-sm">
 					{#each sportsByCategory as group}
 						<div class="mb-4">
 							<div class="mb-2 flex items-center gap-3">
@@ -181,12 +181,10 @@
 							</div>
 						</div>
 					{/each}
-				{:else}
-					<div class="italic opacity-70">All sports</div>
-				{/if}
-			</div>
-		</details>
-	</div>
+				</div>
+			</details>
+		</div>
+	{/if}
 
 	<!-- Activities section -->
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
