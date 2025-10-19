@@ -8,6 +8,7 @@
 	} from '$lib/sport';
 	import type { PageProps } from './$types';
 	import type { TrainingPeriodDetails } from './+page';
+	import ActivitiesListItem from '../../../../organisms/ActivitiesListItem.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -92,7 +93,7 @@
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="rounded-box bg-base-100 rounded-t-none p-4 shadow-md">
+	<div class="rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
 		<div class="flex items-center gap-4">
 			<div class="text-3xl">🗓️</div>
 			<div class="flex-1">
@@ -113,7 +114,7 @@
 		</div>
 
 		{#if period.note}
-			<div class="bg-base-200 mt-4 rounded p-3">{period.note}</div>
+			<div class="mt-4 rounded bg-base-200 p-3">{period.note}</div>
 		{/if}
 	</div>
 
@@ -150,6 +151,26 @@
 				{/if}
 			</div>
 		</details>
+	</div>
+
+	<!-- Activities section -->
+	<div class="rounded-box bg-base-100 p-4 shadow-md">
+		<div class="mb-4 flex items-center justify-between">
+			<h2 class="text-lg font-semibold">Activities</h2>
+			<div class="badge badge-neutral">{period.activities.length}</div>
+		</div>
+
+		{#if period.activities.length > 0}
+			<div class="flex flex-col gap-2">
+				{#each period.activities as activity}
+					<ActivitiesListItem {activity} />
+				{/each}
+			</div>
+		{:else}
+			<div class="py-8 text-center text-sm italic opacity-70">
+				No activities in this training period yet
+			</div>
+		{/if}
 	</div>
 </div>
 
