@@ -3,7 +3,8 @@ import {
 	formatDuration,
 	formatRelativeDuration,
 	formatDateTime,
-	formatWeekInterval
+	formatWeekInterval,
+	formatDurationHoursMinutes
 } from './duration';
 import dayjs from 'dayjs';
 
@@ -85,5 +86,15 @@ describe('Formating a week-based time interval', () => {
 		let date = '2026-01-02'; // end of september and start of october
 
 		expect(formatWeekInterval(date)).toEqual('Dec 29-Jan 4');
+	});
+});
+
+describe('formatDurationHoursMinutes', () => {
+	it('Should format duration', () => {
+		expect(formatDurationHoursMinutes(1800)).toEqual('30m');
+		expect(formatDurationHoursMinutes(1801)).toEqual('30m');
+		expect(formatDurationHoursMinutes(3600)).toEqual('1h 00m');
+		expect(formatDurationHoursMinutes(3600 * 10)).toEqual('10h 00m');
+		expect(formatDurationHoursMinutes(3600 * 100)).toEqual('100h 00m');
 	});
 });

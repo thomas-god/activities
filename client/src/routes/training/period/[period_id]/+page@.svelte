@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dayjs, formatDurationCompactWithUnits } from '$lib/duration';
+	import { dayjs, formatDurationHoursMinutes } from '$lib/duration';
 	import {
 		getSportCategory,
 		sportCategoryIcons,
@@ -152,7 +152,7 @@
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+	<div class="rounded-box bg-base-100 rounded-t-none p-4 shadow-md">
 		<div class="flex items-center gap-4">
 			<div class="text-3xl">🗓️</div>
 			<div class="flex-1">
@@ -180,7 +180,7 @@
 		</div>
 
 		{#if period.note}
-			<div class="mt-4 rounded bg-base-200 p-3">{period.note}</div>
+			<div class="bg-base-200 mt-4 rounded p-3">{period.note}</div>
 		{/if}
 	</div>
 
@@ -226,7 +226,7 @@
 
 		{#if period.activities.length > 0}
 			<!-- Summary statistics -->
-			<div class="mb-4 grid grid-cols-2 gap-3 rounded bg-base-200 p-4 md:grid-cols-4">
+			<div class="bg-base-200 mb-4 grid grid-cols-2 gap-3 rounded p-4 md:grid-cols-4">
 				<div class="flex flex-col">
 					<div class="text-xs opacity-70">Total Activities</div>
 					<div class="text-xl font-semibold">{summary.count}</div>
@@ -234,7 +234,7 @@
 				<div class="flex flex-col">
 					<div class="text-xs opacity-70">Total Duration</div>
 					<div class="text-xl font-semibold">
-						{formatDurationCompactWithUnits(summary.duration)}
+						{formatDurationHoursMinutes(summary.duration)}
 					</div>
 				</div>
 				<div class="flex flex-col">

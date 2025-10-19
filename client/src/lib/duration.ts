@@ -69,6 +69,25 @@ export const formatDurationCompactWithUnits = (time: number): string => {
 	return `${days.toString()}d${hours.toString().padStart(2, '0')}h`;
 };
 
+export const formatDurationHoursMinutes = (time: number): string => {
+	let remaining = Math.floor(time);
+
+	const hours = Math.floor(remaining / ONE_HOUR_IN_SECONDS);
+	remaining = remaining - hours * ONE_HOUR_IN_SECONDS;
+
+	const minutes = Math.floor(remaining / ONE_MINUTE_IN_SECONDS);
+
+	if (time === 0) {
+		return '';
+	}
+
+	if (hours === 0) {
+		return `${minutes.toString().padStart(2, '0')}m`;
+	}
+
+	return `${hours.toString()}h ${minutes.toString().padStart(2, '0')}m`;
+};
+
 export const formatRelativeDuration = (value: dayjs.Dayjs, reference: dayjs.Dayjs): string => {
 	return dayjs.duration(value.diff(reference)).humanize(true);
 };
