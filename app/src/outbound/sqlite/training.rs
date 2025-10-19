@@ -270,6 +270,18 @@ impl TrainingRepository for SqliteTrainingRepository {
         })
         .unwrap_or_default()
     }
+
+    async fn delete_training_period(
+        &self,
+        period_id: &TrainingPeriodId,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("DELETE FROM t_training_periods WHERE id = ?1;")
+            .bind(period_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -906,5 +918,96 @@ mod test_sqlite_training_repository {
             .await;
 
         assert!(periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Verify period exists
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+
+        // Delete the period
+        let result = repository.delete_training_period(period.id()).await;
+        assert!(result.is_ok());
+
+        // Verify period is deleted
+        let fetched_after = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched_after.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period_id = TrainingPeriodId::new();
+
+        // Delete non-existent period should succeed (DELETE is idempotent)
+        let result = repository.delete_training_period(&period_id).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_only_deletes_specified_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create two periods for the same user
+        let period1 = build_training_period();
+        let period2 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            period1.user().clone(),
+            "2025-11-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-11-15".parse::<NaiveDate>().unwrap()),
+            "Another Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Cycling)])),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period1.clone())
+            .await
+            .expect("Should save period 1");
+        repository
+            .save_training_period(period2.clone())
+            .await
+            .expect("Should save period 2");
+
+        // Delete only period1
+        let result = repository.delete_training_period(period1.id()).await;
+        assert!(result.is_ok());
+
+        // Verify period1 is deleted
+        let fetched1 = repository
+            .get_training_period(period1.user(), period1.id())
+            .await;
+        assert!(fetched1.is_none());
+
+        // Verify period2 still exists
+        let fetched2 = repository
+            .get_training_period(period2.user(), period2.id())
+            .await;
+        assert!(fetched2.is_some());
+        assert_eq!(fetched2.unwrap().id(), period2.id());
     }
 }

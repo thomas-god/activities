@@ -14,8 +14,9 @@ use crate::domain::{
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
         CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
-        DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService,
-        ListActivitiesFilters, TrainingRepository, UpdateMetricsValuesRequest,
+        DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingPeriodError,
+        DeleteTrainingPeriodRequest, ITrainingService, ListActivitiesFilters, TrainingRepository,
+        UpdateMetricsValuesRequest,
     },
 };
 
@@ -302,6 +303,38 @@ where
             matching_activities,
         ))
     }
+
+    async fn delete_training_period(
+        &self,
+        req: DeleteTrainingPeriodRequest,
+    ) -> Result<(), DeleteTrainingPeriodError> {
+        // Get the period to verify it exists and check ownership
+        let Some(period) = self
+            .training_repository
+            .get_training_period(req.user(), req.period_id())
+            .await
+        else {
+            return Err(DeleteTrainingPeriodError::PeriodDoesNotExist(
+                req.period_id().clone(),
+            ));
+        };
+
+        // Verify user owns the period
+        if period.user() != req.user() {
+            return Err(DeleteTrainingPeriodError::UserDoesNotOwnPeriod(
+                req.user().clone(),
+                req.period_id().clone(),
+            ));
+        }
+
+        // Delete the period
+        self.training_repository
+            .delete_training_period(req.period_id())
+            .await
+            .map_err(DeleteTrainingPeriodError::Unknown)?;
+
+        Ok(())
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -352,7 +385,8 @@ pub mod test_utils {
         models::training::{TrainingMetricValue, TrainingPeriod, TrainingPeriodWithActivities},
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
-            GetDefinitionError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
+            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
+            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
             SaveTrainingMetricError, SaveTrainingPeriodError, UpdateMetricError,
         },
     };
@@ -409,6 +443,11 @@ pub mod test_utils {
                 user: &UserId,
                 period: &TrainingPeriodId,
             ) -> Option<TrainingPeriodWithActivities>;
+
+            async fn delete_training_period(
+                &self,
+                req: DeleteTrainingPeriodRequest,
+            ) -> Result<(), DeleteTrainingPeriodError>;
         }
     }
 
@@ -486,6 +525,11 @@ pub mod test_utils {
                 user: &UserId,
                 period: &TrainingPeriodId,
             ) -> Option<TrainingPeriod>;
+
+            async fn delete_training_period(
+                &self,
+                period_id: &TrainingPeriodId,
+            ) -> Result<(), anyhow::Error>;
         }
     }
 }
@@ -1442,5 +1486,144 @@ mod test_training_service_period {
 
         // Should return None when repository fails
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+        training_repository
+            .expect_delete_training_period()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = DeleteTrainingPeriodRequest::new(user_id.clone(), period_id.clone());
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(DeleteTrainingPeriodError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_user_does_not_own() {
+        let period_id = TrainingPeriodId::new();
+        let owner_user_id = UserId::from("owner");
+        let other_user_id = UserId::from("other");
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            owner_user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = DeleteTrainingPeriodRequest::new(other_user_id.clone(), period_id.clone());
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(DeleteTrainingPeriodError::UserDoesNotOwnPeriod(user, period)) => {
+                assert_eq!(user, other_user_id);
+                assert_eq!(period, period_id);
+            }
+            _ => panic!("Expected UserDoesNotOwnPeriod error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+        training_repository
+            .expect_delete_training_period()
+            .times(1)
+            .returning(|_| Err(anyhow!("database error")));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
+        let result = service.delete_training_period(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(DeleteTrainingPeriodError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
     }
 }
