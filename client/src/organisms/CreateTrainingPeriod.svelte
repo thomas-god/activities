@@ -10,6 +10,7 @@
 	let name = $state('');
 	let dates = $state({ start: null, end: null });
 	let datesValid = $derived(dates.start !== null);
+	let note = $state('');
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
@@ -20,7 +21,13 @@
 	let missingInformation = $derived(!datesValid || name === '');
 
 	let periodRequest = $derived.by(() => {
-		let basePayload = { start: dates.start, end: dates.end, name, sports: null };
+		let basePayload = {
+			start: dates.start,
+			end: dates.end,
+			name,
+			sports: null,
+			note: note.trim() === '' ? null : note.trim()
+		};
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
@@ -61,6 +68,15 @@
 
 		<label class="label" for="period-dates">Training period dates</label>
 		<DateRange bind:dates />
+
+		<label class="label" for="period-note">Note (optional)</label>
+		<textarea
+			id="period-note"
+			class="textarea-bordered textarea"
+			placeholder="Add notes about this training period..."
+			rows="3"
+			bind:value={note}
+		></textarea>
 
 		<div class="mb-2 font-semibold">
 			Sports
