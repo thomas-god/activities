@@ -16,6 +16,9 @@
 
 	let showDeleteModal = $state(false);
 	let isDeleting = $state(false);
+	let showEditModal = $state(false);
+	let isUpdating = $state(false);
+	let editedName = $state('');
 
 	async function handleDelete() {
 		isDeleting = true;
@@ -37,6 +40,44 @@
 		} finally {
 			isDeleting = false;
 			showDeleteModal = false;
+		}
+	}
+
+	function openEditModal() {
+		editedName = period.name;
+		showEditModal = true;
+	}
+
+	async function handleUpdate() {
+		if (!editedName.trim()) {
+			alert('Name cannot be empty');
+			return;
+		}
+
+		isUpdating = true;
+		try {
+			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+				method: 'PATCH',
+				credentials: 'include',
+				mode: 'cors',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ name: editedName.trim() })
+			});
+
+			if (response.ok) {
+				// Reload the page to show updated content
+				window.location.reload();
+			} else {
+				const error = await response.json();
+				alert(error.error || 'Failed to update training period name');
+			}
+		} catch (error) {
+			alert('Error updating training period name');
+			console.error(error);
+		} finally {
+			isUpdating = false;
 		}
 	}
 
@@ -152,7 +193,7 @@
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+	<div class="rounded-box bg-base-100 rounded-t-none p-4 shadow-md">
 		<div class="flex items-center gap-4">
 			<div class="text-3xl">🗓️</div>
 			<div class="flex-1">
@@ -171,6 +212,13 @@
 				{/each}
 			</div>
 			<button
+				class="btn btn-sm btn-primary"
+				onclick={openEditModal}
+				aria-label="Edit training period name"
+			>
+				✏️
+			</button>
+			<button
 				class="btn btn-sm btn-error"
 				onclick={() => (showDeleteModal = true)}
 				aria-label="Delete training period"
@@ -180,7 +228,7 @@
 		</div>
 
 		{#if period.note}
-			<div class="mt-4 rounded bg-base-200 p-3">{period.note}</div>
+			<div class="bg-base-200 mt-4 rounded p-3">{period.note}</div>
 		{/if}
 	</div>
 
@@ -226,7 +274,7 @@
 
 		{#if period.activities.length > 0}
 			<!-- Summary statistics -->
-			<div class="mb-4 grid grid-cols-2 gap-3 rounded bg-base-200 p-4 md:grid-cols-4">
+			<div class="bg-base-200 mb-4 grid grid-cols-2 gap-3 rounded p-4 md:grid-cols-4">
 				<div class="flex flex-col">
 					<div class="text-xs opacity-70">Total Activities</div>
 					<div class="text-xl font-semibold">{summary.count}</div>
@@ -259,6 +307,43 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Edit name modal -->
+{#if showEditModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Edit Training Period Name</h3>
+			<div class="py-4">
+				<label class="input">
+					<span class="label">Name</span>
+					<input
+						type="text"
+						bind:value={editedName}
+						placeholder="Enter period name"
+						class="w-full"
+						disabled={isUpdating}
+					/>
+				</label>
+			</div>
+			<div class="modal-action">
+				<button class="btn" onclick={() => (showEditModal = false)} disabled={isUpdating}>
+					Cancel
+				</button>
+				<button class="btn btn-primary" onclick={handleUpdate} disabled={isUpdating}>
+					{#if isUpdating}
+						<span class="loading loading-sm loading-spinner"></span>
+						Updating...
+					{:else}
+						Update
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={() => (showEditModal = false)}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <!-- Delete confirmation modal -->
 {#if showDeleteModal}
