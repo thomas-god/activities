@@ -2,9 +2,9 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import DateRange from '../../../molecules/DateRange.svelte';
+	import DateRangeSelector from '../../../organisms/DateRangeSelector.svelte';
 	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
-	import { dayjs, localiseDate } from '$lib/duration';
+	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
 	import { aggregateFunctionDisplay } from '$lib/metric';
 
@@ -77,50 +77,10 @@
 		}
 		goto(url);
 	};
-
-	const pastXWeeks = (numberOfWeek: number) => {
-		const now = dayjs().startOf('day');
-		const start = now.subtract(numberOfWeek, 'week');
-		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
-	};
-
-	const thisYear = () => {
-		const now = dayjs().startOf('day');
-		const start = now.startOf('year');
-		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
-	};
-
-	let sortedPeriods = $derived(data.periods.toSorted((a, b) => (a.start < b.start ? 1 : -1)));
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
-	<div class="rounded-box rounded-t-none border-base-300 bg-base-100 shadow-md">
-		<div class="px-2 pl-4">
-			<DateRange bind:dates={() => dates, datesUpdateCallback} />
-		</div>
-		<div class="flex flex-row flex-wrap items-center gap-2 p-2">
-			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(4)}>Last 4 weeks</button>
-			<button class="btn btn-sm sm:btn-md" onclick={() => pastXWeeks(12)}>Last 12 weeks</button>
-			<button class="btn btn-sm sm:btn-md" onclick={thisYear}>This year</button>
-			<select class="select select-sm">
-				<option disabled selected>Training period</option>
-				{#each sortedPeriods as period}
-					<option
-						onclick={() =>
-							datesUpdateCallback({
-								start: period.start,
-								end: period.end === null ? dayjs().toISOString() : period.end
-							})}
-						>{period.name} ({localiseDate(period.start)} - {period.end === null
-							? 'Ongoing'
-							: localiseDate(period.end)})</option
-					>
-				{:else}
-					<option disabled class="italic">No training periods</option>
-				{/each}
-			</select>
-		</div>
-	</div>
+	<DateRangeSelector {dates} {datesUpdateCallback} periods={data.periods} />
 
 	{#each metricsProps as metric}
 		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 shadow-md">
@@ -129,7 +89,7 @@
 					{metric.title}
 				</div>
 				<button
-					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
+					class="btn bg-base-100 hover:outline-base-300 absolute bottom-[8px] right-4 border-0 p-0 shadow-none hover:outline-2"
 					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
 				>
 			</div>
