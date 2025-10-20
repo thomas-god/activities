@@ -722,8 +722,22 @@ impl TrainingPeriod {
         &self.end
     }
 
-    pub fn range(&self) -> DateRange {
-        DateRange::new(self.start, self.end.unwrap_or(Utc::now().date_naive()))
+    /// Returns a DateRange for this training period.
+    /// For open-ended periods (no end date), defaults to today as the end date.
+    /// Note: DateRange end is exclusive, so this will NOT include today's activities.
+    pub fn range_default_today(&self) -> DateRange {
+        let end = self.end.unwrap_or_else(|| Utc::now().date_naive());
+        DateRange::new(self.start, end)
+    }
+
+    /// Returns a DateRange for this training period.
+    /// For open-ended periods (no end date), defaults to tomorrow as the end date.
+    /// Note: DateRange end is exclusive, so this WILL include today's activities.
+    pub fn range_default_tomorrow(&self) -> DateRange {
+        let end = self
+            .end
+            .unwrap_or_else(|| Utc::now().date_naive() + Days::new(1));
+        DateRange::new(self.start, end)
     }
 
     pub fn matches(&self, activity: &Activity) -> bool {
@@ -1887,5 +1901,90 @@ mod test_training_period {
         assert!(period.matches(&activity_with_sport(Sport::TrackRunning)));
         assert!(!period.matches(&activity_with_sport(Sport::Cycling)));
         assert!(!period.matches(&activity_with_sport(Sport::StrengthTraining)));
+    }
+
+    #[test]
+    fn test_period_range_with_end_date() {
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
+        let start = "2025-10-17".parse::<NaiveDate>().unwrap();
+        let end = Some("2025-10-21".parse::<NaiveDate>().unwrap());
+
+        let period = TrainingPeriod::new(
+            id,
+            user,
+            start,
+            end,
+            "test period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        // Both methods should return the same result when end date is specified
+        let range_today = period.range_default_today();
+        let range_tomorrow = period.range_default_tomorrow();
+
+        assert_eq!(range_today.start(), &start);
+        assert_eq!(range_today.end(), &end.unwrap());
+        assert_eq!(range_tomorrow.start(), &start);
+        assert_eq!(range_tomorrow.end(), &end.unwrap());
+    }
+
+    #[test]
+    fn test_period_range_default_today() {
+        use chrono::Utc;
+
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
+        let start = "2025-10-17".parse::<NaiveDate>().unwrap();
+        let end = None; // Open-ended period
+
+        let period = TrainingPeriod::new(
+            id,
+            user,
+            start,
+            end,
+            "test period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let range = period.range_default_today();
+        let today = Utc::now().date_naive();
+
+        assert_eq!(range.start(), &start);
+        // Should use today as end (exclusive, so won't include today's activities)
+        assert_eq!(range.end(), &today);
+    }
+
+    #[test]
+    fn test_period_range_default_tomorrow() {
+        use chrono::{Days, Utc};
+
+        let id = TrainingPeriodId::new();
+        let user = UserId::test_default();
+        let start = "2025-10-17".parse::<NaiveDate>().unwrap();
+        let end = None; // Open-ended period
+
+        let period = TrainingPeriod::new(
+            id,
+            user,
+            start,
+            end,
+            "test period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let range = period.range_default_tomorrow();
+        let today = Utc::now().date_naive();
+        let tomorrow = today + Days::new(1);
+
+        assert_eq!(range.start(), &start);
+        // Should use tomorrow as end (exclusive, so will include today's activities)
+        assert_eq!(range.end(), &tomorrow);
     }
 }

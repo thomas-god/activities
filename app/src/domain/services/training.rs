@@ -280,7 +280,8 @@ where
             .await?;
 
         // Query activities within the period's date range
-        let filters = ListActivitiesFilters::empty().set_date_range(Some(period.range()));
+        let filters =
+            ListActivitiesFilters::empty().set_date_range(Some(period.range_default_tomorrow()));
 
         let Ok(activities) = self
             .activity_repository
@@ -1491,6 +1492,113 @@ mod test_training_service_period {
         let period_with_activities = result.unwrap();
         // Should only include the activity inside the period (2025-10-18)
         assert_eq!(period_with_activities.activities().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_with_activities_open_ended_includes_today() {
+        use crate::domain::models::activity::{
+            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        };
+        use chrono::{Days, Utc};
+
+        let today = Utc::now().date_naive();
+        let yesterday = today - Days::new(1);
+
+        // Create activities: yesterday and today
+        // Note: Tomorrow's activity wouldn't be returned by the repository
+        // because the date range filter is exclusive of the end date
+        let activities = vec![
+            // Yesterday - should be included
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    yesterday
+                        .and_hms_opt(10, 0, 0)
+                        .unwrap()
+                        .and_utc()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Running,
+                ActivityStatistics::default(),
+            ),
+            // Today - should be included (this is the bug we're fixing)
+            Activity::new(
+                ActivityId::new(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(
+                    today
+                        .and_hms_opt(14, 30, 0)
+                        .unwrap()
+                        .and_utc()
+                        .timestamp()
+                        .try_into()
+                        .unwrap(),
+                )
+                .unwrap(),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+            ),
+        ];
+
+        // Create an open-ended period (no end date) starting 7 days ago
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            today - Days::new(7),
+            None, // Open-ended
+            "Open Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activities_clone = activities.clone();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(activities_clone.clone()));
+
+        let service = TrainingService::new(
+            training_repository,
+            Arc::new(Mutex::new(activity_repository)),
+        );
+
+        let result = service
+            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .await;
+
+        assert!(result.is_some());
+        let period_with_activities = result.unwrap();
+
+        // Should include yesterday and today's activities
+        // (Before the fix, today's activities would be excluded)
+        assert_eq!(
+            period_with_activities.activities().len(),
+            2,
+            "Open-ended period should include today's activities"
+        );
+
+        // Verify the activities are yesterday and today
+        let activity_sports: Vec<_> = period_with_activities
+            .activities()
+            .iter()
+            .map(|a| a.sport())
+            .collect();
+        assert!(activity_sports.contains(&&Sport::Running)); // yesterday
+        assert!(activity_sports.contains(&&Sport::Cycling)); // today
     }
 
     #[tokio::test]
