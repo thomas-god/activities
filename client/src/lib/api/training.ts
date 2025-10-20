@@ -140,20 +140,15 @@ export async function fetchTrainingPeriodDetails(
  */
 export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	start?: Date | string,
+	start: Date | string,
 	end?: Date | string
 ): Promise<MetricsList> {
-	// Default to 3 weeks ago if no start date provided
-	const startDate = start
-		? typeof start === 'string'
-			? start
-			: dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ')
-		: dayjs().startOf('isoWeek').subtract(3, 'week').format('YYYY-MM-DDTHH:mm:ssZ');
+	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
 
 	let url = `${PUBLIC_APP_URL}/api/training/metrics?start=${encodeURIComponent(startDate)}`;
 
 	if (end) {
-		const endDate = typeof end === 'string' ? end : dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
+		const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
 		url += `&end=${encodeURIComponent(endDate)}`;
 	}
 
