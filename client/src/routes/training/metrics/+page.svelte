@@ -4,7 +4,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import DateRange from '../../../molecules/DateRange.svelte';
 	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
-	import { dayjs } from '$lib/duration';
+	import { dayjs, localiseDate } from '$lib/duration';
 	import type { PageProps } from './$types';
 	import { aggregateFunctionDisplay } from '$lib/metric';
 
@@ -89,6 +89,8 @@
 		const start = now.startOf('year');
 		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
 	};
+
+	let sortedPeriods = $derived(data.periods.toSorted((a, b) => (a.start < b.start ? 1 : -1)));
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
@@ -102,13 +104,16 @@
 			<button class="btn btn-sm sm:btn-md" onclick={thisYear}>This year</button>
 			<select class="select select-sm">
 				<option disabled selected>Training period</option>
-				{#each data.periods as period}
+				{#each sortedPeriods as period}
 					<option
 						onclick={() =>
 							datesUpdateCallback({
 								start: period.start,
 								end: period.end === null ? dayjs().toISOString() : period.end
-							})}>{period.name}</option
+							})}
+						>{period.name} ({localiseDate(period.start)} - {period.end === null
+							? 'Ongoing'
+							: localiseDate(period.end)})</option
 					>
 				{:else}
 					<option disabled class="italic">No training periods</option>
