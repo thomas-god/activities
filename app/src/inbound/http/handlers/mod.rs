@@ -14,6 +14,7 @@ mod login_user;
 mod patch_activity;
 mod register_user;
 mod types;
+mod update_training_period;
 mod upload_activity;
 mod validate_login;
 
@@ -30,5 +31,6 @@ pub(super) use list_activities::list_activities;
 pub(super) use login_user::login_user;
 pub(super) use patch_activity::patch_activity;
 pub(super) use register_user::register_user;
+pub(super) use update_training_period::update_training_period_name;
 pub(super) use upload_activity::upload_activities;
 pub(super) use validate_login::validate_login;
