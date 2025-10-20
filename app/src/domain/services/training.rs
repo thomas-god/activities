@@ -16,7 +16,7 @@ use crate::domain::{
         CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingPeriodError,
         DeleteTrainingPeriodRequest, ITrainingService, ListActivitiesFilters, TrainingRepository,
-        UpdateMetricsValuesRequest,
+        UpdateMetricsValuesRequest, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
     },
 };
 
@@ -335,6 +335,38 @@ where
 
         Ok(())
     }
+
+    async fn update_training_period_name(
+        &self,
+        req: UpdateTrainingPeriodNameRequest,
+    ) -> Result<(), UpdateTrainingPeriodNameError> {
+        // Get the period to verify it exists and check ownership
+        let Some(period) = self
+            .training_repository
+            .get_training_period(req.user(), req.period_id())
+            .await
+        else {
+            return Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(
+                req.period_id().clone(),
+            ));
+        };
+
+        // Verify user owns the period
+        if period.user() != req.user() {
+            return Err(UpdateTrainingPeriodNameError::UserDoesNotOwnPeriod(
+                req.user().clone(),
+                req.period_id().clone(),
+            ));
+        }
+
+        // Update the period name
+        self.training_repository
+            .update_training_period_name(req.period_id(), req.name().to_string())
+            .await
+            .map_err(UpdateTrainingPeriodNameError::Unknown)?;
+
+        Ok(())
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -448,6 +480,11 @@ pub mod test_utils {
                 &self,
                 req: DeleteTrainingPeriodRequest,
             ) -> Result<(), DeleteTrainingPeriodError>;
+
+            async fn update_training_period_name(
+                &self,
+                req: UpdateTrainingPeriodNameRequest,
+            ) -> Result<(), UpdateTrainingPeriodNameError>;
         }
     }
 
@@ -529,6 +566,12 @@ pub mod test_utils {
             async fn delete_training_period(
                 &self,
                 period_id: &TrainingPeriodId,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn update_training_period_name(
+                &self,
+                period_id: &TrainingPeriodId,
+                name: String,
             ) -> Result<(), anyhow::Error>;
         }
     }
@@ -1623,6 +1666,153 @@ mod test_training_service_period {
         assert!(result.is_err());
         match result {
             Err(DeleteTrainingPeriodError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Old Period Name".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_update_training_period_name()
+            .times(1)
+            .withf(move |id, name| id == &period_id_clone && name == "Updated Period Name")
+            .returning(|_, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(|_, _| None);
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id.clone(), new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_user_does_not_own() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let other_user_id = UserId::from("other_user".to_string());
+        let new_name = "Updated Period Name".to_string();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            other_user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req =
+            UpdateTrainingPeriodNameRequest::new(user_id.clone(), period_id.clone(), new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNameError::UserDoesNotOwnPeriod(uid, pid)) => {
+                assert_eq!(uid, user_id);
+                assert_eq!(pid, period_id);
+            }
+            _ => panic!("Expected UserDoesNotOwnPeriod error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_name = "Updated Period Name".to_string();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+        training_repository
+            .expect_update_training_period_name()
+            .times(1)
+            .returning(|_, _| Err(anyhow!("database error")));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
+        let result = service.update_training_period_name(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodNameError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
     }

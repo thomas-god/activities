@@ -510,6 +510,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteTrainingPeriodRequest,
     ) -> impl Future<Output = Result<(), DeleteTrainingPeriodError>> + Send;
+
+    fn update_training_period_name(
+        &self,
+        req: UpdateTrainingPeriodNameRequest,
+    ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNameError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -645,6 +650,37 @@ pub enum DeleteTrainingPeriodError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct UpdateTrainingPeriodNameRequest {
+    user: UserId,
+    period_id: TrainingPeriodId,
+    name: String,
+}
+
+impl UpdateTrainingPeriodNameRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn period_id(&self) -> &TrainingPeriodId {
+        &self.period_id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingPeriodNameError {
+    #[error("Training period {0} does not exist")]
+    PeriodDoesNotExist(TrainingPeriodId),
+    #[error("User {0} does not own training period {1}")]
+    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_definition(
         &self,
@@ -704,6 +740,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn delete_training_period(
         &self,
         period_id: &TrainingPeriodId,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn update_training_period_name(
+        &self,
+        period_id: &TrainingPeriodId,
+        name: String,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 

@@ -404,8 +404,7 @@ mod tests_activity_service {
             ModifyActivityRequest, RawContent, SaveActivityError, SaveRawDataError,
         },
         services::{
-            activity::test_utils::MockActivityRepository,
-            training::test_utils::MockTrainingService,
+            activity::test_utils::MockActivityRepository, training::test_utils::MockTrainingService,
         },
     };
 

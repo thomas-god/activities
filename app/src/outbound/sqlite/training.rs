@@ -282,6 +282,20 @@ impl TrainingRepository for SqliteTrainingRepository {
             .map_err(|err| anyhow!(err))
             .map(|_| ())
     }
+
+    async fn update_training_period_name(
+        &self,
+        period_id: &TrainingPeriodId,
+        name: String,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_training_periods SET name = ?1 WHERE id = ?2;")
+            .bind(name)
+            .bind(period_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -1009,5 +1023,108 @@ mod test_sqlite_training_repository {
             .await;
         assert!(fetched2.is_some());
         assert_eq!(fetched2.unwrap().id(), period2.id());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Update the name
+        let new_name = "Updated Name".to_string();
+        let result = repository
+            .update_training_period_name(period.id(), new_name.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the name was updated
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+        let fetched_period = fetched.unwrap();
+        assert_eq!(fetched_period.name(), &new_name);
+        // Verify other fields unchanged
+        assert_eq!(fetched_period.id(), period.id());
+        assert_eq!(fetched_period.user(), period.user());
+        assert_eq!(fetched_period.start(), period.start());
+        assert_eq!(fetched_period.end(), period.end());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Try to update a non-existent period
+        let period_id = TrainingPeriodId::new();
+        let result = repository
+            .update_training_period_name(&period_id, "New Name".to_string())
+            .await;
+
+        // Should succeed (no rows affected, but no error)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_only_updates_specified_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create two periods
+        let period1 = build_training_period();
+        let period2 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            period1.user().clone(),
+            "2025-11-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-11-15".parse::<NaiveDate>().unwrap()),
+            "Another Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Cycling)])),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period1.clone())
+            .await
+            .expect("Should save period 1");
+        repository
+            .save_training_period(period2.clone())
+            .await
+            .expect("Should save period 2");
+
+        // Update only period1's name
+        let new_name = "Updated First Period".to_string();
+        let result = repository
+            .update_training_period_name(period1.id(), new_name.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify period1's name was updated
+        let fetched1 = repository
+            .get_training_period(period1.user(), period1.id())
+            .await;
+        assert!(fetched1.is_some());
+        assert_eq!(fetched1.unwrap().name(), &new_name);
+
+        // Verify period2's name is unchanged
+        let fetched2 = repository
+            .get_training_period(period2.user(), period2.id())
+            .await;
+        assert!(fetched2.is_some());
+        assert_eq!(fetched2.unwrap().name(), period2.name());
     }
 }
