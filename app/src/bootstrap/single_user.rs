@@ -72,11 +72,9 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
     ));
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
-    let training_metrics_repository = SqliteTrainingRepository::new(&format!(
-        "sqlite:{}",
-        trainin_metrics_db.to_string_lossy()
-    ))
-    .await?;
+    let training_metrics_repository =
+        SqliteTrainingRepository::new(&format!("sqlite:{}", trainin_metrics_db.to_string_lossy()))
+            .await?;
 
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
