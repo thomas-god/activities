@@ -4,15 +4,19 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { dayjs } from '$lib/duration';
 import { goto } from '$app/navigation';
-import { SportCategories } from '$lib/sport';
+import { SportCategories, sports } from '$lib/sport';
 import { metricAggregateFunctions } from '$lib/metric';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');
 
-	const [activities, metrics] = await Promise.all([fetchActivities(fetch), fetchMetrics(fetch)]);
+	const [activities, metrics, trainingPeriods] = await Promise.all([
+		fetchActivities(fetch),
+		fetchMetrics(fetch),
+		fetchTrainingPeriods(fetch)
+	]);
 
-	return { activities, metrics };
+	return { activities, metrics, trainingPeriods };
 };
 
 const fetchActivities = async (
@@ -52,6 +56,23 @@ const fetchMetrics = async (
 	return [];
 };
 
+const fetchTrainingPeriods = async (
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<TrainingPeriodList> => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/periods`, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+	if (res.status === 401) {
+		goto('/login');
+	}
+	if (res.status === 200) {
+		return TrainingPeriodList.parse(await res.json());
+	}
+	return [];
+};
+
 export const prerender = false;
 
 const ActivityListItem = z.object({
@@ -81,3 +102,20 @@ const MetricsList = z.array(MetricsListItem);
 
 export type MetricsList = z.infer<typeof MetricsList>;
 export type MetricsListItem = z.infer<typeof MetricsListItem>;
+
+const TrainingPeriodListItem = z.object({
+	id: z.string(),
+	start: z.string(),
+	end: z.string().nullable(),
+	name: z.string(),
+	sports: z.object({
+		sports: z.array(z.enum(sports)),
+		categories: z.array(z.enum(SportCategories))
+	}),
+	note: z.string().nullable()
+});
+
+const TrainingPeriodList = z.array(TrainingPeriodListItem);
+
+export type TrainingPeriodList = z.infer<typeof TrainingPeriodList>;
+export type TrainingPeriodListItem = z.infer<typeof TrainingPeriodListItem>;

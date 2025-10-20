@@ -4,6 +4,14 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
 	import { aggregateFunctionDisplay } from '$lib/metric';
+	import { dayjs } from '$lib/duration';
+	import {
+		getSportCategory,
+		SportCategories,
+		sportCategoryIcons,
+		type Sport,
+		type SportCategory
+	} from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
@@ -12,6 +20,34 @@
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
 	);
+
+	// Filter ongoing training periods (no end date or end date >= today)
+	let ongoingPeriods = $derived.by(() => {
+		const today = dayjs().startOf('day');
+		return data.trainingPeriods.filter((period) => {
+			if (period.end === null) return true;
+			return dayjs(period.end).isAfter(today) || dayjs(period.end).isSame(today);
+		});
+	});
+
+	let sportIcons = (sports: { sports: Sport[]; categories: SportCategory[] }): string[] => {
+		const icons: Set<string> = new Set();
+
+		for (const category of sports.categories) {
+			if (SportCategories.includes(category)) {
+				icons.add(sportCategoryIcons[category]);
+			}
+		}
+
+		for (const sport of sports.sports) {
+			const category = getSportCategory(sport);
+			if (category !== null) {
+				icons.add(sportCategoryIcons[category]);
+			}
+		}
+
+		return Array.from(icons);
+	};
 
 	let topMetric = $derived.by(() => {
 		let metric = data.metrics.at(0);
@@ -37,7 +73,7 @@
 </script>
 
 {#if topMetric}
-	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
+	<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 mx-2 mt-5 shadow-md sm:mx-auto">
 		<p class="mx-3 pt-4">{topMetric.title} over the last 4 weeks</p>
 		<TrainingMetricsChart
 			height={300}
@@ -47,6 +83,40 @@
 			granularity={topMetric.granularity}
 			format={topMetric.unit === 's' ? 'duration' : 'number'}
 		/>
+	</div>
+{/if}
+
+{#if ongoingPeriods.length > 0}
+	<div class="rounded-box bg-base-100 mx-2 mt-5 shadow-md sm:mx-auto">
+		<div class="p-4">
+			<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
+			<div class="flex flex-col gap-2">
+				{#each ongoingPeriods as period}
+					{@const icons = sportIcons(period.sports)}
+					<a
+						href={`/training/period/${period.id}`}
+						class="hover:bg-base-200 flex items-center gap-3 rounded-lg p-3"
+					>
+						<div class="text-2xl leading-none">🗓️</div>
+						<div class="min-w-0 flex-1">
+							<div class="font-semibold">{period.name}</div>
+							<div class="text-sm opacity-70">
+								{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
+									? 'Ongoing'
+									: dayjs(period.end).format('MMM D, YYYY')}
+							</div>
+						</div>
+						<div class="flex flex-wrap items-center gap-2">
+							{#each icons as icon}
+								<div class="text-lg">{icon}</div>
+							{:else}
+								<div class="text-sm italic opacity-70">All sports</div>
+							{/each}
+						</div>
+					</a>
+				{/each}
+			</div>
+		</div>
 	</div>
 {/if}
 
