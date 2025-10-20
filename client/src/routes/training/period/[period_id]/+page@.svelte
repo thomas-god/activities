@@ -193,42 +193,55 @@
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="rounded-box bg-base-100 rounded-t-none p-4 shadow-md">
-		<div class="flex items-center gap-4">
-			<div class="text-3xl">🗓️</div>
-			<div class="flex-1">
-				<div class="text-xl font-semibold">{period.name}</div>
-				<div class="text-sm opacity-70">
-					{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
-						? 'Ongoing'
-						: dayjs(period.end).format('MMM D, YYYY')}
+	<div class="rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+		<div class="flex flex-row flex-wrap items-center gap-3">
+			<div class="flex grow-1 flex-row items-center gap-3">
+				<!-- Icon -->
+				<div class="text-3xl leading-none">🗓️</div>
+
+				<!-- Title and date -->
+				<div>
+					<div class="text-xl font-semibold">{period.name}</div>
+					<div class="text-sm opacity-70">
+						{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
+							? 'Ongoing'
+							: dayjs(period.end).format('MMM D, YYYY')}
+					</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2">
-				{#each sportIcons(period.sports) as icon}
-					<div class="text-lg">{icon}</div>
-				{:else}
-					<div class="italic opacity-70">All sports</div>
-				{/each}
+
+			<!-- Sports icons -->
+			<div class="flex flex-row gap-5">
+				<div class="flex flex-wrap items-center gap-2">
+					{#each sportIcons(period.sports) as icon}
+						<div class="text-lg">{icon}</div>
+					{:else}
+						<div class="text-sm italic opacity-70">All sports</div>
+					{/each}
+				</div>
+
+				<!-- Action buttons -->
+				<div class="flex gap-2">
+					<button
+						class="btn btn-sm btn-primary"
+						onclick={openEditModal}
+						aria-label="Edit training period name"
+					>
+						✏️
+					</button>
+					<button
+						class="btn btn-sm btn-error"
+						onclick={() => (showDeleteModal = true)}
+						aria-label="Delete training period"
+					>
+						🗑️
+					</button>
+				</div>
 			</div>
-			<button
-				class="btn btn-sm btn-primary"
-				onclick={openEditModal}
-				aria-label="Edit training period name"
-			>
-				✏️
-			</button>
-			<button
-				class="btn btn-sm btn-error"
-				onclick={() => (showDeleteModal = true)}
-				aria-label="Delete training period"
-			>
-				🗑️
-			</button>
 		</div>
 
 		{#if period.note}
-			<div class="bg-base-200 mt-4 rounded p-3">{period.note}</div>
+			<div class="mt-4 max-w-xl rounded bg-base-200 p-3">{period.note}</div>
 		{/if}
 	</div>
 
@@ -274,7 +287,7 @@
 
 		{#if period.activities.length > 0}
 			<!-- Summary statistics -->
-			<div class="bg-base-200 mb-4 grid grid-cols-2 gap-3 rounded p-4 md:grid-cols-4">
+			<div class="mb-4 grid grid-cols-2 gap-3 rounded bg-base-200 p-4 md:grid-cols-4">
 				<div class="flex flex-col">
 					<div class="text-xs opacity-70">Total Activities</div>
 					<div class="text-xl font-semibold">{summary.count}</div>
