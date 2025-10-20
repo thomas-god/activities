@@ -20,7 +20,9 @@
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
 	const formatMetricTitle = (metric: (typeof data.metrics)[number]): string => {
-		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports'}]`;
+		const sportsText =
+			metric.sports && metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports';
+		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${sportsText}]`;
 	};
 	let metricsProps = $derived.by(() => {
 		let metrics = [];

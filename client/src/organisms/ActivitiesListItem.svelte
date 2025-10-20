@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
-	import type { ActivityListItem } from '../routes/+page';
+	import type { ActivityListItem } from '$lib/api';
 
 	let { activity }: { activity: ActivityListItem } = $props();
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ActivityList, ActivityListItem } from '../routes/+page';
+	import type { ActivityList, ActivityListItem } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 

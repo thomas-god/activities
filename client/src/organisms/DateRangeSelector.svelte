@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DateRange from '../molecules/DateRange.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
-	import type { TrainingPeriodList } from '../routes/training/+layout';
+	import type { TrainingPeriodList } from '$lib/api';
 
 	interface Props {
 		dates: { start: string; end: string };

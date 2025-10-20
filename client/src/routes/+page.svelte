@@ -73,7 +73,7 @@
 </script>
 
 {#if topMetric}
-	<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 mx-2 mt-5 shadow-md sm:mx-auto">
+	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
 		<p class="mx-3 pt-4">{topMetric.title} over the last 4 weeks</p>
 		<TrainingMetricsChart
 			height={300}
@@ -87,7 +87,7 @@
 {/if}
 
 {#if ongoingPeriods.length > 0}
-	<div class="rounded-box bg-base-100 mx-2 mt-5 shadow-md sm:mx-auto">
+	<div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
 		<div class="p-4">
 			<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
 			<div class="flex flex-col gap-2">
@@ -95,7 +95,7 @@
 					{@const icons = sportIcons(period.sports)}
 					<a
 						href={`/training/period/${period.id}`}
-						class="hover:bg-base-200 flex items-center gap-3 rounded-lg p-3"
+						class="flex items-center gap-3 rounded-lg p-3 hover:bg-base-200"
 					>
 						<div class="text-2xl leading-none">🗓️</div>
 						<div class="min-w-0 flex-1">

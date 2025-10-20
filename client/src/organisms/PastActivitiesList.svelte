@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
-	import type { ActivityList, ActivityListItem } from '../routes/+page';
+	import type { ActivityList, ActivityListItem } from '$lib/api';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 
 	let { activityList, moreCallback }: { activityList: ActivityList; moreCallback: () => void } =
