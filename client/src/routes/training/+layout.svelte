@@ -8,8 +8,8 @@
 	};
 </script>
 
-<div class="mt-4 rounded-box rounded-b-none bg-base-100 p-4">
-	<div role="tablist" class="tabs-lift tabs">
+<div class="my-4 rounded-box bg-base-100">
+	<div role="tablist" class="tabs flex flex-row justify-center gap-2 tabs-box px-3">
 		<a
 			role="tab"
 			class={`tab fieldset-legend ${isSelected('/training/metrics')}`}

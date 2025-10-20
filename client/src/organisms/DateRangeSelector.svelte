@@ -60,11 +60,11 @@
 	let sortedPeriods = $derived(periods.toSorted((a, b) => (a.start < b.start ? 1 : -1)));
 </script>
 
-<div class="rounded-box border-base-300 bg-base-100 rounded-t-none shadow-md">
-	<div class="px-2 pl-4">
+<div class="rounded-box border-base-300 bg-base-100 p-2 pt-4 shadow-md sm:p-4">
+	<div class="pl-4">
 		<DateRange bind:dates={localDates} />
 	</div>
-	<div class="flex flex-row flex-wrap items-center gap-2 p-2">
+	<div class="flex flex-row flex-wrap items-center gap-2 py-2">
 		<button
 			class="btn btn-sm sm:btn-md"
 			class:btn-active={selectedQuickRange === '4weeks'}
