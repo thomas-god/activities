@@ -3,10 +3,15 @@
 	import { dayjs } from '$lib/duration';
 	import { getSportCategoryIcon } from '$lib/sport';
 
-	let { activityList }: { activityList: ActivityList } = $props();
-
-	// State for current month view
-	let currentMonth = $state(dayjs().startOf('month'));
+	let {
+		activityList,
+		currentMonth = dayjs().startOf('month'),
+		onMonthChange
+	}: {
+		activityList: ActivityList;
+		currentMonth?: ReturnType<typeof dayjs>;
+		onMonthChange?: (month: ReturnType<typeof dayjs>) => void;
+	} = $props();
 
 	// Compute activities grouped by date
 	let activitiesByDate = $derived.by(() => {
@@ -55,15 +60,15 @@
 	});
 
 	const previousMonth = () => {
-		currentMonth = currentMonth.subtract(1, 'month');
+		onMonthChange?.(currentMonth.subtract(1, 'month'));
 	};
 
 	const nextMonth = () => {
-		currentMonth = currentMonth.add(1, 'month');
+		onMonthChange?.(currentMonth.add(1, 'month'));
 	};
 
 	const goToToday = () => {
-		currentMonth = dayjs().startOf('month');
+		onMonthChange?.(dayjs().startOf('month'));
 	};
 
 	const formatDuration = (seconds: number): string => {
@@ -78,7 +83,7 @@
 
 <div class="rounded-box bg-base-100 shadow-md">
 	<!-- Calendar Header -->
-	<div class="border-base-300 flex items-center justify-between border-b p-4">
+	<div class="flex items-center justify-between border-b border-base-300 p-4">
 		<div class="flex items-center gap-2">
 			<button onclick={previousMonth} class="btn btn-square btn-ghost btn-sm">
 				<span class="text-lg">‹</span>
@@ -104,14 +109,14 @@
 		<div class="grid grid-cols-7 gap-2">
 			{#each calendarDays as day}
 				<div
-					class="hover:bg-base-200 min-h-24 rounded-lg border p-2 transition-colors {day.isCurrentMonth
+					class="min-h-24 rounded-lg border p-2 transition-colors hover:bg-base-200 {day.isCurrentMonth
 						? 'border-base-300 bg-base-100'
-						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday ? 'ring-primary ring-2' : ''}"
+						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday ? 'ring-2 ring-primary' : ''}"
 				>
 					<div class="mb-1 flex items-center justify-between">
 						<span
 							class="text-sm font-medium {day.isToday
-								? 'bg-primary text-primary-content flex h-6 w-6 items-center justify-center rounded-full'
+								? 'flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-content'
 								: ''}"
 						>
 							{day.day}
@@ -126,7 +131,7 @@
 						{#each day.activities.slice(0, 3) as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class="bg-base-200 hover:bg-base-300 flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+								class="flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300"
 							>
 								<span class="text-base leading-none">
 									{getSportCategoryIcon(activity.sport_category)}

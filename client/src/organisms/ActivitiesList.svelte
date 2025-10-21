@@ -27,8 +27,6 @@
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
-	<div class="pb-2 text-lg font-semibold tracking-wide">Past activities</div>
-
 	<div class="flex flex-col gap-2">
 		{#each activitiesByMonth as [month, activities]}
 			<div class="flex flex-col gap-2">
