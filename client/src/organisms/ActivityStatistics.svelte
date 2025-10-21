@@ -33,7 +33,6 @@
 	let statRows = $derived.by<StatRow[]>(() => {
 		const rows: StatRow[] = [];
 
-		// Duration
 		if (duration !== undefined) {
 			rows.push({
 				icon: '⌛',
@@ -42,7 +41,6 @@
 			});
 		}
 
-		// Distance
 		if (distance !== undefined) {
 			rows.push({
 				icon: '📏',
@@ -61,7 +59,6 @@
 			});
 		}
 
-		// Elevation
 		if (elevation !== undefined) {
 			rows.push({
 				icon: '⛰️',
@@ -70,7 +67,6 @@
 			});
 		}
 
-		// Calories
 		if (calories !== undefined) {
 			rows.push({
 				icon: '🔥',
@@ -79,7 +75,6 @@
 			});
 		}
 
-		// Heart Rate
 		if (avgHeartRate !== undefined && maxHeartRate !== undefined) {
 			rows.push({
 				icon: '❤️',
@@ -89,7 +84,6 @@
 			});
 		}
 
-		// Power
 		if (averagePower !== undefined && weightedAveragePower !== undefined) {
 			rows.push({
 				icon: '⚙️',
@@ -103,16 +97,14 @@
 	});
 </script>
 
-<!-- Collapsible Statistics with CSS Grid -->
 <details class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow" open>
 	<summary class="collapse-title text-lg font-semibold">Statistics</summary>
-	<div class="collapse-content">
-		<!-- Grid layout: 1 column on mobile, 2 columns on desktop -->
-		<div class="grid grid-cols-1 md:grid-cols-2">
+	<div class="@container collapse-content">
+		<div class="grid grid-cols-1 @xl:grid-cols-2 @min-[52rem]:grid-cols-3">
 			{#each statRows as row}
 				<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
 					<div class="text-2xl">{row.icon}</div>
-					<div class="flex-1 font-medium">{row.label}</div>
+					<div class=" flex-1 font-medium">{row.label}</div>
 					<div class="text-right {row.subvalue ? '' : 'self-center'}">
 						<div class="text-lg font-semibold">{row.value || '-'}</div>
 						{#if row.subvalue}
