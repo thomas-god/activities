@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDurationHoursMinutes } from '$lib/duration';
 	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
 	import type { ActivityDetails } from '../routes/activity/[activity_id]/proxy+page';
 
@@ -14,6 +15,7 @@
 		}
 		return value / 1000;
 	});
+	let duration = $derived(statistics.get('Duration'));
 	let elevation = $derived(statistics.get('Elevation'));
 	let avgHeartRate = $derived(timeseriesAvg(activity.timeseries.metrics, 'HeartRate'));
 	let maxHeartRate = $derived(timeseriesMaximum(activity.timeseries.metrics, 'HeartRate'));
@@ -30,6 +32,15 @@
 
 	let statRows = $derived.by<StatRow[]>(() => {
 		const rows: StatRow[] = [];
+
+		// Duration
+		if (duration !== undefined) {
+			rows.push({
+				icon: '⌛',
+				label: 'Duration',
+				value: formatDurationHoursMinutes(duration)
+			});
+		}
 
 		// Distance
 		if (distance !== undefined) {
