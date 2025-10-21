@@ -1,11 +1,7 @@
 <script lang="ts">
 	import type { ActivityList } from '$lib/api';
 	import { dayjs } from '$lib/duration';
-	import {
-		getSportCategoryIcon,
-		getSportCategoryBgColorClass,
-		type SportCategory
-	} from '$lib/sport';
+	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 
 	let {
 		activityList,
@@ -75,6 +71,20 @@
 		onMonthChange?.(dayjs().startOf('month'));
 	};
 
+	const handleMonthInput = (event: Event) => {
+		const input = event.target as HTMLInputElement;
+		const [year, month] = input.value.split('-').map(Number);
+		onMonthChange?.(
+			dayjs()
+				.year(year)
+				.month(month - 1)
+				.startOf('month')
+		);
+	};
+
+	// Format current month for the input value (YYYY-MM)
+	const monthInputValue = $derived(currentMonth.format('YYYY-MM'));
+
 	const formatDuration = (seconds: number): string => {
 		const hours = Math.floor(seconds / 3600);
 		const minutes = Math.floor((seconds % 3600) / 60);
@@ -106,7 +116,15 @@
 				<span class="text-lg">›</span>
 			</button>
 		</div>
-		<h2 class="text-base font-semibold sm:text-lg">{currentMonth.format('MMMM YYYY')}</h2>
+
+		<!-- Month/Year Picker -->
+		<input
+			type="month"
+			value={monthInputValue}
+			oninput={handleMonthInput}
+			class="input input-sm input-ghost text-center text-base font-semibold sm:input-md sm:text-lg"
+		/>
+
 		<button onclick={goToToday} class="btn btn-ghost btn-xs sm:btn-sm">Today</button>
 	</div>
 
