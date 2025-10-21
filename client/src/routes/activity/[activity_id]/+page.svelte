@@ -8,6 +8,7 @@
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
+	import ActivityLaps from '../../../organisms/ActivityLaps.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 
@@ -143,6 +144,10 @@
 				</div>
 			{/if}
 		{/if}
+	</div>
+
+	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">
+		<ActivityLaps activity={data.activity} />
 	</div>
 </div>
 

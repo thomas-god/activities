@@ -35,6 +35,12 @@ const ActivityDetailsSchema = z.object({
 				unit: z.string(),
 				values: z.array(z.number().nullable())
 			})
+		),
+		laps: z.array(
+			z.object({
+				start: z.number(),
+				end: z.number()
+			})
 		)
 	})
 });
