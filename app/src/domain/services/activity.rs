@@ -66,6 +66,7 @@ where
             *req.start_time(),
             *req.sport(),
             req.statistics().clone(),
+            None,
         );
         let activity_with_timeseries =
             ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
@@ -295,6 +296,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
+                    None,
                 ))
             });
         }
@@ -311,6 +313,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
+                    None,
                 ))
             });
         }
@@ -596,6 +599,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
             )))
         });
 
@@ -630,6 +634,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
             )))
         });
         activity_repository
@@ -694,6 +699,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
             )))
         });
 
@@ -730,6 +736,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
             )))
         });
         activity_repository

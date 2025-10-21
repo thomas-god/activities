@@ -249,6 +249,7 @@ mod tests {
                             ActivityStatistic::Duration,
                             1200.,
                         )])),
+                        None,
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![0, 1, 2]),

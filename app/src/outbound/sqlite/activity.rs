@@ -119,7 +119,7 @@ where
         .await
         {
             Ok((id, user_id, name, start_time, sport, statistics)) => Ok(Some(Activity::new(
-                id, user_id, name, start_time, sport, statistics,
+                id, user_id, name, start_time, sport, statistics, None,
             ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
@@ -179,7 +179,7 @@ where
             .map(|rows| {
                 rows.into_iter()
                     .map(|(id, user_id, name, start_time, sport, statistics)| {
-                        Activity::new(id, user_id, name, start_time, sport, statistics)
+                        Activity::new(id, user_id, name, start_time, sport, statistics, None)
                     })
                     .collect()
             })
@@ -337,6 +337,7 @@ mod test_sqlite_activity_repository {
             ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            None,
         )
     }
 
@@ -348,6 +349,7 @@ mod test_sqlite_activity_repository {
             ActivityStartTime::new(*start),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            None,
         )
     }
 

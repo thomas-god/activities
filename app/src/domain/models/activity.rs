@@ -25,6 +25,7 @@ pub struct Activity {
     start_time: ActivityStartTime,
     sport: Sport,
     statistics: ActivityStatistics,
+    rpe: Option<ActivityRpe>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -37,6 +38,7 @@ impl Activity {
         start_time: ActivityStartTime,
         sport: Sport,
         statistics: ActivityStatistics,
+        rpe: Option<ActivityRpe>,
     ) -> Self {
         Self {
             id,
@@ -45,6 +47,7 @@ impl Activity {
             start_time,
             sport,
             statistics,
+            rpe,
         }
     }
 
@@ -84,6 +87,10 @@ impl Activity {
 
     pub fn statistics(&self) -> &ActivityStatistics {
         &self.statistics
+    }
+
+    pub fn rpe(&self) -> &Option<ActivityRpe> {
+        &self.rpe
     }
 }
 
@@ -125,6 +132,11 @@ impl ActivityWithTimeseries {
     pub fn statistics(&self) -> &ActivityStatistics {
         self.activity.statistics()
     }
+
+    pub fn rpe(&self) -> &Option<ActivityRpe> {
+        &self.activity.rpe
+    }
+
     pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
     }
@@ -162,6 +174,62 @@ impl fmt::Display for ActivityName {
 impl From<&str> for ActivityName {
     fn from(value: &str) -> Self {
         Self(value.to_string())
+    }
+}
+
+/// Relative Perceived Exertion (RPE) - a value from 1 to 10
+#[derive(Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ActivityRpe {
+    One = 1,
+    Two = 2,
+    Three = 3,
+    Four = 4,
+    Five = 5,
+    Six = 6,
+    Seven = 7,
+    Eight = 8,
+    Nine = 9,
+    Ten = 10,
+}
+
+impl ActivityRpe {
+    pub fn value(&self) -> u8 {
+        *self as u8
+    }
+}
+
+impl From<ActivityRpe> for u8 {
+    fn from(rpe: ActivityRpe) -> Self {
+        rpe as u8
+    }
+}
+
+impl TryFrom<u8> for ActivityRpe {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(ActivityRpe::One),
+            2 => Ok(ActivityRpe::Two),
+            3 => Ok(ActivityRpe::Three),
+            4 => Ok(ActivityRpe::Four),
+            5 => Ok(ActivityRpe::Five),
+            6 => Ok(ActivityRpe::Six),
+            7 => Ok(ActivityRpe::Seven),
+            8 => Ok(ActivityRpe::Eight),
+            9 => Ok(ActivityRpe::Nine),
+            10 => Ok(ActivityRpe::Ten),
+            _ => Err(format!(
+                "Invalid RPE value: {}. Must be between 1 and 10",
+                value
+            )),
+        }
+    }
+}
+
+impl fmt::Display for ActivityRpe {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value())
     }
 }
 
@@ -748,6 +816,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -756,6 +825,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
+            None,
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -770,6 +840,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -778,6 +849,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());
@@ -792,6 +864,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -800,9 +873,44 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
+    }
+
+    #[test]
+    fn test_rpe_valid_values() {
+        assert!(ActivityRpe::try_from(1).is_ok());
+        assert!(ActivityRpe::try_from(5).is_ok());
+        assert!(ActivityRpe::try_from(10).is_ok());
+    }
+
+    #[test]
+    fn test_rpe_invalid_values() {
+        assert!(ActivityRpe::try_from(0).is_err());
+        assert!(ActivityRpe::try_from(11).is_err());
+        assert!(ActivityRpe::try_from(255).is_err());
+    }
+
+    #[test]
+    fn test_rpe_value_getter() {
+        let rpe = ActivityRpe::try_from(7).unwrap();
+        assert_eq!(rpe.value(), 7);
+    }
+
+    #[test]
+    fn test_rpe_variants() {
+        assert_eq!(ActivityRpe::One.value(), 1);
+        assert_eq!(ActivityRpe::Five.value(), 5);
+        assert_eq!(ActivityRpe::Ten.value(), 10);
+    }
+
+    #[test]
+    fn test_rpe_ordering() {
+        assert!(ActivityRpe::One < ActivityRpe::Five);
+        assert!(ActivityRpe::Five < ActivityRpe::Ten);
+        assert_eq!(ActivityRpe::Seven, ActivityRpe::Seven);
     }
 }
 
