@@ -9,8 +9,8 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime,
-                ActivityStatistics, ActivityWithTimeseries, Sport,
+                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe,
+                ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport,
             },
         },
         ports::{
@@ -28,6 +28,7 @@ type ActivityRow = (
     ActivityStartTime,
     Sport,
     ActivityStatistics,
+    Option<ActivityRpe>,
 );
 
 #[derive(Debug, Clone)]
@@ -109,7 +110,7 @@ where
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
         match sqlx::query_as::<_, ActivityRow>(
-            "SELECT id, user_id, name, start_time, sport, statistics
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe
             FROM t_activities
             WHERE id = ?1
             LIMIT 1;",
@@ -118,8 +119,8 @@ where
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, name, start_time, sport, statistics)) => Ok(Some(Activity::new(
-                id, user_id, name, start_time, sport, statistics, None,
+            Ok((id, user_id, name, start_time, sport, statistics, rpe)) => Ok(Some(Activity::new(
+                id, user_id, name, start_time, sport, statistics, rpe,
             ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
@@ -150,7 +151,7 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe
             FROM t_activities ",
         );
         builder.push("WHERE user_id = ").push_bind(user);
@@ -178,8 +179,8 @@ where
             .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
             .map(|rows| {
                 rows.into_iter()
-                    .map(|(id, user_id, name, start_time, sport, statistics)| {
-                        Activity::new(id, user_id, name, start_time, sport, statistics, None)
+                    .map(|(id, user_id, name, start_time, sport, statistics, rpe)| {
+                        Activity::new(id, user_id, name, start_time, sport, statistics, rpe)
                     })
                     .collect()
             })
@@ -218,13 +219,27 @@ where
             .map(|_| ())
     }
 
+    async fn update_activity_rpe(
+        &self,
+        id: &ActivityId,
+        rpe: Option<ActivityRpe>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_activities SET rpe = ?1 WHERE id = ?2;")
+            .bind(rpe)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
+
     async fn save_activity(
         &self,
         activity: &ActivityWithTimeseries,
     ) -> Result<(), SaveActivityError> {
         sqlx::query(
             "INSERT INTO t_activities VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
         );",
         )
         .bind(activity.id())
@@ -234,6 +249,7 @@ where
         .bind(activity.sport())
         .bind(activity.statistics())
         .bind(activity.natural_key())
+        .bind(activity.rpe())
         .execute(&self.pool)
         .await
         .map(|_| ())
@@ -796,6 +812,63 @@ mod test_sqlite_activity_repository {
             .await
             .unwrap(),
             1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_rpe() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Initially, RPE should be NULL
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
+                .bind(activity.id())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            None
+        );
+
+        // Update RPE to 5
+        repository
+            .update_activity_rpe(activity.id(), Some(ActivityRpe::Five))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
+                .bind(activity.id())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            Some(5)
+        );
+
+        // Update RPE to None (clear it)
+        repository
+            .update_activity_rpe(activity.id(), None)
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
+                .bind(activity.id())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            None
         );
     }
 

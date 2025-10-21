@@ -5,8 +5,8 @@ use thiserror::Error;
 
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
-    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
-    ActivityTimeseries, ActivityWithTimeseries, Sport,
+    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe, ActivityStartTime,
+    ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
 };
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
@@ -133,6 +133,37 @@ pub enum ModifyActivityError {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct UpdateActivityRpeRequest {
+    user: UserId,
+    activity: ActivityId,
+    rpe: Option<ActivityRpe>,
+}
+
+impl UpdateActivityRpeRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+
+    pub fn rpe(&self) -> Option<&ActivityRpe> {
+        self.rpe.as_ref()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateActivityRpeError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct DeleteActivityRequest {
     user: UserId,
     activity: ActivityId,
@@ -221,6 +252,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: ModifyActivityRequest,
     ) -> impl Future<Output = Result<(), ModifyActivityError>> + Send;
+
+    fn update_activity_rpe(
+        &self,
+        req: UpdateActivityRpeRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityRpeError>> + Send;
 
     fn delete_activity(
         &self,
@@ -327,6 +363,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
         name: Option<ActivityName>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn update_activity_rpe(
+        &self,
+        id: &ActivityId,
+        rpe: Option<ActivityRpe>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn delete_activity(
