@@ -35,6 +35,16 @@ export const getSportCategoryIcon = (category: SportCategory | null): string => 
 	return sportCategoryIcons[category];
 };
 
+export const getSportCategoryBgColorClass = (category: SportCategory | null): string => {
+	if (category === 'Running') {
+		return 'bg-running';
+	}
+	if (category === 'Cycling') {
+		return 'bg-cycling';
+	}
+	return 'bg-other';
+};
+
 export const getSportCategory = (sport: Sport): SportCategory | null => {
 	for (const [category, sports] of Object.entries(sportsPerCategory)) {
 		if (sports.includes(sport)) {

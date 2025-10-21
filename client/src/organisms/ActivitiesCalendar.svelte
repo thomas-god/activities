@@ -1,7 +1,11 @@
 <script lang="ts">
 	import type { ActivityList } from '$lib/api';
 	import { dayjs } from '$lib/duration';
-	import { getSportCategoryIcon } from '$lib/sport';
+	import {
+		getSportCategoryIcon,
+		getSportCategoryBgColorClass,
+		type SportCategory
+	} from '$lib/sport';
 
 	let {
 		activityList,
@@ -79,59 +83,84 @@
 		}
 		return `${minutes}m`;
 	};
+
+	const activitySportCategoryClass = (category: SportCategory | null): string => {
+		if (category === 'Running') {
+			return 'running';
+		}
+		if (category === 'Cycling') {
+			return 'cycling';
+		}
+		return 'other';
+	};
 </script>
 
 <div class="rounded-box bg-base-100 shadow-md">
 	<!-- Calendar Header -->
-	<div class="flex items-center justify-between border-b border-base-300 p-4">
-		<div class="flex items-center gap-2">
-			<button onclick={previousMonth} class="btn btn-square btn-ghost btn-sm">
+	<div class="flex items-center justify-between border-b border-base-300 p-2 sm:p-4">
+		<div class="flex items-center gap-1 sm:gap-2">
+			<button onclick={previousMonth} class="btn btn-square btn-ghost btn-xs sm:btn-sm">
 				<span class="text-lg">‹</span>
 			</button>
-			<button onclick={nextMonth} class="btn btn-square btn-ghost btn-sm">
+			<button onclick={nextMonth} class="btn btn-square btn-ghost btn-xs sm:btn-sm">
 				<span class="text-lg">›</span>
 			</button>
 		</div>
-		<h2 class="text-lg font-semibold">{currentMonth.format('MMMM YYYY')}</h2>
-		<button onclick={goToToday} class="btn btn-ghost btn-sm">Today</button>
+		<h2 class="text-base font-semibold sm:text-lg">{currentMonth.format('MMMM YYYY')}</h2>
+		<button onclick={goToToday} class="btn btn-ghost btn-xs sm:btn-sm">Today</button>
 	</div>
 
 	<!-- Calendar Grid -->
-	<div class="p-4">
+	<div class="p-2 sm:p-4">
 		<!-- Day Headers -->
-		<div class="mb-2 grid grid-cols-7 gap-2">
+		<div class="mb-2 grid grid-cols-7 gap-1 sm:gap-2">
 			{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dayName}
-				<div class="text-center text-sm font-medium opacity-60">{dayName}</div>
+				<div class="text-center text-xs font-medium opacity-60 sm:text-sm">{dayName}</div>
 			{/each}
 		</div>
 
 		<!-- Calendar Days -->
-		<div class="grid grid-cols-7 gap-2">
+		<div class="grid grid-cols-7 gap-1 sm:gap-2">
 			{#each calendarDays as day}
 				<div
-					class="min-h-24 rounded-lg border p-2 transition-colors hover:bg-base-200 {day.isCurrentMonth
+					class="min-h-16 rounded-lg border p-1 transition-colors hover:bg-base-200 sm:min-h-24 sm:p-2 {day.isCurrentMonth
 						? 'border-base-300 bg-base-100'
 						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday ? 'ring-2 ring-primary' : ''}"
 				>
 					<div class="mb-1 flex items-center justify-between">
 						<span
-							class="text-sm font-medium {day.isToday
-								? 'flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-content'
+							class="text-xs font-medium sm:text-sm {day.isToday
+								? 'flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-content sm:h-6 sm:w-6'
 								: ''}"
 						>
 							{day.day}
 						</span>
-						{#if day.activities.length > 0}
-							<span class="badge badge-xs badge-primary">{day.activities.length}</span>
-						{/if}
+						<!-- {#if day.activities.length > 0}
+							<span class="badge badge-xs badge-primary hidden sm:flex"
+								>{day.activities.length}</span
+							>
+						{/if} -->
 					</div>
 
 					<!-- Activities for this day -->
-					<div class="flex flex-col gap-1">
+					<!-- Mobile: Show only colored dots -->
+					<div class="flex flex-wrap gap-0.5 sm:hidden">
+						{#each day.activities.slice(0, 6) as activity}
+							<a
+								href={`/activity/${activity.id}`}
+								class={`activity-dot h-2 w-2 rounded-full ${activitySportCategoryClass(activity.sport_category)}`}
+								title={activity.name || activity.sport}
+								aria-label={activity.name || activity.sport}
+							></a>
+						{/each}
+					</div>
+
+					<!-- Desktop: Show activity details -->
+					<div class="hidden flex-col gap-1 sm:flex">
 						{#each day.activities.slice(0, 3) as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class="flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300"
+								class={`activity-details flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-base leading-none">
 									{getSportCategoryIcon(activity.sport_category)}
@@ -153,3 +182,31 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.activity-details {
+		border-left-width: 4px;
+
+		&.running {
+			border-left-color: var(--color-running);
+		}
+		&.cycling {
+			border-left-color: var(--color-cycling);
+		}
+		&.other {
+			border-left-color: var(--color-other);
+		}
+	}
+
+	.activity-dot {
+		&.running {
+			background-color: var(--color-running);
+		}
+		&.cycling {
+			background-color: var(--color-cycling);
+		}
+		&.other {
+			background-color: var(--color-other);
+		}
+	}
+</style>
