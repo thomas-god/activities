@@ -45,7 +45,7 @@
 
 				const startDistance = distanceMetric.values[startIndex] ?? 0;
 				const endDistance = distanceMetric.values[endIndex] ?? 0;
-				const lapDistance = (endDistance - startDistance) / 1000; // Convert to km
+				const lapDistance = endDistance - startDistance;
 
 				return lapDistance > 0 ? `${lapDistance.toFixed(2)} km` : undefined;
 			}
