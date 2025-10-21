@@ -8,7 +8,7 @@
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
-	import ActivityLaps from '../../../organisms/ActivityLaps.svelte';
+	import ActivityLaps, { type LapMetric } from '../../../organisms/ActivityLaps.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 
@@ -98,6 +98,35 @@
 		}
 		return 'other';
 	};
+
+	const getLapMetrics = (category: SportCategory | null): LapMetric[] => {
+		switch (category) {
+			case 'Running':
+				return ['distance', 'speed', 'heartRate'];
+			case 'Cycling':
+				return ['distance', 'power', 'heartRate'];
+			case 'Rowing':
+				return ['distance', 'speed', 'power', 'heartRate'];
+			case 'Swimming':
+				return ['distance', 'speed'];
+			case 'Ski':
+				return ['distance', 'speed', 'heartRate'];
+			case 'Walking':
+				return ['distance', 'speed', 'heartRate'];
+			case 'Cardio':
+				return ['heartRate'];
+			case 'Climbing':
+				return ['heartRate'];
+			case 'TeamSports':
+			case 'Racket':
+			case 'WaterSports':
+				return ['distance', 'speed', 'heartRate'];
+			default:
+				return ['heartRate'];
+		}
+	};
+
+	let lapMetrics = $derived(getLapMetrics(data.activity.sport_category));
 </script>
 
 <div class="mx-auto mt-1 flex flex-col gap-4 sm:px-4">
@@ -147,7 +176,7 @@
 	</div>
 
 	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">
-		<ActivityLaps activity={data.activity} />
+		<ActivityLaps activity={data.activity} metrics={lapMetrics} />
 	</div>
 </div>
 
