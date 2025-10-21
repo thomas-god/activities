@@ -805,13 +805,13 @@ mod test_sqlite_activity_repository {
             .expect("Should not have err");
 
         assert_eq!(
-            sqlx::query_scalar::<_, u64>(
-                "select count(*) from t_activities where name = 'a new name';"
+            sqlx::query_scalar::<_, Option<ActivityName>>(
+                "select name from t_activities where name = 'a new name';"
             )
             .fetch_one(&repository.pool)
             .await
             .unwrap(),
-            1
+            Some(ActivityName::from("a new name"))
         );
     }
 
@@ -833,11 +833,13 @@ mod test_sqlite_activity_repository {
 
         // Initially, RPE should be NULL
         assert_eq!(
-            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
-                .bind(activity.id())
-                .fetch_one(&repository.pool)
-                .await
-                .unwrap(),
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                "select rpe from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
             None
         );
 
@@ -848,12 +850,14 @@ mod test_sqlite_activity_repository {
             .expect("Should not have err");
 
         assert_eq!(
-            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
-                .bind(activity.id())
-                .fetch_one(&repository.pool)
-                .await
-                .unwrap(),
-            Some(5)
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                r#"select rpe as "rpe?" from t_activities where id = ?1;"#
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(ActivityRpe::Five)
         );
 
         // Update RPE to None (clear it)
@@ -863,11 +867,13 @@ mod test_sqlite_activity_repository {
             .expect("Should not have err");
 
         assert_eq!(
-            sqlx::query_scalar::<_, Option<u8>>("select rpe from t_activities where id = ?1;")
-                .bind(activity.id())
-                .fetch_one(&repository.pool)
-                .await
-                .unwrap(),
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                "select rpe from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
             None
         );
     }

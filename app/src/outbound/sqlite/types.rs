@@ -402,7 +402,7 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingPeriodSports {
 
 impl sqlx::Type<sqlx::Sqlite> for ActivityRpe {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
-        <u8 as sqlx::Type<sqlx::Sqlite>>::type_info()
+        <u64 as sqlx::Type<sqlx::Sqlite>>::type_info()
     }
 }
 
@@ -419,7 +419,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityRpe {
 
 impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityRpe {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
-        let s = <u8 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        Ok(Self::try_from(s)?)
+        let s = <u64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::try_from(u8::try_from(s)?)?)
     }
 }

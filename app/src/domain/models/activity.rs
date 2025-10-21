@@ -177,7 +177,7 @@ impl From<&str> for ActivityName {
     }
 }
 
-/// Relative Perceived Exertion (RPE) - a value from 1 to 10
+/// Rate of Perceived Exertion (RPE) - a value from 1 to 10
 #[derive(Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ActivityRpe {
     One = 1,
