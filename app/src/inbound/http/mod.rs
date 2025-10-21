@@ -49,8 +49,8 @@ pub struct CookieConfig {
 impl Default for CookieConfig {
     fn default() -> Self {
         Self {
-            secure: false,
-            same_site: SameSite::Lax,
+            secure: true,
+            same_site: SameSite::Strict,
             http_only: true,
             domain: None,
         }
