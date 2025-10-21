@@ -12,7 +12,7 @@ use crate::{
     domain::{
         models::activity::{
             Activity, ActivityId, ActivityStatistic, ActivityTimeseries, ActivityWithTimeseries,
-            Sport, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+            Lap, Sport, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
         },
         ports::{IActivityService, ITrainingService},
     },
@@ -42,12 +42,19 @@ pub struct ActivityTimeseriesBody {
     time: Vec<usize>,
     active_time: Vec<Option<usize>>,
     metrics: HashMap<String, TimeseriesBody>,
+    laps: Vec<LapBody>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct TimeseriesBody {
     unit: String,
     values: Vec<Option<TimeseriesValueBody>>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct LapBody {
+    start: usize,
+    end: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -106,6 +113,16 @@ impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
                 .map(|value| value.value())
                 .collect(),
             metrics: extract_and_convert_metrics(value.metrics()),
+            laps: value.laps().iter().map(LapBody::from).collect(),
+        }
+    }
+}
+
+impl From<&Lap> for LapBody {
+    fn from(lap: &Lap) -> Self {
+        Self {
+            start: lap.start(),
+            end: lap.end(),
         }
     }
 }
@@ -298,7 +315,8 @@ mod tests {
                                 Some(TimeseriesValueBody::Int(130))
                             ]
                         }
-                    )])
+                    )]),
+                    laps: vec![]
                 }
             }
         );

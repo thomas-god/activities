@@ -662,6 +662,16 @@ pub struct Lap {
     end: usize,
 }
 
+impl Lap {
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.end
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct Timeseries {
     metric: TimeseriesMetric,
