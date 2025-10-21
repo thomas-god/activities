@@ -33,6 +33,7 @@ pub struct ResponseBody {
     name: Option<String>,
     duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
+    rpe: Option<u8>,
     statistics: HashMap<String, f64>,
     timeseries: ActivityTimeseriesBody,
 }
@@ -96,6 +97,7 @@ impl From<&ActivityWithTimeseries> for ResponseBody {
                 .statistics()
                 .get(&ActivityStatistic::Duration)
                 .cloned(),
+            rpe: activity.rpe().as_ref().map(|r| u8::from(*r)),
             statistics: activity.statistics().items(),
             timeseries: activity.timeseries().into(),
         }
@@ -302,6 +304,7 @@ mod tests {
                 start_time: "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
+                rpe: None,
                 statistics: HashMap::from([("Duration".to_string(), 1200.)]),
                 timeseries: ActivityTimeseriesBody {
                     time: vec![0, 1, 2],

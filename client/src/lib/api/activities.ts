@@ -25,6 +25,7 @@ const ActivityDetailsSchema = z.object({
 	name: z.string().nullable(),
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
+	rpe: z.number().min(1).max(10).nullable(),
 	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),

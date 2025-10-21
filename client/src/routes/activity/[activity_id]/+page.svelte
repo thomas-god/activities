@@ -5,6 +5,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';
+	import EditableRpe from '../../../molecules/EditableRpe.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
@@ -81,7 +82,8 @@
 		const res = await fetch(
 			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?name=${encodeURIComponent(newName)}`,
 			{
-				method: 'PATCH'
+				method: 'PATCH',
+				credentials: 'include'
 			}
 		);
 
@@ -89,6 +91,24 @@
 			goto('/login');
 		}
 	};
+
+	const updateActivityRpeCallback = async (newRpe: number | null) => {
+		const rpeParam = newRpe === null ? '0' : newRpe.toString();
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?rpe=${rpeParam}`, {
+			method: 'PATCH',
+			credentials: 'include'
+		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
+
+		// Update local state
+		if (res.ok) {
+			data.activity.rpe = newRpe;
+		}
+	};
+
 	const categoryClass = (category: SportCategory | null): string => {
 		if (category === 'Running') {
 			return 'running';
@@ -150,6 +170,10 @@
 			</div>
 			<!-- <div>45 km</div> -->
 		</div>
+	</div>
+
+	<div class="rounded-box bg-base-100 p-4 shadow-md">
+		<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
 	</div>
 
 	<div>
