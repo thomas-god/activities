@@ -7,10 +7,11 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::activity::{ActivityId, ActivityName, ActivityRpe},
+        models::activity::{ActivityId, ActivityName, ActivityRpe, WorkoutType},
         ports::{
             IActivityService, ITrainingService, ModifyActivityError, ModifyActivityRequest,
-            UpdateActivityRpeError, UpdateActivityRpeRequest,
+            UpdateActivityRpeError, UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
+            UpdateActivityWorkoutTypeRequest,
         },
     },
     inbound::{
@@ -40,6 +41,15 @@ impl From<UpdateActivityRpeError> for StatusCode {
     }
 }
 
+impl From<UpdateActivityWorkoutTypeError> for StatusCode {
+    fn from(value: UpdateActivityWorkoutTypeError) -> Self {
+        match value {
+            UpdateActivityWorkoutTypeError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
+            _ => Self::UNPROCESSABLE_ENTITY,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PatchActivityQuery {
     /// Optional new name for the activity
@@ -47,6 +57,9 @@ pub struct PatchActivityQuery {
     /// Optional RPE (Rate of Perceived Exertion) value from 1-10
     /// Use 0 to clear/remove the RPE value
     rpe: Option<u8>,
+    /// Optional workout type: easy, tempo, intervals, long_run, or race
+    /// Use empty string to clear/remove the workout type
+    workout_type: Option<String>,
 }
 
 /// Handler for PATCH /api/activity/{activity_id}
@@ -54,11 +67,14 @@ pub struct PatchActivityQuery {
 /// Updates an activity's metadata. Currently supports:
 /// - `name`: Change the activity name (query parameter)
 /// - `rpe`: Set RPE from 1-10, or use 0 to clear it (query parameter)
+/// - `workout_type`: Set workout type (easy, tempo, intervals, long_run, race), or empty string to clear (query parameter)
 ///
 /// # Example
 /// PATCH /api/activity/123?rpe=7
 /// PATCH /api/activity/123?name=Morning%20Run&rpe=8
 /// PATCH /api/activity/123?rpe=0  // Clear RPE
+/// PATCH /api/activity/123?workout_type=intervals
+/// PATCH /api/activity/123?workout_type=  // Clear workout type
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
@@ -103,6 +119,31 @@ pub async fn patch_activity<
             .map_err(StatusCode::from)?;
     }
 
+    // Update activity workout type if provided
+    if let Some(workout_type_str) = query.workout_type {
+        let workout_type = if workout_type_str.is_empty() {
+            None
+        } else {
+            Some(
+                workout_type_str
+                    .parse::<WorkoutType>()
+                    .map_err(|_| StatusCode::BAD_REQUEST)?,
+            )
+        };
+
+        let req = UpdateActivityWorkoutTypeRequest::new(
+            user.user().clone(),
+            ActivityId::from(&activity_id),
+            workout_type,
+        );
+
+        state
+            .activity_service
+            .update_activity_workout_type(req)
+            .await
+            .map_err(StatusCode::from)?;
+    }
+
     Ok(StatusCode::OK)
 }
 
@@ -116,6 +157,7 @@ mod tests {
         let query = PatchActivityQuery {
             name: None,
             rpe: Some(0),
+            workout_type: None,
         };
         assert_eq!(query.rpe, Some(0));
     }
@@ -136,5 +178,44 @@ mod tests {
             let result = ActivityRpe::try_from(i);
             assert!(result.is_err(), "RPE value {} should be invalid", i);
         }
+    }
+
+    #[test]
+    fn test_workout_type_valid_values() {
+        // Test that valid workout type values can be parsed
+        let valid_types = ["easy", "tempo", "intervals", "long_run", "race"];
+        for workout_type in valid_types {
+            let result = workout_type.parse::<WorkoutType>();
+            assert!(
+                result.is_ok(),
+                "Workout type '{}' should be valid",
+                workout_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_workout_type_invalid_values() {
+        // Test that invalid workout type values are rejected
+        let invalid_types = ["invalid", "sprint", "recovery", "123"];
+        for workout_type in invalid_types {
+            let result = workout_type.parse::<WorkoutType>();
+            assert!(
+                result.is_err(),
+                "Workout type '{}' should be invalid",
+                workout_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_workout_type_empty_string() {
+        // Test that empty string is handled (should clear workout type)
+        let query = PatchActivityQuery {
+            name: None,
+            rpe: None,
+            workout_type: Some(String::new()),
+        };
+        assert_eq!(query.workout_type, Some(String::new()));
     }
 }
