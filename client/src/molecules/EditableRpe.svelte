@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor, getRpeButtonColor } from '$lib/rpe';
+
 	let {
 		rpe: initialRpe,
 		editCallback
@@ -6,30 +8,6 @@
 
 	let rpe = $state(initialRpe);
 	let editMode = $state(false);
-
-	const rpeValues = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-	const getRpeLabel = (value: number | null): string => {
-		if (value === null) return 'Not set';
-		return `${value}/10`;
-	};
-
-	const getRpeColor = (value: number | null): string => {
-		if (value === null) return 'badge-ghost';
-		if (value <= 2) return 'rpe-light-blue';
-		if (value <= 4) return 'rpe-light-green';
-		if (value <= 7) return 'rpe-light-yellow';
-		if (value <= 9) return 'rpe-orange';
-		return 'rpe-red';
-	};
-
-	const getButtonColor = (value: number): string => {
-		if (value <= 2) return 'rpe-light-blue';
-		if (value <= 4) return 'rpe-light-green';
-		if (value <= 7) return 'rpe-light-yellow';
-		if (value <= 9) return 'rpe-orange';
-		return 'rpe-red';
-	};
 
 	const handleSave = () => {
 		editMode = false;
@@ -52,9 +30,9 @@
 			>
 				Clear
 			</button>
-			{#each rpeValues as value}
+			{#each RPE_VALUES as value}
 				<button
-					class={`btn btn-sm ${rpe === value ? `${getButtonColor(value)} border-2 border-base-content` : getButtonColor(value)}`}
+					class={`btn btn-sm ${rpe === value ? `${getRpeButtonColor(value)} border-2 border-base-content` : getRpeButtonColor(value)}`}
 					onclick={() => (rpe = value)}
 				>
 					{value}
@@ -69,44 +47,43 @@
 {:else}
 	<div class="flex items-center gap-2">
 		<div class="text-sm font-medium">RPE:</div>
-		<span class={`badge ${getRpeColor(rpe)}`}>{getRpeLabel(rpe)}</span>
+		<span class={`badge ${rpe === null ? '' : getRpeColor(rpe)}`}>{getRpeLabelAsScale(rpe)}</span>
 		<button class="btn opacity-75 btn-ghost btn-sm" onclick={() => (editMode = true)}> ✏️ </button>
 	</div>
 {/if}
 
 <style>
-	/* RPE Color Scale */
-	.rpe-light-blue {
-		background-color: #bfdbfe; /* blue-200 */
-		color: #1e3a8a; /* blue-900 */
+	.rpe-easy {
+		background-color: var(--color-rpe-easy);
+		color: var(--color-rpe-easy-text);
 	}
 
-	.rpe-light-green {
-		background-color: #bbf7d0; /* green-200 */
-		color: #14532d; /* green-900 */
+	.rpe-moderate {
+		background-color: var(--color-rpe-moderate);
+		color: var(--color-rpe-moderate-text);
 	}
 
-	.rpe-light-yellow {
-		background-color: #fef08a; /* yellow-200 */
-		color: #713f12; /* yellow-900 */
+	.rpe-hard {
+		background-color: var(--color-rpe-hard);
+		color: var(--color-rpe-hard-text);
 	}
 
-	.rpe-orange {
-		background-color: #fed7aa; /* orange-200 */
-		color: #7c2d12; /* orange-900 */
+	.rpe-very-hard {
+		background-color: var(--color-rpe-very-hard);
+		color: var(--color-rpe-very-hard-text);
 	}
 
-	.rpe-red {
-		background-color: #fecaca; /* red-200 */
-		color: #7f1d1d; /* red-900 */
+	.rpe-max {
+		background-color: var(--color-rpe-max);
+		color: var(--color-rpe-max-text);
 	}
 
 	/* Ensure good contrast for badge */
-	.badge.rpe-light-blue,
-	.badge.rpe-light-green,
-	.badge.rpe-light-yellow,
-	.badge.rpe-orange,
-	.badge.rpe-red {
+	.badge.rpe-easy,
+	.badge.rpe-moderate,
+	.badge.rpe-hard,
+	.badge.rpe-very-hard,
+	.badge.rpe-max {
 		border: 1px solid currentColor;
 	}
 </style>

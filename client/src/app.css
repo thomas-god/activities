@@ -18,4 +18,20 @@
 	--color-running-background: #c6f6d5;
 	--color-other: #ed8936;
 	--color-other-background: #feebc8;
+
+	/* RPE categories colors */
+	--color-rpe-easy: #bfdbfe; /* blue-200 */
+	--color-rpe-easy-text: #1e3a8a; /* blue-900 */
+
+	--color-rpe-moderate: #bbf7d0; /* green-200 */
+	--color-rpe-moderate-text: #14532d; /* green-900 */
+
+	--color-rpe-hard: #fef08a; /* yellow-200 */
+	--color-rpe-hard-text: #713f12; /* yellow-900 */
+
+	--color-rpe-very-hard: #fed7aa; /* orange-200 */
+	--color-rpe-very-hard-text: #7c2d12; /* orange-900 */
+
+	--color-rpe-max: #fecaca; /* red-200 */
+	--color-rpe-max-text: #7f1d1d; /* red-900 */
 }
