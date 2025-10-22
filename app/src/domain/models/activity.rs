@@ -332,7 +332,7 @@ impl fmt::Display for BonkStatus {
 
 /// Nutrition and hydration tracking for an activity.
 /// Includes bonk status and optional details about nutrition/hydration intake.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Constructor)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Constructor, Serialize, Deserialize)]
 pub struct ActivityNutrition {
     bonk_status: BonkStatus,
     details: Option<String>,

@@ -5,8 +5,9 @@ use thiserror::Error;
 
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
-    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe, ActivityStartTime,
-    ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport, WorkoutType,
+    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+    ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
+    WorkoutType,
 };
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
@@ -195,6 +196,37 @@ pub enum UpdateActivityWorkoutTypeError {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct UpdateActivityNutritionRequest {
+    user: UserId,
+    activity: ActivityId,
+    nutrition: Option<ActivityNutrition>,
+}
+
+impl UpdateActivityNutritionRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+
+    pub fn nutrition(&self) -> &Option<ActivityNutrition> {
+        &self.nutrition
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateActivityNutritionError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct DeleteActivityRequest {
     user: UserId,
     activity: ActivityId,
@@ -293,6 +325,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: UpdateActivityWorkoutTypeRequest,
     ) -> impl Future<Output = Result<(), UpdateActivityWorkoutTypeError>> + Send;
+
+    fn update_activity_nutrition(
+        &self,
+        req: UpdateActivityNutritionRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityNutritionError>> + Send;
 
     fn delete_activity(
         &self,
@@ -411,6 +448,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
         workout_type: Option<WorkoutType>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn update_activity_nutrition(
+        &self,
+        id: &ActivityId,
+        nutrition: Option<ActivityNutrition>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn delete_activity(

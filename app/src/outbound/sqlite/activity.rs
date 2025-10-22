@@ -9,8 +9,9 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe,
-                ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport, WorkoutType,
+                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
+                ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport,
+                WorkoutType,
             },
         },
         ports::{
@@ -30,6 +31,7 @@ type ActivityRow = (
     ActivityStatistics,
     Option<ActivityRpe>,
     Option<WorkoutType>,
+    Option<ActivityNutrition>,
 );
 
 #[derive(Debug, Clone)]
@@ -111,7 +113,7 @@ where
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
         match sqlx::query_as::<_, ActivityRow>(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition
             FROM t_activities
             WHERE id = ?1
             LIMIT 1;",
@@ -120,19 +122,27 @@ where
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, name, start_time, sport, statistics, rpe, workout_type)) => {
-                Ok(Some(Activity::new(
-                    id,
-                    user_id,
-                    name,
-                    start_time,
-                    sport,
-                    statistics,
-                    rpe,
-                    workout_type,
-                    None, // TODO: Load nutrition from database
-                )))
-            }
+            Ok((
+                id,
+                user_id,
+                name,
+                start_time,
+                sport,
+                statistics,
+                rpe,
+                workout_type,
+                nutrition,
+            )) => Ok(Some(Activity::new(
+                id,
+                user_id,
+                name,
+                start_time,
+                sport,
+                statistics,
+                rpe,
+                workout_type,
+                nutrition,
+            ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
         }
@@ -162,7 +172,7 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition
             FROM t_activities ",
         );
         builder.push("WHERE user_id = ").push_bind(user);
@@ -191,7 +201,17 @@ where
             .map(|rows| {
                 rows.into_iter()
                     .map(
-                        |(id, user_id, name, start_time, sport, statistics, rpe, workout_type)| {
+                        |(
+                            id,
+                            user_id,
+                            name,
+                            start_time,
+                            sport,
+                            statistics,
+                            rpe,
+                            workout_type,
+                            nutrition,
+                        )| {
                             Activity::new(
                                 id,
                                 user_id,
@@ -201,7 +221,7 @@ where
                                 statistics,
                                 rpe,
                                 workout_type,
-                                None, // TODO: Load nutrition from database
+                                nutrition,
                             )
                         },
                     )
@@ -270,14 +290,28 @@ where
             .map(|_| ())
     }
 
+    async fn update_activity_nutrition(
+        &self,
+        id: &ActivityId,
+        nutrition: Option<ActivityNutrition>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_activities SET nutrition = ?1 WHERE id = ?2;")
+            .bind(nutrition)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
+
     async fn save_activity(
         &self,
         activity: &ActivityWithTimeseries,
     ) -> Result<(), SaveActivityError> {
         sqlx::query(
             "INSERT INTO t_activities VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
-        );",
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+    );",
         )
         .bind(activity.id())
         .bind(activity.user())
@@ -288,6 +322,7 @@ where
         .bind(activity.natural_key())
         .bind(activity.rpe())
         .bind(activity.workout_type())
+        .bind(activity.nutrition())
         .execute(&self.pool)
         .await
         .map(|_| ())
@@ -354,9 +389,9 @@ mod test_sqlite_activity_repository {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                    ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
-                    TimeseriesTime, TimeseriesValue,
+                    ActiveTime, ActivityNutrition, ActivityStartTime, ActivityStatistic,
+                    ActivityStatistics, ActivityTimeseries, BonkStatus, Sport, Timeseries,
+                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::{DateRange, GetRawDataError, RawContent, test_utils::MockRawDataRepository},
@@ -991,6 +1026,91 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_nutrition() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Initially, nutrition should be NULL
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+
+        // Update nutrition to bonked with details
+        let nutrition_bonked = ActivityNutrition::new(
+            BonkStatus::Bonked,
+            Some("Forgot to eat breakfast".to_string()),
+        );
+        repository
+            .update_activity_nutrition(activity.id(), Some(nutrition_bonked.clone()))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(nutrition_bonked)
+        );
+
+        // Update nutrition to none (no bonk) without details
+        let nutrition_none = ActivityNutrition::new(BonkStatus::None, None);
+        repository
+            .update_activity_nutrition(activity.id(), Some(nutrition_none.clone()))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(nutrition_none)
+        );
+
+        // Update nutrition to None (clear it)
+        repository
+            .update_activity_nutrition(activity.id(), None)
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)

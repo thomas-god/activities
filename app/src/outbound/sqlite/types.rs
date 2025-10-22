@@ -6,8 +6,8 @@ use sqlx::{Database, encode::IsNull, error::BoxDynError};
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe, ActivityStartTime,
-        ActivityStatistic, ActivityStatistics, Sport, WorkoutType,
+        ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+        ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport, WorkoutType,
     },
     training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
@@ -445,5 +445,29 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for WorkoutType {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(s.parse()?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityNutrition {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityNutrition {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let json_bytes = serde_json::to_vec(&self).unwrap();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Blob(json_bytes.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityNutrition {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(serde_json::from_slice(bytes)?)
     }
 }
