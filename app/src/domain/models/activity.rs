@@ -265,10 +265,23 @@ impl FromStr for WorkoutType {
             "long_run" | "longrun" => Ok(WorkoutType::LongRun),
             "race" => Ok(WorkoutType::Race),
             _ => Err(format!(
-                "Invalid training type: '{}'. Must be one of: easy, intensity, long_run, race",
+                "Invalid training type: '{}'. Must be one of: easy, tempo, intervals, long_run, race",
                 s
             )),
         }
+    }
+}
+
+impl fmt::Display for WorkoutType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            WorkoutType::Easy => "easy",
+            WorkoutType::Tempo => "tempo",
+            WorkoutType::Intervals => "intervals",
+            WorkoutType::LongRun => "long_run",
+            WorkoutType::Race => "race",
+        };
+        write!(f, "{}", s)
     }
 }
 

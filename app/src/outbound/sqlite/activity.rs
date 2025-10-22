@@ -29,6 +29,7 @@ type ActivityRow = (
     Sport,
     ActivityStatistics,
     Option<ActivityRpe>,
+    Option<WorkoutType>,
 );
 
 #[derive(Debug, Clone)]
@@ -110,7 +111,7 @@ where
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
         match sqlx::query_as::<_, ActivityRow>(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type
             FROM t_activities
             WHERE id = ?1
             LIMIT 1;",
@@ -119,9 +120,18 @@ where
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, name, start_time, sport, statistics, rpe)) => Ok(Some(Activity::new(
-                id, user_id, name, start_time, sport, statistics, rpe, None,
-            ))),
+            Ok((id, user_id, name, start_time, sport, statistics, rpe, workout_type)) => {
+                Ok(Some(Activity::new(
+                    id,
+                    user_id,
+                    name,
+                    start_time,
+                    sport,
+                    statistics,
+                    rpe,
+                    workout_type,
+                )))
+            }
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
         }
@@ -151,7 +161,7 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type
             FROM t_activities ",
         );
         builder.push("WHERE user_id = ").push_bind(user);
@@ -179,9 +189,20 @@ where
             .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
             .map(|rows| {
                 rows.into_iter()
-                    .map(|(id, user_id, name, start_time, sport, statistics, rpe)| {
-                        Activity::new(id, user_id, name, start_time, sport, statistics, rpe, None)
-                    })
+                    .map(
+                        |(id, user_id, name, start_time, sport, statistics, rpe, workout_type)| {
+                            Activity::new(
+                                id,
+                                user_id,
+                                name,
+                                start_time,
+                                sport,
+                                statistics,
+                                rpe,
+                                workout_type,
+                            )
+                        },
+                    )
                     .collect()
             })
     }
@@ -235,10 +256,16 @@ where
 
     async fn update_activity_workout_type(
         &self,
-        _id: &ActivityId,
-        _workout_type: Option<WorkoutType>,
+        id: &ActivityId,
+        workout_type: Option<WorkoutType>,
     ) -> Result<(), anyhow::Error> {
-        todo!()
+        sqlx::query("UPDATE t_activities SET workout_type = ?1 WHERE id = ?2;")
+            .bind(workout_type)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
     }
 
     async fn save_activity(
@@ -247,7 +274,7 @@ where
     ) -> Result<(), SaveActivityError> {
         sqlx::query(
             "INSERT INTO t_activities VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
         );",
         )
         .bind(activity.id())
@@ -258,6 +285,7 @@ where
         .bind(activity.statistics())
         .bind(activity.natural_key())
         .bind(activity.rpe())
+        .bind(activity.workout_type())
         .execute(&self.pool)
         .await
         .map(|_| ())
@@ -879,6 +907,86 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityRpe>>(
                 "select rpe from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_workout_type() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Initially, workout_type should be NULL
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+
+        // Update workout_type to Intervals
+        repository
+            .update_activity_workout_type(activity.id(), Some(WorkoutType::Intervals))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(WorkoutType::Intervals)
+        );
+
+        // Update workout_type to Tempo
+        repository
+            .update_activity_workout_type(activity.id(), Some(WorkoutType::Tempo))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(WorkoutType::Tempo)
+        );
+
+        // Update workout_type to None (clear it)
+        repository
+            .update_activity_workout_type(activity.id(), None)
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)

@@ -218,9 +218,35 @@ where
 
     async fn update_activity_workout_type(
         &self,
-        _req: UpdateActivityWorkoutTypeRequest,
+        req: UpdateActivityWorkoutTypeRequest,
     ) -> Result<(), UpdateActivityWorkoutTypeError> {
-        todo!()
+        let Ok(Some(activity)) = self
+            .activity_repository
+            .lock()
+            .await
+            .get_activity(req.activity())
+            .await
+        else {
+            return Err(UpdateActivityWorkoutTypeError::ActivityDoesNotExist(
+                req.activity().clone(),
+            ));
+        };
+
+        if activity.user() != req.user() {
+            return Err(UpdateActivityWorkoutTypeError::UserDoesNotOwnActivity(
+                req.user().clone(),
+                req.activity().clone(),
+            ));
+        }
+
+        let _ = self
+            .activity_repository
+            .lock()
+            .await
+            .update_activity_workout_type(req.activity(), req.workout_type().cloned())
+            .await;
+
+        Ok(())
     }
 
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
@@ -843,6 +869,118 @@ mod tests_activity_service {
 
         let Err(UpdateActivityRpeError::UserDoesNotOwnActivity(user, activity)) =
             service.update_activity_rpe(req).await
+        else {
+            unreachable!("Should have returned an error")
+        };
+        assert_eq!(user, UserId::test_default());
+        assert_eq!(activity, ActivityId::from("test_activity"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_update_activity_workout_type_ok() {
+        use crate::domain::models::activity::WorkoutType;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::new()),
+                None,
+                None,
+            )))
+        });
+        activity_repository
+            .expect_update_activity_workout_type()
+            .withf(|id, wt| *id == ActivityId::from("test") && *wt == Some(WorkoutType::Intervals))
+            .returning(|_, _| Ok(()));
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingService::test_default());
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
+
+        let req = UpdateActivityWorkoutTypeRequest::new(
+            UserId::test_default(),
+            ActivityId::from("test"),
+            Some(WorkoutType::Intervals),
+        );
+
+        let res = service.update_activity_workout_type(req).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_update_activity_workout_type_not_found() {
+        use crate::domain::models::activity::WorkoutType;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_| Ok(None));
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingService::test_default());
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
+
+        let req = UpdateActivityWorkoutTypeRequest::new(
+            UserId::test_default(),
+            ActivityId::from("test"),
+            Some(WorkoutType::Tempo),
+        );
+
+        let Err(UpdateActivityWorkoutTypeError::ActivityDoesNotExist(activity_id)) =
+            service.update_activity_workout_type(req).await
+        else {
+            unreachable!("Should have returned an error")
+        };
+        assert_eq!(activity_id, ActivityId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_update_activity_workout_type_wrong_user() {
+        use crate::domain::models::activity::WorkoutType;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                "other_user".into(),
+                None,
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::new()),
+                None,
+                None,
+            )))
+        });
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let metrics_service = Arc::new(MockTrainingService::test_default());
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            metrics_service,
+        );
+
+        let req = UpdateActivityWorkoutTypeRequest::new(
+            UserId::test_default(),
+            ActivityId::from("test_activity"),
+            Some(WorkoutType::LongRun),
+        );
+
+        let Err(UpdateActivityWorkoutTypeError::UserDoesNotOwnActivity(user, activity)) =
+            service.update_activity_workout_type(req).await
         else {
             unreachable!("Should have returned an error")
         };
