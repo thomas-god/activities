@@ -10,7 +10,7 @@ use crate::{
             UserId,
             activity::{
                 Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityRpe,
-                ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport,
+                ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport, WorkoutType,
             },
         },
         ports::{
@@ -120,7 +120,7 @@ where
         .await
         {
             Ok((id, user_id, name, start_time, sport, statistics, rpe)) => Ok(Some(Activity::new(
-                id, user_id, name, start_time, sport, statistics, rpe,
+                id, user_id, name, start_time, sport, statistics, rpe, None,
             ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
@@ -180,7 +180,7 @@ where
             .map(|rows| {
                 rows.into_iter()
                     .map(|(id, user_id, name, start_time, sport, statistics, rpe)| {
-                        Activity::new(id, user_id, name, start_time, sport, statistics, rpe)
+                        Activity::new(id, user_id, name, start_time, sport, statistics, rpe, None)
                     })
                     .collect()
             })
@@ -231,6 +231,14 @@ where
             .await
             .map_err(|err| anyhow!(err))
             .map(|_| ())
+    }
+
+    async fn update_activity_workout_type(
+        &self,
+        _id: &ActivityId,
+        _workout_type: Option<WorkoutType>,
+    ) -> Result<(), anyhow::Error> {
+        todo!()
     }
 
     async fn save_activity(
@@ -354,6 +362,7 @@ mod test_sqlite_activity_repository {
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             None,
+            None,
         )
     }
 
@@ -365,6 +374,7 @@ mod test_sqlite_activity_repository {
             ActivityStartTime::new(*start),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            None,
             None,
         )
     }

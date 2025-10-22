@@ -26,6 +26,7 @@ pub struct Activity {
     sport: Sport,
     statistics: ActivityStatistics,
     rpe: Option<ActivityRpe>,
+    workout_type: Option<WorkoutType>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -39,6 +40,7 @@ impl Activity {
         sport: Sport,
         statistics: ActivityStatistics,
         rpe: Option<ActivityRpe>,
+        workout_type: Option<WorkoutType>,
     ) -> Self {
         Self {
             id,
@@ -48,6 +50,7 @@ impl Activity {
             sport,
             statistics,
             rpe,
+            workout_type,
         }
     }
 
@@ -92,6 +95,10 @@ impl Activity {
     pub fn rpe(&self) -> &Option<ActivityRpe> {
         &self.rpe
     }
+
+    pub fn workout_type(&self) -> &Option<WorkoutType> {
+        &self.workout_type
+    }
 }
 
 #[derive(Clone, Debug, Constructor)]
@@ -135,6 +142,10 @@ impl ActivityWithTimeseries {
 
     pub fn rpe(&self) -> &Option<ActivityRpe> {
         &self.activity.rpe
+    }
+
+    pub fn workout_type(&self) -> &Option<WorkoutType> {
+        &self.activity.workout_type
     }
 
     pub fn timeseries(&self) -> &ActivityTimeseries {
@@ -230,6 +241,34 @@ impl TryFrom<u8> for ActivityRpe {
 impl fmt::Display for ActivityRpe {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value())
+    }
+}
+
+/// Workout type categorizes the nature of a training session.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WorkoutType {
+    Easy,
+    Tempo,
+    Intervals,
+    LongRun,
+    Race,
+}
+
+impl FromStr for WorkoutType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "easy" => Ok(WorkoutType::Easy),
+            "tempo" => Ok(WorkoutType::Tempo),
+            "intervals" => Ok(WorkoutType::Intervals),
+            "long_run" | "longrun" => Ok(WorkoutType::LongRun),
+            "race" => Ok(WorkoutType::Race),
+            _ => Err(format!(
+                "Invalid training type: '{}'. Must be one of: easy, intensity, long_run, race",
+                s
+            )),
+        }
     }
 }
 
@@ -817,6 +856,7 @@ mod tests {
             Sport::Cycling,
             ActivityStatistics::default(),
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -825,6 +865,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
+            None,
             None,
         );
 
@@ -841,6 +882,7 @@ mod tests {
             Sport::Cycling,
             ActivityStatistics::default(),
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -849,6 +891,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
         );
 
@@ -865,6 +908,7 @@ mod tests {
             Sport::Cycling,
             ActivityStatistics::default(),
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -873,6 +917,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
         );
 

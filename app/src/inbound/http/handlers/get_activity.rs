@@ -252,6 +252,7 @@ mod tests {
                             1200.,
                         )])),
                         None,
+                        None,
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![0, 1, 2]),

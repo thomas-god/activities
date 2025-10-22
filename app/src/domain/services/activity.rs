@@ -13,6 +13,7 @@ use crate::domain::{
         DeleteActivityRequest, GetActivityError, IActivityService, ITrainingService,
         ListActivitiesError, ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest,
         RawDataRepository, UpdateActivityRpeError, UpdateActivityRpeRequest,
+        UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
         UpdateMetricsValuesRequest,
     },
 };
@@ -67,6 +68,8 @@ where
             *req.start_time(),
             *req.sport(),
             req.statistics().clone(),
+            // RPE and WorkoutType are set to None for new activities
+            None,
             None,
         );
         let activity_with_timeseries =
@@ -213,6 +216,13 @@ where
         Ok(())
     }
 
+    async fn update_activity_workout_type(
+        &self,
+        _req: UpdateActivityWorkoutTypeRequest,
+    ) -> Result<(), UpdateActivityWorkoutTypeError> {
+        todo!()
+    }
+
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
         let Ok(Some(activity)) = self
             .activity_repository
@@ -307,6 +317,11 @@ pub mod test_utils {
                 req: UpdateActivityRpeRequest,
             ) -> Result<(), UpdateActivityRpeError>;
 
+            async fn update_activity_workout_type(
+                &self,
+                _req: UpdateActivityWorkoutTypeRequest,
+            ) -> Result<(), UpdateActivityWorkoutTypeError>;
+
             async fn delete_activity(
                 &self,
                 req: DeleteActivityRequest,
@@ -337,6 +352,7 @@ pub mod test_utils {
                     Sport::Running,
                     ActivityStatistics::default(),
                     None,
+                    None,
                 ))
             });
         }
@@ -353,6 +369,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
+                    None,
                     None,
                 ))
             });
@@ -422,6 +439,12 @@ pub mod test_utils {
                 id: &ActivityId,
                 rpe: Option<crate::domain::models::activity::ActivityRpe>,
             ) -> Result<(), anyhow::Error>;
+
+            async fn update_activity_workout_type(
+                &self,
+                id: &ActivityId,
+                workout_type: Option<crate::domain::models::activity::WorkoutType>,
+            ) ->Result<(), anyhow::Error>;
 
             async fn delete_activity(
                 &self,
@@ -650,6 +673,7 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 None,
+                None,
             )))
         });
 
@@ -684,6 +708,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
             )))
         });
@@ -726,6 +751,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
             )))
         });
@@ -797,6 +823,7 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 None,
+                None,
             )))
         });
 
@@ -860,6 +887,7 @@ mod tests_activity_service {
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
                 None,
+                None,
             )))
         });
 
@@ -896,6 +924,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
             )))
         });
