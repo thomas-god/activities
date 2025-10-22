@@ -11,8 +11,9 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::activity::{
-            Activity, ActivityId, ActivityStatistic, ActivityTimeseries, ActivityWithTimeseries,
-            Lap, Sport, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+            Activity, ActivityId, ActivityNutrition, ActivityStatistic, ActivityTimeseries,
+            ActivityWithTimeseries, Lap, Sport, Timeseries, TimeseriesMetric, TimeseriesValue,
+            ToUnit, Unit,
         },
         ports::{IActivityService, ITrainingService},
     },
@@ -35,8 +36,24 @@ pub struct ResponseBody {
     start_time: DateTime<FixedOffset>,
     rpe: Option<u8>,
     workout_type: Option<String>,
+    nutrition: Option<NutritionBody>,
     statistics: HashMap<String, f64>,
     timeseries: ActivityTimeseriesBody,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct NutritionBody {
+    bonk_status: String,
+    details: Option<String>,
+}
+
+impl From<&ActivityNutrition> for NutritionBody {
+    fn from(nutrition: &ActivityNutrition) -> Self {
+        Self {
+            bonk_status: nutrition.bonk_status().to_string(),
+            details: nutrition.details().map(|d| d.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -100,6 +117,7 @@ impl From<&ActivityWithTimeseries> for ResponseBody {
                 .cloned(),
             rpe: activity.rpe().as_ref().map(|r| u8::from(*r)),
             workout_type: activity.workout_type().map(|wt| wt.to_string()),
+            nutrition: activity.nutrition().as_ref().map(NutritionBody::from),
             statistics: activity.statistics().items(),
             timeseries: activity.timeseries().into(),
         }
@@ -310,6 +328,7 @@ mod tests {
                     .unwrap(),
                 rpe: None,
                 workout_type: None,
+                nutrition: None,
                 statistics: HashMap::from([("Duration".to_string(), 1200.)]),
                 timeseries: ActivityTimeseriesBody {
                     time: vec![0, 1, 2],

@@ -3,10 +3,16 @@ import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
+import { BONK_STATUS_VALUES } from '$lib/nutrition';
 
 // =============================================================================
 // Schemas
 // =============================================================================
+
+const NutritionSchema = z.object({
+	bonk_status: z.enum(BONK_STATUS_VALUES),
+	details: z.string().nullable()
+});
 
 const ActivityListItemSchema = z.object({
 	id: z.string(),
@@ -30,6 +36,7 @@ const ActivityDetailsSchema = z.object({
 	start_time: z.iso.datetime({ offset: true }),
 	rpe: z.number().min(1).max(10).nullable(),
 	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
+	nutrition: NutritionSchema.nullable(),
 	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),

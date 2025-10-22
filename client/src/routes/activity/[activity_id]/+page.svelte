@@ -7,6 +7,7 @@
 	import EditableString from '../../../molecules/EditableString.svelte';
 	import EditableRpe from '../../../molecules/EditableRpe.svelte';
 	import EditableWorkoutType from '../../../molecules/EditableWorkoutType.svelte';
+	import EditableNutrition from '../../../molecules/EditableNutrition.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
@@ -14,6 +15,7 @@
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import type { WorkoutType } from '$lib/workout-type';
+	import type { Nutrition } from '$lib/nutrition';
 
 	let { data }: PageProps = $props();
 
@@ -131,6 +133,36 @@
 		}
 	};
 
+	const updateActivityNutritionCallback = async (newNutrition: Nutrition | null) => {
+		const params = new URLSearchParams();
+
+		if (newNutrition === null) {
+			params.set('bonk_status', '');
+		} else {
+			params.set('bonk_status', newNutrition.bonk_status);
+			if (newNutrition.details) {
+				params.set('nutrition_details', newNutrition.details);
+			}
+		}
+
+		const res = await fetch(
+			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?${params.toString()}`,
+			{
+				method: 'PATCH',
+				credentials: 'include'
+			}
+		);
+
+		if (res.status === 401) {
+			goto('/login');
+		}
+
+		// Update local state
+		if (res.ok) {
+			data.activity.nutrition = newNutrition;
+		}
+	};
+
 	const categoryClass = (category: SportCategory | null): string => {
 		if (category === 'Running') {
 			return 'running';
@@ -201,6 +233,11 @@
 			<EditableWorkoutType
 				workoutType={data.activity.workout_type}
 				editCallback={updateActivityWorkoutTypeCallback}
+			/>
+			<div class="divider my-0"></div>
+			<EditableNutrition
+				nutrition={data.activity.nutrition}
+				editCallback={updateActivityNutritionCallback}
 			/>
 		</div>
 	</div>
