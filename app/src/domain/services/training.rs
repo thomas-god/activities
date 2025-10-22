@@ -701,6 +701,7 @@ mod tests_training_metrics_service {
                         )])),
                         None,
                         None,
+                        None,
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![]),
@@ -775,6 +776,7 @@ mod tests_training_metrics_service {
                 ActivityStartTime::from_timestamp(1200).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 12.)])),
+                None,
                 None,
                 None,
             )])
@@ -1111,6 +1113,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1129,6 +1132,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1145,6 +1149,7 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
             ),
@@ -1214,6 +1219,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1232,6 +1238,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1248,6 +1255,7 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
             ),
@@ -1323,6 +1331,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1341,6 +1350,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             Activity::new(
                 ActivityId::new(),
@@ -1357,6 +1367,7 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
             ),
@@ -1442,6 +1453,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             // Inside period
             Activity::new(
@@ -1461,6 +1473,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             // After period
             Activity::new(
@@ -1478,6 +1491,7 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
             ),
@@ -1555,6 +1569,7 @@ mod test_training_service_period {
                 ActivityStatistics::default(),
                 None,
                 None,
+                None,
             ),
             // Today - should be included (this is the bug we're fixing)
             Activity::new(
@@ -1573,6 +1588,7 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
             ),

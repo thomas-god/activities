@@ -130,6 +130,7 @@ where
                     statistics,
                     rpe,
                     workout_type,
+                    None, // TODO: Load nutrition from database
                 )))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -200,6 +201,7 @@ where
                                 statistics,
                                 rpe,
                                 workout_type,
+                                None, // TODO: Load nutrition from database
                             )
                         },
                     )
@@ -391,6 +393,7 @@ mod test_sqlite_activity_repository {
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             None,
             None,
+            None,
         )
     }
 
@@ -402,6 +405,7 @@ mod test_sqlite_activity_repository {
             ActivityStartTime::new(*start),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            None,
             None,
             None,
         )

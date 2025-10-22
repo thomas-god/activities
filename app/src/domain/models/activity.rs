@@ -27,6 +27,7 @@ pub struct Activity {
     statistics: ActivityStatistics,
     rpe: Option<ActivityRpe>,
     workout_type: Option<WorkoutType>,
+    nutrition: Option<ActivityNutrition>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -41,6 +42,7 @@ impl Activity {
         statistics: ActivityStatistics,
         rpe: Option<ActivityRpe>,
         workout_type: Option<WorkoutType>,
+        nutrition: Option<ActivityNutrition>,
     ) -> Self {
         Self {
             id,
@@ -51,6 +53,7 @@ impl Activity {
             statistics,
             rpe,
             workout_type,
+            nutrition,
         }
     }
 
@@ -99,6 +102,10 @@ impl Activity {
     pub fn workout_type(&self) -> &Option<WorkoutType> {
         &self.workout_type
     }
+
+    pub fn nutrition(&self) -> &Option<ActivityNutrition> {
+        &self.nutrition
+    }
 }
 
 #[derive(Clone, Debug, Constructor)]
@@ -146,6 +153,10 @@ impl ActivityWithTimeseries {
 
     pub fn workout_type(&self) -> &Option<WorkoutType> {
         &self.activity.workout_type
+    }
+
+    pub fn nutrition(&self) -> &Option<ActivityNutrition> {
+        &self.activity.nutrition
     }
 
     pub fn timeseries(&self) -> &ActivityTimeseries {
@@ -282,6 +293,58 @@ impl fmt::Display for WorkoutType {
             WorkoutType::Race => "race",
         };
         write!(f, "{}", s)
+    }
+}
+
+/// Bonk status indicates whether the athlete experienced a bonk (energy depletion) during the activity.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BonkStatus {
+    /// No bonk occurred
+    None,
+    /// Bonk occurred - athlete experienced energy depletion
+    Bonked,
+}
+
+impl FromStr for BonkStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" => Ok(BonkStatus::None),
+            "bonked" => Ok(BonkStatus::Bonked),
+            _ => Err(format!(
+                "Invalid bonk status: '{}'. Must be one of: none, bonked",
+                s
+            )),
+        }
+    }
+}
+
+impl fmt::Display for BonkStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            BonkStatus::None => "none",
+            BonkStatus::Bonked => "bonked",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+/// Nutrition and hydration tracking for an activity.
+/// Includes bonk status and optional details about nutrition/hydration intake.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Constructor)]
+pub struct ActivityNutrition {
+    bonk_status: BonkStatus,
+    details: Option<String>,
+}
+
+impl ActivityNutrition {
+    pub fn bonk_status(&self) -> BonkStatus {
+        self.bonk_status
+    }
+
+    pub fn details(&self) -> Option<&str> {
+        self.details.as_deref()
     }
 }
 
@@ -870,6 +933,7 @@ mod tests {
             ActivityStatistics::default(),
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -878,6 +942,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
+            None,
             None,
             None,
         );
@@ -896,6 +961,7 @@ mod tests {
             ActivityStatistics::default(),
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -904,6 +970,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
             None,
         );
@@ -922,6 +989,7 @@ mod tests {
             ActivityStatistics::default(),
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -930,6 +998,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
             None,
         );
@@ -969,6 +1038,21 @@ mod tests {
         assert!(ActivityRpe::One < ActivityRpe::Five);
         assert!(ActivityRpe::Five < ActivityRpe::Ten);
         assert_eq!(ActivityRpe::Seven, ActivityRpe::Seven);
+    }
+
+    #[test]
+    fn test_bonk_status_from_str() {
+        assert_eq!(BonkStatus::from_str("none").unwrap(), BonkStatus::None);
+        assert_eq!(BonkStatus::from_str("bonked").unwrap(), BonkStatus::Bonked);
+        assert_eq!(BonkStatus::from_str("NONE").unwrap(), BonkStatus::None);
+        assert_eq!(BonkStatus::from_str("BONKED").unwrap(), BonkStatus::Bonked);
+        assert!(BonkStatus::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn test_bonk_status_display() {
+        assert_eq!(BonkStatus::None.to_string(), "none");
+        assert_eq!(BonkStatus::Bonked.to_string(), "bonked");
     }
 }
 
