@@ -54,7 +54,7 @@
 			</button>
 			{#each rpeValues as value}
 				<button
-					class={`btn btn-sm ${rpe === value ? `${getButtonColor(value)} border-base-content border-2` : getButtonColor(value)}`}
+					class={`btn btn-sm ${rpe === value ? `${getButtonColor(value)} border-2 border-base-content` : getButtonColor(value)}`}
 					onclick={() => (rpe = value)}
 				>
 					{value}
@@ -70,7 +70,7 @@
 	<div class="flex items-center gap-2">
 		<div class="text-sm font-medium">RPE:</div>
 		<span class={`badge ${getRpeColor(rpe)}`}>{getRpeLabel(rpe)}</span>
-		<button class="btn btn-ghost btn-sm opacity-75" onclick={() => (editMode = true)}> ✏️ </button>
+		<button class="btn opacity-75 btn-ghost btn-sm" onclick={() => (editMode = true)}> ✏️ </button>
 	</div>
 {/if}
 

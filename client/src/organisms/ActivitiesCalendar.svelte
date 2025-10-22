@@ -13,6 +13,9 @@
 		onMonthChange?: (month: ReturnType<typeof dayjs>) => void;
 	} = $props();
 
+	// Track selected day for mobile view
+	let selectedDay = $state<string | null>(null);
+
 	// Compute activities grouped by date
 	let activitiesByDate = $derived.by(() => {
 		const grouped = new Map<string, typeof activityList>();
@@ -103,11 +106,20 @@
 		}
 		return 'other';
 	};
+
+	const handleDayClick = (dateKey: string) => {
+		selectedDay = selectedDay === dateKey ? null : dateKey;
+	};
+
+	// Get activities for selected day
+	const selectedDayActivities = $derived(
+		selectedDay ? activitiesByDate.get(selectedDay) || [] : []
+	);
 </script>
 
 <div class="rounded-box bg-base-100 shadow-md">
 	<!-- Calendar Header -->
-	<div class="flex items-center justify-between border-b border-base-300 p-2 sm:p-4">
+	<div class="border-base-300 flex items-center justify-between border-b p-2 sm:p-4">
 		<div class="flex items-center gap-1 sm:gap-2">
 			<button onclick={previousMonth} class="btn btn-square btn-ghost btn-xs sm:btn-sm">
 				<span class="text-lg">‹</span>
@@ -122,7 +134,7 @@
 			type="month"
 			value={monthInputValue}
 			oninput={handleMonthInput}
-			class="input input-sm input-ghost text-center text-base font-semibold sm:input-md sm:text-lg"
+			class="input input-sm input-ghost sm:input-md text-center text-base font-semibold sm:text-lg"
 		/>
 
 		<button onclick={goToToday} class="btn btn-ghost btn-xs sm:btn-sm">Today</button>
@@ -141,23 +153,29 @@
 		<div class="grid grid-cols-7 gap-1 sm:gap-2">
 			{#each calendarDays as day}
 				<div
-					class="min-h-16 rounded-lg border p-1 transition-colors hover:bg-base-200 sm:min-h-24 sm:p-2 {day.isCurrentMonth
+					role="button"
+					tabindex={day.isCurrentMonth ? 0 : -1}
+					onclick={() => handleDayClick(day.dateKey)}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							handleDayClick(day.dateKey);
+						}
+					}}
+					class="hover:bg-base-200 min-h-16 cursor-pointer rounded-lg border p-1 transition-colors sm:min-h-24 sm:p-2 {day.isCurrentMonth
 						? 'border-base-300 bg-base-100'
-						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday ? 'ring-2 ring-primary' : ''}"
+						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday
+						? 'ring-primary ring-2'
+						: ''} {selectedDay === day.dateKey ? 'ring-secondary ring-2' : ''}"
 				>
 					<div class="mb-1 flex items-center justify-between">
 						<span
 							class="text-xs font-medium sm:text-sm {day.isToday
-								? 'flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-content sm:h-6 sm:w-6'
+								? 'bg-primary text-primary-content flex h-5 w-5 items-center justify-center rounded-full sm:h-6 sm:w-6'
 								: ''}"
 						>
 							{day.day}
 						</span>
-						<!-- {#if day.activities.length > 0}
-							<span class="badge badge-xs badge-primary hidden sm:flex"
-								>{day.activities.length}</span
-							>
-						{/if} -->
 					</div>
 
 					<!-- Activities for this day -->
@@ -178,7 +196,7 @@
 						{#each day.activities.slice(0, 3) as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class={`activity-details flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
+								class={`activity-details bg-base-200 hover:bg-base-300 flex items-center gap-1 rounded-md px-2 py-1 text-xs ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-base leading-none">
 									{getSportCategoryIcon(activity.sport_category)}
@@ -198,6 +216,51 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- Mobile: Selected Day Activities Card -->
+		{#if selectedDay}
+			<div class="bg-base-200 mt-4 rounded-lg p-4 sm:hidden">
+				<div class="mb-3 flex items-center justify-between">
+					<h3 class="text-base font-semibold">
+						{dayjs(selectedDay).format('dddd, MMMM D')}
+					</h3>
+					<button
+						onclick={() => (selectedDay = null)}
+						class="btn btn-circle btn-ghost btn-sm"
+						aria-label="Close"
+					>
+						✕
+					</button>
+				</div>
+				{#if selectedDayActivities.length > 0}
+					<div class="flex flex-col gap-2">
+						{#each selectedDayActivities as activity}
+							<a
+								href={`/activity/${activity.id}`}
+								class={`activity-card bg-base-100 hover:bg-base-300 flex items-center gap-3 rounded-lg p-3 transition-colors ${activitySportCategoryClass(activity.sport_category)}`}
+							>
+								<span class="text-2xl leading-none">
+									{getSportCategoryIcon(activity.sport_category)}
+								</span>
+								<div class="flex-1">
+									<div class="font-medium">
+										{activity.name || activity.sport}
+									</div>
+									<div class="text-xs opacity-60">
+										{dayjs(activity.start_time).format('HH:mm')} • {formatDuration(
+											activity.duration
+										)}
+									</div>
+								</div>
+								<span class="text-lg opacity-40">›</span>
+							</a>
+						{/each}
+					</div>
+				{:else}
+					<div class="py-4 text-center opacity-60">No activities on this day</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -225,6 +288,20 @@
 		}
 		&.other {
 			background-color: var(--color-other);
+		}
+	}
+
+	.activity-card {
+		border-left-width: 4px;
+
+		&.running {
+			border-left-color: var(--color-running);
+		}
+		&.cycling {
+			border-left-color: var(--color-cycling);
+		}
+		&.other {
+			border-left-color: var(--color-other);
 		}
 	}
 </style>
