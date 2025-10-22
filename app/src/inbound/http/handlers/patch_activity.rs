@@ -7,10 +7,13 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::activity::{ActivityId, ActivityName, ActivityRpe, WorkoutType},
+        models::activity::{
+            ActivityId, ActivityName, ActivityNutrition, ActivityRpe, BonkStatus, WorkoutType,
+        },
         ports::{
             IActivityService, ITrainingService, ModifyActivityError, ModifyActivityRequest,
-            UpdateActivityRpeError, UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
+            UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
+            UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
             UpdateActivityWorkoutTypeRequest,
         },
     },
@@ -50,6 +53,15 @@ impl From<UpdateActivityWorkoutTypeError> for StatusCode {
     }
 }
 
+impl From<UpdateActivityNutritionError> for StatusCode {
+    fn from(value: UpdateActivityNutritionError) -> Self {
+        match value {
+            UpdateActivityNutritionError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
+            _ => Self::UNPROCESSABLE_ENTITY,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PatchActivityQuery {
     /// Optional new name for the activity
@@ -60,6 +72,11 @@ pub struct PatchActivityQuery {
     /// Optional workout type: easy, tempo, intervals, long_run, or race
     /// Use empty string to clear/remove the workout type
     workout_type: Option<String>,
+    /// Optional bonk status: none or bonked
+    /// Use empty string to clear/remove the nutrition info
+    bonk_status: Option<String>,
+    /// Optional nutrition details/notes
+    nutrition_details: Option<String>,
 }
 
 /// Handler for PATCH /api/activity/{activity_id}
@@ -68,6 +85,8 @@ pub struct PatchActivityQuery {
 /// - `name`: Change the activity name (query parameter)
 /// - `rpe`: Set RPE from 1-10, or use 0 to clear it (query parameter)
 /// - `workout_type`: Set workout type (easy, tempo, intervals, long_run, race), or empty string to clear (query parameter)
+/// - `bonk_status`: Set bonk status (none, bonked), or empty string to clear nutrition info (query parameter)
+/// - `nutrition_details`: Optional details about nutrition/hydration (query parameter)
 ///
 /// # Example
 /// PATCH /api/activity/123?rpe=7
@@ -75,6 +94,9 @@ pub struct PatchActivityQuery {
 /// PATCH /api/activity/123?rpe=0  // Clear RPE
 /// PATCH /api/activity/123?workout_type=intervals
 /// PATCH /api/activity/123?workout_type=  // Clear workout type
+/// PATCH /api/activity/123?bonk_status=bonked&nutrition_details=Forgot%20to%20eat
+/// PATCH /api/activity/123?bonk_status=none
+/// PATCH /api/activity/123?bonk_status=  // Clear nutrition info
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
@@ -144,6 +166,34 @@ pub async fn patch_activity<
             .map_err(StatusCode::from)?;
     }
 
+    // Update activity nutrition if bonk_status is provided
+    if let Some(bonk_status_str) = query.bonk_status {
+        let nutrition = if bonk_status_str.is_empty() {
+            None
+        } else {
+            let bonk_status = bonk_status_str
+                .parse::<BonkStatus>()
+                .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+            // If nutrition_details is provided and not empty, use it; otherwise None
+            let details = query.nutrition_details.filter(|d| !d.is_empty());
+
+            Some(ActivityNutrition::new(bonk_status, details))
+        };
+
+        let req = UpdateActivityNutritionRequest::new(
+            user.user().clone(),
+            ActivityId::from(&activity_id),
+            nutrition,
+        );
+
+        state
+            .activity_service
+            .update_activity_nutrition(req)
+            .await
+            .map_err(StatusCode::from)?;
+    }
+
     Ok(StatusCode::OK)
 }
 
@@ -158,6 +208,8 @@ mod tests {
             name: None,
             rpe: Some(0),
             workout_type: None,
+            bonk_status: None,
+            nutrition_details: None,
         };
         assert_eq!(query.rpe, Some(0));
     }
@@ -215,7 +267,46 @@ mod tests {
             name: None,
             rpe: None,
             workout_type: Some(String::new()),
+            bonk_status: None,
+            nutrition_details: None,
         };
         assert_eq!(query.workout_type, Some(String::new()));
+    }
+
+    #[test]
+    fn test_bonk_status_valid_values() {
+        // Test that valid bonk status values can be parsed
+        let valid_statuses = ["none", "bonked"];
+        for status in valid_statuses {
+            let result = status.parse::<BonkStatus>();
+            assert!(result.is_ok(), "Bonk status '{}' should be valid", status);
+        }
+    }
+
+    #[test]
+    fn test_bonk_status_invalid_values() {
+        // Test that invalid bonk status values are rejected
+        let invalid_statuses = ["invalid", "mild", "severe", "123"];
+        for status in invalid_statuses {
+            let result = status.parse::<BonkStatus>();
+            assert!(
+                result.is_err(),
+                "Bonk status '{}' should be invalid",
+                status
+            );
+        }
+    }
+
+    #[test]
+    fn test_bonk_status_empty_string() {
+        // Test that empty string is handled (should clear nutrition)
+        let query = PatchActivityQuery {
+            name: None,
+            rpe: None,
+            workout_type: None,
+            bonk_status: Some(String::new()),
+            nutrition_details: None,
+        };
+        assert_eq!(query.bonk_status, Some(String::new()));
     }
 }
