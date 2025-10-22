@@ -6,12 +6,14 @@
 	import { goto } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';
 	import EditableRpe from '../../../molecules/EditableRpe.svelte';
+	import EditableWorkoutType from '../../../molecules/EditableWorkoutType.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
 	import ActivityLaps, { type LapMetric } from '../../../organisms/ActivityLaps.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
+	import type { WorkoutType } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -109,6 +111,26 @@
 		}
 	};
 
+	const updateActivityWorkoutTypeCallback = async (newWorkoutType: WorkoutType | null) => {
+		const workoutTypeParam = newWorkoutType === null ? '' : newWorkoutType;
+		const res = await fetch(
+			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?workout_type=${encodeURIComponent(workoutTypeParam)}`,
+			{
+				method: 'PATCH',
+				credentials: 'include'
+			}
+		);
+
+		if (res.status === 401) {
+			goto('/login');
+		}
+
+		// Update local state
+		if (res.ok) {
+			data.activity.workout_type = newWorkoutType;
+		}
+	};
+
 	const categoryClass = (category: SportCategory | null): string => {
 		if (category === 'Running') {
 			return 'running';
@@ -173,7 +195,14 @@
 	</div>
 
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
-		<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
+		<div class="flex flex-col gap-3">
+			<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
+			<div class="divider my-0"></div>
+			<EditableWorkoutType
+				workoutType={data.activity.workout_type}
+				editCallback={updateActivityWorkoutTypeCallback}
+			/>
+		</div>
 	</div>
 
 	<div>

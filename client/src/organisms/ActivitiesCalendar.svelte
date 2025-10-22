@@ -119,7 +119,7 @@
 
 <div class="rounded-box bg-base-100 shadow-md">
 	<!-- Calendar Header -->
-	<div class="border-base-300 flex items-center justify-between border-b p-2 sm:p-4">
+	<div class="flex items-center justify-between border-b border-base-300 p-2 sm:p-4">
 		<div class="flex items-center gap-1 sm:gap-2">
 			<button onclick={previousMonth} class="btn btn-square btn-ghost btn-xs sm:btn-sm">
 				<span class="text-lg">‹</span>
@@ -134,7 +134,7 @@
 			type="month"
 			value={monthInputValue}
 			oninput={handleMonthInput}
-			class="input input-sm input-ghost sm:input-md text-center text-base font-semibold sm:text-lg"
+			class="input input-sm input-ghost text-center text-base font-semibold sm:input-md sm:text-lg"
 		/>
 
 		<button onclick={goToToday} class="btn btn-ghost btn-xs sm:btn-sm">Today</button>
@@ -162,16 +162,16 @@
 							handleDayClick(day.dateKey);
 						}
 					}}
-					class="hover:bg-base-200 min-h-16 cursor-pointer rounded-lg border p-1 transition-colors sm:min-h-24 sm:p-2 {day.isCurrentMonth
+					class="min-h-16 cursor-pointer rounded-lg border p-1 transition-colors hover:bg-base-200 sm:min-h-24 sm:p-2 {day.isCurrentMonth
 						? 'border-base-300 bg-base-100'
 						: 'border-base-200 bg-base-200 opacity-40'} {day.isToday
-						? 'ring-primary ring-2'
-						: ''} {selectedDay === day.dateKey ? 'ring-secondary ring-2' : ''}"
+						? 'ring-2 ring-primary'
+						: ''} {selectedDay === day.dateKey ? 'ring-2 ring-secondary' : ''}"
 				>
 					<div class="mb-1 flex items-center justify-between">
 						<span
 							class="text-xs font-medium sm:text-sm {day.isToday
-								? 'bg-primary text-primary-content flex h-5 w-5 items-center justify-center rounded-full sm:h-6 sm:w-6'
+								? 'flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-content sm:h-6 sm:w-6'
 								: ''}"
 						>
 							{day.day}
@@ -196,7 +196,7 @@
 						{#each day.activities.slice(0, 3) as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class={`activity-details bg-base-200 hover:bg-base-300 flex items-center gap-1 rounded-md px-2 py-1 text-xs ${activitySportCategoryClass(activity.sport_category)}`}
+								class={`activity-details flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-base leading-none">
 									{getSportCategoryIcon(activity.sport_category)}
@@ -219,7 +219,7 @@
 
 		<!-- Mobile: Selected Day Activities Card -->
 		{#if selectedDay}
-			<div class="bg-base-200 mt-4 rounded-lg p-4 sm:hidden">
+			<div class="mt-4 rounded-lg bg-base-200 p-4 sm:hidden">
 				<div class="mb-3 flex items-center justify-between">
 					<h3 class="text-base font-semibold">
 						{dayjs(selectedDay).format('dddd, MMMM D')}
@@ -237,7 +237,7 @@
 						{#each selectedDayActivities as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class={`activity-card bg-base-100 hover:bg-base-300 flex items-center gap-3 rounded-lg p-3 transition-colors ${activitySportCategoryClass(activity.sport_category)}`}
+								class={`activity-card flex items-center gap-3 rounded-lg bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-2xl leading-none">
 									{getSportCategoryIcon(activity.sport_category)}

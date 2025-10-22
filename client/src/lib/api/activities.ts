@@ -7,6 +7,8 @@ import { SportCategories, sports } from '$lib/sport';
 // Schemas
 // =============================================================================
 
+const workoutTypes = ['easy', 'tempo', 'intervals', 'long_run', 'race'] as const;
+
 const ActivityListItemSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
@@ -26,6 +28,7 @@ const ActivityDetailsSchema = z.object({
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
 	rpe: z.number().min(1).max(10).nullable(),
+	workout_type: z.enum(workoutTypes).nullable(),
 	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),
@@ -50,6 +53,7 @@ const ActivityDetailsSchema = z.object({
 // Types
 // =============================================================================
 
+export type WorkoutType = (typeof workoutTypes)[number];
 export type ActivityListItem = z.infer<typeof ActivityListItemSchema>;
 export type ActivityList = z.infer<typeof ActivityListSchema>;
 export type ActivityDetails = z.infer<typeof ActivityDetailsSchema>;
