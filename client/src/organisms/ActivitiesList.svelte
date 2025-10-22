@@ -2,10 +2,13 @@
 	import type { ActivityList, ActivityListItem } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
+	import ActivityFilters from '../molecules/ActivityFilters.svelte';
 
 	let { activityList }: { activityList: ActivityList } = $props();
 
-	let historyStartMonth = $derived(dayjs(activityList.at(-1)?.start_time).startOf('month'));
+	let filteredActivityList = $state<ActivityList>(activityList);
+
+	let historyStartMonth = $derived(dayjs(filteredActivityList.at(-1)?.start_time).startOf('month'));
 	let historyEndMonth = dayjs().startOf('month');
 
 	let activitiesByMonth = $derived.by(() => {
@@ -17,26 +20,39 @@
 			date = date.subtract(1, 'month');
 		}
 
-		for (const activity of activityList) {
+		for (const activity of filteredActivityList) {
 			let activityStart = dayjs(activity.start_time).format('MMMM YYYY');
 			activities.get(activityStart)?.push(activity);
 		}
 
 		return activities;
 	});
+
+	const handleFilterChange = (filtered: ActivityList) => {
+		filteredActivityList = filtered;
+	};
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
+	<ActivityFilters activities={activityList} onFilterChange={handleFilterChange} />
 	<div class="flex flex-col gap-2">
-		{#each activitiesByMonth as [month, activities]}
-			<div class="flex flex-col gap-2">
-				<div class="my-3 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
-					{month} - {activities.length} activities
-				</div>
-				{#each activities as activity}
-					<ActivitiesListItem {activity} />
-				{/each}
+		{#if filteredActivityList.length === 0}
+			<div class="py-8 text-center text-base-content/60">
+				No activities match the selected filters
 			</div>
-		{/each}
+		{:else}
+			{#each activitiesByMonth as [month, activities]}
+				{#if activities.length > 0}
+					<div class="flex flex-col gap-2">
+						<div class="my-3 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
+							{month} - {activities.length} activities
+						</div>
+						{#each activities as activity}
+							<ActivitiesListItem {activity} />
+						{/each}
+					</div>
+				{/if}
+			{/each}
+		{/if}
 	</div>
 </div>
