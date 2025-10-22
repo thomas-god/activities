@@ -30,37 +30,17 @@ export const getRpeLabelAsScale = (value: number | null): string => {
  * @returns The CSS class name for the color
  */
 export const getRpeColor = (value: number): string => {
-	if (value <= 3) return 'rpe-easy'; // Easy: 1-3
-	if (value <= 6) return 'rpe-moderate'; // Moderate: 4-6
-	if (value <= 8) return 'rpe-hard'; // Hard: 7-8
-	if (value === 9) return 'rpe-very-hard'; // Very Hard: 9
-	return 'rpe-max'; // Max: 10
+	if (value <= 3) return 'rpe-easy';
+	if (value <= 6) return 'rpe-moderate';
+	if (value <= 8) return 'rpe-hard';
+	if (value === 9) return 'rpe-very-hard';
+	return 'rpe-max';
 };
 
-/**
- * Get the color class for an RPE button
- * @param value - The RPE value (1-10)
- * @returns The CSS class name for the button color
- */
-export const getRpeButtonColor = (value: number): string => {
-	if (value <= 3) return 'rpe-easy'; // Easy: 1-3
-	if (value <= 6) return 'rpe-moderate'; // Moderate: 4-6
-	if (value <= 8) return 'rpe-hard'; // Hard: 7-8
-	if (value === 9) return 'rpe-very-hard'; // Very Hard: 9
-	return 'rpe-max'; // Max: 10
-};
-
-/**
- * Get the color class for an RPE value in badge format (for activity lists)
- * Uses daisyUI badge color classes
- * @param rpe - The RPE value as a string or null
- * @returns The daisyUI badge color class
- */
-export const getRpeBadgeColor = (rpe: string | null): string => {
-	if (rpe === null) return 'badge-ghost';
-	const rpeNum = parseInt(rpe);
-	if (rpeNum <= 3) return 'badge-success';
-	if (rpeNum <= 6) return 'badge-info';
-	if (rpeNum <= 8) return 'badge-warning';
-	return 'badge-error';
+export const getRpeClass = (value: number): string => {
+	if (value <= 3) return 'rpe-easy';
+	if (value <= 6) return 'rpe-moderate';
+	if (value <= 8) return 'rpe-hard';
+	if (value === 9) return 'rpe-very-hard';
+	return 'rpe-max';
 };

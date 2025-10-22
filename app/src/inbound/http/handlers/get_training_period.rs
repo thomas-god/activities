@@ -52,6 +52,8 @@ pub struct ActivityItem {
     distance: Option<f64>,
     elevation: Option<f64>,
     start_time: DateTime<FixedOffset>,
+    rpe: Option<u8>,
+    workout_type: Option<String>,
 }
 
 impl From<&Activity> for ActivityItem {
@@ -74,6 +76,8 @@ impl From<&Activity> for ActivityItem {
                 .statistics()
                 .get(&ActivityStatistic::Elevation)
                 .cloned(),
+            rpe: activity.rpe().map(|rpe| rpe.value()),
+            workout_type: activity.workout_type().map(|wt| wt.to_string()),
         }
     }
 }

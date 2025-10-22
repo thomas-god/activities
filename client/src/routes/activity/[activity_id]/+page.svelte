@@ -13,7 +13,7 @@
 	import ActivityLaps, { type LapMetric } from '../../../organisms/ActivityLaps.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
-	import type { WorkoutType } from '$lib/api';
+	import type { WorkoutType } from '$lib/workout-type';
 
 	let { data }: PageProps = $props();
 

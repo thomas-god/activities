@@ -14,7 +14,9 @@ const ActivityListItemSchema = z.object({
 	sport: z.enum(sports),
 	sport_category: z.enum(SportCategories).nullable(),
 	duration: z.number(),
-	start_time: z.iso.datetime({ offset: true })
+	start_time: z.iso.datetime({ offset: true }),
+	rpe: z.number().min(1).max(10).nullable(),
+	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable()
 });
 
 const ActivityListSchema = z.array(ActivityListItemSchema);

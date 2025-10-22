@@ -46,3 +46,18 @@ export const getWorkoutTypeColor = (value: WorkoutType): string => {
 			return 'workout-race';
 	}
 };
+
+export const getWorkoutTypeClass = (value: WorkoutType): string => {
+	switch (value) {
+		case 'easy':
+			return 'workout-easy';
+		case 'tempo':
+			return 'workout-tempo';
+		case 'intervals':
+			return 'workout-intervals';
+		case 'long_run':
+			return 'workout-long-run';
+		case 'race':
+			return 'workout-race';
+	}
+};

@@ -44,6 +44,8 @@ pub struct ResponseBodyItem {
     name: Option<String>,
     duration: Option<f64>,
     start_time: DateTime<FixedOffset>,
+    rpe: Option<u8>,
+    workout_type: Option<String>,
 }
 
 impl From<&Activity> for ResponseBodyItem {
@@ -58,6 +60,8 @@ impl From<&Activity> for ResponseBodyItem {
                 .statistics()
                 .get(&ActivityStatistic::Duration)
                 .cloned(),
+            rpe: activity.rpe().map(|rpe| rpe.value()),
+            workout_type: activity.workout_type().map(|wt| wt.to_string()),
         }
     }
 }

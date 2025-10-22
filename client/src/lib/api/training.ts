@@ -4,6 +4,7 @@ import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
 import { metricAggregateFunctions } from '$lib/metric';
 import { dayjs } from '$lib/duration';
+import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 
 // =============================================================================
 // Schemas
@@ -34,7 +35,9 @@ const TrainingPeriodActivityItemSchema = z.object({
 		.transform((val) => val ?? 0), // Transform null to 0 for compatibility
 	distance: z.number().nullable(),
 	elevation: z.number().nullable(),
-	start_time: z.string()
+	start_time: z.string(),
+	rpe: z.number().min(1).max(10).nullable(),
+	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable()
 });
 
 const TrainingPeriodDetailsSchema = z.object({

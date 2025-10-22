@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor, getRpeButtonColor } from '$lib/rpe';
+	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '$lib/rpe';
 
 	let {
 		rpe: initialRpe,
@@ -32,7 +32,7 @@
 			</button>
 			{#each RPE_VALUES as value}
 				<button
-					class={`btn btn-sm ${rpe === value ? `${getRpeButtonColor(value)} border-2 border-base-content` : getRpeButtonColor(value)}`}
+					class={`btn btn-sm ${getRpeColor(value)} ${rpe === value ? ` border-2 border-base-content` : ''}`}
 					onclick={() => (rpe = value)}
 				>
 					{value}

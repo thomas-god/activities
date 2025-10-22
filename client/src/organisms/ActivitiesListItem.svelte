@@ -2,6 +2,8 @@
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import type { ActivityListItem } from '$lib/api';
+	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
+	import { getRpeClass } from '$lib/rpe';
 
 	let { activity }: { activity: ActivityListItem } = $props();
 
@@ -22,7 +24,7 @@
 
 <a
 	href={`/activity/${activity.id}`}
-	class={`item flex flex-1 items-center p-3 ${categoryClass(activity.sport_category)}`}
+	class={`item @container flex flex-1 items-center p-3 ${categoryClass(activity.sport_category)}`}
 >
 	<div class={`icon ${categoryClass(activity.sport_category)}`}>
 		{getSportCategoryIcon(activity.sport_category)}
@@ -37,8 +39,22 @@
 			</div>
 		</div>
 	</div>
-	<div class="font-semibold sm:text-lg">
-		{formatDuration(activity.duration)}
+	<div class="flex flex-row items-center justify-center gap-2">
+		{#if activity.workout_type}
+			<span
+				class={`badge hidden badge-sm @md:inline ${getWorkoutTypeClass(activity.workout_type)}`}
+			>
+				{getWorkoutTypeLabel(activity.workout_type)}
+			</span>
+		{/if}
+		{#if activity.rpe}
+			<span class={`badge hidden badge-sm @md:inline ${getRpeClass(activity.rpe)}`}>
+				RPE {activity.rpe}
+			</span>
+		{/if}
+		<span class="font-semibold sm:text-lg">
+			{formatDuration(activity.duration)}
+		</span>
 	</div>
 </a>
 
@@ -90,5 +106,55 @@
 	.icon.other {
 		background: var(--color-other-background);
 		color: var(--color-other);
+	}
+
+	.workout-easy {
+		background-color: var(--color-workout-easy);
+		color: var(--color-workout-easy-text);
+	}
+
+	.workout-tempo {
+		background-color: var(--color-workout-tempo);
+		color: var(--color-workout-tempo-text);
+	}
+
+	.workout-intervals {
+		background-color: var(--color-workout-intervals);
+		color: var(--color-workout-intervals-text);
+	}
+
+	.workout-long-run {
+		background-color: var(--color-workout-long-run);
+		color: var(--color-workout-long-run-text);
+	}
+
+	.workout-race {
+		background-color: var(--color-workout-race);
+		color: var(--color-workout-race-text);
+	}
+
+	.rpe-easy {
+		background-color: var(--color-rpe-easy);
+		color: var(--color-rpe-easy-text);
+	}
+
+	.rpe-moderate {
+		background-color: var(--color-rpe-moderate);
+		color: var(--color-rpe-moderate-text);
+	}
+
+	.rpe-hard {
+		background-color: var(--color-rpe-hard);
+		color: var(--color-rpe-hard-text);
+	}
+
+	.rpe-very-hard {
+		background-color: var(--color-rpe-very-hard);
+		color: var(--color-rpe-very-hard-text);
+	}
+
+	.rpe-max {
+		background-color: var(--color-rpe-max);
+		color: var(--color-rpe-max-text);
 	}
 </style>
