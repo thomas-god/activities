@@ -2,12 +2,11 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
+import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 
 // =============================================================================
 // Schemas
 // =============================================================================
-
-const workoutTypes = ['easy', 'tempo', 'intervals', 'long_run', 'race'] as const;
 
 const ActivityListItemSchema = z.object({
 	id: z.string(),
@@ -28,7 +27,7 @@ const ActivityDetailsSchema = z.object({
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
 	rpe: z.number().min(1).max(10).nullable(),
-	workout_type: z.enum(workoutTypes).nullable(),
+	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
 	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),
@@ -53,7 +52,6 @@ const ActivityDetailsSchema = z.object({
 // Types
 // =============================================================================
 
-export type WorkoutType = (typeof workoutTypes)[number];
 export type ActivityListItem = z.infer<typeof ActivityListItemSchema>;
 export type ActivityList = z.infer<typeof ActivityListSchema>;
 export type ActivityDetails = z.infer<typeof ActivityDetailsSchema>;

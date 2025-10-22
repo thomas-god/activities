@@ -22,16 +22,24 @@
 	/* RPE categories colors */
 	--color-rpe-easy: #bfdbfe; /* blue-200 */
 	--color-rpe-easy-text: #1e3a8a; /* blue-900 */
-
 	--color-rpe-moderate: #bbf7d0; /* green-200 */
 	--color-rpe-moderate-text: #14532d; /* green-900 */
-
 	--color-rpe-hard: #fef08a; /* yellow-200 */
 	--color-rpe-hard-text: #713f12; /* yellow-900 */
-
 	--color-rpe-very-hard: #fed7aa; /* orange-200 */
 	--color-rpe-very-hard-text: #7c2d12; /* orange-900 */
-
 	--color-rpe-max: #fecaca; /* red-200 */
 	--color-rpe-max-text: #7f1d1d; /* red-900 */
+
+	/* Workout type colors */
+	--color-workout-easy: #bbf7d0; /* green-200 */
+	--color-workout-easy-text: #14532d; /* green-900 */
+	--color-workout-tempo: #fef08a; /* yellow-200 */
+	--color-workout-tempo-text: #713f12; /* yellow-900 */
+	--color-workout-intervals: #fecaca; /* red-200 */
+	--color-workout-intervals-text: #7f1d1d; /* red-900 */
+	--color-workout-long-run: #bfdbfe; /* blue-200 */
+	--color-workout-long-run-text: #1e3a8a; /* blue-900 */
+	--color-workout-race: #e9d5ff; /* purple-200 */
+	--color-workout-race-text: #581c87; /* purple-900 */
 }
