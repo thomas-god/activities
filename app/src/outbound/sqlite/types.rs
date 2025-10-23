@@ -11,8 +11,8 @@ use crate::domain::models::{
     },
     training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
-        TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingPeriodId,
-        TrainingPeriodSports,
+        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue,
+        TrainingPeriodId, TrainingPeriodSports,
     },
 };
 
@@ -469,5 +469,43 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityNutrition {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricGroupBy {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricGroupBy {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Sport => "sport",
+            Self::SportCategory => "sport_category",
+            Self::WorkoutType => "workout_type",
+            Self::RpeRange => "rpe_range",
+            Self::Bonked => "bonked",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricGroupBy {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+
+        match s {
+            "sport" => Ok(Self::Sport),
+            "sport_category" => Ok(Self::SportCategory),
+            "workout_type" => Ok(Self::WorkoutType),
+            "rpe_range" => Ok(Self::RpeRange),
+            "bonked" => Ok(Self::Bonked),
+            _ => Err(format!("Unknown GroupBy: {}", s).into()),
+        }
     }
 }

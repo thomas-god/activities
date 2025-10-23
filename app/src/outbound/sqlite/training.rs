@@ -28,8 +28,8 @@ type DefinitionRow = (
     TrainingMetricGranularity,
     TrainingMetricAggregate,
     TrainingMetricFilters,
+    Option<TrainingMetricGroupBy>,
 );
-
 type TrainingPeriodRow = (
     TrainingPeriodId,
     UserId,
@@ -39,6 +39,8 @@ type TrainingPeriodRow = (
     TrainingPeriodSports,
     Option<String>,
 );
+
+const NONE_GROUP: &str = "no_group";
 
 #[derive(Debug, Clone)]
 pub struct SqliteTrainingRepository {
@@ -65,18 +67,20 @@ impl TrainingRepository for SqliteTrainingRepository {
         &self,
         definition: TrainingMetricDefinition,
     ) -> Result<(), SaveTrainingMetricError> {
-        sqlx::query("INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5, ?6);")
-            .bind(definition.id())
-            .bind(definition.user())
-            .bind(definition.source())
-            .bind(definition.granularity())
-            .bind(definition.aggregate())
-            .bind(definition.filters())
-            // TODO: save definition.groupby()
-            .execute(&self.pool)
-            .await
-            .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
-            .map(|_| ())
+        sqlx::query(
+            "INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
+        )
+        .bind(definition.id())
+        .bind(definition.user())
+        .bind(definition.source())
+        .bind(definition.granularity())
+        .bind(definition.aggregate())
+        .bind(definition.filters())
+        .bind(definition.group_by())
+        .execute(&self.pool)
+        .await
+        .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
+        .map(|_| ())
     }
 
     async fn get_definition(
@@ -85,7 +89,7 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
-        SELECT id, user_id, source, granularity, aggregate, filters
+        SELECT id, user_id, source, granularity, aggregate, filters, group_by
         FROM t_training_metrics_definitions
         WHERE id = ?1 LIMIT 1;",
         )
@@ -93,7 +97,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, source, granularity, aggregate, filters)) => {
+            Ok((id, user_id, source, granularity, aggregate, filters, group_by)) => {
                 Ok(Some(TrainingMetricDefinition::new(
                     id,
                     user_id,
@@ -101,8 +105,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                     granularity,
                     aggregate,
                     filters,
-                    // TODO: load groupBy from row
-                    TrainingMetricGroupBy::none(),
+                    group_by,
                 )))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -115,7 +118,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT id, user_id, source, granularity, aggregate, filters
+            "SELECT id, user_id, source, granularity, aggregate, filters, group_by
             FROM t_training_metrics_definitions
             WHERE user_id = ?1;",
         )
@@ -125,18 +128,19 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
         .map(|rows| {
             rows.into_iter()
-                .map(|(id, user_id, source, granularity, aggregate, filters)| {
-                    TrainingMetricDefinition::new(
-                        id,
-                        user_id,
-                        source,
-                        granularity,
-                        aggregate,
-                        filters,
-                        // TODO: load groupBy from row
-                        TrainingMetricGroupBy::none(),
-                    )
-                })
+                .map(
+                    |(id, user_id, source, granularity, aggregate, filters, group_by)| {
+                        TrainingMetricDefinition::new(
+                            id,
+                            user_id,
+                            source,
+                            granularity,
+                            aggregate,
+                            filters,
+                            group_by,
+                        )
+                    },
+                )
                 .collect()
         })
     }
@@ -166,13 +170,15 @@ impl TrainingRepository for SqliteTrainingRepository {
     async fn update_metric_value(
         &self,
         id: &TrainingMetricId,
-        values: (TrainingMetricBin, TrainingMetricValue),
+        value: (TrainingMetricBin, TrainingMetricValue),
     ) -> Result<(), UpdateMetricError> {
-        sqlx::query("INSERT INTO t_training_metrics_values VALUES (?1, ?2, ?3);")
+        let query = sqlx::query("INSERT INTO t_training_metrics_values VALUES (?1, ?2, ?3, ?4);")
             .bind(id)
-            // TOOD: also save bin.group
-            .bind(values.0.granule())
-            .bind(values.1)
+            .bind(value.0.granule())
+            .bind(value.1)
+            .bind(value.0.group().clone().unwrap_or(NONE_GROUP.to_string()));
+
+        query
             .execute(&self.pool)
             .await
             .map(|_| ())
@@ -191,11 +197,11 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError> {
         match sqlx::query_as::<_, (TrainingMetricValue,)>(
             "SELECT value FROM t_training_metrics_values
-            WHERE definition_id = ?1 AND granule = ?2;",
+            WHERE definition_id = ?1 AND granule = ?2 AND bin_group = ?3;",
         )
         .bind(id)
-        // TODO: add bin_key.group() to query
         .bind(bin_key.granule())
+        .bind(bin_key.group().clone().unwrap_or(NONE_GROUP.to_string()))
         .fetch_one(&self.pool)
         .await
         {
@@ -212,9 +218,9 @@ impl TrainingRepository for SqliteTrainingRepository {
         &self,
         id: &TrainingMetricId,
     ) -> Result<TrainingMetricValues, GetTrainingMetricValueError> {
-        sqlx::query_as::<_, (String, TrainingMetricValue)>(
+        sqlx::query_as::<_, (String, Option<String>, TrainingMetricValue)>(
             "
-        SELECT granule, value FROM t_training_metrics_values
+        SELECT granule, bin_group, value FROM t_training_metrics_values
         WHERE definition_id = ?1;",
         )
         .bind(id)
@@ -222,11 +228,23 @@ impl TrainingRepository for SqliteTrainingRepository {
         .await
         .map_err(|err| GetTrainingMetricValueError::Unknown(anyhow!(err)))
         .map(|rows| {
-            TrainingMetricValues::new(HashMap::from_iter(
-                rows.iter()
-                    // TODO: add row's group to TainingMetricBin
-                    .map(|row| (TrainingMetricBin::from_granule(&row.0), row.1.clone())),
-            ))
+            TrainingMetricValues::new(HashMap::from_iter(rows.into_iter().map(
+                |(granule, bin_group, value)| {
+                    (
+                        TrainingMetricBin::new(
+                            granule,
+                            bin_group.and_then(|group| {
+                                if group == NONE_GROUP {
+                                    None
+                                } else {
+                                    Some(group)
+                                }
+                            }),
+                        ),
+                        value,
+                    )
+                },
+            )))
         })
     }
 
@@ -388,6 +406,21 @@ mod test_sqlite_training_repository {
         )
     }
 
+    fn build_metric_definition_with_group_by() -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            TrainingMetricId::new(),
+            UserId::test_default(),
+            ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Max,
+            )),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Max,
+            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            Some(TrainingMetricGroupBy::Sport),
+        )
+    }
+
     #[tokio::test]
     async fn test_save_training_metrics() {
         let db_file = NamedTempFile::new().unwrap();
@@ -401,6 +434,31 @@ mod test_sqlite_training_repository {
             .save_definition(definition)
             .await
             .expect("Should have return Ok");
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metrics_with_group_by() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_group_by();
+
+        repository
+            .save_definition(definition)
+            .await
+            .expect("Should have return Ok");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<TrainingMetricGroupBy>>(
+                "select group_by from t_training_metrics_definitions limit 1;"
+            )
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(TrainingMetricGroupBy::Sport)
+        );
     }
 
     #[tokio::test]
@@ -453,6 +511,29 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let definition = build_metric_definition_with_filters();
+
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let res = repository
+            .get_definition(definition.id())
+            .await
+            .expect("Should have returned OK")
+            .expect("Should have returned Some");
+
+        assert_eq!(res, definition);
+    }
+
+    #[tokio::test]
+    async fn test_get_definition_with_group_by() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_group_by();
 
         repository
             .save_definition(definition.clone())
@@ -529,6 +610,50 @@ mod test_sqlite_training_repository {
             .expect("Should have returned OK");
 
         assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_definitions_with_filters() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_filters();
+
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let res = repository
+            .get_definitions(&UserId::test_default())
+            .await
+            .expect("Should have returned OK");
+
+        assert_eq!(res, vec![definition]);
+    }
+
+    #[tokio::test]
+    async fn test_get_definitions_with_group_by() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_group_by();
+
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let res = repository
+            .get_definitions(&UserId::test_default())
+            .await
+            .expect("Should have returned OK");
+
+        assert_eq!(res, vec![definition]);
     }
 
     #[tokio::test]
@@ -675,17 +800,17 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = (
-            TrainingMetricBin::from_granule("2025-09-24"),
+        let initial_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), None),
             TrainingMetricValue::Max(12.3),
         );
         repository
-            .update_metric_value(definition.id(), new_value)
+            .update_metric_value(definition.id(), initial_value)
             .await
             .expect("Should have return an err");
 
         let new_value = (
-            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricBin::new("2025-09-24".to_string(), None),
             TrainingMetricValue::Max(1342.8),
         );
         repository
@@ -730,7 +855,97 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_metric_values() {
+    async fn test_insert_value_with_group() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_group_by();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let new_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Max(12.3),
+        );
+
+        repository
+            .update_metric_value(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, TrainingMetricValue>(
+                "
+            select value
+            from t_training_metrics_values
+            where definition_id = ?1 and granule = ?2 and bin_group = ?3;"
+            )
+            .bind(definition.id())
+            .bind("2025-09-24")
+            .bind("Cycling")
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            TrainingMetricValue::Max(12.3)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upsert_value_with_group() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition_with_group_by();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let initial_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Max(12.3),
+        );
+
+        repository
+            .update_metric_value(definition.id(), initial_value)
+            .await
+            .expect("Should have return an err");
+
+        let new_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Max(45.6),
+        );
+
+        repository
+            .update_metric_value(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, TrainingMetricValue>(
+                "
+            select value
+            from t_training_metrics_values
+            where definition_id = ?1 and granule = ?2 and bin_group = ?3;"
+            )
+            .bind(definition.id())
+            .bind("2025-09-24")
+            .bind("Cycling")
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            TrainingMetricValue::Max(45.6)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_values() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -743,7 +958,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let new_value = (
-            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricBin::new("2025-09-24".to_string(), None),
             TrainingMetricValue::Max(12.3),
         );
         repository
@@ -752,7 +967,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return an err");
 
         let new_value = (
-            TrainingMetricBin::from_granule("2025-09-25"),
+            TrainingMetricBin::new("2025-09-25".to_string(), None),
             TrainingMetricValue::Max(10.1),
         );
         repository
@@ -768,11 +983,61 @@ mod test_sqlite_training_repository {
                 .as_hash_map(),
             HashMap::from_iter(vec![
                 (
-                    TrainingMetricBin::from_granule("2025-09-24"),
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
                     TrainingMetricValue::Max(12.3)
                 ),
                 (
-                    TrainingMetricBin::from_granule("2025-09-25"),
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(10.1)
+                )
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_values_with_group() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let new_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), None),
+            TrainingMetricValue::Max(12.3),
+        );
+        repository
+            .update_metric_value(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        let new_value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Max(10.1),
+        );
+        repository
+            .update_metric_value(definition.id(), new_value)
+            .await
+            .expect("Should have return an err");
+
+        assert_eq!(
+            repository
+                .get_metric_values(definition.id())
+                .await
+                .expect("Should have returned OK")
+                .as_hash_map(),
+            HashMap::from_iter(vec![
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(12.3)
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
                     TrainingMetricValue::Max(10.1)
                 )
             ])
@@ -793,7 +1058,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let new_value = (
-            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricBin::new("2025-09-24".to_string(), None),
             TrainingMetricValue::Max(12.3),
         );
         repository
@@ -805,7 +1070,51 @@ mod test_sqlite_training_repository {
             repository
                 .get_metric_value(
                     definition.id(),
-                    &TrainingMetricBin::from_granule("2025-09-24"),
+                    &TrainingMetricBin::new("2025-09-24".to_string(), None),
+                )
+                .await
+                .expect("Should have returned OK")
+                .expect("Should have returned Some"),
+            TrainingMetricValue::Max(12.3)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_value_with_group() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let value_different_group = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Max(45.6),
+        );
+        repository
+            .update_metric_value(definition.id(), value_different_group)
+            .await
+            .expect("Should have return an err");
+
+        let value = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+            TrainingMetricValue::Max(12.3),
+        );
+        repository
+            .update_metric_value(definition.id(), value)
+            .await
+            .expect("Should have return an err");
+
+        assert_eq!(
+            repository
+                .get_metric_value(
+                    definition.id(),
+                    &TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
                 )
                 .await
                 .expect("Should have returned OK")
