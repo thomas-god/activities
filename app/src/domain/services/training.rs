@@ -7,8 +7,8 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricId,
-            TrainingMetricValues, TrainingPeriodId,
+            ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricGroupBy,
+            TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
         },
     },
     ports::{
@@ -110,6 +110,7 @@ where
             req.granularity().clone(),
             req.aggregate().clone(),
             req.filters().clone(),
+            TrainingMetricGroupBy::none(),
         );
         self.training_repository
             .save_definition(definition.clone())
@@ -854,6 +855,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )])
         });
         repository
@@ -876,6 +878,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )
         );
         assert!(value.is_empty());
@@ -892,6 +895,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )])
         });
         repository.expect_get_metric_values().returning(|_| {
@@ -917,6 +921,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )
         );
         assert_eq!(*value.get("toto").unwrap(), TrainingMetricValue::Max(0.3));
@@ -954,6 +959,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )))
         });
 
@@ -985,6 +991,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
             )))
         });
         repository

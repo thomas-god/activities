@@ -14,8 +14,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, Sport,
-            SportCategory, TimeseriesMetric, ToUnit, Unit,
+            Activity, ActivityRpeRange, ActivityStartTime, ActivityStatistic,
+            ActivityWithTimeseries, BonkStatus, Sport, SportCategory, TimeseriesMetric, ToUnit,
+            Unit, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -88,6 +89,21 @@ impl TrainingMetricFilters {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrainingMetricGroupBy {
+    Sport,
+    SportCategory,
+    WorkoutType,
+    RpeRange,
+    Bonked,
+}
+
+impl TrainingMetricGroupBy {
+    pub fn none() -> Option<TrainingMetricGroupBy> {
+        None
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     id: TrainingMetricId,
@@ -96,6 +112,7 @@ pub struct TrainingMetricDefinition {
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
     filters: TrainingMetricFilters,
+    group_by: Option<TrainingMetricGroupBy>,
 }
 
 impl TrainingMetricDefinition {
@@ -1090,6 +1107,7 @@ mod test_training_metrics {
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
         );
 
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
@@ -1113,6 +1131,7 @@ mod test_training_metrics {
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            TrainingMetricGroupBy::none(),
         );
 
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
@@ -1133,6 +1152,7 @@ mod test_training_metrics {
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            TrainingMetricGroupBy::none(),
         );
 
         let metrics = metric_definition.compute_values(&activities);

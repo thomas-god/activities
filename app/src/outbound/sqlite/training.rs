@@ -9,9 +9,9 @@ use crate::domain::{
         UserId,
         training::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
-            TrainingMetricValue, TrainingMetricValues, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+            TrainingMetricId, TrainingMetricValue, TrainingMetricValues, TrainingPeriod,
+            TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -92,9 +92,17 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, source, granularity, aggregate, filters)) => Ok(Some(
-                TrainingMetricDefinition::new(id, user_id, source, granularity, aggregate, filters),
-            )),
+            Ok((id, user_id, source, granularity, aggregate, filters)) => {
+                Ok(Some(TrainingMetricDefinition::new(
+                    id,
+                    user_id,
+                    source,
+                    granularity,
+                    aggregate,
+                    filters,
+                    TrainingMetricGroupBy::none(),
+                )))
+            }
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(GetDefinitionError::Unknown(anyhow!(err))),
         }
@@ -123,6 +131,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                         granularity,
                         aggregate,
                         filters,
+                        TrainingMetricGroupBy::none(),
                     )
                 })
                 .collect()
@@ -346,6 +355,7 @@ mod test_sqlite_training_repository {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
         )
     }
 
@@ -360,6 +370,7 @@ mod test_sqlite_training_repository {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            TrainingMetricGroupBy::none(),
         )
     }
 

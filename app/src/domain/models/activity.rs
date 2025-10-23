@@ -255,6 +255,40 @@ impl fmt::Display for ActivityRpe {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActivityRpeRange {
+    Easy,
+    Moderate,
+    Hard,
+    VeryHard,
+    Maximum,
+}
+
+impl From<ActivityRpe> for ActivityRpeRange {
+    fn from(value: ActivityRpe) -> Self {
+        match value {
+            ActivityRpe::One | ActivityRpe::Two | ActivityRpe::Three => Self::Easy,
+            ActivityRpe::Four | ActivityRpe::Five | ActivityRpe::Six => Self::Moderate,
+            ActivityRpe::Seven | ActivityRpe::Eight => Self::Hard,
+            ActivityRpe::Nine => Self::VeryHard,
+            ActivityRpe::Ten => Self::Maximum,
+        }
+    }
+}
+
+impl fmt::Display for ActivityRpeRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match *self {
+            Self::Easy => "easy",
+            Self::Moderate => "moderate",
+            Self::Hard => "hard",
+            Self::VeryHard => "very_hard",
+            Self::Maximum => "maximum",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Workout type categorizes the nature of a training session.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WorkoutType {
