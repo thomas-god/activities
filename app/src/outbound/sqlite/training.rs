@@ -133,6 +133,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                         granularity,
                         aggregate,
                         filters,
+                        // TODO: load groupBy from row
                         TrainingMetricGroupBy::none(),
                     )
                 })

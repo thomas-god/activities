@@ -110,6 +110,7 @@ where
             req.granularity().clone(),
             req.aggregate().clone(),
             req.filters().clone(),
+            // TODO: extract groupBy from request
             TrainingMetricGroupBy::none(),
         );
         self.training_repository

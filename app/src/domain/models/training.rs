@@ -98,6 +98,7 @@ pub enum TrainingMetricGroupBy {
 }
 
 impl TrainingMetricGroupBy {
+    // TODO: should no longer be needed after all todos are resolved ? or just for testing
     pub fn none() -> Option<TrainingMetricGroupBy> {
         None
     }
@@ -170,7 +171,16 @@ impl TrainingMetricDefinition {
             .iter()
             .filter_map(|activity| {
                 if self.filters.matches(activity.activity()) {
-                    self.source.metric_from_activity_with_timeseries(activity)
+                    self.source
+                        .metric_from_activity_with_timeseries(activity)
+                        .map(|value| {
+                            (
+                                self.group_by.as_ref().and_then(|group_by| {
+                                    group_by.extract_group(activity.activity())
+                                }),
+                                value,
+                            )
+                        })
                 } else {
                     None
                 }
@@ -184,7 +194,18 @@ impl TrainingMetricDefinition {
             .iter()
             .filter_map(|activity| {
                 if self.filters.matches(activity) {
-                    self.source.metric_from_activity(activity).ok().flatten()
+                    self.source
+                        .metric_from_activity(activity)
+                        .ok()
+                        .flatten()
+                        .map(|value| {
+                            (
+                                self.group_by
+                                    .as_ref()
+                                    .and_then(|group_by| group_by.extract_group(activity)),
+                                value,
+                            )
+                        })
                 } else {
                     None
                 }
@@ -193,7 +214,10 @@ impl TrainingMetricDefinition {
         self.aggregate_metrics(activity_metrics)
     }
 
-    fn aggregate_metrics(&self, activity_metrics: Vec<ActivityMetric>) -> TrainingMetricValues {
+    fn aggregate_metrics(
+        &self,
+        activity_metrics: Vec<(Option<String>, ActivityMetric)>,
+    ) -> TrainingMetricValues {
         let grouped_metrics = group_metrics_by_bin(&self.granularity, activity_metrics);
         TrainingMetricValues::new(aggregate_metrics(
             &self.granularity_aggregate,
@@ -301,13 +325,13 @@ impl ToUnit for ActivityMetricSource {
 
 fn group_metrics_by_bin(
     granularity: &TrainingMetricGranularity,
-    metrics: Vec<ActivityMetric>,
+    metrics: Vec<(Option<String>, ActivityMetric)>,
 ) -> HashMap<TrainingMetricBin, Vec<ActivityMetric>> {
     let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetric>> = HashMap::new();
-    for value in metrics {
-        // TODO: group by TrainingMetricGroupBy
-        let bin = TrainingMetricBin::from_granule(
-            &granularity.datetime_key(value.activity_start_time.date()),
+    for (group, value) in metrics {
+        let bin = TrainingMetricBin::new(
+            granularity.datetime_key(value.activity_start_time.date()),
+            group,
         );
         grouped_values.entry(bin).or_default().push(value);
     }
@@ -1017,7 +1041,11 @@ mod test_training_metrics {
             ),
             Some(120.),
         );
-        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
+        let metrics = vec![
+            (None, metric_1.clone()),
+            (None, metric_2.clone()),
+            (None, metric_3.clone()),
+        ];
         let granularity = TrainingMetricGranularity::Daily;
 
         let res = group_metrics_by_bin(&granularity, metrics);
@@ -1063,7 +1091,11 @@ mod test_training_metrics {
             ),
             Some(12.),
         );
-        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
+        let metrics = vec![
+            (None, metric_1.clone()),
+            (None, metric_2.clone()),
+            (None, metric_3.clone()),
+        ];
         let granularity = TrainingMetricGranularity::Weekly;
 
         let res = group_metrics_by_bin(&granularity, metrics);
@@ -1109,7 +1141,11 @@ mod test_training_metrics {
             ),
             None,
         );
-        let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
+        let metrics = vec![
+            (None, metric_1.clone()),
+            (None, metric_2.clone()),
+            (None, metric_3.clone()),
+        ];
         let granularity = TrainingMetricGranularity::Monthly;
 
         let res = group_metrics_by_bin(&granularity, metrics);
@@ -1228,6 +1264,61 @@ mod test_training_metrics {
         let metrics = metric_definition.compute_values(&activities);
 
         assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn test_compute_training_metrics_with_group_by() {
+        let activities: Vec<Activity> = vec![default_activity()]
+            .iter()
+            .map(|activity| activity.activity().clone())
+            .collect();
+        let metric_definition = TrainingMetricDefinition::new(
+            TrainingMetricId::default(),
+            UserId::test_default(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+            TrainingMetricFilters::empty(),
+            Some(TrainingMetricGroupBy::Sport),
+        );
+
+        let metrics = metric_definition.compute_values(&activities);
+
+        dbg!(&metrics);
+
+        assert!(
+            metrics
+                .get(&TrainingMetricBin::new(
+                    "2025-09-01".to_string(),
+                    Some("Cycling".to_string())
+                ))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_compute_training_metrics_from_timeseries_with_group_by() {
+        let activities = vec![default_activity()];
+        let metric_definition = TrainingMetricDefinition::new(
+            TrainingMetricId::default(),
+            UserId::test_default(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+            TrainingMetricFilters::empty(),
+            Some(TrainingMetricGroupBy::Sport),
+        );
+
+        let metrics = metric_definition.compute_values_from_timeseries(&activities);
+
+        assert!(
+            metrics
+                .get(&TrainingMetricBin::new(
+                    "2025-09-01".to_string(),
+                    Some("Cycling".to_string())
+                ))
+                .is_some()
+        );
     }
 
     #[test]
