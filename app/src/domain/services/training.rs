@@ -7,8 +7,8 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ComputeMetricRequirement, TrainingMetricDefinition, TrainingMetricGroupBy,
-            TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
+            ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
+            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
         },
     },
     ports::{
@@ -83,7 +83,7 @@ where
         for (key, value) in values.into_iter() {
             let _ = self
                 .training_repository
-                .update_metric_values(definition.id(), (key, value))
+                .update_metric_value(definition.id(), (key, value))
                 .await;
         }
     }
@@ -150,12 +150,14 @@ where
                 else {
                     continue;
                 };
-                let bin_key = definition
-                    .granularity()
-                    .datetime_key(activity.start_time().date());
+                let bin = TrainingMetricBin::from_granule(
+                    &definition
+                        .granularity()
+                        .datetime_key(activity.start_time().date()),
+                );
                 let new_value = match self
                     .training_repository
-                    .get_metric_value(definition.id(), &bin_key)
+                    .get_metric_value(definition.id(), &bin)
                     .await
                 {
                     Ok(Some(previous_value)) => {
@@ -177,7 +179,7 @@ where
                 };
                 let _ = self
                     .training_repository
-                    .update_metric_values(definition.id(), (bin_key, new_value))
+                    .update_metric_value(definition.id(), (bin, new_value))
                     .await;
             }
         }
@@ -522,16 +524,16 @@ pub mod test_utils {
                 user: &UserId,
             ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>;
 
-            async fn update_metric_values(
+            async fn update_metric_value(
                 &self,
                 id: &TrainingMetricId,
-                values: (String, TrainingMetricValue),
+                values: (TrainingMetricBin, TrainingMetricValue),
             ) -> Result<(), UpdateMetricError>;
 
             async fn get_metric_value(
                 &self,
                 id: &TrainingMetricId,
-                bin_key: &str
+                bin: &TrainingMetricBin
             ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>;
 
             async fn get_metric_values(
@@ -663,7 +665,7 @@ mod tests_training_metrics_service {
         let mut background_repository = MockTrainingRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
         background_repository
-            .expect_update_metric_values()
+            .expect_update_metric_value()
             .times(1)
             .returning(|_, _| Ok(()));
         repository
@@ -740,11 +742,11 @@ mod tests_training_metrics_service {
         let mut background_repository = MockTrainingRepository::new();
         repository.expect_save_definition().returning(|_| Ok(()));
         repository
-            .expect_update_metric_values()
+            .expect_update_metric_value()
             .times(2) // 2 day fron initial range
             .returning(|_, _| Ok(()));
         background_repository
-            .expect_update_metric_values()
+            .expect_update_metric_value()
             .times(1) // 3 days in user history - 2 days fron initial range
             .returning(|_, _| Ok(()));
         repository
@@ -808,7 +810,7 @@ mod tests_training_metrics_service {
         repository
             .expect_save_definition()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
-        repository.expect_update_metric_values().times(0);
+        repository.expect_update_metric_value().times(0);
         let mut activities = MockActivityRepository::new();
         activities.expect_list_activities_with_timeseries().times(0);
         let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
@@ -900,7 +902,7 @@ mod tests_training_metrics_service {
         });
         repository.expect_get_metric_values().returning(|_| {
             Ok(TrainingMetricValues::new(HashMap::from([(
-                "toto".to_string(),
+                TrainingMetricBin::from_granule("toto"),
                 TrainingMetricValue::Max(0.3),
             )])))
         });
@@ -924,7 +926,10 @@ mod tests_training_metrics_service {
                 TrainingMetricGroupBy::none(),
             )
         );
-        assert_eq!(*value.get("toto").unwrap(), TrainingMetricValue::Max(0.3));
+        assert_eq!(
+            *value.get(&TrainingMetricBin::from_granule("toto")).unwrap(),
+            TrainingMetricValue::Max(0.3)
+        );
     }
 
     #[tokio::test]

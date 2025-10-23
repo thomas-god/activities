@@ -8,10 +8,10 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-            TrainingMetricId, TrainingMetricValue, TrainingMetricValues, TrainingPeriod,
-            TrainingPeriodId, TrainingPeriodSports,
+            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
+            TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
+            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
+            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -72,6 +72,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .bind(definition.granularity())
             .bind(definition.aggregate())
             .bind(definition.filters())
+            // TODO: save definition.groupby()
             .execute(&self.pool)
             .await
             .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
@@ -100,6 +101,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                     granularity,
                     aggregate,
                     filters,
+                    // TODO: load groupBy from row
                     TrainingMetricGroupBy::none(),
                 )))
             }
@@ -160,14 +162,15 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
-    async fn update_metric_values(
+    async fn update_metric_value(
         &self,
         id: &TrainingMetricId,
-        values: (String, TrainingMetricValue),
+        values: (TrainingMetricBin, TrainingMetricValue),
     ) -> Result<(), UpdateMetricError> {
         sqlx::query("INSERT INTO t_training_metrics_values VALUES (?1, ?2, ?3);")
             .bind(id)
-            .bind(values.0)
+            // TOOD: also save bin.group
+            .bind(values.0.granule())
             .bind(values.1)
             .execute(&self.pool)
             .await
@@ -183,14 +186,15 @@ impl TrainingRepository for SqliteTrainingRepository {
     async fn get_metric_value(
         &self,
         id: &TrainingMetricId,
-        bin_key: &str,
+        bin_key: &TrainingMetricBin,
     ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError> {
         match sqlx::query_as::<_, (TrainingMetricValue,)>(
             "SELECT value FROM t_training_metrics_values
             WHERE definition_id = ?1 AND granule = ?2;",
         )
         .bind(id)
-        .bind(bin_key)
+        // TODO: add bin_key.group() to query
+        .bind(bin_key.granule())
         .fetch_one(&self.pool)
         .await
         {
@@ -200,6 +204,9 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    // TODO: add get_metric_granule_values() to get all bin mathching a give granule, i.e. all
+    // matched groups
+    // TODO: add a daterange filter
     async fn get_metric_values(
         &self,
         id: &TrainingMetricId,
@@ -213,7 +220,13 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(|err| GetTrainingMetricValueError::Unknown(anyhow!(err)))
-        .map(|rows| TrainingMetricValues::new(HashMap::from_iter(rows)))
+        .map(|rows| {
+            TrainingMetricValues::new(HashMap::from_iter(
+                rows.iter()
+                    // TODO: add row's group to TainingMetricBin
+                    .map(|row| (TrainingMetricBin::from_granule(&row.0), row.1.clone())),
+            ))
+        })
     }
 
     async fn save_training_period(
@@ -567,9 +580,12 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         // Insert a value for this definition
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
         assert_eq!(
@@ -619,10 +635,13 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
 
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
@@ -655,15 +674,21 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(1342.8));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(1342.8),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
@@ -690,9 +715,12 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         let id = TrainingMetricId::new();
-        let err = repository.update_metric_values(&id, new_value).await;
+        let err = repository.update_metric_value(&id, new_value).await;
 
         let Err(UpdateMetricError::TrainingMetricDoesNotExists(err_id)) = err else {
             unreachable!("Should have returned an err")
@@ -713,15 +741,21 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
-        let new_value = ("2025-09-25".to_string(), TrainingMetricValue::Max(10.1));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-25"),
+            TrainingMetricValue::Max(10.1),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
@@ -732,8 +766,14 @@ mod test_sqlite_training_repository {
                 .expect("Should have returned OK")
                 .as_hash_map(),
             HashMap::from_iter(vec![
-                ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3)),
-                ("2025-09-25".to_string(), TrainingMetricValue::Max(10.1))
+                (
+                    TrainingMetricBin::from_granule("2025-09-24"),
+                    TrainingMetricValue::Max(12.3)
+                ),
+                (
+                    TrainingMetricBin::from_granule("2025-09-25"),
+                    TrainingMetricValue::Max(10.1)
+                )
             ])
         );
     }
@@ -751,15 +791,21 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
         assert_eq!(
             repository
-                .get_metric_value(definition.id(), "2025-09-24")
+                .get_metric_value(
+                    definition.id(),
+                    &TrainingMetricBin::from_granule("2025-09-24"),
+                )
                 .await
                 .expect("Should have returned OK")
                 .expect("Should have returned Some"),
@@ -780,15 +826,21 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have return Ok");
 
-        let new_value = ("2025-09-24".to_string(), TrainingMetricValue::Max(12.3));
+        let new_value = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Max(12.3),
+        );
         repository
-            .update_metric_values(definition.id(), new_value)
+            .update_metric_value(definition.id(), new_value)
             .await
             .expect("Should have return an err");
 
         assert!(
             repository
-                .get_metric_value(definition.id(), "2025-09-01")
+                .get_metric_value(
+                    definition.id(),
+                    &TrainingMetricBin::from_granule("2025-09-01"),
+                )
                 .await
                 .expect("Should have returned OK")
                 .is_none()

@@ -10,10 +10,10 @@ use crate::domain::models::activity::{
     WorkoutType,
 };
 use crate::domain::models::training::{
-    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
-    TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-    TrainingPeriodWithActivities,
+    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
+    TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue,
+    TrainingMetricValues, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
+    TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -831,16 +831,16 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
     > + Send;
 
-    fn update_metric_values(
+    fn update_metric_value(
         &self,
         id: &TrainingMetricId,
-        values: (String, TrainingMetricValue),
+        values: (TrainingMetricBin, TrainingMetricValue),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
     fn get_metric_value(
         &self,
         id: &TrainingMetricId,
-        bin_key: &str,
+        bin: &TrainingMetricBin,
     ) -> impl Future<Output = Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>> + Send;
 
     fn get_metric_values(

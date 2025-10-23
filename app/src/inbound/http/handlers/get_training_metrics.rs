@@ -7,6 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::{DateTime, FixedOffset, Local};
+use derive_more::Constructor;
 use serde::{Deserialize, Serialize, de};
 use serde_json::json;
 
@@ -15,8 +16,8 @@ use crate::{
         models::{
             activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training::{
-                ActivityMetricSource, TrainingMetricDefinition, TrainingMetricGranularity,
-                TrainingMetricValues,
+                ActivityMetricSource, TrainingMetricBin, TrainingMetricDefinition,
+                TrainingMetricGranularity, TrainingMetricValues,
             },
         },
         ports::{IActivityService, ITrainingService},
@@ -79,13 +80,20 @@ fn fill_metric_values(
     values: TrainingMetricValues,
     range: &MetricsDateRange,
 ) -> HashMap<String, f64> {
-    let bins = granularity.bins_keys(
-        &range.start,
-        &range.end.unwrap_or(Local::now().fixed_offset()),
-    );
+    // TODO: update to still check that all bin.granule in range have at least one value
+    // accross possible groups
+    let bins: Vec<TrainingMetricBin> = granularity
+        .bins_keys(
+            &range.start,
+            &range.end.unwrap_or(Local::now().fixed_offset()),
+        )
+        .iter()
+        .map(|granule| TrainingMetricBin::from_granule(granule))
+        .collect();
+
     HashMap::from_iter(bins.iter().map(|bin| {
         (
-            bin.to_string(),
+            bin.granule().to_string(),
             values
                 .get(bin)
                 .cloned()

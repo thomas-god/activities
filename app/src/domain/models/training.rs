@@ -152,6 +152,10 @@ impl TrainingMetricDefinition {
         &self.filters
     }
 
+    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
+        &self.group_by
+    }
+
     pub fn source_requirement(&self) -> ComputeMetricRequirement {
         self.source.input_min_requirement()
     }
@@ -190,7 +194,7 @@ impl TrainingMetricDefinition {
     }
 
     fn aggregate_metrics(&self, activity_metrics: Vec<ActivityMetric>) -> TrainingMetricValues {
-        let grouped_metrics = group_metrics_by_granularity(&self.granularity, activity_metrics);
+        let grouped_metrics = group_metrics_by_bin(&self.granularity, activity_metrics);
         TrainingMetricValues::new(aggregate_metrics(
             &self.granularity_aggregate,
             grouped_metrics,
@@ -295,22 +299,25 @@ impl ToUnit for ActivityMetricSource {
     }
 }
 
-fn group_metrics_by_granularity(
+fn group_metrics_by_bin(
     granularity: &TrainingMetricGranularity,
     metrics: Vec<ActivityMetric>,
-) -> HashMap<String, Vec<ActivityMetric>> {
-    let mut grouped_values: HashMap<String, Vec<ActivityMetric>> = HashMap::new();
+) -> HashMap<TrainingMetricBin, Vec<ActivityMetric>> {
+    let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetric>> = HashMap::new();
     for value in metrics {
-        let key = granularity.datetime_key(value.activity_start_time.date());
-        grouped_values.entry(key).or_default().push(value);
+        // TODO: group by TrainingMetricGroupBy
+        let bin = TrainingMetricBin::from_granule(
+            &granularity.datetime_key(value.activity_start_time.date()),
+        );
+        grouped_values.entry(bin).or_default().push(value);
     }
     grouped_values
 }
 
 fn aggregate_metrics(
     aggregate: &TrainingMetricAggregate,
-    metrics: HashMap<String, Vec<ActivityMetric>>,
-) -> HashMap<String, TrainingMetricValue> {
+    metrics: HashMap<TrainingMetricBin, Vec<ActivityMetric>>,
+) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
     let mut res = HashMap::new();
 
     for (key, values) in metrics.into_iter() {
@@ -606,19 +613,43 @@ impl TrainingMetricValue {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Constructor)]
+pub struct TrainingMetricBin {
+    granule: String,
+    group: Option<String>,
+}
+
+impl TrainingMetricBin {
+    // TODO: should no longer be required once all todos are resolved ?
+    pub fn from_granule(granule: &str) -> Self {
+        Self {
+            granule: granule.to_string(),
+            group: None,
+        }
+    }
+
+    pub fn granule(&self) -> &str {
+        &self.granule
+    }
+
+    pub fn group(&self) -> &Option<String> {
+        &self.group
+    }
+}
+
 #[derive(Debug, Clone, Constructor, Default)]
-pub struct TrainingMetricValues(HashMap<String, TrainingMetricValue>);
+pub struct TrainingMetricValues(HashMap<TrainingMetricBin, TrainingMetricValue>);
 
 impl TrainingMetricValues {
     pub fn insert(
         &mut self,
-        key: String,
+        key: TrainingMetricBin,
         value: TrainingMetricValue,
     ) -> Option<TrainingMetricValue> {
         self.0.insert(key, value)
     }
 
-    pub fn get(&self, key: &str) -> Option<&TrainingMetricValue> {
+    pub fn get(&self, key: &TrainingMetricBin) -> Option<&TrainingMetricValue> {
         self.0.get(key)
     }
 
@@ -630,20 +661,20 @@ impl TrainingMetricValues {
         self.len() == 0
     }
 
-    pub fn iter(&self) -> Iter<'_, String, TrainingMetricValue> {
+    pub fn iter(&self) -> Iter<'_, TrainingMetricBin, TrainingMetricValue> {
         self.0.iter()
     }
 }
 
 impl TrainingMetricValues {
-    pub fn as_hash_map(self) -> HashMap<String, TrainingMetricValue> {
+    pub fn as_hash_map(self) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
         self.0
     }
 }
 
 impl std::iter::IntoIterator for TrainingMetricValues {
-    type Item = (String, TrainingMetricValue);
-    type IntoIter = std::collections::hash_map::IntoIter<String, TrainingMetricValue>;
+    type Item = (TrainingMetricBin, TrainingMetricValue);
+    type IntoIter = std::collections::hash_map::IntoIter<TrainingMetricBin, TrainingMetricValue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -989,10 +1020,18 @@ mod test_training_metrics {
         let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Daily;
 
-        let res = group_metrics_by_granularity(&granularity, metrics);
+        let res = group_metrics_by_bin(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-03").unwrap(), &vec![metric_1, metric_2]);
-        assert_eq!(res.get("2025-09-04").unwrap(), &vec![metric_3]);
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-09-03"))
+                .unwrap(),
+            &vec![metric_1, metric_2]
+        );
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-09-04"))
+                .unwrap(),
+            &vec![metric_3]
+        );
     }
 
     #[test]
@@ -1027,10 +1066,18 @@ mod test_training_metrics {
         let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Weekly;
 
-        let res = group_metrics_by_granularity(&granularity, metrics);
+        let res = group_metrics_by_bin(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-01").unwrap(), &vec![metric_1, metric_2]);
-        assert_eq!(res.get("2025-09-08").unwrap(), &vec![metric_3]);
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-09-01"))
+                .unwrap(),
+            &vec![metric_1, metric_2]
+        );
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-09-08"))
+                .unwrap(),
+            &vec![metric_3]
+        );
     }
 
     #[test]
@@ -1065,16 +1112,24 @@ mod test_training_metrics {
         let metrics = vec![metric_1.clone(), metric_2.clone(), metric_3.clone()];
         let granularity = TrainingMetricGranularity::Monthly;
 
-        let res = group_metrics_by_granularity(&granularity, metrics);
+        let res = group_metrics_by_bin(&granularity, metrics);
         assert_eq!(res.len(), 2);
-        assert_eq!(res.get("2025-09-01").unwrap(), &vec![metric_1, metric_2]);
-        assert_eq!(res.get("2025-08-01").unwrap(), &vec![metric_3]);
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-09-01"))
+                .unwrap(),
+            &vec![metric_1, metric_2]
+        );
+        assert_eq!(
+            res.get(&TrainingMetricBin::from_granule("2025-08-01"))
+                .unwrap(),
+            &vec![metric_3]
+        );
     }
 
     #[test]
     fn test_aggregate_metrics_min() {
         let metrics = HashMap::from([(
-            "2025-09-01".to_string(),
+            TrainingMetricBin::from_granule("2025-09-01"),
             vec![
                 ActivityMetric::new(
                     12.3,
@@ -1101,7 +1156,8 @@ mod test_training_metrics {
         let res = aggregate_metrics(&aggregate, metrics);
 
         assert_eq!(
-            *res.get("2025-09-01").unwrap(),
+            *res.get(&TrainingMetricBin::from_granule("2025-09-01"))
+                .unwrap(),
             TrainingMetricValue::Min(1.3)
         );
     }
@@ -1125,7 +1181,9 @@ mod test_training_metrics {
         let metrics = metric_definition.compute_values_from_timeseries(&activities);
 
         assert_eq!(
-            *metrics.get("2025-09-01").unwrap(),
+            *metrics
+                .get(&TrainingMetricBin::from_granule("2025-09-01"))
+                .unwrap(),
             TrainingMetricValue::Max(20.)
         );
     }
