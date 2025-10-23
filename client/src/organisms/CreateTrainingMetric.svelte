@@ -18,6 +18,8 @@
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
+	let groupBy: 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' = $state('Sport');
+	let groupBySelected = $state(false);
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
@@ -34,7 +36,13 @@
 	let requestPending = $state(false);
 
 	let metricRequest = $derived.by(() => {
-		let basePayload = { source: statisticSource, granularity, aggregate, filters: {} };
+		let basePayload: {
+			source: typeof statisticSource;
+			granularity: typeof granularity;
+			aggregate: typeof aggregate;
+			filters: {};
+			group_by?: typeof groupBy;
+		} = { source: statisticSource, granularity, aggregate, filters: {} };
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
@@ -45,6 +53,10 @@
 			}));
 			const filters = sportFilter.concat(sportCategoriesFilter);
 			basePayload = { ...basePayload, filters: { sports: filters } };
+		}
+
+		if (groupBySelected) {
+			basePayload = { ...basePayload, group_by: groupBy };
 		}
 
 		return basePayload;
@@ -133,6 +145,22 @@
 			<option value="Sum">Total</option>
 			<option value="Average">Average</option>
 		</select>
+
+		<div class="mt-2">
+			<div class="mb-2 font-semibold">
+				Group by
+				<input type="checkbox" bind:checked={groupBySelected} class="toggle toggle-sm" />
+			</div>
+			{#if groupBySelected}
+				<select class="select" bind:value={groupBy} id="metric-group-by">
+					<option value="Sport">Sport</option>
+					<option value="SportCategory">Sport Category</option>
+					<option value="WorkoutType">Workout Type</option>
+					<option value="RpeRange">RPE Range</option>
+					<option value="Bonked">Bonked</option>
+				</select>
+			{/if}
+		</div>
 
 		<details class="collapse-arrow collapse border border-base-300 bg-base-100" open={false}>
 			<summary class="collapse-title font-semibold">Filters</summary>

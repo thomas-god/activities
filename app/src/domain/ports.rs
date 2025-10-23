@@ -11,9 +11,9 @@ use crate::domain::models::activity::{
 };
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
-    TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId, TrainingMetricValue,
-    TrainingMetricValues, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
-    TrainingPeriodSports, TrainingPeriodWithActivities,
+    TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
+    TrainingMetricValue, TrainingMetricValues, TrainingPeriod, TrainingPeriodCreationError,
+    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -507,6 +507,7 @@ pub struct CreateTrainingMetricRequest {
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
     filters: TrainingMetricFilters,
+    group_by: Option<TrainingMetricGroupBy>,
     initial_date_range: Option<DateRange>,
 }
 
@@ -529,6 +530,10 @@ impl CreateTrainingMetricRequest {
 
     pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
+    }
+
+    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
+        &self.group_by
     }
 
     pub fn initial_date_range(&self) -> &Option<DateRange> {

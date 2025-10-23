@@ -98,11 +98,6 @@ pub enum TrainingMetricGroupBy {
 }
 
 impl TrainingMetricGroupBy {
-    // TODO: should no longer be needed after all todos are resolved ? or just for testing
-    pub fn none() -> Option<TrainingMetricGroupBy> {
-        None
-    }
-
     pub fn extract_group(&self, activity: &Activity) -> Option<String> {
         match self {
             Self::Sport => Some(activity.sport().to_string()),
@@ -114,6 +109,13 @@ impl TrainingMetricGroupBy {
                 .as_ref()
                 .map(|nutrition| nutrition.bonk_status().to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+impl TrainingMetricGroupBy {
+    pub fn none() -> Option<TrainingMetricGroupBy> {
+        None
     }
 }
 

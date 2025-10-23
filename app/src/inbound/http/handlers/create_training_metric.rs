@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     domain::{
-        models::{UserId, training::TrainingMetricFilters},
+        models::{
+            UserId,
+            training::{TrainingMetricFilters, TrainingMetricGroupBy},
+        },
         ports::{
             CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
             ITrainingService,
@@ -15,7 +18,7 @@ use crate::{
             auth::{AuthenticatedUser, IUserService},
             handlers::types::{
                 APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
-                APITrainingMetricSource,
+                APITrainingMetricGroupBy, APITrainingMetricSource,
             },
         },
         parser::ParseFile,
@@ -28,6 +31,7 @@ pub struct CreateTrainingMetricBody {
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
     filters: APITrainingMetricFilters,
+    group_by: Option<APITrainingMetricGroupBy>,
     initial_date_range: Option<DateRange>,
 }
 
@@ -38,6 +42,7 @@ fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainin
         body.granularity.into(),
         body.aggregate.into(),
         body.filters.into(),
+        body.group_by.map(TrainingMetricGroupBy::from),
         body.initial_date_range,
     )
 }
@@ -106,6 +111,32 @@ mod tests {
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] }
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Statistic": "Calories"},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "group_by": "Sport"
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "source": { "Statistic": "Calories"},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "group_by": "RpeRange"
         }"#,
             )
             .is_ok()

@@ -8,7 +8,7 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
-            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
+            TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
         },
     },
     ports::{
@@ -110,8 +110,7 @@ where
             req.granularity().clone(),
             req.aggregate().clone(),
             req.filters().clone(),
-            // TODO: extract groupBy from request
-            TrainingMetricGroupBy::none(),
+            req.group_by().clone(),
         );
         self.training_repository
             .save_definition(definition.clone())
@@ -599,8 +598,8 @@ mod tests_training_metrics_service {
             },
             training::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricId,
-                TrainingMetricValue, TrainingMetricValues,
+                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+                TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
             },
         },
         ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -651,6 +650,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
             None,
         );
 
@@ -727,6 +727,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
             None,
         );
 
@@ -793,6 +794,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
             Some(DateRange::new(
                 now.date_naive(),
                 now.date_naive().checked_add_days(Days::new(1)).unwrap(),
@@ -822,6 +824,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
             None,
         );
 

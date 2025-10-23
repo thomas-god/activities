@@ -5,7 +5,8 @@ use crate::domain::models::{
     activity::{ActivityStatistic, Sport, TimeseriesMetric},
     training::{
         ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
-        TrainingMetricFilters, TrainingMetricGranularity, TrainingPeriodSports,
+        TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+        TrainingPeriodSports,
     },
 };
 
@@ -138,6 +139,27 @@ pub struct APITrainingMetricFilters {
 impl From<APITrainingMetricFilters> for TrainingMetricFilters {
     fn from(value: APITrainingMetricFilters) -> Self {
         Self::new(value.sports)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub enum APITrainingMetricGroupBy {
+    Sport,
+    SportCategory,
+    WorkoutType,
+    RpeRange,
+    Bonked,
+}
+
+impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
+    fn from(value: APITrainingMetricGroupBy) -> Self {
+        match value {
+            APITrainingMetricGroupBy::Sport => Self::Sport,
+            APITrainingMetricGroupBy::SportCategory => Self::SportCategory,
+            APITrainingMetricGroupBy::WorkoutType => Self::WorkoutType,
+            APITrainingMetricGroupBy::RpeRange => Self::RpeRange,
+            APITrainingMetricGroupBy::Bonked => Self::Bonked,
+        }
     }
 }
 
