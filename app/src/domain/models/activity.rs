@@ -215,6 +215,12 @@ pub enum ActivityRpe {
 }
 
 impl ActivityRpe {
+    pub fn range(&self) -> ActivityRpeRange {
+        ActivityRpeRange::from(self)
+    }
+}
+
+impl ActivityRpe {
     pub fn value(&self) -> u8 {
         *self as u8
     }
@@ -264,9 +270,9 @@ pub enum ActivityRpeRange {
     Maximum,
 }
 
-impl From<ActivityRpe> for ActivityRpeRange {
-    fn from(value: ActivityRpe) -> Self {
-        match value {
+impl From<&ActivityRpe> for ActivityRpeRange {
+    fn from(value: &ActivityRpe) -> Self {
+        match *value {
             ActivityRpe::One | ActivityRpe::Two | ActivityRpe::Three => Self::Easy,
             ActivityRpe::Four | ActivityRpe::Five | ActivityRpe::Six => Self::Moderate,
             ActivityRpe::Seven | ActivityRpe::Eight => Self::Hard,

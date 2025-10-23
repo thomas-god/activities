@@ -14,9 +14,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityRpeRange, ActivityStartTime, ActivityStatistic,
-            ActivityWithTimeseries, BonkStatus, Sport, SportCategory, TimeseriesMetric, ToUnit,
-            Unit, WorkoutType,
+            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, Sport,
+            SportCategory, TimeseriesMetric, ToUnit, Unit,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -101,6 +100,19 @@ pub enum TrainingMetricGroupBy {
 impl TrainingMetricGroupBy {
     pub fn none() -> Option<TrainingMetricGroupBy> {
         None
+    }
+
+    pub fn extract_group(&self, activity: &Activity) -> Option<String> {
+        match self {
+            Self::Sport => Some(activity.sport().to_string()),
+            Self::SportCategory => activity.sport().category().map(|cat| cat.to_string()),
+            Self::WorkoutType => activity.workout_type().map(|wk| wk.to_string()),
+            Self::RpeRange => activity.rpe().map(|rpe| rpe.range().to_string()),
+            Self::Bonked => activity
+                .nutrition()
+                .as_ref()
+                .map(|nutrition| nutrition.bonk_status().to_string()),
+        }
     }
 }
 
@@ -2024,5 +2036,94 @@ mod test_training_period {
         assert_eq!(range.start(), &start);
         // Should use tomorrow as end (exclusive, so will include today's activities)
         assert_eq!(range.end(), &tomorrow);
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_group_by {
+    use crate::domain::models::activity::{
+        ActivityId, ActivityNutrition, ActivityRpe, ActivityStatistics, BonkStatus, WorkoutType,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_extract_group_from_activity() {
+        let activity = Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            Sport::TrailRunning,
+            ActivityStatistics::new(HashMap::new()),
+            Some(ActivityRpe::Six),
+            Some(WorkoutType::Intervals),
+            Some(ActivityNutrition::new(BonkStatus::Bonked, None)),
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::Sport.extract_group(&activity),
+            Some("TrailRunning".to_string())
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::SportCategory.extract_group(&activity),
+            Some("Running".to_string())
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::WorkoutType.extract_group(&activity),
+            Some("intervals".to_string())
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::RpeRange.extract_group(&activity),
+            Some("moderate".to_string())
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::Bonked.extract_group(&activity),
+            Some("bonked".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_group_from_activity_none() {
+        let activity = Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            Sport::Golf,
+            ActivityStatistics::new(HashMap::new()),
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::SportCategory.extract_group(&activity),
+            None
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::WorkoutType.extract_group(&activity),
+            None
+        );
+
+        assert_eq!(
+            TrainingMetricGroupBy::RpeRange.extract_group(&activity),
+            None
+        );
+
+        assert_eq!(TrainingMetricGroupBy::Bonked.extract_group(&activity), None);
     }
 }
