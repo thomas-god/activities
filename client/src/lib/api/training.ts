@@ -53,6 +53,18 @@ const TrainingPeriodDetailsSchema = z.object({
 	activities: z.array(TrainingPeriodActivityItemSchema)
 });
 
+// Schema for the new API response with grouped values
+const MetricsListItemSchemaGrouped = z.object({
+	id: z.string(),
+	metric: z.string(),
+	unit: z.string(),
+	granularity: z.string(),
+	aggregate: z.enum(metricAggregateFunctions),
+	sports: z.array(z.string()).optional(),
+	values: z.record(z.string(), z.record(z.string(), z.number())) // grouped: { group_name: { date: value } }
+});
+
+// Legacy schema for backward compatibility (flat values)
 const MetricsListItemSchema = z.object({
 	id: z.string(),
 	metric: z.string(),
@@ -63,6 +75,7 @@ const MetricsListItemSchema = z.object({
 	values: z.record(z.string(), z.number())
 });
 
+const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);
 const MetricsListSchema = z.array(MetricsListItemSchema);
 
 // =============================================================================
@@ -73,8 +86,33 @@ export type TrainingPeriodListItem = z.infer<typeof TrainingPeriodListItemSchema
 export type TrainingPeriodList = z.infer<typeof TrainingPeriodListSchema>;
 export type TrainingPeriodActivityItem = z.infer<typeof TrainingPeriodActivityItemSchema>;
 export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
+export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped>;
 export type MetricsListItem = z.infer<typeof MetricsListItemSchema>;
 export type MetricsList = z.infer<typeof MetricsListSchema>;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Extract "no_group" values from the new grouped API response and convert to flat structure
+ * This maintains backward compatibility with existing chart components
+ * @param groupedMetric - Metric with grouped values from the API
+ * @returns Metric with flat values (only "no_group" data)
+ */
+export function extractNoGroupValues(groupedMetric: MetricsListItemGrouped): MetricsListItem {
+	const noGroupValues = groupedMetric.values['no_group'] ?? {};
+
+	return {
+		id: groupedMetric.id,
+		metric: groupedMetric.metric,
+		unit: groupedMetric.unit,
+		granularity: groupedMetric.granularity,
+		aggregate: groupedMetric.aggregate,
+		sports: groupedMetric.sports,
+		values: noGroupValues
+	};
+}
 
 // =============================================================================
 // API Functions
@@ -139,7 +177,7 @@ export async function fetchTrainingPeriodDetails(
  * @param fetch - The fetch function from SvelteKit
  * @param start - Optional start date for metrics (defaults to 3 weeks ago)
  * @param end - Optional end date for metrics
- * @returns Array of metrics or empty array on error
+ * @returns Array of metrics with flat values (extracted from "no_group") or empty array on error
  */
 export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
@@ -167,7 +205,11 @@ export async function fetchTrainingMetrics(
 	}
 
 	if (res.status === 200) {
-		return MetricsListSchema.parse(await res.json());
+		// Parse the new grouped response from the API
+		const groupedMetrics = MetricsListSchemaGrouped.parse(await res.json());
+
+		// Extract "no_group" values and convert to flat structure for backward compatibility
+		return groupedMetrics.map(extractNoGroupValues);
 	}
 
 	return [];
