@@ -108,7 +108,6 @@
 			) as any
 		)
 	);
-	$inspect(series);
 
 	let x = $derived(
 		d3

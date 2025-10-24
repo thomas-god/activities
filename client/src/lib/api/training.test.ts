@@ -9,6 +9,7 @@ describe('extractNoGroupValues', () => {
 			unit: 'km',
 			granularity: 'Daily',
 			aggregate: 'Sum',
+			group_by: 'Sport',
 			values: {
 				no_group: {
 					'2025-09-24': 100.0,
@@ -45,6 +46,7 @@ describe('extractNoGroupValues', () => {
 			unit: 's',
 			granularity: 'Weekly',
 			aggregate: 'Sum',
+			group_by: 'Sport',
 			values: {
 				Running: {
 					'2025-W39': 3600.0
@@ -72,6 +74,7 @@ describe('extractNoGroupValues', () => {
 			granularity: 'Daily',
 			aggregate: 'Sum',
 			sports: ['Cycling', 'Running'],
+			group_by: null,
 			values: {
 				no_group: {
 					'2025-09-24': 500.0

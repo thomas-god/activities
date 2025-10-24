@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingMetricsChart from '../organisms/TrainingMetricsChart.svelte';
+	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
 	import { aggregateFunctionDisplay } from '$lib/metric';
 	import { dayjs } from '$lib/duration';
 	import {
@@ -50,20 +50,23 @@
 	};
 
 	let topMetric = $derived.by(() => {
-		let metric = data.metrics.noGroup.at(0);
+		let metric = data.metrics.metrics.at(0);
 		if (metric === undefined) {
 			return undefined;
 		}
 		let values = [];
-		for (const dt in metric.values) {
-			values.push({ time: dt, value: metric.values[dt] });
+		for (const [group, time_values] of Object.entries(metric.values)) {
+			for (const [dt, value] of Object.entries(time_values)) {
+				values.push({ time: dt, group, value });
+			}
 		}
 
 		return {
 			values: values,
 			title: `${metric.granularity} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  `,
 			unit: metric.unit,
-			granularity: metric.granularity
+			granularity: metric.granularity,
+			showGroup: metric.group_by !== undefined
 		};
 	});
 
@@ -73,15 +76,19 @@
 </script>
 
 {#if topMetric}
-	<div bind:clientWidth={chartWidth} class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
+	<div
+		bind:clientWidth={chartWidth}
+		class="mx-2 mt-5 rounded-box bg-base-100 pb-2 shadow-md sm:mx-auto"
+	>
 		<p class="mx-3 pt-4">{topMetric.title} over the last 4 weeks</p>
-		<TrainingMetricsChart
+		<TrainingMetricsChartStacked
 			height={300}
 			width={chartWidth}
 			values={topMetric.values}
 			unit={topMetric.unit}
 			granularity={topMetric.granularity}
 			format={topMetric.unit === 's' ? 'duration' : 'number'}
+			showGroup={topMetric.showGroup}
 		/>
 	</div>
 {/if}

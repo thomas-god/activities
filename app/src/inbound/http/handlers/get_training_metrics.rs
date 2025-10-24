@@ -32,7 +32,7 @@ use crate::{
 };
 
 /// Constant for representing the "no group" case (when TrainingMetricBin has group = None)
-const NO_GROUP: &str = "no_group";
+const NO_GROUP: &str = "Other";
 
 /// Type alias for metric values grouped by granule (e.g., date or week)
 /// Maps granule string (like "2025-09-24" or "2025-W39") to the metric value
