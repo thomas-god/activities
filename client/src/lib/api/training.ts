@@ -61,7 +61,8 @@ const MetricsListItemSchemaGrouped = z.object({
 	granularity: z.string(),
 	aggregate: z.enum(metricAggregateFunctions),
 	sports: z.array(z.string()).optional(),
-	values: z.record(z.string(), z.record(z.string(), z.number())) // grouped: { group_name: { date: value } }
+	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
+	group_by: z.string().nullable()
 });
 
 // Legacy schema for backward compatibility (flat values)

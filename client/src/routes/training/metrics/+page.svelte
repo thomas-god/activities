@@ -45,7 +45,8 @@
 				title: formatMetricTitle(metric),
 				unit: metric.unit,
 				id: metric.id,
-				granularity: metric.granularity
+				granularity: metric.granularity,
+				showGroup: metric.group_by !== null
 			});
 		}
 		return metrics;
@@ -106,6 +107,7 @@
 				unit={metric.unit}
 				granularity={metric.granularity}
 				format={metric.unit === 's' ? 'duration' : 'number'}
+				showGroup={metric.showGroup}
 			/>
 		</div>
 	{/each}

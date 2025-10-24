@@ -224,3 +224,5 @@ __marimo__/
 tmp.txt
 
 data/
+
+.vscode/

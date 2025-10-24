@@ -10,9 +10,18 @@
 		unit: string;
 		granularity: string;
 		format: 'number' | 'duration';
+		showGroup?: boolean;
 	}
 
-	let { values, height, width, unit, granularity, format }: TimeseriesChartProps = $props();
+	let {
+		values,
+		height,
+		width,
+		unit,
+		granularity,
+		format,
+		showGroup = true
+	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -260,14 +269,16 @@
 	</svg>
 
 	<!-- Legend -->
-	<div class="flex flex-wrap items-center justify-center gap-3 px-2 text-sm">
-		{#each groups as group}
-			<div class="flex items-center gap-1.5">
-				<div class="h-3 w-3 rounded-sm" style="background-color: {color(group)}"></div>
-				<span>{group}</span>
-			</div>
-		{/each}
-	</div>
+	{#if showGroup}
+		<div class="flex flex-wrap items-center justify-center gap-3 px-2 text-sm">
+			{#each groups as group}
+				<div class="flex items-center gap-1.5">
+					<div class="h-3 w-3 rounded-sm" style="background-color: {color(group)}"></div>
+					<span>{group}</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <!-- Tooltip -->
@@ -277,7 +288,9 @@
 		style="left: {tooltip.x}px; top: {tooltip.y - 10}px; transform: translate(-50%, -100%);"
 	>
 		<div class="flex flex-col gap-1">
-			<div class="font-semibold">{tooltip.group}</div>
+			{#if showGroup}
+				<div class="font-semibold">{tooltip.group}</div>
+			{/if}
 			<div class="flex items-center gap-2 text-xs opacity-80">
 				<span>{timeAxisTickFormater(tooltip.time, 0)}</span>
 				<span>•</span>

@@ -99,6 +99,7 @@ pub struct ResponseBodyItem {
     aggregate: String,
     sports: Vec<String>,
     values: GroupedMetricValues,
+    group_by: Option<String>,
 }
 
 fn to_response_body_item(
@@ -122,6 +123,7 @@ fn to_response_body_item(
             .map(|sports| sports.iter().map(|sport| sport.to_string()).collect())
             .unwrap_or_default(),
         values,
+        group_by: def.group_by().as_ref().map(|g| format!("{:?}", g)),
     }
 }
 
