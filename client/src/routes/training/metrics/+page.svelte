@@ -3,11 +3,11 @@
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import DateRangeSelector from '../../../organisms/DateRangeSelector.svelte';
-	import TrainingMetricsChart from '../../../organisms/TrainingMetricsChart.svelte';
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
 	import { aggregateFunctionDisplay } from '$lib/metric';
-	import { type MetricsList } from '$lib/api';
+	import { type MetricsListGrouped } from '$lib/api';
+	import TrainingMetricsChartStacked from '../../../organisms/TrainingMetricsChartStacked.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -20,7 +20,7 @@
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
-	const formatMetricTitle = (metric: MetricsList[number]): string => {
+	const formatMetricTitle = (metric: MetricsListGrouped[number]): string => {
 		const sportsText =
 			metric.sports && metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports';
 		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${sportsText}]`;
@@ -28,14 +28,16 @@
 
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
-		for (let i = 0; i < data.metrics.noGroup.length; i++) {
-			let metric = data.metrics.noGroup.at(i);
+		for (let i = 0; i < data.metrics.metrics.length; i++) {
+			let metric = data.metrics.metrics.at(i);
 			if (metric === undefined) {
 				continue;
 			}
 			let values = [];
-			for (const dt in metric.values) {
-				values.push({ time: dt, value: metric.values[dt] });
+			for (const [group, time_values] of Object.entries(metric.values)) {
+				for (const [dt, value] of Object.entries(time_values)) {
+					values.push({ time: dt, group, value });
+				}
 			}
 
 			metrics.push({
@@ -87,7 +89,7 @@
 	<DateRangeSelector {dates} {datesUpdateCallback} periods={data.periods} />
 
 	{#each metricsProps as metric}
-		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 shadow-md">
+		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
 			<div class="relative p-4 text-center">
 				<div>
 					{metric.title}
@@ -97,7 +99,7 @@
 					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
 				>
 			</div>
-			<TrainingMetricsChart
+			<TrainingMetricsChartStacked
 				height={250}
 				width={chartWidth}
 				values={metric.values}
