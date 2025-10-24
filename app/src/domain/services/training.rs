@@ -150,11 +150,14 @@ where
                 else {
                     continue;
                 };
-                let bin = TrainingMetricBin::from_granule(
-                    &definition
-                        .granularity()
-                        .datetime_key(activity.start_time().date()),
-                );
+                let granule = definition
+                    .granularity()
+                    .datetime_key(activity.start_time().date());
+                let group = definition
+                    .group_by()
+                    .as_ref()
+                    .and_then(|group_by| group_by.extract_group(activity.activity()));
+                let bin = TrainingMetricBin::new(granule, group);
                 let new_metric_value = match self
                     .training_repository
                     .get_metric_value(definition.id(), &bin)
@@ -1030,6 +1033,16 @@ mod tests_training_metrics_service {
         calories: Option<f64>,
         distance: Option<f64>,
     ) -> ActivityWithTimeseries {
+        create_test_activity_with_sport(timestamp, calories, distance, Sport::Running)
+    }
+
+    // Helper function to create a test activity with given timestamp, statistics, and sport
+    fn create_test_activity_with_sport(
+        timestamp: usize,
+        calories: Option<f64>,
+        distance: Option<f64>,
+        sport: Sport,
+    ) -> ActivityWithTimeseries {
         let mut stats_map = HashMap::new();
         if let Some(cal) = calories {
             stats_map.insert(ActivityStatistic::Calories, cal);
@@ -1044,7 +1057,7 @@ mod tests_training_metrics_service {
                 UserId::test_default(),
                 None,
                 ActivityStartTime::from_timestamp(timestamp).unwrap(),
-                Sport::Running,
+                sport,
                 ActivityStatistics::new(stats_map),
                 None,
                 None,
@@ -1417,6 +1430,196 @@ mod tests_training_metrics_service {
         let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
         let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
 
+        let result = service.update_metrics_values(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_metrics_values_with_groupby_sport() {
+        // Arrange
+        let mut repository = MockTrainingRepository::new();
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::new();
+
+        let running_activity =
+            create_test_activity_with_sport(1200, Some(500.0), Some(5000.0), Sport::Running);
+        let cycling_activity =
+            create_test_activity_with_sport(1300, Some(800.0), Some(15000.0), Sport::Cycling);
+
+        let metric_id_clone = metric_id.clone();
+        let user_id_clone = user_id.clone();
+        repository
+            .expect_get_definitions()
+            .times(1)
+            .returning(move |_| {
+                Ok(vec![TrainingMetricDefinition::new(
+                    metric_id_clone.clone(),
+                    user_id_clone.clone(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Weekly,
+                    TrainingMetricAggregate::Sum,
+                    TrainingMetricFilters::empty(),
+                    Some(TrainingMetricGroupBy::Sport),
+                )])
+            });
+
+        let metric_id_clone = metric_id.clone();
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id_clone
+                    && b.granule() == "1969-12-29"
+                    && b.group() == &Some("Running".to_string())
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 500.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let metric_id_clone = metric_id.clone();
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id_clone
+                    && b.granule() == "1969-12-29"
+                    && b.group() == &Some("Cycling".to_string())
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 800.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        // Mock get_metric_value to return None (no previous value)
+        repository
+            .expect_get_metric_value()
+            .returning(|_, _| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req =
+            UpdateMetricsValuesRequest::new(user_id, vec![running_activity, cycling_activity]);
+
+        // Act & Assert
+        let result = service.update_metrics_values(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_metrics_values_without_groupby_uses_none_group() {
+        // Arrange
+        let mut repository = MockTrainingRepository::new();
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::new();
+
+        let activity = create_test_activity(1200, Some(500.0), Some(5000.0));
+
+        let metric_id_clone = metric_id.clone();
+        let user_id_clone = user_id.clone();
+        repository
+            .expect_get_definitions()
+            .times(1)
+            .returning(move |_| {
+                Ok(vec![TrainingMetricDefinition::new(
+                    metric_id_clone.clone(),
+                    user_id_clone.clone(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Weekly,
+                    TrainingMetricAggregate::Sum,
+                    TrainingMetricFilters::empty(),
+                    None, // No group_by
+                )])
+            });
+
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id
+                    && b.granule() == "1969-12-29"
+                    && b.group() == &None // Verify group is None
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 500.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        // Mock get_metric_value to return None (no previous value)
+        repository
+            .expect_get_metric_value()
+            .returning(|_, _| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
+
+        // Act & Assert
+        let result = service.update_metrics_values(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_metrics_values_grouped_same_granule_different_groups() {
+        // Arrange
+        let mut repository = MockTrainingRepository::new();
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::new();
+
+        // Create multiple activities on the same day but different sports
+        let running_am =
+            create_test_activity_with_sport(1200, Some(400.0), Some(5000.0), Sport::Running);
+        let cycling_pm =
+            create_test_activity_with_sport(1205, Some(600.0), Some(20000.0), Sport::Cycling);
+
+        let metric_id_clone = metric_id.clone();
+        let user_id_clone = user_id.clone();
+        repository
+            .expect_get_definitions()
+            .times(1)
+            .returning(move |_| {
+                Ok(vec![TrainingMetricDefinition::new(
+                    metric_id_clone.clone(),
+                    user_id_clone.clone(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Sum,
+                    TrainingMetricFilters::empty(),
+                    Some(TrainingMetricGroupBy::Sport),
+                )])
+            });
+
+        let metric_id_clone = metric_id.clone();
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id_clone
+                    && b.granule() == "1970-01-01"
+                    && b.group() == &Some("Running".to_string())
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 400.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let metric_id_clone = metric_id.clone();
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id_clone
+                    && b.granule() == "1970-01-01"
+                    && b.group() == &Some("Cycling".to_string())
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 600.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        // Mock get_metric_value to return None (no previous value)
+        repository
+            .expect_get_metric_value()
+            .returning(|_, _| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateMetricsValuesRequest::new(user_id, vec![running_am, cycling_pm]);
+
+        // Act & Assert - verify both groups are updated for the same day
         let result = service.update_metrics_values(req).await;
         assert!(result.is_ok());
     }

@@ -646,20 +646,22 @@ pub struct TrainingMetricBin {
 }
 
 impl TrainingMetricBin {
-    // TODO: should no longer be required once all todos are resolved ?
-    pub fn from_granule(granule: &str) -> Self {
-        Self {
-            granule: granule.to_string(),
-            group: None,
-        }
-    }
-
     pub fn granule(&self) -> &str {
         &self.granule
     }
 
     pub fn group(&self) -> &Option<String> {
         &self.group
+    }
+}
+
+impl TrainingMetricBin {
+    // TODO: should no longer be required once all todos are resolved ?
+    pub fn from_granule(granule: &str) -> Self {
+        Self {
+            granule: granule.to_string(),
+            group: None,
+        }
     }
 }
 
