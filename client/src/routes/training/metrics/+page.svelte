@@ -5,9 +5,9 @@
 	import DateRangeSelector from '../../../organisms/DateRangeSelector.svelte';
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
-	import { aggregateFunctionDisplay } from '$lib/metric';
-	import { type MetricsListGrouped } from '$lib/api';
+	import type { MetricsListGrouped } from '$lib/api';
 	import TrainingMetricsChartStacked from '../../../organisms/TrainingMetricsChartStacked.svelte';
+	import TrainingMetricTitle from '../../../molecules/TrainingMetricTitle.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -17,14 +17,6 @@
 		start: page.url.searchParams.get('start') as string,
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
-
-	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
-
-	const formatMetricTitle = (metric: MetricsListGrouped[number]): string => {
-		const sportsText =
-			metric.sports && metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports';
-		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${sportsText}]`;
-	};
 
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
@@ -42,10 +34,13 @@
 
 			metrics.push({
 				values: values,
-				title: formatMetricTitle(metric),
+				metric: metric.metric,
+				granularity: metric.granularity,
+				aggregate: metric.aggregate,
+				sports: metric.sports,
+				groupBy: metric.group_by,
 				unit: metric.unit,
 				id: metric.id,
-				granularity: metric.granularity,
 				showGroup: metric.group_by !== null
 			});
 		}
@@ -92,9 +87,13 @@
 	{#each metricsProps as metric}
 		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
 			<div class="relative p-4 text-center">
-				<div>
-					{metric.title}
-				</div>
+				<TrainingMetricTitle
+					granularity={metric.granularity}
+					aggregate={metric.aggregate}
+					metric={metric.metric}
+					sports={metric.sports}
+					groupBy={metric.groupBy}
+				/>
 				<button
 					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
 					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button

@@ -3,7 +3,7 @@
 	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
-	import { aggregateFunctionDisplay } from '$lib/metric';
+	import TrainingMetricTitle from '../molecules/TrainingMetricTitle.svelte';
 	import { dayjs } from '$lib/duration';
 	import {
 		getSportCategory,
@@ -63,10 +63,13 @@
 
 		return {
 			values: values,
-			title: `${metric.granularity} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  `,
-			unit: metric.unit,
+			metric: metric.metric,
 			granularity: metric.granularity,
-			showGroup: metric.group_by !== undefined
+			aggregate: metric.aggregate,
+			sports: metric.sports,
+			groupBy: metric.group_by,
+			unit: metric.unit,
+			showGroup: metric.group_by !== null
 		};
 	});
 
@@ -80,7 +83,15 @@
 		bind:clientWidth={chartWidth}
 		class="mx-2 mt-5 rounded-box bg-base-100 pb-2 shadow-md sm:mx-auto"
 	>
-		<p class="mx-3 pt-4">{topMetric.title} over the last 4 weeks</p>
+		<div class="mx-3 pt-4 text-center">
+			<TrainingMetricTitle
+				granularity={topMetric.granularity}
+				aggregate={topMetric.aggregate}
+				metric={topMetric.metric}
+				sports={topMetric.sports}
+				groupBy={topMetric.groupBy}
+			/>
+		</div>
 		<TrainingMetricsChartStacked
 			height={300}
 			width={chartWidth}
