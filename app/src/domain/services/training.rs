@@ -203,9 +203,21 @@ where
 
         let mut res = vec![];
         for definition in definitions {
+            // Align the date range to the metric's granularity to ensure complete bins
+            // For example, if granularity is Weekly and date_range starts on Wednesday,
+            // we align it to the Monday of that week to include the full week's data
+            let aligned_date_range = date_range.as_ref().map(|range| {
+                let bins = definition.granularity().bins(range);
+                if let (Some(first), Some(last)) = (bins.first(), bins.last()) {
+                    DateRange::new(*first.start(), *last.end())
+                } else {
+                    range.clone()
+                }
+            });
+
             let values = self
                 .training_repository
-                .get_metric_values(definition.id(), date_range)
+                .get_metric_values(definition.id(), &aligned_date_range)
                 .await
                 .unwrap_or_default();
             res.push((definition.clone(), values.clone()))
@@ -594,7 +606,7 @@ mod tests_training_metrics_service {
     use std::{collections::HashMap, sync::Arc};
 
     use anyhow::anyhow;
-    use chrono::{DateTime, Days, FixedOffset, Utc};
+    use chrono::{DateTime, Days, FixedOffset, NaiveDate, Utc};
     use tokio::sync::Mutex;
 
     use crate::domain::{
@@ -997,6 +1009,52 @@ mod tests_training_metrics_service {
         assert_eq!(res.len(), 1);
         let (_, values) = res.first().unwrap();
         assert_eq!(values.clone().as_hash_map().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_training_service_get_metrics_aligns_date_range_to_granularity() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_definitions().returning(|_| {
+            Ok(vec![TrainingMetricDefinition::new(
+                TrainingMetricId::from("test"),
+                UserId::test_default(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly, // Weekly granularity
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            )])
+        });
+
+        // The date range will be aligned to week boundaries (Monday)
+        // Input: Wed Sep 24 to Thu Sep 25, 2025
+        // Should be aligned to: Mon Sep 22 to Mon Sep 29, 2025
+        repository
+            .expect_get_metric_values()
+            .withf(|_, date_range| {
+                let Some(range) = date_range else {
+                    return false;
+                };
+                // Verify that the range starts on Monday (Sep 22)
+                *range.start() == NaiveDate::from_ymd_opt(2025, 9, 22).unwrap()
+                    && *range.end() == NaiveDate::from_ymd_opt(2025, 9, 29).unwrap()
+            })
+            .returning(|_, _| Ok(TrainingMetricValues::default()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        // Input date range: Wednesday to Thursday (mid-week)
+        let date_range = Some(DateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(), // Wednesday
+            NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(), // Thursday
+        ));
+
+        let res = service
+            .get_training_metrics(&UserId::test_default(), &date_range)
+            .await;
+
+        assert_eq!(res.len(), 1);
     }
 
     #[tokio::test]
