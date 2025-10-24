@@ -50,7 +50,7 @@
 	};
 
 	let topMetric = $derived.by(() => {
-		let metric = data.metrics.at(0);
+		let metric = data.metrics.noGroup.at(0);
 		if (metric === undefined) {
 			return undefined;
 		}

@@ -7,6 +7,7 @@
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
 	import { aggregateFunctionDisplay } from '$lib/metric';
+	import { type MetricsList } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -19,15 +20,16 @@
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
-	const formatMetricTitle = (metric: (typeof data.metrics)[number]): string => {
+	const formatMetricTitle = (metric: MetricsList[number]): string => {
 		const sportsText =
 			metric.sports && metric.sports.length > 0 ? metric.sports.join(', ') : 'All sports';
 		return `${capitalize(metric.granularity.toLowerCase())} ${aggregateFunctionDisplay[metric.aggregate]}  ${metric.metric.toLowerCase()}  [${sportsText}]`;
 	};
+
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
-		for (let i = 0; i < data.metrics.length; i++) {
-			let metric = data.metrics.at(i);
+		for (let i = 0; i < data.metrics.noGroup.length; i++) {
+			let metric = data.metrics.noGroup.at(i);
 			if (metric === undefined) {
 				continue;
 			}

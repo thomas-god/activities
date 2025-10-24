@@ -89,6 +89,7 @@ export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
 export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped>;
 export type MetricsListItem = z.infer<typeof MetricsListItemSchema>;
 export type MetricsList = z.infer<typeof MetricsListSchema>;
+export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;
 
 // =============================================================================
 // Helper Functions
@@ -183,7 +184,7 @@ export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	start: Date | string,
 	end?: Date | string
-): Promise<MetricsList> {
+): Promise<{ noGroup: MetricsList; metrics: MetricsListGrouped }> {
 	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
 
 	let url = `${PUBLIC_APP_URL}/api/training/metrics?start=${encodeURIComponent(startDate)}`;
@@ -201,7 +202,7 @@ export async function fetchTrainingMetrics(
 
 	if (res.status === 401) {
 		goto('/login');
-		return [];
+		return { noGroup: [], metrics: [] };
 	}
 
 	if (res.status === 200) {
@@ -209,8 +210,8 @@ export async function fetchTrainingMetrics(
 		const groupedMetrics = MetricsListSchemaGrouped.parse(await res.json());
 
 		// Extract "no_group" values and convert to flat structure for backward compatibility
-		return groupedMetrics.map(extractNoGroupValues);
+		return { noGroup: groupedMetrics.map(extractNoGroupValues), metrics: groupedMetrics };
 	}
 
-	return [];
+	return { noGroup: [], metrics: [] };
 }
