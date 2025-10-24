@@ -25,7 +25,7 @@
 			start: dates.start,
 			end: dates.end,
 			name,
-			sports: null,
+			sports: null as null | ({ Sport: Sport } | { SportCategory: SportCategory })[],
 			note: note.trim() === '' ? null : note.trim()
 		};
 
@@ -36,7 +36,10 @@
 			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
 				SportCategory: category
 			}));
-			const filters = sportFilter.concat(sportCategoriesFilter);
+			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+				...sportFilter,
+				...sportCategoriesFilter
+			];
 			basePayload = { ...basePayload, sports: filters };
 		}
 

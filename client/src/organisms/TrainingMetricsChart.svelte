@@ -22,9 +22,9 @@
 	let marginBottom = 20;
 	let marginLeft = 40;
 
-	let gx: SVGGElement;
-	let gy: SVGGElement;
-	let gyGrid: SVGGElement;
+	let gx = $state<SVGGElement>();
+	let gy = $state<SVGGElement>();
+	let gyGrid = $state<SVGGElement>();
 
 	let noValues = $derived(values.every((val) => val.value === 0));
 
@@ -117,7 +117,7 @@
 
 	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
 	$effect(() => {
-		d3.select(gx).call((sel) =>
+		d3.select(gx!).call((sel) =>
 			sel.call(
 				d3
 					.axisBottom(x)
@@ -131,12 +131,12 @@
 					)
 			)
 		);
-		d3.select(gy).call((sel) =>
+		d3.select(gy!).call((sel) =>
 			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
 		);
 		const yValues = yAxisTickValues() === null ? y.ticks() : yAxisTickValues();
 
-		d3.select(gyGrid).call((sel) =>
+		d3.select(gyGrid!).call((sel) =>
 			sel
 				.selectAll('line')
 				.data(yValues)

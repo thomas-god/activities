@@ -125,7 +125,8 @@ describe('Converting a time series from absolute time to active time', () => {
 					unit: 'W',
 					values: [100, 120, 130]
 				}
-			}
+			},
+			laps: []
 		};
 
 		let activeTimeseries = convertTimeseriesToActiveTime(timeseries);

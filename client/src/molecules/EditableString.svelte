@@ -10,6 +10,7 @@
 
 {#if editMode}
 	<div class="join">
+		<!-- svelte-ignore a11y_autofocus -->
 		<input class="input input-sm join-item" autofocus bind:value={content} />
 		<button
 			class="btn input-sm join-item rounded-r-full"

@@ -51,7 +51,10 @@
 			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
 				SportCategory: category
 			}));
-			const filters = sportFilter.concat(sportCategoriesFilter);
+			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+				...sportFilter,
+				...sportCategoriesFilter
+			];
 			basePayload = { ...basePayload, filters: { sports: filters } };
 		}
 

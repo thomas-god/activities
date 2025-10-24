@@ -144,7 +144,9 @@
 			.on('zoom', zoomed)
 	);
 
-	let zoomedDomain = $state([x_min, x_max]);
+	// We intentionally capture initial values for zoom comparison
+	// svelte-ignore state_referenced_locally
+	let zoomedDomain = $state.raw([x_min, x_max]);
 	let zoomedIn = $derived(zoomedDomain[0] !== x_min || zoomedDomain[1] !== x_max);
 
 	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
@@ -177,7 +179,7 @@
 		}
 		const values = metricsProps.map((metric) => {
 			let nearestValue =
-				metric.values[bisector.center(metric.values, zoomedXScale.invert(tooltipXOffset))];
+				metric.values[bisector.center(metric.values, zoomedXScale.invert(tooltipXOffset!))];
 			return {
 				metric: metric.name,
 				value: nearestValue[1],
@@ -185,7 +187,7 @@
 				order: metric.order
 			};
 		});
-		return { time: zoomedXScale.invert(tooltipXOffset), values };
+		return { time: zoomedXScale.invert(tooltipXOffset!), values };
 	});
 
 	let smoothing = $state(5);

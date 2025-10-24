@@ -56,6 +56,8 @@
 		return options;
 	});
 
+	// We use $derived to recalculate when availableOptions changes
+	// svelte-ignore state_referenced_locally
 	let selectedOptions = $state([availableOptions[0]]);
 
 	let selectedMetrics = $derived.by(() => {
