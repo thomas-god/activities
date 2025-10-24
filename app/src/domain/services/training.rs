@@ -204,7 +204,7 @@ where
         for definition in definitions {
             let values = self
                 .training_repository
-                .get_metric_values(definition.id())
+                .get_metric_values(definition.id(), &None)
                 .await
                 .unwrap_or_default();
             res.push((definition.clone(), values.clone()))
@@ -544,6 +544,7 @@ pub mod test_utils {
             async fn get_metric_values(
                 &self,
                 id: &TrainingMetricId,
+                date_range: &Option<DateRange>,
             ) -> Result<TrainingMetricValues, GetTrainingMetricValueError>;
 
             async fn get_definition(
@@ -871,7 +872,7 @@ mod tests_training_metrics_service {
         });
         repository
             .expect_get_metric_values()
-            .returning(|_| Ok(TrainingMetricValues::new(HashMap::new())));
+            .returning(|_, _| Ok(TrainingMetricValues::new(HashMap::new())));
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(repository, activity_repository);
@@ -909,7 +910,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGroupBy::none(),
             )])
         });
-        repository.expect_get_metric_values().returning(|_| {
+        repository.expect_get_metric_values().returning(|_, _| {
             Ok(TrainingMetricValues::new(HashMap::from([(
                 TrainingMetricBin::from_granule("toto"),
                 TrainingMetricValue::Max(0.3),

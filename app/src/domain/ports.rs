@@ -851,6 +851,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn get_metric_values(
         &self,
         id: &TrainingMetricId,
+        date_range: &Option<DateRange>,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
 
     fn save_training_period(

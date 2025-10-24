@@ -15,7 +15,7 @@ use crate::domain::{
         },
     },
     ports::{
-        DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
+        DateRange, DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
         GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, SaveTrainingPeriodError,
         TrainingRepository, UpdateMetricError,
     },
@@ -213,39 +213,49 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     // TODO: add get_metric_granule_values() to get all bin mathching a give granule, i.e. all
     // matched groups
-    // TODO: add a daterange filter
     async fn get_metric_values(
         &self,
         id: &TrainingMetricId,
+        date_range: &Option<DateRange>,
     ) -> Result<TrainingMetricValues, GetTrainingMetricValueError> {
-        sqlx::query_as::<_, (String, Option<String>, TrainingMetricValue)>(
-            "
-        SELECT granule, bin_group, value FROM t_training_metrics_values
-        WHERE definition_id = ?1;",
-        )
-        .bind(id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| GetTrainingMetricValueError::Unknown(anyhow!(err)))
-        .map(|rows| {
-            TrainingMetricValues::new(HashMap::from_iter(rows.into_iter().map(
-                |(granule, bin_group, value)| {
-                    (
-                        TrainingMetricBin::new(
-                            granule,
-                            bin_group.and_then(|group| {
-                                if group == NONE_GROUP {
-                                    None
-                                } else {
-                                    Some(group)
-                                }
-                            }),
-                        ),
-                        value,
-                    )
-                },
-            )))
-        })
+        let mut builder = sqlx::QueryBuilder::<'_, sqlx::Sqlite>::new(
+            "SELECT granule, bin_group, value
+            FROM t_training_metrics_values
+            WHERE definition_id = ",
+        );
+        builder.push_bind(id);
+
+        if let Some(range) = date_range {
+            builder.push(" AND granule >= ").push_bind(range.start());
+
+            builder.push(" AND granule <= ").push_bind(range.end());
+        }
+
+        let query = builder.build_query_as::<'_, (String, Option<String>, TrainingMetricValue)>();
+
+        query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| GetTrainingMetricValueError::Unknown(anyhow!(err)))
+            .map(|rows| {
+                TrainingMetricValues::new(HashMap::from_iter(rows.into_iter().map(
+                    |(granule, bin_group, value)| {
+                        (
+                            TrainingMetricBin::new(
+                                granule,
+                                bin_group.and_then(|group| {
+                                    if group == NONE_GROUP {
+                                        None
+                                    } else {
+                                        Some(group)
+                                    }
+                                }),
+                            ),
+                            value,
+                        )
+                    },
+                )))
+            })
     }
 
     async fn save_training_period(
@@ -977,7 +987,7 @@ mod test_sqlite_training_repository {
 
         assert_eq!(
             repository
-                .get_metric_values(definition.id())
+                .get_metric_values(definition.id(), &None)
                 .await
                 .expect("Should have returned OK")
                 .as_hash_map(),
@@ -1027,7 +1037,7 @@ mod test_sqlite_training_repository {
 
         assert_eq!(
             repository
-                .get_metric_values(definition.id())
+                .get_metric_values(definition.id(), &None)
                 .await
                 .expect("Should have returned OK")
                 .as_hash_map(),
@@ -1041,6 +1051,76 @@ mod test_sqlite_training_repository {
                     TrainingMetricValue::Max(10.1)
                 )
             ])
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_metric_values_with_date_range() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should have return Ok");
+
+        // Add values for multiple dates
+        let dates_values = vec![
+            ("2025-09-20", 10.0),
+            ("2025-09-24", 12.3),
+            ("2025-09-25", 10.1),
+            ("2025-09-28", 15.5),
+        ];
+
+        for (date, value) in dates_values {
+            repository
+                .update_metric_value(
+                    definition.id(),
+                    (
+                        TrainingMetricBin::new(date.to_string(), None),
+                        TrainingMetricValue::Max(value),
+                    ),
+                )
+                .await
+                .expect("Should have saved value");
+        }
+
+        // Test with date range filter (2025-09-24 to 2025-09-25)
+        let date_range = DateRange::new(
+            chrono::NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+            chrono::NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+        );
+
+        let values = repository
+            .get_metric_values(definition.id(), &Some(date_range))
+            .await
+            .expect("Should have returned OK");
+
+        // Convert to HashMap once
+        let values_map = values.as_hash_map();
+
+        // Should only return values within the date range
+        assert_eq!(values_map.len(), 2);
+        assert_eq!(
+            values_map.get(&TrainingMetricBin::new("2025-09-24".to_string(), None)),
+            Some(&TrainingMetricValue::Max(12.3))
+        );
+        assert_eq!(
+            values_map.get(&TrainingMetricBin::new("2025-09-25".to_string(), None)),
+            Some(&TrainingMetricValue::Max(10.1))
+        );
+
+        // Values outside range should not be included
+        assert_eq!(
+            values_map.get(&TrainingMetricBin::new("2025-09-20".to_string(), None)),
+            None
+        );
+        assert_eq!(
+            values_map.get(&TrainingMetricBin::new("2025-09-28".to_string(), None)),
+            None
         );
     }
 
