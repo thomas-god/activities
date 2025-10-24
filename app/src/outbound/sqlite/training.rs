@@ -211,8 +211,6 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
-    // TODO: add get_metric_granule_values() to get all bin mathching a give granule, i.e. all
-    // matched groups
     async fn get_metric_values(
         &self,
         id: &TrainingMetricId,

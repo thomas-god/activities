@@ -195,6 +195,7 @@ where
     async fn get_training_metrics(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
         let Ok(definitions) = self.training_repository.get_definitions(user).await else {
             return vec![];
@@ -204,7 +205,7 @@ where
         for definition in definitions {
             let values = self
                 .training_repository
-                .get_metric_values(definition.id(), &None)
+                .get_metric_values(definition.id(), date_range)
                 .await
                 .unwrap_or_default();
             res.push((definition.clone(), values.clone()))
@@ -456,6 +457,7 @@ pub mod test_utils {
             async fn get_training_metrics(
                 &self,
                 user: &UserId,
+                date_range: &Option<DateRange>,
             ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)>;
 
             async fn delete_metric(
@@ -504,7 +506,7 @@ pub mod test_utils {
             mock.expect_create_metric()
                 .returning(|_| Ok(TrainingMetricId::default()));
             mock.expect_update_metrics_values().returning(|_| Ok(()));
-            mock.expect_get_training_metrics().returning(|_| vec![]);
+            mock.expect_get_training_metrics().returning(|_, _| vec![]);
             mock.expect_delete_metric().returning(|_| Ok(()));
 
             mock
@@ -852,7 +854,9 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::test_default()).await;
+        let res = service
+            .get_training_metrics(&UserId::test_default(), &None)
+            .await;
         assert!(res.is_empty());
     }
 
@@ -877,7 +881,9 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::test_default()).await;
+        let res = service
+            .get_training_metrics(&UserId::test_default(), &None)
+            .await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -920,7 +926,9 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(repository, activity_repository);
 
-        let res = service.get_training_metrics(&UserId::test_default()).await;
+        let res = service
+            .get_training_metrics(&UserId::test_default(), &None)
+            .await;
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -940,6 +948,55 @@ mod tests_training_metrics_service {
             *value.get(&TrainingMetricBin::from_granule("toto")).unwrap(),
             TrainingMetricValue::Max(0.3)
         );
+    }
+
+    #[tokio::test]
+    async fn test_training_service_get_metrics_with_date_range() {
+        use crate::domain::ports::DateRange;
+        use chrono::NaiveDate;
+
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_definitions().returning(|_| {
+            Ok(vec![TrainingMetricDefinition::new(
+                TrainingMetricId::from("test"),
+                UserId::test_default(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            )])
+        });
+
+        // Expect the repository method to be called with the date range
+        repository
+            .expect_get_metric_values()
+            .withf(|_, date_range| {
+                // Verify that the date range is passed through
+                date_range.is_some()
+            })
+            .returning(|_, _| {
+                Ok(TrainingMetricValues::new(HashMap::from([(
+                    TrainingMetricBin::from_granule("2025-09-24"),
+                    TrainingMetricValue::Max(100.0),
+                )])))
+            });
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let date_range = Some(DateRange::new(
+            NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+            NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+        ));
+
+        let res = service
+            .get_training_metrics(&UserId::test_default(), &date_range)
+            .await;
+
+        assert_eq!(res.len(), 1);
+        let (_, values) = res.first().unwrap();
+        assert_eq!(values.clone().as_hash_map().len(), 1);
     }
 
     #[tokio::test]

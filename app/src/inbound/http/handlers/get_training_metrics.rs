@@ -20,7 +20,7 @@ use crate::{
                 TrainingMetricGranularity, TrainingMetricValues,
             },
         },
-        ports::{IActivityService, ITrainingService},
+        ports::{DateRange, IActivityService, ITrainingService},
     },
     inbound::{
         http::{
@@ -35,6 +35,17 @@ use crate::{
 pub struct MetricsDateRange {
     start: DateTime<FixedOffset>,
     end: Option<DateTime<FixedOffset>>,
+}
+
+impl From<&MetricsDateRange> for DateRange {
+    fn from(value: &MetricsDateRange) -> Self {
+        let start_date = value.start.date_naive();
+        let end_date = value
+            .end
+            .map(|e| e.date_naive())
+            .unwrap_or_else(|| Local::now().date_naive());
+        Self::new(start_date, end_date)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -159,7 +170,7 @@ pub async fn get_training_metrics<
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
         .training_metrics_service
-        .get_training_metrics(user.user())
+        .get_training_metrics(user.user(), &Some(DateRange::from(&date_range)))
         .await;
 
     let body = ResponseBody(

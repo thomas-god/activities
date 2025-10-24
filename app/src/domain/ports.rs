@@ -609,6 +609,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn get_training_metrics(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
 
     fn delete_metric(
