@@ -12,14 +12,14 @@
 		| 'Elevation'
 		| 'Distance'
 		| 'Duration'
-		| 'NormalizedPower' = $state('Calories');
+		| 'NormalizedPower' = $state('Duration');
 	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' | 'Altitude' | 'Cadence' =
 		$state('Power');
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
-	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
-	let groupBy: 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' = $state('Sport');
-	let groupBySelected = $state(false);
+	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Sum');
+	let groupBy: 'None' | 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' =
+		$state('None');
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
@@ -41,7 +41,7 @@
 			granularity: typeof granularity;
 			aggregate: typeof aggregate;
 			filters: {};
-			group_by?: typeof groupBy;
+			group_by?: Exclude<typeof groupBy, 'None'>;
 		} = { source: statisticSource, granularity, aggregate, filters: {} };
 
 		if (sportFilterSelected) {
@@ -58,7 +58,7 @@
 			basePayload = { ...basePayload, filters: { sports: filters } };
 		}
 
-		if (groupBySelected) {
+		if (groupBy !== 'None') {
 			basePayload = { ...basePayload, group_by: groupBy };
 		}
 
@@ -149,27 +149,25 @@
 			<option value="Average">Average</option>
 		</select>
 
-		<div class="mt-2">
-			<div class="mb-2 font-semibold">
-				Group by
-				<input type="checkbox" bind:checked={groupBySelected} class="toggle toggle-sm" />
-			</div>
-			{#if groupBySelected}
-				<select class="select" bind:value={groupBy} id="metric-group-by">
-					<option value="Sport">Sport</option>
-					<option value="SportCategory">Sport Category</option>
-					<option value="WorkoutType">Workout Type</option>
-					<option value="RpeRange">RPE Range</option>
-					<option value="Bonked">Bonked</option>
-				</select>
-			{/if}
-		</div>
-
-		<details class="collapse-arrow collapse border border-base-300 bg-base-100" open={false}>
-			<summary class="collapse-title font-semibold">Filters</summary>
+		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
+			<summary class="collapse-title font-semibold">Groups and filters</summary>
 			<div class="collapse-content text-sm">
+				<div class="mb-2">
+					<label class="label mb-1.5 text-xs" for="metric-group-by">Group by</label>
+					<select class="select w-full" bind:value={groupBy} id="metric-group-by">
+						<option value="None">No grouping</option>
+						<option value="Sport">Sport</option>
+						<option value="SportCategory">Sport Category</option>
+						<option value="WorkoutType">Workout Type</option>
+						<option value="RpeRange">RPE Range</option>
+						<option value="Bonked">Bonked</option>
+					</select>
+				</div>
+
+				<div class="divider"></div>
+
 				<div class="mb-2 font-semibold">
-					Sports
+					<span class="pr-2"> Filter by sports </span>
 					<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
 				</div>
 				{#if sportFilterSelected}

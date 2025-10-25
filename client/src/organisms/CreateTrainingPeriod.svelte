@@ -81,8 +81,8 @@
 			bind:value={note}
 		></textarea>
 
-		<div class="mb-2 font-semibold">
-			Sports
+		<div class="my-2 font-semibold">
+			<span class="pr-2"> Filter by sports </span>
 			<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
 		</div>
 		{#if sportFilterSelected}
