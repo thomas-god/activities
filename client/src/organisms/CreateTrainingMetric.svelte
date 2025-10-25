@@ -90,48 +90,58 @@
 
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
-		<label class="label" for="source-type">Metric source</label>
-		<select class="select" bind:value={sourceType} id="source-type">
-			<option value="activity-statistics">Activity statistics</option>
-			<option value="timeseries-aggregate">Timeseries aggregate</option>
-		</select>
-
-		{#if sourceType === 'activity-statistics'}
-			<label class="label" for="source-Activity-statistics">Statistics</label>
-			<select class="select" bind:value={sourceActivityStatistics} id="source-Activity-statistics">
-				<option value="Calories">Calories</option>
-				<option value="Elevation">Elevation gain</option>
-				<option value="Distance">Distance</option>
-				<option value="Duration">Duration</option>
-				<option value="NormalizedPower">Normalized power</option>
+		{#if aggregate !== 'NumberOfActivities'}
+			<label class="label" for="source-type">Metric source</label>
+			<select class="select" bind:value={sourceType} id="source-type">
+				<option value="activity-statistics">Activity statistics</option>
+				<option value="timeseries-aggregate">Timeseries aggregate</option>
 			</select>
-		{:else}
-			<div class="ml-3 flex flex-row gap-3">
-				<div>
-					<label class="label p-1" for="source-timeseries-metric">Timeseries metric</label>
-					<select class="select" bind:value={sourceTimeseriesMetric} id="source-timeseries-metric">
-						<option value="Altitude">Altitude</option>
-						<option value="Speed">Speed</option>
-						<option value="Power">Power</option>
-						<option value="HeartRate">Heart rate</option>
-						<option value="Cadence">Cadence</option>
-					</select>
-				</div>
 
-				<div>
-					<label class="label p-1" for="source-timeseries-aggregate">Timeseries aggregate</label>
-					<select
-						class="select"
-						bind:value={sourceTimeseriesAggregate}
-						id="source-timeseries-aggregate"
-					>
-						<option value="Max">Maximum value</option>
-						<option value="Min">Minimum value</option>
-						<option value="Sum">Total</option>
-						<option value="Average">Average</option>
-					</select>
+			{#if sourceType === 'activity-statistics'}
+				<label class="label" for="source-Activity-statistics">Statistics</label>
+				<select
+					class="select"
+					bind:value={sourceActivityStatistics}
+					id="source-Activity-statistics"
+				>
+					<option value="Calories">Calories</option>
+					<option value="Elevation">Elevation gain</option>
+					<option value="Distance">Distance</option>
+					<option value="Duration">Duration</option>
+					<option value="NormalizedPower">Normalized power</option>
+				</select>
+			{:else}
+				<div class="ml-3 flex flex-row gap-3">
+					<div>
+						<label class="label p-1" for="source-timeseries-metric">Timeseries metric</label>
+						<select
+							class="select"
+							bind:value={sourceTimeseriesMetric}
+							id="source-timeseries-metric"
+						>
+							<option value="Altitude">Altitude</option>
+							<option value="Speed">Speed</option>
+							<option value="Power">Power</option>
+							<option value="HeartRate">Heart rate</option>
+							<option value="Cadence">Cadence</option>
+						</select>
+					</div>
+
+					<div>
+						<label class="label p-1" for="source-timeseries-aggregate">Timeseries aggregate</label>
+						<select
+							class="select"
+							bind:value={sourceTimeseriesAggregate}
+							id="source-timeseries-aggregate"
+						>
+							<option value="Max">Maximum value</option>
+							<option value="Min">Minimum value</option>
+							<option value="Sum">Total</option>
+							<option value="Average">Average</option>
+						</select>
+					</div>
 				</div>
-			</div>
+			{/if}
 		{/if}
 
 		<label class="label" for="metric-granularity">Granularity</label>
