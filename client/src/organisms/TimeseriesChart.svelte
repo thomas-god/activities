@@ -216,7 +216,6 @@
 	{height}
 	viewBox={`0 0 ${width} ${height}`}
 	role="img"
-	class="select-none"
 	onmousemove={tooltipCallback}
 >
 	<clipPath id="clip-path">
