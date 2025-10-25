@@ -162,6 +162,22 @@
 		return `${value.toFixed(1)} ${unit}`;
 	};
 
+	// Hide tooltip on scroll
+	const handleScroll = () => {
+		if (tooltip.visible) {
+			tooltip = { ...tooltip, visible: false };
+		}
+	};
+
+	$effect(() => {
+		// Add scroll listener to hide tooltip when scrolling
+		window.addEventListener('scroll', handleScroll, true); // Use capture phase to catch all scroll events
+
+		return () => {
+			window.removeEventListener('scroll', handleScroll, true);
+		};
+	});
+
 	$effect(() => {
 		d3.select(svg).call((sel) =>
 			sel
