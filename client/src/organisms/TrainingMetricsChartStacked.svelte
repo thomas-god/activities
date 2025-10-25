@@ -59,7 +59,19 @@
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
-		return d3.ticks(0, d3.max(values, (d) => d.value)!, 6);
+		const maxGroupValue = values
+			.reduce<Map<string, number>>((groupValues, value) => {
+				if (groupValues.has(value.time)) {
+					groupValues.set(value.time, groupValues.get(value.time)! + value.value);
+				} else {
+					groupValues.set(value.time, value.value);
+				}
+
+				return groupValues;
+			}, new Map<string, number>())
+			.entries()
+			.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1];
+		return d3.ticks(0, maxGroupValue, 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
