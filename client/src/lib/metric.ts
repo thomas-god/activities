@@ -7,12 +7,19 @@ export const activityStatistics = [
 ] as const;
 export type ActivityStatistic = (typeof activityStatistics)[number];
 
-export const metricAggregateFunctions = ['Min', 'Max', 'Average', 'Sum'] as const;
+export const metricAggregateFunctions = [
+	'Min',
+	'Max',
+	'Average',
+	'Sum',
+	'NumberOfActivities'
+] as const;
 export type MetricAggregateFunction = (typeof metricAggregateFunctions)[number];
 
 export const aggregateFunctionDisplay: Record<MetricAggregateFunction, string> = {
 	Average: 'activity average',
 	Max: 'maximum',
 	Min: 'minimum',
-	Sum: 'total'
+	Sum: 'total',
+	NumberOfActivities: 'number of activities'
 };

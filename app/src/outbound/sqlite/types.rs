@@ -285,6 +285,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricAggregate {
             Self::Max => "max",
             Self::Min => "min",
             Self::Sum => "sum",
+            Self::NumberOfActivities => "number_of_activities",
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
@@ -299,6 +300,7 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricAggregate {
             "max" => Ok(Self::Max),
             "min" => Ok(Self::Min),
             "sum" => Ok(Self::Sum),
+            "number_of_activities" => Ok(Self::NumberOfActivities),
             _ => Err(format!("Unknown Aggregate: {}", s).into()),
         }
     }

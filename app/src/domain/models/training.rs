@@ -518,6 +518,7 @@ pub enum TrainingMetricAggregate {
     Max,
     Average,
     Sum,
+    NumberOfActivities,
 }
 
 impl TrainingMetricAggregate {
@@ -553,6 +554,9 @@ impl TrainingMetricAggregate {
                     .into_iter()
                     .fold(0., |sum, metric| sum + metric.value),
             ),
+            TrainingMetricAggregate::NumberOfActivities => {
+                TrainingMetricValue::NumberOfActivities(activity_metrics.len())
+            }
         })
     }
 
@@ -566,6 +570,7 @@ impl TrainingMetricAggregate {
                 sum: new_metric.value,
                 number_of_elements: 1,
             },
+            Self::NumberOfActivities => TrainingMetricValue::NumberOfActivities(1),
         })
     }
 
@@ -608,6 +613,12 @@ impl TrainingMetricAggregate {
                     value: (*sum + new_metric.value) / (*number_of_elements as f64 + 1.),
                 })
             }
+            Self::NumberOfActivities => {
+                let TrainingMetricValue::NumberOfActivities(count) = previous_value else {
+                    return None;
+                };
+                Some(TrainingMetricValue::NumberOfActivities(count + 1))
+            }
         }
     }
 }
@@ -622,19 +633,21 @@ pub enum TrainingMetricValue {
         sum: f64,
         number_of_elements: usize,
     },
+    NumberOfActivities(usize),
 }
 
 impl TrainingMetricValue {
-    pub fn value(&self) -> &f64 {
+    pub fn value(&self) -> f64 {
         match self {
-            Self::Max(max) => max,
-            Self::Min(min) => min,
-            Self::Sum(sum) => sum,
+            Self::Max(max) => *max,
+            Self::Min(min) => *min,
+            Self::Sum(sum) => *sum,
             Self::Average {
                 value,
                 sum: _,
                 number_of_elements: _,
-            } => value,
+            } => *value,
+            Self::NumberOfActivities(count) => *count as f64,
         }
     }
 }
@@ -655,8 +668,8 @@ impl TrainingMetricBin {
     }
 }
 
+#[cfg(test)]
 impl TrainingMetricBin {
-    // TODO: should no longer be required once all todos are resolved ?
     pub fn from_granule(granule: &str) -> Self {
         Self {
             granule: granule.to_string(),

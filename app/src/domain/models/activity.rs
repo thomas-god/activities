@@ -742,6 +742,7 @@ pub enum Unit {
     BeatPerMinute,
     RevolutionPerMinute,
     Second,
+    NumberOfActivities,
 }
 
 impl fmt::Display for Unit {
@@ -756,6 +757,7 @@ impl fmt::Display for Unit {
             Self::BeatPerMinute => "bpm",
             Self::RevolutionPerMinute => "rpm",
             Self::Second => "s",
+            Self::NumberOfActivities => "activities",
         };
 
         write!(f, "{}", unit)

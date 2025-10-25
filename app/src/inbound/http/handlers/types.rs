@@ -101,6 +101,7 @@ pub enum APITrainingMetricAggregate {
     Max,
     Average,
     Sum,
+    NumberOfActivities,
 }
 
 impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
@@ -110,6 +111,7 @@ impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
             APITrainingMetricAggregate::Max => Self::Max,
             APITrainingMetricAggregate::Average => Self::Average,
             APITrainingMetricAggregate::Sum => Self::Sum,
+            APITrainingMetricAggregate::NumberOfActivities => Self::NumberOfActivities,
         }
     }
 }

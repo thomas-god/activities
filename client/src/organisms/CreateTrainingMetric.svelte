@@ -17,7 +17,7 @@
 		$state('Power');
 	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
 	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
-	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Sum');
+	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' | 'NumberOfActivities' = $state('Sum');
 	let groupBy: 'None' | 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' =
 		$state('None');
 
@@ -147,6 +147,7 @@
 			<option value="Min">Minimum value</option>
 			<option value="Sum">Total</option>
 			<option value="Average">Average</option>
+			<option value="NumberOfActivities">Number of activities</option>
 		</select>
 
 		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
