@@ -159,6 +159,9 @@
 		if (format === 'duration') {
 			return formatDurationCompactWithUnits(value);
 		}
+		if (unit === 'activities') {
+			return `${Math.round(value)} ${unit}`;
+		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
 
