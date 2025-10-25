@@ -36,7 +36,9 @@
 	<div class="text-base font-medium">
 		{capitalize(granularity.toLowerCase())}
 		{aggregateFunctionDisplay[aggregate]}
-		{metric.toLowerCase()}
+		{#if aggregate !== 'NumberOfActivities'}
+			{metric.toLowerCase()}
+		{/if}
 	</div>
 	{#if subtitle}
 		<div class="text-sm opacity-70">
