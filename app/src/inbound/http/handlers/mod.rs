@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 
 mod create_training_metric;
+mod create_training_note;
 mod create_training_period;
 mod delete_activity;
 mod delete_training_metric;
@@ -19,6 +20,7 @@ mod upload_activity;
 mod validate_login;
 
 pub(super) use create_training_metric::create_training_metric;
+pub(super) use create_training_note::create_training_note;
 pub(super) use create_training_period::create_training_period;
 pub(super) use delete_activity::delete_activity;
 pub(super) use delete_training_metric::delete_training_metric;
