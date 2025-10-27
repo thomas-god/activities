@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import CreateTrainingMetric from '../../organisms/CreateTrainingMetric.svelte';
 	import CreateTrainingPeriod from '../../organisms/CreateTrainingPeriod.svelte';
+	import CreateTrainingNote from '../../organisms/CreateTrainingNote.svelte';
 
 	let { children } = $props();
 
@@ -19,13 +20,19 @@
 		createTrainingPeriodDialog.close();
 	};
 
+	const createTrainingNoteCallback = () => {
+		createTrainingNoteDialog.close();
+		invalidate('app:training-notes');
+	};
+
 	let createTrainingMetricDialog: HTMLDialogElement;
 	let createTrainingPeriodDialog: HTMLDialogElement;
+	let createTrainingNoteDialog: HTMLDialogElement;
 </script>
 
 <div class="@container">
 	<div
-		class="my-4 flex flex-col flex-wrap items-stretch gap-2 rounded-box bg-base-100 p-2 @min-[400px]:flex-row @min-[400px]:items-center @min-[400px]:justify-between"
+		class="my-4 flex flex-col flex-wrap items-stretch gap-2 rounded-box bg-base-100 p-2 @min-[450px]:flex-row @min-[450px]:items-center @min-[450px]:justify-between"
 	>
 		<div role="tablist" class="tabs tabs-box px-3 font-semibold">
 			<a role="tab" class={`tab  ${isSelected('/training/metrics')}`} href="/training/metrics"
@@ -34,6 +41,7 @@
 			<a role="tab" class={`tab  ${isSelected('/training/periods')}`} href="/training/periods"
 				>Periods</a
 			>
+			<a role="tab" class={`tab  ${isSelected('/training/notes')}`} href="/training/notes">Notes</a>
 		</div>
 
 		{#if page.url.pathname === '/training/metrics'}
@@ -48,6 +56,13 @@
 				<button
 					class="btn w-full rounded-lg btn-primary"
 					onclick={() => createTrainingPeriodDialog.showModal()}>+ New training period</button
+				>
+			</div>
+		{:else if page.url.pathname === '/training/notes'}
+			<div class="btn-create">
+				<button
+					class="btn w-full rounded-lg btn-primary"
+					onclick={() => createTrainingNoteDialog.showModal()}>+ New note</button
 				>
 			</div>
 		{/if}
@@ -72,6 +87,15 @@
 	</form>
 </dialog>
 
+<dialog class="modal" id="create-training-note-modal" bind:this={createTrainingNoteDialog}>
+	<div class="modal-box">
+		<CreateTrainingNote callback={createTrainingNoteCallback} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
 <div>
 	{@render children?.()}
 </div>
@@ -81,7 +105,5 @@
 		.btn-create {
 			flex-grow: 1;
 		}
-		/* margin-left: auto; */
-		/* margin-right: auto; */
 	}
 </style>

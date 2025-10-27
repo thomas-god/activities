@@ -79,6 +79,14 @@ const MetricsListItemSchema = z.object({
 const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);
 const MetricsListSchema = z.array(MetricsListItemSchema);
 
+const TrainingNoteSchema = z.object({
+	id: z.string(),
+	content: z.string(),
+	created_at: z.string()
+});
+
+const TrainingNotesListSchema = z.array(TrainingNoteSchema);
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -91,6 +99,8 @@ export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped
 export type MetricsListItem = z.infer<typeof MetricsListItemSchema>;
 export type MetricsList = z.infer<typeof MetricsListSchema>;
 export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;
+export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
+export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
 
 // =============================================================================
 // Helper Functions
@@ -215,4 +225,98 @@ export async function fetchTrainingMetrics(
 	}
 
 	return { noGroup: [], metrics: [] };
+}
+
+/**
+ * Fetch all training notes for the current user
+ * @param fetch - The fetch function from SvelteKit
+ * @returns Array of training notes or empty array on error
+ */
+export async function fetchTrainingNotes(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<TrainingNotesList> {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/notes`, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return [];
+	}
+
+	if (res.status === 200) {
+		return TrainingNotesListSchema.parse(await res.json());
+	}
+
+	return [];
+}
+
+/**
+ * Create a new training note
+ * @param content - The note content
+ * @returns The created note or null on error
+ */
+export async function createTrainingNote(content: string): Promise<void> {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note`, {
+		method: 'POST',
+		mode: 'cors',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ content })
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+	}
+
+	return;
+}
+
+/**
+ * Update an existing training note
+ * @param noteId - The ID of the note to update
+ * @param content - The new content
+ * @returns true if successful, false otherwise
+ */
+export async function updateTrainingNote(noteId: string, content: string): Promise<boolean> {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note/${noteId}`, {
+		method: 'PATCH',
+		mode: 'cors',
+		credentials: 'include',
+		headers: {
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ content })
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return false;
+	}
+
+	return res.status === 204;
+}
+
+/**
+ * Delete a training note
+ * @param noteId - The ID of the note to delete
+ * @returns true if successful, false otherwise
+ */
+export async function deleteTrainingNote(noteId: string): Promise<boolean> {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note/${noteId}`, {
+		method: 'DELETE',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return false;
+	}
+
+	return res.status === 204;
 }
