@@ -696,6 +696,30 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: CreateTrainingNoteRequest,
     ) -> impl Future<Output = Result<TrainingNoteId, CreateTrainingNoteError>> + Send;
+
+    fn get_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> impl Future<Output = Result<Option<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn get_training_notes(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn update_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+        content: TrainingNoteContent,
+    ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
+
+    fn delete_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -894,6 +918,24 @@ pub enum SaveTrainingNoteError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum GetTrainingNoteError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingNoteError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteTrainingNoteError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_definition(
         &self,
@@ -966,6 +1008,27 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         note: TrainingNote,
     ) -> impl Future<Output = Result<(), SaveTrainingNoteError>> + Send;
+
+    fn get_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+    ) -> impl Future<Output = Result<Option<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn get_training_notes(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn update_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+        content: TrainingNoteContent,
+    ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
+
+    fn delete_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+    ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
 }
 
 #[cfg(test)]

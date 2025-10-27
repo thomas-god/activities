@@ -17,8 +17,9 @@ use crate::domain::ports::{IActivityService, ITrainingService};
 
 use crate::inbound::http::handlers::{
     create_training_metric, create_training_note, create_training_period, delete_activity,
-    delete_training_metric, delete_training_period, get_activity, get_training_metrics,
-    get_training_period, get_training_periods, list_activities, patch_activity,
+    delete_training_metric, delete_training_note, delete_training_period, get_activity,
+    get_training_metrics, get_training_note, get_training_notes, get_training_period,
+    get_training_periods, list_activities, patch_activity, update_training_note,
     update_training_period_name, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
@@ -185,6 +186,19 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IU
         .route(
             "/training/note",
             post(create_training_note::<AS, PF, TS, US>),
+        )
+        .route("/training/notes", get(get_training_notes::<AS, PF, TS, US>))
+        .route(
+            "/training/note/{note_id}",
+            get(get_training_note::<AS, PF, TS, US>),
+        )
+        .route(
+            "/training/note/{note_id}",
+            patch(update_training_note::<AS, PF, TS, US>),
+        )
+        .route(
+            "/training/note/{note_id}",
+            delete(delete_training_note::<AS, PF, TS, US>),
         )
         .route(
             "/training/period/{period_id}",

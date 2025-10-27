@@ -11,13 +11,15 @@ use crate::domain::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-            TrainingNote, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     },
     ports::{
-        DateRange, DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, SaveTrainingNoteError,
-        SaveTrainingPeriodError, TrainingRepository, UpdateMetricError,
+        DateRange, DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
+        GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError, GetTrainingNoteError,
+        SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+        TrainingRepository, UpdateMetricError, UpdateTrainingNoteError,
     },
 };
 
@@ -359,6 +361,84 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map_err(|err| SaveTrainingNoteError::Unknown(anyhow!(err)))
         .map(|_| ())
     }
+
+    async fn get_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+    ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
+        match sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT id, user_id, content, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
+        )
+        .bind(note_id.to_string())
+        .fetch_one(&self.pool)
+        .await
+        {
+            Ok((id, user_id, content, created_at)) => {
+                let note = TrainingNote::new(
+                    TrainingNoteId::from(id.as_str()),
+                    UserId::from(user_id),
+                    TrainingNoteContent::from(content),
+                    chrono::DateTime::parse_from_rfc3339(&created_at)
+                        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?,
+                );
+                Ok(Some(note))
+            }
+            Err(sqlx::Error::RowNotFound) => Ok(None),
+            Err(err) => Err(GetTrainingNoteError::Unknown(anyhow!(err))),
+        }
+    }
+
+    async fn get_training_notes(
+        &self,
+        user: &UserId,
+    ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
+        let rows = sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT id, user_id, content, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
+        )
+        .bind(user.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
+
+        rows.into_iter()
+            .map(|(id, user_id, content, created_at)| {
+                let note = TrainingNote::new(
+                    TrainingNoteId::from(id.as_str()),
+                    UserId::from(user_id),
+                    TrainingNoteContent::from(content),
+                    chrono::DateTime::parse_from_rfc3339(&created_at)
+                        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?,
+                );
+                Ok(note)
+            })
+            .collect()
+    }
+
+    async fn update_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+        content: TrainingNoteContent,
+    ) -> Result<(), UpdateTrainingNoteError> {
+        sqlx::query("UPDATE t_training_notes SET content = ?1 WHERE id = ?2;")
+            .bind(content.to_string())
+            .bind(note_id.to_string())
+            .execute(&self.pool)
+            .await
+            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
+            .map(|_| ())
+    }
+
+    async fn delete_training_note(
+        &self,
+        note_id: &TrainingNoteId,
+    ) -> Result<(), DeleteTrainingNoteError> {
+        sqlx::query("DELETE FROM t_training_notes WHERE id = ?1;")
+            .bind(note_id.to_string())
+            .execute(&self.pool)
+            .await
+            .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
+            .map(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -366,15 +446,15 @@ mod test_sqlite_training_repository {
 
     use std::collections::HashMap;
 
-    use chrono::NaiveDate;
+    use chrono::{NaiveDate, Utc};
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
         activity::{Sport, TimeseriesMetric},
         training::{
             ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingNote, TrainingNoteContent,
+            TrainingNoteId, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     };
 
@@ -1675,5 +1755,241 @@ mod test_sqlite_training_repository {
         // Second save with same ID should fail
         let result = repository.save_training_note(note.clone()).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_note_returns_note() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        let retrieved = repository
+            .get_training_note(note.id())
+            .await
+            .expect("Should retrieve note")
+            .expect("Note should exist");
+
+        assert_eq!(retrieved.id(), note.id());
+        assert_eq!(retrieved.user(), note.user());
+        assert_eq!(retrieved.content(), note.content());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_note_returns_none_when_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let result = repository
+            .get_training_note(&TrainingNoteId::new())
+            .await
+            .expect("Should not error");
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_notes_returns_all_user_notes() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let user_id = UserId::test_default();
+        let other_user_id = UserId::new();
+
+        // Save notes for the test user
+        let note1 = build_training_note();
+        let note2 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            TrainingNoteContent::from("Second note"),
+            Utc::now().into(),
+        );
+
+        // Save note for another user
+        let other_note = TrainingNote::new(
+            TrainingNoteId::new(),
+            other_user_id,
+            TrainingNoteContent::from("Other user note"),
+            Utc::now().into(),
+        );
+
+        repository
+            .save_training_note(note1.clone())
+            .await
+            .expect("Should save note1");
+        repository
+            .save_training_note(note2.clone())
+            .await
+            .expect("Should save note2");
+        repository
+            .save_training_note(other_note)
+            .await
+            .expect("Should save other_note");
+
+        // Get notes for test user
+        let notes = repository
+            .get_training_notes(&user_id)
+            .await
+            .expect("Should retrieve notes");
+
+        assert_eq!(notes.len(), 2);
+        assert!(notes.iter().any(|n| n.id() == note1.id()));
+        assert!(notes.iter().any(|n| n.id() == note2.id()));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_notes_returns_empty_when_no_notes() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let notes = repository
+            .get_training_notes(&UserId::new())
+            .await
+            .expect("Should not error");
+
+        assert_eq!(notes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_notes_orders_by_created_at_desc() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let user_id = UserId::test_default();
+
+        // Create notes with different timestamps
+        let older_note = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            TrainingNoteContent::from("Older note"),
+            (Utc::now() - chrono::Duration::hours(2)).into(),
+        );
+
+        let newer_note = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            TrainingNoteContent::from("Newer note"),
+            Utc::now().into(),
+        );
+
+        // Save in random order
+        repository
+            .save_training_note(older_note.clone())
+            .await
+            .expect("Should save older note");
+        repository
+            .save_training_note(newer_note.clone())
+            .await
+            .expect("Should save newer note");
+
+        let notes = repository
+            .get_training_notes(&user_id)
+            .await
+            .expect("Should retrieve notes");
+
+        // Newer note should come first
+        assert_eq!(notes[0].id(), newer_note.id());
+        assert_eq!(notes[1].id(), older_note.id());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_updates_content() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        let new_content = TrainingNoteContent::from("Updated content");
+        repository
+            .update_training_note(note.id(), new_content.clone())
+            .await
+            .expect("Should update note");
+
+        // Verify content was updated
+        let updated_note = repository
+            .get_training_note(note.id())
+            .await
+            .expect("Should retrieve note")
+            .expect("Note should exist");
+
+        assert_eq!(updated_note.content(), &new_content);
+        assert_eq!(updated_note.id(), note.id());
+        assert_eq!(updated_note.user(), note.user());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_does_not_fail_when_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let result = repository
+            .update_training_note(&TrainingNoteId::new(), TrainingNoteContent::from("Content"))
+            .await;
+
+        // Should not fail even if note doesn't exist
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_removes_note() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        repository
+            .delete_training_note(note.id())
+            .await
+            .expect("Should delete note");
+
+        // Verify note was deleted
+        let result = repository
+            .get_training_note(note.id())
+            .await
+            .expect("Should not error");
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_does_not_fail_when_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let result = repository
+            .delete_training_note(&TrainingNoteId::new())
+            .await;
+
+        // Should not fail even if note doesn't exist
+        assert!(result.is_ok());
     }
 }

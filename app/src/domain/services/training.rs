@@ -8,15 +8,17 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
-            TrainingMetricId, TrainingMetricValues, TrainingNoteId, TrainingPeriodId,
+            TrainingMetricId, TrainingMetricValues, TrainingNote, TrainingNoteContent,
+            TrainingNoteId, TrainingPeriodId,
         },
     },
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
         CreateTrainingNoteError, CreateTrainingNoteRequest, CreateTrainingPeriodError,
         CreateTrainingPeriodRequest, DateRange, DeleteTrainingMetricError,
-        DeleteTrainingMetricRequest, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-        ITrainingService, ListActivitiesFilters, TrainingRepository, UpdateMetricsValuesRequest,
+        DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
+        DeleteTrainingPeriodRequest, GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
+        TrainingRepository, UpdateMetricsValuesRequest, UpdateTrainingNoteError,
         UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
     },
 };
@@ -414,6 +416,81 @@ where
 
         Ok(note_id)
     }
+
+    async fn get_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
+        let note = self.training_repository.get_training_note(note_id).await?;
+
+        // Verify the note belongs to the user
+        if let Some(ref n) = note
+            && n.user() != user
+        {
+            return Ok(None);
+        }
+
+        Ok(note)
+    }
+
+    async fn get_training_notes(
+        &self,
+        user: &UserId,
+    ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
+        self.training_repository.get_training_notes(user).await
+    }
+
+    async fn update_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+        content: TrainingNoteContent,
+    ) -> Result<(), UpdateTrainingNoteError> {
+        // Verify the note exists and belongs to the user
+        let note = self
+            .training_repository
+            .get_training_note(note_id)
+            .await
+            .map_err(|err| UpdateTrainingNoteError::Unknown(err.into()))?;
+
+        match note {
+            Some(n) if n.user() == user => {
+                self.training_repository
+                    .update_training_note(note_id, content)
+                    .await?;
+                Ok(())
+            }
+            _ => Err(UpdateTrainingNoteError::Unknown(anyhow::anyhow!(
+                "Training note not found or unauthorized"
+            ))),
+        }
+    }
+
+    async fn delete_training_note(
+        &self,
+        user: &UserId,
+        note_id: &TrainingNoteId,
+    ) -> Result<(), DeleteTrainingNoteError> {
+        // Verify the note exists and belongs to the user
+        let note = self
+            .training_repository
+            .get_training_note(note_id)
+            .await
+            .map_err(|err| DeleteTrainingNoteError::Unknown(err.into()))?;
+
+        match note {
+            Some(n) if n.user() == user => {
+                self.training_repository
+                    .delete_training_note(note_id)
+                    .await?;
+                Ok(())
+            }
+            _ => Err(DeleteTrainingNoteError::Unknown(anyhow::anyhow!(
+                "Training note not found or unauthorized"
+            ))),
+        }
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -462,14 +539,15 @@ pub mod test_utils {
 
     use crate::domain::{
         models::training::{
-            TrainingMetricValue, TrainingNote, TrainingPeriod, TrainingPeriodWithActivities,
+            TrainingMetricValue, TrainingNote, TrainingNoteContent, TrainingPeriod,
+            TrainingPeriodWithActivities,
         },
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
-            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
-            GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
-            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
-            UpdateMetricError,
+            DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
+            GetDefinitionError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
+            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
+            SaveTrainingPeriodError, UpdateMetricError, UpdateTrainingNoteError,
         },
     };
 
@@ -541,6 +619,30 @@ pub mod test_utils {
                 &self,
                 req: CreateTrainingNoteRequest,
             ) -> Result<TrainingNoteId, CreateTrainingNoteError>;
+
+            async fn get_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
+
+            async fn get_training_notes(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn update_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+                content: TrainingNoteContent,
+            ) -> Result<(), UpdateTrainingNoteError>;
+
+            async fn delete_training_note(
+                &self,
+                user: &UserId,
+                note_id: &TrainingNoteId,
+            ) -> Result<(), DeleteTrainingNoteError>;
         }
     }
 
@@ -635,6 +737,27 @@ pub mod test_utils {
                 &self,
                 note: TrainingNote,
             ) -> Result<(), SaveTrainingNoteError>;
+
+            async fn get_training_note(
+                &self,
+                note_id: &TrainingNoteId,
+            ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
+
+            async fn get_training_notes(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn update_training_note(
+                &self,
+                note_id: &TrainingNoteId,
+                content: TrainingNoteContent,
+            ) -> Result<(), UpdateTrainingNoteError>;
+
+            async fn delete_training_note(
+                &self,
+                note_id: &TrainingNoteId,
+            ) -> Result<(), DeleteTrainingNoteError>;
         }
     }
 }
