@@ -83,6 +83,7 @@ const TrainingNoteSchema = z.object({
 	id: z.string(),
 	title: z.string().nullable(),
 	content: z.string(),
+	date: z.string(),
 	created_at: z.string()
 });
 
@@ -257,13 +258,20 @@ export async function fetchTrainingNotes(
 /**
  * Create a new training note
  * @param content - The note content
+ * @param title - The optional note title
+ * @param date - The optional note date (defaults to today if not provided)
  * @returns The created note or null on error
  */
-export async function createTrainingNote(content: string, title: string | null): Promise<void> {
-	let body: {content: string, title: string | null} = {content, title: null}
-	if (title !== null) {
-		body = {...body, title}
-	}
+export async function createTrainingNote(
+	content: string,
+	title: string | null,
+	date: string
+): Promise<void> {
+	const body: { content: string; title: string | null; date: string } = {
+		content,
+		title: title || null,
+		date
+	};
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note`, {
 		method: 'POST',
 		mode: 'cors',
@@ -286,13 +294,20 @@ export async function createTrainingNote(content: string, title: string | null):
  * @param noteId - The ID of the note to update
  * @param title - The optional title
  * @param content - The new content
+ * @param date - The date for the note
  * @returns true if successful, false otherwise
  */
 export async function updateTrainingNote(
 	noteId: string,
 	title: string | undefined,
-	content: string
+	content: string,
+	date: string
 ): Promise<boolean> {
+	const body: { title?: string; content: string; date: string } = {
+		title: title || undefined,
+		content,
+		date
+	};
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note/${noteId}`, {
 		method: 'PATCH',
 		mode: 'cors',
@@ -300,7 +315,7 @@ export async function updateTrainingNote(
 		headers: {
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ title: title || undefined, content })
+		body: JSON.stringify(body)
 	});
 
 	if (res.status === 401) {

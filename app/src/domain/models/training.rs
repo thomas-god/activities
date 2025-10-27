@@ -980,12 +980,59 @@ impl From<String> for TrainingNoteTitle {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrainingNoteDate(NaiveDate);
+
+impl TrainingNoteDate {
+    pub fn new(date: NaiveDate) -> Self {
+        Self(date)
+    }
+
+    pub fn as_naive_date(&self) -> &NaiveDate {
+        &self.0
+    }
+
+    #[cfg(test)]
+    pub fn today() -> Self {
+        Self(Utc::now().date_naive())
+    }
+}
+
+impl fmt::Display for TrainingNoteDate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<NaiveDate> for TrainingNoteDate {
+    fn from(date: NaiveDate) -> Self {
+        Self(date)
+    }
+}
+
+impl TryFrom<&str> for TrainingNoteDate {
+    type Error = chrono::ParseError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").map(Self)
+    }
+}
+
+impl TryFrom<String> for TrainingNoteDate {
+    type Error = chrono::ParseError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::try_from(s.as_str())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TrainingNote {
     id: TrainingNoteId,
     user: UserId,
     title: Option<TrainingNoteTitle>,
     content: TrainingNoteContent,
+    date: TrainingNoteDate,
     created_at: DateTime<FixedOffset>,
 }
 
@@ -995,6 +1042,7 @@ impl TrainingNote {
         user: UserId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
+        date: TrainingNoteDate,
         created_at: DateTime<FixedOffset>,
     ) -> Self {
         Self {
@@ -1002,6 +1050,7 @@ impl TrainingNote {
             user,
             title,
             content,
+            date,
             created_at,
         }
     }
@@ -1020,6 +1069,10 @@ impl TrainingNote {
 
     pub fn content(&self) -> &TrainingNoteContent {
         &self.content
+    }
+
+    pub fn date(&self) -> &TrainingNoteDate {
+        &self.date
     }
 
     pub fn created_at(&self) -> &DateTime<FixedOffset> {

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import { createTrainingNote } from '$lib/api/training';
+	import { dayjs } from '$lib/duration';
 
 	let { callback }: { callback: () => void } = $props();
 
 	let title = $state<string | null>(null);
 	let content = $state('');
+	let date = $state(dayjs().format('YYYY-MM-DD'));
 	let requestPending = $state(false);
 	let errorMessage = $state('');
 
@@ -18,10 +20,11 @@
 		errorMessage = '';
 
 		try {
-			await createTrainingNote(content.trim(), title);
+			await createTrainingNote(content.trim(), title, date);
 			invalidate('app:training-notes');
 			content = '';
 			title = null;
+			date = dayjs().format('YYYY-MM-DD');
 			callback();
 		} catch (error) {
 			errorMessage = 'An error occurred. Please try again.';
@@ -41,6 +44,9 @@
 			id="note-title"
 			bind:value={title}
 		/>
+
+		<label class="label" for="note-date">Date</label>
+		<input type="date" class="input" id="note-date" bind:value={date} />
 
 		<label class="label" for="note-content">Note content</label>
 		<textarea

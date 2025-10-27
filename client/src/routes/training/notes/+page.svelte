@@ -11,19 +11,22 @@
 	let editingNoteId = $state<string | null>(null);
 	let editTitle = $state('');
 	let editContent = $state('');
+	let editDate = $state('');
 	let deleteConfirmNoteId = $state<string | null>(null);
 	let isDeleting = $state(false);
 
-	const startEdit = (noteId: string, title: string | null, content: string) => {
+	const startEdit = (noteId: string, title: string | null, content: string, date: string) => {
 		editingNoteId = noteId;
 		editTitle = title || '';
 		editContent = content;
+		editDate = date;
 	};
 
 	const cancelEdit = () => {
 		editingNoteId = null;
 		editTitle = '';
 		editContent = '';
+		editDate = '';
 	};
 
 	const saveEdit = async (noteId: string) => {
@@ -32,12 +35,14 @@
 		const success = await updateTrainingNote(
 			noteId,
 			editTitle.trim() || undefined,
-			editContent.trim()
+			editContent.trim(),
+			editDate
 		);
 		if (success) {
 			editingNoteId = null;
 			editTitle = '';
 			editContent = '';
+			editDate = '';
 			invalidate('app:training-notes');
 		}
 	};
@@ -81,13 +86,15 @@
 					{/if}
 					<div class="mb-2 flex items-center justify-between">
 						<div class="text-xs font-light opacity-70">
-							{dayjs(note.created_at).format('MMM D, YYYY • HH:mm')}
+							<div class="text-[10px] opacity-60">
+								{dayjs(note.date).format('MMM D, YYYY')}
+							</div>
 						</div>
 						{#if editingNoteId !== note.id}
 							<div class="flex gap-2">
 								<button
 									class="btn btn-ghost btn-xs"
-									onclick={() => startEdit(note.id, note.title, note.content)}
+									onclick={() => startEdit(note.id, note.title, note.content, note.date)}
 								>
 									✏️ Edit
 								</button>
@@ -100,6 +107,10 @@
 
 					{#if editingNoteId === note.id}
 						<div class="flex flex-col gap-2">
+							<label class="floating-label">
+								<input type="date" class="input" bind:value={editDate} />
+								<span>Date</span>
+							</label>
 							<input
 								type="text"
 								class="input-bordered input w-full"

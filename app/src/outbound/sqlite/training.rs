@@ -11,8 +11,8 @@ use crate::domain::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-            TrainingPeriodId, TrainingPeriodSports,
+            TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -46,6 +46,7 @@ type TrainingNoteRow = (
     UserId,
     Option<TrainingNoteTitle>,
     TrainingNoteContent,
+    TrainingNoteDate,
     DateTime<FixedOffset>,
 );
 
@@ -357,12 +358,13 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
         sqlx::query(
-            "INSERT INTO t_training_notes (id, user_id, title, content, created_at) VALUES (?1, ?2, ?3, ?4, ?5);",
+            "INSERT INTO t_training_notes (id, user_id, title, content, date, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
         )
         .bind(note.id().to_string())
         .bind(note.user().to_string())
         .bind(note.title().as_ref().map(|t| t.to_string()))
         .bind(note.content().to_string())
+        .bind(note.date().to_string())
         .bind(note.created_at().to_rfc3339())
         .execute(&self.pool)
         .await
@@ -375,19 +377,20 @@ impl TrainingRepository for SqliteTrainingRepository {
         note_id: &TrainingNoteId,
     ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
         match sqlx::query_as::<_, TrainingNoteRow>(
-            "SELECT id, user_id, title, content, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
+            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
         )
         .bind(note_id.to_string())
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, title, content, created_at)) => {
+            Ok((id, user_id, title, content, date, created_at)) => {
                 Ok(Some(TrainingNote::new(
                     id,
                     user_id,
                     title,
                     content,
-                    created_at
+                    date,
+                    created_at,
                 )))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -400,7 +403,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
         let rows = sqlx::query_as::<_, TrainingNoteRow>(
-            "SELECT id, user_id, title, content, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
+            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
         )
         .bind(user.to_string())
         .fetch_all(&self.pool)
@@ -408,8 +411,10 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
 
         rows.into_iter()
-            .map(|(id, user_id, title, content, created_at)| {
-                Ok(TrainingNote::new(id, user_id, title, content, created_at))
+            .map(|(id, user_id, title, content, date, created_at)| {
+                Ok(TrainingNote::new(
+                    id, user_id, title, content, date, created_at,
+                ))
             })
             .collect()
     }
@@ -419,15 +424,19 @@ impl TrainingRepository for SqliteTrainingRepository {
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
+        date: TrainingNoteDate,
     ) -> Result<(), UpdateTrainingNoteError> {
-        sqlx::query("UPDATE t_training_notes SET title = ?1, content = ?2 WHERE id = ?3;")
-            .bind(title.as_ref().map(|t| t.to_string()))
-            .bind(content.to_string())
-            .bind(note_id.to_string())
-            .execute(&self.pool)
-            .await
-            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
-            .map(|_| ())
+        sqlx::query(
+            "UPDATE t_training_notes SET title = ?1, content = ?2, date = ?3 WHERE id = ?4;",
+        )
+        .bind(title.as_ref().map(|t| t.to_string()))
+        .bind(content.to_string())
+        .bind(date.to_string())
+        .bind(note_id.to_string())
+        .execute(&self.pool)
+        .await
+        .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
+        .map(|_| ())
     }
 
     async fn delete_training_note(
@@ -1677,7 +1686,9 @@ mod test_sqlite_training_repository {
     }
 
     fn build_training_note() -> TrainingNote {
-        use crate::domain::models::training::{TrainingNoteContent, TrainingNoteId};
+        use crate::domain::models::training::{
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId,
+        };
         use chrono::Utc;
 
         TrainingNote::new(
@@ -1685,6 +1696,7 @@ mod test_sqlite_training_repository {
             UserId::test_default(),
             Some(TrainingNoteTitle::from("title")),
             TrainingNoteContent::from("Test training note"),
+            TrainingNoteDate::today(),
             Utc::now().into(),
         )
     }
@@ -1817,6 +1829,7 @@ mod test_sqlite_training_repository {
             user_id.clone(),
             Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Second note"),
+            TrainingNoteDate::today(),
             Utc::now().into(),
         );
 
@@ -1826,6 +1839,7 @@ mod test_sqlite_training_repository {
             other_user_id,
             Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Other user note"),
+            TrainingNoteDate::today(),
             Utc::now().into(),
         );
 
@@ -1883,6 +1897,7 @@ mod test_sqlite_training_repository {
             user_id.clone(),
             Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Older note"),
+            TrainingNoteDate::today(),
             (Utc::now() - chrono::Duration::hours(2)).into(),
         );
 
@@ -1891,6 +1906,7 @@ mod test_sqlite_training_repository {
             user_id.clone(),
             Some(TrainingNoteTitle::from("another note title")),
             TrainingNoteContent::from("Newer note"),
+            TrainingNoteDate::today(),
             Utc::now().into(),
         );
 
@@ -1929,12 +1945,18 @@ mod test_sqlite_training_repository {
 
         let new_title = Some(TrainingNoteTitle::from("Updated title"));
         let new_content = TrainingNoteContent::from("Updated content");
+        let new_date = TrainingNoteDate::try_from("2025-01-15").unwrap();
         repository
-            .update_training_note(note.id(), new_title.clone(), new_content.clone())
+            .update_training_note(
+                note.id(),
+                new_title.clone(),
+                new_content.clone(),
+                new_date.clone(),
+            )
             .await
             .expect("Should update note");
 
-        // Verify content and title were updated
+        // Verify content, title, and date were updated
         let updated_note = repository
             .get_training_note(note.id())
             .await
@@ -1943,6 +1965,7 @@ mod test_sqlite_training_repository {
 
         assert_eq!(updated_note.content(), &new_content);
         assert_eq!(updated_note.title(), &new_title);
+        assert_eq!(updated_note.date(), &new_date);
         assert_eq!(updated_note.id(), note.id());
         assert_eq!(updated_note.user(), note.user());
     }
@@ -1959,6 +1982,7 @@ mod test_sqlite_training_repository {
                 &TrainingNoteId::new(),
                 None,
                 TrainingNoteContent::from("Content"),
+                TrainingNoteDate::today(),
             )
             .await;
 

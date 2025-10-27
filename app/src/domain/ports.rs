@@ -12,9 +12,9 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricValue, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteId,
-    TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
-    TrainingPeriodSports, TrainingPeriodWithActivities,
+    TrainingMetricValue, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+    TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -714,6 +714,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
+        date: TrainingNoteDate,
     ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
 
     fn delete_training_note(
@@ -896,6 +897,7 @@ pub struct CreateTrainingNoteRequest {
     user: UserId,
     title: Option<TrainingNoteTitle>,
     content: TrainingNoteContent,
+    date: TrainingNoteDate,
 }
 
 impl CreateTrainingNoteRequest {
@@ -909,6 +911,10 @@ impl CreateTrainingNoteRequest {
 
     pub fn content(&self) -> &TrainingNoteContent {
         &self.content
+    }
+
+    pub fn date(&self) -> &TrainingNoteDate {
+        &self.date
     }
 }
 
@@ -1030,6 +1036,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
+        date: TrainingNoteDate,
     ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
 
     fn delete_training_note(

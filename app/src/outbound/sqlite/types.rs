@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::DateTime;
+use chrono::{DateTime, NaiveDate};
 use sqlx::{Database, encode::IsNull, error::BoxDynError};
 
 use crate::domain::models::{
@@ -12,7 +12,7 @@ use crate::domain::models::{
     training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue,
-        TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+        TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         TrainingPeriodSports,
     },
 };
@@ -606,5 +606,30 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteContent {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(Self::from(s))
+    }
+}
+
+// SQLx trait implementations for database operations
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteDate {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteDate {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let date_str = <&str as sqlx::Decode<'r, sqlx::Sqlite>>::decode(value)?;
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
+        Ok(TrainingNoteDate::from(date))
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Sqlite> for TrainingNoteDate {
+    fn encode_by_ref(
+        &self,
+        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        let date_str = self.as_naive_date().format("%Y-%m-%d").to_string();
+        <String as sqlx::Encode<'_, sqlx::Sqlite>>::encode(date_str, buf)
     }
 }

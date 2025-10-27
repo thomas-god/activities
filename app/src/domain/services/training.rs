@@ -9,7 +9,7 @@ use crate::domain::{
         training::{
             ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
             TrainingMetricId, TrainingMetricValues, TrainingNote, TrainingNoteContent,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -406,6 +406,7 @@ where
             req.user().clone(),
             req.title().clone(),
             req.content().clone(),
+            req.date().clone(),
             chrono::Utc::now().into(),
         );
 
@@ -448,6 +449,7 @@ where
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
+        date: TrainingNoteDate,
     ) -> Result<(), UpdateTrainingNoteError> {
         // Verify the note exists and belongs to the user
         let note = self
@@ -459,7 +461,7 @@ where
         match note {
             Some(n) if n.user() == user => {
                 self.training_repository
-                    .update_training_note(note_id, title, content)
+                    .update_training_note(note_id, title, content, date)
                     .await?;
                 Ok(())
             }
@@ -639,6 +641,7 @@ pub mod test_utils {
                 note_id: &TrainingNoteId,
                 title: Option<TrainingNoteTitle>,
                 content: TrainingNoteContent,
+                date: TrainingNoteDate,
             ) -> Result<(), UpdateTrainingNoteError>;
 
             async fn delete_training_note(
@@ -756,6 +759,7 @@ pub mod test_utils {
                 note_id: &TrainingNoteId,
                 title: Option<TrainingNoteTitle>,
                 content: TrainingNoteContent,
+                date: TrainingNoteDate,
             ) -> Result<(), UpdateTrainingNoteError>;
 
             async fn delete_training_note(
@@ -2906,6 +2910,7 @@ mod test_training_service_training_note {
         let user_id = UserId::from("user1");
         let title = None;
         let content = TrainingNoteContent::from("This is a test note");
+        let date = TrainingNoteDate::today();
 
         let mut training_repository = MockTrainingRepository::new();
         training_repository
@@ -2916,7 +2921,7 @@ mod test_training_service_training_note {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(training_repository, activity_repository);
 
-        let req = CreateTrainingNoteRequest::new(user_id, title, content);
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
 
         assert!(result.is_ok());
@@ -2927,6 +2932,7 @@ mod test_training_service_training_note {
         let user_id = UserId::from("user1");
         let title = None;
         let content = TrainingNoteContent::from("Note that fails to save");
+        let date = TrainingNoteDate::today();
 
         let mut training_repository = MockTrainingRepository::new();
         training_repository
@@ -2937,7 +2943,7 @@ mod test_training_service_training_note {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(training_repository, activity_repository);
 
-        let req = CreateTrainingNoteRequest::new(user_id, title, content);
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
 
         assert!(result.is_err());
