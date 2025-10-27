@@ -12,8 +12,9 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricValue, TrainingMetricValues, TrainingPeriod, TrainingPeriodCreationError,
-    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+    TrainingMetricValue, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteId,
+    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+    TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -690,6 +691,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: UpdateTrainingPeriodNameRequest,
     ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNameError>> + Send;
+
+    fn create_training_note(
+        &self,
+        req: CreateTrainingNoteRequest,
+    ) -> impl Future<Output = Result<TrainingNoteId, CreateTrainingNoteError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -856,6 +862,38 @@ pub enum UpdateTrainingPeriodNameError {
     Unknown(#[from] anyhow::Error),
 }
 
+///////////////////////////////////////////////////////////////////
+/// TRAINING NOTE TYPES
+///////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct CreateTrainingNoteRequest {
+    user: UserId,
+    content: TrainingNoteContent,
+}
+
+impl CreateTrainingNoteRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn content(&self) -> &TrainingNoteContent {
+        &self.content
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CreateTrainingNoteError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum SaveTrainingNoteError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_definition(
         &self,
@@ -923,6 +961,11 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         period_id: &TrainingPeriodId,
         name: String,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn save_training_note(
+        &self,
+        note: TrainingNote,
+    ) -> impl Future<Output = Result<(), SaveTrainingNoteError>> + Send;
 }
 
 #[cfg(test)]

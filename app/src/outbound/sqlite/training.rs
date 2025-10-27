@@ -11,13 +11,13 @@ use crate::domain::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            TrainingNote, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
         DateRange, DeleteMetricError, GetDefinitionError, GetTrainingMetricValueError,
-        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, SaveTrainingPeriodError,
-        TrainingRepository, UpdateMetricError,
+        GetTrainingMetricsDefinitionsError, SaveTrainingMetricError, SaveTrainingNoteError,
+        SaveTrainingPeriodError, TrainingRepository, UpdateMetricError,
     },
 };
 
@@ -344,6 +344,20 @@ impl TrainingRepository for SqliteTrainingRepository {
             .await
             .map_err(|err| anyhow!(err))
             .map(|_| ())
+    }
+
+    async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
+        sqlx::query(
+            "INSERT INTO t_training_notes (id, user_id, content, created_at) VALUES (?1, ?2, ?3, ?4);",
+        )
+        .bind(note.id().to_string())
+        .bind(note.user().to_string())
+        .bind(note.content().to_string())
+        .bind(note.created_at().to_rfc3339())
+        .execute(&self.pool)
+        .await
+        .map_err(|err| SaveTrainingNoteError::Unknown(anyhow!(err)))
+        .map(|_| ())
     }
 }
 
@@ -1577,5 +1591,89 @@ mod test_sqlite_training_repository {
             .await;
         assert!(fetched2.is_some());
         assert_eq!(fetched2.unwrap().name(), period2.name());
+    }
+
+    fn build_training_note() -> TrainingNote {
+        use crate::domain::models::training::{TrainingNoteContent, TrainingNoteId};
+        use chrono::Utc;
+
+        TrainingNote::new(
+            TrainingNoteId::new(),
+            UserId::test_default(),
+            TrainingNoteContent::from("Test training note"),
+            Utc::now().into(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_save_training_note_without_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        // Verify note was saved
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("select count(*) from t_training_notes where id = ?1")
+                .bind(note.id().to_string())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_training_note_stores_all_fields() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        // Verify all fields were stored correctly
+        let (stored_id, stored_user, stored_content, _stored_created_at) =
+            sqlx::query_as::<_, (String, String, String, String)>(
+                "select id, user_id, content, created_at from t_training_notes where id = ?1",
+            )
+            .bind(note.id().to_string())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_id, note.id().to_string());
+        assert_eq!(stored_user, note.user().to_string());
+        assert_eq!(stored_content, note.content().to_string());
+    }
+
+    #[tokio::test]
+    async fn test_save_training_note_duplicate_fails() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+
+        // First save should succeed
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("First save should succeed");
+
+        // Second save with same ID should fail
+        let result = repository.save_training_note(note.clone()).await;
+        assert!(result.is_err());
     }
 }

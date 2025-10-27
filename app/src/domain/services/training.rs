@@ -8,15 +8,16 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
-            TrainingMetricId, TrainingMetricValues, TrainingPeriodId,
+            TrainingMetricId, TrainingMetricValues, TrainingNoteId, TrainingPeriodId,
         },
     },
     ports::{
         ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
-        CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
-        DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingPeriodError,
-        DeleteTrainingPeriodRequest, ITrainingService, ListActivitiesFilters, TrainingRepository,
-        UpdateMetricsValuesRequest, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+        CreateTrainingNoteError, CreateTrainingNoteRequest, CreateTrainingPeriodError,
+        CreateTrainingPeriodRequest, DateRange, DeleteTrainingMetricError,
+        DeleteTrainingMetricRequest, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
+        ITrainingService, ListActivitiesFilters, TrainingRepository, UpdateMetricsValuesRequest,
+        UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
     },
 };
 
@@ -389,6 +390,30 @@ where
 
         Ok(())
     }
+
+    async fn create_training_note(
+        &self,
+        req: CreateTrainingNoteRequest,
+    ) -> Result<TrainingNoteId, CreateTrainingNoteError> {
+        use crate::domain::models::training::{TrainingNote, TrainingNoteId};
+
+        // Create the note
+        let note_id = TrainingNoteId::new();
+        let note = TrainingNote::new(
+            note_id.clone(),
+            req.user().clone(),
+            req.content().clone(),
+            chrono::Utc::now().into(),
+        );
+
+        // Save to repository
+        self.training_repository
+            .save_training_note(note)
+            .await
+            .map_err(|err| CreateTrainingNoteError::Unknown(err.into()))?;
+
+        Ok(note_id)
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -436,12 +461,15 @@ pub mod test_utils {
     use mockall::mock;
 
     use crate::domain::{
-        models::training::{TrainingMetricValue, TrainingPeriod, TrainingPeriodWithActivities},
+        models::training::{
+            TrainingMetricValue, TrainingNote, TrainingPeriod, TrainingPeriodWithActivities,
+        },
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
             DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
             GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
-            SaveTrainingMetricError, SaveTrainingPeriodError, UpdateMetricError,
+            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+            UpdateMetricError,
         },
     };
 
@@ -508,6 +536,11 @@ pub mod test_utils {
                 &self,
                 req: UpdateTrainingPeriodNameRequest,
             ) -> Result<(), UpdateTrainingPeriodNameError>;
+
+            async fn create_training_note(
+                &self,
+                req: CreateTrainingNoteRequest,
+            ) -> Result<TrainingNoteId, CreateTrainingNoteError>;
         }
     }
 
@@ -597,6 +630,11 @@ pub mod test_utils {
                 period_id: &TrainingPeriodId,
                 name: String,
             ) -> Result<(), anyhow::Error>;
+
+            async fn save_training_note(
+                &self,
+                note: TrainingNote,
+            ) -> Result<(), SaveTrainingNoteError>;
         }
     }
 }
@@ -2720,6 +2758,62 @@ mod test_training_service_period {
         assert!(result.is_err());
         match result {
             Err(UpdateTrainingPeriodNameError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_training_note {
+    use super::*;
+    use crate::domain::models::training::TrainingNoteContent;
+    use crate::domain::ports::{
+        CreateTrainingNoteError, CreateTrainingNoteRequest, SaveTrainingNoteError,
+    };
+    use crate::domain::services::activity::test_utils::MockActivityRepository;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+
+    #[tokio::test]
+    async fn test_create_training_note_ok() {
+        let user_id = UserId::from("user1");
+        let content = TrainingNoteContent::from("This is a test note");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = CreateTrainingNoteRequest::new(user_id, content);
+        let result = service.create_training_note(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_repository_error() {
+        let user_id = UserId::from("user1");
+        let content = TrainingNoteContent::from("Note that fails to save");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = CreateTrainingNoteRequest::new(user_id, content);
+        let result = service.create_training_note(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(CreateTrainingNoteError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
     }

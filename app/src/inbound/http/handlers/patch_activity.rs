@@ -222,26 +222,26 @@ pub async fn patch_activity<
     }
 
     // Update activity feedback if provided in request body
-    if let Some(Json(body)) = body {
-        if let Some(feedback_str) = body.feedback {
-            let feedback = if feedback_str.is_empty() {
-                None
-            } else {
-                Some(ActivityFeedback::from(feedback_str))
-            };
+    if let Some(Json(body)) = body
+        && let Some(feedback_str) = body.feedback
+    {
+        let feedback = if feedback_str.is_empty() {
+            None
+        } else {
+            Some(ActivityFeedback::from(feedback_str))
+        };
 
-            let req = UpdateActivityFeedbackRequest::new(
-                user.user().clone(),
-                ActivityId::from(&activity_id),
-                feedback,
-            );
+        let req = UpdateActivityFeedbackRequest::new(
+            user.user().clone(),
+            ActivityId::from(&activity_id),
+            feedback,
+        );
 
-            state
-                .activity_service
-                .update_activity_feedback(req)
-                .await
-                .map_err(StatusCode::from)?;
-        }
+        state
+            .activity_service
+            .update_activity_feedback(req)
+            .await
+            .map_err(StatusCode::from)?;
     }
 
     Ok(StatusCode::OK)
