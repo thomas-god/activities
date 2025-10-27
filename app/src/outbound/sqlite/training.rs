@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use anyhow::anyhow;
-use chrono::NaiveDate;
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::domain::{
@@ -11,8 +11,8 @@ use crate::domain::{
             ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
+            TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -40,6 +40,13 @@ type TrainingPeriodRow = (
     String,
     TrainingPeriodSports,
     Option<String>,
+);
+type TrainingNoteRow = (
+    TrainingNoteId,
+    UserId,
+    Option<TrainingNoteTitle>,
+    TrainingNoteContent,
+    DateTime<FixedOffset>,
 );
 
 const NONE_GROUP: &str = "no_group";
@@ -350,10 +357,11 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
         sqlx::query(
-            "INSERT INTO t_training_notes (id, user_id, content, created_at) VALUES (?1, ?2, ?3, ?4);",
+            "INSERT INTO t_training_notes (id, user_id, title, content, created_at) VALUES (?1, ?2, ?3, ?4, ?5);",
         )
         .bind(note.id().to_string())
         .bind(note.user().to_string())
+        .bind(note.title().as_ref().map(|t| t.to_string()))
         .bind(note.content().to_string())
         .bind(note.created_at().to_rfc3339())
         .execute(&self.pool)
@@ -366,22 +374,21 @@ impl TrainingRepository for SqliteTrainingRepository {
         &self,
         note_id: &TrainingNoteId,
     ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
-        match sqlx::query_as::<_, (String, String, String, String)>(
-            "SELECT id, user_id, content, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
+        match sqlx::query_as::<_, TrainingNoteRow>(
+            "SELECT id, user_id, title, content, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
         )
         .bind(note_id.to_string())
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, content, created_at)) => {
-                let note = TrainingNote::new(
-                    TrainingNoteId::from(id.as_str()),
-                    UserId::from(user_id),
-                    TrainingNoteContent::from(content),
-                    chrono::DateTime::parse_from_rfc3339(&created_at)
-                        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?,
-                );
-                Ok(Some(note))
+            Ok((id, user_id, title, content, created_at)) => {
+                Ok(Some(TrainingNote::new(
+                    id,
+                    user_id,
+                    title,
+                    content,
+                    created_at
+                )))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(GetTrainingNoteError::Unknown(anyhow!(err))),
@@ -392,8 +399,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         &self,
         user: &UserId,
     ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
-        let rows = sqlx::query_as::<_, (String, String, String, String)>(
-            "SELECT id, user_id, content, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
+        let rows = sqlx::query_as::<_, TrainingNoteRow>(
+            "SELECT id, user_id, title, content, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
         )
         .bind(user.to_string())
         .fetch_all(&self.pool)
@@ -401,15 +408,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
 
         rows.into_iter()
-            .map(|(id, user_id, content, created_at)| {
-                let note = TrainingNote::new(
-                    TrainingNoteId::from(id.as_str()),
-                    UserId::from(user_id),
-                    TrainingNoteContent::from(content),
-                    chrono::DateTime::parse_from_rfc3339(&created_at)
-                        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?,
-                );
-                Ok(note)
+            .map(|(id, user_id, title, content, created_at)| {
+                Ok(TrainingNote::new(id, user_id, title, content, created_at))
             })
             .collect()
     }
@@ -454,7 +454,8 @@ mod test_sqlite_training_repository {
         training::{
             ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingNote, TrainingNoteContent,
-            TrainingNoteId, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     };
 
@@ -1680,6 +1681,7 @@ mod test_sqlite_training_repository {
         TrainingNote::new(
             TrainingNoteId::new(),
             UserId::test_default(),
+            Some(TrainingNoteTitle::from("title")),
             TrainingNoteContent::from("Test training note"),
             Utc::now().into(),
         )
@@ -1811,6 +1813,7 @@ mod test_sqlite_training_repository {
         let note2 = TrainingNote::new(
             TrainingNoteId::new(),
             user_id.clone(),
+            Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Second note"),
             Utc::now().into(),
         );
@@ -1819,6 +1822,7 @@ mod test_sqlite_training_repository {
         let other_note = TrainingNote::new(
             TrainingNoteId::new(),
             other_user_id,
+            Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Other user note"),
             Utc::now().into(),
         );
@@ -1875,6 +1879,7 @@ mod test_sqlite_training_repository {
         let older_note = TrainingNote::new(
             TrainingNoteId::new(),
             user_id.clone(),
+            Some(TrainingNoteTitle::from("note title")),
             TrainingNoteContent::from("Older note"),
             (Utc::now() - chrono::Duration::hours(2)).into(),
         );
@@ -1882,6 +1887,7 @@ mod test_sqlite_training_repository {
         let newer_note = TrainingNote::new(
             TrainingNoteId::new(),
             user_id.clone(),
+            Some(TrainingNoteTitle::from("another note title")),
             TrainingNoteContent::from("Newer note"),
             Utc::now().into(),
         );

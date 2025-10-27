@@ -13,8 +13,8 @@ use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
     TrainingMetricValue, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteId,
-    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-    TrainingPeriodWithActivities,
+    TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
+    TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -893,12 +893,17 @@ pub enum UpdateTrainingPeriodNameError {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingNoteRequest {
     user: UserId,
+    title: Option<TrainingNoteTitle>,
     content: TrainingNoteContent,
 }
 
 impl CreateTrainingNoteRequest {
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    pub fn title(&self) -> &Option<TrainingNoteTitle> {
+        &self.title
     }
 
     pub fn content(&self) -> &TrainingNoteContent {

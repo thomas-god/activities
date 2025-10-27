@@ -950,9 +950,41 @@ impl From<String> for TrainingNoteContent {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct TrainingNoteTitle(String);
+
+impl TrainingNoteTitle {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self(title.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for TrainingNoteTitle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for TrainingNoteTitle {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for TrainingNoteTitle {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct TrainingNote {
     id: TrainingNoteId,
     user: UserId,
+    title: Option<TrainingNoteTitle>,
     content: TrainingNoteContent,
     created_at: DateTime<FixedOffset>,
 }
@@ -961,12 +993,14 @@ impl TrainingNote {
     pub fn new(
         id: TrainingNoteId,
         user: UserId,
+        title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
         created_at: DateTime<FixedOffset>,
     ) -> Self {
         Self {
             id,
             user,
+            title,
             content,
             created_at,
         }
@@ -978,6 +1012,10 @@ impl TrainingNote {
 
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    pub fn title(&self) -> &Option<TrainingNoteTitle> {
+        &self.title
     }
 
     pub fn content(&self) -> &TrainingNoteContent {

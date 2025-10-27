@@ -404,6 +404,7 @@ where
         let note = TrainingNote::new(
             note_id.clone(),
             req.user().clone(),
+            req.title().clone(),
             req.content().clone(),
             chrono::Utc::now().into(),
         );
@@ -2900,6 +2901,7 @@ mod test_training_service_training_note {
     #[tokio::test]
     async fn test_create_training_note_ok() {
         let user_id = UserId::from("user1");
+        let title = None;
         let content = TrainingNoteContent::from("This is a test note");
 
         let mut training_repository = MockTrainingRepository::new();
@@ -2911,7 +2913,7 @@ mod test_training_service_training_note {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(training_repository, activity_repository);
 
-        let req = CreateTrainingNoteRequest::new(user_id, content);
+        let req = CreateTrainingNoteRequest::new(user_id, title, content);
         let result = service.create_training_note(req).await;
 
         assert!(result.is_ok());
@@ -2920,6 +2922,7 @@ mod test_training_service_training_note {
     #[tokio::test]
     async fn test_create_training_note_repository_error() {
         let user_id = UserId::from("user1");
+        let title = None;
         let content = TrainingNoteContent::from("Note that fails to save");
 
         let mut training_repository = MockTrainingRepository::new();
@@ -2931,7 +2934,7 @@ mod test_training_service_training_note {
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(training_repository, activity_repository);
 
-        let req = CreateTrainingNoteRequest::new(user_id, content);
+        let req = CreateTrainingNoteRequest::new(user_id, title, content);
         let result = service.create_training_note(req).await;
 
         assert!(result.is_err());

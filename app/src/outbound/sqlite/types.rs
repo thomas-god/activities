@@ -12,7 +12,8 @@ use crate::domain::models::{
     training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue,
-        TrainingPeriodId, TrainingPeriodSports,
+        TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 
@@ -533,5 +534,77 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricGroupBy {
             "bonked" => Ok(Self::Bonked),
             _ => Err(format!("Unknown GroupBy: {}", s).into()),
         }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteId {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteId {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteId {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteTitle {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteTitle {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteTitle {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingNoteContent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingNoteContent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingNoteContent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
     }
 }

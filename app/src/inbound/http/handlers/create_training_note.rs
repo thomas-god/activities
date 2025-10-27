@@ -22,7 +22,8 @@ pub struct CreateTrainingNoteResponse {
 }
 
 fn build_request(body: CreateTrainingNoteBody, user: &UserId) -> CreateTrainingNoteRequest {
-    CreateTrainingNoteRequest::new(user.clone(), TrainingNoteContent::from(body.content))
+    // TODO: replace None with title from request
+    CreateTrainingNoteRequest::new(user.clone(), None, TrainingNoteContent::from(body.content))
 }
 
 impl From<CreateTrainingNoteError> for StatusCode {
