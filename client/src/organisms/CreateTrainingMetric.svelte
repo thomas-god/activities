@@ -90,6 +90,22 @@
 
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
+		<label class="label" for="metric-granularity">Granularity</label>
+		<select class="select" bind:value={granularity} id="metric-granularity">
+			<option value="Daily">Daily</option>
+			<option value="Weekly">Weekly</option>
+			<option value="Monthly">Monthly</option>
+		</select>
+
+		<label class="label" for="metric-aggregate">Aggregate function</label>
+		<select class="select" bind:value={aggregate} id="metric-aggregate">
+			<option value="Max">Maximum value</option>
+			<option value="Min">Minimum value</option>
+			<option value="Sum">Total</option>
+			<option value="Average">Average</option>
+			<option value="NumberOfActivities">Number of activities</option>
+		</select>
+
 		{#if aggregate !== 'NumberOfActivities'}
 			<label class="label" for="source-type">Metric source</label>
 			<select class="select" bind:value={sourceType} id="source-type">
@@ -143,22 +159,6 @@
 				</div>
 			{/if}
 		{/if}
-
-		<label class="label" for="metric-granularity">Granularity</label>
-		<select class="select" bind:value={granularity} id="metric-granularity">
-			<option value="Daily">Daily</option>
-			<option value="Weekly">Weekly</option>
-			<option value="Monthly">Monthly</option>
-		</select>
-
-		<label class="label" for="metric-aggregate">Aggregate function</label>
-		<select class="select" bind:value={aggregate} id="metric-aggregate">
-			<option value="Max">Maximum value</option>
-			<option value="Min">Minimum value</option>
-			<option value="Sum">Total</option>
-			<option value="Average">Average</option>
-			<option value="NumberOfActivities">Number of activities</option>
-		</select>
 
 		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
 			<summary class="collapse-title font-semibold">Groups and filters</summary>
