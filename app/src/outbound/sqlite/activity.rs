@@ -9,9 +9,9 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
-                ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityWithTimeseries, Sport,
-                WorkoutType,
+                Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey,
+                ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistics,
+                ActivityWithTimeseries, Sport, WorkoutType,
             },
         },
         ports::{
@@ -32,6 +32,7 @@ type ActivityRow = (
     Option<ActivityRpe>,
     Option<WorkoutType>,
     Option<ActivityNutrition>,
+    Option<ActivityFeedback>,
 );
 
 #[derive(Debug, Clone)]
@@ -113,7 +114,7 @@ where
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
         match sqlx::query_as::<_, ActivityRow>(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback
             FROM t_activities
             WHERE id = ?1
             LIMIT 1;",
@@ -132,6 +133,7 @@ where
                 rpe,
                 workout_type,
                 nutrition,
+                feedback,
             )) => Ok(Some(Activity::new(
                 id,
                 user_id,
@@ -142,6 +144,7 @@ where
                 rpe,
                 workout_type,
                 nutrition,
+                feedback,
             ))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
@@ -172,7 +175,7 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition
+            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback
             FROM t_activities ",
         );
         builder.push("WHERE user_id = ").push_bind(user);
@@ -211,6 +214,7 @@ where
                             rpe,
                             workout_type,
                             nutrition,
+                            feedback,
                         )| {
                             Activity::new(
                                 id,
@@ -222,6 +226,7 @@ where
                                 rpe,
                                 workout_type,
                                 nutrition,
+                                feedback,
                             )
                         },
                     )
@@ -304,13 +309,27 @@ where
             .map(|_| ())
     }
 
+    async fn update_activity_feedback(
+        &self,
+        id: &ActivityId,
+        feedback: Option<ActivityFeedback>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_activities SET feedback = ?1 WHERE id = ?2;")
+            .bind(feedback)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
+
     async fn save_activity(
         &self,
         activity: &ActivityWithTimeseries,
     ) -> Result<(), SaveActivityError> {
         sqlx::query(
             "INSERT INTO t_activities VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
     );",
         )
         .bind(activity.id())
@@ -323,6 +342,7 @@ where
         .bind(activity.rpe())
         .bind(activity.workout_type())
         .bind(activity.nutrition())
+        .bind(activity.feedback())
         .execute(&self.pool)
         .await
         .map(|_| ())
@@ -429,6 +449,7 @@ mod test_sqlite_activity_repository {
             None,
             None,
             None,
+            None,
         )
     }
 
@@ -440,6 +461,7 @@ mod test_sqlite_activity_repository {
             ActivityStartTime::new(*start),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            None,
             None,
             None,
             None,
@@ -654,6 +676,43 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
+    async fn test_get_activity_with_feedback() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        // Create an activity with feedback
+        let feedback_text = ActivityFeedback::from("Great workout! Felt strong throughout.");
+        let activity = build_activity_with_timeseries();
+
+        // Save activity without feedback first
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Update with feedback
+        repository
+            .update_activity_feedback(activity.id(), Some(feedback_text.clone()))
+            .await
+            .expect("Update should have succeeded");
+
+        // Retrieve the activity and verify feedback is present
+        let retrieved = repository
+            .get_activity(activity.id())
+            .await
+            .expect("Get should have succeeded")
+            .expect("Should not be None");
+
+        assert_eq!(retrieved.feedback(), &Some(feedback_text));
+    }
+
+    #[tokio::test]
     async fn test_get_activity_not_found() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
@@ -845,6 +904,54 @@ mod test_sqlite_activity_repository {
             .expect("Get should have succeeded");
 
         assert_eq!(res.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_activities_includes_feedback() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        // Save activity without feedback
+        let activity1 = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity1)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Save activity and add feedback
+        let activity2 = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity2)
+            .await
+            .expect("Insertion should have succeed");
+
+        let feedback_text = ActivityFeedback::from("Second activity was much better!");
+        repository
+            .update_activity_feedback(activity2.id(), Some(feedback_text.clone()))
+            .await
+            .expect("Update should have succeeded");
+
+        // List all activities
+        let res = repository
+            .list_activities(activity1.user(), &ListActivitiesFilters::empty())
+            .await
+            .expect("Get should have succeeded");
+
+        assert_eq!(res.len(), 2);
+
+        // Find the activities in the results
+        let retrieved1 = res.iter().find(|a| a.id() == activity1.id()).unwrap();
+        let retrieved2 = res.iter().find(|a| a.id() == activity2.id()).unwrap();
+
+        // Verify feedback is correct
+        assert_eq!(retrieved1.feedback(), &None);
+        assert_eq!(retrieved2.feedback(), &Some(feedback_text));
     }
 
     #[tokio::test]
@@ -1111,6 +1218,88 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_feedback() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        // Initially, feedback should be NULL
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+
+        // Update feedback with some text
+        let feedback_text = ActivityFeedback::from("Felt great today! Weather was perfect.");
+        repository
+            .update_activity_feedback(activity.id(), Some(feedback_text.clone()))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(feedback_text)
+        );
+
+        // Update feedback with different text
+        let feedback_updated = ActivityFeedback::from("Actually struggled a bit on the hills.");
+        repository
+            .update_activity_feedback(activity.id(), Some(feedback_updated.clone()))
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(feedback_updated)
+        );
+
+        // Clear feedback (set to None)
+        repository
+            .update_activity_feedback(activity.id(), None)
+            .await
+            .expect("Should not have err");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)

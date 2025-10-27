@@ -28,6 +28,7 @@ pub struct Activity {
     rpe: Option<ActivityRpe>,
     workout_type: Option<WorkoutType>,
     nutrition: Option<ActivityNutrition>,
+    feedback: Option<ActivityFeedback>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43,6 +44,7 @@ impl Activity {
         rpe: Option<ActivityRpe>,
         workout_type: Option<WorkoutType>,
         nutrition: Option<ActivityNutrition>,
+        feedback: Option<ActivityFeedback>,
     ) -> Self {
         Self {
             id,
@@ -54,6 +56,7 @@ impl Activity {
             rpe,
             workout_type,
             nutrition,
+            feedback,
         }
     }
 
@@ -106,6 +109,10 @@ impl Activity {
     pub fn nutrition(&self) -> &Option<ActivityNutrition> {
         &self.nutrition
     }
+
+    pub fn feedback(&self) -> &Option<ActivityFeedback> {
+        &self.feedback
+    }
 }
 
 #[derive(Clone, Debug, Constructor)]
@@ -157,6 +164,10 @@ impl ActivityWithTimeseries {
 
     pub fn nutrition(&self) -> &Option<ActivityNutrition> {
         &self.activity.nutrition
+    }
+
+    pub fn feedback(&self) -> &Option<ActivityFeedback> {
+        &self.activity.feedback
     }
 
     pub fn timeseries(&self) -> &ActivityTimeseries {
@@ -385,6 +396,35 @@ impl ActivityNutrition {
 
     pub fn details(&self) -> Option<&str> {
         self.details.as_deref()
+    }
+}
+
+/// Free-form text feedback about an activity.
+/// Can include subjective impressions, training notes, or any other commentary.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ActivityFeedback(String);
+
+impl fmt::Display for ActivityFeedback {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for ActivityFeedback {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+impl From<String> for ActivityFeedback {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl ActivityFeedback {
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -976,6 +1016,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -984,6 +1025,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
+            None,
             None,
             None,
             None,
@@ -1004,6 +1046,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -1012,6 +1055,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
             None,
             None,
@@ -1032,6 +1076,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         let second_activity = Activity::new(
             ActivityId::new(),
@@ -1040,6 +1085,7 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
             None,
             None,

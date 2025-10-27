@@ -919,6 +919,7 @@ mod test_training_metrics {
                 None,
                 None,
                 None,
+                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -967,6 +968,7 @@ mod test_training_metrics {
                 ),
                 Sport::Cycling,
                 ActivityStatistics::default(),
+                None,
                 None,
                 None,
                 None,
@@ -1873,6 +1875,7 @@ mod test_training_metric_filters {
             None,
             None,
             None,
+            None,
         );
 
         assert!(SportFilter::Sport(Sport::IndoorCycling).matches(&activity));
@@ -1895,6 +1898,7 @@ mod test_training_metric_filters {
             ),
             Sport::Cycling,
             ActivityStatistics::default(),
+            None,
             None,
             None,
             None,
@@ -1989,6 +1993,7 @@ mod test_training_period {
             None,
             None,
             None,
+            None,
         )
     }
 
@@ -2004,6 +2009,7 @@ mod test_training_period {
             ),
             sport,
             ActivityStatistics::new(HashMap::new()),
+            None,
             None,
             None,
             None,
@@ -2229,6 +2235,7 @@ mod test_training_metric_group_by {
             Some(ActivityRpe::Six),
             Some(WorkoutType::Intervals),
             Some(ActivityNutrition::new(BonkStatus::Bonked, None)),
+            None,
         );
 
         assert_eq!(
@@ -2270,6 +2277,7 @@ mod test_training_metric_group_by {
             ),
             Sport::Golf,
             ActivityStatistics::new(HashMap::new()),
+            None,
             None,
             None,
             None,

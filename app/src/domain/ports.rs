@@ -5,9 +5,9 @@ use thiserror::Error;
 
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
-    Activity, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-    ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
-    WorkoutType,
+    Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
+    ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+    Sport, WorkoutType,
 };
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
@@ -454,6 +454,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
         nutrition: Option<ActivityNutrition>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn update_activity_feedback(
+        &self,
+        id: &ActivityId,
+        feedback: Option<ActivityFeedback>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn delete_activity(

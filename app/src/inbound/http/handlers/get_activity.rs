@@ -274,6 +274,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        None,
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![0, 1, 2]),

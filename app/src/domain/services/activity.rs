@@ -68,7 +68,8 @@ where
             *req.start_time(),
             *req.sport(),
             req.statistics().clone(),
-            // RPE, WorkoutType and Nutrition are set to None for new activities
+            // RPE, WorkoutType, Nutrition and Feedback are set to None for new activities
+            None,
             None,
             None,
             None,
@@ -419,6 +420,7 @@ pub mod test_utils {
                     None,
                     None,
                     None,
+                    None,
                 ))
             });
         }
@@ -435,6 +437,7 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
+                    None,
                     None,
                     None,
                     None,
@@ -517,6 +520,12 @@ pub mod test_utils {
                 &self,
                 id: &ActivityId,
                 nutrition: Option<crate::domain::models::activity::ActivityNutrition>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn update_activity_feedback(
+                &self,
+                id: &ActivityId,
+                feedback: Option<crate::domain::models::activity::ActivityFeedback>,
             ) -> Result<(), anyhow::Error>;
 
             async fn delete_activity(
@@ -748,6 +757,7 @@ mod tests_activity_service {
                 None,
                 None,
                 None,
+                None,
             )))
         });
 
@@ -782,6 +792,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
                 None,
                 None,
@@ -826,6 +837,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
                 None,
                 None,
@@ -901,6 +913,7 @@ mod tests_activity_service {
                 None,
                 None,
                 None,
+                None,
             )))
         });
 
@@ -940,6 +953,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
                 None,
                 None,
@@ -1015,6 +1029,7 @@ mod tests_activity_service {
                 None,
                 None,
                 None,
+                None,
             )))
         });
 
@@ -1054,6 +1069,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
                 None,
                 None,
@@ -1131,6 +1147,7 @@ mod tests_activity_service {
                 None,
                 None,
                 None,
+                None,
             )))
         });
 
@@ -1198,6 +1215,7 @@ mod tests_activity_service {
                 None,
                 None,
                 None,
+                None,
             )))
         });
 
@@ -1234,6 +1252,7 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
+                None,
                 None,
                 None,
                 None,
