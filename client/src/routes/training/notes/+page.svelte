@@ -9,26 +9,34 @@
 	let notes = $derived(data.notes.toSorted((a, b) => (a.created_at > b.created_at ? -1 : 1)));
 
 	let editingNoteId = $state<string | null>(null);
+	let editTitle = $state('');
 	let editContent = $state('');
 	let deleteConfirmNoteId = $state<string | null>(null);
 	let isDeleting = $state(false);
 
-	const startEdit = (noteId: string, content: string) => {
+	const startEdit = (noteId: string, title: string | null, content: string) => {
 		editingNoteId = noteId;
+		editTitle = title || '';
 		editContent = content;
 	};
 
 	const cancelEdit = () => {
 		editingNoteId = null;
+		editTitle = '';
 		editContent = '';
 	};
 
 	const saveEdit = async (noteId: string) => {
 		if (editContent.trim() === '') return;
 
-		const success = await updateTrainingNote(noteId, editContent.trim());
+		const success = await updateTrainingNote(
+			noteId,
+			editTitle.trim() || undefined,
+			editContent.trim()
+		);
 		if (success) {
 			editingNoteId = null;
+			editTitle = '';
 			editContent = '';
 			invalidate('app:training-notes');
 		}
@@ -66,8 +74,10 @@
 		<div>
 			{#each notes as note}
 				<div class="note-item border-b border-base-200 p-4">
-					{#if note.title}
-						<h3 class="mb-2 text-lg font-semibold">{note.title}</h3>
+					{#if editingNoteId !== note.id}
+						{#if note.title}
+							<h3 class="mb-2 text-lg font-semibold">{note.title}</h3>
+						{/if}
 					{/if}
 					<div class="mb-2 flex items-center justify-between">
 						<div class="text-xs font-light opacity-70">
@@ -77,7 +87,7 @@
 							<div class="flex gap-2">
 								<button
 									class="btn btn-ghost btn-xs"
-									onclick={() => startEdit(note.id, note.content)}
+									onclick={() => startEdit(note.id, note.title, note.content)}
 								>
 									✏️ Edit
 								</button>
@@ -90,7 +100,17 @@
 
 					{#if editingNoteId === note.id}
 						<div class="flex flex-col gap-2">
-							<textarea class="textarea-bordered textarea w-full" rows="6" bind:value={editContent}
+							<input
+								type="text"
+								class="input-bordered input w-full"
+								placeholder="Title (optional)"
+								bind:value={editTitle}
+							/>
+							<textarea
+								class="textarea-bordered textarea w-full"
+								rows="6"
+								placeholder="Content"
+								bind:value={editContent}
 							></textarea>
 							<div class="flex justify-end gap-2">
 								<button class="btn btn-ghost btn-sm" onclick={cancelEdit}>Cancel</button>

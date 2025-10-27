@@ -284,10 +284,15 @@ export async function createTrainingNote(content: string, title: string | null):
 /**
  * Update an existing training note
  * @param noteId - The ID of the note to update
+ * @param title - The optional title
  * @param content - The new content
  * @returns true if successful, false otherwise
  */
-export async function updateTrainingNote(noteId: string, content: string): Promise<boolean> {
+export async function updateTrainingNote(
+	noteId: string,
+	title: string | undefined,
+	content: string
+): Promise<boolean> {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note/${noteId}`, {
 		method: 'PATCH',
 		mode: 'cors',
@@ -295,7 +300,7 @@ export async function updateTrainingNote(noteId: string, content: string): Promi
 		headers: {
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ content })
+		body: JSON.stringify({ title: title || undefined, content })
 	});
 
 	if (res.status === 401) {

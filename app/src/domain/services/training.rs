@@ -9,7 +9,7 @@ use crate::domain::{
         training::{
             ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
             TrainingMetricId, TrainingMetricValues, TrainingNote, TrainingNoteContent,
-            TrainingNoteId, TrainingPeriodId,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -446,6 +446,7 @@ where
         &self,
         user: &UserId,
         note_id: &TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
     ) -> Result<(), UpdateTrainingNoteError> {
         // Verify the note exists and belongs to the user
@@ -458,7 +459,7 @@ where
         match note {
             Some(n) if n.user() == user => {
                 self.training_repository
-                    .update_training_note(note_id, content)
+                    .update_training_note(note_id, title, content)
                     .await?;
                 Ok(())
             }
@@ -636,6 +637,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 note_id: &TrainingNoteId,
+                title: Option<TrainingNoteTitle>,
                 content: TrainingNoteContent,
             ) -> Result<(), UpdateTrainingNoteError>;
 
@@ -752,6 +754,7 @@ pub mod test_utils {
             async fn update_training_note(
                 &self,
                 note_id: &TrainingNoteId,
+                title: Option<TrainingNoteTitle>,
                 content: TrainingNoteContent,
             ) -> Result<(), UpdateTrainingNoteError>;
 

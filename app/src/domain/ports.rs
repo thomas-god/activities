@@ -712,6 +712,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         note_id: &TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
     ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
 
@@ -1027,6 +1028,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn update_training_note(
         &self,
         note_id: &TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
     ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
 

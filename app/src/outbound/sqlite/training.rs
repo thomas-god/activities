@@ -417,9 +417,11 @@ impl TrainingRepository for SqliteTrainingRepository {
     async fn update_training_note(
         &self,
         note_id: &TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
     ) -> Result<(), UpdateTrainingNoteError> {
-        sqlx::query("UPDATE t_training_notes SET content = ?1 WHERE id = ?2;")
+        sqlx::query("UPDATE t_training_notes SET title = ?1, content = ?2 WHERE id = ?3;")
+            .bind(title.as_ref().map(|t| t.to_string()))
             .bind(content.to_string())
             .bind(note_id.to_string())
             .execute(&self.pool)
@@ -1925,13 +1927,14 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should save note");
 
+        let new_title = Some(TrainingNoteTitle::from("Updated title"));
         let new_content = TrainingNoteContent::from("Updated content");
         repository
-            .update_training_note(note.id(), new_content.clone())
+            .update_training_note(note.id(), new_title.clone(), new_content.clone())
             .await
             .expect("Should update note");
 
-        // Verify content was updated
+        // Verify content and title were updated
         let updated_note = repository
             .get_training_note(note.id())
             .await
@@ -1939,6 +1942,7 @@ mod test_sqlite_training_repository {
             .expect("Note should exist");
 
         assert_eq!(updated_note.content(), &new_content);
+        assert_eq!(updated_note.title(), &new_title);
         assert_eq!(updated_note.id(), note.id());
         assert_eq!(updated_note.user(), note.user());
     }
@@ -1951,7 +1955,11 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let result = repository
-            .update_training_note(&TrainingNoteId::new(), TrainingNoteContent::from("Content"))
+            .update_training_note(
+                &TrainingNoteId::new(),
+                None,
+                TrainingNoteContent::from("Content"),
+            )
             .await;
 
         // Should not fail even if note doesn't exist
