@@ -61,11 +61,14 @@
 <div class="mx-auto flex flex-col gap-4">
 	<div class="rounded-box bg-base-100 shadow-md">
 		<div class="p-2 px-4 text-sm tracking-wide italic opacity-60">
-			Training notes are personal thoughts, observations, and insights about your training journey.
+			Training notes are personal observations, insights and decisions about your training.
 		</div>
 		<div>
 			{#each notes as note}
 				<div class="note-item border-b border-base-200 p-4">
+					{#if note.title}
+						<h3 class="mb-2 text-lg font-semibold">{note.title}</h3>
+					{/if}
 					<div class="mb-2 flex items-center justify-between">
 						<div class="text-xs font-light opacity-70">
 							{dayjs(note.created_at).format('MMM D, YYYY • HH:mm')}
@@ -122,8 +125,14 @@
 				Are you sure you want to delete this note?
 				{#if noteToDelete}
 					<br />
-					<span class="mt-2 line-clamp-3 block text-sm italic opacity-70">
-						"{noteToDelete.content.slice(0, 100)}{noteToDelete.content.length > 100 ? '...' : ''}"
+					<span class="mt-2 block text-sm italic opacity-70">
+						{#if noteToDelete.title}
+							<strong>"{noteToDelete.title}"</strong>
+							<br />
+						{/if}
+						<span class="line-clamp-3">
+							{noteToDelete.content.slice(0, 100)}{noteToDelete.content.length > 100 ? '...' : ''}
+						</span>
 					</span>
 				{/if}
 				<br />

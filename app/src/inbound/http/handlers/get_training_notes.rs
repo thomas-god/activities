@@ -14,6 +14,7 @@ use crate::{
 #[derive(Debug, Serialize)]
 pub struct TrainingNoteResponse {
     id: String,
+    title: Option<String>,
     content: String,
     created_at: String,
 }
@@ -22,6 +23,7 @@ impl From<TrainingNote> for TrainingNoteResponse {
     fn from(note: TrainingNote) -> Self {
         Self {
             id: note.id().to_string(),
+            title: note.title().as_ref().map(|t| t.to_string()),
             content: note.content().to_string(),
             created_at: note.created_at().to_rfc3339(),
         }

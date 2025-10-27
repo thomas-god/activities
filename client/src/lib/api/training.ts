@@ -81,6 +81,7 @@ const MetricsListSchema = z.array(MetricsListItemSchema);
 
 const TrainingNoteSchema = z.object({
 	id: z.string(),
+	title: z.string().nullable(),
 	content: z.string(),
 	created_at: z.string()
 });
