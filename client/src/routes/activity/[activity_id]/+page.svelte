@@ -8,6 +8,7 @@
 	import EditableRpe from '../../../molecules/EditableRpe.svelte';
 	import EditableWorkoutType from '../../../molecules/EditableWorkoutType.svelte';
 	import EditableNutrition from '../../../molecules/EditableNutrition.svelte';
+	import EditableFeedback from '../../../molecules/EditableFeedback.svelte';
 	import MultiSelect from '../../../molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
@@ -165,6 +166,28 @@
 		}
 	};
 
+	const updateActivityFeedbackCallback = async (newFeedback: string | null) => {
+		const body = { feedback: newFeedback };
+
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(body)
+		});
+
+		if (res.status === 401) {
+			goto('/login');
+		}
+
+		// Update local state
+		if (res.ok) {
+			data.activity.feedback = newFeedback;
+		}
+	};
+
 	const categoryClass = (category: SportCategory | null): string => {
 		if (category === 'Running') {
 			return 'running';
@@ -240,6 +263,11 @@
 			<EditableNutrition
 				nutrition={data.activity.nutrition}
 				editCallback={updateActivityNutritionCallback}
+			/>
+			<div class="divider my-0"></div>
+			<EditableFeedback
+				feedback={data.activity.feedback}
+				editCallback={updateActivityFeedbackCallback}
 			/>
 		</div>
 	</div>

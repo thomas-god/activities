@@ -37,6 +37,7 @@ const ActivityDetailsSchema = z.object({
 	rpe: z.number().min(1).max(10).nullable(),
 	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
 	nutrition: NutritionSchema.nullable(),
+	feedback: z.string().nullable(),
 	statistics: z.record(z.string(), z.number()),
 	timeseries: z.object({
 		time: z.array(z.number()),
