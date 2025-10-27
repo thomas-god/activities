@@ -11,6 +11,7 @@
 	let editingNoteId = $state<string | null>(null);
 	let editContent = $state('');
 	let deleteConfirmNoteId = $state<string | null>(null);
+	let isDeleting = $state(false);
 
 	const startEdit = (noteId: string, content: string) => {
 		editingNoteId = noteId;
@@ -41,13 +42,20 @@
 		deleteConfirmNoteId = null;
 	};
 
-	const deleteNote = async (noteId: string) => {
-		const success = await deleteTrainingNote(noteId);
+	const deleteNote = async () => {
+		if (!deleteConfirmNoteId) return;
+
+		isDeleting = true;
+		const success = await deleteTrainingNote(deleteConfirmNoteId);
 		if (success) {
 			deleteConfirmNoteId = null;
 			invalidate('app:training-notes');
 		}
+		isDeleting = false;
 	};
+
+	// Find the note content for the delete modal
+	const noteToDelete = $derived(notes.find((n) => n.id === deleteConfirmNoteId));
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
@@ -62,7 +70,7 @@
 						<div class="text-xs font-light opacity-70">
 							{dayjs(note.created_at).format('MMM D, YYYY • HH:mm')}
 						</div>
-						{#if editingNoteId !== note.id && deleteConfirmNoteId !== note.id}
+						{#if editingNoteId !== note.id}
 							<div class="flex gap-2">
 								<button
 									class="btn btn-ghost btn-xs"
@@ -92,19 +100,6 @@
 								</button>
 							</div>
 						</div>
-					{:else if deleteConfirmNoteId === note.id}
-						<div class="alert alert-warning">
-							<div class="flex w-full flex-col gap-2">
-								<p class="font-semibold">Are you sure you want to delete this note?</p>
-								<p class="text-sm">This action cannot be undone.</p>
-								<div class="mt-2 flex justify-end gap-2">
-									<button class="btn btn-ghost btn-sm" onclick={cancelDelete}>Cancel</button>
-									<button class="btn btn-sm btn-error" onclick={() => deleteNote(note.id)}>
-										Delete
-									</button>
-								</div>
-							</div>
-						</div>
 					{:else}
 						<div class="text-sm whitespace-pre-wrap">{note.content}</div>
 					{/if}
@@ -117,6 +112,40 @@
 		</div>
 	</div>
 </div>
+
+<!-- Delete confirmation modal -->
+{#if deleteConfirmNoteId}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Delete Training Note</h3>
+			<p class="py-4">
+				Are you sure you want to delete this note?
+				{#if noteToDelete}
+					<br />
+					<span class="mt-2 line-clamp-3 block text-sm italic opacity-70">
+						"{noteToDelete.content.slice(0, 100)}{noteToDelete.content.length > 100 ? '...' : ''}"
+					</span>
+				{/if}
+				<br />
+				<strong>This action cannot be undone.</strong>
+			</p>
+			<div class="modal-action">
+				<button class="btn" onclick={cancelDelete} disabled={isDeleting}> Cancel </button>
+				<button class="btn btn-error" onclick={deleteNote} disabled={isDeleting}>
+					{#if isDeleting}
+						<span class="loading loading-sm loading-spinner"></span>
+						Deleting...
+					{:else}
+						Delete
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={cancelDelete}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <style>
 	.note-item:hover {
