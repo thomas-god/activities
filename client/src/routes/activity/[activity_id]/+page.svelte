@@ -252,24 +252,27 @@
 	</div>
 
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
-		<div class="flex flex-col gap-3">
-			<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
-			<div class="divider my-0"></div>
-			<EditableWorkoutType
-				workoutType={data.activity.workout_type}
-				editCallback={updateActivityWorkoutTypeCallback}
-			/>
-			<div class="divider my-0"></div>
-			<EditableNutrition
-				nutrition={data.activity.nutrition}
-				editCallback={updateActivityNutritionCallback}
-			/>
-			<div class="divider my-0"></div>
-			<EditableFeedback
-				feedback={data.activity.feedback}
-				editCallback={updateActivityFeedbackCallback}
-			/>
-		</div>
+		<fieldset class="fieldset">
+			<legend class="text-lg font-semibold">Session feedbacks</legend>
+			<div class="flex flex-col gap-3">
+				<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
+				<div class="my-0 border-b border-base-300"></div>
+				<EditableWorkoutType
+					workoutType={data.activity.workout_type}
+					editCallback={updateActivityWorkoutTypeCallback}
+				/>
+				<div class="my-0 border-b border-base-300"></div>
+				<EditableNutrition
+					nutrition={data.activity.nutrition}
+					editCallback={updateActivityNutritionCallback}
+				/>
+				<div class="my-0 border-b border-base-300"></div>
+				<EditableFeedback
+					feedback={data.activity.feedback}
+					editCallback={updateActivityFeedbackCallback}
+				/>
+			</div>
+		</fieldset>
 	</div>
 
 	<div>

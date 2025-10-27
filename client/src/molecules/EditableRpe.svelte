@@ -45,10 +45,24 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex items-center gap-2">
-		<div class="text-sm font-medium">RPE:</div>
-		<span class={`badge ${rpe === null ? '' : getRpeColor(rpe)}`}>{getRpeLabelAsScale(rpe)}</span>
-		<button class="btn opacity-75 btn-ghost btn-sm" onclick={() => (editMode = true)}> ✏️ </button>
+	<div class="flex flex-col gap-2">
+		<div class="flex flex-row text-sm font-medium">
+			<span>RPE</span>
+			{#if rpe !== null}
+				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
+					✏️ Edit
+				</button>
+			{/if}
+		</div>
+		{#if rpe === null}
+			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
+				Add RPE
+			</button>
+		{:else}
+			<div class="flex items-center gap-2">
+				<span class={`badge ${getRpeColor(rpe)}`}>{getRpeLabelAsScale(rpe)}</span>
+			</div>
+		{/if}
 	</div>
 {/if}
 

@@ -23,7 +23,7 @@
 
 {#if editMode}
 	<div class="flex flex-col gap-2">
-		<div class="text-sm font-medium">Activity Feedback</div>
+		<div class="text-sm font-medium">Note</div>
 		<div class="flex flex-col gap-2">
 			<label class="label" for="activity-feedback">
 				<span class="label-text text-xs">Share your thoughts about this activity</span>
@@ -53,16 +53,19 @@
 	</div>
 {:else}
 	<div class="flex flex-col gap-2">
-		<div class="flex items-center gap-2">
-			<div class="text-sm font-medium">Feedback:</div>
-			{#if feedback === null || feedback === ''}
-				<span class="badge">Not set</span>
+		<div class="flex flex-row text-sm font-medium">
+			<span>Note</span>
+			{#if feedback !== null && feedback !== ''}
+				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
+					✏️ Edit
+				</button>
 			{/if}
-			<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
-				✏️ Edit
-			</button>
 		</div>
-		{#if feedback && feedback !== ''}
+		{#if feedback === null || feedback === ''}
+			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
+				Add note
+			</button>
+		{:else}
 			<div class="rounded-lg bg-base-200 p-3 text-sm">
 				<p class="whitespace-pre-wrap">{feedback}</p>
 			</div>

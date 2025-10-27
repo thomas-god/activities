@@ -53,12 +53,26 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex items-center gap-2">
-		<div class="text-sm font-medium">Workout Type:</div>
-		<span class={`badge workout-${workoutType}`}>
-			{getWorkoutTypeLabel(workoutType)}
-		</span>
-		<button class="btn btn-ghost btn-xs" onclick={() => (editMode = true)}>✏️ Edit</button>
+	<div class="flex flex-col gap-2">
+		<div class="flex flex-row text-sm font-medium">
+			<span> Workout Type </span>
+			{#if workoutType !== null}
+				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
+					✏️ Edit
+				</button>
+			{/if}
+		</div>
+		{#if workoutType === null}
+			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
+				Add workout type
+			</button>
+		{:else}
+			<div class="flex items-center gap-2">
+				<span class={`badge workout-${workoutType}`}>
+					{getWorkoutTypeLabel(workoutType)}
+				</span>
+			</div>
+		{/if}
 	</div>
 {/if}
 
@@ -78,7 +92,7 @@
 		color: var(--color-workout-intervals-text);
 	}
 
-	.workout-long-run {
+	.workout-long_run {
 		background-color: var(--color-workout-long-run);
 		color: var(--color-workout-long-run-text);
 	}
