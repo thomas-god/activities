@@ -1,6 +1,7 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
+use crate::domain::models::training::TrainingNoteTitle;
 use crate::domain::ports::IActivityService;
 use crate::inbound::parser::ParseFile;
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingNoteBody {
+    title: Option<String>,
     content: String,
 }
 
@@ -22,8 +24,11 @@ pub struct CreateTrainingNoteResponse {
 }
 
 fn build_request(body: CreateTrainingNoteBody, user: &UserId) -> CreateTrainingNoteRequest {
-    // TODO: replace None with title from request
-    CreateTrainingNoteRequest::new(user.clone(), None, TrainingNoteContent::from(body.content))
+    CreateTrainingNoteRequest::new(
+        user.clone(),
+        body.title.map(TrainingNoteTitle::from),
+        TrainingNoteContent::from(body.content),
+    )
 }
 
 impl From<CreateTrainingNoteError> for StatusCode {

@@ -258,7 +258,11 @@ export async function fetchTrainingNotes(
  * @param content - The note content
  * @returns The created note or null on error
  */
-export async function createTrainingNote(content: string): Promise<void> {
+export async function createTrainingNote(content: string, title: string | null): Promise<void> {
+	let body: {content: string, title: string | null} = {content, title: null}
+	if (title !== null) {
+		body = {...body, title}
+	}
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/note`, {
 		method: 'POST',
 		mode: 'cors',
@@ -266,7 +270,7 @@ export async function createTrainingNote(content: string): Promise<void> {
 		headers: {
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({ content })
+		body: JSON.stringify(body)
 	});
 
 	if (res.status === 401) {

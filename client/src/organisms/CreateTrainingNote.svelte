@@ -4,6 +4,7 @@
 
 	let { callback }: { callback: () => void } = $props();
 
+	let title = $state<string | null>(null);
 	let content = $state('');
 	let requestPending = $state(false);
 	let errorMessage = $state('');
@@ -17,9 +18,10 @@
 		errorMessage = '';
 
 		try {
-			await createTrainingNote(content.trim());
+			await createTrainingNote(content.trim(), title);
 			invalidate('app:training-notes');
 			content = '';
+			title = null;
 			callback();
 		} catch (error) {
 			errorMessage = 'An error occurred. Please try again.';
@@ -31,6 +33,15 @@
 
 <div class="text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
+		<label class="label" for="note-title">Title (optional)</label>
+		<input
+			type="text"
+			placeholder="Optional title"
+			class="input"
+			id="note-title"
+			bind:value={title}
+		/>
+
 		<label class="label" for="note-content">Note content</label>
 		<textarea
 			id="note-content"
