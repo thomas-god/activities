@@ -227,6 +227,37 @@ pub enum UpdateActivityNutritionError {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct UpdateActivityFeedbackRequest {
+    user: UserId,
+    activity: ActivityId,
+    feedback: Option<ActivityFeedback>,
+}
+
+impl UpdateActivityFeedbackRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+
+    pub fn feedback(&self) -> &Option<ActivityFeedback> {
+        &self.feedback
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateActivityFeedbackError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct DeleteActivityRequest {
     user: UserId,
     activity: ActivityId,
@@ -330,6 +361,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: UpdateActivityNutritionRequest,
     ) -> impl Future<Output = Result<(), UpdateActivityNutritionError>> + Send;
+
+    fn update_activity_feedback(
+        &self,
+        req: UpdateActivityFeedbackRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityFeedbackError>> + Send;
 
     fn delete_activity(
         &self,
