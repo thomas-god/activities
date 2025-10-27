@@ -889,6 +889,106 @@ impl TrainingPeriodWithActivities {
     }
 }
 
+// =============================================================================
+// Training Notes
+// =============================================================================
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
+pub struct TrainingNoteId(String);
+
+impl TrainingNoteId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_string())
+    }
+
+    pub fn from(id: &str) -> Self {
+        Self(id.to_string())
+    }
+}
+
+impl fmt::Display for TrainingNoteId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Default for TrainingNoteId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrainingNoteContent(String);
+
+impl TrainingNoteContent {
+    pub fn new(content: impl Into<String>) -> Self {
+        Self(content.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for TrainingNoteContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for TrainingNoteContent {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for TrainingNoteContent {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrainingNote {
+    id: TrainingNoteId,
+    user: UserId,
+    content: TrainingNoteContent,
+    created_at: DateTime<FixedOffset>,
+}
+
+impl TrainingNote {
+    pub fn new(
+        id: TrainingNoteId,
+        user: UserId,
+        content: TrainingNoteContent,
+        created_at: DateTime<FixedOffset>,
+    ) -> Self {
+        Self {
+            id,
+            user,
+            content,
+            created_at,
+        }
+    }
+
+    pub fn id(&self) -> &TrainingNoteId {
+        &self.id
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn content(&self) -> &TrainingNoteContent {
+        &self.content
+    }
+
+    pub fn created_at(&self) -> &DateTime<FixedOffset> {
+        &self.created_at
+    }
+}
+
 #[cfg(test)]
 mod test_training_metrics {
 
