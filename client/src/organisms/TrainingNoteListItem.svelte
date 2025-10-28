@@ -12,6 +12,8 @@
 
 	let isEditing = $state(false);
 	let isExpanded = $state(false);
+	let showDeleteModal = $state(false);
+	let isDeleting = $state(false);
 	let editContent = $state('');
 	let editDate = $state('');
 
@@ -37,6 +39,22 @@
 
 	const toggleExpand = () => {
 		isExpanded = !isExpanded;
+	};
+
+	const confirmDelete = () => {
+		showDeleteModal = true;
+	};
+
+	const cancelDelete = () => {
+		showDeleteModal = false;
+		isDeleting = false;
+	};
+
+	const handleDelete = async () => {
+		isDeleting = true;
+		await onDelete();
+		isDeleting = false;
+		showDeleteModal = false;
 	};
 
 	const MAX_CHARS_COLLAPSED = 300; // Maximum characters to show when collapsed
@@ -80,7 +98,7 @@
 		{#if !isEditing}
 			<div class="flex gap-2">
 				<button class="btn btn-ghost btn-xs" onclick={startEdit}> ✏️ Edit </button>
-				<button class="btn btn-ghost btn-xs" onclick={onDelete}> 🗑️ Delete </button>
+				<button class="btn btn-ghost btn-xs" onclick={confirmDelete}> 🗑️ Delete </button>
 			</div>
 		{/if}
 	</div>
@@ -118,3 +136,37 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- Delete confirmation modal -->
+{#if showDeleteModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Delete Training Note</h3>
+			<p class="py-4">
+				Are you sure you want to delete this note?
+				<br />
+				<span class="mt-2 block text-sm italic opacity-70">
+					<span class="line-clamp-3">
+						{note.content.slice(0, 75)}{note.content.length > 75 ? '...' : ''}
+					</span>
+				</span>
+				<br />
+				<strong>This action cannot be undone.</strong>
+			</p>
+			<div class="modal-action">
+				<button class="btn" onclick={cancelDelete} disabled={isDeleting}> Cancel </button>
+				<button class="btn btn-error" onclick={handleDelete} disabled={isDeleting}>
+					{#if isDeleting}
+						<span class="loading loading-sm loading-spinner"></span>
+						Deleting...
+					{:else}
+						Delete
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={cancelDelete}>close</button>
+		</form>
+	</dialog>
+{/if}
