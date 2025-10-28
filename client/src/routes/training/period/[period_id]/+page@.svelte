@@ -135,25 +135,6 @@
 		}
 	};
 
-	const sportIcons = (sports: TrainingPeriodDetails['sports']): string[] => {
-		const icons: Set<string> = new Set();
-
-		for (const category of sports.categories) {
-			if (category in sportCategoryIcons) {
-				icons.add(sportCategoryIcons[category]);
-			}
-		}
-
-		for (const sport of sports.sports) {
-			const category = getSportCategory(sport);
-			if (category !== null) {
-				icons.add(sportCategoryIcons[category]);
-			}
-		}
-
-		return Array.from(icons);
-	};
-
 	const sportsByCategory = $derived.by(() => {
 		const sports = period.sports;
 		// Map category -> { category, icon, sports[], showAll }
@@ -265,8 +246,15 @@
 			<!-- Sports icons -->
 			<div class="flex flex-row gap-5">
 				<div class="flex flex-wrap items-center gap-2">
-					{#each sportIcons(period.sports) as icon}
-						<div class="text-lg">{icon}</div>
+					{#each sportsByCategory as group}
+						<div
+							class="tooltip tooltip-bottom text-lg"
+							data-tip={group.showAll
+								? `${group.category} (all sub-sports)`
+								: `${group.category}: ${group.sports.join(', ')}`}
+						>
+							{group.icon}
+						</div>
 					{:else}
 						<div class="text-sm italic opacity-70">All sports</div>
 					{/each}
@@ -296,39 +284,6 @@
 			<div class="mt-4 max-w-xl rounded bg-base-200 p-3">{period.note}</div>
 		{/if}
 	</div>
-
-	<!-- Sports details section -->
-	{#if period.sports.categories.length > 0 || period.sports.sports.length > 0}
-		<div class="rounded-box bg-base-100 p-4 shadow-md">
-			<details class="collapse-arrow collapse" open={false}>
-				<summary class="collapse-title font-semibold">Sports</summary>
-				<div class="collapse-content text-sm">
-					{#each sportsByCategory as group}
-						<div class="mb-4">
-							<div class="mb-2 flex items-center gap-3">
-								<div class="text-2xl">{group.icon}</div>
-								<div class="font-semibold">{group.category}</div>
-								{#if group.showAll}
-									<span class="text-sm italic opacity-70">all sub-sports</span>
-								{:else}
-									<div class="text-sm italic opacity-70">
-										{group.sports.length} sub-sports
-									</div>
-								{/if}
-							</div>
-							<div class="ml-11 flex flex-wrap gap-2">
-								{#if !group.showAll}
-									{#each group.sports as sport}
-										<div class="badge badge-outline">{sport}</div>
-									{/each}
-								{/if}
-							</div>
-						</div>
-					{/each}
-				</div>
-			</details>
-		</div>
-	{/if}
 
 	<!-- Activities section -->
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
