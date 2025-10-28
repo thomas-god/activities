@@ -5,7 +5,6 @@
 
 	let { callback }: { callback: () => void } = $props();
 
-	let title = $state<string | null>(null);
 	let content = $state('');
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	let requestPending = $state(false);
@@ -20,10 +19,9 @@
 		errorMessage = '';
 
 		try {
-			await createTrainingNote(content.trim(), title, date);
+			await createTrainingNote(content.trim(), date);
 			invalidate('app:training-notes');
 			content = '';
-			title = null;
 			date = dayjs().format('YYYY-MM-DD');
 			callback();
 		} catch (error) {
@@ -36,15 +34,6 @@
 
 <div class="text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
-		<label class="label" for="note-title">Title (optional)</label>
-		<input
-			type="text"
-			placeholder="Optional title"
-			class="input"
-			id="note-title"
-			bind:value={title}
-		/>
-
 		<label class="label" for="note-date">Date</label>
 		<input type="date" class="input" id="note-date" bind:value={date} />
 

@@ -9,22 +9,19 @@
 	let notes = $derived(data.notes.toSorted((a, b) => (a.created_at > b.created_at ? -1 : 1)));
 
 	let editingNoteId = $state<string | null>(null);
-	let editTitle = $state('');
 	let editContent = $state('');
 	let editDate = $state('');
 	let deleteConfirmNoteId = $state<string | null>(null);
 	let isDeleting = $state(false);
 
-	const startEdit = (noteId: string, title: string | null, content: string, date: string) => {
+	const startEdit = (noteId: string, content: string, date: string) => {
 		editingNoteId = noteId;
-		editTitle = title || '';
 		editContent = content;
 		editDate = date;
 	};
 
 	const cancelEdit = () => {
 		editingNoteId = null;
-		editTitle = '';
 		editContent = '';
 		editDate = '';
 	};
@@ -32,15 +29,9 @@
 	const saveEdit = async (noteId: string) => {
 		if (editContent.trim() === '') return;
 
-		const success = await updateTrainingNote(
-			noteId,
-			editTitle.trim() || undefined,
-			editContent.trim(),
-			editDate
-		);
+		const success = await updateTrainingNote(noteId, editContent.trim(), editDate);
 		if (success) {
 			editingNoteId = null;
-			editTitle = '';
 			editContent = '';
 			editDate = '';
 			invalidate('app:training-notes');
@@ -73,20 +64,16 @@
 
 <div class="mx-auto flex flex-col gap-4">
 	<div class="rounded-box bg-base-100 shadow-md">
-		<div class="p-2 px-4 text-sm tracking-wide italic opacity-60">
+		<div class="p-4 text-sm tracking-wide italic opacity-60">
 			Training notes are personal observations, insights and decisions about your training.
 		</div>
 		<div>
 			{#each notes as note}
 				<div class="note-item border-b border-base-200 p-4">
-					{#if editingNoteId !== note.id}
-						{#if note.title}
-							<h3 class="mb-2 text-lg font-semibold">{note.title}</h3>
-						{/if}
-					{/if}
+					{#if editingNoteId !== note.id}{/if}
 					<div class="mb-2 flex items-center justify-between">
 						<div class="text-xs font-light opacity-70">
-							<div class="text-[10px] opacity-60">
+							<div class="text-xs opacity-60">
 								{dayjs(note.date).format('MMM D, YYYY')}
 							</div>
 						</div>
@@ -94,7 +81,7 @@
 							<div class="flex gap-2">
 								<button
 									class="btn btn-ghost btn-xs"
-									onclick={() => startEdit(note.id, note.title, note.content, note.date)}
+									onclick={() => startEdit(note.id, note.content, note.date)}
 								>
 									✏️ Edit
 								</button>
@@ -111,12 +98,7 @@
 								<input type="date" class="input" bind:value={editDate} />
 								<span>Date</span>
 							</label>
-							<input
-								type="text"
-								class="input-bordered input w-full"
-								placeholder="Title (optional)"
-								bind:value={editTitle}
-							/>
+
 							<textarea
 								class="textarea-bordered textarea w-full"
 								rows="6"
@@ -157,10 +139,6 @@
 				{#if noteToDelete}
 					<br />
 					<span class="mt-2 block text-sm italic opacity-70">
-						{#if noteToDelete.title}
-							<strong>"{noteToDelete.title}"</strong>
-							<br />
-						{/if}
 						<span class="line-clamp-3">
 							{noteToDelete.content.slice(0, 100)}{noteToDelete.content.length > 100 ? '...' : ''}
 						</span>
