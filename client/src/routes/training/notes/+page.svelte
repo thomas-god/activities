@@ -1,39 +1,19 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
 	import { deleteTrainingNote, updateTrainingNote } from '$lib/api/training';
 	import { invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
+	import TrainingNoteListItem from '../../../organisms/TrainingNoteListItem.svelte';
 
 	let { data }: PageProps = $props();
 
 	let notes = $derived(data.notes.toSorted((a, b) => (a.date > b.date ? -1 : 1)));
 
-	let editingNoteId = $state<string | null>(null);
-	let editContent = $state('');
-	let editDate = $state('');
 	let deleteConfirmNoteId = $state<string | null>(null);
 	let isDeleting = $state(false);
 
-	const startEdit = (noteId: string, content: string, date: string) => {
-		editingNoteId = noteId;
-		editContent = content;
-		editDate = date;
-	};
-
-	const cancelEdit = () => {
-		editingNoteId = null;
-		editContent = '';
-		editDate = '';
-	};
-
-	const saveEdit = async (noteId: string) => {
-		if (editContent.trim() === '') return;
-
-		const success = await updateTrainingNote(noteId, editContent.trim(), editDate);
+	const saveNote = async (noteId: string, content: string, date: string) => {
+		const success = await updateTrainingNote(noteId, content, date);
 		if (success) {
-			editingNoteId = null;
-			editContent = '';
-			editDate = '';
 			invalidate('app:training-notes');
 		}
 	};
@@ -69,57 +49,11 @@
 		</div>
 		<div>
 			{#each notes as note}
-				<div class="note-item border-b border-base-200 p-4">
-					{#if editingNoteId !== note.id}{/if}
-					<div class="mb-2 flex items-center justify-between">
-						<div class="text-xs font-light opacity-70">
-							<div class="text-xs opacity-60">
-								{dayjs(note.date).format('MMM D, YYYY')}
-							</div>
-						</div>
-						{#if editingNoteId !== note.id}
-							<div class="flex gap-2">
-								<button
-									class="btn btn-ghost btn-xs"
-									onclick={() => startEdit(note.id, note.content, note.date)}
-								>
-									✏️ Edit
-								</button>
-								<button class="btn btn-ghost btn-xs" onclick={() => confirmDelete(note.id)}>
-									🗑️ Delete
-								</button>
-							</div>
-						{/if}
-					</div>
-
-					{#if editingNoteId === note.id}
-						<div class="flex flex-col gap-2">
-							<label class="floating-label">
-								<input type="date" class="input" bind:value={editDate} />
-								<span>Date</span>
-							</label>
-
-							<textarea
-								class="textarea-bordered textarea w-full"
-								rows="6"
-								placeholder="Content"
-								bind:value={editContent}
-							></textarea>
-							<div class="flex justify-end gap-2">
-								<button class="btn btn-ghost btn-sm" onclick={cancelEdit}>Cancel</button>
-								<button
-									class="btn btn-sm btn-primary"
-									onclick={() => saveEdit(note.id)}
-									disabled={editContent.trim() === ''}
-								>
-									Save
-								</button>
-							</div>
-						</div>
-					{:else}
-						<div class="text-sm whitespace-pre-wrap">{note.content}</div>
-					{/if}
-				</div>
+				<TrainingNoteListItem
+					{note}
+					onSave={(content, date) => saveNote(note.id, content, date)}
+					onDelete={() => confirmDelete(note.id)}
+				/>
 			{:else}
 				<div class="italic text-sm text-center tracking-wide opacity-60 p-8">
 					No training notes yet. Click "+ New note" to create your first one.
@@ -140,7 +74,7 @@
 					<br />
 					<span class="mt-2 block text-sm italic opacity-70">
 						<span class="line-clamp-3">
-							{noteToDelete.content.slice(0, 100)}{noteToDelete.content.length > 100 ? '...' : ''}
+							{noteToDelete.content.slice(0, 75)}{noteToDelete.content.length > 75 ? '...' : ''}
 						</span>
 					</span>
 				{/if}
@@ -164,13 +98,3 @@
 		</form>
 	</dialog>
 {/if}
-
-<style>
-	.note-item:hover {
-		background: oklch(var(--b2));
-	}
-
-	.note-item:last-child {
-		border-bottom: none;
-	}
-</style>
