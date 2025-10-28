@@ -7,7 +7,7 @@ import {
 } from '$lib/api';
 import { fetchTrainingNotes, type TrainingNote } from '$lib/api/training';
 
-export const load: PageLoad = async ({ fetch, params }) => {
+export const load: PageLoad = async ({ fetch, params, depends }) => {
 	const periodDetails = await fetchTrainingPeriodDetails(fetch, params.period_id);
 
 	if (periodDetails === null) {
@@ -15,6 +15,7 @@ export const load: PageLoad = async ({ fetch, params }) => {
 	}
 
 	// Fetch training notes (we'll filter them on the client side based on period dates)
+	depends("app:training-notes")
 	const trainingNotes = await fetchTrainingNotes(fetch);
 
 	return { periodDetails, trainingNotes };
