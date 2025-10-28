@@ -6,7 +6,7 @@
 
 	let { data }: PageProps = $props();
 
-	let notes = $derived(data.notes.toSorted((a, b) => (a.created_at > b.created_at ? -1 : 1)));
+	let notes = $derived(data.notes.toSorted((a, b) => (a.date > b.date ? -1 : 1)));
 
 	let editingNoteId = $state<string | null>(null);
 	let editContent = $state('');
