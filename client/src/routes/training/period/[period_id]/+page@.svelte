@@ -6,11 +6,13 @@
 		getSportCategoryIcon,
 		type SportCategory
 	} from '$lib/sport';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { TrainingPeriodDetails } from './+page';
+	import type { TrainingPeriodDetails, TrainingNote } from './+page';
 	import ActivitiesListItem from '../../../../organisms/ActivitiesListItem.svelte';
+	import TrainingNoteListItem from '../../../../organisms/TrainingNoteListItem.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
+	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 
 	let { data }: PageProps = $props();
 
@@ -82,6 +84,56 @@
 	}
 
 	const period = data.periodDetails;
+
+	// Filter training notes to only include those within the period date range
+	const periodNotes = $derived.by(() => {
+		const startDate = dayjs(period.start);
+		const endDate = period.end ? dayjs(period.end) : dayjs(); // If no end, use today
+
+		return data.trainingNotes.filter((note) => {
+			const noteDate = dayjs(note.date);
+			return (
+				(noteDate.isAfter(startDate, 'day') || noteDate.isSame(startDate, 'day')) &&
+				(noteDate.isBefore(endDate, 'day') || noteDate.isSame(endDate, 'day'))
+			);
+		});
+	});
+
+	// Merge activities and notes, sorted by date (most recent first)
+	type TimelineItem =
+		| { type: 'activity'; data: (typeof period.activities)[0]; date: string }
+		| { type: 'note'; data: TrainingNote; date: string };
+
+	const timeline = $derived.by((): TimelineItem[] => {
+		const items: TimelineItem[] = [
+			...period.activities.map((activity) => ({
+				type: 'activity' as const,
+				data: activity,
+				date: activity.start_time
+			})),
+			...periodNotes.map((note) => ({
+				type: 'note' as const,
+				data: note,
+				date: note.date
+			}))
+		];
+
+		return items.sort((a, b) => (a.date > b.date ? -1 : 1));
+	});
+
+	const saveNote = async (noteId: string, content: string, date: string) => {
+		const success = await updateTrainingNote(noteId, content, date);
+		if (success) {
+			invalidate('app:training-notes');
+		}
+	};
+
+	const handleDeleteNote = async (noteId: string) => {
+		const success = await deleteTrainingNote(noteId);
+		if (success) {
+			invalidate('app:training-notes');
+		}
+	};
 
 	const sportIcons = (sports: TrainingPeriodDetails['sports']): string[] => {
 		const icons: Set<string> = new Set();
@@ -281,8 +333,7 @@
 	<!-- Activities section -->
 	<div class="rounded-box bg-base-100 p-4 shadow-md">
 		<div class="mb-4 flex items-center justify-between">
-			<h2 class="text-lg font-semibold">Activities</h2>
-			<div class="badge badge-neutral">{period.activities.length}</div>
+			<h2 class="text-lg font-semibold">Activities & Notes</h2>
 		</div>
 
 		{#if period.activities.length > 0}
@@ -309,8 +360,22 @@
 			</div>
 
 			<div class="flex flex-col gap-2">
-				{#each period.activities as activity}
-					<ActivitiesListItem {activity} />
+				{#each timeline as item}
+					{#if item.type === 'activity'}
+						<ActivitiesListItem activity={item.data} />
+					{:else}
+						<div class="rounded-box border-l-4 border-warning bg-warning/2">
+							<div class="flex items-center gap-2 px-4 pt-3 pb-1">
+								<span class="text-base">📝</span>
+								<span class="text-xs font-semibold opacity-70">Training Note</span>
+							</div>
+							<TrainingNoteListItem
+								note={item.data}
+								onSave={(content, date) => saveNote(item.data.id, content, date)}
+								onDelete={() => handleDeleteNote(item.data.id)}
+							/>
+						</div>
+					{/if}
 				{/each}
 			</div>
 		{:else}

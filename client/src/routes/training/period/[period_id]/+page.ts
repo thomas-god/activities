@@ -5,6 +5,7 @@ import {
 	type TrainingPeriodDetails,
 	type TrainingPeriodActivityItem
 } from '$lib/api';
+import { fetchTrainingNotes, type TrainingNote } from '$lib/api/training';
 
 export const load: PageLoad = async ({ fetch, params }) => {
 	const periodDetails = await fetchTrainingPeriodDetails(fetch, params.period_id);
@@ -13,10 +14,13 @@ export const load: PageLoad = async ({ fetch, params }) => {
 		redirect(307, '/');
 	}
 
-	return { periodDetails };
+	// Fetch training notes (we'll filter them on the client side based on period dates)
+	const trainingNotes = await fetchTrainingNotes(fetch);
+
+	return { periodDetails, trainingNotes };
 };
 
 export const prerender = false;
 export const ssr = false;
 
-export type { TrainingPeriodDetails, TrainingPeriodActivityItem };
+export type { TrainingPeriodDetails, TrainingPeriodActivityItem, TrainingNote };
