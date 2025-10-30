@@ -226,56 +226,56 @@
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
-		<div class="flex flex-row flex-wrap items-center gap-3">
-			<div class="flex grow-1 flex-row items-center gap-3">
-				<!-- Icon -->
-				<div class="text-3xl leading-none">🗓️</div>
+	<div class="@container rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+		<!-- Top row: Icon and Title/Date/Actions -->
+		<div class="flex items-center gap-3">
+			<!-- Icon -->
+			<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
 
-				<!-- Title and date -->
-				<div>
-					<div class="text-xl font-semibold">{period.name}</div>
-					<div class="text-sm opacity-70">
+			<!-- Title and date -->
+			<div class="flex-1">
+				<div class="text-lg font-semibold @lg:text-xl">{period.name}</div>
+				<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
+					<div class="opacity-70">
 						{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
 							? 'Ongoing'
 							: dayjs(period.end).format('MMM D, YYYY')}
 					</div>
-				</div>
-			</div>
-
-			<!-- Sports icons -->
-			<div class="flex flex-row gap-5">
-				<div class="flex flex-wrap items-center gap-2">
-					{#each sportsByCategory as group}
-						<div
-							class="tooltip tooltip-bottom text-lg"
-							data-tip={group.showAll
-								? `${group.category} (all sub-sports)`
-								: `${group.category}: ${group.sports.join(', ')}`}
-						>
-							{group.icon}
+					{#if sportsByCategory.length > 0}
+						<div class="flex items-center gap-1.5">
+							<span class="opacity-50">·</span>
+							{#each sportsByCategory as group}
+								<div
+									class="tooltip tooltip-bottom text-base"
+									data-tip={group.showAll
+										? `${group.category} (all sub-sports)`
+										: `${group.category}: ${group.sports.join(', ')}`}
+								>
+									{group.icon}
+								</div>
+							{/each}
 						</div>
 					{:else}
-						<div class="text-sm italic opacity-70">All sports</div>
-					{/each}
-				</div>
-
-				<!-- Action buttons -->
-				<div class="flex gap-2">
-					<button
-						class="btn btn-sm btn-primary"
-						onclick={openEditModal}
-						aria-label="Edit training period name"
-					>
-						✏️
-					</button>
-					<button
-						class="btn btn-sm btn-error"
-						onclick={() => (showDeleteModal = true)}
-						aria-label="Delete training period"
-					>
-						🗑️
-					</button>
+						<div class="opacity-50">· All sports</div>
+					{/if}
+					<!-- Action menu dropdown (always inline) -->
+					<details class="dropdown dropdown-end">
+						<summary class="btn btn-square opacity-100 btn-ghost btn-xs">⋮</summary>
+						<ul class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
+							<li>
+								<button onclick={openEditModal}>
+									<span>✏️</span>
+									<span>Edit name</span>
+								</button>
+							</li>
+							<li>
+								<button onclick={() => (showDeleteModal = true)} class="text-error">
+									<span>🗑️</span>
+									<span>Delete</span>
+								</button>
+							</li>
+						</ul>
+					</details>
 				</div>
 			</div>
 		</div>
