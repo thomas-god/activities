@@ -10,29 +10,32 @@
 
 	let { note, onSave, onDelete }: Props = $props();
 
-	let isEditing = $state(false);
 	let isExpanded = $state(false);
+	let showEditModal = $state(false);
 	let showDeleteModal = $state(false);
 	let isDeleting = $state(false);
+	let isSaving = $state(false);
 	let editContent = $state('');
 	let editDate = $state('');
 
 	const startEdit = () => {
-		isEditing = true;
+		showEditModal = true;
 		editContent = note.content;
 		editDate = note.date;
 	};
 
 	const cancelEdit = () => {
-		isEditing = false;
+		showEditModal = false;
 		editContent = '';
 		editDate = '';
 	};
 
-	const saveEdit = () => {
+	const saveEdit = async () => {
 		if (editContent.trim() === '') return;
-		onSave(editContent.trim(), editDate);
-		isEditing = false;
+		isSaving = true;
+		await onSave(editContent.trim(), editDate);
+		isSaving = false;
+		showEditModal = false;
 		editContent = '';
 		editDate = '';
 	};
@@ -89,53 +92,80 @@
 </script>
 
 <div>
-	<div class="mb-1 flex items-center justify-between">
+	<div class="mb-1 flex items-center gap-2">
 		<div class="text-xs font-light opacity-70">
 			<div class="text-xs opacity-60">
 				{dayjs(note.date).format('MMM D, YYYY')}
 			</div>
 		</div>
-		{#if !isEditing}
-			<div class="flex gap-2">
-				<button class="btn btn-ghost btn-xs" onclick={startEdit}> ✏️ Edit </button>
-				<button class="btn btn-ghost btn-xs" onclick={confirmDelete}> 🗑️ Delete </button>
-			</div>
-		{/if}
+		<div class="dropdown dropdown-end">
+			<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">⋮</div>
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<ul tabindex="0" class="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow">
+				<li>
+					<button onclick={startEdit}>
+						<span>✏️</span>
+						<span>Edit</span>
+					</button>
+				</li>
+				<li>
+					<button onclick={confirmDelete} class="text-error">
+						<span>🗑️</span>
+						<span>Delete</span>
+					</button>
+				</li>
+			</ul>
+		</div>
 	</div>
 
-	{#if isEditing}
-		<div class="flex flex-col gap-2">
-			<label class="floating-label">
-				<input type="date" class="input" bind:value={editDate} />
-				<span>Date</span>
-			</label>
+	<div class="text-sm whitespace-pre-wrap">{getDisplayContent(note.content)}</div>
+	{#if shouldShowExpandButton(note.content)}
+		<button class="btn mt-2 btn-ghost btn-xs" onclick={toggleExpand}>
+			{isExpanded ? '▲ Show less' : '▼ Show more'}
+		</button>
+	{/if}
+</div>
 
-			<textarea
-				class="textarea-bordered textarea w-full"
-				rows="6"
-				placeholder="Content"
-				bind:value={editContent}
-			></textarea>
-			<div class="flex justify-end gap-2">
-				<button class="btn btn-ghost btn-sm" onclick={cancelEdit}>Cancel</button>
+<!-- Edit modal -->
+{#if showEditModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Edit Training Note</h3>
+			<div class="flex flex-col gap-4 py-4">
+				<label class="floating-label">
+					<input type="date" class="input" bind:value={editDate} disabled={isSaving} />
+					<span>Date</span>
+				</label>
+
+				<textarea
+					class="textarea-bordered textarea w-full"
+					rows="8"
+					placeholder="Content"
+					bind:value={editContent}
+					disabled={isSaving}
+				></textarea>
+			</div>
+			<div class="modal-action">
+				<button class="btn" onclick={cancelEdit} disabled={isSaving}> Cancel </button>
 				<button
-					class="btn btn-sm btn-primary"
+					class="btn btn-primary"
 					onclick={saveEdit}
-					disabled={editContent.trim() === ''}
+					disabled={editContent.trim() === '' || isSaving}
 				>
-					Save
+					{#if isSaving}
+						<span class="loading loading-sm loading-spinner"></span>
+						Saving...
+					{:else}
+						Save
+					{/if}
 				</button>
 			</div>
 		</div>
-	{:else}
-		<div class="text-sm whitespace-pre-wrap">{getDisplayContent(note.content)}</div>
-		{#if shouldShowExpandButton(note.content)}
-			<button class="btn mt-2 btn-ghost btn-xs" onclick={toggleExpand}>
-				{isExpanded ? '▲ Show less' : '▼ Show more'}
-			</button>
-		{/if}
-	{/if}
-</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={cancelEdit}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <!-- Delete confirmation modal -->
 {#if showDeleteModal}
