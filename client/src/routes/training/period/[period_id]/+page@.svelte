@@ -259,9 +259,15 @@
 						<div class="opacity-50">· All sports</div>
 					{/if}
 					<!-- Action menu dropdown (always inline) -->
-					<details class="dropdown dropdown-end">
-						<summary class="btn btn-square opacity-100 btn-ghost btn-xs">⋮</summary>
-						<ul class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
+					<div class="dropdown dropdown-end">
+						<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
+							⋮
+						</div>
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<ul
+							tabindex="0"
+							class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+						>
 							<li>
 								<button onclick={openEditModal}>
 									<span>✏️</span>
@@ -275,7 +281,7 @@
 								</button>
 							</li>
 						</ul>
-					</details>
+					</div>
 				</div>
 			</div>
 		</div>
