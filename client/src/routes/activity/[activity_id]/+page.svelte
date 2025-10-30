@@ -251,9 +251,12 @@
 		</div>
 	</div>
 
-	<div class="rounded-box bg-base-100 p-4 shadow-md">
-		<fieldset class="fieldset">
-			<legend class="text-lg font-semibold">Session feedbacks</legend>
+	<details
+		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
+		open
+	>
+		<summary class="collapse-title text-lg font-semibold">Session feedbacks</summary>
+		<div class="collapse-content">
 			<div class="flex flex-col gap-3">
 				<EditableRpe rpe={data.activity.rpe} editCallback={updateActivityRpeCallback} />
 				<div class="my-0 border-b border-base-300"></div>
@@ -272,8 +275,8 @@
 					editCallback={updateActivityFeedbackCallback}
 				/>
 			</div>
-		</fieldset>
-	</div>
+		</div>
+	</details>
 
 	<div>
 		<ActivityStatistics activity={data.activity} />
