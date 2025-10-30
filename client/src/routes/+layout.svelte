@@ -62,7 +62,13 @@
 	.container {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 20px;
+		padding: 12px 8px;
+	}
+
+	@media (min-width: 640px) {
+		.container {
+			padding: 20px;
+		}
 	}
 
 	.active {

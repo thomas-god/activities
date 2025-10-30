@@ -51,9 +51,9 @@
 	};
 </script>
 
-<div class="mx-2 mt-5 sm:mx-auto">
+<div class="@container mx-2 mt-5 sm:mx-auto">
 	<!-- View Toggle -->
-	<div class="mb-4 flex items-center justify-between">
+	<div class="mb-4 flex flex-col justify-between gap-2 @sm:flex-row @sm:items-center">
 		<h1 class="text-2xl font-bold">Past activities</h1>
 		<div class="join">
 			<button
