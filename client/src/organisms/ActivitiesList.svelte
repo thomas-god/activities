@@ -2,7 +2,7 @@
 	import type { ActivityList, ActivityListItem } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
-	import ActivityFilters from '../molecules/ActivityFilters.svelte';
+	import ActivitiesFilters from '../molecules/ActivitiesFilters.svelte';
 
 	let { activityList }: { activityList: ActivityList } = $props();
 
@@ -33,9 +33,9 @@
 	};
 </script>
 
-<div class="rounded-box bg-base-100 p-4 shadow-md">
-	<ActivityFilters activities={activityList} onFilterChange={handleFilterChange} />
-	<div class="flex flex-col gap-2">
+<div class="rounded-box bg-base-100 shadow-md">
+	<ActivitiesFilters activities={activityList} onFilterChange={handleFilterChange} />
+	<div class="flex flex-col gap-2 p-4 pt-0">
 		{#if filteredActivityList.length === 0}
 			<div class="py-8 text-center text-base-content/60">
 				No activities match the selected filters

@@ -17,9 +17,6 @@
 	let selectedWorkoutTypes = $state<WorkoutType[]>([]);
 	let selectedSportCategories = $state<SportCategory[]>([]);
 
-	// Show/hide filters
-	let showFilters = $state(false);
-
 	// Get unique sport categories from activities
 	let availableSportCategories = $derived.by(() => {
 		const categories = new Set<SportCategory>();
@@ -106,80 +103,84 @@
 	);
 </script>
 
-<div class="flex items-center justify-between">
-	<div class="flex items-center gap-2">
-		<h2 class="text-lg font-semibold">Filters</h2>
-		{#if hasActiveFilters}
-			<span class="badge badge-sm badge-primary">
-				{filteredActivities.length} / {activities.length}
-			</span>
-		{/if}
-	</div>
-	<div class="flex items-center gap-2">
-		{#if hasActiveFilters}
-			<button class="btn btn-ghost btn-sm" onclick={clearFilters}> Clear all </button>
-		{/if}
-		<button
-			class="btn btn-ghost btn-sm"
-			onclick={() => (showFilters = !showFilters)}
-			aria-expanded={showFilters}
-		>
-			{showFilters ? '▲' : '▼'}
-		</button>
-	</div>
-</div>
+<details class="collapse-arrow collapse">
+	<summary class="collapse-title flex items-center justify-between">
+		<div class="flex items-center gap-2">
+			<h2 class="text-lg font-semibold">Filters</h2>
+			{#if hasActiveFilters}
+				<span class="badge badge-sm badge-primary">
+					{filteredActivities.length} / {activities.length}
+				</span>
+			{/if}
+		</div>
+	</summary>
 
-{#if showFilters}
-	<div class="mt-4 flex flex-col gap-4">
-		<!-- Sport Category Filter -->
-		{#if availableSportCategories.length > 0}
+	<div class=" collapse-content mx-4 border-b-2 border-b-base-content/25 pt-0">
+		<div class="flex flex-col gap-4">
+			<!-- Sport Category Filter -->
+			{#if availableSportCategories.length > 0}
+				<div>
+					<div class="mb-2 text-sm font-medium">Sport</div>
+					<div class="flex flex-wrap gap-2">
+						{#each availableSportCategories as category}
+							<button
+								class={`btn btn-sm ${selectedSportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
+								onclick={() => toggleSportCategory(category)}
+							>
+								<span class="text-lg">{sportCategoryIcons[category]}</span>
+								<span>{category}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Workout Type Filter -->
 			<div>
-				<div class="mb-2 text-sm font-medium">Sport</div>
+				<div class="mb-2 text-sm font-medium">Workout Type</div>
 				<div class="flex flex-wrap gap-2">
-					{#each availableSportCategories as category}
+					{#each WORKOUT_TYPE_LABELS as { value, label }}
 						<button
-							class={`btn btn-sm ${selectedSportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
-							onclick={() => toggleSportCategory(category)}
+							class={`btn btn-sm ${selectedWorkoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
+							onclick={() => toggleWorkoutType(value)}
 						>
-							<span class="text-lg">{sportCategoryIcons[category]}</span>
-							<span>{category}</span>
+							{label}
 						</button>
 					{/each}
 				</div>
 			</div>
-		{/if}
 
-		<!-- Workout Type Filter -->
-		<div>
-			<div class="mb-2 text-sm font-medium">Workout Type</div>
-			<div class="flex flex-wrap gap-2">
-				{#each WORKOUT_TYPE_LABELS as { value, label }}
-					<button
-						class={`btn btn-sm ${selectedWorkoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
-						onclick={() => toggleWorkoutType(value)}
-					>
-						{label}
-					</button>
-				{/each}
+			<!-- RPE Filter -->
+			<div>
+				<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
+				<div class="flex flex-wrap gap-2">
+					{#each RPE_VALUES as rpe}
+						<button
+							class={`btn btn-sm ${selectedRpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
+							onclick={() => toggleRpe(rpe)}
+						>
+							{rpe}
+						</button>
+					{/each}
+				</div>
 			</div>
-		</div>
 
-		<!-- RPE Filter -->
-		<div>
-			<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
-			<div class="flex flex-wrap gap-2">
-				{#each RPE_VALUES as rpe}
+			{#if hasActiveFilters}
+				<div>
 					<button
-						class={`btn btn-sm ${selectedRpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
-						onclick={() => toggleRpe(rpe)}
+						class="btn btn-sm"
+						onclick={(e) => {
+							e.preventDefault();
+							clearFilters();
+						}}
 					>
-						{rpe}
+						Clear all filters
 					</button>
-				{/each}
-			</div>
+				</div>
+			{/if}
 		</div>
 	</div>
-{/if}
+</details>
 
 <style>
 	.rpe-easy {
