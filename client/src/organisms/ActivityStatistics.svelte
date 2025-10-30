@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDurationHoursMinutes } from '$lib/duration';
+	import { formatDuration } from '$lib/duration';
 	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
 	import type { ActivityDetails } from '../routes/activity/[activity_id]/proxy+page';
 
@@ -37,7 +37,7 @@
 			rows.push({
 				icon: '⌛',
 				label: 'Duration',
-				value: formatDurationHoursMinutes(duration)
+				value: formatDuration(duration)
 			});
 		}
 
