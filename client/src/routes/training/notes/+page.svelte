@@ -30,11 +30,13 @@
 		</div>
 		<div>
 			{#each notes as note}
-				<TrainingNoteListItem
-					{note}
-					onSave={(content, date) => saveNote(note.id, content, date)}
-					onDelete={() => deleteNote(note.id)}
-				/>
+				<div class="px-4 py-2">
+					<TrainingNoteListItem
+						{note}
+						onSave={(content, date) => saveNote(note.id, content, date)}
+						onDelete={() => deleteNote(note.id)}
+					/>
+				</div>
 			{:else}
 				<div class="italic text-sm text-center tracking-wide opacity-60 p-8">
 					No training notes yet. Click "+ New note" to create your first one.

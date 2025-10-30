@@ -88,8 +88,8 @@
 	};
 </script>
 
-<div class="border-b border-base-200 p-4">
-	<div class="mb-2 flex items-center justify-between">
+<div>
+	<div class="mb-1 flex items-center justify-between">
 		<div class="text-xs font-light opacity-70">
 			<div class="text-xs opacity-60">
 				{dayjs(note.date).format('MMM D, YYYY')}

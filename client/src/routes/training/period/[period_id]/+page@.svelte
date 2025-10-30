@@ -319,16 +319,14 @@
 					{#if item.type === 'activity'}
 						<ActivitiesListItem activity={item.data} />
 					{:else}
-						<div class="rounded-box border-l-4 border-warning bg-warning/2">
-							<div class="flex items-center gap-2 px-4 pt-3 pb-1">
-								<span class="text-base">📝</span>
-								<span class="text-xs font-semibold opacity-70">Training Note</span>
+						<div class="rounded-box border-l-4 border-warning/60 bg-warning/2">
+							<div class="p-2 px-4">
+								<TrainingNoteListItem
+									note={item.data}
+									onSave={(content, date) => saveNote(item.data.id, content, date)}
+									onDelete={() => handleDeleteNote(item.data.id)}
+								/>
 							</div>
-							<TrainingNoteListItem
-								note={item.data}
-								onSave={(content, date) => saveNote(item.data.id, content, date)}
-								onDelete={() => handleDeleteNote(item.data.id)}
-							/>
 						</div>
 					{/if}
 				{/each}
