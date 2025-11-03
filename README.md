@@ -32,6 +32,27 @@ Beside the authentication process, both versions offer the same set of features.
 
 All images are available for both `amd64` and `arm64`.
 
+### Quick start: try it locally
+
+You can quickly test the application locally with a single Docker command:
+
+```bash
+docker run --rm -p 8080:80 \
+  -e ACTIVITIES_DATA_PATH=/app/data \
+  ghcr.io/thomas-god/activities:single-user-main
+```
+
+Then open http://localhost:8080 in your browser. Your data will be stored in an
+anonymous Docker volume and will be lost when you stop the container. To persist
+your data, add a volume mount:
+
+```bash
+docker run --rm -p 8080:80 \
+  -e ACTIVITIES_DATA_PATH=/app/data \
+  -v activities_data:/app/data \
+  ghcr.io/thomas-god/activities:single-user-main
+```
+
 ### Using _docker-compose_ or _docker-stack_
 
 The most basic `docker-compose.yaml` file looks like that:
