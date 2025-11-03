@@ -20,7 +20,7 @@ use crate::inbound::http::handlers::{
     delete_training_metric, delete_training_note, delete_training_period, get_activity,
     get_training_metrics, get_training_note, get_training_notes, get_training_period,
     get_training_periods, list_activities, patch_activity, update_training_note,
-    update_training_period_name, upload_activities,
+    update_training_period, upload_activities,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -210,7 +210,7 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IU
         )
         .route(
             "/training/period/{period_id}",
-            patch(update_training_period_name::<AS, PF, TS, US>),
+            patch(update_training_period::<AS, PF, TS, US>),
         )
         .route(
             "/training/periods",
