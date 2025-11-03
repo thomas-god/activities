@@ -346,11 +346,11 @@ where
             .await?;
 
         // Dispatch metrics update for deleted activity
-        let metric_service = self.training_metrics_service.clone();
-        tokio::spawn(async move {
-            let req = RemoveActivityFromMetricsRequest::new(req.user().clone(), activity);
-            metric_service.remove_activity_from_metrics(req).await
-        });
+        let req = RemoveActivityFromMetricsRequest::new(req.user().clone(), activity);
+        let _ = self
+            .training_metrics_service
+            .remove_activity_from_metrics(req)
+            .await;
 
         Ok(())
     }
@@ -1434,11 +1434,20 @@ mod tests_activity_service {
             .returning(|_| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let metrics_service = Arc::new(MockTrainingService::test_default());
+        let mut metrics_service = MockTrainingService::test_default();
+        let user_id_clone = UserId::from("test_user".to_string());
+        let activity_id = ActivityId::from("test_activity");
+        metrics_service
+            .expect_remove_activity_from_metrics()
+            .withf(move |req| {
+                req.user() == &user_id_clone && req.deleted_activity().id() == &activity_id
+            })
+            .times(1)
+            .returning(|_| Ok(()));
         let service = ActivityService::new(
             Arc::new(Mutex::new(activity_repository)),
             raw_data_repository,
-            metrics_service,
+            Arc::new(metrics_service),
         );
 
         let req = DeleteActivityRequest::new(

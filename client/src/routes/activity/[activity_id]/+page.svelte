@@ -3,7 +3,7 @@
 	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import EditableString from '../../../molecules/EditableString.svelte';
 	import EditableRpe from '../../../molecules/EditableRpe.svelte';
 	import EditableWorkoutType from '../../../molecules/EditableWorkoutType.svelte';
@@ -88,6 +88,7 @@
 			}
 
 			if (res.ok) {
+				await invalidate('app:training-metrics');
 				goto('/');
 			} else {
 				console.error('Failed to delete activity');
