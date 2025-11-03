@@ -110,3 +110,9 @@ good to go!
 ## Design decisions
 
 Key design decisions are documented [here](adr/README.md).
+
+## Credits
+
+Favicon icon from [OpenMoji](https://openmoji.org/) – the open-source emoji and
+icon project. License:
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)

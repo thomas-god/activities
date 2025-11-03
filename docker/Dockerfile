@@ -14,7 +14,7 @@ COPY client/.gitignore ./
 COPY client/.npmrc ./
 # COPY client/.env.production ./.env
 COPY client/src/ ./src
-# COPY client/public/ ./public
+COPY client/static/ ./static
 ENV NODE_ENV=production
 ENV PUBLIC_APP_URL=
 RUN npm run build
