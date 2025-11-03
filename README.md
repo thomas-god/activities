@@ -1,11 +1,13 @@
-# Activities: self-hosted archiving and exploration of training activities
+# Activities: self-hosted training journal and performance tracking platform
 
-Activities is a self-hosted solution to archive and explore your training
-activities from sport devices (sport watches, bike computers, etc.):
+Activities is a self-hosted platform for athletes to archive their activities
+and manage their training journal, and track their progress:
 
+- Track your training history with custom metrics and periods,
+- Keep a training journal with notes on workouts and training blocks,
+- Explore your performance data and visualize your progress,
 - It can be deployed from a single Docker image,
-- It supports importing activities from `.tcx` and `.fit` files,
-- It lets you explore you training history and define your own training metrics.
+- It supports importing activities from `.tcx` and `.fit` files.
 
 ## How to deploy
 
@@ -96,10 +98,12 @@ good to go!
 
 ## Intended scope and limitations
 
-- The application focuses on a single-user experience: there is no plan to add
-  social features like friends, timeline, sharing, etc. Though coaching related
-  features might be considered at some point.
-- Because the appplication is designed to be self-hosted, and since sport device
+- The application focuses on providing athletes with tools to track and analyze
+  their training: organizing activities into training periods, keeping training
+  notes, defining custom metrics, and visualizing performance trends. While
+  social features like friends, timeline, or sharing are not planned,
+  coaching-related features might be considered in the future.
+- Because the application is designed to be self-hosted, and since sport device
   ecosystems are mostly closed, there is sadly no feature to automatically
   import your activities from your devices.
 
