@@ -10,6 +10,7 @@
 	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
 	import EditableFeedback from '$components/molecules/EditableFeedback.svelte';
 	import MultiSelect from '$components/molecules/MultiSelect.svelte';
+	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
 	import ActivityLaps, { type LapMetric } from '$components/organisms/ActivityLaps.svelte';
@@ -22,7 +23,6 @@
 
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
-	let isDeleting = $state(false);
 
 	let summary = $derived.by(() => {
 		return {
@@ -74,38 +74,27 @@
 	});
 
 	const deleteActivityCallback = async (): Promise<void> => {
-		isDeleting = true;
-		try {
-			const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
-				method: 'DELETE',
-				mode: 'cors',
-				credentials: 'include'
-			});
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
+			method: 'DELETE',
+			mode: 'cors',
+			credentials: 'include'
+		});
 
-			if (res.status === 401) {
-				goto('/login');
-				return;
-			}
+		if (res.status === 401) {
+			goto('/login');
+			return;
+		}
 
-			if (res.ok) {
-				await invalidate('app:training-metrics');
-				goto('/');
-			} else {
-				console.error('Failed to delete activity');
-				isDeleting = false;
-			}
-		} catch (error) {
-			console.error('Error deleting activity:', error);
-			isDeleting = false;
+		if (res.ok) {
+			await invalidate('app:training-metrics');
+			goto('/');
+		} else {
+			throw new Error('Failed to delete activity');
 		}
 	};
 
 	const openDeleteModal = () => {
 		showDeleteModal = true;
-	};
-
-	const cancelDelete = () => {
-		showDeleteModal = false;
 	};
 
 	const updateActivityNameCallback = async (newName: string) => {
@@ -341,36 +330,13 @@
 </div>
 
 <!-- Delete confirmation modal -->
-{#if showDeleteModal}
-	<dialog class="modal-open modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">Delete Activity</h3>
-			<p class="py-4">
-				Are you sure you want to delete this activity?
-				<br />
-				<span class="mt-2 block text-sm italic opacity-70">
-					{summary.title} - {localiseDateTime(data.activity.start_time)}
-				</span>
-				<br />
-				<strong>This action cannot be undone.</strong>
-			</p>
-			<div class="modal-action">
-				<button class="btn" onclick={cancelDelete} disabled={isDeleting}> Cancel </button>
-				<button class="btn btn-error" onclick={deleteActivityCallback} disabled={isDeleting}>
-					{#if isDeleting}
-						<span class="loading loading-sm loading-spinner"></span>
-						Deleting...
-					{:else}
-						Delete
-					{/if}
-				</button>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={cancelDelete}>close</button>
-		</form>
-	</dialog>
-{/if}
+<DeleteModal
+	bind:isOpen={showDeleteModal}
+	title="Delete Activity"
+	description="Are you sure you want to delete this activity?"
+	itemPreview="{summary.title} - {localiseDateTime(data.activity.start_time)}"
+	onConfirm={deleteActivityCallback}
+/>
 
 <style>
 	.chip-container > :global(div) {

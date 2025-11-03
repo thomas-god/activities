@@ -6,13 +6,13 @@
 	import type { TrainingNote } from './+page';
 	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
 	import TrainingNoteListItem from '$components/organisms/TrainingNoteListItem.svelte';
+	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 
 	let { data }: PageProps = $props();
 
 	let showDeleteModal = $state(false);
-	let isDeleting = $state(false);
 	let showEditModal = $state(false);
 	let isUpdating = $state(false);
 	let editedName = $state('');
@@ -21,25 +21,16 @@
 	let isUpdatingNote = $state(false);
 
 	async function handleDelete() {
-		isDeleting = true;
-		try {
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
-				method: 'DELETE',
-				credentials: 'include',
-				mode: 'cors'
-			});
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+			method: 'DELETE',
+			credentials: 'include',
+			mode: 'cors'
+		});
 
-			if (response.ok) {
-				await goto('/training/periods');
-			} else {
-				alert('Failed to delete training period');
-			}
-		} catch (error) {
-			alert('Error deleting training period');
-			console.error(error);
-		} finally {
-			isDeleting = false;
-			showDeleteModal = false;
+		if (response.ok) {
+			await goto('/training/periods');
+		} else {
+			throw new Error('Failed to delete training period');
 		}
 	}
 
@@ -433,34 +424,13 @@
 {/if}
 
 <!-- Delete confirmation modal -->
-{#if showDeleteModal}
-	<dialog class="modal-open modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">Delete Training Period</h3>
-			<p class="py-4">
-				Are you sure you want to delete "<strong>{period.name}</strong>"?
-				<br />
-				This action cannot be undone.
-			</p>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (showDeleteModal = false)} disabled={isDeleting}>
-					Cancel
-				</button>
-				<button class="btn btn-error" onclick={handleDelete} disabled={isDeleting}>
-					{#if isDeleting}
-						<span class="loading loading-sm loading-spinner"></span>
-						Deleting...
-					{:else}
-						Delete
-					{/if}
-				</button>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={() => (showDeleteModal = false)}>close</button>
-		</form>
-	</dialog>
-{/if}
+<DeleteModal
+	bind:isOpen={showDeleteModal}
+	title="Delete Training Period"
+	description="Are you sure you want to delete this training period ? "
+	itemPreview={period.name}
+	onConfirm={handleDelete}
+/>
 
 <!-- Edit note modal -->
 {#if showEditNoteModal}
