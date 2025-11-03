@@ -21,6 +21,8 @@
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
+	let showDeleteModal = $state(false);
+	let isDeleting = $state(false);
 
 	let summary = $derived.by(() => {
 		return {
@@ -72,17 +74,37 @@
 	});
 
 	const deleteActivityCallback = async (): Promise<void> => {
-		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
-			method: 'DELETE',
-			mode: 'cors',
-			credentials: 'include'
-		});
+		isDeleting = true;
+		try {
+			const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}`, {
+				method: 'DELETE',
+				mode: 'cors',
+				credentials: 'include'
+			});
 
-		if (res.status === 401) {
-			goto('/login');
+			if (res.status === 401) {
+				goto('/login');
+				return;
+			}
+
+			if (res.ok) {
+				goto('/');
+			} else {
+				console.error('Failed to delete activity');
+				isDeleting = false;
+			}
+		} catch (error) {
+			console.error('Error deleting activity:', error);
+			isDeleting = false;
 		}
+	};
 
-		goto('/');
+	const openDeleteModal = () => {
+		showDeleteModal = true;
+	};
+
+	const cancelDelete = () => {
+		showDeleteModal = false;
 	};
 
 	const updateActivityNameCallback = async (newName: string) => {
@@ -249,6 +271,17 @@
 			</div>
 			<!-- <div>45 km</div> -->
 		</div>
+		<div class="dropdown dropdown-end ml-2">
+			<button tabindex="0" class="btn btn-circle btn-ghost btn-sm" aria-label="More options">
+				⋮
+			</button>
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<ul tabindex="0" class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow">
+				<li>
+					<button onclick={openDeleteModal} class="text-error"> 🗑️ Delete Activity </button>
+				</li>
+			</ul>
+		</div>
 	</div>
 
 	<details
@@ -305,6 +338,38 @@
 		<ActivityLaps activity={data.activity} metrics={lapMetrics} />
 	</div>
 </div>
+
+<!-- Delete confirmation modal -->
+{#if showDeleteModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Delete Activity</h3>
+			<p class="py-4">
+				Are you sure you want to delete this activity?
+				<br />
+				<span class="mt-2 block text-sm italic opacity-70">
+					{summary.title} - {localiseDateTime(data.activity.start_time)}
+				</span>
+				<br />
+				<strong>This action cannot be undone.</strong>
+			</p>
+			<div class="modal-action">
+				<button class="btn" onclick={cancelDelete} disabled={isDeleting}> Cancel </button>
+				<button class="btn btn-error" onclick={deleteActivityCallback} disabled={isDeleting}>
+					{#if isDeleting}
+						<span class="loading loading-sm loading-spinner"></span>
+						Deleting...
+					{:else}
+						Delete
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={cancelDelete}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <style>
 	.chip-container > :global(div) {
