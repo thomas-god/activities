@@ -2,12 +2,11 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import DateRangeSelector from '../../../organisms/DateRangeSelector.svelte';
+	import DateRangeSelector from '$components/organisms/DateRangeSelector.svelte';
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
-	import type { MetricsListGrouped } from '$lib/api';
-	import TrainingMetricsChartStacked from '../../../organisms/TrainingMetricsChartStacked.svelte';
-	import TrainingMetricTitle from '../../../molecules/TrainingMetricTitle.svelte';
+	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
+	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 
 	let { data }: PageProps = $props();
 

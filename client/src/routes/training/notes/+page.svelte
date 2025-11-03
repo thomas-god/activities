@@ -2,7 +2,7 @@
 	import { deleteTrainingNote, updateTrainingNote } from '$lib/api/training';
 	import { invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import TrainingNoteListItem from '../../../organisms/TrainingNoteListItem.svelte';
+	import TrainingNoteListItem from '$components/organisms/TrainingNoteListItem.svelte';
 
 	let { data }: PageProps = $props();
 

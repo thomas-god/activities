@@ -2,7 +2,7 @@
 	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import '../app.css';
-	import ActivitiesUploader from '../organisms/ActivitiesUploader.svelte';
+	import ActivitiesUploader from '$components/organisms/ActivitiesUploader.svelte';
 
 	let { children } = $props();
 

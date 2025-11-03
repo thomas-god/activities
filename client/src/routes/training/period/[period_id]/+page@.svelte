@@ -4,8 +4,8 @@
 	import { goto, invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
 	import type { TrainingNote } from './+page';
-	import ActivitiesListItem from '../../../../organisms/ActivitiesListItem.svelte';
-	import TrainingNoteListItem from '../../../../organisms/TrainingNoteListItem.svelte';
+	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
+	import TrainingNoteListItem from '$components/organisms/TrainingNoteListItem.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 

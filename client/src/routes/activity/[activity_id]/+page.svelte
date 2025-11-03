@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { formatDuration, localiseDateTime } from '$lib/duration';
-	import TimeseriesChart from '../../../organisms/TimeseriesChart.svelte';
+	import TimeseriesChart from '$components/organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto, invalidate } from '$app/navigation';
-	import EditableString from '../../../molecules/EditableString.svelte';
-	import EditableRpe from '../../../molecules/EditableRpe.svelte';
-	import EditableWorkoutType from '../../../molecules/EditableWorkoutType.svelte';
-	import EditableNutrition from '../../../molecules/EditableNutrition.svelte';
-	import EditableFeedback from '../../../molecules/EditableFeedback.svelte';
-	import MultiSelect from '../../../molecules/MultiSelect.svelte';
+	import EditableString from '$components/molecules/EditableString.svelte';
+	import EditableRpe from '$components/molecules/EditableRpe.svelte';
+	import EditableWorkoutType from '$components/molecules/EditableWorkoutType.svelte';
+	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
+	import EditableFeedback from '$components/molecules/EditableFeedback.svelte';
+	import MultiSelect from '$components/molecules/MultiSelect.svelte';
 	import type { Metric } from '$lib/colors';
-	import ActivityStatistics from '../../../organisms/ActivityStatistics.svelte';
-	import ActivityLaps, { type LapMetric } from '../../../organisms/ActivityLaps.svelte';
+	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
+	import ActivityLaps, { type LapMetric } from '$components/organisms/ActivityLaps.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import type { WorkoutType } from '$lib/workout-type';

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import { page } from '$app/state';
-	import CreateTrainingMetric from '../../organisms/CreateTrainingMetric.svelte';
-	import CreateTrainingPeriod from '../../organisms/CreateTrainingPeriod.svelte';
-	import CreateTrainingNote from '../../organisms/CreateTrainingNote.svelte';
+	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
+	import CreateTrainingPeriod from '$components/organisms/CreateTrainingPeriod.svelte';
+	import CreateTrainingNote from '$components/organisms/CreateTrainingNote.svelte';
 
 	let { children } = $props();
 

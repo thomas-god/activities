@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ActivitiesList from '../../organisms/ActivitiesList.svelte';
-	import ActivitiesCalendar from '../../organisms/ActivitiesCalendar.svelte';
+	import ActivitiesList from '$components/organisms/ActivitiesList.svelte';
+	import ActivitiesCalendar from '$components/organisms/ActivitiesCalendar.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';

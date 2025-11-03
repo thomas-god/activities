@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import PastActivitiesList from '../organisms/PastActivitiesList.svelte';
+	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
-	import TrainingMetricTitle from '../molecules/TrainingMetricTitle.svelte';
+	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
+	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import { dayjs } from '$lib/duration';
 	import {
 		getSportCategory,
