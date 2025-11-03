@@ -12,9 +12,10 @@ use crate::domain::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, IActivityService, ITrainingService,
         ListActivitiesError, ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest,
-        RawDataRepository, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
-        UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
-        UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
+        RawDataRepository, RemoveActivityFromMetricsRequest, UpdateActivityFeedbackError,
+        UpdateActivityFeedbackRequest, UpdateActivityNutritionError,
+        UpdateActivityNutritionRequest, UpdateActivityRpeError, UpdateActivityRpeRequest,
+        UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
         UpdateMetricsValuesRequest,
     },
 };
@@ -343,6 +344,13 @@ where
             .await
             .delete_activity(req.activity())
             .await?;
+
+        // Dispatch metrics update for deleted activity
+        let metric_service = self.training_metrics_service.clone();
+        tokio::spawn(async move {
+            let req = RemoveActivityFromMetricsRequest::new(req.user().clone(), activity);
+            metric_service.remove_activity_from_metrics(req).await
+        });
 
         Ok(())
     }
@@ -1440,5 +1448,99 @@ mod tests_activity_service {
 
         let res = service.delete_activity(req).await;
         assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_propagates_to_training_service() {
+        let user_id = UserId::from("test_user".to_string());
+        let activity_id = ActivityId::from("test_activity");
+        let activity = Activity::new(
+            activity_id.clone(),
+            user_id.clone(),
+            None,
+            ActivityStartTime::from_timestamp(1000).unwrap(),
+            Sport::Running,
+            ActivityStatistics::new(HashMap::from([(
+                crate::domain::models::activity::ActivityStatistic::Calories,
+                500.0,
+            )])),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let mut activity_repository = MockActivityRepository::new();
+        let activity_clone = activity.clone();
+        activity_repository
+            .expect_get_activity()
+            .return_once(move |_| Ok(Some(activity_clone)));
+
+        let activity_id_clone = activity_id.clone();
+        activity_repository
+            .expect_delete_activity()
+            .withf(move |id| *id == activity_id_clone)
+            .returning(|_| Ok(()));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let mut metrics_service = MockTrainingService::new();
+        let user_id_clone = user_id.clone();
+        let activity_id_clone2 = activity_id.clone();
+        metrics_service
+            .expect_remove_activity_from_metrics()
+            .withf(move |req| {
+                req.user() == &user_id_clone && req.deleted_activity().id() == &activity_id_clone2
+            })
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            Arc::new(metrics_service),
+        );
+
+        let req = DeleteActivityRequest::new(user_id.clone(), activity_id.clone());
+
+        let res = service.delete_activity(req).await;
+        assert!(res.is_ok());
+
+        // Give the spawned task a chance to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_does_not_propagate_on_error() {
+        let user_id = UserId::from("test_user".to_string());
+        let activity_id = ActivityId::from("test_activity");
+
+        let mut activity_repository = MockActivityRepository::new();
+        // Activity doesn't exist
+        activity_repository
+            .expect_get_activity()
+            .return_once(move |_| Ok(None));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let mut metrics_service = MockTrainingService::new();
+        // Should NOT be called since the deletion will fail
+        metrics_service
+            .expect_remove_activity_from_metrics()
+            .times(0);
+
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+            Arc::new(metrics_service),
+        );
+
+        let req = DeleteActivityRequest::new(user_id.clone(), activity_id.clone());
+
+        let res = service.delete_activity(req).await;
+        assert!(res.is_err());
+
+        // Give any potential spawned task a chance to run (there shouldn't be any)
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
 }

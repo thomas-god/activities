@@ -609,6 +609,22 @@ impl UpdateMetricsValuesRequest {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct RemoveActivityFromMetricsRequest {
+    user: UserId,
+    deleted_activity: Activity,
+}
+
+impl RemoveActivityFromMetricsRequest {
+    pub fn deleted_activity(&self) -> &Activity {
+        &self.deleted_activity
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct DeleteTrainingMetricRequest {
     user: UserId,
     metric: TrainingMetricId,
@@ -647,6 +663,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn update_metrics_values(
         &self,
         req: UpdateMetricsValuesRequest,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn remove_activity_from_metrics(
+        &self,
+        req: RemoveActivityFromMetricsRequest,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 
     fn get_training_metrics(

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::NaiveDate;
 use derive_more::Constructor;
 use tokio::sync::Mutex;
 
@@ -18,8 +19,8 @@ use crate::domain::{
         CreateTrainingPeriodRequest, DateRange, DeleteTrainingMetricError,
         DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
         DeleteTrainingPeriodRequest, GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
-        TrainingRepository, UpdateMetricsValuesRequest, UpdateTrainingNoteError,
-        UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+        RemoveActivityFromMetricsRequest, TrainingRepository, UpdateMetricsValuesRequest,
+        UpdateTrainingNoteError, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
         UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
     },
 };
@@ -189,6 +190,58 @@ where
                 let _ = self
                     .training_repository
                     .update_metric_value(definition.id(), (bin, new_metric_value))
+                    .await;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn remove_activity_from_metrics(
+        &self,
+        req: RemoveActivityFromMetricsRequest,
+    ) -> Result<(), ()> {
+        let definitions = self
+            .training_repository
+            .get_definitions(req.user())
+            .await
+            .unwrap();
+
+        let activity = req.deleted_activity();
+
+        // Collect bins affected by the deleted activity that need recomputation
+        let mut bins_to_recompute: std::collections::HashSet<(
+            TrainingMetricId,
+            String, // granule key for date range reconstruction
+        )> = std::collections::HashSet::new();
+
+        for definition in &definitions {
+            // Determine the bin(s) that need recomputation
+            let granule = definition
+                .granularity()
+                .datetime_key(activity.start_time().date());
+
+            bins_to_recompute.insert((definition.id().clone(), granule));
+        }
+
+        // Recompute bins affected by deleted activity
+        for (metric_id, granule_key) in bins_to_recompute {
+            // Find the definition for this metric
+            let Some(definition) = definitions.iter().find(|d| d.id() == &metric_id) else {
+                continue;
+            };
+
+            // Parse the granule key to get the start date
+            let Ok(start_date) = NaiveDate::parse_from_str(&granule_key, "%Y-%m-%d") else {
+                continue;
+            };
+
+            // Create a date range for this bin
+            let bin_range = definition
+                .granularity()
+                .bins(&DateRange::new(start_date, start_date));
+            if let Some(first_bin) = bin_range.first() {
+                self.compute_metric_values(definition, first_bin, req.user())
                     .await;
             }
         }
@@ -607,6 +660,11 @@ pub mod test_utils {
             async fn update_metrics_values(
                 &self,
                 req: UpdateMetricsValuesRequest,
+            ) -> Result<(), ()>;
+
+            async fn remove_activity_from_metrics(
+                &self,
+                req: RemoveActivityFromMetricsRequest,
             ) -> Result<(), ()>;
 
             async fn get_training_metrics(
@@ -1953,6 +2011,205 @@ mod tests_training_metrics_service {
 
         // Act & Assert - verify both groups are updated for the same day
         let result = service.update_metrics_values(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_recomputes_affected_bin() {
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::from("test");
+
+        // Create the activity to be removed
+        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+
+        // Create the definition
+        let definition = TrainingMetricDefinition::new(
+            metric_id.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        // Mock get_definitions - return our metric definition
+        repository
+            .expect_get_definitions()
+            .returning(move |_| Ok(vec![definition.clone()]));
+
+        // Mock list_activities for recomputation
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_list_activities()
+            .returning(|_, _| Ok(vec![])); // No activities left after deletion
+
+        // Note: update_metric_value won't be called since there are no activities to compute
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_handles_multiple_metrics() {
+        let user_id = UserId::test_default();
+        let metric_id_1 = TrainingMetricId::from("metric1");
+        let metric_id_2 = TrainingMetricId::from("metric2");
+
+        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+
+        // Create two metric definitions
+        let definition_1 = TrainingMetricDefinition::new(
+            metric_id_1.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let definition_2 = TrainingMetricDefinition::new(
+            metric_id_2.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        repository
+            .expect_get_definitions()
+            .returning(move |_| Ok(vec![definition_1.clone(), definition_2.clone()]));
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_list_activities()
+            .returning(|_, _| Ok(vec![]));
+
+        // Note: update_metric_value won't be called since there are no activities to compute
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_with_weekly_granularity() {
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::from("test");
+
+        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+
+        // Create a weekly granularity metric
+        let definition = TrainingMetricDefinition::new(
+            metric_id.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        repository
+            .expect_get_definitions()
+            .returning(move |_| Ok(vec![definition.clone()]));
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_list_activities()
+            .returning(|_, _| Ok(vec![]));
+
+        // Note: update_metric_value won't be called since there are no activities to compute
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_with_no_metrics() {
+        let user_id = UserId::test_default();
+        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+
+        let mut repository = MockTrainingRepository::new();
+
+        // No metric definitions
+        repository
+            .expect_get_definitions()
+            .returning(|_| Ok(vec![]));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_recomputes_with_remaining_activities() {
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::from("test");
+
+        let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+        let remaining_activity = create_test_activity(600, Some(600.0), Some(5000.0));
+
+        let definition = TrainingMetricDefinition::new(
+            metric_id.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        repository
+            .expect_get_definitions()
+            .returning(move |_| Ok(vec![definition.clone()]));
+
+        let mut activity_repository = MockActivityRepository::default();
+        // Return the remaining activity when recomputing
+        activity_repository
+            .expect_list_activities()
+            .returning(move |_, _| Ok(vec![remaining_activity.activity().clone()]));
+
+        // Expect the recomputed value to be based only on remaining activity (600.0 calories)
+        repository
+            .expect_update_metric_value()
+            .withf(|_, (_, v)| matches!(v, TrainingMetricValue::Sum(val) if (*val - 600.0).abs() < 0.01))
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req =
+            RemoveActivityFromMetricsRequest::new(user_id, deleted_activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
         assert!(result.is_ok());
     }
 }
