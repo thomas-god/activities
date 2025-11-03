@@ -692,6 +692,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: UpdateTrainingPeriodNameRequest,
     ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNameError>> + Send;
 
+    fn update_training_period_note(
+        &self,
+        req: UpdateTrainingPeriodNoteRequest,
+    ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNoteError>> + Send;
+
     fn create_training_note(
         &self,
         req: CreateTrainingNoteRequest,
@@ -888,6 +893,37 @@ pub enum UpdateTrainingPeriodNameError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct UpdateTrainingPeriodNoteRequest {
+    user: UserId,
+    period_id: TrainingPeriodId,
+    note: Option<String>,
+}
+
+impl UpdateTrainingPeriodNoteRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn period_id(&self) -> &TrainingPeriodId {
+        &self.period_id
+    }
+
+    pub fn note(&self) -> &Option<String> {
+        &self.note
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingPeriodNoteError {
+    #[error("Training period {0} does not exist")]
+    PeriodDoesNotExist(TrainingPeriodId),
+    #[error("User {0} does not own training period {1}")]
+    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 ///////////////////////////////////////////////////////////////////
 /// TRAINING NOTE TYPES
 ///////////////////////////////////////////////////////////////////
@@ -1014,6 +1050,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         period_id: &TrainingPeriodId,
         name: String,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn update_training_period_note(
+        &self,
+        period_id: &TrainingPeriodId,
+        note: Option<String>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn save_training_note(
