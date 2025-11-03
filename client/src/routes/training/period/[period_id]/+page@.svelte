@@ -1,14 +1,9 @@
 <script lang="ts">
 	import { dayjs, formatDurationHoursMinutes } from '$lib/duration';
-	import {
-		getSportCategory,
-		sportCategoryIcons,
-		getSportCategoryIcon,
-		type SportCategory
-	} from '$lib/sport';
+	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { TrainingPeriodDetails, TrainingNote } from './+page';
+	import type { TrainingNote } from './+page';
 	import ActivitiesListItem from '../../../../organisms/ActivitiesListItem.svelte';
 	import TrainingNoteListItem from '../../../../organisms/TrainingNoteListItem.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
@@ -21,6 +16,9 @@
 	let showEditModal = $state(false);
 	let isUpdating = $state(false);
 	let editedName = $state('');
+	let showEditNoteModal = $state(false);
+	let editedNote = $state('');
+	let isUpdatingNote = $state(false);
 
 	async function handleDelete() {
 		isDeleting = true;
@@ -48,6 +46,39 @@
 	function openEditModal() {
 		editedName = period.name;
 		showEditModal = true;
+	}
+
+	function openEditNoteModal() {
+		editedNote = period.note ?? '';
+		showEditNoteModal = true;
+	}
+
+	async function handleUpdateNote() {
+		isUpdatingNote = true;
+		try {
+			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+				method: 'PATCH',
+				credentials: 'include',
+				mode: 'cors',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ note: editedNote.trim() })
+			});
+
+			if (response.ok) {
+				// Reload the page to show updated content
+				window.location.reload();
+			} else {
+				const error = await response.json();
+				alert(error.error || 'Failed to update training period note');
+			}
+		} catch (error) {
+			alert('Error updating training period note');
+			console.error(error);
+		} finally {
+			isUpdatingNote = false;
+		}
 	}
 
 	async function handleUpdate() {
@@ -286,9 +317,28 @@
 			</div>
 		</div>
 
-		{#if period.note}
-			<div class="mt-4 max-w-xl rounded bg-base-200 p-3">{period.note}</div>
-		{/if}
+		<!-- Period note section -->
+		<div class="mt-4">
+			{#if period.note}
+				<div class="flex items-start gap-2">
+					<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
+						{period.note}
+					</div>
+					<button
+						class="btn btn-square btn-ghost btn-xs"
+						onclick={openEditNoteModal}
+						aria-label="Edit note"
+					>
+						✏️
+					</button>
+				</div>
+			{:else}
+				<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
+					<span>📝</span>
+					<span>Add period note</span>
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Activities section -->
@@ -408,6 +458,45 @@
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button onclick={() => (showDeleteModal = false)}>close</button>
+		</form>
+	</dialog>
+{/if}
+
+<!-- Edit note modal -->
+{#if showEditNoteModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">
+				{period.note ? 'Edit' : 'Add'} training period description
+			</h3>
+			<div class="py-4">
+				<label class="floating-label">
+					<textarea
+						bind:value={editedNote}
+						placeholder="Add a description of this training period..."
+						class="textarea w-full"
+						rows="6"
+						disabled={isUpdatingNote}
+					></textarea>
+					<span>Description</span>
+				</label>
+			</div>
+			<div class="modal-action">
+				<button class="btn" onclick={() => (showEditNoteModal = false)} disabled={isUpdatingNote}>
+					Cancel
+				</button>
+				<button class="btn btn-primary" onclick={handleUpdateNote} disabled={isUpdatingNote}>
+					{#if isUpdatingNote}
+						<span class="loading loading-sm loading-spinner"></span>
+						Saving...
+					{:else}
+						Save
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={() => (showEditNoteModal = false)}>close</button>
 		</form>
 	</dialog>
 {/if}
