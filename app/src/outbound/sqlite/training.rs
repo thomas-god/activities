@@ -200,6 +200,22 @@ impl TrainingRepository for SqliteTrainingRepository {
             })
     }
 
+    async fn delete_metric_values_for_bin(
+        &self,
+        id: &TrainingMetricId,
+        granule: &str,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "DELETE FROM t_training_metrics_values WHERE definition_id = ?1 AND granule = ?2;",
+        )
+        .bind(id)
+        .bind(granule)
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(|err| anyhow!(err))
+    }
+
     async fn get_metric_value(
         &self,
         id: &TrainingMetricId,
@@ -1352,6 +1368,193 @@ mod test_sqlite_training_repository {
                 .await
                 .expect("Should have returned OK")
                 .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_metric_values_for_bin_removes_all_values_for_granule() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should save definition");
+
+        // Insert multiple values for the same granule but different groups
+        let value1 = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+            TrainingMetricValue::Sum(100.0),
+        );
+        let value2 = (
+            TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+            TrainingMetricValue::Sum(200.0),
+        );
+        let value3 = (
+            TrainingMetricBin::from_granule("2025-09-25"),
+            TrainingMetricValue::Sum(150.0),
+        );
+
+        repository
+            .update_metric_value(definition.id(), value1.clone())
+            .await
+            .expect("Should insert value 1");
+        repository
+            .update_metric_value(definition.id(), value2.clone())
+            .await
+            .expect("Should insert value 2");
+        repository
+            .update_metric_value(definition.id(), value3.clone())
+            .await
+            .expect("Should insert value 3");
+
+        // Delete all values for granule "2025-09-24"
+        repository
+            .delete_metric_values_for_bin(definition.id(), "2025-09-24")
+            .await
+            .expect("Should delete values");
+
+        // Verify that values for "2025-09-24" are deleted
+        assert!(
+            repository
+                .get_metric_value(definition.id(), &value1.0)
+                .await
+                .expect("Should query")
+                .is_none(),
+            "Value 1 should be deleted"
+        );
+        assert!(
+            repository
+                .get_metric_value(definition.id(), &value2.0)
+                .await
+                .expect("Should query")
+                .is_none(),
+            "Value 2 should be deleted"
+        );
+
+        // Verify that value for "2025-09-25" still exists
+        assert!(
+            repository
+                .get_metric_value(definition.id(), &value3.0)
+                .await
+                .expect("Should query")
+                .is_some(),
+            "Value 3 should still exist"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_metric_values_for_bin_does_not_fail_when_no_values_exist() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition = build_metric_definition();
+        repository
+            .save_definition(definition.clone())
+            .await
+            .expect("Should save definition");
+
+        // Try to delete from a granule that has no values
+        let result = repository
+            .delete_metric_values_for_bin(definition.id(), "2025-09-24")
+            .await;
+
+        assert!(result.is_ok(), "Should not fail when no values exist");
+    }
+
+    #[tokio::test]
+    async fn test_delete_metric_values_for_bin_only_deletes_specified_metric() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition1_id = TrainingMetricId::from("metric1");
+        let definition2_id = TrainingMetricId::from("metric2");
+
+        let definition1 = TrainingMetricDefinition::new(
+            definition1_id.clone(),
+            UserId::test_default(),
+            ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Max,
+            )),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
+        );
+
+        let definition2 = TrainingMetricDefinition::new(
+            definition2_id.clone(),
+            UserId::test_default(),
+            ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Max,
+            )),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
+        );
+
+        repository
+            .save_definition(definition1.clone())
+            .await
+            .expect("Should save definition 1");
+        repository
+            .save_definition(definition2.clone())
+            .await
+            .expect("Should save definition 2");
+
+        // Insert values for both metrics with the same granule
+        let value1 = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Sum(100.0),
+        );
+        let value2 = (
+            TrainingMetricBin::from_granule("2025-09-24"),
+            TrainingMetricValue::Sum(200.0),
+        );
+
+        repository
+            .update_metric_value(&definition1_id, value1.clone())
+            .await
+            .expect("Should insert value 1");
+        repository
+            .update_metric_value(&definition2_id, value2.clone())
+            .await
+            .expect("Should insert value 2");
+
+        // Delete values only for definition1
+        repository
+            .delete_metric_values_for_bin(&definition1_id, "2025-09-24")
+            .await
+            .expect("Should delete values");
+
+        // Verify that value for definition1 is deleted
+        assert!(
+            repository
+                .get_metric_value(&definition1_id, &value1.0)
+                .await
+                .expect("Should query")
+                .is_none(),
+            "Value for metric 1 should be deleted"
+        );
+
+        // Verify that value for definition2 still exists
+        assert!(
+            repository
+                .get_metric_value(&definition2_id, &value2.0)
+                .await
+                .expect("Should query")
+                .is_some(),
+            "Value for metric 2 should still exist"
         );
     }
 

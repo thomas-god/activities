@@ -231,6 +231,13 @@ where
                 continue;
             };
 
+            // Delete existing values for this bin before recomputing
+            // This ensures that if the bin becomes empty, old values are removed
+            let _ = self
+                .training_repository
+                .delete_metric_values_for_bin(&metric_id, &granule_key)
+                .await;
+
             // Parse the granule key to get the start date
             let Ok(start_date) = NaiveDate::parse_from_str(&granule_key, "%Y-%m-%d") else {
                 continue;
@@ -785,6 +792,12 @@ pub mod test_utils {
                 id: &TrainingMetricId,
                 values: (TrainingMetricBin, TrainingMetricValue),
             ) -> Result<(), UpdateMetricError>;
+
+            async fn delete_metric_values_for_bin(
+                &self,
+                id: &TrainingMetricId,
+                granule: &str,
+            ) -> Result<(), anyhow::Error>;
 
             async fn get_metric_value(
                 &self,
@@ -2040,6 +2053,12 @@ mod tests_training_metrics_service {
             .expect_get_definitions()
             .returning(move |_| Ok(vec![definition.clone()]));
 
+        // Mock delete_metric_values_for_bin - should be called to clear old values
+        repository
+            .expect_delete_metric_values_for_bin()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
         // Mock list_activities for recomputation
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
@@ -2091,6 +2110,12 @@ mod tests_training_metrics_service {
             .expect_get_definitions()
             .returning(move |_| Ok(vec![definition_1.clone(), definition_2.clone()]));
 
+        // Mock delete_metric_values_for_bin - should be called twice (once per metric)
+        repository
+            .expect_delete_metric_values_for_bin()
+            .times(2)
+            .returning(|_, _| Ok(()));
+
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
             .expect_list_activities()
@@ -2129,6 +2154,12 @@ mod tests_training_metrics_service {
         repository
             .expect_get_definitions()
             .returning(move |_| Ok(vec![definition.clone()]));
+
+        // Mock delete_metric_values_for_bin
+        repository
+            .expect_delete_metric_values_for_bin()
+            .times(1)
+            .returning(|_, _| Ok(()));
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
@@ -2190,6 +2221,12 @@ mod tests_training_metrics_service {
             .expect_get_definitions()
             .returning(move |_| Ok(vec![definition.clone()]));
 
+        // Mock delete_metric_values_for_bin
+        repository
+            .expect_delete_metric_values_for_bin()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
         let mut activity_repository = MockActivityRepository::default();
         // Return the remaining activity when recomputing
         activity_repository
@@ -2202,6 +2239,56 @@ mod tests_training_metrics_service {
             .withf(|_, (_, v)| matches!(v, TrainingMetricValue::Sum(val) if (*val - 600.0).abs() < 0.01))
             .times(1)
             .returning(|_, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req =
+            RemoveActivityFromMetricsRequest::new(user_id, deleted_activity.activity().clone());
+
+        let result = service.remove_activity_from_metrics(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_remove_activity_from_metrics_clears_bin_when_last_activity_deleted() {
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::from("test");
+
+        // The activity to be deleted - it's the only one in its bin
+        let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
+
+        let definition = TrainingMetricDefinition::new(
+            metric_id.clone(),
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        repository
+            .expect_get_definitions()
+            .returning(move |_| Ok(vec![definition.clone()]));
+
+        // CRITICAL: Expect delete_metric_values_for_bin to be called before recomputing
+        repository
+            .expect_delete_metric_values_for_bin()
+            .withf(|id, granule| *id == TrainingMetricId::from("test") && granule == "1970-01-01")
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_repository = MockActivityRepository::default();
+        // Return empty list - no activities left in this bin
+        activity_repository
+            .expect_list_activities()
+            .returning(|_, _| Ok(vec![]));
+
+        // update_metric_value should NOT be called since there are no activities
+        repository.expect_update_metric_value().times(0);
 
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);

@@ -1034,6 +1034,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         values: (TrainingMetricBin, TrainingMetricValue),
     ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
 
+    fn delete_metric_values_for_bin(
+        &self,
+        id: &TrainingMetricId,
+        granule: &str,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
     fn get_metric_value(
         &self,
         id: &TrainingMetricId,
