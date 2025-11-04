@@ -9,6 +9,7 @@ use crate::domain::models::{
         ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
         ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport, WorkoutType,
     },
+    preferences::{Preference, PreferenceKey},
     training::{
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue,
@@ -631,5 +632,50 @@ impl sqlx::Encode<'_, sqlx::Sqlite> for TrainingNoteDate {
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
         let date_str = self.as_naive_date().format("%Y-%m-%d").to_string();
         <String as sqlx::Encode<'_, sqlx::Sqlite>>::encode(date_str, buf)
+    }
+}
+
+///////////////////////////////////////////////////////////////////
+/// PREFERENCES TYPES
+///////////////////////////////////////////////////////////////////
+
+impl sqlx::Type<sqlx::Sqlite> for PreferenceKey {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for PreferenceKey {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let text = self.to_string();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(text.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for PreferenceKey {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        s.parse().map_err(|e: String| e.into())
+    }
+}
+
+/// Serialize a preference value to string for storage
+pub fn serialize_preference_value(preference: &Preference) -> Result<String, BoxDynError> {
+    match preference {
+        Preference::FavoriteMetric(id) => Ok(id.to_string()),
+    }
+}
+
+/// Deserialize a preference value from storage
+pub fn deserialize_preference(key: &PreferenceKey, value: &str) -> Result<Preference, BoxDynError> {
+    match key {
+        PreferenceKey::FavoriteMetric => {
+            let id = TrainingMetricId::from(value);
+            Ok(Preference::FavoriteMetric(id))
+        }
     }
 }
