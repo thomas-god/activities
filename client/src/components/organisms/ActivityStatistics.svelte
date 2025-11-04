@@ -1,7 +1,8 @@
 <script lang="ts">
+	import type { ActivityDetails } from '$lib/api';
 	import { formatDuration } from '$lib/duration';
+	import { paceToString, speedToPace } from '$lib/speed';
 	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
-	import type { ActivityDetails } from '../routes/activity/[activity_id]/proxy+page';
 
 	let { activity }: { activity: ActivityDetails } = $props();
 
@@ -20,6 +21,7 @@
 	let avgHeartRate = $derived(timeseriesAvg(activity.timeseries.metrics, 'HeartRate'));
 	let maxHeartRate = $derived(timeseriesMaximum(activity.timeseries.metrics, 'HeartRate'));
 	let averageSpeed = $derived(timeseriesAvg(activity.timeseries.metrics, 'Speed'));
+	let averagePace = $derived(averageSpeed === undefined ? undefined : speedToPace(averageSpeed));
 	let averagePower = $derived(timeseriesAvg(activity.timeseries.metrics, 'Power'));
 	let weightedAveragePower = $derived(timeseriesQuarticAvg(activity.timeseries.metrics, 'Power'));
 
@@ -51,12 +53,21 @@
 
 		// Speed
 		if (averageSpeed !== undefined) {
-			rows.push({
-				icon: '⚡',
-				label: 'Speed',
-				value: `${averageSpeed.toFixed(2)} km/h`,
-				subvalue: 'avg'
-			});
+			if (activity.sport_category === 'Running') {
+				rows.push({
+					icon: '⚡',
+					label: 'Pace',
+					value: paceToString(averagePace!),
+					subvalue: 'avg'
+				});
+			} else {
+				rows.push({
+					icon: '⚡',
+					label: 'Speed',
+					value: `${averageSpeed.toFixed(2)} km/h`,
+					subvalue: 'avg'
+				});
+			}
 		}
 
 		if (elevation !== undefined) {
