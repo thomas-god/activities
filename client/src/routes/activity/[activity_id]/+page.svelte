@@ -16,7 +16,6 @@
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
-	import type { SportCategory } from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
@@ -190,35 +189,6 @@
 			data.activity.feedback = newFeedback;
 		}
 	};
-
-	const getLapMetrics = (category: SportCategory | null): LapMetric[] => {
-		switch (category) {
-			case 'Running':
-				return ['distance', 'speed', 'heartRate'];
-			case 'Cycling':
-				return ['distance', 'power', 'heartRate'];
-			case 'Rowing':
-				return ['distance', 'speed', 'power', 'heartRate'];
-			case 'Swimming':
-				return ['distance', 'speed'];
-			case 'Ski':
-				return ['distance', 'speed', 'heartRate'];
-			case 'Walking':
-				return ['distance', 'speed', 'heartRate'];
-			case 'Cardio':
-				return ['heartRate'];
-			case 'Climbing':
-				return ['heartRate'];
-			case 'TeamSports':
-			case 'Racket':
-			case 'WaterSports':
-				return ['distance', 'speed', 'heartRate'];
-			default:
-				return ['heartRate'];
-		}
-	};
-
-	let lapMetrics = $derived(getLapMetrics(data.activity.sport_category));
 </script>
 
 <div class="mx-auto mt-1 flex flex-col gap-4 sm:px-4">
@@ -279,7 +249,7 @@
 		{/if}
 	</details>
 
-	<ActivityLaps activity={data.activity} metrics={lapMetrics} />
+	<ActivityLaps activity={data.activity} />
 </div>
 
 <!-- Delete confirmation modal -->

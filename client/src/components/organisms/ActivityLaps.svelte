@@ -1,17 +1,43 @@
 <script lang="ts">
 	import type { ActivityDetails } from '$lib/api/activities';
 	import { dayjs } from '$lib/duration';
+	import { paceToString, speedToPace } from '$lib/speed';
 
-	export type LapMetric = 'distance' | 'speed' | 'power' | 'heartRate';
+	export type LapMetric = 'distance' | 'speed' | 'power' | 'heartRate' | 'pace';
 
 	interface Props {
 		activity: ActivityDetails;
-		metrics?: LapMetric[];
 	}
 
-	let { activity, metrics = [] }: Props = $props();
+	let { activity }: Props = $props();
 
-	const laps = $derived(activity.timeseries.laps);
+	let laps = $derived(activity.timeseries.laps);
+	let metrics: LapMetric[] = $derived.by(() => {
+		switch (activity.sport_category) {
+			case 'Running':
+				return ['distance', 'pace', 'heartRate'];
+			case 'Cycling':
+				return ['distance', 'power', 'heartRate'];
+			case 'Rowing':
+				return ['distance', 'speed', 'power', 'heartRate'];
+			case 'Swimming':
+				return ['distance', 'speed'];
+			case 'Ski':
+				return ['distance', 'speed', 'heartRate'];
+			case 'Walking':
+				return ['distance', 'speed', 'heartRate'];
+			case 'Cardio':
+				return ['heartRate'];
+			case 'Climbing':
+				return ['heartRate'];
+			case 'TeamSports':
+			case 'Racket':
+			case 'WaterSports':
+				return ['distance', 'speed', 'heartRate'];
+			default:
+				return ['heartRate'];
+		}
+	});
 	const showMetrics = $derived(metrics.length > 0);
 
 	function formatDuration(seconds: number): string {
@@ -63,6 +89,19 @@
 				return `${avg.toFixed(2)} km/h`;
 			}
 
+			case 'pace': {
+				const speedMetric = activity.timeseries.metrics['Speed'];
+				if (!speedMetric) return undefined;
+
+				const lapValues = speedMetric.values.slice(startIndex, endIndex + 1);
+				const validValues = lapValues.filter((v): v is number => v !== null);
+
+				if (validValues.length === 0) return undefined;
+
+				const avg = validValues.reduce((sum, v) => sum + v, 0) / validValues.length;
+				return paceToString(speedToPace(avg), true);
+			}
+
 			case 'power': {
 				const powerMetric = activity.timeseries.metrics['Power'];
 				if (!powerMetric) return undefined;
@@ -104,6 +143,8 @@
 				return 'Avg Power';
 			case 'heartRate':
 				return 'Avg HR';
+			case 'pace':
+				return 'Avg pace';
 		}
 	}
 </script>
