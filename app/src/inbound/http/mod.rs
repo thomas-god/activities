@@ -24,8 +24,11 @@ use crate::inbound::http::handlers::{
 };
 use crate::inbound::parser::ParseFile;
 
+#[cfg(feature = "multi-user")]
+pub use self::auth::infra::mailer::smtp::SMTPEmailProvider;
+
 pub use self::auth::infra::{
-    mailer::{DoNothingMailProvider, SMTPEmailProvider},
+    mailer::DoNothingMailProvider,
     sqlite::{
         magic_link::SqliteMagicLinkRepository, session::SqliteSessionRepository,
         user::SqliteUserRepository,

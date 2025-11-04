@@ -1,4 +1,3 @@
-use derive_more::Constructor;
 use handlebars::{
     Context, Handlebars, Helper, HelperResult, JsonRender, Output, RenderContext, RenderErrorReason,
 };
@@ -15,24 +14,6 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::inbound::http::auth::{EmailAddress, MagicLink, services::magic_link::MailProvider};
-
-#[derive(Debug, Clone, Constructor)]
-pub struct DoNothingMailProvider {}
-
-impl MailProvider for DoNothingMailProvider {
-    async fn send_magic_link_email(
-        &self,
-        email: &EmailAddress,
-        _magic_link: &MagicLink,
-    ) -> Result<(), ()> {
-        tracing::info!(
-            "Dummy send to {email:?} for token: {:?} to user {:?}",
-            _magic_link.token(),
-            _magic_link.user()
-        );
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SMTPEmailProvider {
@@ -180,7 +161,7 @@ mod test {
     use handlebars::Handlebars;
     use serde_json::json;
 
-    use crate::inbound::http::auth::infra::mailer::link_helper;
+    use super::*;
 
     #[test]
     fn test_link_helper() {

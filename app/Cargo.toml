@@ -23,13 +23,18 @@ lettre = { version = "0.11.18", features = [
     "tokio1-rustls",
     "ring",
     "rustls-platform-verifier",
-], default-features = false }
+], default-features = false, optional = true }
 rand = "0.9.2"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
 roxmltree = "0.21.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "chrono"] }
+sqlx = { version = "0.8.6", features = [
+    "runtime-tokio",
+    "tls-rustls-ring-native-roots",
+    "sqlite",
+    "chrono",
+] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = "0.5.2"
@@ -46,4 +51,4 @@ tempfile = "3.23.0"
 
 [features]
 single-user = []
-multi-user = []
+multi-user = ["lettre"]
