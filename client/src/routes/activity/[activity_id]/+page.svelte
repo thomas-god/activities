@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { formatDuration, localiseDateTime } from '$lib/duration';
 	import TimeseriesChart from '$components/organisms/TimeseriesChart.svelte';
 	import type { PageProps } from './$types';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto, invalidate } from '$app/navigation';
-	import EditableString from '$components/molecules/EditableString.svelte';
 	import EditableRpe from '$components/molecules/EditableRpe.svelte';
 	import EditableWorkoutType from '$components/molecules/EditableWorkoutType.svelte';
 	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
@@ -14,27 +12,16 @@
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
 	import ActivityLaps, { type LapMetric } from '$components/organisms/ActivityLaps.svelte';
+	import ActivityHeader from '$components/organisms/ActivityHeader.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
-	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
+	import type { SportCategory } from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
-
-	let summary = $derived.by(() => {
-		return {
-			sport: data.activity.sport,
-			duration: formatDuration(data.activity.duration),
-			start_time: data.activity.start_time,
-			title:
-				data.activity.name === null || data.activity.name === ''
-					? data.activity.sport
-					: data.activity.name
-		};
-	});
 
 	let active_metrics = $derived(convertTimeseriesToActiveTime(data.activity.timeseries));
 
@@ -108,6 +95,10 @@
 
 		if (res.status === 401) {
 			goto('/login');
+		}
+
+		if (res.ok) {
+			data.activity.name = newName;
 		}
 	};
 
@@ -200,16 +191,6 @@
 		}
 	};
 
-	const categoryClass = (category: SportCategory | null): string => {
-		if (category === 'Running') {
-			return 'running';
-		}
-		if (category === 'Cycling') {
-			return 'cycling';
-		}
-		return 'other';
-	};
-
 	const getLapMetrics = (category: SportCategory | null): LapMetric[] => {
 		switch (category) {
 			case 'Running':
@@ -241,38 +222,11 @@
 </script>
 
 <div class="mx-auto mt-1 flex flex-col gap-4 sm:px-4">
-	<div
-		class={`item mt-5 flex flex-1 items-center bg-base-100 p-3 ${categoryClass(data.activity.sport_category)}`}
-	>
-		<div class={`icon ${categoryClass(data.activity.sport_category)}`}>
-			{getSportCategoryIcon(data.activity.sport_category)}
-		</div>
-		<div class="flex flex-1 flex-col">
-			<div class="mb-1 text-lg font-semibold">
-				<EditableString content={summary?.title} editCallback={updateActivityNameCallback} />
-			</div>
-			<div class="text-xs font-light">
-				{localiseDateTime(data.activity.start_time)}
-			</div>
-		</div>
-		<div class="font-semibold sm:text-lg">
-			<div>
-				{formatDuration(data.activity.duration)}
-			</div>
-			<!-- <div>45 km</div> -->
-		</div>
-		<div class="dropdown dropdown-end ml-2">
-			<button tabindex="0" class="btn btn-circle btn-ghost btn-sm" aria-label="More options">
-				⋮
-			</button>
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-			<ul tabindex="0" class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow">
-				<li>
-					<button onclick={openDeleteModal} class="text-error"> 🗑️ Delete Activity </button>
-				</li>
-			</ul>
-		</div>
-	</div>
+	<ActivityHeader
+		activity={data.activity}
+		onEditNameCallback={updateActivityNameCallback}
+		onDeleteClickedCallback={openDeleteModal}
+	/>
 
 	<details
 		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
@@ -334,57 +288,6 @@
 	bind:isOpen={showDeleteModal}
 	title="Delete Activity"
 	description="Are you sure you want to delete this activity?"
-	itemPreview="{summary.title} - {localiseDateTime(data.activity.start_time)}"
+	itemPreview={data.activity.name || data.activity.sport}
 	onConfirm={deleteActivityCallback}
 />
-
-<style>
-	.chip-container > :global(div) {
-		flex-shrink: 0;
-	}
-
-	.item {
-		box-sizing: border-box;
-		border-left: 4px solid transparent;
-		border-radius: 8px;
-	}
-
-	.item.cycling {
-		border-left-color: var(--color-cycling);
-	}
-
-	.item.running {
-		border-left-color: var(--color-running);
-	}
-
-	.item.other {
-		border-left-color: var(--color-other);
-	}
-
-	.icon {
-		width: 40px;
-		height: 40px;
-		border-radius: 8px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		margin-right: 16px;
-		font-size: 20px;
-		flex-shrink: 0;
-	}
-
-	.icon.cycling {
-		background: var(--color-cycling-background);
-		color: var(--color-cycling);
-	}
-
-	.icon.running {
-		background: var(--color-running-background);
-		color: var(--color-running);
-	}
-
-	.icon.other {
-		background: var(--color-other-background);
-		color: var(--color-other);
-	}
-</style>
