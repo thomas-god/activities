@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::ports::IActivityService;
+use crate::domain::ports::{IActivityService, IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
@@ -25,9 +25,10 @@ pub async fn delete_training_note<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(note_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let note_id = TrainingNoteId::from(note_id.as_str());

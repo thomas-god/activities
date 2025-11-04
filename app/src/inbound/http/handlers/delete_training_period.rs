@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use crate::domain::models::training::TrainingPeriodId;
 use crate::domain::ports::{
-    DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, IActivityService, ITrainingService,
+    DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, IActivityService, IPreferencesService,
+    ITrainingService,
 };
 use crate::inbound::http::AppState;
 use crate::inbound::http::auth::{AuthenticatedUser, IUserService};
@@ -23,9 +24,10 @@ pub async fn delete_training_period<
     PF: ParseFile,
     TS: ITrainingService,
     US: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TS, US>>,
+    State(state): State<AppState<AS, PF, TS, US, PS>>,
     Path(period_id): Path<Uuid>,
 ) -> Response {
     let request = DeleteTrainingPeriodRequest::new(

@@ -4,14 +4,19 @@ use tokio::sync::Mutex;
 
 use crate::{
     config::{Config, load_env},
-    domain::services::{activity::ActivityService, training::TrainingService},
+    domain::services::{
+        activity::ActivityService, preferences::PreferencesService, training::TrainingService,
+    },
     inbound::{
         http::{DisabledUserService, HttpServer},
         parser::Parser,
     },
     outbound::{
         fs::FilesystemRawDataRepository,
-        sqlite::{activity::SqliteActivityRepository, training::SqliteTrainingRepository},
+        sqlite::{
+            activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
+            training::SqliteTrainingRepository,
+        },
     },
 };
 
@@ -31,6 +36,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         >,
         DisabledUserService,
+        PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
     // start tracing
@@ -86,15 +92,35 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         training_metrics_service.clone(),
     );
     let user_service = DisabledUserService {};
+    let preferences_service = build_preferences_service().await?;
 
     let http_server = HttpServer::new(
         activity_service,
         parser,
         training_metrics_service,
         user_service,
+        preferences_service,
         config,
     )
     .await?;
 
     Ok(http_server)
+}
+
+async fn build_preferences_service()
+-> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
+    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let db_dir = root_path.clone().join("db/");
+    if !db_dir.exists() {
+        tokio::fs::create_dir_all(&db_dir).await?;
+    }
+
+    let preferences_db = db_dir.clone().join("preferences.db");
+    let preferences_repository =
+        SqlitePreferencesRepository::new(&format!("sqlite:{}", preferences_db.to_string_lossy()))
+            .await?;
+
+    let preference_service = PreferencesService::new(preferences_repository);
+
+    anyhow::Ok(preference_service)
 }

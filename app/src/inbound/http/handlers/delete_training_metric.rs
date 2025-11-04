@@ -9,7 +9,7 @@ use crate::{
         models::training::TrainingMetricId,
         ports::{
             DeleteTrainingMetricError, DeleteTrainingMetricRequest, IActivityService,
-            ITrainingService,
+            IPreferencesService, ITrainingService,
         },
     },
     inbound::{
@@ -36,9 +36,10 @@ pub async fn delete_training_metric<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(metric_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req =

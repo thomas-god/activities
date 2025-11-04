@@ -4,7 +4,6 @@ use crate::domain::models::training::TrainingMetricId;
 /// PREFERENCE ENUM AND KEY
 ///////////////////////////////////////////////////////////////////
 
-/// Identifies the type of a preference
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreferenceKey {
     FavoriteMetric,

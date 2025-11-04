@@ -11,7 +11,7 @@ use flate2::read::GzDecoder;
 use serde::Serialize;
 
 use crate::{
-    domain::ports::{CreateActivityError, IActivityService, ITrainingService},
+    domain::ports::{CreateActivityError, IActivityService, IPreferencesService, ITrainingService},
     inbound::{
         http::{
             AppState,
@@ -56,9 +56,10 @@ pub async fn upload_activities<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
     let mut unprocessable_files = Vec::new();
@@ -154,7 +155,9 @@ mod tests {
 
     use crate::{
         domain::services::{
-            activity::test_utils::MockActivityService, training::test_utils::MockTrainingService,
+            activity::test_utils::MockActivityService,
+            preferences::tests_utils::MockPreferencesService,
+            training::test_utils::MockTrainingService,
         },
         inbound::{
             http::{
@@ -177,6 +180,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -210,6 +214,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 

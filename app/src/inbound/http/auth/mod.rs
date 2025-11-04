@@ -17,7 +17,7 @@ use rand::Rng;
 use crate::{
     domain::{
         models::UserId,
-        ports::{IActivityService, ITrainingService},
+        ports::{IActivityService, IPreferencesService, ITrainingService},
     },
     inbound::{http::AppState, parser::ParseFile},
 };
@@ -427,14 +427,15 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<UserId, ()>> + Send;
 }
 
-impl<AS, PF, TMS, US> FromRef<AppState<AS, PF, TMS, US>> for Arc<US>
+impl<AS, PF, TMS, US, PS> FromRef<AppState<AS, PF, TMS, US, PS>> for Arc<US>
 where
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
     US: IUserService,
+    PS: IPreferencesService,
 {
-    fn from_ref(input: &AppState<AS, PF, TMS, US>) -> Self {
+    fn from_ref(input: &AppState<AS, PF, TMS, US, PS>) -> Self {
         input.user_service.clone()
     }
 }
@@ -562,7 +563,9 @@ mod test {
 
     use crate::{
         domain::services::{
-            activity::test_utils::MockActivityService, training::test_utils::MockTrainingService,
+            activity::test_utils::MockActivityService,
+            preferences::tests_utils::MockPreferencesService,
+            training::test_utils::MockTrainingService,
         },
         inbound::{
             http::{CookieConfig, auth::test_utils::MockUserService},
@@ -608,6 +611,7 @@ mod test {
             training_metrics_service: Arc::new(MockTrainingService::new()),
             file_parser: Arc::new(MockFileParser::new()),
             user_service: Arc::new(session_service),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -627,6 +631,7 @@ mod test {
                         MockFileParser,
                         MockTrainingService,
                         MockUserService,
+                        MockPreferencesService,
                     >,
                 >(state));
         TestServer::new(app).expect("unable to create test server")

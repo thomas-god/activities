@@ -1,7 +1,7 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::Serialize;
 
-use crate::domain::ports::IActivityService;
+use crate::domain::ports::{IActivityService, IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
@@ -43,9 +43,10 @@ pub async fn get_training_notes<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
     state
         .training_metrics_service

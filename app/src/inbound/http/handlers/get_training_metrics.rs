@@ -20,7 +20,7 @@ use crate::{
                 TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricValues,
             },
         },
-        ports::{DateRange, IActivityService, ITrainingService},
+        ports::{DateRange, IActivityService, IPreferencesService, ITrainingService},
     },
     inbound::{
         http::{
@@ -254,9 +254,10 @@ pub async fn get_training_metrics<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Query(date_range): Query<MetricsDateRange>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state

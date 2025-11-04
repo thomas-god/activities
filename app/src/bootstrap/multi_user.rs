@@ -5,7 +5,9 @@ use tokio::sync::Mutex;
 
 use crate::{
     config::{Config, load_env},
-    domain::services::{activity::ActivityService, training::TrainingService},
+    domain::services::{
+        activity::ActivityService, preferences::PreferencesService, training::TrainingService,
+    },
     inbound::{
         http::{
             HttpServer, MagicLinkService, SMTPEmailProvider, SessionService,
@@ -15,7 +17,10 @@ use crate::{
     },
     outbound::{
         fs::FilesystemRawDataRepository,
-        sqlite::{activity::SqliteActivityRepository, training::SqliteTrainingRepository},
+        sqlite::{
+            activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
+            training::SqliteTrainingRepository,
+        },
     },
 };
 
@@ -39,6 +44,7 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
             SqliteUserRepository,
             SessionService<SqliteSessionRepository>,
         >,
+        PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
     // start tracing
@@ -60,11 +66,14 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
 
     let user_service = build_user_service().await?;
 
+    let preferences_service = build_preferences_service().await?;
+
     let http_server = HttpServer::new(
         activity_service,
         parser,
         training_metrics_service,
         user_service,
+        preferences_service,
         config,
     )
     .await?;
@@ -178,4 +187,22 @@ async fn build_user_service() -> anyhow::Result<
     let user_service = UserService::new(magic_link_service, user_repository, session_service);
 
     Ok(user_service)
+}
+
+async fn build_preferences_service()
+-> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
+    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let db_dir = root_path.clone().join("db/");
+    if !db_dir.exists() {
+        tokio::fs::create_dir_all(&db_dir).await?;
+    }
+
+    let preferences_db = db_dir.clone().join("preferences.db");
+    let preferences_repository =
+        SqlitePreferencesRepository::new(&format!("sqlite:{}", preferences_db.to_string_lossy()))
+            .await?;
+
+    let preference_service = PreferencesService::new(preferences_repository);
+
+    anyhow::Ok(preference_service)
 }

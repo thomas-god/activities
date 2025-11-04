@@ -2,7 +2,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::models::training::{TrainingNoteDate, TrainingNoteTitle};
-use crate::domain::ports::IActivityService;
+use crate::domain::ports::{IActivityService, IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
@@ -49,9 +49,10 @@ pub async fn create_training_note<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Json(payload): Json<CreateTrainingNoteBody>,
 ) -> Result<Json<CreateTrainingNoteResponse>, StatusCode> {
     let req = build_request(payload, user.user())?;

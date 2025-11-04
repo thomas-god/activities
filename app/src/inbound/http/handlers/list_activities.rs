@@ -11,7 +11,7 @@ use serde_json::json;
 use crate::{
     domain::{
         models::activity::{Activity, ActivityStatistic, Sport},
-        ports::{IActivityService, ITrainingService, ListActivitiesFilters},
+        ports::{IActivityService, IPreferencesService, ITrainingService, ListActivitiesFilters},
     },
     inbound::{
         http::{
@@ -71,9 +71,10 @@ pub async fn list_activities<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Query(filters): Query<Filters>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let Ok(res) = state

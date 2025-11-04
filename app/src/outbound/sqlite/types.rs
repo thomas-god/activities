@@ -635,10 +635,6 @@ impl sqlx::Encode<'_, sqlx::Sqlite> for TrainingNoteDate {
     }
 }
 
-///////////////////////////////////////////////////////////////////
-/// PREFERENCES TYPES
-///////////////////////////////////////////////////////////////////
-
 impl sqlx::Type<sqlx::Sqlite> for PreferenceKey {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
         <String as sqlx::Type<sqlx::Sqlite>>::type_info()

@@ -5,7 +5,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    domain::ports::{IActivityService, ITrainingService},
+    domain::ports::{IActivityService, IPreferencesService, ITrainingService},
     inbound::{
         http::{
             AppState, UserLoginResult,
@@ -25,8 +25,9 @@ pub async fn register_user<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Query(query): Query<RegisterUserQuery>,
 ) -> StatusCode {
     let Ok(email) = EmailAddress::try_from(query.email) else {

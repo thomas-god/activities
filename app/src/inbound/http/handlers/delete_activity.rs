@@ -7,7 +7,10 @@ use axum::{
 use crate::{
     domain::{
         models::activity::ActivityId,
-        ports::{DeleteActivityError, DeleteActivityRequest, IActivityService, ITrainingService},
+        ports::{
+            DeleteActivityError, DeleteActivityRequest, IActivityService, IPreferencesService,
+            ITrainingService,
+        },
     },
     inbound::{
         http::{
@@ -33,9 +36,10 @@ pub async fn delete_activity<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let req = DeleteActivityRequest::new(user.user().clone(), ActivityId::from(&activity_id));

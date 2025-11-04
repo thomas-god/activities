@@ -20,7 +20,7 @@ use crate::{
                 TrainingPeriodSports,
             },
         },
-        ports::{IActivityService, ITrainingService},
+        ports::{IActivityService, IPreferencesService, ITrainingService},
     },
     inbound::{
         http::{
@@ -91,9 +91,10 @@ pub async fn get_training_periods<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
         .training_metrics_service

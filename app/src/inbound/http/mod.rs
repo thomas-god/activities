@@ -13,7 +13,7 @@ use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
-use crate::domain::ports::{IActivityService, ITrainingService};
+use crate::domain::ports::{IActivityService, IPreferencesService, ITrainingService};
 
 use crate::inbound::http::handlers::{
     create_training_metric, create_training_note, create_training_period, delete_activity,
@@ -62,31 +62,46 @@ impl Default for CookieConfig {
 }
 
 #[derive(Debug, Clone)]
-struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, UR: IUserService> {
+struct AppState<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    UR: IUserService,
+    PS: IPreferencesService,
+> {
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
     user_service: Arc<UR>,
+    #[allow(dead_code)]
+    preferences_service: Arc<PS>,
     cookie_config: Arc<CookieConfig>,
 }
 
-pub struct HttpServer<AS, PF, TMS, UR> {
+pub struct HttpServer<AS, PF, TMS, UR, PS> {
     router: axum::Router,
     listener: net::TcpListener,
     _marker_activity: PhantomData<AS>,
     _marker_paser: PhantomData<PF>,
     _marker_training_metrics: PhantomData<TMS>,
     _marker_user_service: PhantomData<UR>,
+    _marker_preferences_service: PhantomData<PS>,
 }
 
-impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>
-    HttpServer<AS, PF, TMS, US>
+impl<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    US: IUserService,
+    PS: IPreferencesService,
+> HttpServer<AS, PF, TMS, US, PS>
 {
     pub async fn new(
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
         session_repository: US,
+        preferences_service: PS,
         config: Config,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -102,6 +117,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserServic
             file_parser: Arc::new(file_parser),
             user_service: Arc::new(session_repository),
             cookie_config: Arc::new(CookieConfig::default()),
+            preferences_service: Arc::new(preferences_service),
         };
 
         let origin = config
@@ -136,6 +152,7 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserServic
             _marker_paser: PhantomData,
             _marker_training_metrics: PhantomData,
             _marker_user_service: PhantomData,
+            _marker_preferences_service: PhantomData,
         })
     }
 
@@ -148,76 +165,85 @@ impl<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserServic
     }
 }
 
-fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IUserService>(
-    state: AppState<AS, PF, TS, US>,
-) -> Router<AppState<AS, PF, TS, US>> {
+fn core_routes<
+    AS: IActivityService,
+    PF: ParseFile,
+    TS: ITrainingService,
+    US: IUserService,
+    PS: IPreferencesService,
+>(
+    state: AppState<AS, PF, TS, US, PS>,
+) -> Router<AppState<AS, PF, TS, US, PS>> {
     let mut router = Router::new()
         .route(
             "/activity",
-            post(upload_activities::<AS, PF, TS, US>)
+            post(upload_activities::<AS, PF, TS, US, PS>)
                 .route_layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
         )
-        .route("/activities", get(list_activities::<AS, PF, TS, US>))
+        .route("/activities", get(list_activities::<AS, PF, TS, US, PS>))
         .route(
             "/activity/{activity_id}",
-            get(get_activity::<AS, PF, TS, US>),
+            get(get_activity::<AS, PF, TS, US, PS>),
         )
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, PF, TS, US>),
+            patch(patch_activity::<AS, PF, TS, US, PS>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, PF, TS, US>),
+            delete(delete_activity::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, PF, TS, US>),
+            get(get_training_metrics::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, PF, TS, US>),
+            post(create_training_metric::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, PF, TS, US>),
+            delete(delete_training_metric::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period",
-            post(create_training_period::<AS, PF, TS, US>),
+            post(create_training_period::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/note",
-            post(create_training_note::<AS, PF, TS, US>),
-        )
-        .route("/training/notes", get(get_training_notes::<AS, PF, TS, US>))
-        .route(
-            "/training/note/{note_id}",
-            get(get_training_note::<AS, PF, TS, US>),
+            post(create_training_note::<AS, PF, TS, US, PS>),
         )
         .route(
-            "/training/note/{note_id}",
-            patch(update_training_note::<AS, PF, TS, US>),
+            "/training/notes",
+            get(get_training_notes::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/note/{note_id}",
-            delete(delete_training_note::<AS, PF, TS, US>),
+            get(get_training_note::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/note/{note_id}",
+            patch(update_training_note::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/note/{note_id}",
+            delete(delete_training_note::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            get(get_training_period::<AS, PF, TS, US>),
+            get(get_training_period::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            delete(delete_training_period::<AS, PF, TS, US>),
+            delete(delete_training_period::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            patch(update_training_period::<AS, PF, TS, US>),
+            patch(update_training_period::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/periods",
-            get(get_training_periods::<AS, PF, TS, US>),
+            get(get_training_periods::<AS, PF, TS, US, PS>),
         );
 
     if cfg!(feature = "single-user") {
@@ -227,26 +253,31 @@ fn core_routes<AS: IActivityService, PF: ParseFile, TS: ITrainingService, US: IU
     } else {
         router = router.route_layer(axum::middleware::from_extractor_with_state::<
             crate::inbound::http::auth::CookieUserExtractor<US>,
-            AppState<AS, PF, TS, US>,
+            AppState<AS, PF, TS, US, PS>,
         >(state.clone()));
     }
 
     router
 }
 
-fn login_routes<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, US: IUserService>()
--> Router<AppState<AS, PF, TMS, US>> {
+fn login_routes<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    US: IUserService,
+    PS: IPreferencesService,
+>() -> Router<AppState<AS, PF, TMS, US, PS>> {
     Router::new()
         .route(
             "/register",
-            post(crate::inbound::http::handlers::register_user::<AS, PF, TMS, US>),
+            post(crate::inbound::http::handlers::register_user::<AS, PF, TMS, US, PS>),
         )
         .route(
             "/login",
-            post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US>),
+            post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US, PS>),
         )
         .route(
             "/login/validate/{magic_token}",
-            post(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US>),
+            post(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US, PS>),
         )
 }

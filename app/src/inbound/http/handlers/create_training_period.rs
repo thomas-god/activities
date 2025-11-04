@@ -7,7 +7,8 @@ use crate::{
         models::{UserId, training::TrainingMetricFilters},
         ports::{
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingPeriodError,
-            CreateTrainingPeriodRequest, DateRange, IActivityService, ITrainingService,
+            CreateTrainingPeriodRequest, DateRange, IActivityService, IPreferencesService,
+            ITrainingService,
         },
     },
     inbound::{
@@ -54,9 +55,10 @@ pub async fn create_training_period<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Json(payload): Json<CreateTrainingPeriodBody>,
 ) -> Result<StatusCode, StatusCode> {
     let req = build_request(payload, user.user());

@@ -73,20 +73,52 @@ where
         self.preferences_repository
             .delete_preference(user, key)
             .await
-            .map_err(|e| DeletePreferenceError::Unknown(e))?;
+            .map_err(DeletePreferenceError::Unknown)?;
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use mockall::predicate::eq;
+pub mod tests_utils {
+    use mockall::mock;
 
     use super::*;
-    use crate::domain::{models::training::TrainingMetricId, ports::SavePreferenceError};
 
-    mockall::mock! {
-        PreferencesRepository {}
+    mock! {
+        pub PreferencesService {}
+
+        impl Clone for PreferencesService {
+            fn clone(&self) -> Self;
+        }
+
+        impl IPreferencesService for PreferencesService {
+            async fn get_preference(
+                &self,
+                user: &UserId,
+                key: &PreferenceKey,
+            ) -> Result<Option<Preference>, GetPreferenceError>;
+
+            async fn get_all_preferences(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<Preference>, GetPreferenceError>;
+
+            async fn set_preference(
+                &self,
+                user: &UserId,
+                preference: Preference,
+            ) -> Result<(), SetPreferenceError>;
+
+            async fn delete_preference(
+                &self,
+                user: &UserId,
+                key: &PreferenceKey,
+            ) -> Result<(), DeletePreferenceError>;
+        }
+    }
+
+    mock! {
+        pub PreferencesRepository {}
 
         impl Clone for PreferencesRepository {
             fn clone(&self) -> Self;
@@ -108,7 +140,7 @@ mod tests {
                 &self,
                 user: &UserId,
                 preference: &Preference,
-            ) -> Result<(), SavePreferenceError>;
+            ) -> Result<(), crate::domain::ports::SavePreferenceError>;
 
             async fn delete_preference(
                 &self,
@@ -117,6 +149,17 @@ mod tests {
             ) -> Result<(), anyhow::Error>;
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use mockall::predicate::eq;
+
+    use super::*;
+    use crate::domain::{
+        models::training::TrainingMetricId,
+        services::preferences::tests_utils::MockPreferencesRepository,
+    };
 
     #[tokio::test]
     async fn test_get_preference_returns_none_when_not_exists() {

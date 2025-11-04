@@ -15,7 +15,7 @@ use crate::{
             ActivityWithTimeseries, Lap, Sport, Timeseries, TimeseriesMetric, TimeseriesValue,
             ToUnit, Unit,
         },
-        ports::{IActivityService, ITrainingService},
+        ports::{IActivityService, IPreferencesService, ITrainingService},
     },
     inbound::{
         http::{
@@ -202,9 +202,10 @@ pub async fn get_activity<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<ResponseBody>, StatusCode> {
     let Ok(res) = state
@@ -240,6 +241,7 @@ mod tests {
             ports::GetActivityError,
             services::{
                 activity::test_utils::MockActivityService,
+                preferences::tests_utils::MockPreferencesService,
                 training::test_utils::MockTrainingService,
             },
         },
@@ -306,6 +308,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         });
         let path = Path("target_id".to_string());
@@ -374,6 +377,7 @@ mod tests {
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
             user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         });
         let path = Path("target_id".to_string());

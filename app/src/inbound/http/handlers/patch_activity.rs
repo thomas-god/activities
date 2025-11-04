@@ -12,8 +12,8 @@ use crate::{
             WorkoutType,
         },
         ports::{
-            IActivityService, ITrainingService, ModifyActivityError, ModifyActivityRequest,
-            UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
+            IActivityService, IPreferencesService, ITrainingService, ModifyActivityError,
+            ModifyActivityRequest, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
             UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
             UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
             UpdateActivityWorkoutTypeRequest,
@@ -128,9 +128,10 @@ pub async fn patch_activity<
     PF: ParseFile,
     TMS: ITrainingService,
     UR: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR>>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(activity_id): Path<String>,
     Query(query): Query<PatchActivityQuery>,
     body: Option<Json<PatchActivityBody>>,
@@ -390,6 +391,7 @@ mod tests {
             },
             services::{
                 activity::test_utils::MockActivityService,
+                preferences::tests_utils::MockPreferencesService,
                 training::test_utils::MockTrainingService,
             },
         },
@@ -402,12 +404,19 @@ mod tests {
 
     fn create_test_state(
         activity_service: MockActivityService,
-    ) -> AppState<MockActivityService, MockFileParser, MockTrainingService, MockUserService> {
+    ) -> AppState<
+        MockActivityService,
+        MockFileParser,
+        MockTrainingService,
+        MockUserService,
+        MockPreferencesService,
+    > {
         AppState {
             activity_service: Arc::new(activity_service),
             file_parser: Arc::new(MockFileParser::test_default()),
             training_metrics_service: Arc::new(MockTrainingService::test_default()),
             user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         }
     }

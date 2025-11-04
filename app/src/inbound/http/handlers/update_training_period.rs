@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::domain::models::training::TrainingPeriodId;
 use crate::domain::ports::{
-    IActivityService, ITrainingService, UpdateTrainingPeriodNameError,
+    IActivityService, IPreferencesService, ITrainingService, UpdateTrainingPeriodNameError,
     UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
     UpdateTrainingPeriodNoteRequest,
 };
@@ -31,9 +31,10 @@ pub async fn update_training_period<
     PF: ParseFile,
     TS: ITrainingService,
     US: IUserService,
+    PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TS, US>>,
+    State(state): State<AppState<AS, PF, TS, US, PS>>,
     Path(period_id): Path<Uuid>,
     axum::Json(body): axum::Json<UpdateTrainingPeriodBody>,
 ) -> Response {
