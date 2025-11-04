@@ -51,10 +51,23 @@
 	};
 
 	let topMetric = $derived.by(() => {
-		let metric = data.metrics.metrics.at(0);
+		// Find favorite metric ID from preferences
+		const favoriteMetricPref = data.preferences.find((p) => p.key === 'favorite_metric');
+		const favoriteMetricId = favoriteMetricPref?.value;
+
+		// Try to find the favorite metric, otherwise use the first one
+		let metric = favoriteMetricId
+			? data.metrics.metrics.find((m) => m.id === favoriteMetricId)
+			: undefined;
+
+		if (metric === undefined) {
+			metric = data.metrics.metrics.at(0);
+		}
+
 		if (metric === undefined) {
 			return undefined;
 		}
+
 		let values = [];
 		for (const [group, time_values] of Object.entries(metric.values)) {
 			for (const [dt, value] of Object.entries(time_values)) {
@@ -63,6 +76,7 @@
 		}
 
 		return {
+			id: metric.id,
 			values: values,
 			metric: metric.metric,
 			granularity: metric.granularity,
