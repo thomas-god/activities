@@ -16,6 +16,7 @@
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
+	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
@@ -93,7 +94,7 @@
 			/>
 		</div>
 		<TrainingMetricsChartStacked
-			height={300}
+			height={chartHeight}
 			width={chartWidth}
 			values={topMetric.values}
 			unit={topMetric.unit}
