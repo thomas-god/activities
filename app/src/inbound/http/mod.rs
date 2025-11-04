@@ -15,14 +15,14 @@ use tower_http::cors::CorsLayer;
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, IPreferencesService, ITrainingService};
 
-use crate::inbound::http::handlers::{
-    create_training_metric, create_training_note, create_training_period, delete_activity,
-    delete_training_metric, delete_training_note, delete_training_period, get_activity,
-    get_training_metrics, get_training_note, get_training_notes, get_training_period,
-    get_training_periods, list_activities, patch_activity, update_training_note,
-    update_training_period, upload_activities,
-};
 use crate::inbound::parser::ParseFile;
+use handlers::{
+    create_training_metric, create_training_note, create_training_period, delete_activity,
+    delete_preference, delete_training_metric, delete_training_note, delete_training_period,
+    get_activity, get_all_preferences, get_preference, get_training_metrics, get_training_note,
+    get_training_notes, get_training_period, get_training_periods, list_activities, patch_activity,
+    set_preference, update_training_note, update_training_period, upload_activities,
+};
 
 #[cfg(feature = "multi-user")]
 pub use self::auth::infra::mailer::smtp::SMTPEmailProvider;
@@ -244,6 +244,19 @@ fn core_routes<
         .route(
             "/training/periods",
             get(get_training_periods::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/preferences",
+            get(get_all_preferences::<AS, PF, TS, US, PS>),
+        )
+        .route("/preferences", post(set_preference::<AS, PF, TS, US, PS>))
+        .route(
+            "/preferences/{key}",
+            get(get_preference::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/preferences/{key}",
+            delete(delete_preference::<AS, PF, TS, US, PS>),
         );
 
     if cfg!(feature = "single-user") {

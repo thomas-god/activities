@@ -16,6 +16,7 @@ mod get_training_periods;
 mod list_activities;
 mod login_user;
 mod patch_activity;
+mod preferences;
 mod register_user;
 mod types;
 mod update_training_note;
@@ -39,6 +40,9 @@ pub(super) use get_training_periods::get_training_periods;
 pub(super) use list_activities::list_activities;
 pub(super) use login_user::login_user;
 pub(super) use patch_activity::patch_activity;
+pub(super) use preferences::{
+    delete_preference, get_all_preferences, get_preference, set_preference,
+};
 pub(super) use register_user::register_user;
 pub(super) use update_training_note::update_training_note;
 pub(super) use update_training_period::update_training_period;
