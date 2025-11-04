@@ -22,11 +22,10 @@ export const PreferencesListSchema = z.array(PreferenceResponseSchema);
 export type PreferenceResponse = z.infer<typeof PreferenceResponseSchema>;
 export type PreferencesList = z.infer<typeof PreferencesListSchema>;
 
-export type SetPreferenceRequest =
-	| {
-			key: 'favorite_metric';
-			value: string;
-	  };
+export type SetPreferenceRequest = {
+	key: 'favorite_metric';
+	value: string;
+};
 
 // =============================================================================
 // API Functions

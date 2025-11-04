@@ -1,5 +1,5 @@
 import type { PageLoad } from './$types';
-import { fetchTrainingMetrics } from '$lib/api';
+import { fetchTrainingMetrics, fetchAllPreferences } from '$lib/api';
 
 export const load: PageLoad = async ({ fetch, depends, url }) => {
 	depends('app:training-metrics');
@@ -8,16 +8,15 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	const endDate = url.searchParams.get('end');
 
 	if (startDate === null) {
-		return { metrics: { noGroup: [], metrics: [] } };
+		return { metrics: { noGroup: [], metrics: [] }, preferences: [] };
 	}
 
-	const metrics = await fetchTrainingMetrics(
-		fetch,
-		startDate,
-		endDate !== null ? endDate : undefined
-	);
+	const [metrics, preferences] = await Promise.all([
+		fetchTrainingMetrics(fetch, startDate, endDate !== null ? endDate : undefined),
+		fetchAllPreferences(fetch)
+	]);
 
-	return { metrics };
+	return { metrics, preferences };
 };
 
 export const prerender = false;

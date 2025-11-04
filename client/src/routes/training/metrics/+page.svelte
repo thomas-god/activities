@@ -7,6 +7,7 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
+	import { setPreference, deletePreference } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -16,6 +17,8 @@
 		start: page.url.searchParams.get('start') as string,
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
+
+	let favoriteMetricId = $derived(data.preferences.find((p) => p.key === 'favorite_metric')?.value);
 
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
@@ -59,6 +62,20 @@
 		invalidate('app:training-metrics');
 	};
 
+	const toggleFavoriteMetric = async (metricId: string): Promise<void> => {
+		if (favoriteMetricId === metricId) {
+			// Remove favorite
+			await deletePreference(fetch, 'favorite_metric');
+		} else {
+			// Set as favorite
+			await setPreference(fetch, {
+				key: 'favorite_metric',
+				value: metricId
+			});
+		}
+		invalidate('app:training-metrics');
+	};
+
 	$effect(() => {
 		// Redirect if no start parameter
 		const startDate = page.url.searchParams.get('start');
@@ -93,10 +110,24 @@
 					sports={metric.sports}
 					groupBy={metric.groupBy}
 				/>
-				<button
-					class="btn absolute right-4 bottom-[8px] border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
-					onclick={() => deleteMetricCallback(metric.id)}>🗑️</button
-				>
+				<div class="absolute right-4 bottom-[8px] flex gap-2">
+					<button
+						class="btn border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
+						onclick={() => toggleFavoriteMetric(metric.id)}
+						title={favoriteMetricId === metric.id
+							? 'Remove from favorites'
+							: 'Set as favorite (shown on homepage)'}
+					>
+						{favoriteMetricId === metric.id ? '⭐' : '☆'}
+					</button>
+					<button
+						class="btn border-0 bg-base-100 p-0 shadow-none hover:outline-2 hover:outline-base-300"
+						onclick={() => deleteMetricCallback(metric.id)}
+						title="Delete metric"
+					>
+						🗑️
+					</button>
+				</div>
 			</div>
 			<TrainingMetricsChartStacked
 				height={250}
