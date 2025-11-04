@@ -216,6 +216,7 @@
 				.attr('y', (stackedDataPoint: any) => y(stackedDataPoint[1]))
 				.attr('height', (stackedDataPoint: any) => y(stackedDataPoint[0]) - y(stackedDataPoint[1]))
 				.attr('width', x.bandwidth())
+				.attr('stroke', 'none')
 				.on('mouseenter', function (event: MouseEvent, stackedDataPoint: any) {
 					// Show tooltip
 					const rect = event.target as SVGRectElement;
@@ -236,15 +237,15 @@
 						total: total
 					};
 
-					// Highlight the bar
-					d3.select(rect).attr('opacity', 0.8);
+					// Highlight the bar with a border using the group's color
+					d3.select(rect).attr('stroke', color(stackedDataPoint.key)).attr('stroke-width', 3);
 				})
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
 					tooltip = { ...tooltip, visible: false };
 
 					// Remove highlight
-					d3.select(event.target as SVGRectElement).attr('opacity', 1);
+					d3.select(event.target as SVGRectElement).attr('stroke', 'none');
 				})
 		);
 
