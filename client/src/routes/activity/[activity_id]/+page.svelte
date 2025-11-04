@@ -255,17 +255,18 @@
 		</div>
 	</details>
 
-	<div>
-		<ActivityStatistics activity={data.activity} />
-	</div>
+	<ActivityStatistics activity={data.activity} />
 
-	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">
-		{#if data.activity}
-			<fieldset class="fieldset">
-				<legend class="fieldset-legend text-lg">Metrics</legend>
-				<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
-			</fieldset>
-			{#if selectedMetrics}
+	<details
+		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
+		open
+	>
+		<summary class="collapse-title text-lg font-semibold">Metrics</summary>
+		<fieldset class="fieldset px-4">
+			<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
+		</fieldset>
+		{#if selectedMetrics}
+			<div class="px-4 pb-2">
 				<div bind:clientWidth={chartWidth}>
 					<TimeseriesChart
 						time={active_metrics.time}
@@ -274,13 +275,11 @@
 						width={chartWidth}
 					/>
 				</div>
-			{/if}
+			</div>
 		{/if}
-	</div>
+	</details>
 
-	<div class="rounded-box bg-base-100 p-4 pt-0 shadow-md">
-		<ActivityLaps activity={data.activity} metrics={lapMetrics} />
-	</div>
+	<ActivityLaps activity={data.activity} metrics={lapMetrics} />
 </div>
 
 <!-- Delete confirmation modal -->

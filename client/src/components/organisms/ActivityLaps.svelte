@@ -109,8 +109,11 @@
 </script>
 
 {#if laps.length > 0}
-	<details class="collapse-arrow collapse">
-		<summary class="collapse-title text-xl font-medium">Laps</summary>
+	<details
+		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
+		open
+	>
+		<summary class="collapse-title text-lg font-semibold">Laps</summary>
 		<div class="collapse-content">
 			<div class="overflow-x-auto">
 				<table class="table table-sm">
