@@ -314,6 +314,7 @@ pub enum WorkoutType {
     Intervals,
     LongRun,
     Race,
+    CrossTraining,
 }
 
 impl FromStr for WorkoutType {
@@ -326,6 +327,7 @@ impl FromStr for WorkoutType {
             "intervals" => Ok(WorkoutType::Intervals),
             "long_run" | "longrun" => Ok(WorkoutType::LongRun),
             "race" => Ok(WorkoutType::Race),
+            "cross_training" => Ok(WorkoutType::CrossTraining),
             _ => Err(format!(
                 "Invalid training type: '{}'. Must be one of: easy, tempo, intervals, long_run, race",
                 s
@@ -342,6 +344,7 @@ impl fmt::Display for WorkoutType {
             WorkoutType::Intervals => "intervals",
             WorkoutType::LongRun => "long_run",
             WorkoutType::Race => "race",
+            WorkoutType::CrossTraining => "cross_training",
         };
         write!(f, "{}", s)
     }

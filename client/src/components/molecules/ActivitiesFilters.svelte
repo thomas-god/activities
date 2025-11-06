@@ -232,4 +232,9 @@
 		background-color: var(--color-workout-race);
 		color: var(--color-workout-race-text);
 	}
+
+	.workout-cross-training {
+		background-color: var(--color-workout-cross-training);
+		color: var(--color-workout-cross-training-text);
+	}
 </style>

@@ -3,7 +3,8 @@
 		WORKOUT_TYPE_LABELS,
 		getWorkoutTypeLabel,
 		getWorkoutTypeColor,
-		type WorkoutType
+		type WorkoutType,
+		getWorkoutTypeClass
 	} from '$lib/workout-type';
 
 	let {
@@ -68,7 +69,7 @@
 			</button>
 		{:else}
 			<div class="flex items-center gap-2">
-				<span class={`badge workout-${workoutType}`}>
+				<span class={`badge ${getWorkoutTypeClass(workoutType)}`}>
 					{getWorkoutTypeLabel(workoutType)}
 				</span>
 			</div>
@@ -92,7 +93,7 @@
 		color: var(--color-workout-intervals-text);
 	}
 
-	.workout-long_run {
+	.workout-long-run {
 		background-color: var(--color-workout-long-run);
 		color: var(--color-workout-long-run-text);
 	}
@@ -100,5 +101,10 @@
 	.workout-race {
 		background-color: var(--color-workout-race);
 		color: var(--color-workout-race-text);
+	}
+
+	.workout-cross-training {
+		background-color: var(--color-workout-cross-training);
+		color: var(--color-workout-cross-training-text);
 	}
 </style>
