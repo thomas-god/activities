@@ -10,11 +10,12 @@ use crate::domain::models::activity::{
     Sport, WorkoutType,
 };
 use crate::domain::models::training::{
-    ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin, TrainingMetricDefinition,
-    TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricValue, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-    TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+    ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricBin,
+    TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
+    TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
+    TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+    TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -674,7 +675,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         date_range: &Option<DateRange>,
-    ) -> impl Future<Output = Vec<(TrainingMetricDefinition, TrainingMetricValues)>> + Send;
+    ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
 
     fn delete_metric(
         &self,
@@ -1006,9 +1007,9 @@ pub enum DeleteTrainingNoteError {
 }
 
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
-    fn save_definition(
+    fn save_training_metric_definition(
         &self,
-        definition: TrainingMetricDefinition,
+        metric: TrainingMetric,
     ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
 
     fn get_definition(
@@ -1021,12 +1022,10 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         metric: &TrainingMetricId,
     ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
 
-    fn get_definitions(
+    fn get_metrics(
         &self,
         user: &UserId,
-    ) -> impl Future<
-        Output = Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>,
-    > + Send;
+    ) -> impl Future<Output = Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>> + Send;
 
     fn update_metric_value(
         &self,

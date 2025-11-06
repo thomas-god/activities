@@ -8,7 +8,7 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
+            ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricBin,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
             TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
@@ -73,14 +73,15 @@ impl SqliteTrainingRepository {
 }
 
 impl TrainingRepository for SqliteTrainingRepository {
-    async fn save_definition(
+    async fn save_training_metric_definition(
         &self,
-        definition: TrainingMetricDefinition,
+        metric: TrainingMetric,
     ) -> Result<(), SaveTrainingMetricError> {
+        let definition = metric.definition();
         sqlx::query(
             "INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
         )
-        .bind(definition.id())
+        .bind(metric.id())
         .bind(definition.user())
         .bind(definition.source())
         .bind(definition.granularity())
@@ -107,9 +108,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((id, user_id, source, granularity, aggregate, filters, group_by)) => {
+            Ok((_id, user_id, source, granularity, aggregate, filters, group_by)) => {
                 Ok(Some(TrainingMetricDefinition::new(
-                    id,
                     user_id,
                     source,
                     granularity,
@@ -123,10 +123,10 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
-    async fn get_definitions(
+    async fn get_metrics(
         &self,
         user: &UserId,
-    ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError> {
+    ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
             "SELECT id, user_id, source, granularity, aggregate, filters, group_by
             FROM t_training_metrics_definitions
@@ -140,14 +140,16 @@ impl TrainingRepository for SqliteTrainingRepository {
             rows.into_iter()
                 .map(
                     |(id, user_id, source, granularity, aggregate, filters, group_by)| {
-                        TrainingMetricDefinition::new(
+                        TrainingMetric::new(
                             id,
-                            user_id,
-                            source,
-                            granularity,
-                            aggregate,
-                            filters,
-                            group_by,
+                            TrainingMetricDefinition::new(
+                                user_id,
+                                source,
+                                granularity,
+                                aggregate,
+                                filters,
+                                group_by,
+                            ),
                         )
                     },
                 )
@@ -520,48 +522,54 @@ mod test_sqlite_training_repository {
             .unwrap();
     }
 
-    fn build_metric_definition() -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
+    fn build_metric() -> TrainingMetric {
+        TrainingMetric::new(
             TrainingMetricId::new(),
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Altitude,
-                TimeseriesAggregate::Max,
-            )),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
         )
     }
 
-    fn build_metric_definition_with_filters() -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
+    fn build_metric_definition_with_filters() -> TrainingMetric {
+        TrainingMetric::new(
             TrainingMetricId::new(),
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Altitude,
-                TimeseriesAggregate::Max,
-            )),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
-            TrainingMetricGroupBy::none(),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+                TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                TrainingMetricGroupBy::none(),
+            ),
         )
     }
 
-    fn build_metric_definition_with_group_by() -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
+    fn build_metric_definition_with_group_by() -> TrainingMetric {
+        TrainingMetric::new(
             TrainingMetricId::new(),
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Altitude,
-                TimeseriesAggregate::Max,
-            )),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
-            Some(TrainingMetricGroupBy::Sport),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+                TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                Some(TrainingMetricGroupBy::Sport),
+            ),
         )
     }
 
@@ -572,10 +580,10 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
 
         repository
-            .save_definition(definition)
+            .save_training_metric_definition(definition)
             .await
             .expect("Should have return Ok");
     }
@@ -590,7 +598,7 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_group_by();
 
         repository
-            .save_definition(definition)
+            .save_training_metric_definition(definition)
             .await
             .expect("Should have return Ok");
 
@@ -612,14 +620,14 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
         repository
-            .save_definition(definition)
+            .save_training_metric_definition(definition)
             .await
             .expect_err("Should have return Err");
     }
@@ -631,20 +639,20 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let metric = build_metric();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(definition.id())
+            .get_definition(metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, definition);
+        assert_eq!(res, *metric.definition());
     }
 
     #[tokio::test]
@@ -654,20 +662,20 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition_with_filters();
+        let metric = build_metric_definition_with_filters();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(definition.id())
+            .get_definition(metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, definition);
+        assert_eq!(res, *metric.definition());
     }
 
     #[tokio::test]
@@ -677,20 +685,20 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition_with_group_by();
+        let metric = build_metric_definition_with_group_by();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(definition.id())
+            .get_definition(metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, definition);
+        assert_eq!(res, *metric.definition());
     }
 
     #[tokio::test]
@@ -714,19 +722,19 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
         let definition_with_filters = build_metric_definition_with_filters();
         repository
-            .save_definition(definition_with_filters.clone())
+            .save_training_metric_definition(definition_with_filters.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definitions(&UserId::test_default())
+            .get_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -742,14 +750,14 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definitions(&UserId::from("another_user".to_string()))
+            .get_metrics(&UserId::from("another_user".to_string()))
             .await
             .expect("Should have returned OK");
 
@@ -766,12 +774,12 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_filters();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definitions(&UserId::test_default())
+            .get_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -788,12 +796,12 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_group_by();
 
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definitions(&UserId::test_default())
+            .get_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -807,9 +815,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -843,9 +851,9 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         // Create definition
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -899,9 +907,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -938,9 +946,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1007,7 +1015,7 @@ mod test_sqlite_training_repository {
 
         let definition = build_metric_definition_with_group_by();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1047,7 +1055,7 @@ mod test_sqlite_training_repository {
 
         let definition = build_metric_definition_with_group_by();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1095,9 +1103,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1145,9 +1153,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1195,9 +1203,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1265,9 +1273,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1300,9 +1308,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1344,9 +1352,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1378,9 +1386,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should save definition");
 
@@ -1453,9 +1461,9 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric_definition();
+        let definition = build_metric();
         repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(definition.clone())
             .await
             .expect("Should save definition");
 
@@ -1477,38 +1485,42 @@ mod test_sqlite_training_repository {
         let definition1_id = TrainingMetricId::from("metric1");
         let definition2_id = TrainingMetricId::from("metric2");
 
-        let definition1 = TrainingMetricDefinition::new(
+        let definition1 = TrainingMetric::new(
             definition1_id.clone(),
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Altitude,
-                TimeseriesAggregate::Max,
-            )),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
         );
 
-        let definition2 = TrainingMetricDefinition::new(
+        let definition2 = TrainingMetric::new(
             definition2_id.clone(),
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Altitude,
-                TimeseriesAggregate::Max,
-            )),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
         );
 
         repository
-            .save_definition(definition1.clone())
+            .save_training_metric_definition(definition1.clone())
             .await
             .expect("Should save definition 1");
         repository
-            .save_definition(definition2.clone())
+            .save_training_metric_definition(definition2.clone())
             .await
             .expect("Should save definition 2");
 

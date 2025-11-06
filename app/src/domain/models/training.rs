@@ -120,8 +120,23 @@ impl TrainingMetricGroupBy {
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct TrainingMetricDefinition {
+pub struct TrainingMetric {
     id: TrainingMetricId,
+    definition: TrainingMetricDefinition,
+}
+
+impl TrainingMetric {
+    pub fn id(&self) -> &TrainingMetricId {
+        &self.id
+    }
+
+    pub fn definition(&self) -> &TrainingMetricDefinition {
+        &self.definition
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricDefinition {
     user: UserId,
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
@@ -131,10 +146,6 @@ pub struct TrainingMetricDefinition {
 }
 
 impl TrainingMetricDefinition {
-    pub fn id(&self) -> &TrainingMetricId {
-        &self.id
-    }
-
     pub fn user(&self) -> &UserId {
         &self.user
     }
@@ -1412,7 +1423,6 @@ mod test_training_metrics {
     fn test_compute_training_metrics_from_timeseries() {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
-            TrainingMetricId::default(),
             UserId::test_default(),
             ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Power,
@@ -1438,7 +1448,6 @@ mod test_training_metrics {
     fn test_compute_training_metrics_from_timeseries_with_filters() {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
-            TrainingMetricId::default(),
             UserId::test_default(),
             ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Power,
@@ -1462,7 +1471,6 @@ mod test_training_metrics {
             .map(|activity| activity.activity().clone())
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
-            TrainingMetricId::default(),
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
@@ -1483,7 +1491,6 @@ mod test_training_metrics {
             .map(|activity| activity.activity().clone())
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
-            TrainingMetricId::default(),
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
@@ -1510,7 +1517,6 @@ mod test_training_metrics {
     fn test_compute_training_metrics_from_timeseries_with_group_by() {
         let activities = vec![default_activity()];
         let metric_definition = TrainingMetricDefinition::new(
-            TrainingMetricId::default(),
             UserId::test_default(),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,

@@ -16,7 +16,7 @@ use crate::{
         models::{
             activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training::{
-                ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
+                ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricBin,
                 TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricValues,
             },
         },
@@ -103,27 +103,28 @@ pub struct ResponseBodyItem {
 }
 
 fn to_response_body_item(
-    metric: (TrainingMetricDefinition, TrainingMetricValues),
+    metric: (TrainingMetric, TrainingMetricValues),
     range: &MetricsDateRange,
 ) -> ResponseBodyItem {
-    let (def, metric_values) = metric;
-    let values = fill_metric_values(def.granularity(), metric_values, range);
-    let (unit, values) = convert_metric_values(values, def.source(), def.aggregate());
+    let (metric, metric_values) = metric;
+    let definition = metric.definition();
+    let values = fill_metric_values(definition.granularity(), metric_values, range);
+    let (unit, values) = convert_metric_values(values, definition.source(), definition.aggregate());
 
     ResponseBodyItem {
-        id: def.id().to_string(),
-        metric: format_source(def.source()),
+        id: metric.id().to_string(),
+        metric: format_source(definition.source()),
         unit: unit.to_string(),
-        granularity: def.granularity().to_string(),
-        aggregate: def.aggregate().to_string(),
-        sports: def
+        granularity: definition.granularity().to_string(),
+        aggregate: definition.aggregate().to_string(),
+        sports: definition
             .filters()
             .sports()
             .as_ref()
             .map(|sports| sports.iter().map(|sport| sport.to_string()).collect())
             .unwrap_or_default(),
         values,
-        group_by: def.group_by().as_ref().map(|g| format!("{:?}", g)),
+        group_by: definition.group_by().as_ref().map(|g| format!("{:?}", g)),
     }
 }
 

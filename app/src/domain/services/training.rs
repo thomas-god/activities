@@ -8,7 +8,7 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ComputeMetricRequirement, TrainingMetricBin, TrainingMetricDefinition,
+            ComputeMetricRequirement, TrainingMetric, TrainingMetricBin, TrainingMetricDefinition,
             TrainingMetricId, TrainingMetricValues, TrainingNote, TrainingNoteContent,
             TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
@@ -46,11 +46,11 @@ where
 {
     async fn compute_metric_values(
         &self,
-        definition: &TrainingMetricDefinition,
+        training_metric: &TrainingMetric,
         bin: &DateRange,
         user: &UserId,
     ) {
-        let values = match definition.source_requirement() {
+        let values = match training_metric.definition().source_requirement() {
             ComputeMetricRequirement::ActivityWithTimeseries => {
                 let Ok(activities) = self
                     .activity_repository
@@ -65,7 +65,9 @@ where
                     return;
                 };
 
-                definition.compute_values_from_timeseries(&activities)
+                training_metric
+                    .definition()
+                    .compute_values_from_timeseries(&activities)
             }
             ComputeMetricRequirement::Activity => {
                 let Ok(activities) = self
@@ -81,14 +83,14 @@ where
                     return;
                 };
 
-                definition.compute_values(&activities)
+                training_metric.definition().compute_values(&activities)
             }
         };
 
         for (key, value) in values.into_iter() {
             let _ = self
                 .training_repository
-                .update_metric_value(definition.id(), (key, value))
+                .update_metric_value(training_metric.id(), (key, value))
                 .await;
         }
     }
@@ -109,7 +111,6 @@ where
     ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
         let id = TrainingMetricId::new();
         let definition = TrainingMetricDefinition::new(
-            id.clone(),
             req.user().clone(),
             req.source().clone(),
             req.granularity().clone(),
@@ -117,15 +118,19 @@ where
             req.filters().clone(),
             req.group_by().clone(),
         );
+        let training_metric = TrainingMetric::new(id.clone(), definition);
         self.training_repository
-            .save_definition(definition.clone())
+            .save_training_metric_definition(training_metric.clone())
             .await?;
 
         let mut initial_bins = Vec::new();
         if let Some(initial_range) = req.initial_date_range() {
-            initial_bins = definition.granularity().bins(initial_range);
+            initial_bins = training_metric
+                .definition()
+                .granularity()
+                .bins(initial_range);
             for bin in initial_bins.iter() {
-                self.compute_metric_values(&definition, bin, req.user())
+                self.compute_metric_values(&training_metric, bin, req.user())
                     .await;
             }
         }
@@ -133,7 +138,7 @@ where
         let this = self.clone();
         tokio::spawn(async move {
             let _ = this
-                .compute_initial_values(req, definition, initial_bins)
+                .compute_initial_values(req, training_metric, initial_bins)
                 .await;
         });
 
@@ -141,35 +146,39 @@ where
     }
 
     async fn update_metrics_values(&self, req: UpdateMetricsValuesRequest) -> Result<(), ()> {
-        let definitions = self
+        let metrics = self
             .training_repository
-            .get_definitions(req.user())
+            .get_metrics(req.user())
             .await
             .unwrap();
 
-        for definition in definitions {
+        for metric in metrics {
             for activity in req.new_activities() {
-                let Some(activity_metric) = definition
+                let Some(activity_metric) = metric
+                    .definition()
                     .source()
                     .metric_from_activity_with_timeseries(activity)
                 else {
                     continue;
                 };
-                let granule = definition
+                let granule = metric
+                    .definition()
                     .granularity()
                     .datetime_key(activity.start_time().date());
-                let group = definition
+                let group = metric
+                    .definition()
                     .group_by()
                     .as_ref()
                     .and_then(|group_by| group_by.extract_group(activity.activity()));
                 let bin = TrainingMetricBin::new(granule, group);
                 let new_metric_value = match self
                     .training_repository
-                    .get_metric_value(definition.id(), &bin)
+                    .get_metric_value(metric.id(), &bin)
                     .await
                 {
                     Ok(Some(previous_metric_value)) => {
-                        let Some(new_metric_value) = definition
+                        let Some(new_metric_value) = metric
+                            .definition()
                             .aggregate()
                             .update_value(&previous_metric_value, &activity_metric)
                         else {
@@ -178,8 +187,10 @@ where
                         new_metric_value
                     }
                     Ok(None) => {
-                        let Some(new_metric_value) =
-                            definition.aggregate().initial_value(&activity_metric)
+                        let Some(new_metric_value) = metric
+                            .definition()
+                            .aggregate()
+                            .initial_value(&activity_metric)
                         else {
                             continue;
                         };
@@ -189,7 +200,7 @@ where
                 };
                 let _ = self
                     .training_repository
-                    .update_metric_value(definition.id(), (bin, new_metric_value))
+                    .update_metric_value(metric.id(), (bin, new_metric_value))
                     .await;
             }
         }
@@ -201,9 +212,9 @@ where
         &self,
         req: RemoveActivityFromMetricsRequest,
     ) -> Result<(), ()> {
-        let definitions = self
+        let metrics = self
             .training_repository
-            .get_definitions(req.user())
+            .get_metrics(req.user())
             .await
             .unwrap();
 
@@ -215,19 +226,20 @@ where
             String, // granule key for date range reconstruction
         )> = std::collections::HashSet::new();
 
-        for definition in &definitions {
+        for metric in &metrics {
             // Determine the bin(s) that need recomputation
-            let granule = definition
+            let granule = metric
+                .definition()
                 .granularity()
                 .datetime_key(activity.start_time().date());
 
-            bins_to_recompute.insert((definition.id().clone(), granule));
+            bins_to_recompute.insert((metric.id().clone(), granule));
         }
 
         // Recompute bins affected by deleted activity
         for (metric_id, granule_key) in bins_to_recompute {
             // Find the definition for this metric
-            let Some(definition) = definitions.iter().find(|d| d.id() == &metric_id) else {
+            let Some(metric) = metrics.iter().find(|d| d.id() == &metric_id) else {
                 continue;
             };
 
@@ -244,11 +256,12 @@ where
             };
 
             // Create a date range for this bin
-            let bin_range = definition
+            let bin_range = metric
+                .definition()
                 .granularity()
                 .bins(&DateRange::new(start_date, start_date));
             if let Some(first_bin) = bin_range.first() {
-                self.compute_metric_values(definition, first_bin, req.user())
+                self.compute_metric_values(metric, first_bin, req.user())
                     .await;
             }
         }
@@ -260,18 +273,18 @@ where
         &self,
         user: &UserId,
         date_range: &Option<DateRange>,
-    ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)> {
-        let Ok(definitions) = self.training_repository.get_definitions(user).await else {
+    ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
+        let Ok(metrics) = self.training_repository.get_metrics(user).await else {
             return vec![];
         };
 
         let mut res = vec![];
-        for definition in definitions {
+        for metric in metrics {
             // Align the date range to the metric's granularity to ensure complete bins
             // For example, if granularity is Weekly and date_range starts on Wednesday,
             // we align it to the Monday of that week to include the full week's data
             let aligned_date_range = date_range.as_ref().map(|range| {
-                let bins = definition.granularity().bins(range);
+                let bins = metric.definition().granularity().bins(range);
                 if let (Some(first), Some(last)) = (bins.first(), bins.last()) {
                     DateRange::new(*first.start(), *last.end())
                 } else {
@@ -281,10 +294,10 @@ where
 
             let values = self
                 .training_repository
-                .get_metric_values(definition.id(), &aligned_date_range)
+                .get_metric_values(metric.id(), &aligned_date_range)
                 .await
                 .unwrap_or_default();
-            res.push((definition.clone(), values.clone()))
+            res.push((metric.clone(), values.clone()))
         }
 
         res
@@ -598,7 +611,7 @@ where
     async fn compute_initial_values(
         &self,
         req: CreateTrainingMetricRequest,
-        definition: TrainingMetricDefinition,
+        metric: TrainingMetric,
         initial_bins: Vec<DateRange>,
     ) {
         // Compute initial values over the user history
@@ -612,15 +625,17 @@ where
             return;
         };
 
-        let bins = definition.granularity().bins_from_datetime(&history_range);
+        let bins = metric
+            .definition()
+            .granularity()
+            .bins_from_datetime(&history_range);
 
         // Iterate in reverse so that the most recent bins' values are available first
         for bin in bins.iter().rev() {
             if initial_bins.contains(bin) {
                 continue;
             }
-            self.compute_metric_values(&definition, bin, req.user())
-                .await;
+            self.compute_metric_values(&metric, bin, req.user()).await;
         }
     }
 }
@@ -678,7 +693,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 date_range: &Option<DateRange>,
-            ) -> Vec<(TrainingMetricDefinition, TrainingMetricValues)>;
+            ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
 
             async fn delete_metric(
                 &self,
@@ -777,15 +792,15 @@ pub mod test_utils {
         }
 
         impl TrainingRepository for TrainingRepository {
-            async fn save_definition(
+            async fn save_training_metric_definition(
                 &self,
-                definition: TrainingMetricDefinition,
+                metric: TrainingMetric,
             ) -> Result<(), SaveTrainingMetricError>;
 
-            async fn get_definitions(
+            async fn get_metrics(
                 &self,
                 user: &UserId,
-            ) -> Result<Vec<TrainingMetricDefinition>, GetTrainingMetricsDefinitionsError>;
+            ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>;
 
             async fn update_metric_value(
                 &self,
@@ -919,7 +934,9 @@ mod tests_training_metrics_service {
     async fn test_create_metric_ok() {
         let mut repository = MockTrainingRepository::new();
         let background_repository = MockTrainingRepository::new();
-        repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_save_training_metric_definition()
+            .returning(|_| Ok(()));
         repository
             .expect_clone()
             .return_once(move || background_repository);
@@ -968,7 +985,9 @@ mod tests_training_metrics_service {
     async fn test_create_metric_compute_initial_values() {
         let mut repository = MockTrainingRepository::new();
         let mut background_repository = MockTrainingRepository::new();
-        repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_save_training_metric_definition()
+            .returning(|_| Ok(()));
         background_repository
             .expect_update_metric_value()
             .times(1)
@@ -1047,7 +1066,9 @@ mod tests_training_metrics_service {
         let now = Utc::now();
         let mut repository = MockTrainingRepository::new();
         let mut background_repository = MockTrainingRepository::new();
-        repository.expect_save_definition().returning(|_| Ok(()));
+        repository
+            .expect_save_training_metric_definition()
+            .returning(|_| Ok(()));
         repository
             .expect_update_metric_value()
             .times(2) // 2 day fron initial range
@@ -1117,7 +1138,7 @@ mod tests_training_metrics_service {
     async fn test_create_metric_fails_to_save_definition() {
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_save_definition()
+            .expect_save_training_metric_definition()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         repository.expect_update_metric_value().times(0);
         let mut activities = MockActivityRepository::new();
@@ -1143,7 +1164,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_when_get_definitions_err() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definitions().returning(|_| {
+        repository.expect_get_metrics().returning(|_| {
             Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
                 "an error"
             )))
@@ -1161,15 +1182,17 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_def_without_values() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definitions().returning(|_| {
-            Ok(vec![TrainingMetricDefinition::new(
+        repository.expect_get_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                ),
             )])
         });
         repository
@@ -1187,14 +1210,16 @@ mod tests_training_metrics_service {
         let (def, value) = res.first().unwrap();
         assert_eq!(
             def,
-            &TrainingMetricDefinition::new(
+            &TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                )
             )
         );
         assert!(value.is_empty());
@@ -1203,15 +1228,17 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definitions().returning(|_| {
-            Ok(vec![TrainingMetricDefinition::new(
+        repository.expect_get_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                ),
             )])
         });
         repository.expect_get_metric_values().returning(|_, _| {
@@ -1232,14 +1259,16 @@ mod tests_training_metrics_service {
         let (def, value) = res.first().unwrap();
         assert_eq!(
             def,
-            &TrainingMetricDefinition::new(
+            &TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                )
             )
         );
         assert_eq!(
@@ -1254,15 +1283,17 @@ mod tests_training_metrics_service {
         use chrono::NaiveDate;
 
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definitions().returning(|_| {
-            Ok(vec![TrainingMetricDefinition::new(
+        repository.expect_get_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                ),
             )])
         });
 
@@ -1300,15 +1331,17 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_get_metrics_aligns_date_range_to_granularity() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definitions().returning(|_| {
-            Ok(vec![TrainingMetricDefinition::new(
+        repository.expect_get_metrics().returning(|_| {
+            Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
-                UserId::test_default(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                TrainingMetricGranularity::Weekly, // Weekly granularity
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
+                TrainingMetricDefinition::new(
+                    UserId::test_default(),
+                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                    TrainingMetricGranularity::Weekly, // Weekly granularity
+                    TrainingMetricAggregate::Sum,
+                    TrainingMetricFilters::empty(),
+                    TrainingMetricGroupBy::none(),
+                ),
             )])
         });
 
@@ -1369,7 +1402,6 @@ mod tests_training_metrics_service {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
-                TrainingMetricId::from("test"),
                 "other_user".to_string().into(),
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
@@ -1401,7 +1433,6 @@ mod tests_training_metrics_service {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
-                TrainingMetricId::from("test"),
                 "user".to_string().into(),
                 ActivityMetricSource::Statistic(ActivityStatistic::Calories),
                 TrainingMetricGranularity::Daily,
@@ -1474,7 +1505,7 @@ mod tests_training_metrics_service {
     async fn test_update_metrics_values_with_no_definitions() {
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(|_| Ok(vec![]));
         repository.expect_update_metric_value().times(0);
@@ -1497,17 +1528,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository.expect_update_metric_value().times(0);
@@ -1531,17 +1564,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1575,17 +1610,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1619,17 +1656,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1661,27 +1700,31 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
                 Ok(vec![
-                    TrainingMetricDefinition::new(
+                    TrainingMetric::new(
                         metric_id1.clone(),
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
+                        TrainingMetricDefinition::new(
+                            user_id_clone.clone(),
+                            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                            TrainingMetricFilters::empty(),
+                            TrainingMetricGroupBy::none(),
+                        ),
                     ),
-                    TrainingMetricDefinition::new(
+                    TrainingMetric::new(
                         metric_id2.clone(),
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
+                        TrainingMetricDefinition::new(
+                            user_id_clone.clone(),
+                            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                            TrainingMetricFilters::empty(),
+                            TrainingMetricGroupBy::none(),
+                        ),
                     ),
                 ])
             });
@@ -1712,17 +1755,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1749,17 +1794,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1790,17 +1837,19 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Average,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Average,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
                 )])
             });
         repository
@@ -1852,17 +1901,19 @@ mod tests_training_metrics_service {
         let metric_id_clone = metric_id.clone();
         let user_id_clone = user_id.clone();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id_clone.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Weekly,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    Some(TrainingMetricGroupBy::Sport),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Weekly,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        Some(TrainingMetricGroupBy::Sport),
+                    ),
                 )])
             });
 
@@ -1918,17 +1969,19 @@ mod tests_training_metrics_service {
         let metric_id_clone = metric_id.clone();
         let user_id_clone = user_id.clone();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id_clone.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Weekly,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    None, // No group_by
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Weekly,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        None, // No group_by
+                    ),
                 )])
             });
 
@@ -1974,17 +2027,19 @@ mod tests_training_metrics_service {
         let metric_id_clone = metric_id.clone();
         let user_id_clone = user_id.clone();
         repository
-            .expect_get_definitions()
+            .expect_get_metrics()
             .times(1)
             .returning(move |_| {
-                Ok(vec![TrainingMetricDefinition::new(
+                Ok(vec![TrainingMetric::new(
                     metric_id_clone.clone(),
-                    user_id_clone.clone(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    Some(TrainingMetricGroupBy::Sport),
+                    TrainingMetricDefinition::new(
+                        user_id_clone.clone(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        Some(TrainingMetricGroupBy::Sport),
+                    ),
                 )])
             });
 
@@ -2035,23 +2090,24 @@ mod tests_training_metrics_service {
         // Create the activity to be removed
         let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
 
-        // Create the definition
-        let definition = TrainingMetricDefinition::new(
+        // Create the metric
+        let metric = TrainingMetric::new(
             metric_id.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
         let mut repository = MockTrainingRepository::new();
 
-        // Mock get_definitions - return our metric definition
         repository
-            .expect_get_definitions()
-            .returning(move |_| Ok(vec![definition.clone()]));
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric.clone()]));
 
         // Mock delete_metric_values_for_bin - should be called to clear old values
         repository
@@ -2084,31 +2140,35 @@ mod tests_training_metrics_service {
         let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
 
         // Create two metric definitions
-        let definition_1 = TrainingMetricDefinition::new(
+        let metric_1 = TrainingMetric::new(
             metric_id_1.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
-        let definition_2 = TrainingMetricDefinition::new(
+        let metric_2 = TrainingMetric::new(
             metric_id_2.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
         let mut repository = MockTrainingRepository::new();
 
         repository
-            .expect_get_definitions()
-            .returning(move |_| Ok(vec![definition_1.clone(), definition_2.clone()]));
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric_1.clone(), metric_2.clone()]));
 
         // Mock delete_metric_values_for_bin - should be called twice (once per metric)
         repository
@@ -2139,21 +2199,23 @@ mod tests_training_metrics_service {
         let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
 
         // Create a weekly granularity metric
-        let definition = TrainingMetricDefinition::new(
+        let metric = TrainingMetric::new(
             metric_id.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
         let mut repository = MockTrainingRepository::new();
 
         repository
-            .expect_get_definitions()
-            .returning(move |_| Ok(vec![definition.clone()]));
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric.clone()]));
 
         // Mock delete_metric_values_for_bin
         repository
@@ -2183,10 +2245,8 @@ mod tests_training_metrics_service {
 
         let mut repository = MockTrainingRepository::new();
 
-        // No metric definitions
-        repository
-            .expect_get_definitions()
-            .returning(|_| Ok(vec![]));
+        // No metrics
+        repository.expect_get_metrics().returning(|_| Ok(vec![]));
 
         let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
         let service = TrainingService::new(repository, activity_repository);
@@ -2205,21 +2265,23 @@ mod tests_training_metrics_service {
         let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
         let remaining_activity = create_test_activity(600, Some(600.0), Some(5000.0));
 
-        let definition = TrainingMetricDefinition::new(
+        let metric = TrainingMetric::new(
             metric_id.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
         let mut repository = MockTrainingRepository::new();
 
         repository
-            .expect_get_definitions()
-            .returning(move |_| Ok(vec![definition.clone()]));
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric.clone()]));
 
         // Mock delete_metric_values_for_bin
         repository
@@ -2258,21 +2320,23 @@ mod tests_training_metrics_service {
         // The activity to be deleted - it's the only one in its bin
         let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
 
-        let definition = TrainingMetricDefinition::new(
+        let metric = TrainingMetric::new(
             metric_id.clone(),
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
         );
 
         let mut repository = MockTrainingRepository::new();
 
         repository
-            .expect_get_definitions()
-            .returning(move |_| Ok(vec![definition.clone()]));
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric.clone()]));
 
         // CRITICAL: Expect delete_metric_values_for_bin to be called before recomputing
         repository
