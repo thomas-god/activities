@@ -155,9 +155,9 @@
 		open
 	>
 		<summary class="collapse-title text-lg font-semibold">Laps</summary>
-		<div class="collapse-content">
-			<div class="overflow-x-auto">
-				<table class="table table-sm">
+		<div class="collapse-content overflow-x-auto p-0">
+			<div class="px-4 pb-4">
+				<table class="table w-full table-sm">
 					<thead>
 						<tr>
 							<th>Lap</th>
