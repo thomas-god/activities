@@ -22,6 +22,21 @@
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
 
+	// Calculate responsive chart height based on width
+	let chartHeight = $derived.by(() => {
+		if (chartWidth < 640) {
+			// Mobile: smaller height
+			return 250;
+		} else if (chartWidth < 1024) {
+			// Tablet: medium height
+			return 350;
+		} else {
+			// Desktop: full height
+			return 400;
+		}
+	});
+	$inspect(chartWidth, chartHeight);
+
 	let active_metrics = $derived(convertTimeseriesToActiveTime(data.activity.timeseries));
 
 	let metricOptions: { option: Metric; display: string }[] = [
@@ -237,11 +252,11 @@
 		</fieldset>
 		{#if selectedMetrics}
 			<div class="px-4 pb-2">
-				<div bind:clientWidth={chartWidth}>
+				<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 					<TimeseriesChart
 						time={active_metrics.time}
 						metrics={selectedMetrics}
-						height={400}
+						height={chartHeight}
 						width={chartWidth}
 					/>
 				</div>
