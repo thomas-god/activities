@@ -14,11 +14,12 @@ use crate::domain::{
         },
     },
     ports::{
-        ActivityRepository, CreateTrainingMetricError, CreateTrainingMetricRequest,
-        CreateTrainingNoteError, CreateTrainingNoteRequest, CreateTrainingPeriodError,
-        CreateTrainingPeriodRequest, DateRange, DeleteTrainingMetricError,
-        DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-        DeleteTrainingPeriodRequest, GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
+        ActivityRepository, ComputeTrainingMetricValuesError, CreateTrainingMetricError,
+        CreateTrainingMetricRequest, CreateTrainingNoteError, CreateTrainingNoteRequest,
+        CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
+        DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
+        DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
+        GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
         RemoveActivityFromMetricsRequest, TrainingRepository, UpdateMetricsValuesRequest,
         UpdateTrainingNoteError, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
         UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
@@ -269,7 +270,7 @@ where
         Ok(())
     }
 
-    async fn get_training_metrics(
+    async fn get_training_metrics_values(
         &self,
         user: &UserId,
         date_range: &Option<DateRange>,
@@ -601,6 +602,80 @@ where
             ))),
         }
     }
+
+    async fn get_training_metric_values(
+        &self,
+        user: &UserId,
+        metric_id: &TrainingMetricId,
+        date_range: &Option<DateRange>,
+    ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError> {
+        let definition = self
+            .training_repository
+            .get_definition(metric_id)
+            .await
+            .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?;
+
+        match definition {
+            Some(def) if def.user() == user => {
+                self.training_repository
+                    .get_metric_values(metric_id, date_range)
+                    .await
+                    .map_err(|err| match err {
+                        crate::domain::ports::GetTrainingMetricValueError::TrainingMetricDoesNotExists(id) => {
+                            GetTrainingMetricValuesError::TrainingMetricDoesNotExists(id)
+                        }
+                        crate::domain::ports::GetTrainingMetricValueError::Unknown(e) => {
+                            GetTrainingMetricValuesError::Unknown(e)
+                        }
+                    })
+            }
+            Some(_) => Err(GetTrainingMetricValuesError::Unknown(anyhow::anyhow!(
+                "Training metric does not belong to user"
+            ))),
+            None => Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
+                metric_id.clone(),
+            )),
+        }
+    }
+
+    async fn compute_training_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let values = match definition.source_requirement() {
+            ComputeMetricRequirement::ActivityWithTimeseries => {
+                let activities = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities_with_timeseries(
+                        definition.user(),
+                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                    )
+                    .await
+                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
+
+                definition.compute_values_from_timeseries(&activities)
+            }
+            ComputeMetricRequirement::Activity => {
+                let activities = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities(
+                        definition.user(),
+                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                    )
+                    .await
+                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
+
+                definition.compute_values(&activities)
+            }
+        };
+
+        Ok(values)
+    }
 }
 
 impl<TMR, AR> TrainingService<TMR, AR>
@@ -689,7 +764,7 @@ pub mod test_utils {
                 req: RemoveActivityFromMetricsRequest,
             ) -> Result<(), ()>;
 
-            async fn get_training_metrics(
+            async fn get_training_metrics_values(
                 &self,
                 user: &UserId,
                 date_range: &Option<DateRange>,
@@ -767,6 +842,19 @@ pub mod test_utils {
                 user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_metric_values(
+                &self,
+                user: &UserId,
+                metric_id: &TrainingMetricId,
+                date_range: &Option<DateRange>,
+            ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError>;
+
+            async fn compute_training_metric_values(
+                &self,
+                definition: &TrainingMetricDefinition,
+                date_range: &DateRange,
+            ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError>;
         }
     }
 
@@ -777,7 +865,8 @@ pub mod test_utils {
             mock.expect_create_metric()
                 .returning(|_| Ok(TrainingMetricId::default()));
             mock.expect_update_metrics_values().returning(|_| Ok(()));
-            mock.expect_get_training_metrics().returning(|_, _| vec![]);
+            mock.expect_get_training_metrics_values()
+                .returning(|_, _| vec![]);
             mock.expect_delete_metric().returning(|_| Ok(()));
 
             mock
@@ -1174,7 +1263,7 @@ mod tests_training_metrics_service {
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
-            .get_training_metrics(&UserId::test_default(), &None)
+            .get_training_metrics_values(&UserId::test_default(), &None)
             .await;
         assert!(res.is_empty());
     }
@@ -1203,7 +1292,7 @@ mod tests_training_metrics_service {
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
-            .get_training_metrics(&UserId::test_default(), &None)
+            .get_training_metrics_values(&UserId::test_default(), &None)
             .await;
 
         assert_eq!(res.len(), 1);
@@ -1252,7 +1341,7 @@ mod tests_training_metrics_service {
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
-            .get_training_metrics(&UserId::test_default(), &None)
+            .get_training_metrics_values(&UserId::test_default(), &None)
             .await;
 
         assert_eq!(res.len(), 1);
@@ -1320,7 +1409,7 @@ mod tests_training_metrics_service {
         ));
 
         let res = service
-            .get_training_metrics(&UserId::test_default(), &date_range)
+            .get_training_metrics_values(&UserId::test_default(), &date_range)
             .await;
 
         assert_eq!(res.len(), 1);
@@ -1370,7 +1459,7 @@ mod tests_training_metrics_service {
         ));
 
         let res = service
-            .get_training_metrics(&UserId::test_default(), &date_range)
+            .get_training_metrics_values(&UserId::test_default(), &date_range)
             .await;
 
         assert_eq!(res.len(), 1);
@@ -3590,5 +3679,211 @@ mod test_training_service_training_note {
             Err(CreateTrainingNoteError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_metric_values {
+    use super::*;
+    use crate::domain::models::activity::{
+        Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
+    };
+    use crate::domain::models::training::{
+        ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
+        TrainingMetricGranularity,
+    };
+    use crate::domain::ports::GetTrainingMetricValuesError;
+    use crate::domain::services::activity::test_utils::MockActivityRepository;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn test_get_training_metric_values_ok() {
+        let user_id = UserId::from("user1");
+        let metric_id = TrainingMetricId::new();
+        let date_range = Some(DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-12-31".parse::<NaiveDate>().unwrap(),
+        ));
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let values = TrainingMetricValues::new(HashMap::new());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_definition()
+            .times(1)
+            .return_once(move |_| Ok(Some(definition)));
+        training_repository
+            .expect_get_metric_values()
+            .times(1)
+            .return_once(move |_, _| Ok(values));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metric_values(&user_id, &metric_id, &date_range)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metric_values_metric_not_found() {
+        let user_id = UserId::from("user1");
+        let metric_id = TrainingMetricId::new();
+        let date_range = None;
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_definition()
+            .times(1)
+            .return_once(move |_| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metric_values(&user_id, &metric_id, &date_range)
+            .await;
+
+        assert!(result.is_err());
+        match result {
+            Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(_)) => {}
+            _ => panic!("Expected TrainingMetricDoesNotExists error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metric_values_wrong_user() {
+        let user_id = UserId::from("user1");
+        let other_user_id = UserId::from("user2");
+        let metric_id = TrainingMetricId::new();
+        let date_range = None;
+
+        let definition = TrainingMetricDefinition::new(
+            other_user_id,
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_definition()
+            .times(1)
+            .return_once(move |_| Ok(Some(definition)));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metric_values(&user_id, &metric_id, &date_range)
+            .await;
+
+        assert!(result.is_err());
+        match result {
+            Err(GetTrainingMetricValuesError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_ok() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(|_, _| Ok(vec![]));
+
+        let training_repository = MockTrainingRepository::new();
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_activities() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        // Create some test activities
+        let mut stats_map = HashMap::new();
+        stats_map.insert(ActivityStatistic::Distance, 10000.0);
+
+        let activity = Activity::new(
+            ActivityId::new(),
+            user_id.clone(),
+            None,
+            ActivityStartTime::from_timestamp(1705315200).unwrap(), // 2024-01-15T10:00:00Z
+            Sport::Running,
+            ActivityStatistics::new(stats_map),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_list_activities()
+            .times(1)
+            .returning(move |_, _| Ok(vec![activity.clone()]));
+
+        let training_repository = MockTrainingRepository::new();
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        // With weekly granularity and sum aggregate, we should have one bin with the activity distance
+        assert!(!values.is_empty());
     }
 }

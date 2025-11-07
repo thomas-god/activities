@@ -671,11 +671,24 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: RemoveActivityFromMetricsRequest,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 
-    fn get_training_metrics(
+    fn get_training_metrics_values(
         &self,
         user: &UserId,
         date_range: &Option<DateRange>,
     ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
+
+    fn get_training_metric_values(
+        &self,
+        user: &UserId,
+        metric_id: &TrainingMetricId,
+        date_range: &Option<DateRange>,
+    ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValuesError>> + Send;
+
+    fn compute_training_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        date_range: &DateRange,
+    ) -> impl Future<Output = Result<TrainingMetricValues, ComputeTrainingMetricValuesError>> + Send;
 
     fn delete_metric(
         &self,
@@ -789,6 +802,20 @@ pub enum DeleteMetricError {
 
 #[derive(Debug, Error)]
 pub enum GetDefinitionError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum GetTrainingMetricValuesError {
+    #[error("Training metric {0:?} does not exist")]
+    TrainingMetricDoesNotExists(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum ComputeTrainingMetricValuesError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }

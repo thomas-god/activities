@@ -263,7 +263,7 @@ pub async fn get_training_metrics<
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
         .training_metrics_service
-        .get_training_metrics(user.user(), &Some(DateRange::from(&date_range)))
+        .get_training_metrics_values(user.user(), &Some(DateRange::from(&date_range)))
         .await;
 
     let body = ResponseBody(
