@@ -16,7 +16,7 @@ use crate::{
         http::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
-            handlers::types::{
+            handlers::training::types::{
                 APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
                 APITrainingMetricGroupBy, APITrainingMetricSource,
             },
