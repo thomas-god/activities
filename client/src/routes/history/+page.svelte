@@ -5,6 +5,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
+	import type { WorkoutType } from '$lib/workout-type';
+	import type { SportCategory } from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
@@ -16,6 +18,28 @@
 	let viewMode = $derived(
 		(page.url.searchParams.get('view') === 'calendar' ? 'calendar' : 'list') as 'list' | 'calendar'
 	);
+
+	// Parse filters from URL
+	let initialRpe = $derived.by(() => {
+		const rpeParam = page.url.searchParams.get('rpe');
+		if (!rpeParam) return [];
+		return rpeParam
+			.split(',')
+			.map(Number)
+			.filter((n) => !isNaN(n) && n >= 1 && n <= 10);
+	});
+
+	let initialWorkoutTypes = $derived.by(() => {
+		const wtParam = page.url.searchParams.get('workout_type');
+		if (!wtParam) return [];
+		return wtParam.split(',') as WorkoutType[];
+	});
+
+	let initialSportCategories = $derived.by(() => {
+		const scParam = page.url.searchParams.get('sport_category');
+		if (!scParam) return [];
+		return scParam.split(',') as SportCategory[];
+	});
 
 	// Current month from URL parameter, default to current month
 	let currentMonth = $derived.by(() => {
@@ -49,6 +73,37 @@
 		}
 		goto(url, { replaceState: true, keepFocus: true });
 	};
+
+	const handleFilterChange = (filters: {
+		rpe: number[];
+		workoutTypes: WorkoutType[];
+		sportCategories: SportCategory[];
+	}) => {
+		const url = new URL(page.url);
+
+		// Update RPE filter
+		if (filters.rpe.length > 0) {
+			url.searchParams.set('rpe', filters.rpe.join(','));
+		} else {
+			url.searchParams.delete('rpe');
+		}
+
+		// Update workout type filter
+		if (filters.workoutTypes.length > 0) {
+			url.searchParams.set('workout_type', filters.workoutTypes.join(','));
+		} else {
+			url.searchParams.delete('workout_type');
+		}
+
+		// Update sport category filter
+		if (filters.sportCategories.length > 0) {
+			url.searchParams.set('sport_category', filters.sportCategories.join(','));
+		} else {
+			url.searchParams.delete('sport_category');
+		}
+
+		goto(url, { replaceState: true, keepFocus: true });
+	};
 </script>
 
 <div class="@container mx-2 mt-5 sm:mx-auto">
@@ -75,7 +130,13 @@
 
 	<!-- View Content -->
 	{#if viewMode === 'list'}
-		<ActivitiesList activityList={sorted_activities} />
+		<ActivitiesList
+			activityList={sorted_activities}
+			{initialRpe}
+			{initialWorkoutTypes}
+			{initialSportCategories}
+			onFiltersChange={handleFilterChange}
+		/>
 	{:else}
 		<ActivitiesCalendar
 			activityList={sorted_activities}

@@ -3,19 +3,39 @@
 	import { RPE_VALUES, getRpeColor } from '$lib/rpe';
 	import { WORKOUT_TYPE_LABELS, getWorkoutTypeColor, type WorkoutType } from '$lib/workout-type';
 	import { getSportCategory, sportCategoryIcons, type SportCategory } from '$lib/sport';
+	import { untrack } from 'svelte';
 
 	let {
 		activities,
-		onFilterChange
+		onFilterChange,
+		initialRpe = [],
+		initialWorkoutTypes = [],
+		initialSportCategories = [],
+		onFiltersStateChange
 	}: {
 		activities: ActivityList;
 		onFilterChange: (filteredActivities: ActivityList) => void;
+		initialRpe?: number[];
+		initialWorkoutTypes?: WorkoutType[];
+		initialSportCategories?: SportCategory[];
+		onFiltersStateChange?: (filters: {
+			rpe: number[];
+			workoutTypes: WorkoutType[];
+			sportCategories: SportCategory[];
+		}) => void;
 	} = $props();
 
-	// Filter state
-	let selectedRpe = $state<number[]>([]);
-	let selectedWorkoutTypes = $state<WorkoutType[]>([]);
-	let selectedSportCategories = $state<SportCategory[]>([]);
+	// Filter state - initialize from props
+	let selectedRpe = $state<number[]>(initialRpe);
+	let selectedWorkoutTypes = $state<WorkoutType[]>(initialWorkoutTypes);
+	let selectedSportCategories = $state<SportCategory[]>(initialSportCategories);
+
+	// Update state when initial values change (e.g., when navigating back/forward)
+	$effect(() => {
+		selectedRpe = initialRpe;
+		selectedWorkoutTypes = initialWorkoutTypes;
+		selectedSportCategories = initialSportCategories;
+	});
 
 	// Get unique sport categories from activities
 	let availableSportCategories = $derived.by(() => {
@@ -67,6 +87,17 @@
 		onFilterChange(filteredActivities);
 	});
 
+	// Helper function to notify URL change
+	const notifyFiltersChange = () => {
+		untrack(() => {
+			onFiltersStateChange?.({
+				rpe: selectedRpe,
+				workoutTypes: selectedWorkoutTypes,
+				sportCategories: selectedSportCategories
+			});
+		});
+	};
+
 	// Toggle functions
 	const toggleRpe = (rpe: number) => {
 		if (selectedRpe.includes(rpe)) {
@@ -74,6 +105,7 @@
 		} else {
 			selectedRpe = [...selectedRpe, rpe];
 		}
+		notifyFiltersChange();
 	};
 
 	const toggleWorkoutType = (workoutType: WorkoutType) => {
@@ -82,6 +114,7 @@
 		} else {
 			selectedWorkoutTypes = [...selectedWorkoutTypes, workoutType];
 		}
+		notifyFiltersChange();
 	};
 
 	const toggleSportCategory = (category: SportCategory) => {
@@ -90,12 +123,14 @@
 		} else {
 			selectedSportCategories = [...selectedSportCategories, category];
 		}
+		notifyFiltersChange();
 	};
 
 	const clearFilters = () => {
 		selectedRpe = [];
 		selectedWorkoutTypes = [];
 		selectedSportCategories = [];
+		notifyFiltersChange();
 	};
 
 	let hasActiveFilters = $derived(

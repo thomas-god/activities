@@ -3,8 +3,26 @@
 	import { dayjs } from '$lib/duration';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 	import ActivitiesFilters from '../molecules/ActivitiesFilters.svelte';
+	import type { WorkoutType } from '$lib/workout-type';
+	import type { SportCategory } from '$lib/sport';
 
-	let { activityList }: { activityList: ActivityList } = $props();
+	let {
+		activityList,
+		initialRpe = [],
+		initialWorkoutTypes = [],
+		initialSportCategories = [],
+		onFiltersChange
+	}: {
+		activityList: ActivityList;
+		initialRpe?: number[];
+		initialWorkoutTypes?: WorkoutType[];
+		initialSportCategories?: SportCategory[];
+		onFiltersChange?: (filters: {
+			rpe: number[];
+			workoutTypes: WorkoutType[];
+			sportCategories: SportCategory[];
+		}) => void;
+	} = $props();
 
 	let filteredActivityList = $state<ActivityList>(activityList);
 
@@ -31,10 +49,25 @@
 	const handleFilterChange = (filtered: ActivityList) => {
 		filteredActivityList = filtered;
 	};
+
+	const handleFiltersStateChange = (filters: {
+		rpe: number[];
+		workoutTypes: WorkoutType[];
+		sportCategories: SportCategory[];
+	}) => {
+		onFiltersChange?.(filters);
+	};
 </script>
 
 <div class="rounded-box bg-base-100 shadow-md">
-	<ActivitiesFilters activities={activityList} onFilterChange={handleFilterChange} />
+	<ActivitiesFilters
+		activities={activityList}
+		onFilterChange={handleFilterChange}
+		{initialRpe}
+		{initialWorkoutTypes}
+		{initialSportCategories}
+		onFiltersStateChange={handleFiltersStateChange}
+	/>
 	<div class="flex flex-col gap-2 p-4 pt-0">
 		{#if filteredActivityList.length === 0}
 			<div class="py-8 text-center text-base-content/60">
