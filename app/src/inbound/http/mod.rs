@@ -17,9 +17,10 @@ use crate::domain::ports::{IActivityService, IPreferencesService, ITrainingServi
 
 use crate::inbound::parser::ParseFile;
 use handlers::{
-    create_training_metric, create_training_note, create_training_period, delete_activity,
-    delete_preference, delete_training_metric, delete_training_note, delete_training_period,
-    get_activity, get_all_preferences, get_preference, get_training_metrics, get_training_note,
+    compute_training_metric_values, create_training_metric, create_training_note,
+    create_training_period, delete_activity, delete_preference, delete_training_metric,
+    delete_training_note, delete_training_period, get_activity, get_all_preferences,
+    get_preference, get_training_metric_values, get_training_metrics, get_training_note,
     get_training_notes, get_training_period, get_training_periods, list_activities, patch_activity,
     set_preference, update_training_note, update_training_period, upload_activities,
 };
@@ -204,6 +205,14 @@ fn core_routes<
         .route(
             "/training/metric/{metric_id}",
             delete(delete_training_metric::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/metric/{metric_id}/values",
+            get(get_training_metric_values::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/metric/values",
+            get(compute_training_metric_values::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period",
