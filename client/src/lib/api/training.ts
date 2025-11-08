@@ -37,7 +37,8 @@ const TrainingPeriodActivityItemSchema = z.object({
 	elevation: z.number().nullable(),
 	start_time: z.string(),
 	rpe: z.number().min(1).max(10).nullable(),
-	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable()
+	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
+	feedback: z.string().nullable()
 });
 
 const TrainingPeriodDetailsSchema = z.object({

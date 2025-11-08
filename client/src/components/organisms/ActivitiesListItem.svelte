@@ -5,7 +5,13 @@
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 
-	let { activity }: { activity: ActivityListItem } = $props();
+	let {
+		activity,
+		showNote = false
+	}: {
+		activity: ActivityListItem;
+		showNote?: boolean;
+	} = $props();
 
 	let title = $derived(
 		activity.name === null || activity.name === '' ? activity.sport : activity.name
@@ -37,6 +43,11 @@
 					activity.start_time
 				).format('MMM D, YYYY')}
 			</div>
+			{#if showNote && activity.feedback}
+				<div class="mt-2 line-clamp-2 text-sm text-gray-600 italic">
+					📝 {activity.feedback}
+				</div>
+			{/if}
 		</div>
 	</div>
 	<div class="flex flex-row items-center justify-center gap-2">

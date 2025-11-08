@@ -35,7 +35,6 @@
 			return 400;
 		}
 	});
-	$inspect(chartWidth, chartHeight);
 
 	let active_metrics = $derived(convertTimeseriesToActiveTime(data.activity.timeseries));
 

@@ -81,7 +81,7 @@
 							{month} - {activities.length} activities
 						</div>
 						{#each activities as activity}
-							<ActivitiesListItem {activity} />
+							<ActivitiesListItem {activity} showNote={false} />
 						{/each}
 					</div>
 				{/if}

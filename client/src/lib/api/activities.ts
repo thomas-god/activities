@@ -22,7 +22,8 @@ const ActivityListItemSchema = z.object({
 	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
 	rpe: z.number().min(1).max(10).nullable(),
-	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable()
+	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
+	feedback: z.string().nullable()
 });
 
 const ActivityListSchema = z.array(ActivityListItemSchema);

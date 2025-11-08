@@ -46,6 +46,7 @@ pub struct ResponseBodyItem {
     start_time: DateTime<FixedOffset>,
     rpe: Option<u8>,
     workout_type: Option<String>,
+    feedback: Option<String>,
 }
 
 impl From<&Activity> for ResponseBodyItem {
@@ -62,6 +63,7 @@ impl From<&Activity> for ResponseBodyItem {
                 .cloned(),
             rpe: activity.rpe().map(|rpe| rpe.value()),
             workout_type: activity.workout_type().map(|wt| wt.to_string()),
+            feedback: activity.feedback().as_ref().map(|f| f.to_string()),
         }
     }
 }
