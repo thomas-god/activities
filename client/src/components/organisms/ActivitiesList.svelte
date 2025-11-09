@@ -11,20 +11,24 @@
 		initialRpe = [],
 		initialWorkoutTypes = [],
 		initialSportCategories = [],
+		initialShowNotes = false,
 		onFiltersChange
 	}: {
 		activityList: ActivityList;
 		initialRpe?: number[];
 		initialWorkoutTypes?: WorkoutType[];
 		initialSportCategories?: SportCategory[];
+		initialShowNotes?: boolean;
 		onFiltersChange?: (filters: {
 			rpe: number[];
 			workoutTypes: WorkoutType[];
 			sportCategories: SportCategory[];
+			showNotes: boolean;
 		}) => void;
 	} = $props();
 
 	let filteredActivityList = $state<ActivityList>(activityList);
+	let showNotes = $state<boolean>(initialShowNotes);
 
 	let historyStartMonth = $derived(dayjs(filteredActivityList.at(-1)?.start_time).startOf('month'));
 	let historyEndMonth = dayjs().startOf('month');
@@ -54,7 +58,9 @@
 		rpe: number[];
 		workoutTypes: WorkoutType[];
 		sportCategories: SportCategory[];
+		showNotes: boolean;
 	}) => {
+		showNotes = filters.showNotes;
 		onFiltersChange?.(filters);
 	};
 </script>
@@ -66,6 +72,7 @@
 		{initialRpe}
 		{initialWorkoutTypes}
 		{initialSportCategories}
+		bind:showNotes
 		onFiltersStateChange={handleFiltersStateChange}
 	/>
 	<div class="flex flex-col p-4 pt-0">
@@ -81,7 +88,7 @@
 							{month} - {activities.length} activities
 						</div>
 						{#each activities as activity}
-							<ActivitiesListItem {activity} showNote={false} />
+							<ActivitiesListItem {activity} showNote={showNotes} />
 						{/each}
 					</div>
 				{/if}
