@@ -38,7 +38,7 @@
 
 	{#if groupedActivities.thisWeek.length > 0}
 		<p class={containerClass}>This week</p>
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col">
 			{#each groupedActivities.thisWeek as activity}
 				<ActivitiesListItem {activity} />
 			{/each}
@@ -47,7 +47,7 @@
 
 	{#if groupedActivities.thisMonth.length > 0}
 		<p class={containerClass}>This month</p>
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col">
 			{#each groupedActivities.thisMonth as activity}
 				<ActivitiesListItem {activity} />
 			{/each}
@@ -56,7 +56,7 @@
 
 	{#if groupedActivities.earlier.length > 0}
 		<p class={containerClass}>Earlier</p>
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col">
 			{#each groupedActivities.earlier as activity}
 				<ActivitiesListItem {activity} />
 			{/each}

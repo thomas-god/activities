@@ -30,7 +30,7 @@
 
 <a
 	href={`/activity/${activity.id}`}
-	class={`item @container flex flex-1 items-center p-3 ${categoryClass(activity.sport_category)}`}
+	class={`item @container flex flex-1 items-center p-1 pl-2 ${categoryClass(activity.sport_category)}`}
 >
 	<div class={`icon ${categoryClass(activity.sport_category)}`}>
 		{getSportCategoryIcon(activity.sport_category)}
@@ -77,7 +77,7 @@
 	.item {
 		box-sizing: border-box;
 		border-left: 4px solid transparent;
-		border-radius: 8px;
+		border-radius: 0px;
 	}
 
 	.item.cycling {

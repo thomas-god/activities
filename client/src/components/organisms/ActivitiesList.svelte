@@ -68,7 +68,7 @@
 		{initialSportCategories}
 		onFiltersStateChange={handleFiltersStateChange}
 	/>
-	<div class="flex flex-col gap-2 p-4 pt-0">
+	<div class="flex flex-col p-4 pt-0">
 		{#if filteredActivityList.length === 0}
 			<div class="py-8 text-center text-base-content/60">
 				No activities match the selected filters
@@ -76,7 +76,7 @@
 		{:else}
 			{#each activitiesByMonth as [month, activities]}
 				{#if activities.length > 0}
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col">
 						<div class="my-3 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
 							{month} - {activities.length} activities
 						</div>

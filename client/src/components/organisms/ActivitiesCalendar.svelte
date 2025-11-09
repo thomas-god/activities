@@ -196,7 +196,7 @@
 						{#each day.activities.slice(0, 3) as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class={`activity-details flex items-center gap-1 rounded-md bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
+								class={`activity-details flex items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-base leading-none">
 									{getSportCategoryIcon(activity.sport_category)}
@@ -237,7 +237,7 @@
 						{#each selectedDayActivities as activity}
 							<a
 								href={`/activity/${activity.id}`}
-								class={`activity-card flex items-center gap-3 rounded-lg bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
+								class={`activity-card flex items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-2xl leading-none">
 									{getSportCategoryIcon(activity.sport_category)}

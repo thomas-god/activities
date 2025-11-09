@@ -361,12 +361,12 @@
 				</div>
 			</div>
 
-			<div class="flex flex-col gap-2">
+			<div class="flex flex-col gap-0">
 				{#each timeline as item}
 					{#if item.type === 'activity'}
 						<ActivitiesListItem activity={item.data} showNote={true} />
 					{:else}
-						<div class="rounded-box border-l-4 border-warning/60 bg-warning/2">
+						<div class="border-l-4 border-warning/40 bg-warning/2">
 							<div class="p-2 px-4">
 								<TrainingNoteListItem
 									note={item.data}
