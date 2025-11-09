@@ -16,6 +16,7 @@
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
+	import { sportDisplay } from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
@@ -99,7 +100,7 @@
 
 	const updateActivityNameCallback = async (newName: string) => {
 		const res = await fetch(
-			`${PUBLIC_APP_URL}/api/activity/${data.activity?.id}?name=${encodeURIComponent(newName)}`,
+			`${PUBLIC_APP_URL}/api/activity/${data.activity.id}?name=${encodeURIComponent(newName)}`,
 			{
 				method: 'PATCH',
 				credentials: 'include'
@@ -110,9 +111,7 @@
 			goto('/login');
 		}
 
-		if (res.ok) {
-			data.activity.name = newName;
-		}
+		invalidate(`app:activity:${data.activity.id}`);
 	};
 
 	const updateActivityRpeCallback = async (newRpe: number | null) => {
@@ -271,6 +270,6 @@
 	bind:isOpen={showDeleteModal}
 	title="Delete Activity"
 	description="Are you sure you want to delete this activity?"
-	itemPreview={data.activity.name || data.activity.sport}
+	itemPreview={data.activity.name || sportDisplay(data.activity.sport)}
 	onConfirm={deleteActivityCallback}
 />

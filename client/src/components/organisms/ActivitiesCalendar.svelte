@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ActivityList } from '$lib/api';
 	import { dayjs } from '$lib/duration';
-	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
+	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 
 	let {
 		activityList,
@@ -185,8 +185,8 @@
 							<a
 								href={`/activity/${activity.id}`}
 								class={`activity-dot h-2 w-2 rounded-full ${activitySportCategoryClass(activity.sport_category)}`}
-								title={activity.name || activity.sport}
-								aria-label={activity.name || activity.sport}
+								title={activity.name || sportDisplay(activity.sport)}
+								aria-label={activity.name || sportDisplay(activity.sport)}
 							></a>
 						{/each}
 					</div>
@@ -202,7 +202,7 @@
 									{getSportCategoryIcon(activity.sport_category)}
 								</span>
 								<span class="flex-1 truncate">
-									{activity.name || activity.sport}
+									{activity.name || sportDisplay(activity.sport)}
 								</span>
 								<span class="text-xs opacity-60">
 									{formatDuration(activity.duration)}
@@ -244,7 +244,7 @@
 								</span>
 								<div class="flex-1">
 									<div class="font-medium">
-										{activity.name || activity.sport}
+										{activity.name || sportDisplay(activity.sport)}
 									</div>
 									<div class="text-xs opacity-60">
 										{dayjs(activity.start_time).format('HH:mm')} • {formatDuration(

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Sport, type SportCategory } from '$lib/sport';
+	import { sportCategoryDisplay, sportDisplay, type Sport, type SportCategory } from '$lib/sport';
 
 	let {
 		category,
@@ -21,7 +21,11 @@
 <div class="sport-category">
 	<div class="sport-category-title">
 		<span>
-			{category} sports
+			{#if ['WaterSports', 'TeamSports'].includes(category)}
+				{sportCategoryDisplay(category)}
+			{:else}
+				{sportCategoryDisplay(category)} sports
+			{/if}
 		</span>
 		<input
 			type="checkbox"
@@ -35,7 +39,7 @@
 			<input
 				type="checkbox"
 				class="btn btn-sm"
-				aria-label={sport}
+				aria-label={sportDisplay(sport)}
 				checked={sportIsSelected(sport) || categoryIsSelected(category)}
 				onclick={() => toggleSport(sport, category)}
 			/>

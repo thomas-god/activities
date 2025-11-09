@@ -2,7 +2,14 @@
  * Workout Type utility functions and constants
  */
 
-export const WORKOUT_TYPE_VALUES = ['easy', 'tempo', 'intervals', 'long_run', 'race', "cross_training"] as const;
+export const WORKOUT_TYPE_VALUES = [
+	'easy',
+	'tempo',
+	'intervals',
+	'long_run',
+	'race',
+	'cross_training'
+] as const;
 export type WorkoutType = (typeof WORKOUT_TYPE_VALUES)[number];
 
 /**
@@ -14,7 +21,7 @@ export const WORKOUT_TYPE_LABELS: { value: WorkoutType; label: string }[] = [
 	{ value: 'intervals', label: 'Intervals' },
 	{ value: 'long_run', label: 'Long Run' },
 	{ value: 'race', label: 'Race' },
-	{value: "cross_training", label: "Cross training"}
+	{ value: 'cross_training', label: 'Cross training' }
 ];
 
 /**
@@ -45,8 +52,8 @@ export const getWorkoutTypeColor = (value: WorkoutType): string => {
 			return 'workout-long-run';
 		case 'race':
 			return 'workout-race';
-		case "cross_training":
-			return "workout-cross-training"
+		case 'cross_training':
+			return 'workout-cross-training';
 	}
 };
 
@@ -62,7 +69,7 @@ export const getWorkoutTypeClass = (value: WorkoutType): string => {
 			return 'workout-long-run';
 		case 'race':
 			return 'workout-race';
-		case "cross_training":
-			return "workout-cross-training"
+		case 'cross_training':
+			return 'workout-cross-training';
 	}
 };

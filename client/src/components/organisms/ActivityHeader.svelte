@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { formatDuration, localiseDateTime } from '$lib/duration';
-	import EditableString from '$components/molecules/EditableString.svelte';
-	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
+	import EditableActivityName from '$components/molecules/EditableActivityName.svelte';
+	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 	import type { ActivityDetails } from '$lib/api/activities';
 
 	interface Props {
@@ -13,7 +13,7 @@
 	let { activity, onEditNameCallback, onDeleteClickedCallback }: Props = $props();
 
 	let title = $derived(
-		activity.name === null || activity.name === '' ? activity.sport : activity.name
+		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
 	);
 	let duration = $derived(formatDuration(activity.duration));
 
@@ -36,7 +36,7 @@
 	</div>
 	<div class="flex flex-1 flex-col">
 		<div class="mb-1 text-lg font-semibold">
-			<EditableString content={title} editCallback={onEditNameCallback} />
+			<EditableActivityName name={title} editCallback={onEditNameCallback} />
 		</div>
 		<div class="text-xs font-light">
 			{localiseDateTime(activity.start_time)}

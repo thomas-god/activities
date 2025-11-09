@@ -2,7 +2,12 @@
 	import type { ActivityList } from '$lib/api';
 	import { RPE_VALUES, getRpeColor } from '$lib/rpe';
 	import { WORKOUT_TYPE_LABELS, getWorkoutTypeColor, type WorkoutType } from '$lib/workout-type';
-	import { getSportCategory, sportCategoryIcons, type SportCategory } from '$lib/sport';
+	import {
+		getSportCategory,
+		sportCategoryDisplay,
+		sportCategoryIcons,
+		type SportCategory
+	} from '$lib/sport';
 	import { untrack } from 'svelte';
 
 	let {
@@ -163,7 +168,7 @@
 								onclick={() => toggleSportCategory(category)}
 							>
 								<span class="text-lg">{sportCategoryIcons[category]}</span>
-								<span>{category}</span>
+								<span>{sportCategoryDisplay(category)}</span>
 							</button>
 						{/each}
 					</div>

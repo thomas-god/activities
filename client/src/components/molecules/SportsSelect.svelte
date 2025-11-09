@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		SportCategories,
+		sportDisplay,
 		sportsPerCategory,
 		sportsWithoutCategory,
 		type Sport,
@@ -91,7 +92,7 @@
 				<input
 					type="checkbox"
 					class="btn btn-sm"
-					aria-label={sport}
+					aria-label={sportDisplay(sport)}
 					checked={sportIsSelected(sport)}
 					onclick={() => toggleSportWithoutCategory(sport)}
 				/>

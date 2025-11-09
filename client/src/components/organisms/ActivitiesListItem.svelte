@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
-	import { getSportCategoryIcon, type SportCategory } from '$lib/sport';
+	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 	import type { ActivityListItem } from '$lib/api';
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
@@ -14,7 +14,7 @@
 	} = $props();
 
 	let title = $derived(
-		activity.name === null || activity.name === '' ? activity.sport : activity.name
+		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
 	);
 
 	const categoryClass = (category: SportCategory | null): string => {
