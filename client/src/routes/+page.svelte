@@ -4,14 +4,8 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
+	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { dayjs } from '$lib/duration';
-	import {
-		getSportCategory,
-		SportCategories,
-		sportCategoryIcons,
-		type Sport,
-		type SportCategory
-	} from '$lib/sport';
 
 	let { data }: PageProps = $props();
 
@@ -30,25 +24,6 @@
 			return dayjs(period.end).isAfter(today) || dayjs(period.end).isSame(today);
 		});
 	});
-
-	let sportIcons = (sports: { sports: Sport[]; categories: SportCategory[] }): string[] => {
-		const icons: Set<string> = new Set();
-
-		for (const category of sports.categories) {
-			if (SportCategories.includes(category)) {
-				icons.add(sportCategoryIcons[category]);
-			}
-		}
-
-		for (const sport of sports.sports) {
-			const category = getSportCategory(sport);
-			if (category !== null) {
-				icons.add(sportCategoryIcons[category]);
-			}
-		}
-
-		return Array.from(icons);
-	};
 
 	let topMetric = $derived.by(() => {
 		// Find favorite metric ID from preferences
@@ -125,28 +100,7 @@
 			<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
 			<div class="flex flex-col gap-2">
 				{#each ongoingPeriods as period}
-					{@const icons = sportIcons(period.sports)}
-					<a
-						href={`/training/period/${period.id}`}
-						class="flex items-center gap-3 rounded-lg p-3 hover:bg-base-200"
-					>
-						<div class="text-2xl leading-none">🗓️</div>
-						<div class="min-w-0 flex-1">
-							<div class="font-semibold">{period.name}</div>
-							<div class="text-sm opacity-70">
-								{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
-									? 'Ongoing'
-									: dayjs(period.end).format('MMM D, YYYY')}
-							</div>
-						</div>
-						<div class="flex flex-wrap items-center gap-2">
-							{#each icons as icon}
-								<div class="text-lg">{icon}</div>
-							{:else}
-								<div class="text-sm italic opacity-70">All sports</div>
-							{/each}
-						</div>
-					</a>
+					<TrainingPeriodCard {period} />
 				{/each}
 			</div>
 		</div>
