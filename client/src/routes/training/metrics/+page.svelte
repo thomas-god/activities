@@ -137,6 +137,7 @@
 				granularity={metric.granularity}
 				format={metric.unit === 's' ? 'duration' : 'number'}
 				showGroup={metric.showGroup}
+				groupBy={metric.groupBy}
 			/>
 		</div>
 	{/each}

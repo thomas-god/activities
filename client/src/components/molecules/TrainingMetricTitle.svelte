@@ -1,12 +1,17 @@
 <script lang="ts">
-	import { aggregateFunctionDisplay, type MetricAggregateFunction } from '$lib/metric';
+	import {
+		aggregateFunctionDisplay,
+		groupByClauseDisplay,
+		type GroupByClause,
+		type MetricAggregateFunction
+	} from '$lib/metric';
 
 	interface TrainingMetricTitleProps {
 		granularity: string;
 		aggregate: MetricAggregateFunction;
 		metric: string;
 		sports?: string[];
-		groupBy?: string | null;
+		groupBy: GroupByClause | null;
 	}
 
 	let { granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps = $props();
@@ -25,7 +30,7 @@
 
 		// Add group by if present
 		if (groupBy) {
-			parts.push(`grouped by ${groupBy}`);
+			parts.push(`grouped by ${groupByClauseDisplay(groupBy)}`);
 		}
 
 		return parts.join(' · ');

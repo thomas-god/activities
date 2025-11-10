@@ -88,6 +88,7 @@
 			granularity={topMetric.granularity}
 			format={topMetric.unit === 's' ? 'duration' : 'number'}
 			showGroup={topMetric.showGroup}
+			groupBy={topMetric.groupBy}
 		/>
 	</div>
 {/if}

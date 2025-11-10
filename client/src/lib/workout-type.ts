@@ -12,6 +12,23 @@ export const WORKOUT_TYPE_VALUES = [
 ] as const;
 export type WorkoutType = (typeof WORKOUT_TYPE_VALUES)[number];
 
+export const workoutTypeDisplay = (type: WorkoutType): string => {
+	switch (type) {
+		case 'easy':
+			return 'Easy';
+		case 'tempo':
+			return 'Tempo';
+		case 'intervals':
+			return 'Intervals';
+		case 'long_run':
+			return 'Long Run';
+		case 'race':
+			return 'Race';
+		case 'cross_training':
+			return 'Cross Training';
+	}
+};
+
 /**
  * All workout types with their display labels
  */

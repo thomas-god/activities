@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
-import { metricAggregateFunctions } from '$lib/metric';
+import { groupByClauses, metricAggregateFunctions } from '$lib/metric';
 import { dayjs } from '$lib/duration';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 
@@ -63,7 +63,7 @@ const MetricsListItemSchemaGrouped = z.object({
 	aggregate: z.enum(metricAggregateFunctions),
 	sports: z.array(z.string()).optional(),
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
-	group_by: z.string().nullable()
+	group_by: z.enum(groupByClauses).nullable()
 });
 
 const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
+	import { displayGroupName, type GroupByClause } from '$lib/metric';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
 
@@ -11,6 +12,7 @@
 		granularity: string;
 		format: 'number' | 'duration';
 		showGroup?: boolean;
+		groupBy: GroupByClause | null;
 	}
 
 	let {
@@ -20,6 +22,7 @@
 		unit,
 		granularity,
 		format,
+		groupBy,
 		showGroup = true
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
@@ -111,12 +114,12 @@
 	let series = $derived(
 		d3
 			.stack()
-			.keys(d3.union(values.map((v) => v.group)))
+			.keys(d3.union(values.map((v) => displayGroupName(v.group, groupBy))))
 			.value(([_time, groupMap]: any, groupKey) => groupMap.get(groupKey).value)(
 			d3.index(
 				values as any,
 				(value: any) => value.time,
-				(value: any) => value.group
+				(value: any) => displayGroupName(value.group, groupBy)
 			) as any
 		)
 	);
@@ -145,7 +148,9 @@
 	const color = $derived(d3.scaleOrdinal(d3.schemeObservable10));
 
 	// Extract unique group names for the legend
-	let groups = $derived(Array.from(d3.union(values.map((v) => v.group))).sort());
+	let groups = $derived(
+		Array.from(d3.union(values.map((v) => displayGroupName(v.group, groupBy)))).sort()
+	);
 
 	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 
