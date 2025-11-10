@@ -22,8 +22,8 @@
 
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
-		for (let i = 0; i < data.metrics.metrics.length; i++) {
-			let metric = data.metrics.metrics.at(i);
+		for (let i = 0; i < data.metrics.length; i++) {
+			let metric = data.metrics.at(i);
 			if (metric === undefined) {
 				continue;
 			}

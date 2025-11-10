@@ -66,19 +66,7 @@ const MetricsListItemSchemaGrouped = z.object({
 	group_by: z.string().nullable()
 });
 
-// Legacy schema for backward compatibility (flat values)
-const MetricsListItemSchema = z.object({
-	id: z.string(),
-	metric: z.string(),
-	unit: z.string(),
-	granularity: z.string(),
-	aggregate: z.enum(metricAggregateFunctions),
-	sports: z.array(z.string()).optional(),
-	values: z.record(z.string(), z.number())
-});
-
 const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);
-const MetricsListSchema = z.array(MetricsListItemSchema);
 
 const TrainingNoteSchema = z.object({
 	id: z.string(),
@@ -98,35 +86,9 @@ export type TrainingPeriodList = z.infer<typeof TrainingPeriodListSchema>;
 export type TrainingPeriodActivityItem = z.infer<typeof TrainingPeriodActivityItemSchema>;
 export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
 export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped>;
-export type MetricsListItem = z.infer<typeof MetricsListItemSchema>;
-export type MetricsList = z.infer<typeof MetricsListSchema>;
 export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/**
- * Extract "no_group" values from the new grouped API response and convert to flat structure
- * This maintains backward compatibility with existing chart components
- * @param groupedMetric - Metric with grouped values from the API
- * @returns Metric with flat values (only "no_group" data)
- */
-export function extractNoGroupValues(groupedMetric: MetricsListItemGrouped): MetricsListItem {
-	const noGroupValues = groupedMetric.values['no_group'] ?? {};
-
-	return {
-		id: groupedMetric.id,
-		metric: groupedMetric.metric,
-		unit: groupedMetric.unit,
-		granularity: groupedMetric.granularity,
-		aggregate: groupedMetric.aggregate,
-		sports: groupedMetric.sports,
-		values: noGroupValues
-	};
-}
 
 // =============================================================================
 // API Functions
@@ -197,7 +159,7 @@ export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	start: Date | string,
 	end?: Date | string
-): Promise<{ noGroup: MetricsList; metrics: MetricsListGrouped }> {
+): Promise<MetricsListGrouped> {
 	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
 
 	let url = `${PUBLIC_APP_URL}/api/training/metrics?start=${encodeURIComponent(startDate)}`;
@@ -215,18 +177,17 @@ export async function fetchTrainingMetrics(
 
 	if (res.status === 401) {
 		goto('/login');
-		return { noGroup: [], metrics: [] };
+		return [];
 	}
 
 	if (res.status === 200) {
 		// Parse the new grouped response from the API
 		const groupedMetrics = MetricsListSchemaGrouped.parse(await res.json());
 
-		// Extract "no_group" values and convert to flat structure for backward compatibility
-		return { noGroup: groupedMetrics.map(extractNoGroupValues), metrics: groupedMetrics };
+		return groupedMetrics;
 	}
 
-	return { noGroup: [], metrics: [] };
+	return [];
 }
 
 /**

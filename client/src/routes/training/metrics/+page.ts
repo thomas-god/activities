@@ -8,7 +8,7 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	const endDate = url.searchParams.get('end');
 
 	if (startDate === null) {
-		return { metrics: { noGroup: [], metrics: [] }, preferences: [] };
+		return { metrics: [], preferences: [] };
 	}
 
 	const [metrics, preferences] = await Promise.all([

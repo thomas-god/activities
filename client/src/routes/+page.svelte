@@ -31,12 +31,10 @@
 		const favoriteMetricId = favoriteMetricPref?.value;
 
 		// Try to find the favorite metric, otherwise use the first one
-		let metric = favoriteMetricId
-			? data.metrics.metrics.find((m) => m.id === favoriteMetricId)
-			: undefined;
+		let metric = favoriteMetricId ? data.metrics.find((m) => m.id === favoriteMetricId) : undefined;
 
 		if (metric === undefined) {
-			metric = data.metrics.metrics.at(0);
+			metric = data.metrics.at(0);
 		}
 
 		if (metric === undefined) {
