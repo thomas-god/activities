@@ -7,3 +7,4 @@ resulting trade-offs.
 
 - [User authentication](20250918-authentication.md)
 - [Activity storage](20250924-activities-storage.md)
+- [Training metrics values computation and storage strategy](20251110-training-metrics-computation.md)
