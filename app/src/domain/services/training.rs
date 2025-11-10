@@ -20,9 +20,10 @@ use crate::domain::{
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
         DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
         GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
-        RemoveActivityFromMetricsRequest, TrainingRepository, UpdateMetricsValuesRequest,
-        UpdateTrainingNoteError, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
-        UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+        RemoveActivityFromMetricsRequest, TrainingRepository, UpdateMetricsForActivityRequest,
+        UpdateMetricsValuesRequest, UpdateTrainingNoteError, UpdateTrainingPeriodNameError,
+        UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
+        UpdateTrainingPeriodNoteRequest,
     },
 };
 
@@ -268,6 +269,35 @@ where
         }
 
         Ok(())
+    }
+
+    async fn update_metrics_for_activity(
+        &self,
+        req: UpdateMetricsForActivityRequest,
+    ) -> Result<(), ()> {
+        // Get the updated activity with timeseries
+        let activity_with_timeseries = self
+            .activity_repository
+            .lock()
+            .await
+            .get_activity_with_timeseries(req.activity_id())
+            .await
+            .map_err(|_| ())?
+            .ok_or(())?;
+
+        // First, remove the activity from all metrics to ensure it's not in old groups
+        // This is necessary because the activity's groupBy properties (rpe, workout_type, etc.) may have changed
+        let remove_req = RemoveActivityFromMetricsRequest::new(
+            req.user().clone(),
+            activity_with_timeseries.activity().clone(),
+        );
+        self.remove_activity_from_metrics(remove_req).await?;
+
+        // Then add the activity back with its new values
+        let update_metrics_req =
+            UpdateMetricsValuesRequest::new(req.user().clone(), vec![activity_with_timeseries]);
+
+        self.update_metrics_values(update_metrics_req).await
     }
 
     async fn get_training_metrics_values(
@@ -764,6 +794,11 @@ pub mod test_utils {
                 req: RemoveActivityFromMetricsRequest,
             ) -> Result<(), ()>;
 
+            async fn update_metrics_for_activity(
+                &self,
+                req: UpdateMetricsForActivityRequest,
+            ) -> Result<(), ()>;
+
             async fn get_training_metrics_values(
                 &self,
                 user: &UserId,
@@ -865,6 +900,8 @@ pub mod test_utils {
             mock.expect_create_metric()
                 .returning(|_| Ok(TrainingMetricId::default()));
             mock.expect_update_metrics_values().returning(|_| Ok(()));
+            mock.expect_update_metrics_for_activity()
+                .returning(|_| Ok(()));
             mock.expect_get_training_metrics_values()
                 .returning(|_, _| vec![]);
             mock.expect_delete_metric().returning(|_| Ok(()));
@@ -1000,9 +1037,9 @@ mod tests_training_metrics_service {
     use crate::domain::{
         models::{
             activity::{
-                Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                ActivityTimeseries, ActivityWithTimeseries, Sport, TimeseriesActiveTime,
-                TimeseriesTime,
+                Activity, ActivityId, ActivityRpe, ActivityStartTime, ActivityStatistic,
+                ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
+                TimeseriesActiveTime, TimeseriesTime,
             },
             training::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
@@ -2451,6 +2488,129 @@ mod tests_training_metrics_service {
 
         let result = service.remove_activity_from_metrics(req).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_metrics_for_activity_removes_from_old_group_rpe() {
+        // Test that when an activity's RPE changes, it's removed from the old group and added to the new one
+        let user_id = UserId::test_default();
+        let metric_id = TrainingMetricId::from("test_rpe");
+        let activity_id = ActivityId::new();
+
+        // Create an activity with RPE=8 (new value)
+        let mut stats_map = HashMap::new();
+        stats_map.insert(ActivityStatistic::Calories, 1000.0);
+        stats_map.insert(ActivityStatistic::Distance, 42195.0);
+
+        let activity = Activity::new(
+            activity_id.clone(),
+            user_id.clone(),
+            None,
+            ActivityStartTime::from_timestamp(1200).unwrap(),
+            Sport::Running,
+            ActivityStatistics::new(stats_map),
+            Some(ActivityRpe::Eight), // RPE = 8 (new value)
+            None,
+            None,
+            None,
+        );
+
+        let activity_with_ts = ActivityWithTimeseries::new(activity, ActivityTimeseries::default());
+
+        // Create a metric grouped by RPE range
+        let metric = TrainingMetric::new(
+            metric_id.clone(),
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                Some(TrainingMetricGroupBy::RpeRange),
+            ),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+
+        // Expect get_metrics to be called twice (once for remove, once for update)
+        let metric_clone = metric.clone();
+        repository
+            .expect_get_metrics()
+            .returning(move |_| Ok(vec![metric_clone.clone()]));
+
+        // Expect delete_metric_values_for_bin to be called to remove from old RPE group
+        repository
+            .expect_delete_metric_values_for_bin()
+            .withf(|id, granule| {
+                *id == TrainingMetricId::from("test_rpe") && granule == "1970-01-01"
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        // Expect get_metric_value for the update phase
+        repository
+            .expect_get_metric_value()
+            .returning(|_, _| Ok(None));
+
+        // Expect update_metric_value to be called for new RPE=8 group (which is "hard" range)
+        let metric_id_clone = metric_id.clone();
+        repository
+            .expect_update_metric_value()
+            .withf(move |m, (b, v)| {
+                m == &metric_id_clone
+                    && b.granule() == "1970-01-01"
+                    && b.group() == &Some("hard".to_string())
+                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 1000.0).abs() < 0.01)
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_repository = MockActivityRepository::default();
+
+        // Mock get_activity_with_timeseries to return the activity with updated RPE
+        let activity_with_ts_clone = activity_with_ts.clone();
+        activity_repository
+            .expect_get_activity_with_timeseries()
+            .returning(move |_| Ok(Some(activity_with_ts_clone.clone())));
+
+        // Mock list_activities for recomputation - return empty (activity was removed from old bin)
+        activity_repository
+            .expect_list_activities()
+            .returning(|_, _| Ok(vec![]));
+
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateMetricsForActivityRequest::new(user_id, activity_id);
+
+        // Act
+        let result = service.update_metrics_for_activity(req).await;
+
+        // Assert
+        assert!(result.is_ok(), "update_metrics_for_activity should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_update_metrics_for_activity_activity_not_found() {
+        // Test that when activity doesn't exist, we return an error
+        let user_id = UserId::test_default();
+        let activity_id = ActivityId::new();
+
+        let mut activity_repository = MockActivityRepository::default();
+
+        // Mock get_activity_with_timeseries to return None
+        activity_repository
+            .expect_get_activity_with_timeseries()
+            .returning(move |_| Ok(None));
+
+        let repository = MockTrainingRepository::new();
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateMetricsForActivityRequest::new(user_id, activity_id);
+
+        let result = service.update_metrics_for_activity(req).await;
+        assert!(result.is_err());
     }
 }
 

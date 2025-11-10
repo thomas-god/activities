@@ -16,7 +16,7 @@ use crate::{
             ModifyActivityRequest, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
             UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
             UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
-            UpdateActivityWorkoutTypeRequest,
+            UpdateActivityWorkoutTypeRequest, UpdateMetricsForActivityRequest,
         },
     },
     inbound::{
@@ -71,6 +71,21 @@ impl From<UpdateActivityFeedbackError> for StatusCode {
             _ => Self::UNPROCESSABLE_ENTITY,
         }
     }
+}
+
+/// Helper function to update training metrics after an activity modification
+async fn update_training_metrics<AS: IActivityService, PF: ParseFile, TMS: ITrainingService>(
+    state: &AppState<AS, PF, TMS, impl IUserService, impl IPreferencesService>,
+    user_id: &crate::domain::models::UserId,
+    activity_id: &ActivityId,
+) -> Result<(), StatusCode> {
+    let req = UpdateMetricsForActivityRequest::new(user_id.clone(), activity_id.clone());
+
+    state
+        .training_metrics_service
+        .update_metrics_for_activity(req)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[derive(Debug, Deserialize)]
@@ -167,6 +182,9 @@ pub async fn patch_activity<
             .update_activity_rpe(req)
             .await
             .map_err(StatusCode::from)?;
+
+        // Update training metrics as RPE affects groupBy
+        update_training_metrics(&state, user.user(), &ActivityId::from(&activity_id)).await?;
     }
 
     // Update activity workout type if provided
@@ -192,6 +210,9 @@ pub async fn patch_activity<
             .update_activity_workout_type(req)
             .await
             .map_err(StatusCode::from)?;
+
+        // Update training metrics as workout type affects groupBy
+        update_training_metrics(&state, user.user(), &ActivityId::from(&activity_id)).await?;
     }
 
     // Update activity nutrition if bonk_status is provided
@@ -220,6 +241,9 @@ pub async fn patch_activity<
             .update_activity_nutrition(req)
             .await
             .map_err(StatusCode::from)?;
+
+        // Update training metrics as bonk status affects groupBy
+        update_training_metrics(&state, user.user(), &ActivityId::from(&activity_id)).await?;
     }
 
     // Update activity feedback if provided in request body
@@ -415,6 +439,26 @@ mod tests {
             activity_service: Arc::new(activity_service),
             file_parser: Arc::new(MockFileParser::test_default()),
             training_metrics_service: Arc::new(MockTrainingService::test_default()),
+            user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+            cookie_config: Arc::new(CookieConfig::default()),
+        }
+    }
+
+    fn create_test_state_with_training_service(
+        activity_service: MockActivityService,
+        training_service: MockTrainingService,
+    ) -> AppState<
+        MockActivityService,
+        MockFileParser,
+        MockTrainingService,
+        MockUserService,
+        MockPreferencesService,
+    > {
+        AppState {
+            activity_service: Arc::new(activity_service),
+            file_parser: Arc::new(MockFileParser::test_default()),
+            training_metrics_service: Arc::new(training_service),
             user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
@@ -674,6 +718,7 @@ mod tests {
             .expect_update_activity_rpe()
             .times(1)
             .returning(|_| Ok(()));
+
         activity_service
             .expect_update_activity_feedback()
             .with(function(move |req: &UpdateActivityFeedbackRequest| {
@@ -698,6 +743,253 @@ mod tests {
         let body = Some(Json(PatchActivityBody {
             feedback: Some("Hard session".to_string()),
         }));
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_rpe_updates_training_metrics() {
+        // Test that updating RPE triggers training metrics update
+        let activity_id = "test_activity_id".to_string();
+        let activity_id_clone = activity_id.clone();
+        let user_id = UserId::from("test_user");
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_update_activity_rpe()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_update_metrics_for_activity()
+            .with(function(move |req: &UpdateMetricsForActivityRequest| {
+                req.user() == &user_id && req.activity_id() == &ActivityId::from(&activity_id_clone)
+            }))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: None,
+            rpe: Some(8),
+            workout_type: None,
+            bonk_status: None,
+            nutrition_details: None,
+        });
+        let body = None;
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_workout_type_updates_training_metrics() {
+        // Test that updating workout type triggers training metrics update
+        let activity_id = "test_activity_id".to_string();
+        let activity_id_clone = activity_id.clone();
+        let user_id = UserId::from("test_user");
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_update_activity_workout_type()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_update_metrics_for_activity()
+            .with(function(move |req: &UpdateMetricsForActivityRequest| {
+                req.user() == &user_id && req.activity_id() == &ActivityId::from(&activity_id_clone)
+            }))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: None,
+            rpe: None,
+            workout_type: Some("intervals".to_string()),
+            bonk_status: None,
+            nutrition_details: None,
+        });
+        let body = None;
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_bonk_status_updates_training_metrics() {
+        // Test that updating bonk status triggers training metrics update
+        let activity_id = "test_activity_id".to_string();
+        let activity_id_clone = activity_id.clone();
+        let user_id = UserId::from("test_user");
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_update_activity_nutrition()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_update_metrics_for_activity()
+            .with(function(move |req: &UpdateMetricsForActivityRequest| {
+                req.user() == &user_id && req.activity_id() == &ActivityId::from(&activity_id_clone)
+            }))
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: None,
+            rpe: None,
+            workout_type: None,
+            bonk_status: Some("bonked".to_string()),
+            nutrition_details: Some("Forgot to eat".to_string()),
+        });
+        let body = None;
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_name_does_not_update_training_metrics() {
+        // Test that updating activity name does NOT trigger training metrics update
+        let activity_id = "test_activity_id".to_string();
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_modify_activity()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        // Should NOT call update_metrics_for_activity
+        training_service
+            .expect_update_metrics_for_activity()
+            .times(0);
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: Some("Morning Run".to_string()),
+            rpe: None,
+            workout_type: None,
+            bonk_status: None,
+            nutrition_details: None,
+        });
+        let body = None;
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_feedback_does_not_update_training_metrics() {
+        // Test that updating activity feedback does NOT trigger training metrics update
+        let activity_id = "test_activity_id".to_string();
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_update_activity_feedback()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        // Should NOT call update_metrics_for_activity
+        training_service
+            .expect_update_metrics_for_activity()
+            .times(0);
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: None,
+            rpe: None,
+            workout_type: None,
+            bonk_status: None,
+            nutrition_details: None,
+        });
+        let body = Some(Json(PatchActivityBody {
+            feedback: Some("Great session!".to_string()),
+        }));
+
+        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_multiple_updates_calls_metrics_multiple_times() {
+        // Test that updating multiple groupBy properties calls update_metrics_for_activity multiple times
+        let activity_id = "test_activity_id".to_string();
+        let activity_id_clone = activity_id.clone();
+        let user_id = UserId::from("test_user");
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_update_activity_rpe()
+            .times(1)
+            .returning(|_| Ok(()));
+        activity_service
+            .expect_update_activity_workout_type()
+            .times(1)
+            .returning(|_| Ok(()));
+        activity_service
+            .expect_update_activity_nutrition()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut training_service = MockTrainingService::new();
+        // Should call update_metrics_for_activity 3 times (once for RPE, once for workout_type, once for bonk_status)
+        training_service
+            .expect_update_metrics_for_activity()
+            .with(function(move |req: &UpdateMetricsForActivityRequest| {
+                req.user() == &user_id && req.activity_id() == &ActivityId::from(&activity_id_clone)
+            }))
+            .times(3)
+            .returning(|_| Ok(()));
+
+        let state = create_test_state_with_training_service(activity_service, training_service);
+
+        let user = AuthenticatedUser::new(UserId::from("test_user"));
+        let path = Path(activity_id);
+        let query = Query(PatchActivityQuery {
+            name: None,
+            rpe: Some(8),
+            workout_type: Some("intervals".to_string()),
+            bonk_status: Some("bonked".to_string()),
+            nutrition_details: None,
+        });
+        let body = None;
 
         let result = patch_activity(Extension(user), State(state), path, query, body).await;
 
