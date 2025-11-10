@@ -212,7 +212,7 @@ fn core_routes<
         )
         .route(
             "/training/metric/values",
-            get(compute_training_metric_values::<AS, PF, TS, US, PS>),
+            post(compute_training_metric_values::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/period",

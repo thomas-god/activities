@@ -1,11 +1,6 @@
 use std::collections::HashMap;
 
-use axum::{
-    Extension, Json,
-    extract::{Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
 
@@ -30,8 +25,9 @@ use crate::{
     },
 };
 
+/// Request body for computing training metric values
 #[derive(Debug, Deserialize)]
-pub struct ComputeMetricValuesQuery {
+pub struct ComputeMetricValuesRequest {
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
@@ -43,8 +39,8 @@ pub struct ComputeMetricValuesQuery {
     end: Option<DateTime<FixedOffset>>,
 }
 
-impl From<&ComputeMetricValuesQuery> for DateRange {
-    fn from(value: &ComputeMetricValuesQuery) -> Self {
+impl From<&ComputeMetricValuesRequest> for DateRange {
+    fn from(value: &ComputeMetricValuesRequest) -> Self {
         let start_date = value.start.date_naive();
         let end_date = value
             .end
@@ -82,23 +78,23 @@ pub async fn compute_training_metric_values<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
-    Query(query): Query<ComputeMetricValuesQuery>,
+    Json(request): Json<ComputeMetricValuesRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let date_range = DateRange::from(&query);
+    let date_range = DateRange::from(&request);
 
-    // Build the training metric definition from the query parameters
-    let filters = query
+    // Build the training metric definition from the request
+    let filters = request
         .filters
         .map(TrainingMetricFilters::from)
         .unwrap_or_else(TrainingMetricFilters::empty);
 
-    let group_by = query.group_by.map(|gb| gb.into());
+    let group_by = request.group_by.map(|gb| gb.into());
 
     let definition = TrainingMetricDefinition::new(
         user.user().clone(),
-        query.source.into(),
-        query.granularity.into(),
-        query.aggregate.into(),
+        request.source.into(),
+        request.granularity.into(),
+        request.aggregate.into(),
         filters,
         group_by,
     );
@@ -125,4 +121,55 @@ pub async fn compute_training_metric_values<
     Ok(Json(ResponseBody {
         values: response_values,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_request_deserialize_minimal() {
+        // Test with only required fields
+        // Demonstrates basic JSON format for the request
+        let json = r#"{
+            "source": {"Statistic": "Calories"},
+            "granularity": "Daily",
+            "aggregate": "Sum",
+            "start": "2024-01-01T00:00:00+00:00"
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+        assert!(request.filters.is_none());
+        assert!(request.group_by.is_none());
+        assert!(request.end.is_none());
+    }
+
+    #[test]
+    fn test_request_deserialize_all_fields() {
+        // Test with all fields provided
+        // Demonstrates complete JSON format including:
+        // - Statistic source (alternative: {"Timeseries": ["Speed", "Average"]})
+        // - Optional end date
+        // - Optional group_by (values: Sport, SportCategory, WorkoutType, RpeRange, Bonked)
+        // - Optional filters with sports (Sport or SportCategory)
+        let json = r#"{
+            "source": {"Statistic": "Calories"},
+            "granularity": "Daily",
+            "aggregate": "Sum",
+            "start": "2024-01-01T00:00:00+00:00",
+            "end": "2024-12-31T23:59:59+00:00",
+            "group_by": "Sport",
+            "filters": {"sports": [{"Sport": "Running"}]}
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+        assert!(request.filters.is_some());
+        assert!(request.group_by.is_some());
+        assert!(request.end.is_some());
+    }
 }
