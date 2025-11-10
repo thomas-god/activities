@@ -1501,8 +1501,6 @@ mod test_training_metrics {
 
         let metrics = metric_definition.compute_values(&activities);
 
-        dbg!(&metrics);
-
         assert!(
             metrics
                 .get(&TrainingMetricBin::new(

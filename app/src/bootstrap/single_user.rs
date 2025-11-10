@@ -25,10 +25,6 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         ActivityService<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             FilesystemRawDataRepository,
-            TrainingService<
-                SqliteTrainingRepository,
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
-            >,
         >,
         Parser,
         TrainingService<
@@ -86,11 +82,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         training_metrics_repository,
         activity_repository.clone(),
     ));
-    let activity_service = ActivityService::new(
-        activity_repository.clone(),
-        raw_data_repository,
-        training_metrics_service.clone(),
-    );
+    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
     let user_service = DisabledUserService {};
     let preferences_service = build_preferences_service().await?;
 

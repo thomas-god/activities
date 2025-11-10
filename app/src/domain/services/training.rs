@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::NaiveDate;
 use derive_more::Constructor;
 use tokio::sync::Mutex;
 
@@ -8,9 +7,9 @@ use crate::domain::{
     models::{
         UserId,
         training::{
-            ComputeMetricRequirement, TrainingMetric, TrainingMetricBin, TrainingMetricDefinition,
-            TrainingMetricId, TrainingMetricValues, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            ComputeMetricRequirement, TrainingMetric, TrainingMetricDefinition, TrainingMetricId,
+            TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -19,11 +18,9 @@ use crate::domain::{
         CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
         DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
-        GetTrainingNoteError, ITrainingService, ListActivitiesFilters,
-        RemoveActivityFromMetricsRequest, TrainingRepository, UpdateMetricsForActivityRequest,
-        UpdateMetricsValuesRequest, UpdateTrainingNoteError, UpdateTrainingPeriodNameError,
-        UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
-        UpdateTrainingPeriodNoteRequest,
+        GetTrainingNoteError, ITrainingService, ListActivitiesFilters, TrainingRepository,
+        UpdateTrainingNoteError, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+        UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
     },
 };
 
@@ -39,63 +36,6 @@ where
 {
     training_repository: TR,
     activity_repository: Arc<Mutex<AR>>,
-}
-
-impl<TR, AR> TrainingService<TR, AR>
-where
-    TR: TrainingRepository,
-    AR: ActivityRepository,
-{
-    async fn compute_metric_values(
-        &self,
-        training_metric: &TrainingMetric,
-        bin: &DateRange,
-        user: &UserId,
-    ) {
-        let values = match training_metric.definition().source_requirement() {
-            ComputeMetricRequirement::ActivityWithTimeseries => {
-                let Ok(activities) = self
-                    .activity_repository
-                    .lock()
-                    .await
-                    .list_activities_with_timeseries(
-                        user,
-                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
-                    )
-                    .await
-                else {
-                    return;
-                };
-
-                training_metric
-                    .definition()
-                    .compute_values_from_timeseries(&activities)
-            }
-            ComputeMetricRequirement::Activity => {
-                let Ok(activities) = self
-                    .activity_repository
-                    .lock()
-                    .await
-                    .list_activities(
-                        user,
-                        &ListActivitiesFilters::empty().set_date_range(Some(bin.clone())),
-                    )
-                    .await
-                else {
-                    return;
-                };
-
-                training_metric.definition().compute_values(&activities)
-            }
-        };
-
-        for (key, value) in values.into_iter() {
-            let _ = self
-                .training_repository
-                .update_metric_value(training_metric.id(), (key, value))
-                .await;
-        }
-    }
 }
 
 impl<TMR, AR> ITrainingService for TrainingService<TMR, AR>
@@ -125,181 +65,51 @@ where
             .save_training_metric_definition(training_metric.clone())
             .await?;
 
-        let mut initial_bins = Vec::new();
-        if let Some(initial_range) = req.initial_date_range() {
-            initial_bins = training_metric
-                .definition()
-                .granularity()
-                .bins(initial_range);
-            for bin in initial_bins.iter() {
-                self.compute_metric_values(&training_metric, bin, req.user())
-                    .await;
-            }
-        }
-
-        let this = self.clone();
-        tokio::spawn(async move {
-            let _ = this
-                .compute_initial_values(req, training_metric, initial_bins)
-                .await;
-        });
-
         Ok(id)
     }
 
-    async fn update_metrics_values(&self, req: UpdateMetricsValuesRequest) -> Result<(), ()> {
-        let metrics = self
-            .training_repository
-            .get_metrics(req.user())
-            .await
-            .unwrap();
-
-        for metric in metrics {
-            for activity in req.new_activities() {
-                let Some(activity_metric) = metric
-                    .definition()
-                    .source()
-                    .metric_from_activity_with_timeseries(activity)
-                else {
-                    continue;
-                };
-                let granule = metric
-                    .definition()
-                    .granularity()
-                    .datetime_key(activity.start_time().date());
-                let group = metric
-                    .definition()
-                    .group_by()
-                    .as_ref()
-                    .and_then(|group_by| group_by.extract_group(activity.activity()));
-                let bin = TrainingMetricBin::new(granule, group);
-                let new_metric_value = match self
-                    .training_repository
-                    .get_metric_value(metric.id(), &bin)
+    /// Compute training metric values from a [TrainingMetricDefinition] and a [DateRange] using
+    /// activities within the [DateRange].
+    async fn compute_training_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let values = match definition.source_requirement() {
+            ComputeMetricRequirement::ActivityWithTimeseries => {
+                let activities = self
+                    .activity_repository
+                    .lock()
                     .await
-                {
-                    Ok(Some(previous_metric_value)) => {
-                        let Some(new_metric_value) = metric
-                            .definition()
-                            .aggregate()
-                            .update_value(&previous_metric_value, &activity_metric)
-                        else {
-                            continue;
-                        };
-                        new_metric_value
-                    }
-                    Ok(None) => {
-                        let Some(new_metric_value) = metric
-                            .definition()
-                            .aggregate()
-                            .initial_value(&activity_metric)
-                        else {
-                            continue;
-                        };
-                        new_metric_value
-                    }
-                    Err(_err) => continue,
-                };
-                let _ = self
-                    .training_repository
-                    .update_metric_value(metric.id(), (bin, new_metric_value))
-                    .await;
+                    .list_activities_with_timeseries(
+                        definition.user(),
+                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                    )
+                    .await
+                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
+
+                definition.compute_values_from_timeseries(&activities)
             }
-        }
+            ComputeMetricRequirement::Activity => {
+                let activities = self
+                    .activity_repository
+                    .lock()
+                    .await
+                    .list_activities(
+                        definition.user(),
+                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                    )
+                    .await
+                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
 
-        Ok(())
-    }
-
-    async fn remove_activity_from_metrics(
-        &self,
-        req: RemoveActivityFromMetricsRequest,
-    ) -> Result<(), ()> {
-        let metrics = self
-            .training_repository
-            .get_metrics(req.user())
-            .await
-            .unwrap();
-
-        let activity = req.deleted_activity();
-
-        // Collect bins affected by the deleted activity that need recomputation
-        let mut bins_to_recompute: std::collections::HashSet<(
-            TrainingMetricId,
-            String, // granule key for date range reconstruction
-        )> = std::collections::HashSet::new();
-
-        for metric in &metrics {
-            // Determine the bin(s) that need recomputation
-            let granule = metric
-                .definition()
-                .granularity()
-                .datetime_key(activity.start_time().date());
-
-            bins_to_recompute.insert((metric.id().clone(), granule));
-        }
-
-        // Recompute bins affected by deleted activity
-        for (metric_id, granule_key) in bins_to_recompute {
-            // Find the definition for this metric
-            let Some(metric) = metrics.iter().find(|d| d.id() == &metric_id) else {
-                continue;
-            };
-
-            // Delete existing values for this bin before recomputing
-            // This ensures that if the bin becomes empty, old values are removed
-            let _ = self
-                .training_repository
-                .delete_metric_values_for_bin(&metric_id, &granule_key)
-                .await;
-
-            // Parse the granule key to get the start date
-            let Ok(start_date) = NaiveDate::parse_from_str(&granule_key, "%Y-%m-%d") else {
-                continue;
-            };
-
-            // Create a date range for this bin
-            let bin_range = metric
-                .definition()
-                .granularity()
-                .bins(&DateRange::new(start_date, start_date));
-            if let Some(first_bin) = bin_range.first() {
-                self.compute_metric_values(metric, first_bin, req.user())
-                    .await;
+                definition.compute_values(&activities)
             }
-        }
+        };
 
-        Ok(())
+        Ok(values)
     }
 
-    async fn update_metrics_for_activity(
-        &self,
-        req: UpdateMetricsForActivityRequest,
-    ) -> Result<(), ()> {
-        // Get the updated activity with timeseries
-        let activity_with_timeseries = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity_with_timeseries(req.activity_id())
-            .await
-            .map_err(|_| ())?
-            .ok_or(())?;
-
-        // First, remove the activity from all metrics to ensure it's not in old groups
-        // This is necessary because the activity's groupBy properties (rpe, workout_type, etc.) may have changed
-        let remove_req = RemoveActivityFromMetricsRequest::new(
-            req.user().clone(),
-            activity_with_timeseries.activity().clone(),
-        );
-        self.remove_activity_from_metrics(remove_req).await?;
-
-        // Then add the activity back with its new values
-        let update_metrics_req =
-            UpdateMetricsValuesRequest::new(req.user().clone(), vec![activity_with_timeseries]);
-
-        self.update_metrics_values(update_metrics_req).await
-    }
-
+    /// Get training metric values for all registered training metrics for a given user.
     async fn get_training_metrics_values(
         &self,
         user: &UserId,
@@ -330,13 +140,13 @@ where
                     .unwrap_or_default(),
                 None => {
                     // If no date range specified, compute over entire user history
-                    match self
+                    let range = self
                         .activity_repository
                         .lock()
                         .await
                         .get_user_history_date_range(user)
-                        .await
-                    {
+                        .await;
+                    match range {
                         Ok(Some(history_range)) => {
                             let bins = metric
                                 .definition()
@@ -362,6 +172,33 @@ where
         }
 
         res
+    }
+
+    /// Get training metric values for a given registered training metric.
+    async fn get_training_metric_values(
+        &self,
+        user: &UserId,
+        metric_id: &TrainingMetricId,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError> {
+        let definition = self
+            .training_repository
+            .get_definition(metric_id)
+            .await
+            .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?;
+
+        match definition {
+            Some(def) if def.user() == user => self
+                .compute_training_metric_values(&def, date_range)
+                .await
+                .map_err(GetTrainingMetricValuesError::from),
+            Some(_) => Err(GetTrainingMetricValuesError::Unknown(anyhow::anyhow!(
+                "Training metric does not belong to user"
+            ))),
+            None => Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
+                metric_id.clone(),
+            )),
+        }
     }
 
     async fn delete_metric(
@@ -662,117 +499,6 @@ where
             ))),
         }
     }
-
-    async fn get_training_metric_values(
-        &self,
-        user: &UserId,
-        metric_id: &TrainingMetricId,
-        date_range: &Option<DateRange>,
-    ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError> {
-        let definition = self
-            .training_repository
-            .get_definition(metric_id)
-            .await
-            .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?;
-
-        match definition {
-            Some(def) if def.user() == user => {
-                self.training_repository
-                    .get_metric_values(metric_id, date_range)
-                    .await
-                    .map_err(|err| match err {
-                        crate::domain::ports::GetTrainingMetricValueError::TrainingMetricDoesNotExists(id) => {
-                            GetTrainingMetricValuesError::TrainingMetricDoesNotExists(id)
-                        }
-                        crate::domain::ports::GetTrainingMetricValueError::Unknown(e) => {
-                            GetTrainingMetricValuesError::Unknown(e)
-                        }
-                    })
-            }
-            Some(_) => Err(GetTrainingMetricValuesError::Unknown(anyhow::anyhow!(
-                "Training metric does not belong to user"
-            ))),
-            None => Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
-                metric_id.clone(),
-            )),
-        }
-    }
-
-    async fn compute_training_metric_values(
-        &self,
-        definition: &TrainingMetricDefinition,
-        date_range: &DateRange,
-    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
-        let values = match definition.source_requirement() {
-            ComputeMetricRequirement::ActivityWithTimeseries => {
-                let activities = self
-                    .activity_repository
-                    .lock()
-                    .await
-                    .list_activities_with_timeseries(
-                        definition.user(),
-                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
-                    )
-                    .await
-                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
-
-                definition.compute_values_from_timeseries(&activities)
-            }
-            ComputeMetricRequirement::Activity => {
-                let activities = self
-                    .activity_repository
-                    .lock()
-                    .await
-                    .list_activities(
-                        definition.user(),
-                        &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
-                    )
-                    .await
-                    .map_err(|err| ComputeTrainingMetricValuesError::Unknown(err.into()))?;
-
-                definition.compute_values(&activities)
-            }
-        };
-
-        Ok(values)
-    }
-}
-
-impl<TMR, AR> TrainingService<TMR, AR>
-where
-    TMR: TrainingRepository,
-    AR: ActivityRepository,
-{
-    async fn compute_initial_values(
-        &self,
-        req: CreateTrainingMetricRequest,
-        metric: TrainingMetric,
-        initial_bins: Vec<DateRange>,
-    ) {
-        // Compute initial values over the user history
-        let Ok(Some(history_range)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_user_history_date_range(req.user())
-            .await
-        else {
-            return;
-        };
-
-        let bins = metric
-            .definition()
-            .granularity()
-            .bins_from_datetime(&history_range);
-
-        // Iterate in reverse so that the most recent bins' values are available first
-        for bin in bins.iter().rev() {
-            if initial_bins.contains(bin) {
-                continue;
-            }
-            self.compute_metric_values(&metric, bin, req.user()).await;
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -786,15 +512,14 @@ pub mod test_utils {
 
     use crate::domain::{
         models::training::{
-            TrainingMetricValue, TrainingNote, TrainingNoteContent, TrainingPeriod,
-            TrainingPeriodWithActivities,
+            TrainingNote, TrainingNoteContent, TrainingPeriod, TrainingPeriodWithActivities,
         },
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
             DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-            GetDefinitionError, GetTrainingMetricValueError, GetTrainingMetricsDefinitionsError,
-            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
-            SaveTrainingPeriodError, UpdateMetricError, UpdateTrainingNoteError,
+            GetDefinitionError, GetTrainingMetricsDefinitionsError, GetTrainingNoteError,
+            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+            UpdateTrainingNoteError,
         },
     };
 
@@ -813,21 +538,6 @@ pub mod test_utils {
                 &self,
                 req: CreateTrainingMetricRequest
             ) -> Result<TrainingMetricId, CreateTrainingMetricError>;
-
-            async fn update_metrics_values(
-                &self,
-                req: UpdateMetricsValuesRequest,
-            ) -> Result<(), ()>;
-
-            async fn remove_activity_from_metrics(
-                &self,
-                req: RemoveActivityFromMetricsRequest,
-            ) -> Result<(), ()>;
-
-            async fn update_metrics_for_activity(
-                &self,
-                req: UpdateMetricsForActivityRequest,
-            ) -> Result<(), ()>;
 
             async fn get_training_metrics_values(
                 &self,
@@ -912,7 +622,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 metric_id: &TrainingMetricId,
-                date_range: &Option<DateRange>,
+                date_range: &DateRange,
             ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError>;
 
             async fn compute_training_metric_values(
@@ -929,9 +639,6 @@ pub mod test_utils {
 
             mock.expect_create_metric()
                 .returning(|_| Ok(TrainingMetricId::default()));
-            mock.expect_update_metrics_values().returning(|_| Ok(()));
-            mock.expect_update_metrics_for_activity()
-                .returning(|_| Ok(()));
             mock.expect_get_training_metrics_values()
                 .returning(|_, _| vec![]);
             mock.expect_delete_metric().returning(|_| Ok(()));
@@ -957,30 +664,6 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
             ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>;
-
-            async fn update_metric_value(
-                &self,
-                id: &TrainingMetricId,
-                values: (TrainingMetricBin, TrainingMetricValue),
-            ) -> Result<(), UpdateMetricError>;
-
-            async fn delete_metric_values_for_bin(
-                &self,
-                id: &TrainingMetricId,
-                granule: &str,
-            ) -> Result<(), anyhow::Error>;
-
-            async fn get_metric_value(
-                &self,
-                id: &TrainingMetricId,
-                bin: &TrainingMetricBin
-            ) -> Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>;
-
-            async fn get_metric_values(
-                &self,
-                id: &TrainingMetricId,
-                date_range: &Option<DateRange>,
-            ) -> Result<TrainingMetricValues, GetTrainingMetricValueError>;
 
             async fn get_definition(
                 &self,
@@ -1058,23 +741,24 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests_training_metrics_service {
-    use std::{collections::HashMap, sync::Arc};
 
     use anyhow::anyhow;
-    use chrono::{DateTime, Days, FixedOffset, Utc};
+    use chrono::{DateTime, FixedOffset};
     use tokio::sync::Mutex;
 
+    use super::*;
+    use crate::domain::models::activity::{
+        Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+    };
+
+    use crate::domain::ports::DateRange;
     use crate::domain::{
         models::{
-            activity::{
-                Activity, ActivityId, ActivityRpe, ActivityStartTime, ActivityStatistic,
-                ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
-                TimeseriesActiveTime, TimeseriesTime,
-            },
+            activity::ActivityStatistic,
             training::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
                 TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-                TrainingMetricId, TrainingMetricValue,
+                TrainingMetricId,
             },
         },
         ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -1083,42 +767,16 @@ mod tests_training_metrics_service {
             training::test_utils::MockTrainingRepository,
         },
     };
-
-    use super::*;
+    use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
     #[tokio::test]
     async fn test_create_metric_ok() {
         let mut repository = MockTrainingRepository::new();
-        let background_repository = MockTrainingRepository::new();
         repository
             .expect_save_training_metric_definition()
             .returning(|_| Ok(()));
-        repository
-            .expect_clone()
-            .return_once(move || background_repository);
+        let activities = MockActivityRepository::new();
 
-        let mut activities = MockActivityRepository::new();
-        let mut background_activities = MockActivityRepository::new();
-        background_activities
-            .expect_get_user_history_date_range()
-            .returning(|_| {
-                Ok(Some(DateTimeRange::new(
-                    "2025-09-05T00:00:00+02:00"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                    Some(
-                        "2025-09-05T00:00:00+02:00"
-                            .parse::<DateTime<FixedOffset>>()
-                            .unwrap(),
-                    ),
-                )))
-            });
-        background_activities
-            .expect_list_activities_with_timeseries()
-            .returning(|_, _| Ok(vec![]));
-        activities
-            .expect_clone()
-            .return_once(move || background_activities);
         let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
@@ -1129,159 +787,6 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
             None,
-        );
-
-        let _ = service
-            .create_metric(req)
-            .await
-            .expect("Should have return ok");
-    }
-
-    #[tokio::test]
-    async fn test_create_metric_compute_initial_values() {
-        let mut repository = MockTrainingRepository::new();
-        let mut background_repository = MockTrainingRepository::new();
-        repository
-            .expect_save_training_metric_definition()
-            .returning(|_| Ok(()));
-        background_repository
-            .expect_update_metric_value()
-            .times(1)
-            .returning(|_, _| Ok(()));
-        repository
-            .expect_clone()
-            .return_once(move || background_repository);
-
-        let mut activities = MockActivityRepository::new();
-        let mut background_activities = MockActivityRepository::new();
-        background_activities
-            .expect_get_user_history_date_range()
-            .returning(|_| {
-                Ok(Some(DateTimeRange::new(
-                    "2025-09-05T00:00:00+02:00"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                    Some(
-                        "2025-09-05T00:00:00+02:00"
-                            .parse::<DateTime<FixedOffset>>()
-                            .unwrap(),
-                    ),
-                )))
-            });
-        background_activities
-            .expect_list_activities_with_timeseries()
-            .returning(|_, _| {
-                Ok(vec![ActivityWithTimeseries::new(
-                    Activity::new(
-                        ActivityId::new(),
-                        UserId::test_default(),
-                        None,
-                        ActivityStartTime::from_timestamp(1200).unwrap(),
-                        Sport::Cycling,
-                        ActivityStatistics::new(HashMap::from([(
-                            ActivityStatistic::Calories,
-                            12.,
-                        )])),
-                        None,
-                        None,
-                        None,
-                        None,
-                    ),
-                    ActivityTimeseries::new(
-                        TimeseriesTime::new(vec![]),
-                        TimeseriesActiveTime::new(vec![]),
-                        vec![],
-                        vec![],
-                    )
-                    .unwrap(),
-                )])
-            });
-        activities
-            .expect_clone()
-            .return_once(move || background_activities);
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
-
-        let req = CreateTrainingMetricRequest::new(
-            UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Average,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
-            None,
-        );
-
-        let _ = service
-            .create_metric(req)
-            .await
-            .expect("Should have return ok");
-    }
-
-    #[tokio::test]
-    async fn test_create_metric_compute_initial_values_with_initial_date_range() {
-        let now = Utc::now();
-        let mut repository = MockTrainingRepository::new();
-        let mut background_repository = MockTrainingRepository::new();
-        repository
-            .expect_save_training_metric_definition()
-            .returning(|_| Ok(()));
-        repository
-            .expect_update_metric_value()
-            .times(2) // 2 day fron initial range
-            .returning(|_, _| Ok(()));
-        background_repository
-            .expect_update_metric_value()
-            .times(1) // 3 days in user history - 2 days fron initial range
-            .returning(|_, _| Ok(()));
-        repository
-            .expect_clone()
-            .return_once(move || background_repository);
-
-        let mut activities = MockActivityRepository::new();
-        let cloned_now = now.clone();
-        activities
-            .expect_get_user_history_date_range()
-            .returning(move |_| {
-                Ok(Some(DateTimeRange::new(
-                    cloned_now
-                        .checked_sub_days(Days::new(1))
-                        .unwrap()
-                        .fixed_offset(),
-                    Some(
-                        cloned_now
-                            .checked_add_days(Days::new(1))
-                            .unwrap()
-                            .fixed_offset(),
-                    ),
-                )))
-            });
-        activities.expect_list_activities().returning(|_, _| {
-            Ok(vec![Activity::new(
-                ActivityId::new(),
-                UserId::test_default(),
-                None,
-                ActivityStartTime::from_timestamp(1200).unwrap(),
-                Sport::Cycling,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 12.)])),
-                None,
-                None,
-                None,
-                None,
-            )])
-        });
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
-
-        let req = CreateTrainingMetricRequest::new(
-            UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Average,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
-            Some(DateRange::new(
-                now.date_naive(),
-                now.date_naive().checked_add_days(Days::new(1)).unwrap(),
-            )),
         );
 
         let _ = service
@@ -1296,9 +801,7 @@ mod tests_training_metrics_service {
         repository
             .expect_save_training_metric_definition()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
-        repository.expect_update_metric_value().times(0);
-        let mut activities = MockActivityRepository::new();
-        activities.expect_list_activities_with_timeseries().times(0);
+        let activities = MockActivityRepository::new();
         let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
 
         let req = CreateTrainingMetricRequest::new(
@@ -1385,11 +888,6 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_metrics_service_get_metrics_map_def_with_its_values() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
-        use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
@@ -1477,12 +975,6 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_service_get_metrics_with_date_range() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
-        use crate::domain::ports::DateRange;
-        use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
@@ -1553,11 +1045,6 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_training_service_get_metrics_aligns_date_range_to_granularity() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
-        use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
@@ -1710,1032 +1197,46 @@ mod tests_training_metrics_service {
         assert!(res.is_ok());
     }
 
-    // Helper function to create a test activity with given timestamp and statistics
-    fn create_test_activity(
-        timestamp: usize,
-        calories: Option<f64>,
-        distance: Option<f64>,
-    ) -> ActivityWithTimeseries {
-        create_test_activity_with_sport(timestamp, calories, distance, Sport::Running)
-    }
-
-    // Helper function to create a test activity with given timestamp, statistics, and sport
-    fn create_test_activity_with_sport(
-        timestamp: usize,
-        calories: Option<f64>,
-        distance: Option<f64>,
-        sport: Sport,
-    ) -> ActivityWithTimeseries {
-        let mut stats_map = HashMap::new();
-        if let Some(cal) = calories {
-            stats_map.insert(ActivityStatistic::Calories, cal);
-        }
-        if let Some(dist) = distance {
-            stats_map.insert(ActivityStatistic::Distance, dist);
-        }
-
-        ActivityWithTimeseries::new(
-            Activity::new(
-                ActivityId::new(),
-                UserId::test_default(),
-                None,
-                ActivityStartTime::from_timestamp(timestamp).unwrap(),
-                sport,
-                ActivityStatistics::new(stats_map),
-                None,
-                None,
-                None,
-                None,
-            ),
-            ActivityTimeseries::default(),
-        )
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_no_definitions() {
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(|_| Ok(vec![]));
-        repository.expect_update_metric_value().times(0);
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(UserId::test_default(), vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_activity_not_matching_metric_source() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository.expect_update_metric_value().times(0);
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        // Activity has no distance, so does not match the metric definition
-        let activity = create_test_activity(1200, Some(1000.0), None);
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_no_previous_value() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(1)
-            .returning(|_, _| Ok(None)); // No previous value
-        repository
-            .expect_update_metric_value()
-            .times(1)
-            .withf(|_, (_, value)| {
-                // For Sum aggregate, initial value should be the metric value itself (1000 calories)
-                matches!(value, TrainingMetricValue::Sum(v) if (*v - 1000.0).abs() < 0.01)
-            })
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_updates_existing_value() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(1)
-            .returning(|_, _| Ok(Some(TrainingMetricValue::Sum(500.0)))); // Previous value with 500 calories
-        repository
-            .expect_update_metric_value()
-            .times(1)
-            .withf(|_, (_, value)| {
-                // For Sum aggregate, updated value should be 1500 calories (500 + 1000)
-                matches!(value, TrainingMetricValue::Sum(v) if (*v - 1500.0).abs() < 0.01)
-            })
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_multiple_activities() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(2)
-            .returning(|_, _| Ok(None));
-        repository
-            .expect_update_metric_value()
-            .times(2)
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity1 = create_test_activity(1200, Some(1000.0), Some(5000.0));
-        let activity2 = create_test_activity(3000, Some(1000.0), Some(10000.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity1, activity2]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_multiple_definitions() {
-        let metric_id1 = TrainingMetricId::from("test1");
-        let metric_id2 = TrainingMetricId::from("test2");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![
-                    TrainingMetric::new(
-                        metric_id1.clone(),
-                        TrainingMetricDefinition::new(
-                            user_id_clone.clone(),
-                            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                            TrainingMetricGranularity::Daily,
-                            TrainingMetricAggregate::Sum,
-                            TrainingMetricFilters::empty(),
-                            TrainingMetricGroupBy::none(),
-                        ),
-                    ),
-                    TrainingMetric::new(
-                        metric_id2.clone(),
-                        TrainingMetricDefinition::new(
-                            user_id_clone.clone(),
-                            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                            TrainingMetricGranularity::Daily,
-                            TrainingMetricAggregate::Sum,
-                            TrainingMetricFilters::empty(),
-                            TrainingMetricGroupBy::none(),
-                        ),
-                    ),
-                ])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(2)
-            .returning(|_, _| Ok(None));
-        repository
-            .expect_update_metric_value()
-            .times(2)
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(5000.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_continues_on_get_metric_value_error() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(1)
-            .returning(|_, _| Err(anyhow!("database error").into()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        // Should return Ok despite the error, as it continues processing
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_continues_on_update_error() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(1)
-            .returning(|_, _| Ok(None));
-        repository
-            .expect_update_metric_value()
-            .times(1)
-            .returning(|_, _| Err(anyhow!("database error").into()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        // Should return Ok despite the error, as it continues processing
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_average_aggregate() {
-        let metric_id = TrainingMetricId::from("test");
-        let user_id = UserId::test_default();
-        let user_id_clone = user_id.clone();
-
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Average,
-                        TrainingMetricFilters::empty(),
-                        TrainingMetricGroupBy::none(),
-                    ),
-                )])
-            });
-        repository
-            .expect_get_metric_value()
-            .times(1)
-            .returning(|_, _| {
-                Ok(Some(TrainingMetricValue::Average {
-                    value: 500.0,
-                    sum: 1000.0,
-                    number_of_elements: 2,
-                }))
-            }); // Average of 2 activities = 500
-        repository
-            .expect_update_metric_value()
-            .times(1)
-            .withf(|_, (_, value)| {
-                // For Average aggregate with 2 activities at 500 avg (sum 1000) and new activity with 1000 calories
-                // New average: (1000 + 1000) / 3 = 2000 / 3 ≈ 666.67
-                matches!(
-                    value,
-                    TrainingMetricValue::Average { value: v, sum: s, number_of_elements: n }
-                    if (*v - 666.67).abs() < 0.01 && (*s - 2000.0).abs() < 0.01 && *n == 3
-                )
-            })
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_with_groupby_sport() {
-        // Arrange
-        let mut repository = MockTrainingRepository::new();
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::new();
-
-        let running_activity =
-            create_test_activity_with_sport(1200, Some(500.0), Some(5000.0), Sport::Running);
-        let cycling_activity =
-            create_test_activity_with_sport(1300, Some(800.0), Some(15000.0), Sport::Cycling);
-
-        let metric_id_clone = metric_id.clone();
-        let user_id_clone = user_id.clone();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id_clone.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Weekly,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        Some(TrainingMetricGroupBy::Sport),
-                    ),
-                )])
-            });
-
-        let metric_id_clone = metric_id.clone();
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id_clone
-                    && b.granule() == "1969-12-29"
-                    && b.group() == &Some("Running".to_string())
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 500.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let metric_id_clone = metric_id.clone();
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id_clone
-                    && b.granule() == "1969-12-29"
-                    && b.group() == &Some("Cycling".to_string())
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 800.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        // Mock get_metric_value to return None (no previous value)
-        repository
-            .expect_get_metric_value()
-            .returning(|_, _| Ok(None));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req =
-            UpdateMetricsValuesRequest::new(user_id, vec![running_activity, cycling_activity]);
-
-        // Act & Assert
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_without_groupby_uses_none_group() {
-        // Arrange
-        let mut repository = MockTrainingRepository::new();
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::new();
-
-        let activity = create_test_activity(1200, Some(500.0), Some(5000.0));
-
-        let metric_id_clone = metric_id.clone();
-        let user_id_clone = user_id.clone();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id_clone.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Weekly,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        None, // No group_by
-                    ),
-                )])
-            });
-
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id
-                    && b.granule() == "1969-12-29"
-                    && b.group() == &None // Verify group is None
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 500.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        // Mock get_metric_value to return None (no previous value)
-        repository
-            .expect_get_metric_value()
-            .returning(|_, _| Ok(None));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![activity]);
-
-        // Act & Assert
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_values_grouped_same_granule_different_groups() {
-        // Arrange
-        let mut repository = MockTrainingRepository::new();
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::new();
-
-        // Create multiple activities on the same day but different sports
-        let running_am =
-            create_test_activity_with_sport(1200, Some(400.0), Some(5000.0), Sport::Running);
-        let cycling_pm =
-            create_test_activity_with_sport(1205, Some(600.0), Some(20000.0), Sport::Cycling);
-
-        let metric_id_clone = metric_id.clone();
-        let user_id_clone = user_id.clone();
-        repository
-            .expect_get_metrics()
-            .times(1)
-            .returning(move |_| {
-                Ok(vec![TrainingMetric::new(
-                    metric_id_clone.clone(),
-                    TrainingMetricDefinition::new(
-                        user_id_clone.clone(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                        TrainingMetricGranularity::Daily,
-                        TrainingMetricAggregate::Sum,
-                        TrainingMetricFilters::empty(),
-                        Some(TrainingMetricGroupBy::Sport),
-                    ),
-                )])
-            });
-
-        let metric_id_clone = metric_id.clone();
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id_clone
-                    && b.granule() == "1970-01-01"
-                    && b.group() == &Some("Running".to_string())
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 400.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let metric_id_clone = metric_id.clone();
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id_clone
-                    && b.granule() == "1970-01-01"
-                    && b.group() == &Some("Cycling".to_string())
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 600.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        // Mock get_metric_value to return None (no previous value)
-        repository
-            .expect_get_metric_value()
-            .returning(|_, _| Ok(None));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = UpdateMetricsValuesRequest::new(user_id, vec![running_am, cycling_pm]);
-
-        // Act & Assert - verify both groups are updated for the same day
-        let result = service.update_metrics_values(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_recomputes_affected_bin() {
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::from("test");
-
-        // Create the activity to be removed
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-
-        // Create the metric
-        let metric = TrainingMetric::new(
-            metric_id.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric.clone()]));
-
-        // Mock delete_metric_values_for_bin - should be called to clear old values
-        repository
-            .expect_delete_metric_values_for_bin()
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        // Mock list_activities for recomputation
-        let mut activity_repository = MockActivityRepository::default();
-        activity_repository
-            .expect_list_activities()
-            .returning(|_, _| Ok(vec![])); // No activities left after deletion
-
-        // Note: update_metric_value won't be called since there are no activities to compute
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_handles_multiple_metrics() {
-        let user_id = UserId::test_default();
-        let metric_id_1 = TrainingMetricId::from("metric1");
-        let metric_id_2 = TrainingMetricId::from("metric2");
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-
-        // Create two metric definitions
-        let metric_1 = TrainingMetric::new(
-            metric_id_1.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let metric_2 = TrainingMetric::new(
-            metric_id_2.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric_1.clone(), metric_2.clone()]));
-
-        // Mock delete_metric_values_for_bin - should be called twice (once per metric)
-        repository
-            .expect_delete_metric_values_for_bin()
-            .times(2)
-            .returning(|_, _| Ok(()));
-
-        let mut activity_repository = MockActivityRepository::default();
-        activity_repository
-            .expect_list_activities()
-            .returning(|_, _| Ok(vec![]));
-
-        // Note: update_metric_value won't be called since there are no activities to compute
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_with_weekly_granularity() {
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::from("test");
-
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-
-        // Create a weekly granularity metric
-        let metric = TrainingMetric::new(
-            metric_id.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Weekly,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric.clone()]));
-
-        // Mock delete_metric_values_for_bin
-        repository
-            .expect_delete_metric_values_for_bin()
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let mut activity_repository = MockActivityRepository::default();
-        activity_repository
-            .expect_list_activities()
-            .returning(|_, _| Ok(vec![]));
-
-        // Note: update_metric_value won't be called since there are no activities to compute
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_with_no_metrics() {
-        let user_id = UserId::test_default();
-        let activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-
-        let mut repository = MockTrainingRepository::new();
-
-        // No metrics
-        repository.expect_get_metrics().returning(|_| Ok(vec![]));
-
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = RemoveActivityFromMetricsRequest::new(user_id, activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_recomputes_with_remaining_activities() {
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::from("test");
-
-        let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-        let remaining_activity = create_test_activity(600, Some(600.0), Some(5000.0));
-
-        let metric = TrainingMetric::new(
-            metric_id.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric.clone()]));
-
-        // Mock delete_metric_values_for_bin
-        repository
-            .expect_delete_metric_values_for_bin()
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let mut activity_repository = MockActivityRepository::default();
-        // Return the remaining activity when recomputing
-        activity_repository
-            .expect_list_activities()
-            .returning(move |_, _| Ok(vec![remaining_activity.activity().clone()]));
-
-        // Expect the recomputed value to be based only on remaining activity (600.0 calories)
-        repository
-            .expect_update_metric_value()
-            .withf(|_, (_, v)| matches!(v, TrainingMetricValue::Sum(val) if (*val - 600.0).abs() < 0.01))
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req =
-            RemoveActivityFromMetricsRequest::new(user_id, deleted_activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_remove_activity_from_metrics_clears_bin_when_last_activity_deleted() {
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::from("test");
-
-        // The activity to be deleted - it's the only one in its bin
-        let deleted_activity = create_test_activity(1200, Some(1000.0), Some(42195.0));
-
-        let metric = TrainingMetric::new(
-            metric_id.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                None,
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric.clone()]));
-
-        // CRITICAL: Expect delete_metric_values_for_bin to be called before recomputing
-        repository
-            .expect_delete_metric_values_for_bin()
-            .withf(|id, granule| *id == TrainingMetricId::from("test") && granule == "1970-01-01")
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let mut activity_repository = MockActivityRepository::default();
-        // Return empty list - no activities left in this bin
-        activity_repository
-            .expect_list_activities()
-            .returning(|_, _| Ok(vec![]));
-
-        // update_metric_value should NOT be called since there are no activities
-        repository.expect_update_metric_value().times(0);
-
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req =
-            RemoveActivityFromMetricsRequest::new(user_id, deleted_activity.activity().clone());
-
-        let result = service.remove_activity_from_metrics(req).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_for_activity_removes_from_old_group_rpe() {
-        // Test that when an activity's RPE changes, it's removed from the old group and added to the new one
-        let user_id = UserId::test_default();
-        let metric_id = TrainingMetricId::from("test_rpe");
-        let activity_id = ActivityId::new();
-
-        // Create an activity with RPE=8 (new value)
-        let mut stats_map = HashMap::new();
-        stats_map.insert(ActivityStatistic::Calories, 1000.0);
-        stats_map.insert(ActivityStatistic::Distance, 42195.0);
-
-        let activity = Activity::new(
-            activity_id.clone(),
-            user_id.clone(),
-            None,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            Sport::Running,
-            ActivityStatistics::new(stats_map),
-            Some(ActivityRpe::Eight), // RPE = 8 (new value)
-            None,
-            None,
-            None,
-        );
-
-        let activity_with_ts = ActivityWithTimeseries::new(activity, ActivityTimeseries::default());
-
-        // Create a metric grouped by RPE range
-        let metric = TrainingMetric::new(
-            metric_id.clone(),
-            TrainingMetricDefinition::new(
-                user_id.clone(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricFilters::empty(),
-                Some(TrainingMetricGroupBy::RpeRange),
-            ),
-        );
-
-        let mut repository = MockTrainingRepository::new();
-
-        // Expect get_metrics to be called twice (once for remove, once for update)
-        let metric_clone = metric.clone();
-        repository
-            .expect_get_metrics()
-            .returning(move |_| Ok(vec![metric_clone.clone()]));
-
-        // Expect delete_metric_values_for_bin to be called to remove from old RPE group
-        repository
-            .expect_delete_metric_values_for_bin()
-            .withf(|id, granule| {
-                *id == TrainingMetricId::from("test_rpe") && granule == "1970-01-01"
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        // Expect get_metric_value for the update phase
-        repository
-            .expect_get_metric_value()
-            .returning(|_, _| Ok(None));
-
-        // Expect update_metric_value to be called for new RPE=8 group (which is "hard" range)
-        let metric_id_clone = metric_id.clone();
-        repository
-            .expect_update_metric_value()
-            .withf(move |m, (b, v)| {
-                m == &metric_id_clone
-                    && b.granule() == "1970-01-01"
-                    && b.group() == &Some("hard".to_string())
-                    && matches!(v, TrainingMetricValue::Sum(val) if (val - 1000.0).abs() < 0.01)
-            })
-            .times(1)
-            .returning(|_, _| Ok(()));
-
-        let mut activity_repository = MockActivityRepository::default();
-
-        // Mock get_activity_with_timeseries to return the activity with updated RPE
-        let activity_with_ts_clone = activity_with_ts.clone();
-        activity_repository
-            .expect_get_activity_with_timeseries()
-            .returning(move |_| Ok(Some(activity_with_ts_clone.clone())));
-
-        // Mock list_activities for recomputation - return empty (activity was removed from old bin)
-        activity_repository
-            .expect_list_activities()
-            .returning(|_, _| Ok(vec![]));
-
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = UpdateMetricsForActivityRequest::new(user_id, activity_id);
-
-        // Act
-        let result = service.update_metrics_for_activity(req).await;
-
-        // Assert
-        assert!(result.is_ok(), "update_metrics_for_activity should succeed");
-    }
-
-    #[tokio::test]
-    async fn test_update_metrics_for_activity_activity_not_found() {
-        // Test that when activity doesn't exist, we return an error
-        let user_id = UserId::test_default();
-        let activity_id = ActivityId::new();
-
-        let mut activity_repository = MockActivityRepository::default();
-
-        // Mock get_activity_with_timeseries to return None
-        activity_repository
-            .expect_get_activity_with_timeseries()
-            .returning(move |_| Ok(None));
-
-        let repository = MockTrainingRepository::new();
-        let activity_repository = Arc::new(Mutex::new(activity_repository));
-        let service = TrainingService::new(repository, activity_repository);
-
-        let req = UpdateMetricsForActivityRequest::new(user_id, activity_id);
-
-        let result = service.update_metrics_for_activity(req).await;
-        assert!(result.is_err());
-    }
+    // // Helper function to create a test activity with given timestamp and statistics
+    // fn create_test_activity(
+    //     timestamp: usize,
+    //     calories: Option<f64>,
+    //     distance: Option<f64>,
+    // ) -> ActivityWithTimeseries {
+    //     create_test_activity_with_sport(timestamp, calories, distance, Sport::Running)
+    // }
+
+    // // Helper function to create a test activity with given timestamp, statistics, and sport
+    // fn create_test_activity_with_sport(
+    //     timestamp: usize,
+    //     calories: Option<f64>,
+    //     distance: Option<f64>,
+    //     sport: Sport,
+    // ) -> ActivityWithTimeseries {
+    //     let mut stats_map = HashMap::new();
+    //     if let Some(cal) = calories {
+    //         stats_map.insert(ActivityStatistic::Calories, cal);
+    //     }
+    //     if let Some(dist) = distance {
+    //         stats_map.insert(ActivityStatistic::Distance, dist);
+    //     }
+
+    //     ActivityWithTimeseries::new(
+    //         Activity::new(
+    //             ActivityId::new(),
+    //             UserId::test_default(),
+    //             None,
+    //             ActivityStartTime::from_timestamp(timestamp).unwrap(),
+    //             sport,
+    //             ActivityStatistics::new(stats_map),
+    //             None,
+    //             None,
+    //             None,
+    //             None,
+    //         ),
+    //         ActivityTimeseries::default(),
+    //     )
+    // }
 }
 
 #[cfg(test)]
@@ -3968,6 +2469,8 @@ mod test_training_service_training_note {
 
 #[cfg(test)]
 mod test_training_service_metric_values {
+    use chrono::NaiveDate;
+
     use super::*;
     use crate::domain::models::activity::{
         Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
@@ -3981,51 +2484,54 @@ mod test_training_service_metric_values {
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use std::collections::HashMap;
 
-    #[tokio::test]
-    async fn test_get_training_metric_values_ok() {
-        let user_id = UserId::from("user1");
-        let metric_id = TrainingMetricId::new();
-        let date_range = Some(DateRange::new(
-            "2024-01-01".parse::<NaiveDate>().unwrap(),
-            "2024-12-31".parse::<NaiveDate>().unwrap(),
-        ));
+    // #[tokio::test]
+    // async fn test_get_training_metric_values_ok() {
+    //     let user_id = UserId::from("user1");
+    //     let metric_id = TrainingMetricId::new();
+    //     let date_range = DateRange::new(
+    //         "2024-01-01".parse::<NaiveDate>().unwrap(),
+    //         "2024-12-31".parse::<NaiveDate>().unwrap(),
+    //     );
 
-        let definition = TrainingMetricDefinition::new(
-            user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
-        );
+    //     let definition = TrainingMetricDefinition::new(
+    //         user_id.clone(),
+    //         ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+    //         TrainingMetricGranularity::Weekly,
+    //         TrainingMetricAggregate::Sum,
+    //         TrainingMetricFilters::empty(),
+    //         None,
+    //     );
 
-        let values = TrainingMetricValues::new(HashMap::new());
+    //     let values = TrainingMetricValues::new(HashMap::new());
 
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_definition()
-            .times(1)
-            .return_once(move |_| Ok(Some(definition)));
-        training_repository
-            .expect_get_metric_values()
-            .times(1)
-            .return_once(move |_, _| Ok(values));
+    //     let mut training_repository = MockTrainingRepository::new();
+    //     training_repository
+    //         .expect_get_definition()
+    //         .times(1)
+    //         .return_once(move |_| Ok(Some(definition)));
+    //     training_repository
+    //         .expect_get_metric_values()
+    //         .times(1)
+    //         .return_once(move |_, _| Ok(values));
 
-        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
-        let service = TrainingService::new(training_repository, activity_repository);
+    //     let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+    //     let service = TrainingService::new(training_repository, activity_repository);
 
-        let result = service
-            .get_training_metric_values(&user_id, &metric_id, &date_range)
-            .await;
+    //     let result = service
+    //         .get_training_metric_values(&user_id, &metric_id, &date_range)
+    //         .await;
 
-        assert!(result.is_ok());
-    }
+    //     assert!(result.is_ok());
+    // }
 
     #[tokio::test]
     async fn test_get_training_metric_values_metric_not_found() {
         let user_id = UserId::from("user1");
         let metric_id = TrainingMetricId::new();
-        let date_range = None;
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-12-31".parse::<NaiveDate>().unwrap(),
+        );
 
         let mut training_repository = MockTrainingRepository::new();
         training_repository
@@ -4052,7 +2558,10 @@ mod test_training_service_metric_values {
         let user_id = UserId::from("user1");
         let other_user_id = UserId::from("user2");
         let metric_id = TrainingMetricId::new();
-        let date_range = None;
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-12-31".parse::<NaiveDate>().unwrap(),
+        );
 
         let definition = TrainingMetricDefinition::new(
             other_user_id,

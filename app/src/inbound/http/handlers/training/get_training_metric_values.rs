@@ -76,7 +76,7 @@ pub async fn get_training_metric_values<
     Query(query): Query<MetricValuesQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let metric_id = TrainingMetricId::from(&metric_id);
-    let date_range = Some(DateRange::from(&query));
+    let date_range = DateRange::from(&query);
 
     let values = state
         .training_metrics_service

@@ -10,12 +10,11 @@ use crate::domain::models::activity::{
     Sport, WorkoutType,
 };
 use crate::domain::models::training::{
-    ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricBin,
-    TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
-    TrainingMetricGroupBy, TrainingMetricId, TrainingMetricValue, TrainingMetricValues,
-    TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-    TrainingPeriodWithActivities,
+    ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
+    TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
+    TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId,
+    TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
+    TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -677,21 +676,6 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: CreateTrainingMetricRequest,
     ) -> impl Future<Output = Result<TrainingMetricId, CreateTrainingMetricError>> + Send;
 
-    fn update_metrics_values(
-        &self,
-        req: UpdateMetricsValuesRequest,
-    ) -> impl Future<Output = Result<(), ()>> + Send;
-
-    fn remove_activity_from_metrics(
-        &self,
-        req: RemoveActivityFromMetricsRequest,
-    ) -> impl Future<Output = Result<(), ()>> + Send;
-
-    fn update_metrics_for_activity(
-        &self,
-        req: UpdateMetricsForActivityRequest,
-    ) -> impl Future<Output = Result<(), ()>> + Send;
-
     fn get_training_metrics_values(
         &self,
         user: &UserId,
@@ -702,7 +686,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         metric_id: &TrainingMetricId,
-        date_range: &Option<DateRange>,
+        date_range: &DateRange,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValuesError>> + Send;
 
     fn compute_training_metric_values(
@@ -839,6 +823,14 @@ pub enum GetTrainingMetricValuesError {
 pub enum ComputeTrainingMetricValuesError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+}
+
+impl From<ComputeTrainingMetricValuesError> for GetTrainingMetricValuesError {
+    fn from(value: ComputeTrainingMetricValuesError) -> Self {
+        match value {
+            ComputeTrainingMetricValuesError::Unknown(err) => Self::Unknown(err),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -1074,30 +1066,6 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
     ) -> impl Future<Output = Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>> + Send;
-
-    fn update_metric_value(
-        &self,
-        id: &TrainingMetricId,
-        values: (TrainingMetricBin, TrainingMetricValue),
-    ) -> impl Future<Output = Result<(), UpdateMetricError>> + Send;
-
-    fn delete_metric_values_for_bin(
-        &self,
-        id: &TrainingMetricId,
-        granule: &str,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-
-    fn get_metric_value(
-        &self,
-        id: &TrainingMetricId,
-        bin: &TrainingMetricBin,
-    ) -> impl Future<Output = Result<Option<TrainingMetricValue>, GetTrainingMetricValueError>> + Send;
-
-    fn get_metric_values(
-        &self,
-        id: &TrainingMetricId,
-        date_range: &Option<DateRange>,
-    ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValueError>> + Send;
 
     fn save_training_period(
         &self,

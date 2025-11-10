@@ -29,10 +29,6 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         ActivityService<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
             FilesystemRawDataRepository,
-            TrainingService<
-                SqliteTrainingRepository,
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
-            >,
         >,
         Parser,
         TrainingService<
@@ -96,10 +92,6 @@ async fn build_activity_service() -> anyhow::Result<(
     ActivityService<
         SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         FilesystemRawDataRepository,
-        TrainingService<
-            SqliteTrainingRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
-        >,
     >,
     Parser,
     Arc<
@@ -142,11 +134,7 @@ async fn build_activity_service() -> anyhow::Result<(
         training_metrics_repository,
         activity_repository.clone(),
     ));
-    let activity_service = ActivityService::new(
-        activity_repository.clone(),
-        raw_data_repository,
-        training_metrics_service.clone(),
-    );
+    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
     anyhow::Ok((activity_service, parser, training_metrics_service))
 }
