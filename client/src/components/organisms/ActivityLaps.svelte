@@ -99,7 +99,7 @@
 				if (validValues.length === 0) return undefined;
 
 				const avg = validValues.reduce((sum, v) => sum + v, 0) / validValues.length;
-				return paceToString(speedToPace(avg), true);
+				return paceToString(speedToPace(avg), true) + ' /km';
 			}
 
 			case 'power': {

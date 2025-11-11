@@ -29,7 +29,8 @@
 		icon: string;
 		label: string;
 		value: string | undefined;
-		subvalue?: string;
+		unit: string;
+		legend?: string;
 	};
 
 	let statRows = $derived.by<StatRow[]>(() => {
@@ -39,7 +40,8 @@
 			rows.push({
 				icon: '⌛',
 				label: 'Duration',
-				value: formatDuration(duration)
+				value: formatDuration(duration),
+				unit: ''
 			});
 		}
 
@@ -47,7 +49,8 @@
 			rows.push({
 				icon: '📏',
 				label: 'Distance',
-				value: `${distance.toFixed(3)} km`
+				value: `${distance.toFixed(3)}`,
+				unit: 'km'
 			});
 		}
 
@@ -58,14 +61,16 @@
 					icon: '⚡',
 					label: 'Pace',
 					value: paceToString(averagePace!),
-					subvalue: 'avg'
+					unit: '/km',
+					legend: 'avg'
 				});
 			} else {
 				rows.push({
 					icon: '⚡',
 					label: 'Speed',
-					value: `${averageSpeed.toFixed(2)} km/h`,
-					subvalue: 'avg'
+					value: `${averageSpeed.toFixed(2)}`,
+					unit: 'km/h',
+					legend: 'avg'
 				});
 			}
 		}
@@ -74,7 +79,8 @@
 			rows.push({
 				icon: '⛰️',
 				label: 'Elevation',
-				value: `${elevation.toFixed(0)} m`
+				value: `${elevation.toFixed(0)}`,
+				unit: 'm'
 			});
 		}
 
@@ -82,7 +88,8 @@
 			rows.push({
 				icon: '🔥',
 				label: 'Calories',
-				value: `${calories.toFixed(0)} kcal`
+				value: `${calories.toFixed(0)}`,
+				unit: 'kcal'
 			});
 		}
 
@@ -90,8 +97,9 @@
 			rows.push({
 				icon: '❤️',
 				label: 'Heart rate',
-				value: `${avgHeartRate.toFixed(0)} / ${maxHeartRate.toFixed(0)} bpm`,
-				subvalue: 'avg / max'
+				value: `${avgHeartRate.toFixed(0)} / ${maxHeartRate.toFixed(0)}`,
+				unit: 'bpm',
+				legend: 'avg / max'
 			});
 		}
 
@@ -99,8 +107,9 @@
 			rows.push({
 				icon: '⚙️',
 				label: 'Power',
-				value: `${averagePower.toFixed(0)} / ${weightedAveragePower.toFixed(0)} W`,
-				subvalue: 'avg / weighted'
+				value: `${averagePower.toFixed(0)} / ${weightedAveragePower.toFixed(0)}`,
+				unit: 'W',
+				legend: 'avg / weighted'
 			});
 		}
 
@@ -111,18 +120,41 @@
 <details class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow" open>
 	<summary class="collapse-title text-lg font-semibold">Statistics</summary>
 	<div class="@container collapse-content">
-		<div class="grid grid-cols-1 @xl:grid-cols-2 @min-[52rem]:grid-cols-3">
+		<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
 			{#each statRows as row}
 				<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
 					<div class="text-2xl">{row.icon}</div>
 					<div class=" flex-1 font-medium">{row.label}</div>
-					<div class="text-right {row.subvalue ? '' : 'self-center'}">
-						<div class="text-lg font-semibold">{row.value || '-'}</div>
-						{#if row.subvalue}
+					<div class="text-right {row.legend ? '' : 'self-center'}">
+						<div class="text-lg font-semibold">{row.value || '-'} {row.unit}</div>
+						{#if row.legend}
 							<div class="text-xs opacity-60">
-								{row.subvalue}
+								{row.legend}
 							</div>
 						{/if}
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="grid grid-cols-3">
+			{#each statRows as row}
+				<div class="flex flex-col gap-1 pb-2 @lg:hidden">
+					<div class="text-lg font-semibold">
+						{row.value || '-'}
+						<span class="text-sm font-medium">
+							{row.unit}
+						</span>
+					</div>
+					<div class="text-xs">
+						{row.icon}
+						<span class="opacity-60">
+							{row.label}
+
+							{#if row.legend}
+								<span class="ml-1">({row.legend})</span>
+							{/if}
+						</span>
 					</div>
 				</div>
 			{/each}
