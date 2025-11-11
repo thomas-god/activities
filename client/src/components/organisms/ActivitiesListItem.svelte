@@ -39,7 +39,7 @@
 		<div class="flex flex-col">
 			<div class="mb-1 font-semibold">{title}</div>
 			<div class="text-xs font-light">
-				{formatRelativeDuration(dayjs(activity.start_time), dayjs())} . {dayjs(
+				{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
 					activity.start_time
 				).format('MMM D, YYYY')}
 			</div>

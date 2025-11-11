@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDuration, localiseDateTime } from '$lib/duration';
+	import { localiseDateTime } from '$lib/duration';
 	import EditableActivityName from '$components/molecules/EditableActivityName.svelte';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 	import type { ActivityDetails } from '$lib/api/activities';
@@ -15,7 +15,6 @@
 	let title = $derived(
 		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
 	);
-	let duration = $derived(formatDuration(activity.duration));
 
 	const categoryClass = (category: SportCategory | null): string => {
 		if (category === 'Running') {
@@ -40,13 +39,11 @@
 		</div>
 		<div class="text-xs font-light">
 			{localiseDateTime(activity.start_time)}
+			·
+			{sportDisplay(activity.sport)}
 		</div>
 	</div>
-	<div class="font-semibold sm:text-lg">
-		<div>
-			{duration}
-		</div>
-	</div>
+
 	<div class="dropdown dropdown-end ml-2">
 		<button tabindex="0" class="btn btn-circle btn-ghost btn-sm" aria-label="More options">
 			⋮
