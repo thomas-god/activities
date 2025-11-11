@@ -139,14 +139,14 @@
 
 		<div class="grid grid-cols-3">
 			{#each statRows as row}
-				<div class="flex flex-col gap-0 pb-3 @lg:hidden">
+				<div class="flex h-16 flex-col gap-0 pb-3 text-center @lg:hidden">
 					<div class="text-lg font-semibold">
 						{row.value || '-'}
-						<span class="text-sm font-medium">
+						<span class="text-xs font-medium">
 							{row.unit}
 						</span>
 					</div>
-					<div class="overflow-x-auto text-xs text-nowrap">
+					<div class="text-xs">
 						{row.icon}
 						<span class="opacity-60">
 							{row.label}
