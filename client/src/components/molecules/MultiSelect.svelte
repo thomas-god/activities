@@ -29,10 +29,10 @@
 	};
 </script>
 
-<div class="flex flex-wrap gap-1">
+<div class="@container flex flex-wrap gap-1">
 	{#each options as option}
 		<input
-			class={`btn ${option.option.toLocaleLowerCase()}`}
+			class={`btn btn-xs @sm:btn-sm ${option.option.toLocaleLowerCase()}`}
 			type="checkbox"
 			bind:checked={option.selected}
 			disabled={(!option.selected && numberSelectedOptions >= maxSelected) ||
