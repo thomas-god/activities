@@ -174,12 +174,11 @@
 
 	const bisector = d3.bisector<[number, number], number>((point) => point[0]);
 	let nearestValues = $derived.by(() => {
-		if (tooltipXOffset === undefined) {
-			return undefined;
-		}
+		let offset = tooltipXOffset === undefined ? zoomedXScale.range()[0] : tooltipXOffset;
+
 		const values = metricsProps.map((metric) => {
 			let nearestValue =
-				metric.values[bisector.center(metric.values, zoomedXScale.invert(tooltipXOffset!))];
+				metric.values[bisector.center(metric.values, zoomedXScale.invert(offset!))];
 			return {
 				metric: metric.name,
 				value: nearestValue[1],
@@ -187,29 +186,27 @@
 				order: metric.order
 			};
 		});
-		return { time: zoomedXScale.invert(tooltipXOffset!), values };
+		return { time: zoomedXScale.invert(offset!), values };
 	});
 
 	let smoothing = $state(5);
 </script>
 
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
-{#if nearestValues}
-	<p class="flex justify-center pt-2 text-sm sm:text-base">
-		{#if zoomedIn}
-			<button onclick={resetZoom}>🔄</button>
-		{/if}
-		<span class="px-1.5">
-			⌚ {formatDuration(nearestValues.time)} :
+<p class="flex justify-center pt-2 text-xs sm:text-base">
+	{#if zoomedIn}
+		<button onclick={resetZoom}>🔄</button>
+	{/if}
+	<span class="px-1.5">
+		⌚ {formatDuration(nearestValues.time)}
+	</span>
+	{#each nearestValues.values as value}
+		<span class={`px-1.5 ${textColors[value.metric]}`}>
+			{value.metric}: {value.value.toFixed(2)}
+			{value.unit}
 		</span>
-		{#each nearestValues.values as value}
-			<span class={`px-1.5 ${textColors[value.metric]}`}>
-				{value.metric}: {value.value.toFixed(2)}
-				{value.unit}
-			</span>
-		{/each}
-	</p>
-{/if}
+	{/each}
+</p>
 <svg
 	bind:this={svgElement}
 	{width}
