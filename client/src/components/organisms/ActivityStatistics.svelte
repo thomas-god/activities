@@ -84,15 +84,6 @@
 			});
 		}
 
-		if (calories !== undefined) {
-			rows.push({
-				icon: '🔥',
-				label: 'Calories',
-				value: `${calories.toFixed(0)}`,
-				unit: 'kcal'
-			});
-		}
-
 		if (avgHeartRate !== undefined && maxHeartRate !== undefined) {
 			rows.push({
 				icon: '❤️',
@@ -100,6 +91,15 @@
 				value: `${avgHeartRate.toFixed(0)} / ${maxHeartRate.toFixed(0)}`,
 				unit: 'bpm',
 				legend: 'avg / max'
+			});
+		}
+
+		if (calories !== undefined) {
+			rows.push({
+				icon: '🔥',
+				label: 'Calories',
+				value: `${calories.toFixed(0)}`,
+				unit: 'kcal'
 			});
 		}
 
@@ -139,14 +139,14 @@
 
 		<div class="grid grid-cols-3">
 			{#each statRows as row}
-				<div class="flex flex-col gap-1 pb-2 @lg:hidden">
+				<div class="flex flex-col gap-0 pb-3 @lg:hidden">
 					<div class="text-lg font-semibold">
 						{row.value || '-'}
 						<span class="text-sm font-medium">
 							{row.unit}
 						</span>
 					</div>
-					<div class="text-xs">
+					<div class="overflow-x-auto text-xs text-nowrap">
 						{row.icon}
 						<span class="opacity-60">
 							{row.label}
