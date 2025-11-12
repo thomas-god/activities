@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { invalidate } from '$app/navigation';
 	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { dayjs } from '$lib/duration';
+	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 
 	let { data }: PageProps = $props();
 
@@ -64,6 +66,16 @@
 	const moreActivitiesCallback = () => {
 		goto('/history');
 	};
+
+	const handleNoteSave = async (noteId: string, content: string, date: string) => {
+		await updateTrainingNote(noteId, content, date);
+		await invalidate('app:activities');
+	};
+
+	const handleNoteDelete = async (noteId: string) => {
+		await deleteTrainingNote(noteId);
+		await invalidate('app:activities');
+	};
 </script>
 
 {#if topMetric}
@@ -107,5 +119,11 @@
 {/if}
 
 <div class="mx-2 mt-5 sm:mx-auto">
-	<PastActivitiesList activityList={sorted_activities} moreCallback={moreActivitiesCallback} />
+	<PastActivitiesList
+		activityList={sorted_activities}
+		trainingNotes={data.trainingNotes}
+		moreCallback={moreActivitiesCallback}
+		onNoteSave={handleNoteSave}
+		onNoteDelete={handleNoteDelete}
+	/>
 </div>

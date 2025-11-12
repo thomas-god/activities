@@ -46,11 +46,11 @@
 		{#if page.url.pathname === '/'}
 			<div class="flex w-full flex-row justify-center gap-2 sm:justify-end">
 				<button
-					class="btn w-32 rounded-lg btn-sm btn-primary sm:btn-md"
+					class="btn w-32 rounded-lg btn-sm btn-primary sm:w-36 sm:btn-md"
 					onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
 				>
 				<button
-					class="btn w-32 rounded-lg btn-sm btn-primary sm:btn-md"
+					class="btn w-32 rounded-lg btn-sm btn-primary sm:w-36 sm:btn-md"
 					onclick={() => newTrainingNoteDialog.showModal()}>+ New note</button
 				>
 			</div>

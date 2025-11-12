@@ -5,10 +5,10 @@
 	import type { PageProps } from './$types';
 	import type { TrainingNote } from './+page';
 	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
-	import TrainingNoteListItem from '$components/organisms/TrainingNoteListItem.svelte';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
+	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -366,15 +366,11 @@
 					{#if item.type === 'activity'}
 						<ActivitiesListItem activity={item.data} showNote={true} />
 					{:else}
-						<div class="border-l-4 border-warning/40 bg-warning/2">
-							<div class="p-2 px-4">
-								<TrainingNoteListItem
-									note={item.data}
-									onSave={(content, date) => saveNote(item.data.id, content, date)}
-									onDelete={() => handleDeleteNote(item.data.id)}
-								/>
-							</div>
-						</div>
+						<TrainingNoteListItemCompact
+							note={item.data}
+							onEdit={(content, date) => saveNote(item.data.id, content, date)}
+							onDelete={() => handleDeleteNote(item.data.id)}
+						/>
 					{/if}
 				{/each}
 			</div>

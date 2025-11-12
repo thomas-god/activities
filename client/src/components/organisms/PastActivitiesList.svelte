@@ -1,69 +1,143 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
 	import type { ActivityList, ActivityListItem } from '$lib/api';
+	import type { TrainingNote, TrainingNotesList } from '$lib/api/training';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
+	import TrainingNoteListItemCompact from './TrainingNoteListItemCompact.svelte';
 
-	let { activityList, moreCallback }: { activityList: ActivityList; moreCallback: () => void } =
-		$props();
+	type TimelineItem =
+		| { type: 'activity'; data: ActivityListItem; date: string }
+		| { type: 'note'; data: TrainingNote; date: string };
 
-	let groupedActivities = $derived.by(() => {
+	let {
+		activityList,
+		trainingNotes = [],
+		moreCallback,
+		onNoteSave,
+		onNoteDelete
+	}: {
+		activityList: ActivityList;
+		trainingNotes?: TrainingNotesList;
+		moreCallback: () => void;
+		onNoteSave?: (noteId: string, content: string, date: string) => void;
+		onNoteDelete?: (noteId: string) => void;
+	} = $props();
+
+	let groupedItems = $derived.by(() => {
 		const now = dayjs();
-		const activities = {
-			thisWeek: [] as ActivityListItem[],
-			thisMonth: [] as ActivityListItem[],
-			earlier: [] as ActivityListItem[]
+		const items = {
+			thisWeek: [] as TimelineItem[],
+			thisMonth: [] as TimelineItem[],
+			earlier: [] as TimelineItem[]
 		};
 
+		// Add activities to timeline
 		for (const activity of activityList) {
-			const start = dayjs(activity.start_time);
-			if (start > now.startOf('isoWeek')) {
-				activities.thisWeek.push(activity);
-			} else if (start > now.startOf('month')) {
-				activities.thisMonth.push(activity);
+			const date = dayjs(activity.start_time);
+			const item: TimelineItem = {
+				type: 'activity',
+				data: activity,
+				date: activity.start_time
+			};
+
+			if (date > now.startOf('isoWeek')) {
+				items.thisWeek.push(item);
+			} else if (date > now.startOf('month')) {
+				items.thisMonth.push(item);
 			} else {
-				activities.earlier.push(activity);
+				items.earlier.push(item);
 			}
 		}
 
-		return activities;
+		// Add training notes to timeline
+		for (const note of trainingNotes) {
+			const date = dayjs(note.date);
+			const item: TimelineItem = {
+				type: 'note',
+				data: note,
+				date: note.date
+			};
+
+			if (date > now.startOf('isoWeek')) {
+				items.thisWeek.push(item);
+			} else if (date > now.startOf('month')) {
+				items.thisMonth.push(item);
+			} else {
+				items.earlier.push(item);
+			}
+		}
+
+		// Sort each group by date (most recent first)
+		items.thisWeek.sort((a, b) => dayjs(b.date).diff(dayjs(a.date)));
+		items.thisMonth.sort((a, b) => dayjs(b.date).diff(dayjs(a.date)));
+		items.earlier.sort((a, b) => dayjs(b.date).diff(dayjs(a.date)));
+
+		return items;
 	});
+
 	const containerClass = 'text-base-content/60 my-3 text-xs font-semibold uppercase tracking-wide';
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
 	<div class="flex items-center justify-between pb-2 text-lg font-semibold tracking-wide">
-		<span> Recent activities </span>
+		<span> Recent activities and notes</span>
 		<button class="btn btn-link btn-sm" onclick={moreCallback}> view all →</button>
 	</div>
 
-	{#if groupedActivities.thisWeek.length > 0}
+	{#if groupedItems.thisWeek.length > 0}
 		<p class={containerClass}>This week</p>
 		<div class="flex flex-col">
-			{#each groupedActivities.thisWeek as activity}
-				<ActivitiesListItem {activity} />
+			{#each groupedItems.thisWeek as item}
+				{#if item.type === 'activity'}
+					<ActivitiesListItem activity={item.data} />
+				{:else}
+					<TrainingNoteListItemCompact
+						note={item.data}
+						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
+						onDelete={() => onNoteDelete?.(item.data.id)}
+					/>
+				{/if}
 			{/each}
 		</div>
 	{/if}
 
-	{#if groupedActivities.thisMonth.length > 0}
+	{#if groupedItems.thisMonth.length > 0}
 		<p class={containerClass}>This month</p>
 		<div class="flex flex-col">
-			{#each groupedActivities.thisMonth as activity}
-				<ActivitiesListItem {activity} />
+			{#each groupedItems.thisMonth as item}
+				{#if item.type === 'activity'}
+					<ActivitiesListItem activity={item.data} />
+				{:else}
+					<TrainingNoteListItemCompact
+						note={item.data}
+						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
+						onDelete={() => onNoteDelete?.(item.data.id)}
+					/>
+				{/if}
 			{/each}
 		</div>
 	{/if}
 
-	{#if groupedActivities.earlier.length > 0}
+	{#if groupedItems.earlier.length > 0}
 		<p class={containerClass}>Earlier</p>
 		<div class="flex flex-col">
-			{#each groupedActivities.earlier as activity}
-				<ActivitiesListItem {activity} />
+			{#each groupedItems.earlier as item}
+				{#if item.type === 'activity'}
+					<ActivitiesListItem activity={item.data} />
+				{:else}
+					<TrainingNoteListItemCompact
+						note={item.data}
+						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
+						onDelete={() => onNoteDelete?.(item.data.id)}
+					/>
+				{/if}
 			{/each}
 		</div>
 	{/if}
 
-	{#if activityList.length === 0}
-		<div class="p-4 pb-2 text-center text-sm tracking-wide italic opacity-60">No activities</div>
+	{#if activityList.length === 0 && trainingNotes.length === 0}
+		<div class="p-4 pb-2 text-center text-sm tracking-wide italic opacity-60">
+			No activities or notes
+		</div>
 	{/if}
 </div>
