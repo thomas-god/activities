@@ -69,12 +69,12 @@
 
 	const handleNoteSave = async (noteId: string, content: string, date: string) => {
 		await updateTrainingNote(noteId, content, date);
-		await invalidate('app:activities');
+		await invalidate('app:training-notes');
 	};
 
 	const handleNoteDelete = async (noteId: string) => {
 		await deleteTrainingNote(noteId);
-		await invalidate('app:activities');
+		await invalidate('app:training-notes');
 	};
 </script>
 

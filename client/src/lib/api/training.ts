@@ -196,8 +196,10 @@ export async function fetchTrainingMetrics(
  * @returns Array of training notes or empty array on error
  */
 export async function fetchTrainingNotes(
-	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	depends: (...deps: `${string}:${string}`[]) => void
 ): Promise<TrainingNotesList> {
+	depends('app:training-notes');
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/notes`, {
 		method: 'GET',
 		mode: 'cors',

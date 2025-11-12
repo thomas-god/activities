@@ -18,7 +18,7 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 		fetchTrainingMetrics(fetch, startDate),
 		fetchTrainingPeriods(fetch),
 		fetchAllPreferences(fetch),
-		fetchTrainingNotes(fetch)
+		fetchTrainingNotes(fetch, depends)
 	]);
 
 	// Filter notes to only include those after (inclusive) the oldest activity date
