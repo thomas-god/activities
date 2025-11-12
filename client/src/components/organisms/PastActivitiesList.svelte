@@ -89,7 +89,7 @@
 		<div class="flex flex-col">
 			{#each groupedItems.thisWeek as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} />
+					<ActivitiesListItem activity={item.data} showNote={true} />
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}
@@ -106,7 +106,7 @@
 		<div class="flex flex-col">
 			{#each groupedItems.thisMonth as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} />
+					<ActivitiesListItem activity={item.data} showNote={true} />
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}
@@ -123,7 +123,7 @@
 		<div class="flex flex-col">
 			{#each groupedItems.earlier as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} />
+					<ActivitiesListItem activity={item.data} showNote={true} />
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}
