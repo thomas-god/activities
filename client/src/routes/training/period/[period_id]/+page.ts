@@ -16,7 +16,7 @@ export const load: PageLoad = async ({ fetch, params, depends }) => {
 
 	// Fetch training notes (we'll filter them on the client side based on period dates)
 	depends('app:training-notes');
-	const trainingNotes = await fetchTrainingNotes(fetch);
+	const trainingNotes = await fetchTrainingNotes(fetch, depends);
 
 	return { periodDetails, trainingNotes };
 };
