@@ -90,6 +90,7 @@
 
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
+		<legend class="fieldset-legend text-base">New training metric</legend>
 		<label class="label" for="metric-granularity">Granularity</label>
 		<select class="select" bind:value={granularity} id="metric-granularity">
 			<option value="Daily">Daily</option>

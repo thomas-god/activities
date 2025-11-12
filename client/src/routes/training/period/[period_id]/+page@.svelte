@@ -326,7 +326,7 @@
 			{:else}
 				<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
 					<span>📝</span>
-					<span>Add period note</span>
+					<span>Add period description</span>
 				</button>
 			{/if}
 		</div>

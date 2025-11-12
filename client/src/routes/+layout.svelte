@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import '../app.css';
 	import ActivitiesUploader from '$components/organisms/ActivitiesUploader.svelte';
+	import CreateTrainingNote from '$components/organisms/CreateTrainingNote.svelte';
 
 	let { children } = $props();
 
@@ -18,7 +19,13 @@
 		invalidate('app:activities');
 	};
 
+	const newTrainingNoteCallback = () => {
+		newTrainingNoteDialog.close();
+		invalidate('app:training-notes');
+	};
+
 	let activitiesUploadDialog: HTMLDialogElement;
+	let newTrainingNoteDialog: HTMLDialogElement;
 </script>
 
 <div class="container">
@@ -37,10 +44,14 @@
 			>
 		</div>
 		{#if page.url.pathname === '/'}
-			<div class="">
+			<div class="flex w-full flex-row justify-center gap-2 sm:justify-end">
 				<button
-					class="btn w-full rounded-lg btn-primary"
+					class="btn w-32 rounded-lg btn-sm btn-primary sm:btn-md"
 					onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
+				>
+				<button
+					class="btn w-32 rounded-lg btn-sm btn-primary sm:btn-md"
+					onclick={() => newTrainingNoteDialog.showModal()}>+ New note</button
 				>
 			</div>
 		{/if}
@@ -49,6 +60,15 @@
 	<dialog class="modal" id="activity-upload-modal" bind:this={activitiesUploadDialog}>
 		<div class="modal-box">
 			<ActivitiesUploader {activitiesUploadedCallback} />
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
+	<dialog class="modal" id="new-training-note-modal" bind:this={newTrainingNoteDialog}>
+		<div class="modal-box">
+			<CreateTrainingNote callback={newTrainingNoteCallback} />
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button>close</button>

@@ -66,6 +66,7 @@
 
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
+		<legend class="fieldset-legend text-base">New training period</legend>
 		<label class="label" for="period-name">Training period name</label>
 		<input type="text" placeholder="Name" class="input" id="period-name" bind:value={name} />
 

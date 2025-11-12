@@ -34,6 +34,7 @@
 
 <div class="text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
+		<legend class="fieldset-legend text-base">New training note</legend>
 		<label class="label" for="note-date">Date</label>
 		<input type="date" class="input" id="note-date" bind:value={date} />
 
