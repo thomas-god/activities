@@ -44,7 +44,7 @@
 				).format('MMM D, YYYY')}
 			</div>
 			{#if showNote && activity.feedback}
-				<div class="mt-2 line-clamp-2 text-sm text-gray-600 italic">
+				<div class="mt-2 text-sm text-gray-600 italic">
 					📝 {activity.feedback}
 				</div>
 			{/if}

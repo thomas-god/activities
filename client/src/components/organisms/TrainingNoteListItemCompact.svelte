@@ -82,7 +82,7 @@
 				</ul>
 			</div>
 		</div>
-		<div class="my-2 line-clamp-2 pl-2 text-sm whitespace-pre-wrap italic opacity-80">
+		<div class="my-2 pl-2 text-sm whitespace-pre-wrap italic opacity-80">
 			{note.content}
 		</div>
 	</div>
