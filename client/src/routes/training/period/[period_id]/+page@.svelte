@@ -9,6 +9,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
+	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -19,6 +20,9 @@
 	let showEditNoteModal = $state(false);
 	let editedNote = $state('');
 	let isUpdatingNote = $state(false);
+
+	let chartWidth: number = $state(300);
+	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 
 	async function handleDelete() {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
@@ -331,6 +335,15 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if data.metrics.length > 0}
+		<div
+			bind:clientWidth={chartWidth}
+			class="mx-2 rounded-box bg-base-100 pb-2 shadow-md sm:mx-auto"
+		>
+			<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
+		</div>
+	{/if}
 
 	<!-- Activities section -->
 	<div class="rounded-box bg-base-100 p-4 shadow-md">

@@ -5,7 +5,8 @@ import {
 	type TrainingPeriodDetails,
 	type TrainingPeriodActivityItem
 } from '$lib/api';
-import { fetchTrainingNotes, type TrainingNote } from '$lib/api/training';
+import { fetchTrainingNotes, fetchTrainingMetrics, type TrainingNote } from '$lib/api/training';
+import { dayjs } from '$lib/duration';
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
 	const periodDetails = await fetchTrainingPeriodDetails(fetch, params.period_id);
@@ -18,7 +19,12 @@ export const load: PageLoad = async ({ fetch, params, depends }) => {
 	depends('app:training-notes');
 	const trainingNotes = await fetchTrainingNotes(fetch, depends);
 
-	return { periodDetails, trainingNotes };
+	// Fetch training metrics for the period date range
+	const startDate = dayjs(periodDetails.start).toDate();
+	const endDate = periodDetails.end ? dayjs(periodDetails.end).toDate() : new Date();
+	const metrics = await fetchTrainingMetrics(fetch, startDate, endDate);
+
+	return { periodDetails, trainingNotes, metrics };
 };
 
 export const prerender = false;
