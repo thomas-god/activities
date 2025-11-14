@@ -281,6 +281,22 @@ impl TrainingRepository for SqliteTrainingRepository {
             .map(|_| ())
     }
 
+    async fn update_training_period_dates(
+        &self,
+        period_id: &TrainingPeriodId,
+        start: NaiveDate,
+        end: Option<NaiveDate>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_training_periods SET start = ?1, end = ?2 WHERE id = ?3;")
+            .bind(start)
+            .bind(end)
+            .bind(period_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
+
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
         sqlx::query(
             "INSERT INTO t_training_notes (id, user_id, title, content, date, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
@@ -407,7 +423,12 @@ mod test_sqlite_training_repository {
             .await
             .unwrap();
 
-        sqlx::query("select count(*) from t_training_metrics_values;")
+        sqlx::query("select count(*) from t_training_periods;")
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap();
+
+        sqlx::query("select count(*) from t_training_notes;")
             .fetch_one(&repository.pool)
             .await
             .unwrap();
@@ -1230,6 +1251,184 @@ mod test_sqlite_training_repository {
             .await;
         assert!(fetched2.is_some());
         assert_eq!(fetched2.unwrap().note(), period2.note());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Update the dates
+        let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
+        let result = repository
+            .update_training_period_dates(period.id(), new_start, new_end.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the dates were updated
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+        let fetched_period = fetched.unwrap();
+        assert_eq!(fetched_period.start(), &new_start);
+        assert_eq!(fetched_period.end(), &new_end);
+        // Verify other fields unchanged
+        assert_eq!(fetched_period.id(), period.id());
+        assert_eq!(fetched_period.user(), period.user());
+        assert_eq!(fetched_period.name(), period.name());
+        assert_eq!(fetched_period.note(), period.note());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_clear_end_date() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period with an end date
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Update dates and clear the end date
+        let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
+        let result = repository
+            .update_training_period_dates(period.id(), new_start, None)
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the dates were updated and end date is cleared
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+        let fetched_period = fetched.unwrap();
+        assert_eq!(fetched_period.start(), &new_start);
+        assert_eq!(fetched_period.end(), &None);
+        // Verify other fields unchanged
+        assert_eq!(fetched_period.name(), period.name());
+        assert_eq!(fetched_period.note(), period.note());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_only_start() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period
+        let period = build_training_period();
+        let original_end = period.end().clone();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Update only the start date, keeping the original end
+        let new_start = "2025-10-15".parse::<NaiveDate>().unwrap();
+        let result = repository
+            .update_training_period_dates(period.id(), new_start, original_end.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify only start was updated
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+        let fetched_period = fetched.unwrap();
+        assert_eq!(fetched_period.start(), &new_start);
+        assert_eq!(fetched_period.end(), &original_end);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Try to update a non-existent period
+        let period_id = TrainingPeriodId::new();
+        let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
+        let result = repository
+            .update_training_period_dates(&period_id, new_start, new_end)
+            .await;
+
+        // Should succeed (no rows affected, but no error)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_only_updates_specified_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create two periods
+        let period1 = build_training_period();
+        let period2 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            period1.user().clone(),
+            "2025-11-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-11-15".parse::<NaiveDate>().unwrap()),
+            "Another Period".to_string(),
+            TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Cycling)])),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period1.clone())
+            .await
+            .expect("Should save period 1");
+        repository
+            .save_training_period(period2.clone())
+            .await
+            .expect("Should save period 2");
+
+        // Update only period1's dates
+        let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
+        let result = repository
+            .update_training_period_dates(period1.id(), new_start, new_end.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify period1's dates were updated
+        let fetched1 = repository
+            .get_training_period(period1.user(), period1.id())
+            .await;
+        assert!(fetched1.is_some());
+        let updated_period1 = fetched1.unwrap();
+        assert_eq!(updated_period1.start(), &new_start);
+        assert_eq!(updated_period1.end(), &new_end);
+
+        // Verify period2's dates are unchanged
+        let fetched2 = repository
+            .get_training_period(period2.user(), period2.id())
+            .await;
+        assert!(fetched2.is_some());
+        let unchanged_period2 = fetched2.unwrap();
+        assert_eq!(unchanged_period2.start(), period2.start());
+        assert_eq!(unchanged_period2.end(), period2.end());
     }
 
     fn build_training_note() -> TrainingNote {

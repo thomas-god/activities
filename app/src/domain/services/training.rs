@@ -19,7 +19,8 @@ use crate::domain::{
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
         DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
         GetTrainingNoteError, ITrainingService, ListActivitiesFilters, TrainingRepository,
-        UpdateTrainingNoteError, UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+        UpdateTrainingNoteError, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+        UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
         UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
     },
 };
@@ -397,6 +398,45 @@ where
         Ok(())
     }
 
+    async fn update_training_period_dates(
+        &self,
+        req: UpdateTrainingPeriodDatesRequest,
+    ) -> Result<(), UpdateTrainingPeriodDatesError> {
+        // Get the period to verify it exists and check ownership
+        let Some(period) = self
+            .training_repository
+            .get_training_period(req.user(), req.period_id())
+            .await
+        else {
+            return Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(
+                req.period_id().clone(),
+            ));
+        };
+
+        // Verify user owns the period
+        if period.user() != req.user() {
+            return Err(UpdateTrainingPeriodDatesError::UserDoesNotOwnPeriod(
+                req.user().clone(),
+                req.period_id().clone(),
+            ));
+        }
+
+        // Validate dates
+        if let Some(end_date) = req.end()
+            && req.start() > end_date
+        {
+            return Err(UpdateTrainingPeriodDatesError::EndDateBeforeStartDate);
+        }
+
+        // Update the period dates
+        self.training_repository
+            .update_training_period_dates(req.period_id(), *req.start(), req.end().clone())
+            .await
+            .map_err(UpdateTrainingPeriodDatesError::Unknown)?;
+
+        Ok(())
+    }
+
     async fn create_training_note(
         &self,
         req: CreateTrainingNoteRequest,
@@ -508,6 +548,7 @@ where
 #[cfg(test)]
 pub mod test_utils {
 
+    use chrono::NaiveDate;
     use mockall::mock;
 
     use crate::domain::{
@@ -586,6 +627,11 @@ pub mod test_utils {
                 &self,
                 req: UpdateTrainingPeriodNoteRequest,
             ) -> Result<(), UpdateTrainingPeriodNoteError>;
+
+            async fn update_training_period_dates(
+                &self,
+                req: UpdateTrainingPeriodDatesRequest,
+            ) -> Result<(), UpdateTrainingPeriodDatesError>;
 
             async fn create_training_note(
                 &self,
@@ -706,6 +752,13 @@ pub mod test_utils {
                 &self,
                 period_id: &TrainingPeriodId,
                 note: Option<String>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn update_training_period_dates(
+                &self,
+                period_id: &TrainingPeriodId,
+                start: NaiveDate,
+                end: Option<NaiveDate>,
             ) -> Result<(), anyhow::Error>;
 
             async fn save_training_note(
@@ -2402,6 +2455,246 @@ mod test_training_service_period {
         assert!(result.is_err());
         match result {
             Err(UpdateTrainingPeriodNoteError::Unknown(_)) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_ok() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let period_id_clone = period_id.clone();
+        let new_start_clone = new_start;
+        let new_end_clone = new_end.clone();
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .withf(move |id, start, end| {
+                id == &period_id_clone && start == &new_start_clone && end == &new_end_clone
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_clear_end_date() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = None;
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let period_id_clone = period_id.clone();
+        let new_start_clone = new_start;
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .withf(move |id, start, end| {
+                id == &period_id_clone && start == &new_start_clone && end.is_none()
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_end_before_start() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-30".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-01".parse::<NaiveDate>().unwrap());
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::EndDateBeforeStartDate) => {}
+            _ => panic!("Expected EndDateBeforeStartDate error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_not_found() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(|_, _| None);
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req =
+            UpdateTrainingPeriodDatesRequest::new(user_id, period_id.clone(), new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(id)) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected PeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_user_does_not_own() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let other_user_id = UserId::from("other_user".to_string());
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            other_user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodDatesRequest::new(
+            user_id.clone(),
+            period_id.clone(),
+            new_start,
+            new_end,
+        );
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::UserDoesNotOwnPeriod(uid, pid)) => {
+                assert_eq!(uid, user_id);
+                assert_eq!(pid, period_id);
+            }
+            _ => panic!("Expected UserDoesNotOwnPeriod error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_repository_error() {
+        let period_id = TrainingPeriodId::new();
+        let user_id = UserId::test_default();
+        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            "2025-10-17".parse::<NaiveDate>().unwrap(),
+            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .return_once(move |_, _| Some(period));
+        training_repository
+            .expect_update_training_period_dates()
+            .times(1)
+            .returning(|_, _, _| Err(anyhow!("database error")));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
+        let result = service.update_training_period_dates(req).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(UpdateTrainingPeriodDatesError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
     }
