@@ -20,6 +20,10 @@
 	let showEditNoteModal = $state(false);
 	let editedNote = $state('');
 	let isUpdatingNote = $state(false);
+	let showEditDatesModal = $state(false);
+	let editedStart = $state('');
+	let editedEnd = $state('');
+	let isUpdatingDates = $state(false);
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
@@ -48,6 +52,12 @@
 		showEditNoteModal = true;
 	}
 
+	function openEditDatesModal() {
+		editedStart = period.start;
+		editedEnd = period.end ?? '';
+		showEditDatesModal = true;
+	}
+
 	async function handleUpdateNote() {
 		isUpdatingNote = true;
 		try {
@@ -73,6 +83,49 @@
 			console.error(error);
 		} finally {
 			isUpdatingNote = false;
+		}
+	}
+
+	async function handleUpdateDates() {
+		if (!editedStart) {
+			alert('Start date is required');
+			return;
+		}
+
+		if (editedEnd && editedEnd < editedStart) {
+			alert('End date must be after start date');
+			return;
+		}
+
+		isUpdatingDates = true;
+		try {
+			const body: { start: string; end?: string } = { start: editedStart };
+			if (editedEnd) {
+				body.end = editedEnd;
+			}
+
+			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+				method: 'PATCH',
+				credentials: 'include',
+				mode: 'cors',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(body)
+			});
+
+			if (response.ok) {
+				// Reload the page to show updated content
+				window.location.reload();
+			} else {
+				const error = await response.json();
+				alert(error.error || 'Failed to update training period dates');
+			}
+		} catch (error) {
+			alert('Error updating training period dates');
+			console.error(error);
+		} finally {
+			isUpdatingDates = false;
 		}
 	}
 
@@ -301,6 +354,12 @@
 								</button>
 							</li>
 							<li>
+								<button onclick={openEditDatesModal}>
+									<span>📅</span>
+									<span>Edit dates</span>
+								</button>
+							</li>
+							<li>
 								<button onclick={() => (showDeleteModal = true)} class="text-error">
 									<span>🗑️</span>
 									<span>Delete</span>
@@ -437,6 +496,54 @@
 	itemPreview={period.name}
 	onConfirm={handleDelete}
 />
+
+<!-- Edit dates modal -->
+{#if showEditDatesModal}
+	<dialog class="modal-open modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Edit Training Period Dates</h3>
+			<div class="space-y-4 py-4">
+				<label class="input">
+					<span class="label">Start Date</span>
+					<input
+						type="date"
+						bind:value={editedStart}
+						class="w-full text-right"
+						disabled={isUpdatingDates}
+						required
+					/>
+				</label>
+				<label class="input">
+					<span class="label">End Date (optional)</span>
+					<input
+						type="date"
+						bind:value={editedEnd}
+						class="w-full text-right"
+						disabled={isUpdatingDates}
+						min={editedStart}
+					/>
+				</label>
+				<p class="text-xs opacity-70">Leave end date empty for an ongoing period</p>
+			</div>
+			<div class="modal-action">
+				<button class="btn" onclick={() => (showEditDatesModal = false)} disabled={isUpdatingDates}>
+					Cancel
+				</button>
+				<button class="btn btn-primary" onclick={handleUpdateDates} disabled={isUpdatingDates}>
+					{#if isUpdatingDates}
+						<span class="loading loading-sm loading-spinner"></span>
+						Updating...
+					{:else}
+						Update
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button onclick={() => (showEditDatesModal = false)}>close</button>
+		</form>
+	</dialog>
+{/if}
 
 <!-- Edit note modal -->
 {#if showEditNoteModal}
