@@ -37,7 +37,7 @@
 	});
 </script>
 
-<div class="flex flex-col">
+<div class="flex items-center justify-center gap-1.5">
 	<div class="text-base font-medium">
 		{capitalize(granularity.toLowerCase())}
 		{aggregateFunctionDisplay[aggregate]}
@@ -46,8 +46,8 @@
 		{/if}
 	</div>
 	{#if subtitle}
-		<div class="text-sm opacity-70">
-			{subtitle}
+		<div class="tooltip tooltip-bottom" data-tip={subtitle}>
+			<span class="cursor-help text-xs opacity-50">ℹ️</span>
 		</div>
 	{/if}
 </div>
