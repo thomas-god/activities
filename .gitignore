@@ -228,3 +228,6 @@ data/
 .vscode/
 
 todo
+instructions/
+copilot-instructions.md
+CLAUDE.md
