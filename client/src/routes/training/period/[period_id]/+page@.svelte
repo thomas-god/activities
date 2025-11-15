@@ -272,6 +272,27 @@
 
 		return Array.from(map.values());
 	});
+
+	const formatPeriodDuration = (start: string, end: string | null): string => {
+		const startDate = dayjs(start);
+		const endDate = end ? dayjs(end) : dayjs();
+		// Add 1 to include the last day (end date is inclusive)
+		const days = endDate.diff(startDate, 'day') + 1;
+
+		if (days === 1) return '1 day';
+		if (days < 7) return `${days} days`;
+
+		const weeks = Math.floor(days / 7);
+		const remainingDays = days % 7;
+
+		if (remainingDays === 0) {
+			return weeks === 1 ? '1 week' : `${weeks} weeks`;
+		}
+
+		const weeksText = weeks === 1 ? '1 week' : `${weeks} weeks`;
+		const daysText = remainingDays === 1 ? '1 day' : `${remainingDays} days`;
+		return `${weeksText} ${daysText}`;
+	};
 </script>
 
 <div class="mx-auto mt-4 flex flex-col gap-4">
@@ -338,6 +359,7 @@
 						</ul>
 					</div>
 				</div>
+				<div class="text-xs opacity-70">{formatPeriodDuration(period.start, period.end)}</div>
 			</div>
 		</div>
 
@@ -378,7 +400,7 @@
 		</div>
 
 		{#if period.activities.length > 0}
-			<div class="mb-4">
+			<div class="mb-4 rounded bg-base-200 p-4">
 				<TrainingPeriodStatistics {period} />
 			</div>
 

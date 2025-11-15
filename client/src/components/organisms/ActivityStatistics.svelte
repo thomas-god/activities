@@ -137,9 +137,9 @@
 			{/each}
 		</div>
 
-		<div class="grid grid-cols-3">
+		<div class="grid grid-cols-3 gap-0.5">
 			{#each statRows as row}
-				<div class="flex h-16 flex-col gap-0 pb-3 text-center @lg:hidden">
+				<div class="flex h-16 flex-col gap-0 pb-3 text-left @lg:hidden">
 					<div class="text-lg font-semibold">
 						{row.value || '-'}
 						<span class="text-xs font-medium">
@@ -147,8 +147,8 @@
 						</span>
 					</div>
 					<div class="text-xs">
-						{row.icon}
 						<span class="opacity-60">
+							<!-- {row.icon} -->
 							{row.label}
 
 							{#if row.legend}

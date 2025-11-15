@@ -41,19 +41,24 @@
 			{localiseDateTime(activity.start_time)}
 			·
 			{sportDisplay(activity.sport)}
-		</div>
-	</div>
 
-	<div class="dropdown dropdown-end ml-2">
-		<button tabindex="0" class="btn btn-circle btn-ghost btn-sm" aria-label="More options">
-			⋮
-		</button>
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-		<ul tabindex="0" class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow">
-			<li>
-				<button onclick={onDeleteClickedCallback} class="text-error"> 🗑️ Delete Activity </button>
-			</li>
-		</ul>
+			<div class="dropdown dropdown-end ml-0">
+				<button tabindex="0" class="btn btn-circle btn-ghost btn-xs" aria-label="More options">
+					⋮
+				</button>
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<ul
+					tabindex="0"
+					class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
+				>
+					<li>
+						<button onclick={onDeleteClickedCallback} class="text-error">
+							🗑️ Delete Activity
+						</button>
+					</li>
+				</ul>
+			</div>
+		</div>
 	</div>
 </div>
 

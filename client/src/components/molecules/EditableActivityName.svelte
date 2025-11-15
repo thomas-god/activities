@@ -42,8 +42,10 @@
 		</div>
 	</div>
 {:else}
-	<div class="flex items-center gap-2">
-		<span>{displayName}</span>
-		<button class="btn opacity-75 btn-ghost btn-xs" onclick={startEditing}> ✏️ </button>
+	<div>
+		<span>
+			{displayName}
+		</span>
+		<button class="btn pl-0 opacity-75 btn-ghost btn-xs" onclick={startEditing}> ✏️ </button>
 	</div>
 {/if}

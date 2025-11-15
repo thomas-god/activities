@@ -25,27 +25,6 @@
 		return total;
 	});
 
-	const formatPeriodDuration = (start: string, end: string | null): string => {
-		const startDate = dayjs(start);
-		const endDate = end ? dayjs(end) : dayjs();
-		// Add 1 to include the last day (end date is inclusive)
-		const days = endDate.diff(startDate, 'day') + 1;
-
-		if (days === 1) return '1 day';
-		if (days < 7) return `${days} days`;
-
-		const weeks = Math.floor(days / 7);
-		const remainingDays = days % 7;
-
-		if (remainingDays === 0) {
-			return weeks === 1 ? '1 week' : `${weeks} weeks`;
-		}
-
-		const weeksText = weeks === 1 ? '1 week' : `${weeks} weeks`;
-		const daysText = remainingDays === 1 ? '1 day' : `${remainingDays} days`;
-		return `${weeksText} ${daysText}`;
-	};
-
 	const formatDistance = (meters: number): string => {
 		if (meters === 0) return '0 km';
 		const km = meters / 1000;
@@ -58,11 +37,7 @@
 	};
 </script>
 
-<div class="flex flex-row flex-wrap gap-6 rounded bg-base-200 p-4">
-	<div class="flex flex-col">
-		<div class="text-xs opacity-70">Period Duration</div>
-		<div class="text-xl font-semibold">{formatPeriodDuration(period.start, period.end)}</div>
-	</div>
+<div class="grid max-w-80 grid-cols-2 gap-2">
 	<div class="flex flex-col">
 		<div class="text-xs opacity-70">Activities</div>
 		<div class="text-xl font-semibold">{summary.count}</div>
