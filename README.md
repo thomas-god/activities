@@ -27,8 +27,8 @@ Beside the authentication process, both versions offer the same set of features.
 
 ### Available images
 
-- multi-user: `ghcr.io/thomas-god/activities:multi-user-main`,
-- single-user: `ghcr.io/thomas-god/activities:single-user-main`.
+- multi-user: `ghcr.io/thomas-god/activities:multi-user-latest`,
+- single-user: `ghcr.io/thomas-god/activities:single-user-latest`.
 
 All images are available for both `amd64` and `arm64`.
 

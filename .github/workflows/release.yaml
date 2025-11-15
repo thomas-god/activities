@@ -111,12 +111,12 @@ jobs:
         with:
           images: ghcr.io/thomas-god/activities
           flavor: |
-            latest=auto
-            prefix=${{ matrix.feature }}-
+            latest=false
           tags: |
             type=semver,pattern={{version}},prefix=${{ matrix.feature }}-
             type=semver,pattern={{major}}.{{minor}},prefix=${{ matrix.feature }}-
             type=semver,pattern={{major}},prefix=${{ matrix.feature }}-
+            type=raw,value=${{ matrix.feature }}-latest
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests/${{ matrix.feature }}
