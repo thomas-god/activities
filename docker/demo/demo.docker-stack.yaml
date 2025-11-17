@@ -1,6 +1,6 @@
 services:
   activities:
-    image: ghcr.io/thomas-god/activities:single-user-main
+    image: ghcr.io/thomas-god/activities:single-user-latest
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.activities-demo.loadbalancer.server.port=80"

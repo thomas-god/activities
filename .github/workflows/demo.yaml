@@ -2,7 +2,7 @@ name: Deploy demo app
 
 on:
   workflow_run:
-    workflows: ["Build app image"]
+    workflows: ["Release"]
     types:
       - completed
 jobs:
@@ -19,7 +19,7 @@ jobs:
       uses: cssnr/stack-deploy-action@v1
       with:
         name: activities-demo
-        file: docker/demo.docker-stack.yaml
+        file: docker/demo/demo.docker-stack.yaml
         host: demo.activities.training
         user: deploy
         ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
