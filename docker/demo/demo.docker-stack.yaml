@@ -12,10 +12,24 @@ services:
       ACTIVITIES_DATA_PATH: /app/data
     networks:
       - traefik-public
+      - demo-internal
     deploy:
       update_config:
         order: start-first
 
+  demo-reset:
+    image: ghcr.io/thomas-god/activities-demo-reset:latest
+    networks:
+      - demo-internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
 networks:
   traefik-public:
     external: true
+  demo-internal:
+    driver: overlay
