@@ -1,13 +1,12 @@
 # Activities: self-hosted training journal and performance tracking platform
 
-Activities is a self-hosted platform for athletes to archive their activities
-and manage their training journal, and track their progress:
+Activities is a self-hosted platform to archive sport activities, manage your
+training journal and track your progress:
 
-- Track your training history with custom metrics and periods,
+- Import sport activities from `.tcx` and `.fit` files,
 - Keep a training journal with notes on workouts and training blocks,
-- Explore your performance data and visualize your progress,
+- Explore and track your progress with custom training metrics,
 - It can be deployed from a single Docker image,
-- It supports importing activities from `.tcx` and `.fit` files.
 
 ## How to deploy
 
@@ -39,7 +38,7 @@ You can quickly test the application locally with a single Docker command:
 ```bash
 docker run --rm -p 8080:80 \
   -e ACTIVITIES_DATA_PATH=/app/data \
-  ghcr.io/thomas-god/activities:single-user-main
+  ghcr.io/thomas-god/activities:single-user-latest
 ```
 
 Then open http://localhost:8080 in your browser. Your data will be stored in an
@@ -50,7 +49,7 @@ your data, add a volume mount:
 docker run --rm -p 8080:80 \
   -e ACTIVITIES_DATA_PATH=/app/data \
   -v activities_data:/app/data \
-  ghcr.io/thomas-god/activities:single-user-main
+  ghcr.io/thomas-god/activities:single-user-latest
 ```
 
 ### Using _docker-compose_ or _docker-stack_
@@ -60,7 +59,7 @@ The most basic `docker-compose.yaml` file looks like that:
 ```yaml
 services:
   activities:
-    image: ghcr.io/thomas-god/activities:single-user-main
+    image: ghcr.io/thomas-god/activities:single-user-latest
     environment:
       ACTIVITIES_DATA_PATH: /app/data
     volumes:
