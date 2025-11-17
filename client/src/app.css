@@ -30,6 +30,7 @@
 	--color-rpe-very-hard-text: #7c2d12; /* orange-900 */
 	--color-rpe-max: #fecaca; /* red-200 */
 	--color-rpe-max-text: #7f1d1d; /* red-900 */
+	--color-rpe-other: #d18ca3;
 
 	/* Workout type colors */
 	--color-workout-easy: #bbf7d0; /* green-200 */
@@ -44,4 +45,5 @@
 	--color-workout-race-text: #581c87; /* purple-900 */
 	--color-workout-cross-training: #ffd6a8; /* orange-200 */
 	--color-workout-cross-training-text: #7e2a0c; /* orange-900 */
+	--color-workout-other: #d18ca3;
 }

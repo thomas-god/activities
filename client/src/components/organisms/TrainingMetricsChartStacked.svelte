@@ -35,6 +35,35 @@
 	let gyGrid: SVGGElement;
 	let svg: SVGElement;
 
+	// Get color for a group based on the groupBy category
+	const getGroupColor = (groupName: string, groupBy: GroupByClause | null): string | null => {
+		if (!groupBy) return null;
+
+		switch (groupBy) {
+			case 'RpeRange':
+				if (groupName === 'Easy') return 'var(--color-rpe-easy)';
+				if (groupName === 'Moderate') return 'var(--color-rpe-moderate)';
+				if (groupName === 'Hard') return 'var(--color-rpe-hard)';
+				if (groupName === 'Very Hard') return 'var(--color-rpe-very-hard)';
+				if (groupName === 'Maximum Effort') return 'var(--color-rpe-max)';
+				if (groupName === 'Other') return 'var(--color-rpe-other)';
+				return null;
+
+			case 'WorkoutType':
+				if (groupName === 'Easy') return 'var(--color-workout-easy)';
+				if (groupName === 'Tempo') return 'var(--color-workout-tempo)';
+				if (groupName === 'Intervals') return 'var(--color-workout-intervals)';
+				if (groupName === 'Long Run') return 'var(--color-workout-long-run)';
+				if (groupName === 'Race') return 'var(--color-workout-race)';
+				if (groupName === 'Cross Training') return 'var(--color-workout-cross-training)';
+				if (groupName === 'Other') return 'var(--color-workout-other)';
+				return null;
+
+			default:
+				return null;
+		}
+	};
+
 	let timeAxisTickFormater = $derived.by(() => {
 		if (granularity === 'Monthly') {
 			return (date: string, _idx: number) => {
@@ -145,7 +174,14 @@
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
-	const color = $derived(d3.scaleOrdinal(d3.schemeObservable10));
+	const colors = $derived.by(() => {
+		const scale = d3.scaleOrdinal(d3.schemeObservable10);
+		const customScale = (groupName: string) => {
+			const customColor = getGroupColor(groupName, groupBy);
+			return customColor || scale(groupName);
+		};
+		return customScale;
+	});
 
 	// Extract unique group names for the legend
 	let groups = $derived(
@@ -206,7 +242,7 @@
 				.selectAll('g')
 				.data(series)
 				.join('g')
-				.attr('fill', (groupSeries) => color(groupSeries.key))
+				.attr('fill', (groupSeries) => colors(groupSeries.key))
 				.selectAll('rect')
 				.data((groupSeries) =>
 					groupSeries.map((stackedDataPoint: any) => {
@@ -243,7 +279,7 @@
 					};
 
 					// Highlight the bar with a border using the group's color
-					d3.select(rect).attr('stroke', color(stackedDataPoint.key)).attr('stroke-width', 3);
+					d3.select(rect).attr('stroke', colors(stackedDataPoint.key)).attr('stroke-width', 3);
 				})
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
@@ -316,7 +352,7 @@
 		<div class="flex flex-wrap items-center justify-center gap-3 px-2 text-sm">
 			{#each groups as group}
 				<div class="flex items-center gap-1.5">
-					<div class="h-3 w-3 rounded-sm" style="background-color: {color(group)}"></div>
+					<div class="h-3 w-3 rounded-sm" style="background-color: {colors(group)}"></div>
 					<span>{group}</span>
 				</div>
 			{/each}
