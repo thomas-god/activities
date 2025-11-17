@@ -38,6 +38,9 @@
 	});
 
 	let active_metrics = $derived(convertTimeseriesToActiveTime(data.activity.timeseries));
+	let active_distance = $derived(
+		'Distance' in active_metrics.metrics ? active_metrics.metrics['Distance'].values : undefined
+	);
 
 	let metricOptions: { option: Metric; display: string }[] = [
 		{ option: 'HeartRate', display: 'Heart rate' },
@@ -253,6 +256,7 @@
 				<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 					<TimeseriesChart
 						time={active_metrics.time}
+						distance={active_distance}
 						metrics={selectedMetrics}
 						height={chartHeight}
 						width={chartWidth}

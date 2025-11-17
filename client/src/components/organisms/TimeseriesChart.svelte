@@ -13,12 +13,13 @@
 
 	export interface TimeseriesChartProps {
 		time: number[];
+		distance?: (number | null)[];
 		metrics: Array<Metric>;
 		width: number;
 		height: number;
 	}
 
-	let { time, metrics, height, width }: TimeseriesChartProps = $props();
+	let { time, metrics, height, width, distance }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -177,7 +178,7 @@
 		let offset = tooltipXOffset === undefined ? zoomedXScale.range()[0] : tooltipXOffset;
 
 		const values = metricsProps.map((metric) => {
-			let nearestValue =
+			const nearestValue =
 				metric.values[bisector.center(metric.values, zoomedXScale.invert(offset!))];
 			return {
 				metric: metric.name,
@@ -186,7 +187,11 @@
 				order: metric.order
 			};
 		});
-		return { time: zoomedXScale.invert(offset!), values };
+
+		const nearestDistance =
+			distance === undefined ? undefined : distance.at(zoomedXScale.invert(offset));
+
+		return { time: zoomedXScale.invert(offset!), distance: nearestDistance, values };
 	});
 
 	let smoothing = $state(5);
@@ -200,6 +205,11 @@
 	<span class="px-1.5">
 		⌚ {formatDuration(nearestValues.time)}
 	</span>
+	{#if nearestValues.distance !== undefined && nearestValues.distance !== null}
+		<span class="px-1.5">
+			📏 {nearestValues.distance.toFixed(2)} km
+		</span>
+	{/if}
 	{#each nearestValues.values as value}
 		<span class={`px-1.5 ${textColors[value.metric]}`}>
 			{value.metric}: {value.value.toFixed(2)}
