@@ -6,18 +6,8 @@ echo "Starting demo reset at $(date)"
 #!/bin/bash
 set -e
 
-API_URL="http://activities:8080/api"
-
-# Wait for API to be ready
-echo "Waiting for API to be ready..."
-for i in {1..30}; do
-  if curl -sf "$API_URL/../health" >/dev/null 2>&1; then
-    echo "API is ready"
-    break
-  fi
-  echo "Waiting for API... ($i/30)"
-  sleep 2
-done
+API_URL="http://activities/api"
+# API_URL="http://localhost:8080/api"
 
 # Wait for the service to be available
 echo "Waiting for API to be available..."
@@ -54,17 +44,15 @@ done
 # Get all training metrics and delete them
 echo "Deleting all existing training metrics..."
 METRICS=$(curl -s "$API_URL/training/metrics?start=2020-01-01T00:00:00%2B00:00" 2>&1 | jq -r '.[].id' 2>&1)
-if [ -n "$METRICS" ] && [ "$METRICS" != "null" ]; then
-  for id in $METRICS; do
-    curl -s -X DELETE "$API_URL/training/metric/$id" 2>&1 >/dev/null
-    echo "Deleted metric: $id"
-  done
-else
-  echo "No metrics found to delete (or query failed)"
-fi
+for id in $METRICS; do
+  curl -s -X DELETE "$API_URL/training/metric/$id" 2>&1 >/dev/null
+  echo "Deleted metric: $id"
+done
+
 
 # Generate fresh demo data
 echo "Generating fresh demo data..."
 /usr/local/bin/generate-demo-data.sh
+# ./generate-demo-data.sh
 
 echo "Demo reset completed at $(date)"
