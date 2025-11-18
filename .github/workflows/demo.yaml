@@ -33,8 +33,8 @@ jobs:
       - name: Build and push demo-reset image
         uses: docker/build-push-action@v5
         with:
-          context: docker/demo
-          file: docker/demo/Dockerfile.reset
+          context: infra/demo
+          file: infra/demo/Dockerfile.reset
           push: true
           platforms: linux/arm64
           tags: ghcr.io/thomas-god/activities-demo-reset:latest
@@ -51,7 +51,7 @@ jobs:
         uses: cssnr/stack-deploy-action@v1
         with:
           name: activities-demo
-          file: docker/demo/demo.docker-stack.yaml
+          file: infra/demo/docker-stack.yaml
           host: demo.activities.training
           user: deploy
           ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}

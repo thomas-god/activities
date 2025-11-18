@@ -19,7 +19,7 @@ jobs:
       uses: cssnr/stack-deploy-action@v1
       with:
         name: activities-beta
-        file: docker/beta.docker-stack.yaml
+        file: infra/beta/docker-stack.yaml
         host: beta.activities.training
         user: deploy
         ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}

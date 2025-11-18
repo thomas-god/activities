@@ -51,7 +51,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: "{{defaultContext}}"
-          file: ./docker/Dockerfile
+          file: ./infra/docker/Dockerfile
           build-args: |
             APP_FEATURE=${{ matrix.feature }}
           platforms: ${{ matrix.platform }}
