@@ -295,8 +295,8 @@
 	};
 </script>
 
-<div class="mx-auto mt-4 flex flex-col gap-4">
-	<div class="@container rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+<div class="period_container">
+	<div class="item period-title @container rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
 		<!-- Top row: Icon and Title/Date/Actions -->
 		<div class="flex items-center gap-3">
 			<!-- Icon -->
@@ -388,13 +388,16 @@
 	</div>
 
 	{#if data.metrics.length > 0}
-		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-2 shadow-md">
+		<div
+			bind:clientWidth={chartWidth}
+			class="item period-metrics rounded-box bg-base-100 pb-2 shadow-md"
+		>
 			<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
 		</div>
 	{/if}
 
 	<!-- Activities section -->
-	<div class="rounded-box bg-base-100 p-4 shadow-md">
+	<div class="item period-activities rounded-box bg-base-100 p-4 shadow-md">
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="text-lg font-semibold">Activities & Notes</h2>
 		</div>
@@ -561,5 +564,46 @@
 <style>
 	.rounded-box {
 		border-radius: 8px;
+	}
+
+	.period_container {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: calc(var(--spacing) * 5);
+		margin-top: calc(var(--spacing) * 5);
+		padding-inline: calc(var(--spacing) * 1);
+
+		@media (min-width: 400px) {
+			padding-inline: calc(var(--spacing) * 2);
+		}
+	}
+
+	.item {
+		width: 100%;
+	}
+
+	@media (min-width: 900px) {
+		.period_container {
+			display: grid;
+			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
+			align-items: start;
+		}
+
+		.period-title {
+			grid-row: 1;
+			grid-column: 1 / 3;
+		}
+
+		.period-metrics {
+			grid-row: 2;
+			grid-column: 2;
+		}
+
+		.period-activities {
+			grid-row: 2;
+			grid-column: 1;
+		}
 	}
 </style>

@@ -78,52 +78,99 @@
 	};
 </script>
 
-{#if topMetric}
-	<div
-		bind:clientWidth={chartWidth}
-		class="mx-2 mt-5 rounded-box bg-base-100 pb-2 shadow-md sm:mx-auto"
-	>
-		<div class="mx-3 pt-4 text-center">
-			<TrainingMetricTitle
+<div class="homepage_container">
+	{#if topMetric}
+		<div
+			bind:clientWidth={chartWidth}
+			class="item metric_chart rounded-box bg-base-100 pb-2 shadow-md"
+		>
+			<div class="mx-3 pt-4 text-center">
+				<TrainingMetricTitle
+					granularity={topMetric.granularity}
+					aggregate={topMetric.aggregate}
+					metric={topMetric.metric}
+					sports={topMetric.sports}
+					groupBy={topMetric.groupBy}
+				/>
+			</div>
+			<TrainingMetricsChartStacked
+				height={chartHeight}
+				width={chartWidth}
+				values={topMetric.values}
+				unit={topMetric.unit}
 				granularity={topMetric.granularity}
-				aggregate={topMetric.aggregate}
-				metric={topMetric.metric}
-				sports={topMetric.sports}
+				format={topMetric.unit === 's' ? 'duration' : 'number'}
+				showGroup={topMetric.showGroup}
 				groupBy={topMetric.groupBy}
 			/>
 		</div>
-		<TrainingMetricsChartStacked
-			height={chartHeight}
-			width={chartWidth}
-			values={topMetric.values}
-			unit={topMetric.unit}
-			granularity={topMetric.granularity}
-			format={topMetric.unit === 's' ? 'duration' : 'number'}
-			showGroup={topMetric.showGroup}
-			groupBy={topMetric.groupBy}
-		/>
-	</div>
-{/if}
+	{/if}
 
-{#if ongoingPeriods.length > 0}
-	<div class="mx-2 mt-5 rounded-box bg-base-100 shadow-md sm:mx-auto">
-		<div class="p-4">
-			<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
-			<div class="flex flex-col gap-2">
-				{#each ongoingPeriods as period}
-					<TrainingPeriodCard {period} />
-				{/each}
+	<div class="item history">
+		{#if ongoingPeriods.length > 0}
+			<div class="rounded-box bg-base-100 shadow-md">
+				<div class="p-4">
+					<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
+					<div class="flex flex-col gap-2">
+						{#each ongoingPeriods as period}
+							<TrainingPeriodCard {period} />
+						{/each}
+					</div>
+				</div>
 			</div>
+		{/if}
+
+		<div class="">
+			<PastActivitiesList
+				activityList={sorted_activities}
+				trainingNotes={data.trainingNotes}
+				moreCallback={moreActivitiesCallback}
+				onNoteSave={handleNoteSave}
+				onNoteDelete={handleNoteDelete}
+			/>
 		</div>
 	</div>
-{/if}
-
-<div class="mx-2 mt-5 sm:mx-auto">
-	<PastActivitiesList
-		activityList={sorted_activities}
-		trainingNotes={data.trainingNotes}
-		moreCallback={moreActivitiesCallback}
-		onNoteSave={handleNoteSave}
-		onNoteDelete={handleNoteDelete}
-	/>
 </div>
+
+<style>
+	.homepage_container {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: calc(var(--spacing) * 5);
+		margin-top: calc(var(--spacing) * 5);
+		padding-inline: calc(var(--spacing) * 1);
+
+		@media (min-width: 400px) {
+			padding-inline: calc(var(--spacing) * 2);
+		}
+	}
+
+	.item {
+		width: 100%;
+	}
+
+	.item.history {
+		display: flex;
+		flex-direction: column;
+		gap: calc(var(--spacing) * 5);
+	}
+
+	@media (min-width: 900px) {
+		.homepage_container {
+			display: grid;
+			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
+			align-items: start;
+		}
+
+		.item.metric_chart {
+			grid-column: 2;
+		}
+
+		.item.history {
+			grid-column: 1;
+			grid-row: 1;
+		}
+	}
+</style>

@@ -28,7 +28,7 @@
 	let newTrainingNoteDialog: HTMLDialogElement;
 </script>
 
-<div class="container">
+<div class="layout_container">
 	<div class=" flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
 		<div class="flex gap-6">
 			<a class={`btn px-2 text-xl font-bold btn-ghost ${classExactPath('/')}`} href="/"
@@ -79,14 +79,12 @@
 </div>
 
 <style>
-	.container {
-		max-width: 1200px;
+	.layout_container {
+		max-width: 1350px;
 		margin: 0 auto;
 		padding: 12px 8px;
-	}
 
-	@media (min-width: 640px) {
-		.container {
+		@media (min-width: 640px) {
 			padding: 20px;
 		}
 	}
