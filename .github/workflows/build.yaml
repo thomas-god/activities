@@ -6,7 +6,50 @@ on:
       - main
 
 jobs:
+  check-skip:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_skip: ${{ steps.check.outputs.should_skip }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if should skip
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_MSG=$(git log -1 --pretty=%B)
+          PREVIOUS_SHA=$(git log -2 --pretty=%H | tail -n 1)
+
+          # Check if current commit is a version bump
+          if [[ "$CURRENT_MSG" =~ ^chore:\ bump\ version\ to ]]; then
+            echo "Current commit is a version bump"
+
+            # Check if this workflow ran for the previous commit
+            WORKFLOW_RUNS=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${{ github.repository }}/actions/workflows/build.yaml/runs?head_sha=$PREVIOUS_SHA&status=completed" \
+              --jq '.total_count')
+
+            if [ "$WORKFLOW_RUNS" -gt 0 ]; then
+              echo "Workflow ran for previous commit ($PREVIOUS_SHA), skipping this version bump"
+              echo "should_skip=true" >> $GITHUB_OUTPUT
+            else
+              echo "Workflow did NOT run for previous commit ($PREVIOUS_SHA), running build"
+              echo "should_skip=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Not a version bump commit, running build"
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+
   build-docker-image:
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip != 'true'
     strategy:
       matrix:
         feature: ["single-user", "multi-user"]
@@ -85,7 +128,9 @@ jobs:
   merge:
     runs-on: ubuntu-24.04
     needs:
+      - check-skip
       - build-docker-image
+    if: needs.check-skip.outputs.should_skip != 'true'
     strategy:
       matrix:
         feature: ["single-user", "multi-user"]
