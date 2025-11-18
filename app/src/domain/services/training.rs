@@ -430,7 +430,7 @@ where
 
         // Update the period dates
         self.training_repository
-            .update_training_period_dates(req.period_id(), *req.start(), req.end().clone())
+            .update_training_period_dates(req.period_id(), *req.start(), *req.end())
             .await
             .map_err(UpdateTrainingPeriodDatesError::Unknown)?;
 

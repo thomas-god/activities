@@ -8,7 +8,7 @@ use axum::{
     response::IntoResponse,
 };
 use flate2::read::GzDecoder;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::ports::{CreateActivityError, IActivityService, IPreferencesService, ITrainingService},
@@ -27,12 +27,13 @@ impl From<CreateActivityError> for StatusCode {
     }
 }
 
-#[derive(Serialize)]
-struct UnprocessableFilesResponse {
+#[derive(Serialize, Deserialize)]
+struct UploadActivitiesResponse {
+    created_ids: Vec<String>,
     unprocessable_files: Vec<(String, RejectionReason)>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 enum RejectionReason {
     CannotReadContent,
     CannotProcessFile,
@@ -62,6 +63,7 @@ pub async fn upload_activities<
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
+    let mut created_ids = Vec::new();
     let mut unprocessable_files = Vec::new();
     while let Ok(Some(field)) = multipart.next_field().await {
         let Some(name) = field.name().map(|n| n.to_string()) else {
@@ -93,27 +95,28 @@ pub async fn upload_activities<
 
         let create_activity_request = parsed_content.into_request(user.user());
 
-        if let Err(err) = state
+        match state
             .activity_service
             .create_activity(create_activity_request)
             .await
         {
-            unprocessable_files.push((name.to_string(), err.into()));
+            Ok(activity) => {
+                created_ids.push(activity.id().to_string());
+            }
+            Err(err) => {
+                unprocessable_files.push((name.to_string(), err.into()));
+            }
         }
     }
 
-    if unprocessable_files.is_empty() {
-        Ok(StatusCode::CREATED.into_response())
-    } else {
-        // Return JSON with failed files
-        Ok((
-            StatusCode::CREATED,
-            Json(UnprocessableFilesResponse {
-                unprocessable_files,
-            }),
-        )
-            .into_response())
-    }
+    Ok((
+        StatusCode::CREATED,
+        Json(UploadActivitiesResponse {
+            created_ids,
+            unprocessable_files,
+        }),
+    )
+        .into_response())
 }
 
 async fn extract_content(filename: &str, field: Field<'_>) -> Result<Vec<u8>, anyhow::Error> {
@@ -152,12 +155,19 @@ mod tests {
 
     use axum::{Router, middleware::from_extractor, routing::post};
     use axum_test::TestServer;
+    use mockall::Sequence;
 
     use crate::{
-        domain::services::{
-            activity::test_utils::MockActivityService,
-            preferences::tests_utils::MockPreferencesService,
-            training::test_utils::MockTrainingService,
+        domain::{
+            models::{
+                UserId,
+                activity::{Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport},
+            },
+            services::{
+                activity::test_utils::MockActivityService,
+                preferences::tests_utils::MockPreferencesService,
+                training::test_utils::MockTrainingService,
+            },
         },
         inbound::{
             http::{
@@ -172,7 +182,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_upload_single_activity() {
-        let service = MockActivityService::test_default();
+        let mut service = MockActivityService::new();
+        let expected_id = ActivityId::new();
+        let expected_id_clone = expected_id.clone();
+        service
+            .expect_create_activity()
+            .times(1)
+            .returning(move |_| {
+                Ok(Activity::new(
+                    expected_id_clone.clone(),
+                    UserId::test_default(),
+                    None,
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            });
+
         let metrics = MockTrainingService::test_default();
         let file_parser = MockFileParser::test_default();
         let state = AppState {
@@ -201,12 +231,58 @@ mod tests {
             .await;
 
         response.assert_status(StatusCode::CREATED);
-        assert!(response.as_bytes().is_empty());
+        let json: UploadActivitiesResponse = response.json();
+        assert_eq!(json.created_ids.len(), 1);
+        assert_eq!(json.created_ids[0], expected_id.to_string());
+        assert!(json.unprocessable_files.is_empty());
     }
 
     #[tokio::test]
     async fn test_upload_multiple_activities() {
-        let service = MockActivityService::test_default();
+        let mut seq = Sequence::new();
+        let mut service = MockActivityService::new();
+        let expected_id1 = ActivityId::new();
+        let expected_id2 = ActivityId::new();
+        let expected_id1_clone = expected_id1.clone();
+        let expected_id2_clone = expected_id2.clone();
+
+        service
+            .expect_create_activity()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                Ok(Activity::new(
+                    expected_id1_clone.clone(),
+                    UserId::test_default(),
+                    None,
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            });
+        service
+            .expect_create_activity()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                Ok(Activity::new(
+                    expected_id2_clone.clone(),
+                    UserId::test_default(),
+                    None,
+                    ActivityStartTime::from_timestamp(2000).unwrap(),
+                    Sport::Cycling,
+                    ActivityStatistics::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            });
+
         let metrics = MockTrainingService::test_default();
         let file_parser = MockFileParser::test_default();
         let state = AppState {
@@ -243,7 +319,132 @@ mod tests {
             .await;
 
         response.assert_status(StatusCode::CREATED);
-        assert!(response.as_bytes().is_empty());
+        let json: UploadActivitiesResponse = response.json();
+        assert_eq!(json.created_ids.len(), 2);
+        assert_eq!(json.created_ids[0], expected_id1.to_string());
+        assert_eq!(json.created_ids[1], expected_id2.to_string());
+        assert!(json.unprocessable_files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_upload_with_unprocessable_files() {
+        use crate::domain::ports::CreateActivityError;
+
+        let mut seq = Sequence::new();
+        let mut service = MockActivityService::new();
+        let expected_id = ActivityId::new();
+        let expected_id_clone = expected_id.clone();
+
+        service
+            .expect_create_activity()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                Ok(Activity::new(
+                    expected_id_clone.clone(),
+                    UserId::test_default(),
+                    None,
+                    ActivityStartTime::from_timestamp(1000).unwrap(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            });
+        service
+            .expect_create_activity()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Err(CreateActivityError::SimilarActivityExistsError));
+
+        let metrics = MockTrainingService::test_default();
+        let file_parser = MockFileParser::test_default();
+        let state = AppState {
+            activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
+            file_parser: Arc::new(file_parser),
+            user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+            cookie_config: Arc::new(CookieConfig::default()),
+        };
+
+        let app = Router::new()
+            .route("/test_upload", post(upload_activities))
+            .route_layer(from_extractor::<DefaultUserExtractor>())
+            .with_state(state);
+        let server = TestServer::new(app).expect("unable to create test server");
+
+        let file1_data = b"test fit file content 1".to_vec();
+        let file2_data = b"test fit file content 2".to_vec();
+
+        let response = server
+            .post("/test_upload")
+            .multipart(
+                axum_test::multipart::MultipartForm::new()
+                    .add_part(
+                        "test1.fit".to_string(),
+                        axum_test::multipart::Part::bytes(file1_data),
+                    )
+                    .add_part(
+                        "test2.fit".to_string(),
+                        axum_test::multipart::Part::bytes(file2_data),
+                    ),
+            )
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+        let json: UploadActivitiesResponse = response.json();
+        assert_eq!(json.created_ids.len(), 1);
+        assert_eq!(json.created_ids[0], expected_id.to_string());
+        assert_eq!(json.unprocessable_files.len(), 1);
+        assert_eq!(json.unprocessable_files[0].0, "test2.fit");
+        assert!(matches!(
+            json.unprocessable_files[0].1,
+            RejectionReason::DuplicatedActivity
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_upload_unsupported_file_extension() {
+        let service = MockActivityService::test_default();
+        let metrics = MockTrainingService::test_default();
+        let file_parser = MockFileParser::test_default();
+        let state = AppState {
+            activity_service: Arc::new(service),
+            training_metrics_service: Arc::new(metrics),
+            file_parser: Arc::new(file_parser),
+            user_service: Arc::new(MockUserService::new()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+            cookie_config: Arc::new(CookieConfig::default()),
+        };
+
+        let app = Router::new()
+            .route("/test_upload", post(upload_activities))
+            .route_layer(from_extractor::<DefaultUserExtractor>())
+            .with_state(state);
+        let server = TestServer::new(app).expect("unable to create test server");
+
+        let file_data = b"test content".to_vec();
+
+        let response = server
+            .post("/test_upload")
+            .multipart(axum_test::multipart::MultipartForm::new().add_part(
+                "test.gpx".to_string(),
+                axum_test::multipart::Part::bytes(file_data),
+            ))
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+        let json: UploadActivitiesResponse = response.json();
+        assert!(json.created_ids.is_empty());
+        assert_eq!(json.unprocessable_files.len(), 1);
+        assert_eq!(json.unprocessable_files[0].0, "test.gpx");
+        assert!(matches!(
+            json.unprocessable_files[0].1,
+            RejectionReason::UnsupportedFileExtension
+        ));
     }
 
     #[test]
