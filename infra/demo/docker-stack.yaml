@@ -18,7 +18,7 @@ services:
         order: start-first
 
   demo-reset:
-    image: ghcr.io/thomas-god/activities-demo-reset:latest
+    image: activities-demo-reset:latest
     networks:
       - demo-internal
     deploy:
