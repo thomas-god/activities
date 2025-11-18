@@ -41,7 +41,10 @@
 		return scParam.split(',') as SportCategory[];
 	});
 
-	let initialShowNotes = $derived(page.url.searchParams.get('show_notes') === 'true');
+	let initialShowNotes = $derived.by(() => {
+		const param = page.url.searchParams.get('show_notes');
+		return param === null ? true : param === 'true';
+	});
 
 	// Current month from URL parameter, default to current month
 	let currentMonth = $derived.by(() => {
