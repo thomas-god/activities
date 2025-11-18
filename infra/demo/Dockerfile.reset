@@ -1,29 +1,26 @@
-FROM debian:12-slim
+FROM ghcr.io/astral-sh/uv:debian-slim
 
-# Install required packages
+# Install cron for scheduled resets
 RUN apt-get update && apt-get install -y \
-    curl \
-    jq \
     cron \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy scripts
-COPY reset-demo.sh /usr/local/bin/reset-demo.sh
-COPY generate-demo-data.sh /usr/local/bin/generate-demo-data.sh
-RUN chmod +x /usr/local/bin/reset-demo.sh /usr/local/bin/generate-demo-data.sh
+# Copy Python scripts
+COPY reset-demo.py /usr/local/bin/reset-demo.py
+RUN chmod +x /usr/local/bin/reset-demo.py
 
 # Create crontab for nightly reset at 3 AM UTC
-RUN echo "0 3 * * * /usr/local/bin/reset-demo.sh >> /var/log/cron.log 2>&1" | crontab -
+RUN echo "0 3 * * * /usr/local/bin/reset-demo.py >> /var/log/cron.log 2>&1" | crontab -
 
 # Create entrypoint script
 RUN printf '#!/bin/bash\n\
 echo "Demo reset service starting..."\n\
-echo "Cron job scheduled: 0 3 * * * /usr/local/bin/reset-demo.sh"\n\
+echo "Cron job scheduled: 0 3 * * * /usr/local/bin/reset-demo.py"\n\
 echo "Logs will be written to /var/log/cron.log"\n\
 \n\
 # Run initial reset\n\
 echo "Running initial demo data generation..."\n\
-/usr/local/bin/reset-demo.sh\n\
+uv /usr/local/bin/reset-demo.py\n\
 \n\
 # Start cron in foreground\n\
 echo "Starting cron daemon..."\n\

@@ -1,0 +1,42 @@
+services:
+  activities:
+    image: ghcr.io/thomas-god/activities:single-user-latest
+    environment:
+      ACTIVITIES_DATA_PATH: /app/data
+    networks:
+      - demo-test
+    ports:
+      - 8080:80
+
+  demo-reset:
+    build:
+      context: .
+      dockerfile: Dockerfile.reset
+    depends_on:
+      - activities
+    networks:
+      - demo-test
+    volumes:
+      - ./reset-demo.py:/usr/local/bin/reset-demo.py:ro
+    # Override entrypoint for development - watch and rerun on changes
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      apt-get update && apt-get install -y inotify-tools &&
+      echo 'Development mode: watching for script changes...' &&
+      which uv &&
+      sleep 2 &&
+      while true; do
+        echo '=== Running demo reset ===' ;
+        if uv run /usr/local/bin/reset-demo.py; then
+          echo '=== Success! Waiting for file changes ==='
+        else
+          echo '=== Script failed. Waiting for file changes ==='
+        fi ;
+        inotifywait -e modify /usr/local/bin/reset-demo.py 2>/dev/null ;
+        echo 'File changed, rerunning...' ;
+      done
+      "
+
+networks:
+  demo-test:
