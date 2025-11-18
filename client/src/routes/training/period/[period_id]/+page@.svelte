@@ -388,7 +388,7 @@
 	</div>
 
 	{#if data.metrics.length > 0}
-		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-2 shadow-md sm:mx-auto">
+		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-2 shadow-md">
 			<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
 		</div>
 	{/if}
