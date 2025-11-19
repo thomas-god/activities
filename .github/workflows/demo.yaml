@@ -2,7 +2,7 @@ name: Deploy demo app
 
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: ["Build app image"]
     types:
       - completed
 
