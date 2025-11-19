@@ -49,7 +49,9 @@ def delete_all_activities() -> None:
         if del_response.status_code == 200:
             print(f"Deleted activity: {activity_id}")
         else:
-            print(f"Failed to delete activity {activity_id}: {del_response.status_code}")
+            print(
+                f"Failed to delete activity {activity_id}: {del_response.status_code}"
+            )
 
 
 def delete_all_periods() -> None:
@@ -205,7 +207,10 @@ def upload_activities() -> list[str]:
             response = requests.post(f"{API_URL}/activity", files=files)
 
         if response.status_code == 201:
-            print(f"Uploading {filename}... 201 - Response: {response.text}")
+            data = response.json()
+            created_ids = data.get("created_ids", [])
+            activity_ids.extend(created_ids)
+            print(f"Uploading {filename}... 201 - Created ID(s): {created_ids}")
         else:
             print(f"Uploading {filename}... {response.status_code} - {response.text}")
 
@@ -213,19 +218,137 @@ def upload_activities() -> list[str]:
     return activity_ids
 
 
-def create_training_period(
-    name: str, start: str, end: str, description: str
-) :
+def update_activity(
+    activity_id: str,
+    name: str | None = None,
+    rpe: int | None = None,
+    workout_type: str | None = None,
+    bonk_status: str | None = None,
+    nutrition_details: str | None = None,
+    feedback: str | None = None,
+) -> bool:
+    """Update activity metadata using PATCH endpoint."""
+    # Build query parameters
+    params = {}
+    if name is not None:
+        params["name"] = name
+    if rpe is not None:
+        params["rpe"] = rpe
+    if workout_type is not None:
+        params["workout_type"] = workout_type
+    if bonk_status is not None:
+        params["bonk_status"] = bonk_status
+    if nutrition_details is not None:
+        params["nutrition_details"] = nutrition_details
+
+    # Build request body for feedback
+    body = None
+    if feedback is not None:
+        body = {"feedback": feedback}
+
+    # Make PATCH request
+    response = requests.patch(
+        f"{API_URL}/activity/{activity_id}",
+        params=params,
+        json=body if body else None,
+        headers={"Content-Type": "application/json"} if body else None,
+    )
+
+    if response.status_code == 200:
+        print(f"Updated activity {activity_id}")
+        return True
+    else:
+        print(
+            f"Failed to update activity {activity_id}: {response.status_code} - {response.text}"
+        )
+        return False
+
+
+def generate_activity(
+    date: str,
+    sport: str,
+    duration_seconds: int,
+    distance_meters: int,
+    avg_hr: int,
+    name: str | None = None,
+    rpe: int | None = None,
+    workout_type: str | None = None,
+    bonk_status: str | None = None,
+    nutrition_details: str | None = None,
+    feedback: str | None = None,
+) -> str | None:
+    """Generate a TCX file, upload it, and update with additional metadata.
+
+    Returns the created activity ID if successful, None otherwise.
+    """
+    # Generate unique filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"activity_{timestamp}.tcx"
+
+    # Generate TCX file
+    generate_tcx(date, sport, duration_seconds, distance_meters, avg_hr, filename)
+
+    # Upload the file
+    tcx_file = TEMP_DIR / filename
+    with open(tcx_file, "rb") as f:
+        files = {"file.tcx": (filename, f, "application/xml")}
+        response = requests.post(f"{API_URL}/activity", files=files)
+
+    if response.status_code != 201:
+        print(f"Failed to upload activity: {response.status_code} - {response.text}")
+        return None
+
+    # # Extract created activity ID
+    # print(f"Upload response (status {response.status_code}):")
+    # print(f"  Content-Type: {response.headers.get('content-type')}")
+    # print(f"  Body length: {len(response.text)}")
+    # print(f"  Body: {response.text}")
+
+    if not response.text:
+        print("Response body is empty!")
+        return None
+
+    try:
+        data = response.json()
+        created_ids = data.get("created_ids", [])
+        if not created_ids:
+            print("No activity ID returned from upload")
+            return None
+    except Exception as e:
+        print(f"Failed to parse JSON: {e}")
+        return None
+
+    activity_id = created_ids[0]
+    print(f"Created activity {activity_id}")
+
+    # Update activity with additional metadata
+    if any([name, rpe, workout_type, bonk_status, nutrition_details, feedback]):
+        update_activity(
+            activity_id,
+            name=name,
+            rpe=rpe,
+            workout_type=workout_type,
+            bonk_status=bonk_status,
+            nutrition_details=nutrition_details,
+            feedback=feedback,
+        )
+
+    return activity_id
+
+
+def create_training_period(name: str, start: str, end: str, description: str):
     """Create a training period."""
     payload = {
         "name": name,
         "start": start,
         "end": end,
-        "description": description,
+        "note": description,
         "sports": None,
     }
     response = requests.post(
-        f"{API_URL}/training/period", json=payload, headers={"Content-Type": "application/json"}
+        f"{API_URL}/training/period",
+        json=payload,
+        headers={"Content-Type": "application/json"},
     )
     print(f"Period ({name}): {response.status_code}")
     if response.status_code == 201:
@@ -257,7 +380,9 @@ def create_training_metric(
         payload["group_by"] = group_by
 
     response = requests.post(
-        f"{API_URL}/training/metric", json=payload, headers={"Content-Type": "application/json"}
+        f"{API_URL}/training/metric",
+        json=payload,
+        headers={"Content-Type": "application/json"},
     )
     if response.status_code == 201:
         data = response.text
@@ -272,7 +397,9 @@ def create_training_note(date: str, content: str) -> dict[str, Any] | None:
     """Create a training note."""
     payload = {"date": date, "content": content}
     response = requests.post(
-        f"{API_URL}/training/note", json=payload, headers={"Content-Type": "application/json"}
+        f"{API_URL}/training/note",
+        json=payload,
+        headers={"Content-Type": "application/json"},
     )
     if response.status_code == 201:
         data = response.json()
@@ -293,66 +420,106 @@ def generate_demo_data() -> int:
     # Create temp directory
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Find the most recent Monday (or today if it's Monday)
+    days_since_monday = today.weekday()  # 0=Monday, 6=Sunday
+    most_recent_monday = today - timedelta(days=days_since_monday)
+    print(f"Aligning activities to weeks starting from Monday: {most_recent_monday}")
+
     # Generate 12 weeks of activities (4 per week)
     print("Generating activities...")
+
     for week in range(12):
-        # Activity 1: Easy run
-        days_ago = week * 7 + 1
-        date = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        generate_tcx(date, "Running", 1800, 5000, 135, f"run_easy_week{week}_1.tcx")
+        week_start = most_recent_monday - timedelta(weeks=week)
 
-        # Activity 2: Tempo run
-        days_ago = week * 7 + 3
-        date = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        generate_tcx(date, "Running", 2400, 8000, 155, f"run_tempo_week{week}_2.tcx")
+        # Activity 1: Easy run (Tuesday)
+        date = week_start + timedelta(days=1)
+        duration = random.randint(25, 35) * 60  # 25-35 minutes
+        distance = random.randint(4000, 6000)  # 4-6 km
+        if date < today:
+            generate_activity(
+                date=date.strftime("%Y-%m-%d"),
+                sport="Running",
+                duration_seconds=duration,
+                distance_meters=distance,
+                avg_hr=random.randint(130, 140),
+                name="Easy Recovery Run",
+                rpe=random.randint(2, 4),
+                workout_type="easy",
+            )
 
-        # Activity 3: Bike ride
-        days_ago = week * 7 + 5
-        date = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        generate_tcx(date, "Biking", 5400, 40000, 140, f"bike_week{week}_3.tcx")
+        # Activity 2: Tempo run (Thursday)
+        date = week_start + timedelta(days=3)
+        duration = random.randint(35, 45) * 60  # 35-45 minutes
+        distance = random.randint(7000, 9000)  # 7-9 km
+        if date < today:
+            generate_activity(
+                date=date.strftime("%Y-%m-%d"),
+                sport="Running",
+                duration_seconds=duration,
+                distance_meters=distance,
+                avg_hr=random.randint(150, 160),
+                name="Tempo Run",
+                rpe=random.randint(6, 7),
+                workout_type="tempo",
+                feedback="Solid tempo effort, maintained target pace",
+            )
 
-        # Activity 4: Long run (weekend)
-        days_ago = week * 7 + 6
-        date = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
-        generate_tcx(date, "Running", 4500, 15000, 145, f"run_long_week{week}_4.tcx")
+        # Activity 3: Bike ride (Saturday)
+        date = week_start + timedelta(days=5)
+        duration = random.randint(80, 100) * 60  # 80-100 minutes
+        distance = random.randint(35000, 45000)  # 35-45 km
+        if date < today:
+            generate_activity(
+                date=date.strftime("%Y-%m-%d"),
+                sport="Biking",
+                duration_seconds=duration,
+                distance_meters=distance,
+                avg_hr=random.randint(135, 145),
+                name="Endurance Bike Ride",
+                rpe=random.randint(3, 5),
+                workout_type="easy",
+            )
 
-    # Upload activities
-    activity_ids = upload_activities()
+        # Activity 4: Long run (Sunday)
+        date = week_start + timedelta(days=6)
+        duration = random.randint(70, 90) * 60  # 70-90 minutes
+        distance = random.randint(13000, 17000)  # 13-17 km
+        if date < today:
+            generate_activity(
+                date=date.strftime("%Y-%m-%d"),
+                sport="Running",
+                duration_seconds=duration,
+                distance_meters=distance,
+                avg_hr=random.randint(140, 150),
+                name="Long Run",
+                rpe=random.randint(5, 7),
+                workout_type="long_run",
+                feedback="Legs felt strong throughout. Good hydration strategy.",
+            )
+
+    # Today's activity:
+    generate_activity(
+        date=today.strftime("%Y-%m-%d"),
+        sport="Running",
+        duration_seconds=3600,
+        distance_meters=10000,
+        avg_hr=random.randint(130, 140),
+        name="An imported sport activity",
+        rpe=random.randint(2, 4),
+        workout_type="easy",
+        feedback='On top of tracking the RPE, workout type and nutrition for each activtiy, you can add a description to an activity to track your feedback  and what\'s happened more precisely (e.g. "slight pain in my left calf during the first two kilometers", "skipped last rep because too much ice").',
+    )
 
     # Create training periods
     print("\nCreating training periods...")
 
     period1_start = (today - timedelta(days=84)).strftime("%Y-%m-%d")
-    period1_end = (today - timedelta(days=64)).strftime("%Y-%m-%d")
+    period1_end = today_str
     create_training_period(
-        "Base Building",
+        "This is a training period",
         period1_start,
         period1_end,
-        "Building aerobic base with easy miles",
-    )
-
-    period2_start = (today - timedelta(days=56)).strftime("%Y-%m-%d")
-    period2_end = (today - timedelta(days=36)).strftime("%Y-%m-%d")
-    create_training_period(
-        "Build Phase",
-        period2_start,
-        period2_end,
-        "Introducing tempo runs and longer rides",
-    )
-
-    period3_start = (today - timedelta(days=28)).strftime("%Y-%m-%d")
-    period3_end = (today - timedelta(days=8)).strftime("%Y-%m-%d")
-    create_training_period(
-        "Peak Training",
-        period3_start,
-        period3_end,
-        "Maximum training load with quality workouts",
-    )
-
-    period4_start = (today - timedelta(days=6)).strftime("%Y-%m-%d")
-    period4_end = today_str
-    create_training_period(
-        "Race Week", period4_start, period4_end, "Taper week with reduced volume"
+        "Training periods help you keep track of specific training blocks, e.g. base training, race specific preparation, etc.",
     )
 
     # Create training metrics
@@ -364,7 +531,7 @@ def generate_demo_data() -> int:
     )
 
     create_training_metric(
-        {"Statistic": "Duration"},
+        {"Statistic": "Distance"},
         "Weekly",
         "Sum",
         metric_start,
@@ -372,19 +539,34 @@ def generate_demo_data() -> int:
         group_by="SportCategory",
     )
 
+    create_training_metric(
+        {"Statistic": "Duration"},
+        "Weekly",
+        "Sum",
+        metric_start,
+        today_str,
+        group_by="WorkoutType",
+    )
+
     # Create training notes
     print("\nCreating training notes...")
 
-    note_date = (today - timedelta(days=3)).strftime("%Y-%m-%d")
+    note_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     create_training_note(
         note_date,
-        "Felt great during today's tempo run. HR was well controlled and pace felt comfortable. Ready for race week!",
+        'Training notes are useful to track what\'s happening outside of a specific activity and can help add context to your training data (e.g. "bad sleep this week").\nYou can also use training notes to track important decisions like changing your training focus because you registered to a new race or event.',
     )
 
-    note_date = (today - timedelta(days=10)).strftime("%Y-%m-%d")
+    note_date = (today - timedelta(days=12)).strftime("%Y-%m-%d")
     create_training_note(
         note_date,
-        "Completed longest run of the training block. Legs felt tired but recovered well with proper nutrition and stretching.",
+        "Out of town these past 3 days with no access to a track, so pace was a bit off but legs felt good.",
+    )
+
+    note_date = (today - timedelta(days=9)).strftime("%Y-%m-%d")
+    create_training_note(
+        note_date,
+        "Completed longest run of the training block. Legs felt tired but recovery was ok after 2 days.",
     )
 
     # Cleanup
