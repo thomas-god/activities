@@ -5,6 +5,7 @@
 # ///
 """Reset demo environment with fresh data using the API."""
 
+from math import floor
 import sys
 import time
 from typing import Any
@@ -127,16 +128,21 @@ def generate_tcx(
     start_time = f"{date}T{hour:02d}:{minute:02d}:00Z"
 
     # Calculate trackpoint data
-    num_points = 10
-    time_step = duration_seconds // num_points
-    dist_step = distance_meters // num_points
+    num_points = floor(duration_seconds)
+    time_step = 1
+    dist_step = distance_meters / num_points
 
     # Parse start time to timestamp for trackpoint calculation
     start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
 
     # Build TCX content
     tcx_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+<TrainingCenterDatabase xsi:schemaLocation="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2 http://www.garmin.com/xmlschemas/TrainingCenterDatabasev2.xsd"
+  xmlns:ns5="http://www.garmin.com/xmlschemas/ActivityGoals/v1"
+  xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2"
+  xmlns:ns2="http://www.garmin.com/xmlschemas/UserProfile/v2"
+  xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns4="http://www.garmin.com/xmlschemas/ProfileExtension/v1">
   <Activities>
     <Activity Sport="{sport}">
       <Id>{start_time}</Id>
@@ -165,6 +171,13 @@ def generate_tcx(
             <Time>{point_timestamp}</Time>
             <DistanceMeters>{point_dist}</DistanceMeters>
             <HeartRateBpm><Value>{point_hr}</Value></HeartRateBpm>
+            <Cadence>{80 + random.randint(-5, 5)}</Cadence>
+              <Extensions>
+              <ns3:TPX>
+                 <ns3:Speed>{3 * random.random()}</ns3:Speed>
+                <ns3:Watts>{150 + random.randint(-50, 50)}</ns3:Watts>
+              </ns3:TPX>
+            </Extensions>
           </Trackpoint>
 """
 
@@ -386,17 +399,12 @@ def generate_demo_data() -> int:
     print("  - 2 training metrics")
     print("  - 2 training notes")
 
-
     return 0
-
-
-
 
 
 def main() -> int:
     """Reset demo environment."""
     print(f"Starting demo reset at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-
 
     wait_for_api()
 
