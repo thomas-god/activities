@@ -10,7 +10,7 @@ COPY reset-demo.py /usr/local/bin/reset-demo.py
 RUN chmod +x /usr/local/bin/reset-demo.py
 
 # Create crontab for nightly reset at 3 AM UTC
-RUN echo "0 3 * * * /usr/local/bin/reset-demo.py >> /var/log/cron.log 2>&1" | crontab -
+RUN echo "0 3 * * * /usr/local/bin/uv run /usr/local/bin/reset-demo.py >> /var/log/cron.log 2>&1" | crontab -
 
 # Create entrypoint script
 RUN printf '#!/bin/bash\n\
@@ -20,7 +20,7 @@ echo "Logs will be written to /var/log/cron.log"\n\
 \n\
 # Run initial reset\n\
 echo "Running initial demo data generation..."\n\
-uv /usr/local/bin/reset-demo.py\n\
+/usr/local/bin/uv run /usr/local/bin/reset-demo.py\n\
 \n\
 # Start cron in foreground\n\
 echo "Starting cron daemon..."\n\
