@@ -20,7 +20,7 @@ jobs:
           host: demo.activities.training
           username: builder
           key: ${{ secrets.BUILDER_SSH_PRIVATE_KEY }}
-          script: /usr/local/bin/build-demo-reset.sh
+          script: /home/builder/bin/build-demo-reset.sh
 
       - name: Docker Stack Deploy
         uses: cssnr/stack-deploy-action@v1
