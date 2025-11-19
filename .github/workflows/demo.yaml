@@ -30,3 +30,11 @@ jobs:
           host: demo.activities.training
           user: deploy
           ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Force update demo-reset service
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: demo.activities.training
+          username: deploy
+          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          script: docker service update --force activities-demo_demo-reset
