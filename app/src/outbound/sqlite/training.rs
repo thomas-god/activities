@@ -10,9 +10,9 @@ use crate::domain::{
         training::{
             ActivityMetricSource, TrainingMetric, TrainingMetricAggregate,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingMetricGroupBy, TrainingMetricId, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -25,6 +25,7 @@ use crate::domain::{
 
 type DefinitionRow = (
     TrainingMetricId,
+    Option<TrainingMetricName>,
     UserId,
     ActivityMetricSource,
     TrainingMetricGranularity,
@@ -77,7 +78,7 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<(), SaveTrainingMetricError> {
         let definition = metric.definition();
         sqlx::query(
-            "INSERT INTO t_training_metrics_definitions VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
+            "INSERT INTO t_training_metrics_definitions (id, user_id, source, granularity, aggregate, filters, group_by, name) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
         )
         .bind(metric.id())
         .bind(definition.user())
@@ -86,6 +87,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(definition.aggregate())
         .bind(definition.filters())
         .bind(definition.group_by())
+        .bind(metric.name())
         .execute(&self.pool)
         .await
         .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
@@ -98,7 +100,7 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
-        SELECT id, user_id, source, granularity, aggregate, filters, group_by
+        SELECT id, name, user_id, source, granularity, aggregate, filters, group_by
         FROM t_training_metrics_definitions
         WHERE id = ?1 LIMIT 1;",
         )
@@ -106,7 +108,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((_id, user_id, source, granularity, aggregate, filters, group_by)) => {
+            Ok((_id, _name, user_id, source, granularity, aggregate, filters, group_by)) => {
                 Ok(Some(TrainingMetricDefinition::new(
                     user_id,
                     source,
@@ -126,7 +128,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT id, user_id, source, granularity, aggregate, filters, group_by
+            "SELECT id, name, user_id, source, granularity, aggregate, filters, group_by
             FROM t_training_metrics_definitions
             WHERE user_id = ?1;",
         )
@@ -137,9 +139,10 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|rows| {
             rows.into_iter()
                 .map(
-                    |(id, user_id, source, granularity, aggregate, filters, group_by)| {
+                    |(id, name, user_id, source, granularity, aggregate, filters, group_by)| {
                         TrainingMetric::new(
                             id,
+                            name,
                             TrainingMetricDefinition::new(
                                 user_id,
                                 source,
@@ -437,6 +440,7 @@ mod test_sqlite_training_repository {
     fn build_metric() -> TrainingMetric {
         TrainingMetric::new(
             TrainingMetricId::new(),
+            None,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -454,6 +458,7 @@ mod test_sqlite_training_repository {
     fn build_metric_definition_with_filters() -> TrainingMetric {
         TrainingMetric::new(
             TrainingMetricId::new(),
+            None,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -471,6 +476,7 @@ mod test_sqlite_training_repository {
     fn build_metric_definition_with_group_by() -> TrainingMetric {
         TrainingMetric::new(
             TrainingMetricId::new(),
+            None,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -1775,5 +1781,59 @@ mod test_sqlite_training_repository {
 
         // Should not fail even if note doesn't exist
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_and_retrieve_metric_with_name() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric_with_name = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::new("My Custom Metric")),
+            build_metric().definition().clone(),
+        );
+
+        repository
+            .save_training_metric_definition(metric_with_name.clone())
+            .await
+            .expect("Should save metric with name");
+
+        let metrics = repository
+            .get_metrics(&UserId::test_default())
+            .await
+            .expect("Should retrieve metrics");
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].name(), metric_with_name.name());
+        assert_eq!(
+            metrics[0].name().as_ref().map(|n| n.as_str()),
+            Some("My Custom Metric")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_and_retrieve_metric_without_name() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric_without_name = build_metric(); // None for name
+
+        repository
+            .save_training_metric_definition(metric_without_name.clone())
+            .await
+            .expect("Should save metric without name");
+
+        let metrics = repository
+            .get_metrics(&UserId::test_default())
+            .await
+            .expect("Should retrieve metrics");
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].name(), &None);
     }
 }

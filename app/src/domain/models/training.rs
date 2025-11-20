@@ -119,15 +119,51 @@ impl TrainingMetricGroupBy {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrainingMetricName(String);
+
+impl TrainingMetricName {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(name.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for TrainingMetricName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for TrainingMetricName {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for TrainingMetricName {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetric {
     id: TrainingMetricId,
+    name: Option<TrainingMetricName>,
     definition: TrainingMetricDefinition,
 }
 
 impl TrainingMetric {
     pub fn id(&self) -> &TrainingMetricId {
         &self.id
+    }
+
+    pub fn name(&self) -> &Option<TrainingMetricName> {
+        &self.name
     }
 
     pub fn definition(&self) -> &TrainingMetricDefinition {

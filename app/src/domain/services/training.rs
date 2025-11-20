@@ -61,7 +61,7 @@ where
             req.filters().clone(),
             req.group_by().clone(),
         );
-        let training_metric = TrainingMetric::new(id.clone(), definition);
+        let training_metric = TrainingMetric::new(id.clone(), req.name().clone(), definition);
         self.training_repository
             .save_training_metric_definition(training_metric.clone())
             .await?;
@@ -834,6 +834,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
+            None,
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
@@ -859,6 +860,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
+            None,
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
@@ -897,6 +899,7 @@ mod tests_training_metrics_service {
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -926,6 +929,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -945,6 +949,7 @@ mod tests_training_metrics_service {
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1012,6 +1017,7 @@ mod tests_training_metrics_service {
             def,
             &TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1032,6 +1038,7 @@ mod tests_training_metrics_service {
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1102,6 +1109,7 @@ mod tests_training_metrics_service {
         repository.expect_get_metrics().returning(|_| {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
+                None,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Distance),

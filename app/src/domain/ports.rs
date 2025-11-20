@@ -12,9 +12,9 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId,
-    TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId,
-    TrainingPeriodSports, TrainingPeriodWithActivities,
+    TrainingMetricName, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+    TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -546,6 +546,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingMetricRequest {
     user: UserId,
+    name: Option<TrainingMetricName>,
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
@@ -557,6 +558,10 @@ pub struct CreateTrainingMetricRequest {
 impl CreateTrainingMetricRequest {
     pub fn user(&self) -> &UserId {
         &self.user
+    }
+
+    pub fn name(&self) -> &Option<TrainingMetricName> {
+        &self.name
     }
 
     pub fn source(&self) -> &ActivityMetricSource {

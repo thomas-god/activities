@@ -38,6 +38,7 @@ pub struct CreateTrainingMetricBody {
 fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainingMetricRequest {
     CreateTrainingMetricRequest::new(
         user.clone(),
+        None, // name - not yet exposed in API
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
