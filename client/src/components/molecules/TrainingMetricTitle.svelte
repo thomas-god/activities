@@ -7,6 +7,7 @@
 	} from '$lib/metric';
 
 	interface TrainingMetricTitleProps {
+		name?: string | null;
 		granularity: string;
 		aggregate: MetricAggregateFunction;
 		metric: string;
@@ -14,7 +15,8 @@
 		groupBy: GroupByClause | null;
 	}
 
-	let { granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps = $props();
+	let { name, granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps =
+		$props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
@@ -39,10 +41,14 @@
 
 <div class="flex items-center justify-center gap-1.5">
 	<div class="text-base font-medium">
-		{capitalize(granularity.toLowerCase())}
-		{aggregateFunctionDisplay[aggregate]}
-		{#if aggregate !== 'NumberOfActivities'}
-			{metric.toLowerCase()}
+		{#if name}
+			{name}
+		{:else}
+			{capitalize(granularity.toLowerCase())}
+			{aggregateFunctionDisplay[aggregate]}
+			{#if aggregate !== 'NumberOfActivities'}
+				{metric.toLowerCase()}
+			{/if}
 		{/if}
 	</div>
 	{#if subtitle}

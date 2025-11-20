@@ -57,6 +57,7 @@ const TrainingPeriodDetailsSchema = z.object({
 // Schema for the new API response with grouped values
 const MetricsListItemSchemaGrouped = z.object({
 	id: z.string(),
+	name: z.string().nullable(),
 	metric: z.string(),
 	unit: z.string(),
 	granularity: z.string(),

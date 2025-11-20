@@ -36,6 +36,7 @@
 
 			metrics.push({
 				values: values,
+				name: metric.name,
 				metric: metric.metric,
 				granularity: metric.granularity,
 				aggregate: metric.aggregate,
@@ -104,6 +105,7 @@
 		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
 			<div class="relative p-4 text-center">
 				<TrainingMetricTitle
+					name={metric.name}
 					granularity={metric.granularity}
 					aggregate={metric.aggregate}
 					metric={metric.metric}

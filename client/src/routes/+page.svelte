@@ -52,6 +52,7 @@
 
 		return {
 			id: metric.id,
+			name: metric.name,
 			values: values,
 			metric: metric.metric,
 			granularity: metric.granularity,
@@ -86,6 +87,7 @@
 		>
 			<div class="mx-3 pt-4 text-center">
 				<TrainingMetricTitle
+					name={topMetric.name}
 					granularity={topMetric.granularity}
 					aggregate={topMetric.aggregate}
 					metric={topMetric.metric}

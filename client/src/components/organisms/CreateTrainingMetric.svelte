@@ -60,6 +60,7 @@
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
 	let sportFilterSelected = $state(false);
+	let metricName = $state('');
 
 	let statisticSource = $derived.by(() => {
 		const selectedSource = metricSources.find((s) => s.id === selectedMetricSourceId);
@@ -70,12 +71,17 @@
 
 	let metricRequest = $derived.by(() => {
 		let basePayload: {
+			name?: string;
 			source: typeof statisticSource;
 			granularity: typeof granularity;
 			aggregate: typeof aggregate;
 			filters: {};
 			group_by?: Exclude<typeof groupBy, 'None'>;
 		} = { source: statisticSource, granularity, aggregate, filters: {} };
+
+		if (metricName.trim()) {
+			basePayload = { ...basePayload, name: metricName.trim() };
+		}
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
@@ -171,7 +177,7 @@
 		</select>
 
 		<label class="label" for="metric-aggregate"
-			>How to aggregate each activity's metric from the {granularityDisplay[granularity]}</label
+			>How to aggregate each metric from the {granularityDisplay[granularity]}</label
 		>
 		<select class="select" bind:value={aggregate} id="metric-aggregate">
 			<option value="Max">Maximum value</option>
@@ -180,6 +186,15 @@
 			<option value="Average">Average</option>
 			<option value="NumberOfActivities">Number of activities</option>
 		</select>
+
+		<label class="label" for="metric-name">Metric name (optional)</label>
+		<input
+			type="text"
+			class="input"
+			id="metric-name"
+			bind:value={metricName}
+			placeholder="e.g., Weekly running volume"
+		/>
 
 		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
 			<summary class="collapse-title font-semibold">Groups and filters</summary>

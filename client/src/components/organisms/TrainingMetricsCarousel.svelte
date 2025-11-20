@@ -30,6 +30,7 @@
 
 		return {
 			id: metric.id,
+			name: metric.name,
 			values: values,
 			metric: metric.metric,
 			granularity: metric.granularity,
@@ -65,6 +66,7 @@
 		</button>
 		<div class="flex-1 text-center">
 			<TrainingMetricTitle
+				name={currentMetric.name}
 				granularity={currentMetric.granularity}
 				aggregate={currentMetric.aggregate}
 				metric={currentMetric.metric}
