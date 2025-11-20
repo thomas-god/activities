@@ -33,7 +33,8 @@
 	let gx: SVGGElement;
 	let gy: SVGGElement;
 	let gyGrid: SVGGElement;
-	let svg: SVGElement;
+	let gBars: SVGGElement;
+	let svgElement: SVGElement;
 
 	// Get color for a group based on the groupBy category
 	const getGroupColor = (groupName: string, groupBy: GroupByClause | null): string | null => {
@@ -195,6 +196,7 @@
 		visible: boolean;
 		x: number;
 		y: number;
+		showBelow: boolean;
 		time: string;
 		group: string;
 		value: number;
@@ -203,6 +205,7 @@
 		visible: false,
 		x: 0,
 		y: 0,
+		showBelow: false,
 		time: '',
 		group: '',
 		value: 0,
@@ -237,7 +240,7 @@
 	});
 
 	$effect(() => {
-		d3.select(svg).call((sel) =>
+		d3.select(gBars).call((sel) =>
 			sel
 				.selectAll('g')
 				.data(series)
@@ -261,17 +264,26 @@
 				.on('mouseenter', function (event: MouseEvent, stackedDataPoint: any) {
 					// Show tooltip
 					const rect = event.target as SVGRectElement;
-					const rectBounds = rect.getBoundingClientRect();
 					const value = stackedDataPoint[1] - stackedDataPoint[0]; // Height of this segment
 					const time = stackedDataPoint.data[0];
 
 					// Calculate total for this time across all groups
 					const total = values.filter((v) => v.time === time).reduce((sum, v) => sum + v.value, 0);
 
+					// Use SVG coordinates directly
+					const xPos = x(stackedDataPoint.data[0])! + x.bandwidth() / 2;
+					const yPos = y(stackedDataPoint[1]);
+
+					// Check if there's enough space above the bar for tooltip (need ~100px)
+					const tooltipHeight = 100;
+					const spaceAbove = yPos - marginTop;
+					const showBelow = spaceAbove < tooltipHeight;
+
 					tooltip = {
 						visible: true,
-						x: rectBounds.left + rectBounds.width / 2,
-						y: rectBounds.top,
+						x: xPos,
+						y: yPos,
+						showBelow: showBelow,
 						time: time,
 						group: stackedDataPoint.key,
 						value: value,
@@ -333,6 +345,7 @@
 		viewBox={`0 0 ${width} ${height}`}
 		role="img"
 		class="h-full w-full p-1 select-none"
+		bind:this={svgElement}
 	>
 		<g
 			bind:this={gyGrid}
@@ -341,10 +354,43 @@
 			opacity="0.3"
 		/>
 
-		<g bind:this={svg} />
+		<g bind:this={gBars} />
 
 		<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 		<g bind:this={gy} transform="translate({marginLeft} 0)" />
+
+		<!-- Tooltip inside SVG -->
+		{#if tooltip.visible}
+			<foreignObject
+				x={tooltip.x - 100}
+				y={tooltip.showBelow ? tooltip.y + 10 : tooltip.y - 90}
+				width="200"
+				height="100"
+				class="pointer-events-none overflow-visible"
+			>
+				<div class="flex justify-center">
+					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
+						<div class="flex flex-col gap-1">
+							<div class="font-semibold">{timeAxisTickFormater(tooltip.time, 0)}</div>
+							<div class="flex items-center gap-2 text-xs opacity-80">
+								{#if showGroup}
+									<span>{tooltip.group}</span>
+									<span>•</span>
+								{/if}
+								<span>{formatTooltipValue(tooltip.value)}</span>
+							</div>
+							{#if showGroup && tooltip.total !== tooltip.value}
+								<div class="flex items-center gap-2 text-xs opacity-60">
+									<span>Total</span>
+									<span>•</span>
+									<span>{formatTooltipValue(tooltip.total)}</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+				</div>
+			</foreignObject>
+		{/if}
 	</svg>
 
 	<!-- Legend -->
@@ -359,29 +405,3 @@
 		</div>
 	{/if}
 </div>
-
-<!-- Tooltip -->
-{#if tooltip.visible}
-	<div
-		class="pointer-events-none fixed z-50 rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg"
-		style="left: {tooltip.x}px; top: {tooltip.y - 10}px; transform: translate(-50%, -100%);"
-	>
-		<div class="flex flex-col gap-1">
-			<div class="font-semibold">{timeAxisTickFormater(tooltip.time, 0)}</div>
-			<div class="flex items-center gap-2 text-xs opacity-80">
-				{#if showGroup}
-					<span>{tooltip.group}</span>
-					<span>•</span>
-				{/if}
-				<span>{formatTooltipValue(tooltip.value)}</span>
-			</div>
-			{#if showGroup && tooltip.total !== tooltip.value}
-				<div class="flex items-center gap-2 text-xs opacity-60">
-					<span>Total</span>
-					<span>•</span>
-					<span>{formatTooltipValue(tooltip.total)}</span>
-				</div>
-			{/if}
-		</div>
-	</div>
-{/if}

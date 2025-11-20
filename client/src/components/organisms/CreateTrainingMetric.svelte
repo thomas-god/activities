@@ -5,6 +5,7 @@
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import SportsSelect from '../molecules/SportsSelect.svelte';
+	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	let { callback }: { callback: () => void } = $props();
 
 	// Define unified metric sources
@@ -62,12 +63,96 @@
 	let sportFilterSelected = $state(false);
 	let metricName = $state('');
 
+	let chartWidth: number = $state(0);
+	$inspect(chartWidth);
+
 	let statisticSource = $derived.by(() => {
 		const selectedSource = metricSources.find((s) => s.id === selectedMetricSourceId);
 		return selectedSource?.source || { Statistic: 'Duration' };
 	});
 
+	// Determine unit and format for preview display
+	let previewUnit = $derived.by(() => {
+		if (aggregate === 'NumberOfActivities') return 'activities';
+
+		// Map metric sources to units
+		const source = metricSources.find((s) => s.id === selectedMetricSourceId);
+		if (!source) return 's';
+
+		if ('Statistic' in source.source) {
+			const stat = source.source.Statistic;
+			if (stat === 'Calories') return 'kcal';
+			if (stat === 'Elevation') return 'm';
+			if (stat === 'Distance') return 'km';
+			if (stat === 'Duration') return 's';
+			if (stat === 'NormalizedPower') return 'W';
+		} else if ('Timeseries' in source.source) {
+			const [metric, _] = source.source.Timeseries;
+			if (metric === 'HeartRate') return 'bpm';
+			if (metric === 'Power') return 'W';
+			if (metric === 'Speed') return 'km/h';
+			if (metric === 'Altitude') return 'm';
+			if (metric === 'Cadence') return 'rpm';
+			if (metric === 'Distance') return 'km';
+		}
+
+		return 's';
+	});
+
+	let previewFormat = $derived.by((): 'number' | 'duration' => {
+		if (aggregate === 'NumberOfActivities') return 'number';
+		if (previewUnit === 's') return 'duration';
+		return 'number';
+	});
+
 	let requestPending = $state(false);
+
+	let previewRequest = $derived.by(() => {
+		const startDate = dayjs(dates.start).format('YYYY-MM-DDTHH:mm:ssZ');
+		const endDate = dates.end
+			? dayjs(dates.end).format('YYYY-MM-DDTHH:mm:ssZ')
+			: dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
+
+		let payload: {
+			source: typeof statisticSource;
+			granularity: typeof granularity;
+			aggregate: typeof aggregate;
+			filters?: {};
+			group_by?: Exclude<typeof groupBy, 'None'>;
+			start: string;
+			end: string;
+		} = { source: statisticSource, granularity, aggregate, start: startDate, end: endDate };
+
+		if (sportFilterSelected) {
+			const sportFilter = selectedSports.map((sport) => ({
+				Sport: sport
+			}));
+			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
+				SportCategory: category
+			}));
+			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+				...sportFilter,
+				...sportCategoriesFilter
+			];
+			payload = { ...payload, filters: { sports: filters } };
+		}
+
+		if (groupBy !== 'None') {
+			payload = { ...payload, group_by: groupBy };
+		}
+
+		return payload;
+	});
+
+	// Automatically fetch preview when form values change
+	let previewData = $derived.by(() => {
+		// Access previewRequest to track its dependencies
+		const request = previewRequest;
+		return fetchPreview(request);
+	});
+
+	// Create a unique key for the preview request to force re-rendering
+	let previewKey = $derived(JSON.stringify(previewRequest));
 
 	let metricRequest = $derived.by(() => {
 		let basePayload: {
@@ -125,9 +210,42 @@
 		invalidate('app:training-metrics');
 		callback();
 	};
+
+	const fetchPreview = async (
+		request: typeof previewRequest
+	): Promise<{ time: string; group: string; value: number }[]> => {
+		const body = JSON.stringify(request);
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
+			body,
+			method: 'POST',
+			credentials: 'include',
+			mode: 'cors',
+			headers: { 'Content-Type': 'application/json' }
+		});
+
+		if (res.status === 401) {
+			goto('/login');
+			throw new Error('Unauthorized');
+		}
+
+		if (res.status !== 200) {
+			throw new Error('Failed to fetch preview');
+		}
+
+		const data = await res.json();
+		// Transform the GroupedMetricValues response to the format expected by the chart
+		// Response format: { group_name: { granule: value } }
+		const values: { time: string; group: string; value: number }[] = [];
+		for (const [group, granuleValues] of Object.entries(data.values)) {
+			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
+				values.push({ time, group, value });
+			}
+		}
+		return values;
+	};
 </script>
 
-<div class=" text-sm">
+<div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
 		<legend class="fieldset-legend text-base">New training metric</legend>
 
@@ -220,23 +338,60 @@
 					<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
 				</div>
 				{#if sportFilterSelected}
-					<SportsSelect bind:selectedSports bind:selectedSportCategories />
+					<div class="max-h-96 overflow-scroll">
+						<SportsSelect bind:selectedSports bind:selectedSportCategories />
+					</div>
 				{/if}
 			</div>
 		</details>
 
-		<button
-			class="btn mt-4 btn-neutral"
-			onclick={async () => {
-				requestPending = true;
-				await createMetricCallback(metricRequest);
-				requestPending = false;
-			}}
-			disabled={requestPending}
-			>Create metric
-			{#if requestPending}
-				<span class="loading loading-spinner"></span>
-			{/if}
-		</button>
+		<div class="mt-4">
+			<button
+				class="btn w-full btn-neutral"
+				onclick={async () => {
+					requestPending = true;
+					await createMetricCallback(metricRequest);
+					requestPending = false;
+				}}
+				disabled={requestPending}
+				>Create metric
+				{#if requestPending}
+					<span class="loading loading-spinner"></span>
+				{/if}
+			</button>
+		</div>
 	</fieldset>
+
+	<div class="hidden self-center sm:block">
+		{#key previewKey}
+			{#await previewData}
+				<div class="p-8 text-center">
+					<span class="loading loading-lg loading-spinner"></span>
+				</div>
+			{:then values}
+				{#if values.length > 0}
+					<div bind:clientWidth={chartWidth}>
+						<TrainingMetricsChartStacked
+							height={300}
+							width={chartWidth}
+							{values}
+							unit={previewUnit}
+							{granularity}
+							format={previewFormat}
+							showGroup={groupBy !== 'None'}
+							groupBy={groupBy !== 'None' ? groupBy : null}
+						/>
+					</div>
+				{:else}
+					<div class="alert rounded-box alert-info">
+						<span>No data available for the selected period and filters.</span>
+					</div>
+				{/if}
+			{:catch error}
+				<div class="alert rounded-box alert-error">
+					<span>Failed to load preview. Please try again.</span>
+				</div>
+			{/await}
+		{/key}
+	</div>
 </div>

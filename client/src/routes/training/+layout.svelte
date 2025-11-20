@@ -70,7 +70,7 @@
 </div>
 
 <dialog class="modal" id="create-training-metric-modal" bind:this={createTrainingMetricDialog}>
-	<div class="modal-box">
+	<div class="modal-box max-w-3xl">
 		<CreateTrainingMetric callback={createTrainingMetricCallback} />
 	</div>
 	<form method="dialog" class="modal-backdrop">
