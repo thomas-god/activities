@@ -5,7 +5,7 @@ use crate::{
     domain::{
         models::{
             UserId,
-            training::{TrainingMetricFilters, TrainingMetricGroupBy},
+            training::{TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName},
         },
         ports::{
             CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
@@ -27,6 +27,7 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingMetricBody {
+    name: Option<String>,
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
@@ -38,7 +39,7 @@ pub struct CreateTrainingMetricBody {
 fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainingMetricRequest {
     CreateTrainingMetricRequest::new(
         user.clone(),
-        None, // name - not yet exposed in API
+        body.name.map(TrainingMetricName::from),
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
@@ -139,6 +140,19 @@ mod tests {
             "aggregate": "Min",
             "filters": {},
             "group_by": "RpeRange"
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "My Custom Metric",
+            "source": { "Statistic": "Calories"},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {}
         }"#,
             )
             .is_ok()

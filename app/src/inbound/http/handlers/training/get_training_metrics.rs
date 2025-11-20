@@ -93,6 +93,7 @@ pub struct ResponseBody(Vec<ResponseBodyItem>);
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBodyItem {
     id: String,
+    name: Option<String>,
     metric: String,
     unit: String,
     granularity: String,
@@ -113,6 +114,7 @@ fn to_response_body_item(
 
     ResponseBodyItem {
         id: metric.id().to_string(),
+        name: metric.name().as_ref().map(|n| n.as_str().to_string()),
         metric: format_source(definition.source()),
         unit: unit.to_string(),
         granularity: definition.granularity().to_string(),
