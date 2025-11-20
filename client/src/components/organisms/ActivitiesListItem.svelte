@@ -65,7 +65,9 @@
 		</div>
 	</div>
 	{#if showNote && activity.feedback}
-		<div class="my-1 pl-4 text-sm whitespace-pre-wrap text-gray-600 italic">
+		<div
+			class="my-0.5 ml-2 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+		>
 			📝 {activity.feedback}
 		</div>
 	{/if}
