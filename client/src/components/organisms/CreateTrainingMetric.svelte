@@ -6,31 +6,64 @@
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import SportsSelect from '../molecules/SportsSelect.svelte';
 	let { callback }: { callback: () => void } = $props();
-	let sourceType: 'activity-statistics' | 'timeseries-aggregate' = $state('activity-statistics');
-	let sourceActivityStatistics:
-		| 'Calories'
-		| 'Elevation'
-		| 'Distance'
-		| 'Duration'
-		| 'NormalizedPower' = $state('Duration');
-	let sourceTimeseriesMetric: 'Speed' | 'Power' | 'HeartRate' | 'Altitude' | 'Cadence' =
-		$state('Power');
-	let sourceTimeseriesAggregate: 'Min' | 'Max' | 'Average' | 'Sum' = $state('Average');
-	let granularity: 'Daily' | 'Weekly' | 'Monthly' = $state('Weekly');
+
+	// Define unified metric sources
+	type MetricSourceOption = {
+		id: string;
+		source: { Statistic: string } | { Timeseries: [string, string] };
+	};
+
+	const metricSources: MetricSourceOption[] = [
+		// Activity statistics
+		{ id: 'calories', source: { Statistic: 'Calories' } },
+		{ id: 'elevation', source: { Statistic: 'Elevation' } },
+		{ id: 'distance', source: { Statistic: 'Distance' } },
+		{ id: 'duration', source: { Statistic: 'Duration' } },
+		{ id: 'normalized-power', source: { Statistic: 'NormalizedPower' } },
+		// Heart rate timeseries
+		{ id: 'hr-max', source: { Timeseries: ['HeartRate', 'Max'] } },
+		{ id: 'hr-min', source: { Timeseries: ['HeartRate', 'Min'] } },
+		{ id: 'hr-avg', source: { Timeseries: ['HeartRate', 'Average'] } },
+		// Power timeseries
+		{ id: 'power-max', source: { Timeseries: ['Power', 'Max'] } },
+		{ id: 'power-min', source: { Timeseries: ['Power', 'Min'] } },
+		{ id: 'power-avg', source: { Timeseries: ['Power', 'Average'] } },
+		// Speed timeseries
+		{ id: 'speed-max', source: { Timeseries: ['Speed', 'Max'] } },
+		{ id: 'speed-min', source: { Timeseries: ['Speed', 'Min'] } },
+		{ id: 'speed-avg', source: { Timeseries: ['Speed', 'Average'] } },
+		// Altitude timeseries
+		{ id: 'altitude-max', source: { Timeseries: ['Altitude', 'Max'] } },
+		{ id: 'altitude-min', source: { Timeseries: ['Altitude', 'Min'] } },
+		{ id: 'altitude-avg', source: { Timeseries: ['Altitude', 'Average'] } },
+		// Cadence timeseries
+		{ id: 'cadence-max', source: { Timeseries: ['Cadence', 'Max'] } },
+		{ id: 'cadence-min', source: { Timeseries: ['Cadence', 'Min'] } },
+		{ id: 'cadence-avg', source: { Timeseries: ['Cadence', 'Average'] } }
+	];
+
+	const granularityValues = ['Daily', 'Weekly', 'Monthly'] as const;
+	type Granularity = (typeof granularityValues)[number];
+
+	let selectedMetricSourceId = $state('duration');
+	let granularity: Granularity = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' | 'NumberOfActivities' = $state('Sum');
 	let groupBy: 'None' | 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' =
 		$state('None');
+
+	const granularityDisplay: Record<Granularity, string> = {
+		Daily: 'day',
+		Monthly: 'month',
+		Weekly: 'week'
+	};
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
 	let sportFilterSelected = $state(false);
 
 	let statisticSource = $derived.by(() => {
-		if (sourceType === 'activity-statistics') {
-			return { Statistic: sourceActivityStatistics };
-		} else {
-			return { Timeseries: [sourceTimeseriesMetric, sourceTimeseriesAggregate] };
-		}
+		const selectedSource = metricSources.find((s) => s.id === selectedMetricSourceId);
+		return selectedSource?.source || { Statistic: 'Duration' };
 	});
 
 	let requestPending = $state(false);
@@ -91,14 +124,55 @@
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
 		<legend class="fieldset-legend text-base">New training metric</legend>
-		<label class="label" for="metric-granularity">Granularity</label>
+
+		{#if aggregate !== 'NumberOfActivities'}
+			<label class="label" for="metric-source">Metric to extract from each activity</label>
+			<select class="select" bind:value={selectedMetricSourceId} id="metric-source">
+				<optgroup label="Activity Statistics">
+					<option value="calories">Calories</option>
+					<option value="elevation">Elevation gain</option>
+					<option value="distance">Distance</option>
+					<option value="duration">Duration</option>
+					<option value="normalized-power">Normalized power</option>
+				</optgroup>
+				<optgroup label="Heart Rate">
+					<option value="hr-max">Maximum heart rate</option>
+					<option value="hr-avg">Average heart rate</option>
+					<option value="hr-min">Minimum heart rate</option>
+				</optgroup>
+				<optgroup label="Power">
+					<option value="power-max">Maximum power</option>
+					<option value="power-avg">Average power</option>
+					<option value="power-min">Minimum power</option>
+				</optgroup>
+				<optgroup label="Speed">
+					<option value="speed-max">Maximum speed</option>
+					<option value="speed-avg">Average speed</option>
+					<option value="speed-min">Minimum speed</option>
+				</optgroup>
+				<optgroup label="Altitude">
+					<option value="altitude-max">Maximum altitude</option>
+					<option value="altitude-avg">Average altitude</option>
+					<option value="altitude-min">Minimum altitude</option>
+				</optgroup>
+				<optgroup label="Cadence">
+					<option value="cadence-max">Maximum cadence</option>
+					<option value="cadence-avg">Average cadence</option>
+					<option value="cadence-min">Minimum cadence</option>
+				</optgroup>
+			</select>
+		{/if}
+
+		<label class="label" for="metric-granularity">Group activities by</label>
 		<select class="select" bind:value={granularity} id="metric-granularity">
-			<option value="Daily">Daily</option>
-			<option value="Weekly">Weekly</option>
-			<option value="Monthly">Monthly</option>
+			<option value="Daily">Day</option>
+			<option value="Weekly">Week</option>
+			<option value="Monthly">Month</option>
 		</select>
 
-		<label class="label" for="metric-aggregate">Aggregate function</label>
+		<label class="label" for="metric-aggregate"
+			>How to aggregate each activity's metric from the {granularityDisplay[granularity]}</label
+		>
 		<select class="select" bind:value={aggregate} id="metric-aggregate">
 			<option value="Max">Maximum value</option>
 			<option value="Min">Minimum value</option>
@@ -107,65 +181,13 @@
 			<option value="NumberOfActivities">Number of activities</option>
 		</select>
 
-		{#if aggregate !== 'NumberOfActivities'}
-			<label class="label" for="source-type">Metric source</label>
-			<select class="select" bind:value={sourceType} id="source-type">
-				<option value="activity-statistics">Activity statistics</option>
-				<option value="timeseries-aggregate">Timeseries aggregate</option>
-			</select>
-
-			{#if sourceType === 'activity-statistics'}
-				<label class="label" for="source-Activity-statistics">Statistics</label>
-				<select
-					class="select"
-					bind:value={sourceActivityStatistics}
-					id="source-Activity-statistics"
-				>
-					<option value="Calories">Calories</option>
-					<option value="Elevation">Elevation gain</option>
-					<option value="Distance">Distance</option>
-					<option value="Duration">Duration</option>
-					<option value="NormalizedPower">Normalized power</option>
-				</select>
-			{:else}
-				<div class="ml-3 flex flex-row gap-3">
-					<div>
-						<label class="label p-1" for="source-timeseries-metric">Timeseries metric</label>
-						<select
-							class="select"
-							bind:value={sourceTimeseriesMetric}
-							id="source-timeseries-metric"
-						>
-							<option value="Altitude">Altitude</option>
-							<option value="Speed">Speed</option>
-							<option value="Power">Power</option>
-							<option value="HeartRate">Heart rate</option>
-							<option value="Cadence">Cadence</option>
-						</select>
-					</div>
-
-					<div>
-						<label class="label p-1" for="source-timeseries-aggregate">Timeseries aggregate</label>
-						<select
-							class="select"
-							bind:value={sourceTimeseriesAggregate}
-							id="source-timeseries-aggregate"
-						>
-							<option value="Max">Maximum value</option>
-							<option value="Min">Minimum value</option>
-							<option value="Sum">Total</option>
-							<option value="Average">Average</option>
-						</select>
-					</div>
-				</div>
-			{/if}
-		{/if}
-
 		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
 			<summary class="collapse-title font-semibold">Groups and filters</summary>
 			<div class="collapse-content text-sm">
 				<div class="mb-2">
-					<label class="label mb-1.5 text-xs" for="metric-group-by">Group by</label>
+					<label class="label mb-1.5 text-xs" for="metric-group-by"
+						>Additionally group activities by</label
+					>
 					<select class="select w-full" bind:value={groupBy} id="metric-group-by">
 						<option value="None">No grouping</option>
 						<option value="Sport">Sport</option>
@@ -179,7 +201,7 @@
 				<div class="divider"></div>
 
 				<div class="mb-2 font-semibold">
-					<span class="pr-2"> Filter by sports </span>
+					<span class="pr-2"> Filter activities by sports </span>
 					<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
 				</div>
 				{#if sportFilterSelected}
