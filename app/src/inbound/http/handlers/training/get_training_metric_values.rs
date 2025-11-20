@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
-        models::training::{TrainingMetricBin, TrainingMetricId},
+        models::training::TrainingMetricId,
         ports::{
             DateRange, GetTrainingMetricValuesError, IActivityService, IPreferencesService,
             ITrainingService,
@@ -21,6 +21,7 @@ use crate::{
         http::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
+            handlers::training::utils::GroupedMetricValues,
         },
         parser::ParseFile,
     },
@@ -45,13 +46,7 @@ impl From<&MetricValuesQuery> for DateRange {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody {
-    values: HashMap<String, MetricValue>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct MetricValue {
-    value: f64,
-    group: Option<String>,
+    values: GroupedMetricValues,
 }
 
 impl From<GetTrainingMetricValuesError> for StatusCode {
@@ -84,20 +79,18 @@ pub async fn get_training_metric_values<
         .await
         .map_err(StatusCode::from)?;
 
-    let response_values: HashMap<String, MetricValue> = values
-        .into_iter()
+    let values: GroupedMetricValues = values
+        .iter()
         .map(|(bin, value)| {
-            (
-                bin.granule().to_string(),
-                MetricValue {
-                    value: value.value(),
-                    group: bin.group().clone(),
-                },
-            )
+            let group = bin.group().clone().unwrap_or_else(|| "Other".to_string());
+            (group, bin.granule().to_string(), value.value())
         })
-        .collect();
+        .fold(HashMap::new(), |mut acc, (group, granule, value)| {
+            acc.entry(group)
+                .or_insert_with(HashMap::new)
+                .insert(granule, value);
+            acc
+        });
 
-    Ok(Json(ResponseBody {
-        values: response_values,
-    }))
+    Ok(Json(ResponseBody { values }))
 }

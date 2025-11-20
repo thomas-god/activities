@@ -1,12 +1,13 @@
-use std::collections::HashMap;
-
 use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
-        models::training::{TrainingMetricDefinition, TrainingMetricFilters},
+        models::training::{
+            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
+            TrainingMetricFilters, TrainingMetricGranularity,
+        },
         ports::{
             ComputeTrainingMetricValuesError, DateRange, IActivityService, IPreferencesService,
             ITrainingService,
@@ -16,9 +17,16 @@ use crate::{
         http::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
-            handlers::training::types::{
-                APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
-                APITrainingMetricGroupBy, APITrainingMetricSource,
+            handlers::training::{
+                types::{
+                    APITrainingMetricAggregate, APITrainingMetricFilters,
+                    APITrainingMetricGranularity, APITrainingMetricGroupBy,
+                    APITrainingMetricSource,
+                },
+                utils::{
+                    GroupedMetricValues, MetricsDateRange, convert_metric_values,
+                    fill_metric_values,
+                },
             },
         },
         parser::ParseFile,
@@ -52,13 +60,7 @@ impl From<&ComputeMetricValuesRequest> for DateRange {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody {
-    values: HashMap<String, MetricValue>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct MetricValue {
-    value: f64,
-    group: Option<String>,
+    values: GroupedMetricValues,
 }
 
 impl From<ComputeTrainingMetricValuesError> for StatusCode {
@@ -90,11 +92,20 @@ pub async fn compute_training_metric_values<
 
     let group_by = request.group_by.map(|gb| gb.into());
 
+    // Convert request types before they are moved
+    let source: ActivityMetricSource = request.source.into();
+    let granularity: TrainingMetricGranularity = request.granularity.into();
+    let aggregate: TrainingMetricAggregate = request.aggregate.into();
+    let range = MetricsDateRange {
+        start: request.start,
+        end: request.end,
+    };
+
     let definition = TrainingMetricDefinition::new(
         user.user().clone(),
-        request.source.into(),
-        request.granularity.into(),
-        request.aggregate.into(),
+        source.clone(),
+        granularity.clone(),
+        aggregate.clone(),
         filters,
         group_by,
     );
@@ -105,22 +116,10 @@ pub async fn compute_training_metric_values<
         .await
         .map_err(StatusCode::from)?;
 
-    let response_values: HashMap<String, MetricValue> = values
-        .into_iter()
-        .map(|(bin, value)| {
-            (
-                bin.granule().to_string(),
-                MetricValue {
-                    value: value.value(),
-                    group: bin.group().clone(),
-                },
-            )
-        })
-        .collect();
+    let values = fill_metric_values(&granularity, values, &range);
+    let (_, values) = convert_metric_values(values, &source, &aggregate);
 
-    Ok(Json(ResponseBody {
-        values: response_values,
-    }))
+    Ok(Json(ResponseBody { values }))
 }
 
 #[cfg(test)]

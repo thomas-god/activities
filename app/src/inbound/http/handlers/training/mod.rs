@@ -14,6 +14,7 @@ mod get_training_periods;
 mod types;
 mod update_training_note;
 mod update_training_period;
+mod utils;
 
 pub use compute_training_metric_values::compute_training_metric_values;
 pub use create_training_metric::create_training_metric;
