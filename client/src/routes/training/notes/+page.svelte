@@ -2,7 +2,7 @@
 	import { deleteTrainingNote, updateTrainingNote } from '$lib/api/training';
 	import { invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import TrainingNoteListItem from '$components/organisms/TrainingNoteListItem.svelte';
+	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -24,16 +24,16 @@
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
-	<div class="rounded-box bg-base-100 shadow-md">
+	<div class="rounded-box bg-base-100 pb-3 shadow-md">
 		<div class="p-4 text-sm tracking-wide italic opacity-60">
 			Training notes are personal observations, insights and decisions about your training.
 		</div>
 		<div>
 			{#each notes as note}
-				<div class="px-4 py-2">
-					<TrainingNoteListItem
+				<div class="px-2 sm:px-4">
+					<TrainingNoteListItemCompact
 						{note}
-						onSave={(content, date) => saveNote(note.id, content, date)}
+						onEdit={(content, date) => saveNote(note.id, content, date)}
 						onDelete={() => deleteNote(note.id)}
 					/>
 				</div>
