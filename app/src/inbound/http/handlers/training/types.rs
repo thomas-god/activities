@@ -45,7 +45,7 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
     fn from(value: APITimeseriesMetric) -> Self {
         match value {
             APITimeseriesMetric::Speed => Self::Speed,
-            APITimeseriesMetric::Power => Self::Distance,
+            APITimeseriesMetric::Power => Self::Power,
             APITimeseriesMetric::HeartRate => Self::HeartRate,
             APITimeseriesMetric::Distance => Self::Distance,
             APITimeseriesMetric::Altitude => Self::Altitude,
