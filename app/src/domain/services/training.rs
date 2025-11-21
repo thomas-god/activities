@@ -19,7 +19,8 @@ use crate::domain::{
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
         DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
         GetTrainingNoteError, ITrainingService, ListActivitiesFilters, TrainingRepository,
-        UpdateTrainingNoteError, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+        UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest, UpdateTrainingNoteError,
+        UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
         UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
         UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
     },
@@ -226,6 +227,38 @@ where
         self.training_repository
             .delete_definition(req.metric())
             .await?;
+
+        Ok(())
+    }
+
+    async fn update_training_metric_name(
+        &self,
+        req: UpdateTrainingMetricNameRequest,
+    ) -> Result<(), UpdateTrainingMetricNameError> {
+        // Get the metric to verify it exists and check ownership
+        let Some(definition) = self
+            .training_repository
+            .get_definition(req.metric_id())
+            .await?
+        else {
+            return Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
+                req.metric_id().clone(),
+            ));
+        };
+
+        // Verify user owns the metric
+        if definition.user() != req.user() {
+            return Err(UpdateTrainingMetricNameError::UserDoesNotOwnTrainingMetric(
+                req.user().clone(),
+                req.metric_id().clone(),
+            ));
+        }
+
+        // Update the metric name
+        self.training_repository
+            .update_training_metric_name(req.metric_id(), req.name().clone())
+            .await
+            .map_err(UpdateTrainingMetricNameError::Unknown)?;
 
         Ok(())
     }
@@ -553,7 +586,8 @@ pub mod test_utils {
 
     use crate::domain::{
         models::training::{
-            TrainingNote, TrainingNoteContent, TrainingPeriod, TrainingPeriodWithActivities,
+            TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
+            TrainingPeriodWithActivities,
         },
         ports::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
@@ -590,6 +624,11 @@ pub mod test_utils {
                 &self,
                 req: DeleteTrainingMetricRequest,
             ) -> Result<(), DeleteTrainingMetricError>;
+
+            async fn update_training_metric_name(
+                &self,
+                req: UpdateTrainingMetricNameRequest,
+            ) -> Result<(), UpdateTrainingMetricNameError>;
 
             async fn create_training_period(
                 &self,
@@ -721,6 +760,12 @@ pub mod test_utils {
                 metric: &TrainingMetricId,
             ) -> Result<(), DeleteMetricError>;
 
+            async fn update_training_metric_name(
+                &self,
+                metric_id: &TrainingMetricId,
+                name: TrainingMetricName,
+            ) -> Result<(), anyhow::Error>;
+
             async fn save_training_period(
                 &self,
                 period: TrainingPeriod,
@@ -811,7 +856,7 @@ mod tests_training_metrics_service {
             training::{
                 ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
                 TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-                TrainingMetricId,
+                TrainingMetricId, TrainingMetricName,
             },
         },
         ports::{DateTimeRange, GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -1254,6 +1299,97 @@ mod tests_training_metrics_service {
         );
 
         let res = service.delete_metric(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_training_service_update_metric_name_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_definition().returning(|_| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateTrainingMetricNameRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Name"),
+        );
+
+        let res = service.update_training_metric_name(req).await;
+
+        let Err(UpdateTrainingMetricNameError::MetricDoesNotExist(metric)) = res else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_training_service_update_metric_name_wrong_user() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_definition().returning(|_| {
+            Ok(Some(TrainingMetricDefinition::new(
+                "other_user".to_string().into(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            )))
+        });
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateTrainingMetricNameRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Name"),
+        );
+
+        let res = service.update_training_metric_name(req).await;
+
+        let Err(UpdateTrainingMetricNameError::UserDoesNotOwnTrainingMetric(user, metric)) = res
+        else {
+            unreachable!("Should have returned an err")
+        };
+        assert_eq!(user, "user".to_string().into());
+        assert_eq!(metric, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_training_service_update_metric_name() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_definition().returning(|_| {
+            Ok(Some(TrainingMetricDefinition::new(
+                "user".to_string().into(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            )))
+        });
+        repository
+            .expect_update_training_metric_name()
+            .times(1)
+            .withf(|id, name| {
+                id == &TrainingMetricId::from("test")
+                    && name == &TrainingMetricName::from("Updated Name")
+            })
+            .returning(|_, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let req = UpdateTrainingMetricNameRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Name"),
+        );
+
+        let res = service.update_training_metric_name(req).await;
 
         assert!(res.is_ok());
     }

@@ -180,6 +180,20 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    async fn update_training_metric_name(
+        &self,
+        metric_id: &TrainingMetricId,
+        name: TrainingMetricName,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query("UPDATE t_training_metrics_definitions SET name = ?1 WHERE id = ?2;")
+            .bind(name.to_string())
+            .bind(metric_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())
+    }
+
     async fn save_training_period(
         &self,
         period: crate::domain::models::training::TrainingPeriod,
@@ -403,7 +417,7 @@ mod test_sqlite_training_repository {
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
-        activity::{Sport, TimeseriesMetric},
+        activity::{ActivityStatistic, Sport, TimeseriesMetric},
         training::{
             ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingNote, TrainingNoteContent,
@@ -759,6 +773,124 @@ mod test_sqlite_training_repository {
             unreachable!("Should have been an err")
         };
         assert_eq!(err_id, id);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_name_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a metric
+        let metric = build_metric();
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        // Update the name
+        let new_name = TrainingMetricName::from("Updated Metric Name");
+        let result = repository
+            .update_training_metric_name(metric.id(), new_name.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the name was updated
+        let fetched = repository.get_definition(metric.id()).await;
+        assert!(fetched.is_ok());
+        let fetched_def = fetched.unwrap();
+        assert!(fetched_def.is_some());
+        let definition = fetched_def.unwrap();
+
+        // Verify other fields unchanged
+        assert_eq!(definition.user(), metric.definition().user());
+        assert_eq!(definition.source(), metric.definition().source());
+        assert_eq!(definition.granularity(), metric.definition().granularity());
+        assert_eq!(definition.aggregate(), metric.definition().aggregate());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_name_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Try to update a non-existent metric
+        let metric_id = TrainingMetricId::new();
+        let result = repository
+            .update_training_metric_name(&metric_id, TrainingMetricName::from("New Name"))
+            .await;
+
+        // Should succeed (no rows affected, but no error)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_name_only_updates_specified_metric() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create two metrics
+        let metric1 = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Metric 1")),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Timeseries((
+                    TimeseriesMetric::Altitude,
+                    TimeseriesAggregate::Max,
+                )),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
+        );
+        let metric2 = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Metric 2")),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(metric1.clone())
+            .await
+            .expect("Should save metric 1");
+        repository
+            .save_training_metric_definition(metric2.clone())
+            .await
+            .expect("Should save metric 2");
+
+        // Update only metric1's name
+        let new_name = TrainingMetricName::from("Updated First Metric");
+        let result = repository
+            .update_training_metric_name(metric1.id(), new_name.clone())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify metric1's name was updated by fetching all metrics
+        let all_metrics = repository
+            .get_metrics(metric1.definition().user())
+            .await
+            .expect("Should fetch metrics");
+
+        let fetched_metric1 = all_metrics.iter().find(|m| m.id() == metric1.id()).unwrap();
+        assert_eq!(fetched_metric1.name(), &Some(new_name));
+
+        // Verify metric2's name is unchanged
+        let fetched_metric2 = all_metrics.iter().find(|m| m.id() == metric2.id()).unwrap();
+        assert_eq!(fetched_metric2.name(), metric2.name());
     }
 
     fn build_training_period() -> TrainingPeriod {

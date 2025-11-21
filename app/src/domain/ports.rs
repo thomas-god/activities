@@ -675,6 +675,39 @@ pub enum DeleteTrainingMetricError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct UpdateTrainingMetricNameRequest {
+    user: UserId,
+    metric_id: TrainingMetricId,
+    name: TrainingMetricName,
+}
+
+impl UpdateTrainingMetricNameRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn metric_id(&self) -> &TrainingMetricId {
+        &self.metric_id
+    }
+
+    pub fn name(&self) -> &TrainingMetricName {
+        &self.name
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingMetricNameError {
+    #[error("Training metric {0} does not exist")]
+    MetricDoesNotExist(TrainingMetricId),
+    #[error("User {0} does not own training metric {1}")]
+    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
+    #[error("An infrastructure error occured when getting definition")]
+    GetDefinitionError(#[from] GetDefinitionError),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
@@ -704,6 +737,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
+
+    fn update_training_metric_name(
+        &self,
+        req: UpdateTrainingMetricNameRequest,
+    ) -> impl Future<Output = Result<(), UpdateTrainingMetricNameError>> + Send;
 
     fn create_training_period(
         &self,
@@ -1109,6 +1147,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         metric: &TrainingMetricId,
     ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
+
+    fn update_training_metric_name(
+        &self,
+        metric_id: &TrainingMetricId,
+        name: TrainingMetricName,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn get_metrics(
         &self,
