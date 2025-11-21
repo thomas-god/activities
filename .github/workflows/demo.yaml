@@ -37,6 +37,8 @@ jobs:
         run: |
           eval "$(ssh-agent -s)"
           ssh-add - <<< "$SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          ssh-keyscan -H demo.activities.training >> ~/.ssh/known_hosts
           export DOCKER_HOST="ssh://deploy@demo.activities.training"
           docker service update --force activities-demo_demo-reset
           ssh-agent -k
