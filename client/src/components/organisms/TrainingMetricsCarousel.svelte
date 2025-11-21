@@ -7,12 +7,14 @@
 		metrics,
 		width,
 		height,
-		initialIndex = 0
+		initialIndex = 0,
+		favoriteMetricId
 	}: {
 		metrics: MetricsListItemGrouped[];
 		width: number;
 		height: number;
 		initialIndex?: number;
+		favoriteMetricId?: string | null;
 	} = $props();
 
 	let currentIndex = $state(initialIndex);
@@ -72,6 +74,7 @@
 				metric={currentMetric.metric}
 				sports={currentMetric.sports}
 				groupBy={currentMetric.groupBy}
+				isFavorite={currentMetric.id === favoriteMetricId}
 			/>
 		</div>
 		<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
@@ -91,7 +94,7 @@
 	/>
 
 	{#if metrics.length > 1}
-		<div class="flex items-center justify-center gap-2 pb-2">
+		<div class="flex items-center justify-center gap-2 py-2">
 			{#each metrics as _, index}
 				<button
 					class="h-2 w-2 rounded-full {index === currentIndex ? 'w-6 bg-primary' : 'bg-base-300'}"

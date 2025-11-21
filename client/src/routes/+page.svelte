@@ -3,8 +3,7 @@
 	import { invalidate } from '$app/navigation';
 	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
-	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
+	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { dayjs } from '$lib/duration';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
@@ -27,41 +26,22 @@
 		});
 	});
 
-	let topMetric = $derived.by(() => {
-		// Find favorite metric ID from preferences
+	let favoriteMetricId = $derived.by(() => {
 		const favoriteMetricPref = data.preferences.find((p) => p.key === 'favorite_metric');
-		const favoriteMetricId = favoriteMetricPref?.value;
+		return favoriteMetricPref?.value;
+	});
 
-		// Try to find the favorite metric, otherwise use the first one
-		let metric = favoriteMetricId ? data.metrics.find((m) => m.id === favoriteMetricId) : undefined;
-
-		if (metric === undefined) {
-			metric = data.metrics.at(0);
+	let metricsForCarousel = $derived.by(() => {
+		// Sort to put favorite first if it exists
+		const sortedMetrics = [...data.metrics];
+		if (favoriteMetricId) {
+			sortedMetrics.sort((a, b) => {
+				if (a.id === favoriteMetricId) return -1;
+				if (b.id === favoriteMetricId) return 1;
+				return 0;
+			});
 		}
-
-		if (metric === undefined) {
-			return undefined;
-		}
-
-		let values = [];
-		for (const [group, time_values] of Object.entries(metric.values)) {
-			for (const [dt, value] of Object.entries(time_values)) {
-				values.push({ time: dt, group, value });
-			}
-		}
-
-		return {
-			id: metric.id,
-			name: metric.name,
-			values: values,
-			metric: metric.metric,
-			granularity: metric.granularity,
-			aggregate: metric.aggregate,
-			sports: metric.sports,
-			groupBy: metric.group_by,
-			unit: metric.unit,
-			showGroup: metric.group_by !== null
-		};
+		return sortedMetrics;
 	});
 
 	const moreActivitiesCallback = () => {
@@ -80,30 +60,16 @@
 </script>
 
 <div class="homepage_container">
-	{#if topMetric}
+	{#if metricsForCarousel.length > 0}
 		<div
 			bind:clientWidth={chartWidth}
 			class="item metric_chart rounded-box bg-base-100 pb-2 shadow-md"
 		>
-			<div class="mx-3 pt-4 text-center">
-				<TrainingMetricTitle
-					name={topMetric.name}
-					granularity={topMetric.granularity}
-					aggregate={topMetric.aggregate}
-					metric={topMetric.metric}
-					sports={topMetric.sports}
-					groupBy={topMetric.groupBy}
-				/>
-			</div>
-			<TrainingMetricsChartStacked
-				height={chartHeight}
+			<TrainingMetricsCarousel
+				metrics={metricsForCarousel}
 				width={chartWidth}
-				values={topMetric.values}
-				unit={topMetric.unit}
-				granularity={topMetric.granularity}
-				format={topMetric.unit === 's' ? 'duration' : 'number'}
-				showGroup={topMetric.showGroup}
-				groupBy={topMetric.groupBy}
+				height={chartHeight}
+				{favoriteMetricId}
 			/>
 		</div>
 	{/if}
