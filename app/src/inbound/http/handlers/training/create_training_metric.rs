@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingMetricBody {
-    name: Option<String>,
+    name: String,
     source: APITrainingMetricSource,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
@@ -36,17 +36,24 @@ pub struct CreateTrainingMetricBody {
     initial_date_range: Option<DateRange>,
 }
 
-fn build_request(body: CreateTrainingMetricBody, user: &UserId) -> CreateTrainingMetricRequest {
-    CreateTrainingMetricRequest::new(
+fn build_request(
+    body: CreateTrainingMetricBody,
+    user: &UserId,
+) -> Result<CreateTrainingMetricRequest, String> {
+    if body.name.trim().is_empty() {
+        return Err("Metric name cannot be empty".to_string());
+    }
+
+    Ok(CreateTrainingMetricRequest::new(
         user.clone(),
-        body.name.map(TrainingMetricName::from),
+        TrainingMetricName::from(body.name),
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
         body.filters.into(),
         body.group_by.map(TrainingMetricGroupBy::from),
         body.initial_date_range,
-    )
+    ))
 }
 
 impl From<CreateTrainingMetricError> for StatusCode {
@@ -65,15 +72,25 @@ pub async fn create_training_metric<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Json(payload): Json<CreateTrainingMetricBody>,
-) -> Result<StatusCode, StatusCode> {
-    let req = build_request(payload, user.user());
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let req = build_request(payload, user.user()).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e })),
+        )
+    })?;
 
     state
         .training_metrics_service
         .create_metric(req)
         .await
         .map(|_| StatusCode::CREATED)
-        .map_err(StatusCode::from)
+        .map_err(|e| {
+            (
+                StatusCode::from(e),
+                Json(serde_json::json!({ "error": "Failed to create training metric" })),
+            )
+        })
 }
 
 #[cfg(test)]
@@ -86,6 +103,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
+            "name": "Test Metric",
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
@@ -98,6 +116,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
+            "name": "Test Metric",
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
@@ -110,6 +129,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
+            "name": "Test Metric",
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
@@ -122,6 +142,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
+            "name": "Test Metric",
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
@@ -135,6 +156,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
+            "name": "Test Metric",
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",

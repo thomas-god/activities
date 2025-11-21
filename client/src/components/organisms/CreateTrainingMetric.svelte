@@ -156,17 +156,13 @@
 
 	let metricRequest = $derived.by(() => {
 		let basePayload: {
-			name?: string;
+			name: string;
 			source: typeof statisticSource;
 			granularity: typeof granularity;
 			aggregate: typeof aggregate;
 			filters: {};
 			group_by?: Exclude<typeof groupBy, 'None'>;
-		} = { source: statisticSource, granularity, aggregate, filters: {} };
-
-		if (metricName.trim()) {
-			basePayload = { ...basePayload, name: metricName.trim() };
-		}
+		} = { name: metricName.trim(), source: statisticSource, granularity, aggregate, filters: {} };
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
@@ -305,13 +301,14 @@
 			<option value="NumberOfActivities">Number of activities</option>
 		</select>
 
-		<label class="label" for="metric-name">Metric name (optional)</label>
+		<label class="label" for="metric-name">Metric name</label>
 		<input
 			type="text"
 			class="input"
 			id="metric-name"
 			bind:value={metricName}
 			placeholder="e.g., Weekly running volume"
+			required
 		/>
 
 		<details class="collapse-arrow collapse mt-3 border border-base-300 bg-base-100" open={false}>
@@ -353,7 +350,7 @@
 					await createMetricCallback(metricRequest);
 					requestPending = false;
 				}}
-				disabled={requestPending}
+				disabled={requestPending || !metricName.trim()}
 				>Create metric
 				{#if requestPending}
 					<span class="loading loading-spinner"></span>

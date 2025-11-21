@@ -546,7 +546,7 @@ pub trait RawDataRepository: Clone + Send + Sync + 'static {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingMetricRequest {
     user: UserId,
-    name: Option<TrainingMetricName>,
+    name: TrainingMetricName,
     source: ActivityMetricSource,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
@@ -560,7 +560,7 @@ impl CreateTrainingMetricRequest {
         &self.user
     }
 
-    pub fn name(&self) -> &Option<TrainingMetricName> {
+    pub fn name(&self) -> &TrainingMetricName {
         &self.name
     }
 

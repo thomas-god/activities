@@ -62,7 +62,7 @@ where
             req.filters().clone(),
             req.group_by().clone(),
         );
-        let training_metric = TrainingMetric::new(id.clone(), req.name().clone(), definition);
+        let training_metric = TrainingMetric::new(id.clone(), Some(req.name().clone()), definition);
         self.training_repository
             .save_training_metric_definition(training_metric.clone())
             .await?;
@@ -879,7 +879,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
-            None,
+            TrainingMetricName::from("Test Metric"),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
@@ -905,7 +905,7 @@ mod tests_training_metrics_service {
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
-            None,
+            TrainingMetricName::from("Test Metric"),
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
