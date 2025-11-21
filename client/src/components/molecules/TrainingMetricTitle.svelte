@@ -13,29 +13,46 @@
 		metric: string;
 		sports?: string[];
 		groupBy: GroupByClause | null;
+		isFavorite?: boolean;
 	}
 
-	let { name, granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps =
-		$props();
+	let {
+		name,
+		granularity,
+		aggregate,
+		metric,
+		sports,
+		groupBy,
+		isFavorite = false
+	}: TrainingMetricTitleProps = $props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
-	let subtitle = $derived.by(() => {
-		const parts = [];
+	let tooltipLines = $derived.by(() => {
+		const lines = [];
 
-		// Add sports filter if present
-		if (sports && sports.length > 0) {
-			parts.push(sports.join(', '));
-		} else {
-			parts.push('All sports');
-		}
+		// Source metric
+		lines.push({ label: 'Metric', value: metric });
 
-		// Add group by if present
+		// Granularity
+		lines.push({ label: 'Granularity', value: capitalize(granularity.toLowerCase()) });
+
+		// Aggregate function
+		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[aggregate] });
+
+		// Group by if present
 		if (groupBy) {
-			parts.push(`grouped by ${groupByClauseDisplay(groupBy)}`);
+			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(groupBy) });
 		}
 
-		return parts.join(' · ');
+		// Sports filter
+		if (sports && sports.length > 0) {
+			lines.push({ label: 'Sports', value: sports.join(', ') });
+		} else {
+			lines.push({ label: 'Sports', value: 'All sports' });
+		}
+
+		return lines;
 	});
 </script>
 
@@ -51,9 +68,25 @@
 			{/if}
 		{/if}
 	</div>
-	{#if subtitle}
-		<div class="tooltip tooltip-bottom" data-tip={subtitle}>
-			<span class="cursor-help text-xs opacity-50">ℹ️</span>
+	<div class="dropdown-hover dropdown dropdown-end dropdown-bottom">
+		<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">ℹ️</div>
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div
+			tabindex="0"
+			class="dropdown-content z-10 rounded-box bg-base-200 p-3 shadow-lg"
+			style="min-width: 200px;"
+		>
+			<div class="space-y-1 text-left text-sm">
+				{#each tooltipLines as line}
+					<div class="flex gap-2">
+						<span class="font-semibold">{line.label}:</span>
+						<span class="text-base-content/80">{line.value}</span>
+					</div>
+				{/each}
+			</div>
 		</div>
+	</div>
+	{#if isFavorite}
+		<span class="text-sm" title="Favorite metric">⭐</span>
 	{/if}
 </div>

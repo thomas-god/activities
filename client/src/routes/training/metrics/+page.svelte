@@ -167,6 +167,7 @@
 					metric={metric.metric}
 					sports={metric.sports}
 					groupBy={metric.groupBy}
+					isFavorite={favoriteMetricId === metric.id}
 				/>
 				<div class="absolute right-4 bottom-[8px]">
 					<!-- Action menu dropdown -->
