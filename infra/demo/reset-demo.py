@@ -361,6 +361,7 @@ def create_training_period(name: str, start: str, end: str, description: str):
 
 
 def create_training_metric(
+    name: str,
     source: dict[str, str],
     granularity: str,
     aggregate: str,
@@ -370,6 +371,7 @@ def create_training_metric(
 ) -> dict[str, Any] | None:
     """Create a training metric."""
     payload: dict[str, Any] = {
+        "name": name,
         "source": source,
         "granularity": granularity,
         "aggregate": aggregate,
@@ -527,10 +529,16 @@ def generate_demo_data() -> int:
     metric_start = (today - timedelta(days=120)).strftime("%Y-%m-%d")
 
     create_training_metric(
-        {"Statistic": "Calories"}, "Weekly", "Sum", metric_start, today_str
+        "Weekly calories",
+        {"Statistic": "Calories"},
+        "Weekly",
+        "Sum",
+        metric_start,
+        today_str,
     )
 
     create_training_metric(
+        "Weekly distance",
         {"Statistic": "Distance"},
         "Weekly",
         "Sum",
@@ -540,6 +548,7 @@ def generate_demo_data() -> int:
     )
 
     create_training_metric(
+        "Weekly duration",
         {"Statistic": "Duration"},
         "Weekly",
         "Sum",
