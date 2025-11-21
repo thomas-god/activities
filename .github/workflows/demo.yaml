@@ -32,9 +32,11 @@ jobs:
           ssh_key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
 
       - name: Force update demo-reset service
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: demo.activities.training
-          username: deploy
-          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          script: docker service update --force activities-demo_demo-reset
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$SSH_PRIVATE_KEY"
+          export DOCKER_HOST="ssh://deploy@demo.activities.training"
+          docker service update --force activities-demo_demo-reset
+          ssh-agent -k
