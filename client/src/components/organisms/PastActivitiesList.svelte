@@ -14,13 +14,15 @@
 		trainingNotes = [],
 		moreCallback,
 		onNoteSave,
-		onNoteDelete
+		onNoteDelete,
+		onActivityClick
 	}: {
 		activityList: ActivityList;
 		trainingNotes?: TrainingNotesList;
 		moreCallback: () => void;
 		onNoteSave?: (noteId: string, content: string, date: string) => void;
 		onNoteDelete?: (noteId: string) => void;
+		onActivityClick?: (activityId: string) => void;
 	} = $props();
 
 	let groupedItems = $derived.by(() => {
@@ -89,7 +91,11 @@
 		<div class="flex flex-col">
 			{#each groupedItems.thisWeek as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} showNote={true} />
+					<ActivitiesListItem
+						activity={item.data}
+						showNote={true}
+						onClick={() => onActivityClick?.(item.data.id)}
+					/>
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}
@@ -106,7 +112,11 @@
 		<div class="flex flex-col">
 			{#each groupedItems.thisMonth as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} showNote={true} />
+					<ActivitiesListItem
+						activity={item.data}
+						showNote={true}
+						onClick={() => onActivityClick?.(item.data.id)}
+					/>
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}
@@ -123,7 +133,11 @@
 		<div class="flex flex-col">
 			{#each groupedItems.earlier as item}
 				{#if item.type === 'activity'}
-					<ActivitiesListItem activity={item.data} showNote={true} />
+					<ActivitiesListItem
+						activity={item.data}
+						showNote={true}
+						onClick={() => onActivityClick?.(item.data.id)}
+					/>
 				{:else}
 					<TrainingNoteListItemCompact
 						note={item.data}

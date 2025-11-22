@@ -58,7 +58,7 @@
 </script>
 
 {#if currentMetric && metrics.length > 0}
-	<div class="flex items-center justify-between px-3 pt-4">
+	<div class="flex items-center justify-between">
 		<button
 			class="btn btn-circle btn-ghost btn-sm"
 			onclick={goToPrevious}

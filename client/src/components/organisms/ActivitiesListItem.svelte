@@ -7,10 +7,12 @@
 
 	let {
 		activity,
-		showNote = false
+		showNote = false,
+		onClick
 	}: {
 		activity: ActivityListItem;
 		showNote?: boolean;
+		onClick?: () => void;
 	} = $props();
 
 	let title = $derived(
@@ -26,11 +28,19 @@
 		}
 		return 'other';
 	};
+
+	const handleClick = (event: MouseEvent) => {
+		if (onClick) {
+			event.preventDefault();
+			onClick();
+		}
+	};
 </script>
 
 <a
 	href={`/activity/${activity.id}`}
 	class={`item @container py-1 ${categoryClass(activity.sport_category)}`}
+	onclick={handleClick}
 >
 	<div class={`flex flex-1 items-center pl-2 ${categoryClass(activity.sport_category)}`}>
 		<div class={`icon ${categoryClass(activity.sport_category)}`}>

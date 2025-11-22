@@ -5,6 +5,6 @@
 	let { data }: PageProps = $props();
 </script>
 
-<div class="mx-auto mt-1 sm:px-4">
+<div class="mx-auto pt-5 sm:px-4">
 	<ActivityDetails activity={data.activity} />
 </div>

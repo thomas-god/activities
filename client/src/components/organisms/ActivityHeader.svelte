@@ -28,7 +28,7 @@
 </script>
 
 <div
-	class={`item mt-5 flex flex-1 items-center bg-base-100 p-3 ${categoryClass(activity.sport_category)}`}
+	class={`item flex flex-1 items-center bg-base-100 p-3 ${categoryClass(activity.sport_category)}`}
 >
 	<div class={`icon ${categoryClass(activity.sport_category)}`}>
 		{getSportCategoryIcon(activity.sport_category)}

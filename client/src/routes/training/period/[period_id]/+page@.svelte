@@ -388,12 +388,15 @@
 	</div>
 
 	{#if data.metrics.length > 0}
-		<div
-			bind:clientWidth={chartWidth}
-			class="item period-metrics rounded-box bg-base-100 pb-2 shadow-md"
+		<details
+			class="item period-metrics collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
+			open
 		>
-			<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
-		</div>
+			<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
+			<div class="collapse-content" bind:clientWidth={chartWidth}>
+				<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
+			</div>
+		</details>
 	{/if}
 
 	<!-- Activities section -->
@@ -584,6 +587,13 @@
 		width: 100%;
 	}
 
+	.period-metrics {
+		& .collapse-content {
+			padding-left: 0rem;
+			padding-right: 0rem;
+		}
+	}
+
 	@media (min-width: 900px) {
 		.period_container {
 			display: grid;
@@ -599,6 +609,11 @@
 		.period-metrics {
 			grid-row: 2;
 			grid-column: 2;
+
+			& .collapse-content {
+				padding-left: 1rem;
+				padding-right: 1rem;
+			}
 		}
 
 		.period-activities {

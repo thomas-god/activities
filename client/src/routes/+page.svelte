@@ -7,11 +7,18 @@
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { dayjs } from '$lib/duration';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
+	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import {
+		fetchActivityDetails,
+		type ActivityDetails as ActivityDetailsType
+	} from '$lib/api/activities';
 
 	let { data }: PageProps = $props();
 
 	let chartWidth: number = $state(0);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
+	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let screenWidth = $state(0);
 
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
@@ -57,22 +64,85 @@
 		await deleteTrainingNote(noteId);
 		await invalidate('app:training-notes');
 	};
+
+	const handleActivityClick = async (activityId: string) => {
+		// On mobile, navigate to activity page
+		if (screenWidth < 900) {
+			goto(`/activity/${activityId}`);
+			return;
+		}
+
+		// On desktop, load and show activity details in right column
+		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+	};
+
+	const handleActivityDeleted = () => {
+		selectedActivityPromise = null;
+		invalidate('app:activities');
+	};
 </script>
 
+<svelte:window bind:innerWidth={screenWidth} />
+
 <div class="homepage_container">
-	{#if metricsForCarousel.length > 0}
-		<div
-			bind:clientWidth={chartWidth}
-			class="item metric_chart rounded-box bg-base-100 pb-2 shadow-md"
-		>
-			<TrainingMetricsCarousel
-				metrics={metricsForCarousel}
-				width={chartWidth}
-				height={chartHeight}
-				{favoriteMetricId}
-			/>
+	<div bind:clientWidth={chartWidth} class="item metric_chart">
+		<div class="">
+			{#if metricsForCarousel.length > 0}
+				<details
+					class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
+					open
+				>
+					<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
+					<div class="collapse-content">
+						<TrainingMetricsCarousel
+							metrics={metricsForCarousel}
+							width={chartWidth}
+							height={chartHeight}
+							{favoriteMetricId}
+						/>
+					</div>
+				</details>
+			{/if}
+
+			<div class="activity_details mt-3">
+				<div class="divider"></div>
+				{#if selectedActivityPromise}
+					{#await selectedActivityPromise}
+						<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+							<span class="loading loading-lg loading-spinner"></span>
+						</div>
+					{:then selectedActivity}
+						{#if selectedActivity}
+							<div>
+								<ActivityDetails
+									activity={selectedActivity}
+									onActivityDeleted={handleActivityDeleted}
+								/>
+							</div>
+						{:else}
+							<div
+								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+							>
+								Failed to load activity
+							</div>
+						{/if}
+					{:catch error}
+						<div
+							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+						>
+							Failed to load activity: {error.message}
+						</div>
+					{/await}
+				{:else}
+					<div
+						class="mt-5 flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
+					>
+						Select an activity to view details
+					</div>
+				{/if}
+			</div>
 		</div>
-	{/if}
+	</div>
 
 	<div class="item history">
 		{#if ongoingPeriods.length > 0}
@@ -95,6 +165,7 @@
 				moreCallback={moreActivitiesCallback}
 				onNoteSave={handleNoteSave}
 				onNoteDelete={handleNoteDelete}
+				onActivityClick={handleActivityClick}
 			/>
 		</div>
 	</div>
@@ -125,6 +196,17 @@
 		gap: calc(var(--spacing) * 5);
 	}
 
+	.item.metric_chart {
+		& .collapse-content {
+			padding-left: 0rem;
+			padding-right: 0rem;
+		}
+	}
+
+	.activity_details {
+		display: none;
+	}
+
 	@media (min-width: 900px) {
 		.homepage_container {
 			display: grid;
@@ -133,12 +215,25 @@
 		}
 
 		.item.metric_chart {
+			display: flex;
+			flex-direction: column;
+			gap: calc(var(--spacing) * 5);
 			grid-column: 2;
+			grid-row: 1;
+
+			& .collapse-content {
+				padding-left: 1rem;
+				padding-right: 1rem;
+			}
 		}
 
 		.item.history {
 			grid-column: 1;
-			grid-row: 1;
+			grid-row: 1 / span 2;
+		}
+
+		.activity_details {
+			display: block;
 		}
 	}
 </style>
