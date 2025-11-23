@@ -15,7 +15,8 @@
 		moreCallback,
 		onNoteSave,
 		onNoteDelete,
-		onActivityClick
+		onActivityClick,
+		selectedActivityId = null
 	}: {
 		activityList: ActivityList;
 		trainingNotes?: TrainingNotesList;
@@ -23,6 +24,7 @@
 		onNoteSave?: (noteId: string, content: string, date: string) => void;
 		onNoteDelete?: (noteId: string) => void;
 		onActivityClick?: (activityId: string) => void;
+		selectedActivityId?: string | null;
 	} = $props();
 
 	let groupedItems = $derived.by(() => {
@@ -95,6 +97,7 @@
 						activity={item.data}
 						showNote={true}
 						onClick={() => onActivityClick?.(item.data.id)}
+						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact
@@ -116,6 +119,7 @@
 						activity={item.data}
 						showNote={true}
 						onClick={() => onActivityClick?.(item.data.id)}
+						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact
@@ -137,6 +141,7 @@
 						activity={item.data}
 						showNote={true}
 						onClick={() => onActivityClick?.(item.data.id)}
+						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact

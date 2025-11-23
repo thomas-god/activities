@@ -8,11 +8,13 @@
 	let {
 		activity,
 		showNote = false,
-		onClick
+		onClick,
+		isSelected = false
 	}: {
 		activity: ActivityListItem;
 		showNote?: boolean;
 		onClick?: () => void;
+		isSelected?: boolean;
 	} = $props();
 
 	let title = $derived(
@@ -39,7 +41,7 @@
 
 <a
 	href={`/activity/${activity.id}`}
-	class={`item @container py-1 ${categoryClass(activity.sport_category)}`}
+	class={`item @container py-1 pr-1 ${categoryClass(activity.sport_category)} ${isSelected ? 'selected' : ''}`}
 	onclick={handleClick}
 >
 	<div class={`flex flex-1 items-center pl-2 ${categoryClass(activity.sport_category)}`}>
@@ -94,16 +96,23 @@
 		border-radius: 0px;
 	}
 
+	@media (min-width: 900px) {
+		.item.selected {
+			background: #e6eef5;
+			border-left-width: 6px;
+		}
+	}
+
 	.item.cycling {
-		border-left-color: var(--color-cycling);
+		border-color: var(--color-cycling);
 	}
 
 	.item.running {
-		border-left-color: var(--color-running);
+		border-color: var(--color-running);
 	}
 
 	.item.other {
-		border-left-color: var(--color-other);
+		border-color: var(--color-other);
 	}
 
 	.icon {

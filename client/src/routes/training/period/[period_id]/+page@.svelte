@@ -34,6 +34,7 @@
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 
 	async function handleDelete() {
@@ -309,10 +310,12 @@
 		}
 
 		// On desktop, load and show activity details in right column
+		selectedActivityId = activityId;
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
 	const handleActivityDeleted = () => {
+		selectedActivityId = null;
 		selectedActivityPromise = null;
 		// Reload the page to update the activities list
 		window.location.reload();
@@ -483,6 +486,7 @@
 							activity={item.data}
 							showNote={true}
 							onClick={() => handleActivityClick(item.data.id)}
+							isSelected={selectedActivityId === item.data.id}
 						/>
 					{:else}
 						<TrainingNoteListItemCompact

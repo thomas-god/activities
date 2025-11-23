@@ -18,6 +18,7 @@
 	let chartWidth: number = $state(0);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 
 	let sorted_activities = $derived(
@@ -73,10 +74,12 @@
 		}
 
 		// On desktop, load and show activity details in right column
+		selectedActivityId = activityId;
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
 	const handleActivityDeleted = () => {
+		selectedActivityId = null;
 		selectedActivityPromise = null;
 		invalidate('app:activities');
 	};
@@ -166,6 +169,7 @@
 				onNoteSave={handleNoteSave}
 				onNoteDelete={handleNoteDelete}
 				onActivityClick={handleActivityClick}
+				{selectedActivityId}
 			/>
 		</div>
 	</div>
