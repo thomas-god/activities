@@ -430,7 +430,6 @@
 		{/if}
 
 		<div class="activity-details-section">
-			<div class="divider"></div>
 			{#if selectedActivityPromise}
 				{#await selectedActivityPromise}
 					<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
@@ -676,7 +675,11 @@
 		.period_container {
 			display: grid;
 			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
+			grid-template-rows: auto 1fr;
 			align-items: start;
+			height: calc(100vh - calc(var(--spacing) * 5) - 60px);
+			margin-top: calc(var(--spacing) * 5);
+			overflow: hidden;
 		}
 
 		.period-title {
@@ -689,9 +692,15 @@
 			grid-column: 2;
 			display: flex;
 			flex-direction: column;
+			gap: calc(var(--spacing) * 5);
+			height: 100%;
+			overflow-y: auto;
+			padding-right: calc(var(--spacing) * 2);
 		}
 
 		.period-metrics {
+			flex-shrink: 0;
+
 			& .collapse-content {
 				padding-left: 1rem;
 				padding-right: 1rem;
@@ -701,10 +710,13 @@
 		.period-activities {
 			grid-row: 2;
 			grid-column: 1;
+			height: 100%;
+			overflow-y: auto;
 		}
 
 		.activity-details-section {
 			display: block;
+			flex-shrink: 0;
 		}
 	}
 </style>

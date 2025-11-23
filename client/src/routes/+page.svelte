@@ -216,6 +216,9 @@
 			display: grid;
 			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
 			align-items: start;
+			height: calc(100vh - calc(var(--spacing) * 5) - 60px);
+			margin-top: calc(var(--spacing) * 5);
+			overflow: hidden;
 		}
 
 		.item.metric_chart {
@@ -224,6 +227,9 @@
 			gap: calc(var(--spacing) * 5);
 			grid-column: 2;
 			grid-row: 1;
+			height: 100%;
+			overflow-y: auto;
+			padding-right: calc(var(--spacing) * 2);
 
 			& .collapse-content {
 				padding-left: 1rem;
@@ -234,6 +240,9 @@
 		.item.history {
 			grid-column: 1;
 			grid-row: 1 / span 2;
+			height: 100%;
+			overflow-y: auto;
+			padding-right: calc(var(--spacing) * 2);
 		}
 
 		.activity_details {
