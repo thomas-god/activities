@@ -11,6 +11,11 @@
 	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
+	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import {
+		fetchActivityDetails,
+		type ActivityDetails as ActivityDetailsType
+	} from '$lib/api/activities';
 
 	let { data }: PageProps = $props();
 
@@ -28,6 +33,8 @@
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
+	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let screenWidth = $state(0);
 
 	async function handleDelete() {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
@@ -293,7 +300,26 @@
 		const daysText = remainingDays === 1 ? '1 day' : `${remainingDays} days`;
 		return `${weeksText} ${daysText}`;
 	};
+
+	const handleActivityClick = (activityId: string) => {
+		// On mobile, navigate to activity page
+		if (screenWidth < 900) {
+			goto(`/activity/${activityId}`);
+			return;
+		}
+
+		// On desktop, load and show activity details in right column
+		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+	};
+
+	const handleActivityDeleted = () => {
+		selectedActivityPromise = null;
+		// Reload the page to update the activities list
+		window.location.reload();
+	};
 </script>
+
+<svelte:window bind:innerWidth={screenWidth} />
 
 <div class="period_container">
 	<div class="item period-title @container rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
@@ -387,17 +413,57 @@
 		</div>
 	</div>
 
-	{#if data.metrics.length > 0}
-		<details
-			class="item period-metrics collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
-			open
-		>
-			<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
-			<div class="collapse-content" bind:clientWidth={chartWidth}>
-				<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
-			</div>
-		</details>
-	{/if}
+	<div class="item period-right-column">
+		{#if data.metrics.length > 0}
+			<details
+				class="period-metrics collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
+				open
+			>
+				<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
+				<div class="collapse-content" bind:clientWidth={chartWidth}>
+					<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
+				</div>
+			</details>
+		{/if}
+
+		<div class="activity-details-section">
+			<div class="divider"></div>
+			{#if selectedActivityPromise}
+				{#await selectedActivityPromise}
+					<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+						<span class="loading loading-lg loading-spinner"></span>
+					</div>
+				{:then selectedActivity}
+					{#if selectedActivity}
+						<div>
+							<ActivityDetails
+								activity={selectedActivity}
+								onActivityDeleted={handleActivityDeleted}
+							/>
+						</div>
+					{:else}
+						<div
+							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+						>
+							Failed to load activity
+						</div>
+					{/if}
+				{:catch error}
+					<div
+						class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+					>
+						Failed to load activity: {error.message}
+					</div>
+				{/await}
+			{:else}
+				<div
+					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
+				>
+					Select an activity to view details
+				</div>
+			{/if}
+		</div>
+	</div>
 
 	<!-- Activities section -->
 	<div class="item period-activities rounded-box bg-base-100 p-4 shadow-md">
@@ -413,7 +479,11 @@
 			<div class="flex flex-col gap-0">
 				{#each timeline as item}
 					{#if item.type === 'activity'}
-						<ActivitiesListItem activity={item.data} showNote={true} />
+						<ActivitiesListItem
+							activity={item.data}
+							showNote={true}
+							onClick={() => handleActivityClick(item.data.id)}
+						/>
 					{:else}
 						<TrainingNoteListItemCompact
 							note={item.data}
@@ -594,6 +664,10 @@
 		}
 	}
 
+	.activity-details-section {
+		display: none;
+	}
+
 	@media (min-width: 900px) {
 		.period_container {
 			display: grid;
@@ -606,10 +680,14 @@
 			grid-column: 1 / 3;
 		}
 
-		.period-metrics {
+		.period-right-column {
 			grid-row: 2;
 			grid-column: 2;
+			display: flex;
+			flex-direction: column;
+		}
 
+		.period-metrics {
 			& .collapse-content {
 				padding-left: 1rem;
 				padding-right: 1rem;
@@ -619,6 +697,10 @@
 		.period-activities {
 			grid-row: 2;
 			grid-column: 1;
+		}
+
+		.activity-details-section {
+			display: block;
 		}
 	}
 </style>
