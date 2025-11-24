@@ -7,7 +7,6 @@
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { dayjs } from '$lib/duration';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
-	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityDetails as ActivityDetailsType
@@ -77,94 +76,38 @@
 		selectedActivityId = activityId;
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
-
-	const handleActivityDeleted = () => {
-		selectedActivityId = null;
-		selectedActivityPromise = null;
-		invalidate('app:activities');
-	};
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
 
 <div class="homepage_container">
-	<div bind:clientWidth={chartWidth} class="item metric_chart">
-		<div class="">
-			{#if metricsForCarousel.length > 0}
-				<details
-					class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
-					open
-				>
-					<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
-					<div class="collapse-content">
-						<TrainingMetricsCarousel
-							metrics={metricsForCarousel}
-							width={chartWidth}
-							height={chartHeight}
-							{favoriteMetricId}
-						/>
-					</div>
-				</details>
-			{/if}
-
-			<div class="activity_details mt-3">
-				<div class="divider"></div>
-				{#if selectedActivityPromise}
-					{#await selectedActivityPromise}
-						<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
-							<span class="loading loading-lg loading-spinner"></span>
-						</div>
-					{:then selectedActivity}
-						{#if selectedActivity}
-							<div>
-								<ActivityDetails
-									activity={selectedActivity}
-									onActivityUpdated={() => {
-										// TODO: handle update
-									}}
-									onActivityDeleted={handleActivityDeleted}
-								/>
-							</div>
-						{:else}
-							<div
-								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-							>
-								Failed to load activity
-							</div>
-						{/if}
-					{:catch error}
-						<div
-							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-						>
-							Failed to load activity: {error.message}
-						</div>
-					{/await}
-				{:else}
-					<div
-						class="mt-5 flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
-					>
-						Select an activity to view details
-					</div>
-				{/if}
-			</div>
+	{#if metricsForCarousel.length > 0}
+		<div bind:clientWidth={chartWidth} class="item metric_chart rounded-box bg-base-100 shadow-md">
+			<h2 class="p-4 pb-0 text-lg font-semibold">Training metrics</h2>
+			<TrainingMetricsCarousel
+				metrics={metricsForCarousel}
+				width={chartWidth}
+				height={chartHeight}
+				{favoriteMetricId}
+			/>
 		</div>
-	</div>
+	{/if}
 
-	<div class="item history">
-		{#if ongoingPeriods.length > 0}
-			<div class="rounded-box bg-base-100 shadow-md">
-				<div class="p-4">
-					<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
-					<div class="flex flex-col gap-2">
-						{#each ongoingPeriods as period}
-							<TrainingPeriodCard {period} />
-						{/each}
-					</div>
+	{#if ongoingPeriods.length > 0}
+		<div class="item periods rounded-box bg-base-100 shadow-md">
+			<div class="p-4">
+				<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
+				<div class="flex flex-col gap-2">
+					{#each ongoingPeriods as period}
+						<TrainingPeriodCard {period} />
+					{/each}
 				</div>
 			</div>
-		{/if}
+		</div>
+	{/if}
 
-		<div class="">
+	<div class="item history">
+		<div>
 			<PastActivitiesList
 				activityList={sorted_activities}
 				trainingNotes={data.trainingNotes}
@@ -181,10 +124,10 @@
 <style>
 	.homepage_container {
 		width: 100%;
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-template-rows: auto;
 		align-items: center;
-		gap: calc(var(--spacing) * 5);
+		gap: calc(var(--spacing) * 3);
 		margin-top: calc(var(--spacing) * 5);
 		padding-inline: calc(var(--spacing) * 1);
 
@@ -198,58 +141,42 @@
 	}
 
 	.item.history {
+		grid-row: 3 / span 1;
 		display: flex;
 		flex-direction: column;
 		gap: calc(var(--spacing) * 5);
 	}
 
 	.item.metric_chart {
-		& .collapse-content {
-			padding-left: 0rem;
-			padding-right: 0rem;
-		}
+		grid-row: 2 / span 1;
 	}
 
-	.activity_details {
-		display: none;
+	.item.periods {
+		grid-row: 1 / span 1;
 	}
 
 	@media (min-width: 900px) {
 		.homepage_container {
 			display: grid;
-			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
+			grid-template-columns: 1fr 1fr;
+			grid-template-rows: auto 1fr;
 			align-items: start;
-			height: calc(100vh - calc(var(--spacing) * 5) - 60px);
 			margin-top: calc(var(--spacing) * 5);
-			overflow: hidden;
 		}
-
-		.item.metric_chart {
-			display: flex;
-			flex-direction: column;
-			gap: calc(var(--spacing) * 5);
-			grid-column: 2;
-			grid-row: 1;
-			height: 100%;
-			overflow-y: auto;
-			padding-right: calc(var(--spacing) * 2);
-
-			& .collapse-content {
-				padding-left: 1rem;
-				padding-right: 1rem;
-			}
-		}
-
 		.item.history {
 			grid-column: 1;
 			grid-row: 1 / span 2;
-			height: 100%;
-			overflow-y: auto;
 			padding-right: calc(var(--spacing) * 2);
 		}
 
-		.activity_details {
-			display: block;
+		.item.periods {
+			grid-row: 1 / span 1;
+			grid-column: 2 / span 1;
+		}
+
+		.item.metric_chart {
+			grid-row: 2 / span 1;
+			grid-column: 2 / span 1;
 		}
 	}
 </style>
