@@ -150,40 +150,34 @@
 </script>
 
 {#if laps.length > 0}
-	<details
-		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
-		open
-	>
-		<summary class="collapse-title text-lg font-semibold">Laps</summary>
-		<div class="collapse-content overflow-x-auto px-4 pb-4">
-			<table class="table w-full table-sm">
-				<thead>
-					<tr>
-						<th>Lap</th>
+	<div class="overflow-x-auto px-4 pb-4">
+		<table class="table w-full table-sm">
+			<thead>
+				<tr>
+					<th>Lap</th>
 
-						<th>Duration</th>
+					<th>Duration</th>
+					{#if showMetrics}
+						{#each metrics as metric}
+							<th>{getMetricLabel(metric)}</th>
+						{/each}
+					{/if}
+				</tr>
+			</thead>
+			<tbody>
+				{#each laps as lap, index}
+					<tr>
+						<td>{index + 1}</td>
+
+						<td>{formatDuration(lap.end - lap.start)}</td>
 						{#if showMetrics}
 							{#each metrics as metric}
-								<th>{getMetricLabel(metric)}</th>
+								<td>{calculateLapMetric(lap.start, lap.end, metric) ?? '-'}</td>
 							{/each}
 						{/if}
 					</tr>
-				</thead>
-				<tbody>
-					{#each laps as lap, index}
-						<tr>
-							<td>{index + 1}</td>
-
-							<td>{formatDuration(lap.end - lap.start)}</td>
-							{#if showMetrics}
-								{#each metrics as metric}
-									<td>{calculateLapMetric(lap.start, lap.end, metric) ?? '-'}</td>
-								{/each}
-							{/if}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</details>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 {/if}

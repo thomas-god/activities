@@ -117,47 +117,44 @@
 	});
 </script>
 
-<details class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow" open>
-	<summary class="collapse-title text-lg font-semibold">Statistics</summary>
-	<div class="@container collapse-content">
-		<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
-			{#each statRows as row}
-				<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
-					<div class="text-2xl">{row.icon}</div>
-					<div class=" flex-1 font-medium">{row.label}</div>
-					<div class="text-right {row.legend ? '' : 'self-center'}">
-						<div class="text-lg font-semibold">{row.value || '-'} {row.unit}</div>
-						{#if row.legend}
-							<div class="text-xs opacity-60">
-								{row.legend}
-							</div>
-						{/if}
-					</div>
+<div class="@container">
+	<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
+		{#each statRows as row}
+			<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
+				<div class="text-2xl">{row.icon}</div>
+				<div class=" flex-1 font-medium">{row.label}</div>
+				<div class="text-right {row.legend ? '' : 'self-center'}">
+					<div class="text-lg font-semibold">{row.value || '-'} {row.unit}</div>
+					{#if row.legend}
+						<div class="text-xs opacity-60">
+							{row.legend}
+						</div>
+					{/if}
 				</div>
-			{/each}
-		</div>
-
-		<div class="grid grid-cols-3 gap-0.5">
-			{#each statRows as row}
-				<div class="flex h-16 flex-col gap-0 pb-3 text-left @lg:hidden">
-					<div class="text-lg font-semibold">
-						{row.value || '-'}
-						<span class="text-xs font-medium">
-							{row.unit}
-						</span>
-					</div>
-					<div class="text-xs">
-						<span class="opacity-60">
-							<!-- {row.icon} -->
-							{row.label}
-
-							{#if row.legend}
-								<span class="ml-1">({row.legend})</span>
-							{/if}
-						</span>
-					</div>
-				</div>
-			{/each}
-		</div>
+			</div>
+		{/each}
 	</div>
-</details>
+
+	<div class="grid grid-cols-3 gap-0.5">
+		{#each statRows as row}
+			<div class="flex h-16 flex-col gap-0 pb-3 text-left @lg:hidden">
+				<div class="text-lg font-semibold">
+					{row.value || '-'}
+					<span class="text-xs font-medium">
+						{row.unit}
+					</span>
+				</div>
+				<div class="text-xs">
+					<span class="opacity-60">
+						<!-- {row.icon} -->
+						{row.label}
+
+						{#if row.legend}
+							<span class="ml-1">({row.legend})</span>
+						{/if}
+					</span>
+				</div>
+			</div>
+		{/each}
+	</div>
+</div>

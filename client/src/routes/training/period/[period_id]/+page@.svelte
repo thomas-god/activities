@@ -422,7 +422,7 @@
 	</div>
 
 	<div
-		class={`item metrics rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden'}`}
+		class={`item metrics rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 	>
 		{#if data.metrics.length > 0}
 			<div bind:clientWidth={chartWidth}>
@@ -439,7 +439,9 @@
 		{/if}
 	</div>
 
-	<div class={`activity-details  ${selectedActivityId !== null ? 'flex' : 'hidden'}`}>
+	<div
+		class={`activity-details rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
+	>
 		{#if selectedActivityPromise}
 			{#await selectedActivityPromise}
 				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
@@ -454,6 +456,7 @@
 								// TODO: handle update path
 							}}
 							onActivityDeleted={handleActivityDeleted}
+							compact={true}
 						/>
 					</div>
 				{:else}
@@ -668,8 +671,7 @@
 			grid-template-columns: 1fr 1fr;
 			grid-template-rows: auto 1fr;
 			align-items: start;
-			height: 100dvh;
-			/* height: calc(100vh - calc(var(--spacing) * 5) - 80px); */
+			height: calc(100dvh - calc(var(--spacing) * 5) - 80px);
 			margin-top: calc(var(--spacing) * 5);
 			overflow: hidden;
 		}
@@ -680,12 +682,13 @@
 		}
 
 		.metrics {
+			display: flex;
+			height: 100%;
+			overflow-y: auto;
 			grid-row: 2;
 			grid-column: 2;
 			flex-direction: column;
 			gap: calc(var(--spacing) * 5);
-			height: 100%;
-			overflow-y: auto;
 		}
 
 		.activities {

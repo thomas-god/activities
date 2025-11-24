@@ -1,7 +1,7 @@
 <script lang="ts">
 	import TimeseriesChart from '$components/organisms/TimeseriesChart.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { goto, invalidate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import EditableRpe from '$components/molecules/EditableRpe.svelte';
 	import EditableWorkoutType from '$components/molecules/EditableWorkoutType.svelte';
 	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
@@ -22,9 +22,10 @@
 		activity: ActivityDetails;
 		onActivityUpdated: () => void;
 		onActivityDeleted: () => void;
+		compact?: boolean;
 	}
 
-	let { activity, onActivityDeleted, onActivityUpdated }: Props = $props();
+	let { activity, onActivityDeleted, onActivityUpdated, compact = false }: Props = $props();
 
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
@@ -215,6 +216,10 @@
 			onActivityUpdated();
 		}
 	};
+
+	let sectionClass = $derived(
+		compact ? '' : 'rounded-box border border-base-300 bg-base-100 shadow'
+	);
 </script>
 
 <div class="flex flex-col gap-4">
@@ -224,59 +229,63 @@
 		onDeleteClickedCallback={openDeleteModal}
 	/>
 
-	<details
-		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
-		open
-	>
+	<details class={`collapse-arrow collapse ${sectionClass}`} open>
 		<summary class="collapse-title text-lg font-semibold">Session feedbacks</summary>
-		<div class="collapse-content">
-			<div class="flex flex-col gap-3">
-				<EditableRpe rpe={activity.rpe} editCallback={updateActivityRpeCallback} />
-				<div class="my-0 border-b border-base-300"></div>
-				<EditableWorkoutType
-					workoutType={activity.workout_type}
-					editCallback={updateActivityWorkoutTypeCallback}
-				/>
-				<div class="my-0 border-b border-base-300"></div>
-				<EditableNutrition
-					nutrition={activity.nutrition}
-					editCallback={updateActivityNutritionCallback}
-				/>
-				<div class="my-0 border-b border-base-300"></div>
-				<EditableFeedback
-					feedback={activity.feedback}
-					editCallback={updateActivityFeedbackCallback}
-				/>
-			</div>
+		<div class="collapse-content flex flex-col gap-3">
+			<EditableRpe rpe={activity.rpe} editCallback={updateActivityRpeCallback} />
+			<div class="my-0 border-b border-base-300"></div>
+			<EditableWorkoutType
+				workoutType={activity.workout_type}
+				editCallback={updateActivityWorkoutTypeCallback}
+			/>
+			<div class="my-0 border-b border-base-300"></div>
+			<EditableNutrition
+				nutrition={activity.nutrition}
+				editCallback={updateActivityNutritionCallback}
+			/>
+			<div class="my-0 border-b border-base-300"></div>
+			<EditableFeedback
+				feedback={activity.feedback}
+				editCallback={updateActivityFeedbackCallback}
+			/>
 		</div>
 	</details>
 
-	<ActivityStatistics {activity} />
-
-	<details
-		class="collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow"
-		open
-	>
-		<summary class="collapse-title text-lg font-semibold">Metrics</summary>
-		<fieldset class="fieldset px-4">
-			<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
-		</fieldset>
-		{#if selectedMetrics}
-			<div class="px-4 pb-2">
-				<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-					<TimeseriesChart
-						time={active_metrics.time}
-						distance={active_distance}
-						metrics={selectedMetrics}
-						height={chartHeight}
-						width={chartWidth}
-					/>
-				</div>
-			</div>
-		{/if}
+	<details class={`collapse-arrow collapse ${sectionClass}`} open>
+		<summary class="collapse-title text-lg font-semibold">Statistics</summary>
+		<div class="collapse-content">
+			<ActivityStatistics {activity} />
+		</div>
 	</details>
 
-	<ActivityLaps {activity} />
+	<details class={`collapse-arrow collapse ${sectionClass}`} open>
+		<summary class="collapse-title text-lg font-semibold">Metrics</summary>
+		<div class="collapse-content px-0">
+			<fieldset class="fieldset px-4">
+				<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
+			</fieldset>
+			{#if selectedMetrics}
+				<div class="pb-2">
+					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
+						<TimeseriesChart
+							time={active_metrics.time}
+							distance={active_distance}
+							metrics={selectedMetrics}
+							height={chartHeight}
+							width={chartWidth}
+						/>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</details>
+
+	<details class={`collapse-arrow collapse ${sectionClass}`} open>
+		<summary class="collapse-title text-lg font-semibold">Laps</summary>
+		<div class="collapse-content">
+			<ActivityLaps {activity} />
+		</div>
+	</details>
 </div>
 
 <!-- Delete confirmation modal -->
