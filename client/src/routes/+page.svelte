@@ -119,6 +119,9 @@
 							<div>
 								<ActivityDetails
 									activity={selectedActivity}
+									onActivityUpdated={() => {
+										// TODO: handle update
+									}}
 									onActivityDeleted={handleActivityDeleted}
 								/>
 							</div>

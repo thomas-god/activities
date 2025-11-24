@@ -428,43 +428,46 @@
 				</div>
 			</details>
 		{/if}
+	</div>
 
-		<div class="activity-details-section">
-			{#if selectedActivityPromise}
-				{#await selectedActivityPromise}
-					<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
-						<span class="loading loading-lg loading-spinner"></span>
+	<div class="activity-details-section col-start-2 col-end-3 row-start-2">
+		{#if selectedActivityPromise}
+			{#await selectedActivityPromise}
+				<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+					<span class="loading loading-lg loading-spinner"></span>
+				</div>
+			{:then selectedActivity}
+				{#if selectedActivity}
+					<div class="">
+						<ActivityDetails
+							activity={selectedActivity}
+							onActivityUpdated={() => {
+								// TODO: handle update path
+							}}
+							onActivityDeleted={handleActivityDeleted}
+						/>
 					</div>
-				{:then selectedActivity}
-					{#if selectedActivity}
-						<div>
-							<ActivityDetails
-								activity={selectedActivity}
-								onActivityDeleted={handleActivityDeleted}
-							/>
-						</div>
-					{:else}
-						<div
-							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-						>
-							Failed to load activity
-						</div>
-					{/if}
-				{:catch error}
+				{:else}
 					<div
 						class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
 					>
-						Failed to load activity: {error.message}
+						Failed to load activity
 					</div>
-				{/await}
-			{:else}
+				{/if}
+			{:catch error}
 				<div
-					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
+					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
 				>
-					Select an activity to view details
+					Failed to load activity: {error.message}
 				</div>
-			{/if}
-		</div>
+			{/await}
+		{:else}
+			<div
+				class="flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
+			>
+				Select an activity to view details
+			</div>
+		{/if}
 	</div>
 
 	<!-- Activities section -->
@@ -674,7 +677,7 @@
 	@media (min-width: 900px) {
 		.period_container {
 			display: grid;
-			grid-template-columns: minmax(20rem, 32rem) minmax(20rem, 800px);
+			grid-template-columns: minmax(20rem, 400px) minmax(20rem, 400px) 400px;
 			grid-template-rows: auto 1fr;
 			align-items: start;
 			height: calc(100vh - calc(var(--spacing) * 5) - 60px);
@@ -684,12 +687,12 @@
 
 		.period-title {
 			grid-row: 1;
-			grid-column: 1 / 3;
+			grid-column: 1 / 4;
 		}
 
 		.period-right-column {
 			grid-row: 2;
-			grid-column: 2;
+			grid-column: 3;
 			display: flex;
 			flex-direction: column;
 			gap: calc(var(--spacing) * 5);

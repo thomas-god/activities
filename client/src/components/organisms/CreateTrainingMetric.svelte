@@ -64,7 +64,6 @@
 	let metricName = $state('');
 
 	let chartWidth: number = $state(0);
-	$inspect(chartWidth);
 
 	let statisticSource = $derived.by(() => {
 		const selectedSource = metricSources.find((s) => s.id === selectedMetricSourceId);

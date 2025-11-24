@@ -3,16 +3,22 @@
 	import ActivitiesCalendar from '$components/organisms/ActivitiesCalendar.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { SportCategory } from '$lib/sport';
+	import { fetchActivityDetails } from '$lib/api';
+	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import type { ActivityDetails as ActivityDetailsType } from '$lib/api/activities';
 
 	let { data }: PageProps = $props();
 
+	let screenWidth = $state(0);
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
 	);
+	let selectedActivityId: string | null = $state(null);
+	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
 
 	// View mode from URL parameter, default to 'list'
 	let viewMode = $derived(
@@ -117,7 +123,33 @@
 
 		goto(url, { replaceState: true, keepFocus: true });
 	};
+
+	const handleActivitySelected = (activityId: string) => {
+		// On small screens, navigate to activity page
+		if (screenWidth < 900) {
+			goto(`/activity/${activityId}`);
+			return;
+		}
+
+		// On larger screens, load and show activity details here
+		selectedActivityId = activityId;
+		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+	};
+
+	const handleActivityDeleted = () => {
+		selectedActivityId = null;
+		selectedActivityPromise = null;
+		invalidate('app:activities');
+	};
+
+	const handleActivityUpdated = (activityId: string) => {
+		console.log('hello?');
+		invalidate('app:activities');
+		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+	};
 </script>
+
+<svelte:window bind:innerWidth={screenWidth} />
 
 <div class="@container mx-2 mt-5 sm:mx-auto">
 	<!-- View Toggle -->
@@ -143,14 +175,49 @@
 
 	<!-- View Content -->
 	{#if viewMode === 'list'}
-		<ActivitiesList
-			activityList={sorted_activities}
-			{initialRpe}
-			{initialWorkoutTypes}
-			{initialSportCategories}
-			{initialShowNotes}
-			onFiltersChange={handleFilterChange}
-		/>
+		<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
+			<div class="grow basis-0 overflow-y-auto">
+				<ActivitiesList
+					activityList={sorted_activities}
+					{initialRpe}
+					{initialWorkoutTypes}
+					{initialSportCategories}
+					{initialShowNotes}
+					onFiltersChange={handleFilterChange}
+					onActivitySelected={handleActivitySelected}
+					selectedActivity={selectedActivityId}
+				/>
+			</div>
+			{#if selectedActivityPromise}
+				<div class="w-full grow basis-0 overflow-auto">
+					{#await selectedActivityPromise}
+						<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+							<span class="loading loading-lg loading-spinner"></span>
+						</div>
+					{:then selectedActivity}
+						{#if selectedActivity}
+							<ActivityDetails
+								activity={selectedActivity}
+								onActivityUpdated={() => handleActivityUpdated(selectedActivity.id)}
+								onActivityDeleted={handleActivityDeleted}
+							/>
+						{:else}
+							<div
+								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+							>
+								Failed to load activity
+							</div>
+						{/if}
+					{:catch error}
+						<div
+							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+						>
+							Failed to load activity: {error.message}
+						</div>
+					{/await}
+				</div>
+			{/if}
+		</div>
 	{:else}
 		<ActivitiesCalendar
 			activityList={sorted_activities}

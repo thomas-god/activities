@@ -20,10 +20,11 @@
 
 	interface Props {
 		activity: ActivityDetails;
-		onActivityDeleted?: () => void;
+		onActivityUpdated: () => void;
+		onActivityDeleted: () => void;
 	}
 
-	let { activity, onActivityDeleted }: Props = $props();
+	let { activity, onActivityDeleted, onActivityUpdated }: Props = $props();
 
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
@@ -95,12 +96,7 @@
 		}
 
 		if (res.ok) {
-			await invalidate('app:training-metrics');
-			if (onActivityDeleted) {
-				onActivityDeleted();
-			} else {
-				goto('/');
-			}
+			onActivityDeleted();
 		} else {
 			throw new Error('Failed to delete activity');
 		}
@@ -123,7 +119,11 @@
 			goto('/login');
 		}
 
-		invalidate(`app:activity:${activity.id}`);
+		// Update local state
+		if (res.ok) {
+			activity.name = newName;
+			onActivityUpdated();
+		}
 	};
 
 	const updateActivityRpeCallback = async (newRpe: number | null) => {
@@ -140,6 +140,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.rpe = newRpe;
+			onActivityUpdated();
 		}
 	};
 
@@ -160,6 +161,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.workout_type = newWorkoutType;
+			onActivityUpdated();
 		}
 	};
 
@@ -187,6 +189,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.nutrition = newNutrition;
+			onActivityUpdated();
 		}
 	};
 
@@ -209,6 +212,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.feedback = newFeedback;
+			onActivityUpdated();
 		}
 	};
 </script>

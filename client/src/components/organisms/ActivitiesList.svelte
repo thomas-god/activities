@@ -12,7 +12,9 @@
 		initialWorkoutTypes = [],
 		initialSportCategories = [],
 		initialShowNotes = false,
-		onFiltersChange
+		onFiltersChange,
+		selectedActivity = null,
+		onActivitySelected
 	}: {
 		activityList: ActivityList;
 		initialRpe?: number[];
@@ -25,6 +27,8 @@
 			sportCategories: SportCategory[];
 			showNotes: boolean;
 		}) => void;
+		selectedActivity: string | null;
+		onActivitySelected?: (activityId: string) => void;
 	} = $props();
 
 	let filteredActivityList = $state<ActivityList>(activityList);
@@ -63,9 +67,15 @@
 		showNotes = filters.showNotes;
 		onFiltersChange?.(filters);
 	};
+
+	const activityClickedCallback = (activityId: string) => {
+		if (onActivitySelected !== undefined) {
+			onActivitySelected(activityId);
+		}
+	};
 </script>
 
-<div class="rounded-box bg-base-100 shadow-md">
+<div class=" rounded-box bg-base-100 shadow-md">
 	<ActivitiesFilters
 		activities={activityList}
 		onFilterChange={handleFilterChange}
@@ -88,7 +98,12 @@
 							{month} - {activities.length} activities
 						</div>
 						{#each activities as activity}
-							<ActivitiesListItem {activity} showNote={showNotes} />
+							<ActivitiesListItem
+								{activity}
+								showNote={showNotes}
+								isSelected={activity.id === selectedActivity}
+								onClick={() => activityClickedCallback(activity.id)}
+							/>
 						{/each}
 					</div>
 				{/if}
