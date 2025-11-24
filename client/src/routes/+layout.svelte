@@ -43,7 +43,7 @@
 				href="/training/metrics">Training</a
 			>
 		</div>
-		{#if page.url.pathname === '/'}
+		{#if ['/', '/history'].includes(page.url.pathname)}
 			<div class="flex w-full flex-row justify-center gap-2 sm:justify-end">
 				<button
 					class="btn w-32 rounded-lg btn-sm btn-primary sm:w-36 sm:btn-md"
