@@ -449,7 +449,8 @@
 				</div>
 			{:then selectedActivity}
 				{#if selectedActivity}
-					<div class="w-full">
+					<div class="relative w-full">
+						<button onclick={() => (selectedActivityId = null)} class="absolute right-1">X</button>
 						<ActivityDetails
 							activity={selectedActivity}
 							onActivityUpdated={() => {
