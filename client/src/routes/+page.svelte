@@ -11,6 +11,7 @@
 		fetchActivityDetails,
 		type ActivityDetails as ActivityDetailsType
 	} from '$lib/api/activities';
+	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -38,7 +39,7 @@
 		return favoriteMetricPref?.value;
 	});
 
-	let metricsForCarousel = $derived.by(() => {
+	let sortedMetrics = $derived.by(() => {
 		// Sort to put favorite first if it exists
 		const sortedMetrics = [...data.metrics];
 		if (favoriteMetricId) {
@@ -67,7 +68,7 @@
 
 	const handleActivityClick = async (activityId: string) => {
 		// On mobile, navigate to activity page
-		if (screenWidth < 900) {
+		if (screenWidth < 700) {
 			goto(`/activity/${activityId}`);
 			return;
 		}
@@ -81,17 +82,22 @@
 <svelte:window bind:innerWidth={screenWidth} />
 
 <div class="homepage_container">
-	{#if metricsForCarousel.length > 0}
-		<div bind:clientWidth={chartWidth} class="item metric_chart rounded-box bg-base-100 shadow-md">
-			<h2 class="p-4 pb-0 text-lg font-semibold">Training metrics</h2>
+	<div
+		bind:clientWidth={chartWidth}
+		class="item metric_chart rounded-box bg-base-100 p-4 shadow-md"
+	>
+		<h2 class=" text-lg font-semibold">Training metrics</h2>
+		{#if screenWidth < 700}
 			<TrainingMetricsCarousel
-				metrics={metricsForCarousel}
+				metrics={sortedMetrics}
 				width={chartWidth}
 				height={chartHeight}
 				{favoriteMetricId}
 			/>
-		</div>
-	{/if}
+		{:else}
+			<TrainingMetricsList metrics={sortedMetrics} width={chartWidth} height={chartHeight} />
+		{/if}
+	</div>
 
 	{#if ongoingPeriods.length > 0}
 		<div class="item periods rounded-box bg-base-100 shadow-md">
@@ -155,7 +161,7 @@
 		grid-row: 1 / span 1;
 	}
 
-	@media (min-width: 900px) {
+	@media (min-width: 700px) {
 		.homepage_container {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
