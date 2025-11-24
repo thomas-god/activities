@@ -74,8 +74,10 @@
 		}
 
 		// On desktop, load and show activity details in right column
-		selectedActivityId = activityId;
-		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+		// selectedActivityId = activityId;
+		// selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+		// TODO: load activity quick preview
+		goto(`/activity/${activityId}`);
 	};
 </script>
 
