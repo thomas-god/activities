@@ -16,6 +16,7 @@
 		fetchActivityDetails,
 		type ActivityDetails as ActivityDetailsType
 	} from '$lib/api/activities';
+	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -304,7 +305,7 @@
 
 	const handleActivityClick = (activityId: string) => {
 		// On mobile, navigate to activity page
-		if (screenWidth < 900) {
+		if (screenWidth < 700) {
 			goto(`/activity/${activityId}`);
 			return;
 		}
@@ -416,29 +417,33 @@
 		</div>
 	</div>
 
-	<div class="item period-right-column">
+	<div
+		class={`item metrics rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden'}`}
+	>
 		{#if data.metrics.length > 0}
-			<details
-				class="period-metrics collapse-arrow collapse rounded-box border border-base-300 bg-base-100 shadow-md"
-				open
-			>
-				<summary class="collapse-title text-lg font-semibold">Training Metrics</summary>
-				<div class="collapse-content" bind:clientWidth={chartWidth}>
+			<div bind:clientWidth={chartWidth}>
+				<h2 class=" text-lg font-semibold">Training metrics</h2>
+
+				{#if screenWidth < 700}
 					<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
-				</div>
-			</details>
+				{:else}
+					<TrainingMetricsList metrics={data.metrics} width={chartWidth} height={chartHeight} />
+				{/if}
+			</div>
+		{:else}
+			<div class="text-center text-sm tracking-wide italic opacity-60">No training metrics</div>
 		{/if}
 	</div>
 
-	<div class="activity-details-section col-start-2 col-end-3 row-start-2">
+	<div class={`activity-details  ${selectedActivityId !== null ? 'flex' : 'hidden'}`}>
 		{#if selectedActivityPromise}
 			{#await selectedActivityPromise}
-				<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
 					<span class="loading loading-lg loading-spinner"></span>
 				</div>
 			{:then selectedActivity}
 				{#if selectedActivity}
-					<div class="">
+					<div class="w-full">
 						<ActivityDetails
 							activity={selectedActivity}
 							onActivityUpdated={() => {
@@ -461,17 +466,11 @@
 					Failed to load activity: {error.message}
 				</div>
 			{/await}
-		{:else}
-			<div
-				class="flex items-center justify-center rounded-box bg-base-100 p-8 text-base-content/60 shadow-md"
-			>
-				Select an activity to view details
-			</div>
 		{/if}
 	</div>
 
 	<!-- Activities section -->
-	<div class="item period-activities rounded-box bg-base-100 p-4 shadow-md">
+	<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="text-lg font-semibold">Activities & Notes</h2>
 		</div>
@@ -641,10 +640,6 @@
 {/if}
 
 <style>
-	.rounded-box {
-		border-radius: 8px;
-	}
-
 	.period_container {
 		width: 100%;
 		display: flex;
@@ -663,63 +658,49 @@
 		width: 100%;
 	}
 
-	.period-metrics {
-		& .collapse-content {
-			padding-left: 0rem;
-			padding-right: 0rem;
-		}
-	}
-
-	.activity-details-section {
+	.activity-details {
 		display: none;
 	}
 
-	@media (min-width: 900px) {
+	@media (min-width: 700px) {
 		.period_container {
 			display: grid;
-			grid-template-columns: minmax(20rem, 400px) minmax(20rem, 400px) 400px;
+			grid-template-columns: 1fr 1fr;
 			grid-template-rows: auto 1fr;
 			align-items: start;
-			height: calc(100vh - calc(var(--spacing) * 5) - 60px);
+			height: 100dvh;
+			/* height: calc(100vh - calc(var(--spacing) * 5) - 80px); */
 			margin-top: calc(var(--spacing) * 5);
 			overflow: hidden;
 		}
 
 		.period-title {
 			grid-row: 1;
-			grid-column: 1 / 4;
+			grid-column: 1 / span 2;
 		}
 
-		.period-right-column {
+		.metrics {
 			grid-row: 2;
-			grid-column: 3;
-			display: flex;
+			grid-column: 2;
 			flex-direction: column;
 			gap: calc(var(--spacing) * 5);
 			height: 100%;
 			overflow-y: auto;
-			padding-right: calc(var(--spacing) * 2);
 		}
 
-		.period-metrics {
-			flex-shrink: 0;
-
-			& .collapse-content {
-				padding-left: 1rem;
-				padding-right: 1rem;
-			}
-		}
-
-		.period-activities {
+		.activities {
 			grid-row: 2;
 			grid-column: 1;
 			height: 100%;
 			overflow-y: auto;
 		}
 
-		.activity-details-section {
-			display: block;
-			flex-shrink: 0;
+		.activity-details {
+			display: flex;
+			height: 100%;
+			overflow-y: auto;
+			grid-row: 2;
+			grid-column: 2;
 		}
 	}
 </style>
