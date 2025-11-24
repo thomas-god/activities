@@ -326,7 +326,7 @@
 <svelte:window bind:innerWidth={screenWidth} />
 
 <div class="period_container">
-	<div class="item period-title @container rounded-box rounded-t-none bg-base-100 p-4 shadow-md">
+	<div class="item period-title @container rounded-box bg-base-100 p-4 shadow-md">
 		<!-- Top row: Icon and Title/Date/Actions -->
 		<div class="flex items-center gap-3">
 			<!-- Icon -->
@@ -394,19 +394,19 @@
 		</div>
 
 		<!-- Period note section -->
-		<div class="mt-4">
+		<div class="my-4">
 			{#if period.note}
 				<div class="flex items-start gap-2">
 					<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
 						{period.note}
+						<button
+							class="btn btn-square btn-ghost btn-xs"
+							onclick={openEditNoteModal}
+							aria-label="Edit note"
+						>
+							✏️
+						</button>
 					</div>
-					<button
-						class="btn btn-square btn-ghost btn-xs"
-						onclick={openEditNoteModal}
-						aria-label="Edit note"
-					>
-						✏️
-					</button>
 				</div>
 			{:else}
 				<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
@@ -414,6 +414,10 @@
 					<span>Add period description</span>
 				</button>
 			{/if}
+		</div>
+
+		<div class="rounded bg-base-200 p-4">
+			<TrainingPeriodStatistics {period} />
 		</div>
 	</div>
 
@@ -476,10 +480,6 @@
 		</div>
 
 		{#if period.activities.length > 0}
-			<div class="mb-4 rounded bg-base-200 p-4">
-				<TrainingPeriodStatistics {period} />
-			</div>
-
 			<div class="flex flex-col gap-0">
 				{#each timeline as item}
 					{#if item.type === 'activity'}

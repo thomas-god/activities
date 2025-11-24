@@ -37,7 +37,7 @@
 	};
 </script>
 
-<div class="grid max-w-80 grid-cols-2 gap-2">
+<div class="flex flex-wrap gap-6 sm:gap-8">
 	<div class="flex flex-col">
 		<div class="text-xs opacity-70">Activities</div>
 		<div class="text-xl font-semibold">{summary.count}</div>
