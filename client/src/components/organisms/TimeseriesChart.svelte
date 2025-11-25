@@ -28,7 +28,7 @@
 	let numberOfMetrics = $derived(Math.min(metrics.length, 3));
 	let timeScale = $derived.by(() => {
 		if (numberOfMetrics === 1) {
-			return [axisWidth, width];
+			return [axisWidth, width - 0.5 * axisWidth];
 		} else if (numberOfMetrics === 2) {
 			return [axisWidth, width - axisWidth];
 		} else {
@@ -37,7 +37,7 @@
 	});
 	let margins = $derived.by(() => {
 		if (numberOfMetrics === 1) {
-			return { left: axisWidth, right: 0 };
+			return { left: axisWidth, right: 0.5 * axisWidth };
 		} else if (numberOfMetrics === 2) {
 			return { left: axisWidth, right: axisWidth };
 		} else {
@@ -230,7 +230,7 @@
 		<rect
 			x={margins.left}
 			y={marginRight}
-			width={width - axisWidth * numberOfMetrics}
+			width={timeScale[1] - timeScale[0]}
 			height={height - marginTop - marginBottom}
 		/>
 	</clipPath>
