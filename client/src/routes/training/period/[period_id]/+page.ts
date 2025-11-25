@@ -9,6 +9,7 @@ import { fetchTrainingNotes, fetchTrainingMetrics, type TrainingNote } from '$li
 import { dayjs } from '$lib/duration';
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
+	depends(`app:training-period:${params.period_id}`);
 	const periodDetails = await fetchTrainingPeriodDetails(fetch, params.period_id);
 
 	if (periodDetails === null) {

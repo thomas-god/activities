@@ -39,7 +39,7 @@
 	let screenWidth = $state(0);
 
 	async function handleDelete() {
-		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
 			method: 'DELETE',
 			credentials: 'include',
 			mode: 'cors'
@@ -53,33 +53,36 @@
 	}
 
 	function openEditModal() {
-		editedName = period.name;
+		editedName = data.periodDetails.name;
 		showEditModal = true;
 	}
 
 	function openEditNoteModal() {
-		editedNote = period.note ?? '';
+		editedNote = data.periodDetails.note ?? '';
 		showEditNoteModal = true;
 	}
 
 	function openEditDatesModal() {
-		editedStart = period.start;
-		editedEnd = period.end ?? '';
+		editedStart = data.periodDetails.start;
+		editedEnd = data.periodDetails.end ?? '';
 		showEditDatesModal = true;
 	}
 
 	async function handleUpdateNote() {
 		isUpdatingNote = true;
 		try {
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
-				method: 'PATCH',
-				credentials: 'include',
-				mode: 'cors',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ note: editedNote.trim() })
-			});
+			const response = await fetch(
+				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
+				{
+					method: 'PATCH',
+					credentials: 'include',
+					mode: 'cors',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ note: editedNote.trim() })
+				}
+			);
 
 			if (response.ok) {
 				// Reload the page to show updated content
@@ -114,15 +117,18 @@
 				body.end = editedEnd;
 			}
 
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
-				method: 'PATCH',
-				credentials: 'include',
-				mode: 'cors',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(body)
-			});
+			const response = await fetch(
+				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
+				{
+					method: 'PATCH',
+					credentials: 'include',
+					mode: 'cors',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(body)
+				}
+			);
 
 			if (response.ok) {
 				// Reload the page to show updated content
@@ -147,15 +153,18 @@
 
 		isUpdating = true;
 		try {
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${period.id}`, {
-				method: 'PATCH',
-				credentials: 'include',
-				mode: 'cors',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ name: editedName.trim() })
-			});
+			const response = await fetch(
+				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
+				{
+					method: 'PATCH',
+					credentials: 'include',
+					mode: 'cors',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ name: editedName.trim() })
+				}
+			);
 
 			if (response.ok) {
 				// Reload the page to show updated content
@@ -172,12 +181,10 @@
 		}
 	}
 
-	const period = data.periodDetails;
-
 	// Filter training notes to only include those within the period date range
 	const periodNotes = $derived.by(() => {
-		const startDate = dayjs(period.start);
-		const endDate = period.end ? dayjs(period.end) : dayjs(); // If no end, use today
+		const startDate = dayjs(data.periodDetails.start);
+		const endDate = data.periodDetails.end ? dayjs(data.periodDetails.end) : dayjs(); // If no end, use today
 
 		return data.trainingNotes.filter((note) => {
 			const noteDate = dayjs(note.date);
@@ -190,12 +197,12 @@
 
 	// Merge activities and notes, sorted by date (most recent first)
 	type TimelineItem =
-		| { type: 'activity'; data: (typeof period.activities)[0]; date: string }
+		| { type: 'activity'; data: (typeof data.periodDetails.activities)[0]; date: string }
 		| { type: 'note'; data: TrainingNote; date: string };
 
 	const timeline = $derived.by((): TimelineItem[] => {
 		const items: TimelineItem[] = [
-			...period.activities.map((activity) => ({
+			...data.periodDetails.activities.map((activity) => ({
 				type: 'activity' as const,
 				data: activity,
 				date: activity.start_time
@@ -225,7 +232,7 @@
 	};
 
 	const sportsByCategory = $derived.by(() => {
-		const sports = period.sports;
+		const sports = data.periodDetails.sports;
 		// Map category -> { category, icon, sports[], showAll }
 		const categorySet: Set<SportCategory | 'Other'> = new Set(sports.categories);
 		const map = new Map<
@@ -318,8 +325,7 @@
 	const handleActivityDeleted = () => {
 		selectedActivityId = null;
 		selectedActivityPromise = null;
-		// Reload the page to update the activities list
-		window.location.reload();
+		invalidate(`app:training-period:${data.periodDetails.id}`);
 	};
 </script>
 
@@ -333,12 +339,12 @@
 
 		<!-- Title and date -->
 		<div class="flex-1">
-			<div class="text-lg font-semibold @lg:text-xl">{period.name}</div>
+			<div class="text-lg font-semibold @lg:text-xl">{data.periodDetails.name}</div>
 			<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
 				<div class="opacity-70">
-					{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
+					{dayjs(data.periodDetails.start).format('MMM D, YYYY')} · {data.periodDetails.end === null
 						? 'Ongoing'
-						: dayjs(period.end).format('MMM D, YYYY')}
+						: dayjs(data.periodDetails.end).format('MMM D, YYYY')}
 				</div>
 				{#if sportsByCategory.length > 0}
 					<div class="flex items-center gap-1.5">
@@ -388,16 +394,18 @@
 					</ul>
 				</div>
 			</div>
-			<div class="text-xs opacity-70">{formatPeriodDuration(period.start, period.end)}</div>
+			<div class="text-xs opacity-70">
+				{formatPeriodDuration(data.periodDetails.start, data.periodDetails.end)}
+			</div>
 		</div>
 	</div>
 
 	<!-- Period note section -->
 	<div class="my-4">
-		{#if period.note}
+		{#if data.periodDetails.note}
 			<div class="flex items-start gap-2">
 				<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
-					{period.note}
+					{data.periodDetails.note}
 					<button
 						class="btn btn-square btn-ghost btn-xs"
 						onclick={openEditNoteModal}
@@ -416,7 +424,7 @@
 	</div>
 
 	<div class="rounded bg-base-200 p-4">
-		<TrainingPeriodStatistics {period} />
+		<TrainingPeriodStatistics period={data.periodDetails} />
 	</div>
 </div>
 <div class="period_container">
@@ -452,7 +460,7 @@
 						<ActivityDetails
 							activity={selectedActivity}
 							onActivityUpdated={() => {
-								// TODO: handle update path
+								invalidate(`app:training-period:${data.periodDetails.id}`);
 							}}
 							onActivityDeleted={handleActivityDeleted}
 							compact={true}
@@ -481,7 +489,7 @@
 			<h2 class="text-lg font-semibold">Activities & Notes</h2>
 		</div>
 
-		{#if period.activities.length > 0}
+		{#if data.periodDetails.activities.length > 0}
 			<div class="flex flex-col gap-0">
 				{#each timeline as item}
 					{#if item.type === 'activity'}
@@ -550,7 +558,7 @@
 	bind:isOpen={showDeleteModal}
 	title="Delete Training Period"
 	description="Are you sure you want to delete this training period ? "
-	itemPreview={period.name}
+	itemPreview={data.periodDetails.name}
 	onConfirm={handleDelete}
 />
 
@@ -607,7 +615,7 @@
 	<dialog class="modal-open modal">
 		<div class="modal-box">
 			<h3 class="text-lg font-bold">
-				{period.note ? 'Edit' : 'Add'} training period description
+				{data.periodDetails.note ? 'Edit' : 'Add'} training period description
 			</h3>
 			<div class="py-4">
 				<label class="floating-label">

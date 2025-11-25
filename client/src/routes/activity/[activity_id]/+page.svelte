@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
 
@@ -10,7 +10,7 @@
 	<ActivityDetails
 		activity={data.activity}
 		onActivityUpdated={() => {
-			// TODO: handle update path
+			invalidate(`app:activity:${data.activity.id}`);
 		}}
 		onActivityDeleted={() => goto('/')}
 	/>
