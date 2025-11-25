@@ -325,109 +325,107 @@
 
 <svelte:window bind:innerWidth={screenWidth} />
 
-<div class="period_container">
-	<div class="item period-title @container rounded-box bg-base-100 p-4 shadow-md">
-		<!-- Top row: Icon and Title/Date/Actions -->
-		<div class="flex items-center gap-3">
-			<!-- Icon -->
-			<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
+<div class="item period-title @container mt-5 rounded-box bg-base-100 p-4 shadow-md">
+	<!-- Top row: Icon and Title/Date/Actions -->
+	<div class="flex items-center gap-3">
+		<!-- Icon -->
+		<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
 
-			<!-- Title and date -->
-			<div class="flex-1">
-				<div class="text-lg font-semibold @lg:text-xl">{period.name}</div>
-				<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
-					<div class="opacity-70">
-						{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
-							? 'Ongoing'
-							: dayjs(period.end).format('MMM D, YYYY')}
-					</div>
-					{#if sportsByCategory.length > 0}
-						<div class="flex items-center gap-1.5">
-							<span class="opacity-50">·</span>
-							{#each sportsByCategory as group}
-								<div
-									class="tooltip tooltip-bottom text-base"
-									data-tip={group.showAll
-										? `${group.category} (all sub-sports)`
-										: `${group.category}: ${group.sports.join(', ')}`}
-								>
-									{group.icon}
-								</div>
-							{/each}
-						</div>
-					{:else}
-						<div class="opacity-50">· All sports</div>
-					{/if}
-					<!-- Action menu dropdown (always inline) -->
-					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
-							⋮
-						</div>
-						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-						<ul
-							tabindex="0"
-							class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
-						>
-							<li>
-								<button onclick={openEditModal}>
-									<span>✏️</span>
-									<span>Edit name</span>
-								</button>
-							</li>
-							<li>
-								<button onclick={openEditDatesModal}>
-									<span>📅</span>
-									<span>Edit dates</span>
-								</button>
-							</li>
-							<li>
-								<button onclick={() => (showDeleteModal = true)} class="text-error">
-									<span>🗑️</span>
-									<span>Delete</span>
-								</button>
-							</li>
-						</ul>
-					</div>
+		<!-- Title and date -->
+		<div class="flex-1">
+			<div class="text-lg font-semibold @lg:text-xl">{period.name}</div>
+			<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
+				<div class="opacity-70">
+					{dayjs(period.start).format('MMM D, YYYY')} · {period.end === null
+						? 'Ongoing'
+						: dayjs(period.end).format('MMM D, YYYY')}
 				</div>
-				<div class="text-xs opacity-70">{formatPeriodDuration(period.start, period.end)}</div>
+				{#if sportsByCategory.length > 0}
+					<div class="flex items-center gap-1.5">
+						<span class="opacity-50">·</span>
+						{#each sportsByCategory as group}
+							<div
+								class="tooltip tooltip-bottom text-base"
+								data-tip={group.showAll
+									? `${group.category} (all sub-sports)`
+									: `${group.category}: ${group.sports.join(', ')}`}
+							>
+								{group.icon}
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="opacity-50">· All sports</div>
+				{/if}
+				<!-- Action menu dropdown (always inline) -->
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
+						⋮
+					</div>
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+					>
+						<li>
+							<button onclick={openEditModal}>
+								<span>✏️</span>
+								<span>Edit name</span>
+							</button>
+						</li>
+						<li>
+							<button onclick={openEditDatesModal}>
+								<span>📅</span>
+								<span>Edit dates</span>
+							</button>
+						</li>
+						<li>
+							<button onclick={() => (showDeleteModal = true)} class="text-error">
+								<span>🗑️</span>
+								<span>Delete</span>
+							</button>
+						</li>
+					</ul>
+				</div>
 			</div>
-		</div>
-
-		<!-- Period note section -->
-		<div class="my-4">
-			{#if period.note}
-				<div class="flex items-start gap-2">
-					<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
-						{period.note}
-						<button
-							class="btn btn-square btn-ghost btn-xs"
-							onclick={openEditNoteModal}
-							aria-label="Edit note"
-						>
-							✏️
-						</button>
-					</div>
-				</div>
-			{:else}
-				<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-					<span>📝</span>
-					<span>Add period description</span>
-				</button>
-			{/if}
-		</div>
-
-		<div class="rounded bg-base-200 p-4">
-			<TrainingPeriodStatistics {period} />
+			<div class="text-xs opacity-70">{formatPeriodDuration(period.start, period.end)}</div>
 		</div>
 	</div>
 
+	<!-- Period note section -->
+	<div class="my-4">
+		{#if period.note}
+			<div class="flex items-start gap-2">
+				<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
+					{period.note}
+					<button
+						class="btn btn-square btn-ghost btn-xs"
+						onclick={openEditNoteModal}
+						aria-label="Edit note"
+					>
+						✏️
+					</button>
+				</div>
+			</div>
+		{:else}
+			<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
+				<span>📝</span>
+				<span>Add period description</span>
+			</button>
+		{/if}
+	</div>
+
+	<div class="rounded bg-base-200 p-4">
+		<TrainingPeriodStatistics {period} />
+	</div>
+</div>
+<div class="period_container">
 	<div
-		class={`item metrics rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
+		class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 	>
 		{#if data.metrics.length > 0}
+			<h2 class=" px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 			<div bind:clientWidth={chartWidth}>
-				<h2 class=" text-lg font-semibold">Training metrics</h2>
-
 				{#if screenWidth < 700}
 					<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
 				{:else}
@@ -440,7 +438,7 @@
 	</div>
 
 	<div
-		class={`activity-details rounded-box bg-base-100 p-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
+		class={`activity-details rounded-box bg-base-100 pt-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
 	>
 		{#if selectedActivityPromise}
 			{#await selectedActivityPromise}
@@ -450,7 +448,7 @@
 			{:then selectedActivity}
 				{#if selectedActivity}
 					<div class="relative w-full">
-						<button onclick={() => (selectedActivityId = null)} class="absolute right-1">X</button>
+						<button onclick={() => (selectedActivityId = null)} class="absolute right-3">X</button>
 						<ActivityDetails
 							activity={selectedActivity}
 							onActivityUpdated={() => {
@@ -651,11 +649,6 @@
 		align-items: center;
 		gap: calc(var(--spacing) * 5);
 		margin-top: calc(var(--spacing) * 5);
-		padding-inline: calc(var(--spacing) * 1);
-
-		@media (min-width: 400px) {
-			padding-inline: calc(var(--spacing) * 2);
-		}
 	}
 
 	.item {
@@ -670,30 +663,23 @@
 		.period_container {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
-			grid-template-rows: auto 1fr;
+			grid-template-rows: 100dvh;
 			align-items: start;
-			height: calc(100dvh - calc(var(--spacing) * 5) - 80px);
-			margin-top: calc(var(--spacing) * 5);
 			overflow: hidden;
-		}
-
-		.period-title {
-			grid-row: 1;
-			grid-column: 1 / span 2;
 		}
 
 		.metrics {
 			display: flex;
 			height: 100%;
 			overflow-y: auto;
-			grid-row: 2;
+			grid-row: 1;
 			grid-column: 2;
 			flex-direction: column;
 			gap: calc(var(--spacing) * 5);
 		}
 
 		.activities {
-			grid-row: 2;
+			grid-row: 1;
 			grid-column: 1;
 			height: 100%;
 			overflow-y: auto;
@@ -703,7 +689,7 @@
 			display: flex;
 			height: 100%;
 			overflow-y: auto;
-			grid-row: 2;
+			grid-row: 1;
 			grid-column: 2;
 		}
 	}

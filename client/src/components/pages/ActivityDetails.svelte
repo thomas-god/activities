@@ -265,8 +265,8 @@
 				<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
 			</fieldset>
 			{#if selectedMetrics}
-				<div class="pb-2">
-					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
+				<div class="px-2 pb-2">
+					<div class=" w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<TimeseriesChart
 							time={active_metrics.time}
 							distance={active_distance}
