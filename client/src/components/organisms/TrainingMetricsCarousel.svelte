@@ -5,18 +5,17 @@
 
 	let {
 		metrics,
-		width,
 		height,
 		initialIndex = 0,
 		favoriteMetricId
 	}: {
 		metrics: MetricsListItemGrouped[];
-		width: number;
 		height: number;
 		initialIndex?: number;
 		favoriteMetricId?: string | null;
 	} = $props();
 
+	let chartWidth: number = $state(300);
 	let currentIndex = $state(initialIndex);
 
 	let currentMetric = $derived.by(() => {
@@ -82,16 +81,18 @@
 		</button>
 	</div>
 
-	<TrainingMetricsChartStacked
-		{height}
-		{width}
-		values={currentMetric.values}
-		unit={currentMetric.unit}
-		granularity={currentMetric.granularity}
-		format={currentMetric.unit === 's' ? 'duration' : 'number'}
-		showGroup={currentMetric.showGroup}
-		groupBy={currentMetric.groupBy}
-	/>
+	<div bind:clientWidth={chartWidth}>
+		<TrainingMetricsChartStacked
+			{height}
+			width={chartWidth}
+			values={currentMetric.values}
+			unit={currentMetric.unit}
+			granularity={currentMetric.granularity}
+			format={currentMetric.unit === 's' ? 'duration' : 'number'}
+			showGroup={currentMetric.showGroup}
+			groupBy={currentMetric.groupBy}
+		/>
+	</div>
 
 	{#if metrics.length > 1}
 		<div class="flex items-center justify-center gap-2 py-2">

@@ -432,12 +432,12 @@
 		class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 	>
 		{#if data.metrics.length > 0}
-			<h2 class=" px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 			<div bind:clientWidth={chartWidth}>
+				<h2 class=" px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 				{#if screenWidth < 700}
-					<TrainingMetricsCarousel metrics={data.metrics} width={chartWidth} height={chartHeight} />
+					<TrainingMetricsCarousel metrics={data.metrics} height={chartHeight} />
 				{:else}
-					<TrainingMetricsList metrics={data.metrics} width={chartWidth} height={chartHeight} />
+					<TrainingMetricsList metrics={data.metrics} height={chartHeight} />
 				{/if}
 			</div>
 		{:else}

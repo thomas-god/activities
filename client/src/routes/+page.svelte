@@ -90,14 +90,9 @@
 	>
 		<h2 class=" text-lg font-semibold">Training metrics</h2>
 		{#if screenWidth < 700}
-			<TrainingMetricsCarousel
-				metrics={sortedMetrics}
-				width={chartWidth}
-				height={chartHeight}
-				{favoriteMetricId}
-			/>
+			<TrainingMetricsCarousel metrics={sortedMetrics} height={chartHeight} {favoriteMetricId} />
 		{:else}
-			<TrainingMetricsList metrics={sortedMetrics} width={chartWidth} height={chartHeight} />
+			<TrainingMetricsList metrics={sortedMetrics} height={chartHeight} />
 		{/if}
 	</div>
 

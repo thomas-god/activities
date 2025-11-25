@@ -5,13 +5,13 @@
 
 	let {
 		metrics,
-		width,
 		height
 	}: {
 		metrics: MetricsListItemGrouped[];
-		width: number;
 		height: number;
 	} = $props();
+
+	let chartWidth: number = $state(300);
 
 	let metricProps = $derived(
 		metrics.map((metric) => {
@@ -39,7 +39,7 @@
 
 <div class="flex flex-col items-center gap-0">
 	{#each metricProps as metric, idx (metric.id)}
-		<div class="flex flex-col gap-0">
+		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 			<TrainingMetricTitle
 				name={metric.name}
 				granularity={metric.granularity}
@@ -52,7 +52,7 @@
 
 			<TrainingMetricsChartStacked
 				{height}
-				{width}
+				width={chartWidth}
 				values={metric.values}
 				unit={metric.unit}
 				granularity={metric.granularity}
