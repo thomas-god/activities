@@ -227,6 +227,7 @@
 		{activity}
 		onEditNameCallback={updateActivityNameCallback}
 		onDeleteClickedCallback={openDeleteModal}
+		{compact}
 	/>
 
 	<details class={`collapse-arrow collapse ${sectionClass}`} open>

@@ -8,9 +8,10 @@
 		activity: ActivityDetails;
 		onEditNameCallback: (newName: string) => Promise<void>;
 		onDeleteClickedCallback: () => void;
+		compact?: boolean;
 	}
 
-	let { activity, onEditNameCallback, onDeleteClickedCallback }: Props = $props();
+	let { activity, onEditNameCallback, onDeleteClickedCallback, compact = false }: Props = $props();
 
 	let title = $derived(
 		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
@@ -28,7 +29,7 @@
 </script>
 
 <div
-	class={`item flex flex-1 items-center bg-base-100 p-3 ${categoryClass(activity.sport_category)}`}
+	class={`item flex flex-1 items-center bg-base-100 p-3 ${categoryClass(activity.sport_category)} ${compact ? 'compact' : ''}`}
 >
 	<div class={`icon ${categoryClass(activity.sport_category)}`}>
 		{getSportCategoryIcon(activity.sport_category)}
@@ -67,6 +68,10 @@
 		box-sizing: border-box;
 		border-left: 4px solid transparent;
 		border-radius: 8px;
+	}
+
+	.item.compact {
+		border-radius: 0;
 	}
 
 	.item.cycling {

@@ -96,7 +96,7 @@
 		border-radius: 0px;
 	}
 
-	@media (min-width: 900px) {
+	@media (min-width: 700px) {
 		.item.selected {
 			background: #e6eef5;
 			border-left-width: 6px;
