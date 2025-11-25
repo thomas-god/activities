@@ -124,9 +124,15 @@
 		goto(url, { replaceState: true, keepFocus: true });
 	};
 
-	const handleActivitySelected = (activityId: string) => {
+	const handleActivitySelected = (activityId: string | null) => {
+		if (activityId === null) {
+			activityId = null;
+			selectedActivityPromise = null;
+			return;
+		}
+
 		// On small screens, navigate to activity page
-		if (screenWidth < 900) {
+		if (screenWidth < 700) {
 			goto(`/activity/${activityId}`);
 			return;
 		}
@@ -143,7 +149,6 @@
 	};
 
 	const handleActivityUpdated = (activityId: string) => {
-		console.log('hello?');
 		invalidate('app:activities');
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
@@ -188,18 +193,24 @@
 					selectedActivity={selectedActivityId}
 				/>
 			</div>
-			{#if selectedActivityPromise}
-				<div class="w-full grow basis-0 overflow-auto">
+			{#if selectedActivityPromise && screenWidth >= 700}
+				<div
+					class="relative w-full grow basis-0 overflow-auto rounded-box bg-base-100 pt-4 shadow-md"
+				>
 					{#await selectedActivityPromise}
 						<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
 							<span class="loading loading-lg loading-spinner"></span>
 						</div>
 					{:then selectedActivity}
 						{#if selectedActivity}
+							<button onclick={() => handleActivitySelected(null)} class="absolute right-3"
+								>X</button
+							>
 							<ActivityDetails
 								activity={selectedActivity}
 								onActivityUpdated={() => handleActivityUpdated(selectedActivity.id)}
 								onActivityDeleted={handleActivityDeleted}
+								compact={true}
 							/>
 						{:else}
 							<div
