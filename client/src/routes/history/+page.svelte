@@ -198,7 +198,7 @@
 					class="relative w-full grow basis-0 overflow-auto rounded-box bg-base-100 pt-4 shadow-md"
 				>
 					{#await selectedActivityPromise}
-						<div class="flex items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+						<div class="flex items-center justify-center">
 							<span class="loading loading-lg loading-spinner"></span>
 						</div>
 					{:then selectedActivity}

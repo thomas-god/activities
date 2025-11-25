@@ -297,7 +297,14 @@
 					};
 
 					// Highlight the bar with a border using the group's color
-					d3.select(rect).attr('stroke', colors(stackedDataPoint.key)).attr('stroke-width', 3);
+					d3.select(rect)
+						.attr('stroke', colors(stackedDataPoint.key))
+						.attr('stroke-width', 3)
+						// Draw only left and right borders
+						.style(
+							'stroke-dasharray',
+							`0 ${rect.width.baseVal.value} ${rect.height.baseVal.value} ${rect.width.baseVal.value} ${rect.height.baseVal.value}`
+						);
 				})
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
