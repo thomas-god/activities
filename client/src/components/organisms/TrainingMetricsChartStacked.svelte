@@ -92,6 +92,9 @@
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
+		if (values.length === 0) {
+			return [];
+		}
 		const maxGroupValue = values
 			.reduce<Map<string, number>>((groupValues, value) => {
 				if (groupValues.has(value.time)) {
@@ -108,6 +111,9 @@
 	};
 
 	let yAxisTickValues = (): number[] => {
+		if (values.length === 0) {
+			return [];
+		}
 		if (format === 'duration') {
 			const dt = 600;
 			const maxDuration = values
@@ -362,17 +368,17 @@
 		<!-- Tooltip inside SVG -->
 		{#if tooltip.visible}
 			<foreignObject
-				x={tooltip.x - 100}
-				y={tooltip.showBelow ? tooltip.y + 10 : tooltip.y - 90}
+				x={Math.round(tooltip.x) - 100}
+				y={tooltip.showBelow ? Math.round(tooltip.y) + 10 : Math.round(tooltip.y) - 90}
 				width="200"
 				height="100"
 				class="pointer-events-none overflow-visible"
 			>
-				<div class="flex justify-center">
+				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
 							<div class="font-semibold">{timeAxisTickFormater(tooltip.time, 0)}</div>
-							<div class="flex items-center gap-2 text-xs opacity-80">
+							<div class="text-xs opacity-80">
 								{#if showGroup}
 									<span>{tooltip.group}</span>
 									<span>•</span>
@@ -380,7 +386,7 @@
 								<span>{formatTooltipValue(tooltip.value)}</span>
 							</div>
 							{#if showGroup && tooltip.total !== tooltip.value}
-								<div class="flex items-center gap-2 text-xs opacity-60">
+								<div class="text-xs opacity-60">
 									<span>Total</span>
 									<span>•</span>
 									<span>{formatTooltipValue(tooltip.total)}</span>
