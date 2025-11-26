@@ -285,9 +285,25 @@
 					const spaceAbove = yPos - marginTop;
 					const showBelow = spaceAbove < tooltipHeight;
 
+					// Check horizontal space for tooltip (tooltip width is 200px)
+					const tooltipWidth = 100;
+					const tooltipHalfWidth = tooltipWidth / 2;
+					const spaceLeft = xPos - marginLeft;
+					const spaceRight = width - marginRight - xPos;
+
+					// Determine tooltip x position
+					let tooltipX = xPos - tooltipHalfWidth; // Center by default
+					if (spaceLeft < tooltipHalfWidth) {
+						// Not enough space on the left, align to left edge
+						tooltipX += tooltipHalfWidth;
+					} else if (spaceRight < tooltipHalfWidth) {
+						// Not enough space on the right, align to right edge
+						tooltipX -= tooltipHalfWidth;
+					}
+
 					tooltip = {
 						visible: true,
-						x: xPos,
+						x: tooltipX,
 						y: yPos,
 						showBelow: showBelow,
 						time: time,
@@ -375,7 +391,7 @@
 		<!-- Tooltip inside SVG -->
 		{#if tooltip.visible}
 			<foreignObject
-				x={Math.round(tooltip.x) - 100}
+				x={Math.round(tooltip.x)}
 				y={tooltip.showBelow ? Math.round(tooltip.y) + 10 : Math.round(tooltip.y) - 90}
 				width="200"
 				height="100"
