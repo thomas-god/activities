@@ -107,7 +107,11 @@
 	let requestPending = $state(false);
 
 	let previewRequest = $derived.by(() => {
-		const startDate = dayjs(dates.start).format('YYYY-MM-DDTHH:mm:ssZ');
+		const start = dayjs(dates.start);
+		if (!start.isValid()) {
+			return null;
+		}
+		const startDate = start.format('YYYY-MM-DDTHH:mm:ssZ');
 		const endDate = dates.end
 			? dayjs(dates.end).format('YYYY-MM-DDTHH:mm:ssZ')
 			: dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
@@ -209,6 +213,10 @@
 	const fetchPreview = async (
 		request: typeof previewRequest
 	): Promise<{ time: string; group: string; value: number }[]> => {
+		if (request === null) {
+			return [];
+		}
+
 		const body = JSON.stringify(request);
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
 			body,
