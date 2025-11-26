@@ -17,6 +17,8 @@
 		initialWorkoutTypes = [],
 		initialSportCategories = [],
 		showNotes = $bindable(false),
+		showNotesFilter = true,
+		open = false,
 		onFiltersStateChange
 	}: {
 		activities: ActivityList;
@@ -31,6 +33,8 @@
 			sportCategories: SportCategory[];
 			showNotes: boolean;
 		}) => void;
+		open?: boolean;
+		showNotesFilter?: boolean;
 	} = $props();
 
 	// Filter state - initialize from props
@@ -98,12 +102,14 @@
 	// Helper function to notify URL change
 	const notifyFiltersChange = () => {
 		untrack(() => {
-			onFiltersStateChange?.({
-				rpe: selectedRpe,
-				workoutTypes: selectedWorkoutTypes,
-				sportCategories: selectedSportCategories,
-				showNotes
-			});
+			if (onFiltersStateChange !== undefined) {
+				onFiltersStateChange({
+					rpe: selectedRpe,
+					workoutTypes: selectedWorkoutTypes,
+					sportCategories: selectedSportCategories,
+					showNotes
+				});
+			}
 		});
 	};
 
@@ -152,7 +158,7 @@
 	);
 </script>
 
-<details class="collapse-arrow collapse">
+<details class="collapse-arrow collapse" bind:open>
 	<summary class="collapse-title flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<h2 class="text-lg font-semibold">Filters</h2>
@@ -164,7 +170,7 @@
 		</div>
 	</summary>
 
-	<div class=" collapse-content mx-4 border-b-2 border-b-base-content/25 pt-0">
+	<div class=" collapse-content mx-4 pt-0">
 		<div class="flex flex-col gap-4">
 			<!-- Sport Category Filter -->
 			{#if availableSportCategories.length > 0}
@@ -215,15 +221,17 @@
 			</div>
 
 			<!-- Show Notes Toggle -->
-			<div>
-				<div class="mb-2 text-sm font-medium">Display</div>
-				<button
-					class={`btn btn-sm ${showNotes ? 'btn-primary' : 'btn-ghost'}`}
-					onclick={toggleShowNotes}
-				>
-					📝 {showNotes ? 'Hide' : 'Show'} Notes
-				</button>
-			</div>
+			{#if showNotesFilter}
+				<div>
+					<div class="mb-2 text-sm font-medium">Display</div>
+					<button
+						class={`btn btn-sm ${showNotes ? 'btn-primary' : 'btn-ghost'}`}
+						onclick={toggleShowNotes}
+					>
+						📝 {showNotes ? 'Hide' : 'Show'} Notes
+					</button>
+				</div>
+			{/if}
 
 			{#if hasActiveFilters}
 				<div>

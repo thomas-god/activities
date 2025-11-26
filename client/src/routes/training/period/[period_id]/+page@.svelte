@@ -17,6 +17,7 @@
 		type ActivityDetails as ActivityDetailsType
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
+	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -37,6 +38,8 @@
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
+	let filteredActivities = $derived(data.periodDetails.activities);
+	let filtersDialog: HTMLDialogElement;
 
 	async function handleDelete() {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
@@ -202,7 +205,7 @@
 
 	const timeline = $derived.by((): TimelineItem[] => {
 		const items: TimelineItem[] = [
-			...data.periodDetails.activities.map((activity) => ({
+			...filteredActivities.map((activity) => ({
 				type: 'activity' as const,
 				data: activity,
 				date: activity.start_time
@@ -487,9 +490,10 @@
 	<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 		<div class="mb-4 flex items-center justify-between">
 			<h2 class="text-lg font-semibold">Activities & Notes</h2>
+			<button onclick={() => filtersDialog.showModal()} class="btn btn-ghost">⚙️</button>
 		</div>
 
-		{#if data.periodDetails.activities.length > 0}
+		{#if timeline.length > 0}
 			<div class="flex flex-col gap-0">
 				{#each timeline as item}
 					{#if item.type === 'activity'}
@@ -515,6 +519,28 @@
 		{/if}
 	</div>
 </div>
+
+<!-- Activities filters modal -->
+<dialog id="modal-period-filters" class="modal" bind:this={filtersDialog}>
+	<div class="modal-box flex flex-col items-center">
+		<ActivitiesFilters
+			activities={data.periodDetails.activities}
+			onFilterChange={(activities) => {
+				const ids = activities.map((activity) => activity.id);
+				filteredActivities = data.periodDetails.activities.filter((activity) =>
+					ids.includes(activity.id)
+				);
+			}}
+			showNotesFilter={false}
+			open={true}
+		/>
+		<button class="btn" onclick={() => filtersDialog.close()}>Close</button>
+	</div>
+	<!-- To allow closing by clicking outside the modal -->
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
 
 <!-- Edit name modal -->
 {#if showEditModal}
