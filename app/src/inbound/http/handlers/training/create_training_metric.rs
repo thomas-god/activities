@@ -52,6 +52,8 @@ fn build_request(
         body.aggregate.into(),
         body.filters.into(),
         body.group_by.map(TrainingMetricGroupBy::from),
+        // TODO: take value from request
+        None,
         body.initial_date_range,
     ))
 }

@@ -155,6 +155,7 @@ pub struct TrainingMetric {
     id: TrainingMetricId,
     name: Option<TrainingMetricName>,
     definition: TrainingMetricDefinition,
+    training_period: Option<TrainingPeriodId>,
 }
 
 impl TrainingMetric {
@@ -168,6 +169,10 @@ impl TrainingMetric {
 
     pub fn definition(&self) -> &TrainingMetricDefinition {
         &self.definition
+    }
+
+    pub fn training_period(&self) -> &Option<TrainingPeriodId> {
+        &self.training_period
     }
 }
 

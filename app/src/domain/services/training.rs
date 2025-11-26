@@ -62,7 +62,12 @@ where
             req.filters().clone(),
             req.group_by().clone(),
         );
-        let training_metric = TrainingMetric::new(id.clone(), Some(req.name().clone()), definition);
+        let training_metric = TrainingMetric::new(
+            id.clone(),
+            Some(req.name().clone()),
+            definition,
+            req.training_period().clone(),
+        );
         self.training_repository
             .save_training_metric_definition(training_metric.clone())
             .await?;
@@ -886,6 +891,7 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
             None,
+            None,
         );
 
         let _ = service
@@ -911,6 +917,7 @@ mod tests_training_metrics_service {
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
+            None,
             None,
         );
 
@@ -953,6 +960,7 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
+                None,
             )])
         });
 
@@ -982,7 +990,8 @@ mod tests_training_metrics_service {
                     TrainingMetricAggregate::Average,
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
-                )
+                ),
+                None,
             )
         );
         assert!(value.is_empty());
@@ -1003,6 +1012,7 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
+                None,
             )])
         });
 
@@ -1070,7 +1080,8 @@ mod tests_training_metrics_service {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
-                )
+                ),
+                None,
             )
         );
         // With default stats (no calories), should have empty values
@@ -1092,6 +1103,7 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
+                None,
             )])
         });
 
@@ -1163,6 +1175,7 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
+                None,
             )])
         });
 
