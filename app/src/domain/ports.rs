@@ -12,9 +12,10 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricName, TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-    TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-    TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+    TrainingMetricName, TrainingMetricScope, TrainingMetricValues, TrainingNote,
+    TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
+    TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+    TrainingPeriodWithActivities,
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -713,11 +714,56 @@ pub enum UpdateTrainingMetricNameError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct UpdateTrainingMetricScopeRequest {
+    user: UserId,
+    metric_id: TrainingMetricId,
+    scope: TrainingMetricScope,
+}
+
+impl UpdateTrainingMetricScopeRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn metric_id(&self) -> &TrainingMetricId {
+        &self.metric_id
+    }
+
+    pub fn scope(&self) -> &TrainingMetricScope {
+        &self.scope
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingMetricScopeError {
+    #[error("Training metric {0} does not exist")]
+    MetricDoesNotExist(TrainingMetricId),
+    #[error("User {0} does not own training metric {1}")]
+    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
+    #[error("Training period {0} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
+    #[error("An infrastructure error occured when getting definition")]
+    GetDefinitionError(#[from] GetDefinitionError),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
         req: CreateTrainingMetricRequest,
     ) -> impl Future<Output = Result<TrainingMetricId, CreateTrainingMetricError>> + Send;
+
+    fn delete_metric(
+        &self,
+        req: DeleteTrainingMetricRequest,
+    ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
+
+    fn update_metric_scope(
+        &self,
+        req: UpdateTrainingMetricScopeRequest,
+    ) -> impl Future<Output = Result<(), UpdateTrainingMetricScopeError>> + Send;
 
     fn get_training_metrics_values(
         &self,
@@ -737,11 +783,6 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         definition: &TrainingMetricDefinition,
         date_range: &DateRange,
     ) -> impl Future<Output = Result<TrainingMetricValues, ComputeTrainingMetricValuesError>> + Send;
-
-    fn delete_metric(
-        &self,
-        req: DeleteTrainingMetricRequest,
-    ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
 
     fn update_training_metric_name(
         &self,
@@ -824,6 +865,12 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
 
 #[derive(Debug, Error)]
 pub enum SaveTrainingMetricError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingMetricScopeRepositoryError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -1142,6 +1189,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         metric: TrainingMetric,
     ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
+
+    fn update_training_metric_scope(
+        &self,
+        metric: &TrainingMetricId,
+        scope: &TrainingMetricScope,
+    ) -> impl Future<Output = Result<(), UpdateTrainingMetricScopeRepositoryError>> + Send;
 
     fn get_definition(
         &self,

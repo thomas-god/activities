@@ -19,7 +19,7 @@ use crate::domain::{
         DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
         GetTrainingMetricsDefinitionsError, GetTrainingNoteError, SaveTrainingMetricError,
         SaveTrainingNoteError, SaveTrainingPeriodError, TrainingRepository,
-        UpdateTrainingNoteError,
+        UpdateTrainingMetricScopeRepositoryError, UpdateTrainingNoteError,
     },
 };
 
@@ -93,6 +93,23 @@ impl TrainingRepository for SqliteTrainingRepository {
         .execute(&self.pool)
         .await
         .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
+        .map(|_| ())
+    }
+
+    async fn update_training_metric_scope(
+        &self,
+        metric: &TrainingMetricId,
+        scope: &TrainingMetricScope,
+    ) -> Result<(), UpdateTrainingMetricScopeRepositoryError> {
+        let period_id: Option<TrainingPeriodId> = scope.into();
+        sqlx::query(
+            "UPDATE t_training_metrics_definitions SET training_period_id = ?1 WHERE id = ?2;",
+        )
+        .bind(period_id)
+        .bind(metric)
+        .execute(&self.pool)
+        .await
+        .map_err(|err| UpdateTrainingMetricScopeRepositoryError::Unknown(anyhow!(err)))
         .map(|_| ())
     }
 
@@ -939,6 +956,132 @@ mod test_sqlite_training_repository {
 
         assert_eq!(metric.scope(), &TrainingMetricScope::Global);
         assert_eq!(metric.id(), &metric_id);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_scope_to_global() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a metric with a training period
+        let period_id = TrainingPeriodId::new();
+        let metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Test Metric")),
+            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        // Update scope to Global
+        let result = repository
+            .update_training_metric_scope(metric.id(), &TrainingMetricScope::Global)
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the scope was updated
+        let metrics = repository
+            .get_metrics(metric.definition().user())
+            .await
+            .expect("Should fetch metrics");
+
+        let fetched_metric = metrics.iter().find(|m| m.id() == metric.id()).unwrap();
+        assert_eq!(fetched_metric.scope(), &TrainingMetricScope::Global);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_scope_to_training_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a metric with Global scope
+        let metric = build_metric();
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        // Update scope to TrainingPeriod
+        let period_id = TrainingPeriodId::new();
+        let new_scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let result = repository
+            .update_training_metric_scope(metric.id(), &new_scope)
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the scope was updated
+        let metrics = repository
+            .get_metrics(metric.definition().user())
+            .await
+            .expect("Should fetch metrics");
+
+        let fetched_metric = metrics.iter().find(|m| m.id() == metric.id()).unwrap();
+        assert_eq!(fetched_metric.scope(), &new_scope);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_scope_change_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a metric with one training period
+        let period_id_1 = TrainingPeriodId::new();
+        let metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Test Metric")),
+            TrainingMetricScope::TrainingPeriod(period_id_1.clone()),
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        // Update scope to a different training period
+        let period_id_2 = TrainingPeriodId::new();
+        let new_scope = TrainingMetricScope::TrainingPeriod(period_id_2.clone());
+        let result = repository
+            .update_training_metric_scope(metric.id(), &new_scope)
+            .await;
+        assert!(result.is_ok());
+
+        // Verify the scope was updated to the new period
+        let metrics = repository
+            .get_metrics(metric.definition().user())
+            .await
+            .expect("Should fetch metrics");
+
+        let fetched_metric = metrics.iter().find(|m| m.id() == metric.id()).unwrap();
+        assert_eq!(fetched_metric.scope(), &new_scope);
+        assert_ne!(
+            fetched_metric.scope(),
+            &TrainingMetricScope::TrainingPeriod(period_id_1)
+        );
     }
 
     fn build_training_period() -> TrainingPeriod {
