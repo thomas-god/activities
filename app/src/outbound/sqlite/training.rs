@@ -142,16 +142,54 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
-    async fn get_metrics(
+    async fn get_global_metrics(
         &self,
         user: &UserId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
             "SELECT id, name, user_id, source, granularity, aggregate, filters, group_by, training_period_id
             FROM t_training_metrics_definitions
-            WHERE user_id = ?1;",
+            WHERE user_id = ?1 AND training_period_id IS NULL;",
         )
         .bind(user)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
+        .map(|rows| {
+            rows.into_iter()
+                .map(
+                    |(id, name, user_id, source, granularity, aggregate, filters, group_by, training_period_id)| {
+                        TrainingMetric::new(
+                            id,
+                            name,
+                            TrainingMetricScope::from(&training_period_id),
+                            TrainingMetricDefinition::new(
+                                user_id,
+                                source,
+                                granularity,
+                                aggregate,
+                                filters,
+                                group_by,
+                            ),
+                        )
+                    },
+                )
+                .collect()
+        })
+    }
+
+    async fn get_period_metrics(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
+    ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
+        sqlx::query_as::<_, DefinitionRow>(
+            "SELECT id, name, user_id, source, granularity, aggregate, filters, group_by, training_period_id
+            FROM t_training_metrics_definitions
+            WHERE user_id = ?1 AND training_period_id = ?2;",
+        )
+        .bind(user)
+        .bind(period)
         .fetch_all(&self.pool)
         .await
         .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
@@ -689,7 +727,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_metrics(&UserId::test_default())
+            .get_global_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -712,7 +750,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_metrics(&UserId::from("another_user".to_string()))
+            .get_global_metrics(&UserId::from("another_user".to_string()))
             .await
             .expect("Should have returned OK");
 
@@ -734,7 +772,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_metrics(&UserId::test_default())
+            .get_global_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -756,7 +794,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_metrics(&UserId::test_default())
+            .get_global_metrics(&UserId::test_default())
             .await
             .expect("Should have returned OK");
 
@@ -906,7 +944,7 @@ mod test_sqlite_training_repository {
 
         // Verify metric1's name was updated by fetching all metrics
         let all_metrics = repository
-            .get_metrics(metric1.definition().user())
+            .get_global_metrics(metric1.definition().user())
             .await
             .expect("Should fetch metrics");
 
@@ -947,7 +985,7 @@ mod test_sqlite_training_repository {
         .expect("Should insert metric with NULL training_period_id");
 
         let metrics = repository
-            .get_metrics(&user_id)
+            .get_global_metrics(&user_id)
             .await
             .expect("Should fetch metrics");
 
@@ -994,7 +1032,7 @@ mod test_sqlite_training_repository {
 
         // Verify the scope was updated
         let metrics = repository
-            .get_metrics(metric.definition().user())
+            .get_global_metrics(metric.definition().user())
             .await
             .expect("Should fetch metrics");
 
@@ -1026,7 +1064,7 @@ mod test_sqlite_training_repository {
 
         // Verify the scope was updated
         let metrics = repository
-            .get_metrics(metric.definition().user())
+            .get_period_metrics(metric.definition().user(), &period_id)
             .await
             .expect("Should fetch metrics");
 
@@ -1072,7 +1110,7 @@ mod test_sqlite_training_repository {
 
         // Verify the scope was updated to the new period
         let metrics = repository
-            .get_metrics(metric.definition().user())
+            .get_period_metrics(metric.definition().user(), &period_id_2)
             .await
             .expect("Should fetch metrics");
 
@@ -2126,7 +2164,7 @@ mod test_sqlite_training_repository {
             .expect("Should save metric with name");
 
         let metrics = repository
-            .get_metrics(&UserId::test_default())
+            .get_global_metrics(&UserId::test_default())
             .await
             .expect("Should retrieve metrics");
 
@@ -2153,11 +2191,232 @@ mod test_sqlite_training_repository {
             .expect("Should save metric without name");
 
         let metrics = repository
-            .get_metrics(&UserId::test_default())
+            .get_global_metrics(&UserId::test_default())
             .await
             .expect("Should retrieve metrics");
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].name(), &None);
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_with_global_scope_filter() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+
+        // Create a global metric
+        let global_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Global Metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        // Create a period-scoped metric
+        let period_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Period Metric")),
+            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(global_metric.clone())
+            .await
+            .expect("Should save global metric");
+
+        repository
+            .save_training_metric_definition(period_metric.clone())
+            .await
+            .expect("Should save period metric");
+
+        // Test: Filter by Global scope should return only global metrics
+        let metrics = repository
+            .get_global_metrics(&user_id)
+            .await
+            .expect("Should retrieve metrics");
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].name(), &Some(TrainingMetricName::from("Global Metric")));
+        assert_eq!(metrics[0].scope(), &TrainingMetricScope::Global);
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_with_training_period_scope_filter() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+
+        // Create a global metric
+        let global_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Global Metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        // Create a period-scoped metric for our period
+        let period_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Period Metric")),
+            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        // Create a period-scoped metric for a different period
+        let other_period_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Other Period Metric")),
+            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new()),
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(global_metric.clone())
+            .await
+            .expect("Should save global metric");
+
+        repository
+            .save_training_metric_definition(period_metric.clone())
+            .await
+            .expect("Should save period metric");
+
+        repository
+            .save_training_metric_definition(other_period_metric.clone())
+            .await
+            .expect("Should save other period metric");
+
+        // Test: Filter by TrainingPeriod scope should return global metrics + metrics for that period
+        let mut global_metrics = repository
+            .get_global_metrics(&user_id)
+            .await
+            .expect("Should retrieve global metrics");
+        
+        let mut period_metrics = repository
+            .get_period_metrics(&user_id, &period_id)
+            .await
+            .expect("Should retrieve period metrics");
+        
+        global_metrics.append(&mut period_metrics);
+        let metrics = global_metrics;
+
+        assert_eq!(metrics.len(), 2);
+        
+        // Should contain the global metric
+        assert!(metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric"))));
+        
+        // Should contain the period metric for our period
+        assert!(metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric"))));
+        
+        // Should NOT contain the metric for the other period
+        assert!(!metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Other Period Metric"))));
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_without_scope_filter_returns_all() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+
+        // Create a global metric
+        let global_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Global Metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        // Create a period-scoped metric
+        let period_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Period Metric")),
+            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricDefinition::new(
+                user_id.clone(),
+                ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricFilters::empty(),
+                None,
+            ),
+        );
+
+        repository
+            .save_training_metric_definition(global_metric.clone())
+            .await
+            .expect("Should save global metric");
+
+        repository
+            .save_training_metric_definition(period_metric.clone())
+            .await
+            .expect("Should save period metric");
+
+        // Test: We can fetch both global and period metrics separately
+        let global_metrics = repository
+            .get_global_metrics(&user_id)
+            .await
+            .expect("Should retrieve global metrics");
+        
+        let period_metrics = repository
+            .get_period_metrics(&user_id, &period_id)
+            .await
+            .expect("Should retrieve period metrics");
+
+        assert_eq!(global_metrics.len(), 1);
+        assert_eq!(period_metrics.len(), 1);
+        assert!(global_metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric"))));
+        assert!(period_metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric"))));
     }
 }

@@ -769,6 +769,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         date_range: &Option<DateRange>,
+        scope: &TrainingMetricScope,
     ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
 
     fn get_training_metric_values(
@@ -1212,9 +1213,15 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         name: TrainingMetricName,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
-    fn get_metrics(
+    fn get_global_metrics(
         &self,
         user: &UserId,
+    ) -> impl Future<Output = Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>> + Send;
+
+    fn get_period_metrics(
+        &self,
+        user: &UserId,
+        period: &TrainingPeriodId,
     ) -> impl Future<Output = Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>> + Send;
 
     fn save_training_period(
