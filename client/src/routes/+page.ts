@@ -15,7 +15,7 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 
 	const [activities, metrics, trainingPeriods, preferences, trainingNotes] = await Promise.all([
 		fetchActivities(fetch, 10),
-		fetchTrainingMetrics(fetch, startDate),
+		fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
 		fetchTrainingPeriods(fetch),
 		fetchAllPreferences(fetch),
 		fetchTrainingNotes(fetch, depends)

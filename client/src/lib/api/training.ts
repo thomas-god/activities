@@ -152,23 +152,39 @@ export async function fetchTrainingPeriodDetails(
 /**
  * Fetch training metrics
  * @param fetch - The fetch function from SvelteKit
- * @param start - Optional start date for metrics (defaults to 3 weeks ago)
+ * @param start - Start date for metrics
  * @param end - Optional end date for metrics
+ * @param scope - Optional scope filter: 'global' for global metrics only, or { period: periodId } for period + global metrics
  * @returns Array of metrics with flat values (extracted from "no_group") or empty array on error
  */
 export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	start: Date | string,
-	end?: Date | string
+	end?: Date | string,
+	scope?: 'global' | { period: string }
 ): Promise<MetricsListGrouped> {
-	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
+	const params = new URLSearchParams();
 
-	let url = `${PUBLIC_APP_URL}/api/training/metrics?start=${encodeURIComponent(startDate)}`;
+	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
+	params.set('start', startDate);
 
 	if (end) {
 		const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
-		url += `&end=${encodeURIComponent(endDate)}`;
+		params.set('end', endDate);
 	}
+
+	// Add scope parameters
+	if (scope === 'global') {
+		params.set('scope', 'global');
+	} else if (scope && typeof scope === 'object' && 'period' in scope) {
+		params.set('scope', 'period');
+		params.set('period_id', scope.period);
+	} else {
+		// Default to global scope if not specified
+		params.set('scope', 'global');
+	}
+
+	const url = `${PUBLIC_APP_URL}/api/training/metrics?${params.toString()}`;
 
 	const res = await fetch(url, {
 		method: 'GET',

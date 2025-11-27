@@ -12,7 +12,7 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	}
 
 	const [metrics, preferences] = await Promise.all([
-		fetchTrainingMetrics(fetch, startDate, endDate !== null ? endDate : undefined),
+		fetchTrainingMetrics(fetch, startDate, endDate !== null ? endDate : undefined, 'global'),
 		fetchAllPreferences(fetch)
 	]);
 

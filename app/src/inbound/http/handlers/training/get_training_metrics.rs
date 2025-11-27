@@ -17,7 +17,7 @@ use crate::{
             activity::{ActivityStatistic, TimeseriesMetric},
             training::{
                 ActivityMetricSource, TrainingMetric, TrainingMetricDefinition,
-                TrainingMetricScope, TrainingMetricValues,
+                TrainingMetricScope, TrainingMetricValues, TrainingPeriodId,
             },
         },
         ports::{DateRange, IActivityService, IPreferencesService, ITrainingService},
@@ -36,6 +36,42 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<ResponseBodyItem>);
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "scope", rename_all = "lowercase")]
+pub enum MetricsQuery {
+    /// Query for global metrics only
+    /// Example: ?scope=global&start=2025-01-01T00:00:00Z&end=2025-01-31T23:59:59Z
+    Global {
+        #[serde(flatten)]
+        date_range: MetricsDateRange,
+    },
+    /// Query for training period metrics (includes both global and period-specific metrics)
+    /// Example: ?scope=period&period_id=abc123&start=2025-01-01T00:00:00Z&end=2025-01-31T23:59:59Z
+    Period {
+        #[serde(flatten)]
+        date_range: MetricsDateRange,
+        period_id: String,
+    },
+}
+
+impl MetricsQuery {
+    pub fn scope(&self) -> TrainingMetricScope {
+        match self {
+            MetricsQuery::Global { .. } => TrainingMetricScope::Global,
+            MetricsQuery::Period { period_id, .. } => {
+                TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from(period_id.as_str()))
+            }
+        }
+    }
+
+    pub fn date_range(&self) -> &MetricsDateRange {
+        match self {
+            MetricsQuery::Global { date_range } => date_range,
+            MetricsQuery::Period { date_range, .. } => date_range,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBodyItem {
@@ -95,21 +131,20 @@ pub async fn get_training_metrics<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
-    Query(date_range): Query<MetricsDateRange>,
+    Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
         .training_metrics_service
         .get_training_metrics_values(
             user.user(),
-            &Some(DateRange::from(&date_range)),
-            // TODO: takes value from request
-            &TrainingMetricScope::Global,
+            &Some(DateRange::from(query.date_range())),
+            &query.scope(),
         )
         .await;
 
     let body = ResponseBody(
         res.into_iter()
-            .map(|metric| to_response_body_item(metric, &date_range))
+            .map(|metric| to_response_body_item(metric, query.date_range()))
             .collect(),
     );
 
@@ -140,5 +175,36 @@ mod tests {
             ))),
             "Max Distance".to_string()
         );
+    }
+
+    #[test]
+    fn test_metrics_query_scope_global_when_no_period_id() {
+        let query = MetricsQuery::Global {
+            date_range: MetricsDateRange {
+                start: "2025-01-01T00:00:00+00:00".parse().unwrap(),
+                end: None,
+            },
+        };
+
+        assert_eq!(query.scope(), TrainingMetricScope::Global);
+    }
+
+    #[test]
+    fn test_metrics_query_scope_period_when_period_id_provided() {
+        let period_id = "test-period-123";
+        let query = MetricsQuery::Period {
+            date_range: MetricsDateRange {
+                start: "2025-01-01T00:00:00+00:00".parse().unwrap(),
+                end: None,
+            },
+            period_id: period_id.to_string(),
+        };
+
+        match query.scope() {
+            TrainingMetricScope::TrainingPeriod(id) => {
+                assert_eq!(id.to_string(), period_id);
+            }
+            TrainingMetricScope::Global => panic!("Expected TrainingPeriod scope"),
+        }
     }
 }
