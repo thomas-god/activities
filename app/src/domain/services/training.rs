@@ -8,8 +8,8 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetric, TrainingMetricDefinition, TrainingMetricId,
-            TrainingMetricValues, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            TrainingMetricScope, TrainingMetricValues, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -65,8 +65,8 @@ where
         let training_metric = TrainingMetric::new(
             id.clone(),
             Some(req.name().clone()),
+            TrainingMetricScope::from(req.training_period()),
             definition,
-            req.training_period().clone(),
         );
         self.training_repository
             .save_training_metric_definition(training_metric.clone())
@@ -952,6 +952,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -960,7 +961,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )])
         });
 
@@ -983,6 +983,7 @@ mod tests_training_metrics_service {
             &TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -991,7 +992,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )
         );
         assert!(value.is_empty());
@@ -1004,6 +1004,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1012,7 +1013,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )])
         });
 
@@ -1073,6 +1073,7 @@ mod tests_training_metrics_service {
             &TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1081,7 +1082,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )
         );
         // With default stats (no calories), should have empty values
@@ -1095,6 +1095,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Calories),
@@ -1103,7 +1104,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )])
         });
 
@@ -1167,6 +1167,7 @@ mod tests_training_metrics_service {
             Ok(vec![TrainingMetric::new(
                 TrainingMetricId::from("test"),
                 None,
+                TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
                     ActivityMetricSource::Statistic(ActivityStatistic::Distance),
@@ -1175,7 +1176,6 @@ mod tests_training_metrics_service {
                     TrainingMetricFilters::empty(),
                     TrainingMetricGroupBy::none(),
                 ),
-                None,
             )])
         });
 

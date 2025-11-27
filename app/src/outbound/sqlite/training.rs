@@ -10,8 +10,8 @@ use crate::domain::{
         training::{
             ActivityMetricSource, TrainingMetric, TrainingMetricAggregate,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingNote,
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
+            TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
             TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
@@ -89,7 +89,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(definition.filters())
         .bind(definition.group_by())
         .bind(metric.name())
-        .bind(metric.training_period())
+        .bind(metric.scope().period())
         .execute(&self.pool)
         .await
         .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
@@ -145,6 +145,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                         TrainingMetric::new(
                             id,
                             name,
+                            TrainingMetricScope::from(&training_period_id),
                             TrainingMetricDefinition::new(
                                 user_id,
                                 source,
@@ -153,7 +154,6 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 filters,
                                 group_by,
                             ),
-                            training_period_id,
                         )
                     },
                 )
@@ -458,6 +458,7 @@ mod test_sqlite_training_repository {
         TrainingMetric::new(
             TrainingMetricId::new(),
             None,
+            TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -469,7 +470,6 @@ mod test_sqlite_training_repository {
                 TrainingMetricFilters::empty(),
                 TrainingMetricGroupBy::none(),
             ),
-            None,
         )
     }
 
@@ -477,6 +477,7 @@ mod test_sqlite_training_repository {
         TrainingMetric::new(
             TrainingMetricId::new(),
             None,
+            TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -488,7 +489,6 @@ mod test_sqlite_training_repository {
                 TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
                 TrainingMetricGroupBy::none(),
             ),
-            None,
         )
     }
 
@@ -496,6 +496,7 @@ mod test_sqlite_training_repository {
         TrainingMetric::new(
             TrainingMetricId::new(),
             None,
+            TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -507,7 +508,6 @@ mod test_sqlite_training_repository {
                 TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
                 Some(TrainingMetricGroupBy::Sport),
             ),
-            None,
         )
     }
 
@@ -844,6 +844,7 @@ mod test_sqlite_training_repository {
         let metric1 = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Metric 1")),
+            TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Timeseries((
@@ -855,11 +856,11 @@ mod test_sqlite_training_repository {
                 TrainingMetricFilters::empty(),
                 TrainingMetricGroupBy::none(),
             ),
-            None,
         );
         let metric2 = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Metric 2")),
+            TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricSource::Statistic(ActivityStatistic::Distance),
@@ -868,7 +869,6 @@ mod test_sqlite_training_repository {
                 TrainingMetricFilters::empty(),
                 TrainingMetricGroupBy::none(),
             ),
-            None,
         );
 
         repository
@@ -937,7 +937,7 @@ mod test_sqlite_training_repository {
         assert_eq!(metrics.len(), 1);
         let metric = &metrics[0];
 
-        assert_eq!(metric.training_period(), &None);
+        assert_eq!(metric.scope(), &TrainingMetricScope::Global);
         assert_eq!(metric.id(), &metric_id);
     }
 
@@ -1973,8 +1973,8 @@ mod test_sqlite_training_repository {
         let metric_with_name = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::new("My Custom Metric")),
+            TrainingMetricScope::Global,
             build_metric().definition().clone(),
-            None,
         );
 
         repository

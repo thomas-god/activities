@@ -154,8 +154,8 @@ impl From<String> for TrainingMetricName {
 pub struct TrainingMetric {
     id: TrainingMetricId,
     name: Option<TrainingMetricName>,
+    scope: TrainingMetricScope,
     definition: TrainingMetricDefinition,
-    training_period: Option<TrainingPeriodId>,
 }
 
 impl TrainingMetric {
@@ -167,12 +167,42 @@ impl TrainingMetric {
         &self.name
     }
 
+    pub fn scope(&self) -> &TrainingMetricScope {
+        &self.scope
+    }
+
     pub fn definition(&self) -> &TrainingMetricDefinition {
         &self.definition
     }
+}
 
-    pub fn training_period(&self) -> &Option<TrainingPeriodId> {
-        &self.training_period
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrainingMetricScope {
+    Global,
+    TrainingPeriod(TrainingPeriodId),
+}
+
+impl From<&Option<TrainingPeriodId>> for TrainingMetricScope {
+    fn from(value: &Option<TrainingPeriodId>) -> Self {
+        match value {
+            None => Self::Global,
+            Some(period) => Self::TrainingPeriod(period.clone()),
+        }
+    }
+}
+
+impl From<&TrainingMetricScope> for Option<TrainingPeriodId> {
+    fn from(value: &TrainingMetricScope) -> Self {
+        match value {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(period) => Some(period.clone()),
+        }
+    }
+}
+
+impl TrainingMetricScope {
+    pub fn period(&self) -> Option<TrainingPeriodId> {
+        self.into()
     }
 }
 
@@ -2543,5 +2573,47 @@ mod test_training_metric_group_by {
         );
 
         assert_eq!(TrainingMetricGroupBy::Bonked.extract_group(&activity), None);
+    }
+
+    #[test]
+    fn test_training_metric_scope_from_none() {
+        let period_id: Option<TrainingPeriodId> = None;
+        let scope = TrainingMetricScope::from(&period_id);
+        assert_eq!(scope, TrainingMetricScope::Global);
+    }
+
+    #[test]
+    fn test_training_metric_scope_from_some_period_id() {
+        let period_id = TrainingPeriodId::new();
+        let scope = TrainingMetricScope::from(&Some(period_id.clone()));
+        assert_eq!(scope, TrainingMetricScope::TrainingPeriod(period_id));
+    }
+
+    #[test]
+    fn test_option_training_period_id_from_global_scope() {
+        let scope = TrainingMetricScope::Global;
+        let period_id: Option<TrainingPeriodId> = (&scope).into();
+        assert_eq!(period_id, None);
+    }
+
+    #[test]
+    fn test_option_training_period_id_from_training_period_scope() {
+        let period_id = TrainingPeriodId::new();
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let result: Option<TrainingPeriodId> = (&scope).into();
+        assert_eq!(result, Some(period_id));
+    }
+
+    #[test]
+    fn test_training_metric_scope_period_returns_none_for_global() {
+        let scope = TrainingMetricScope::Global;
+        assert_eq!(scope.period(), None);
+    }
+
+    #[test]
+    fn test_training_metric_scope_period_returns_some_for_training_period() {
+        let period_id = TrainingPeriodId::new();
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        assert_eq!(scope.period(), Some(period_id));
     }
 }
