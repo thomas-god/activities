@@ -194,7 +194,12 @@
 	});
 
 	const createMetricCallback = async (payload: Object): Promise<void> => {
-		const body = JSON.stringify({ initial_date_range: dates, ...payload });
+		const body = JSON.stringify({
+			initial_date_range: dates,
+			// TODO: properlly handle payload type instead of plain Object
+			scope: { type: 'global' },
+			...payload
+		});
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
 			body,
 			method: 'POST',

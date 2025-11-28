@@ -18,7 +18,7 @@ use crate::{
             auth::{AuthenticatedUser, IUserService},
             handlers::training::types::{
                 APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
-                APITrainingMetricGroupBy, APITrainingMetricSource,
+                APITrainingMetricGroupBy, APITrainingMetricSource, ScopePayload,
             },
         },
         parser::ParseFile,
@@ -33,6 +33,7 @@ pub struct CreateTrainingMetricBody {
     aggregate: APITrainingMetricAggregate,
     filters: APITrainingMetricFilters,
     group_by: Option<APITrainingMetricGroupBy>,
+    scope: ScopePayload,
     initial_date_range: Option<DateRange>,
 }
 
@@ -52,8 +53,7 @@ fn build_request(
         body.aggregate.into(),
         body.filters.into(),
         body.group_by.map(TrainingMetricGroupBy::from),
-        // TODO: take value from request
-        None,
+        body.scope.into(),
         body.initial_date_range,
     ))
 }
@@ -109,7 +109,8 @@ mod tests {
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {}
+            "filters": {},
+            "scope": {"type": "global"}
         }"#,
             )
             .is_ok()
@@ -122,7 +123,8 @@ mod tests {
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {}
+            "filters": {},
+            "scope": {"type": "trainingPeriod", "trainingPeriodId": "123e4567-e89b-12d3-a456-426614174000"}
         }"#,
             )
             .is_ok()
@@ -135,7 +137,8 @@ mod tests {
             "source": { "Timeseries": ["Distance", "Average"]},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] }
+            "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] },
+            "scope": {"type": "global"}
         }"#,
             )
             .is_ok()
@@ -149,7 +152,8 @@ mod tests {
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
-            "group_by": "Sport"
+            "group_by": "Sport",
+            "scope": {"type": "global"}
         }"#,
             )
             .is_ok()
@@ -163,7 +167,8 @@ mod tests {
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
-            "group_by": "RpeRange"
+            "group_by": "RpeRange",
+            "scope": {"type": "global"}
         }"#,
             )
             .is_ok()
@@ -176,7 +181,8 @@ mod tests {
             "source": { "Statistic": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {}
+            "filters": {},
+            "scope": {"type": "global"}
         }"#,
             )
             .is_ok()

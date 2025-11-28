@@ -6,7 +6,7 @@ use crate::domain::models::{
     training::{
         ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
         TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-        TrainingPeriodSports,
+        TrainingMetricScope, TrainingPeriodId, TrainingPeriodSports,
     },
 };
 
@@ -171,5 +171,26 @@ pub struct APITrainingPeriodSports(Option<Vec<SportFilter>>);
 impl From<APITrainingPeriodSports> for TrainingPeriodSports {
     fn from(value: APITrainingPeriodSports) -> Self {
         Self::new(value.0)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ScopePayload {
+    Global,
+    #[serde(rename_all = "camelCase")]
+    TrainingPeriod {
+        training_period_id: String,
+    },
+}
+
+impl From<ScopePayload> for TrainingMetricScope {
+    fn from(payload: ScopePayload) -> Self {
+        match payload {
+            ScopePayload::Global => TrainingMetricScope::Global,
+            ScopePayload::TrainingPeriod { training_period_id } => {
+                TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from(&training_period_id))
+            }
+        }
     }
 }

@@ -15,6 +15,7 @@ use crate::domain::ports::{
 };
 use crate::inbound::http::AppState;
 use crate::inbound::http::auth::{AuthenticatedUser, IUserService};
+use crate::inbound::http::handlers::training::types::ScopePayload;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]
@@ -27,27 +28,6 @@ struct ErrorResponse {
 pub struct UpdateTrainingMetricBody {
     name: Option<String>,
     scope: Option<ScopePayload>,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum ScopePayload {
-    Global,
-    #[serde(rename_all = "camelCase")]
-    TrainingPeriod {
-        training_period_id: String,
-    },
-}
-
-impl From<ScopePayload> for TrainingMetricScope {
-    fn from(payload: ScopePayload) -> Self {
-        match payload {
-            ScopePayload::Global => TrainingMetricScope::Global,
-            ScopePayload::TrainingPeriod { training_period_id } => {
-                TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from(&training_period_id))
-            }
-        }
-    }
 }
 
 pub async fn update_training_metric<

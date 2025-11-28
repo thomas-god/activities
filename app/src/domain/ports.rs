@@ -553,7 +553,7 @@ pub struct CreateTrainingMetricRequest {
     aggregate: TrainingMetricAggregate,
     filters: TrainingMetricFilters,
     group_by: Option<TrainingMetricGroupBy>,
-    training_period: Option<TrainingPeriodId>,
+    scope: TrainingMetricScope,
     initial_date_range: Option<DateRange>,
 }
 
@@ -586,8 +586,8 @@ impl CreateTrainingMetricRequest {
         &self.group_by
     }
 
-    pub fn training_period(&self) -> &Option<TrainingPeriodId> {
-        &self.training_period
+    pub fn scope(&self) -> &TrainingMetricScope {
+        &self.scope
     }
 
     pub fn initial_date_range(&self) -> &Option<DateRange> {

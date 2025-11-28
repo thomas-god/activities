@@ -66,7 +66,7 @@ where
         let training_metric = TrainingMetric::new(
             id.clone(),
             Some(req.name().clone()),
-            TrainingMetricScope::from(req.training_period()),
+            req.scope().clone(),
             definition,
         );
         self.training_repository
@@ -987,7 +987,7 @@ mod tests_training_metrics_service {
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
-            None,
+            TrainingMetricScope::Global,
             None,
         );
 
@@ -1014,7 +1014,7 @@ mod tests_training_metrics_service {
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
-            None,
+            TrainingMetricScope::Global,
             None,
         );
 

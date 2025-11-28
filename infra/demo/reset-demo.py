@@ -377,6 +377,7 @@ def create_training_metric(
         "aggregate": aggregate,
         "filters": {},
         "initial_date_range": {"start": metric_start, "end": today},
+        "scope": {"type": "global"},
     }
     if group_by:
         payload["group_by"] = group_by
