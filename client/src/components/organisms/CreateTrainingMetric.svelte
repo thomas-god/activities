@@ -6,7 +6,10 @@
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import SportsSelect from '../molecules/SportsSelect.svelte';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
-	let { callback }: { callback: () => void } = $props();
+
+	export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
+
+	let { callback, scope = { kind: 'global' } }: { callback: () => void; scope?: Scope } = $props();
 
 	// Define unified metric sources
 	type MetricSourceOption = {
@@ -194,10 +197,13 @@
 	});
 
 	const createMetricCallback = async (payload: Object): Promise<void> => {
+		const _scope =
+			scope.kind === 'global'
+				? { type: 'global' }
+				: { type: 'trainingPeriod', trainingPeriodId: scope.periodId };
 		const body = JSON.stringify({
 			initial_date_range: dates,
-			// TODO: properlly handle payload type instead of plain Object
-			scope: { type: 'global' },
+			scope: _scope,
 			...payload
 		});
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
