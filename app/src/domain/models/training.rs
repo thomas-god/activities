@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, hash_map::Iter},
+    collections::{HashMap, HashSet, hash_map::Iter},
     fmt,
     hash::Hash,
 };
@@ -1165,6 +1165,49 @@ impl TrainingNote {
 
     pub fn created_at(&self) -> &DateTime<FixedOffset> {
         &self.created_at
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct TrainingMetricsOrdering(Vec<TrainingMetricId>);
+
+impl TryFrom<Vec<TrainingMetricId>> for TrainingMetricsOrdering {
+    type Error = ();
+
+    fn try_from(value: Vec<TrainingMetricId>) -> Result<Self, Self::Error> {
+        let mut unique_ids = HashSet::new();
+        for id in value.iter() {
+            if !unique_ids.insert(id) {
+                return Err(());
+            }
+        }
+        Ok(Self(value))
+    }
+}
+
+impl TrainingMetricsOrdering {
+    pub fn sort(&self, mut metrics: Vec<TrainingMetric>) -> Vec<TrainingMetric> {
+        let mut sorted_metrics = Vec::new();
+
+        // Sort known metrics to the ordering
+        for id in self.0.iter() {
+            if let Some(index) = metrics.iter().position(|metric| metric.id == *id) {
+                let metric = metrics.swap_remove(index);
+                sorted_metrics.push(metric);
+            }
+        }
+
+        // Sort remaining unknown metrics alphabetically by metric.id
+        metrics.sort_by_key(|metric| metric.id().clone());
+
+        sorted_metrics.append(&mut metrics);
+
+        sorted_metrics
+    }
+
+    pub fn remove_metric(mut self, id: &TrainingMetricId) -> Self {
+        self.0.retain(|_id| _id != id);
+        Self(self.0)
     }
 }
 
@@ -2615,5 +2658,168 @@ mod test_training_metric_group_by {
         let period_id = TrainingPeriodId::new();
         let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
         assert_eq!(scope.period(), Some(period_id));
+    }
+}
+
+#[cfg(test)]
+mod test_training_metrics_ordering {
+    use super::*;
+
+    fn generate_test_metrics() -> Vec<TrainingMetric> {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            None,
+        );
+
+        let ids = vec!["a", "c", "b", "d"];
+
+        ids.iter()
+            .map(|id| {
+                TrainingMetric::new(
+                    TrainingMetricId::from(id),
+                    None,
+                    TrainingMetricScope::Global,
+                    definition.clone(),
+                )
+            })
+            .collect()
+    }
+
+    fn test_ordering(ids: Vec<&str>, metrics: Vec<TrainingMetric>) {
+        let expected_ids: Vec<TrainingMetricId> =
+            ids.iter().map(|id| TrainingMetricId::from(id)).collect();
+        assert_eq!(
+            metrics
+                .iter()
+                .map(|metric| metric.id().clone())
+                .collect::<Vec<TrainingMetricId>>(),
+            expected_ids
+        );
+    }
+
+    fn ordering_from_vec(ids: Vec<&str>) -> TrainingMetricsOrdering {
+        TrainingMetricsOrdering::try_from(
+            ids.iter()
+                .map(|id| TrainingMetricId::from(id))
+                .collect::<Vec<TrainingMetricId>>(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_building_ordering_from_empty_vec_ok() {
+        let ordering = TrainingMetricsOrdering::try_from(vec![]).expect("Should not err");
+
+        assert_eq!(ordering.0, vec![]);
+    }
+
+    #[test]
+    fn test_building_ordering_from_vec_ok() {
+        let ordering = TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("a"),
+            TrainingMetricId::from("b"),
+        ])
+        .expect("Should not err");
+
+        assert_eq!(
+            ordering.0,
+            vec![TrainingMetricId::from("a"), TrainingMetricId::from("b"),]
+        );
+    }
+
+    #[test]
+    fn test_building_ordering_from_vec_with_duplicates_err() {
+        TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("a"),
+            TrainingMetricId::from("b"),
+            TrainingMetricId::from("a"),
+        ])
+        .expect_err("Should return an err");
+    }
+
+    #[test]
+    fn test_sort_with_empty_ordering_uses_metric_id_ordering() {
+        let ordering = ordering_from_vec(vec![]);
+
+        let metrics = generate_test_metrics();
+
+        let sorted_metrics = ordering.sort(metrics);
+
+        test_ordering(vec!["a", "b", "c", "d"], sorted_metrics);
+    }
+
+    #[test]
+    fn test_sort_with_empty_ordering_and_empty_metrics() {
+        let ordering = ordering_from_vec(vec![]);
+
+        let metrics = vec![];
+
+        let sorted_metrics = ordering.sort(metrics);
+
+        test_ordering(vec![], sorted_metrics);
+    }
+
+    #[test]
+    fn test_sort_with_all_metrics_in_ordering() {
+        let ordering = ordering_from_vec(vec!["d", "c", "a", "b"]);
+
+        let metrics = generate_test_metrics();
+
+        let sorted_metrics = ordering.sort(metrics);
+
+        test_ordering(vec!["d", "c", "a", "b"], sorted_metrics);
+    }
+
+    #[test]
+    fn test_sort_with_metrics_unknown_to_the_ordering() {
+        let ordering = ordering_from_vec(vec!["d", "c"]);
+
+        let metrics = generate_test_metrics();
+
+        let sorted_metrics = ordering.sort(metrics);
+
+        test_ordering(vec!["d", "c", "a", "b"], sorted_metrics);
+    }
+
+    #[test]
+    fn test_sort_with_metrics_missing_the_ordering() {
+        let ordering = ordering_from_vec(vec!["d", "c", "w", "z"]);
+
+        let metrics = generate_test_metrics();
+
+        let sorted_metrics = ordering.sort(metrics);
+
+        test_ordering(vec!["d", "c", "a", "b"], sorted_metrics);
+    }
+
+    #[test]
+    fn test_removing_metric_from_empty_ordering() {
+        let ordering = ordering_from_vec(vec![]);
+
+        let new_ordering = ordering.remove_metric(&TrainingMetricId::from("toto"));
+
+        assert_eq!(new_ordering, ordering_from_vec(vec![]))
+    }
+
+    #[test]
+    fn test_removing_metric_not_in_the_ordering() {
+        let ordering = ordering_from_vec(vec!["a", "b", "c"]);
+
+        let new_ordering = ordering.remove_metric(&TrainingMetricId::from("toto"));
+
+        assert_eq!(new_ordering, ordering_from_vec(vec!["a", "b", "c"]))
+    }
+
+    #[test]
+    fn test_removing_metric_in_the_ordering() {
+        let ordering = ordering_from_vec(vec!["a", "b", "c"]);
+
+        let new_ordering = ordering.remove_metric(&TrainingMetricId::from("b"));
+
+        assert_eq!(new_ordering, ordering_from_vec(vec!["a", "c"]))
     }
 }
