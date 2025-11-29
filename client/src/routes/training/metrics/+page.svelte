@@ -32,6 +32,8 @@
 				}
 			}
 
+			let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
+
 			metrics.push({
 				values: values,
 				name: metric.name,
@@ -42,7 +44,8 @@
 				groupBy: metric.group_by,
 				unit: metric.unit,
 				id: metric.id,
-				showGroup: metric.group_by !== null
+				showGroup: metric.group_by !== null,
+				scope
 			});
 		}
 		return metrics;

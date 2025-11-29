@@ -26,6 +26,8 @@
 					values.push({ time: dt, group, value });
 				}
 			}
+			let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
+
 			return {
 				id: metric.id,
 				name: metric.name,
@@ -36,7 +38,8 @@
 				sports: metric.sports,
 				groupBy: metric.group_by,
 				unit: metric.unit,
-				showGroup: metric.group_by !== null
+				showGroup: metric.group_by !== null,
+				scope
 			};
 		})
 	);
@@ -57,7 +60,8 @@
 				<TrainingMetricMenu
 					metric={{
 						id: metric.id,
-						name: metric.name || ''
+						name: metric.name || '',
+						scope: metric.scope
 					}}
 					{onDelete}
 					{onUpdate}

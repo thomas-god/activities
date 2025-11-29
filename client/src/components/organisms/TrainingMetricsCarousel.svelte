@@ -32,6 +32,8 @@
 			}
 		}
 
+		let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
+
 		return {
 			id: metric.id,
 			name: metric.name,
@@ -42,7 +44,8 @@
 			sports: metric.sports,
 			groupBy: metric.group_by,
 			unit: metric.unit,
-			showGroup: metric.group_by !== null
+			showGroup: metric.group_by !== null,
+			scope
 		};
 	});
 
@@ -80,7 +83,8 @@
 			<TrainingMetricMenu
 				metric={{
 					id: currentMetric.id,
-					name: currentMetric.name || ''
+					name: currentMetric.name || '',
+					scope: currentMetric.scope
 				}}
 				{onDelete}
 				{onUpdate}
