@@ -461,9 +461,19 @@
 					</div>
 				</div>
 				{#if screenWidth < 700}
-					<TrainingMetricsCarousel metrics={data.metrics} height={chartHeight} />
+					<TrainingMetricsCarousel
+						metrics={data.metrics}
+						height={chartHeight}
+						onUpdate={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
+						onDelete={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
+					/>
 				{:else}
-					<TrainingMetricsList metrics={data.metrics} height={chartHeight} />
+					<TrainingMetricsList
+						metrics={data.metrics}
+						height={chartHeight}
+						onUpdate={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
+						onDelete={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
+					/>
 				{/if}
 			</div>
 		{:else}

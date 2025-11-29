@@ -104,9 +104,20 @@
 	>
 		<h2 class="px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 		{#if screenWidth < 700}
-			<TrainingMetricsCarousel metrics={sortedMetrics} height={chartHeight} {favoriteMetricId} />
+			<TrainingMetricsCarousel
+				metrics={sortedMetrics}
+				height={chartHeight}
+				{favoriteMetricId}
+				onUpdate={() => invalidate(`app:activities`)}
+				onDelete={() => invalidate(`app:activities`)}
+			/>
 		{:else}
-			<TrainingMetricsList metrics={sortedMetrics} height={chartHeight} />
+			<TrainingMetricsList
+				metrics={sortedMetrics}
+				height={chartHeight}
+				onUpdate={() => invalidate(`app:activities`)}
+				onDelete={() => invalidate(`app:activities`)}
+			/>
 		{/if}
 	</div>
 

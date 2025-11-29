@@ -2,17 +2,22 @@
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
+	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 
 	let {
 		metrics,
 		height,
 		initialIndex = 0,
-		favoriteMetricId
+		favoriteMetricId,
+		onUpdate,
+		onDelete
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
 		initialIndex?: number;
 		favoriteMetricId?: string | null;
+		onUpdate: () => void;
+		onDelete: () => void;
 	} = $props();
 
 	let chartWidth: number = $state(300);
@@ -65,7 +70,7 @@
 		>
 			←
 		</button>
-		<div class="flex-1 text-center">
+		<div class="flex flex-1 flex-row justify-center text-center">
 			<TrainingMetricTitle
 				name={currentMetric.name}
 				granularity={currentMetric.granularity}
@@ -74,6 +79,15 @@
 				sports={currentMetric.sports}
 				groupBy={currentMetric.groupBy}
 				isFavorite={currentMetric.id === favoriteMetricId}
+			/>
+			<TrainingMetricMenu
+				metric={{
+					id: currentMetric.id,
+					name: currentMetric.name || '',
+					isFavourite: currentMetric.id === favoriteMetricId
+				}}
+				{onDelete}
+				{onUpdate}
 			/>
 		</div>
 		<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
@@ -105,4 +119,6 @@
 			{/each}
 		</div>
 	{/if}
+{:else}
+	<div class="p-3 text-center text-sm italic opacity-90">No training metrics</div>
 {/if}

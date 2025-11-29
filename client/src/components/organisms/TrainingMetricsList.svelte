@@ -2,13 +2,18 @@
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
+	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 
 	let {
 		metrics,
-		height
+		height,
+		onDelete,
+		onUpdate
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
+		onUpdate: () => void;
+		onDelete: () => void;
 	} = $props();
 
 	let chartWidth: number = $state(300);
@@ -40,15 +45,26 @@
 <div class="flex flex-col items-center gap-0">
 	{#each metricProps as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-			<TrainingMetricTitle
-				name={metric.name}
-				granularity={metric.granularity}
-				aggregate={metric.aggregate}
-				metric={metric.metric}
-				sports={metric.sports}
-				groupBy={metric.groupBy}
-				isFavorite={false}
-			/>
+			<div class="flex flex-row justify-center">
+				<TrainingMetricTitle
+					name={metric.name}
+					granularity={metric.granularity}
+					aggregate={metric.aggregate}
+					metric={metric.metric}
+					sports={metric.sports}
+					groupBy={metric.groupBy}
+					isFavorite={false}
+				/>
+				<TrainingMetricMenu
+					metric={{
+						id: metric.id,
+						name: metric.name || '',
+						isFavourite: false
+					}}
+					{onDelete}
+					{onUpdate}
+				/>
+			</div>
 
 			<TrainingMetricsChartStacked
 				{height}
@@ -65,5 +81,7 @@
 				<div class="divider"></div>
 			{/if}
 		</div>
+	{:else}
+		<div class="p-3 text-center text-sm italic opacity-90">No training metrics</div>
 	{/each}
 </div>
