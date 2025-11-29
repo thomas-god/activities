@@ -362,6 +362,11 @@
 				{/if}
 			</button>
 		</div>
+		{#if scope.kind === 'period'}
+			<div class="p-1 italic opacity-90">
+				This metric will only be visible to the current training period
+			</div>
+		{/if}
 	</fieldset>
 
 	<div class="hidden self-center sm:block">
