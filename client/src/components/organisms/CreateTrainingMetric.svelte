@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import { page } from '$app/state';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
@@ -110,14 +109,8 @@
 	let requestPending = $state(false);
 
 	let previewRequest = $derived.by(() => {
-		const start = dayjs(dates.start);
-		if (!start.isValid()) {
-			return null;
-		}
-		const startDate = start.format('YYYY-MM-DDTHH:mm:ssZ');
-		const endDate = dates.end
-			? dayjs(dates.end).format('YYYY-MM-DDTHH:mm:ssZ')
-			: dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
+		const start = dayjs().subtract(3, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ');
+		const end = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
 
 		let payload: {
 			source: typeof statisticSource;
@@ -127,7 +120,7 @@
 			group_by?: Exclude<typeof groupBy, 'None'>;
 			start: string;
 			end: string;
-		} = { source: statisticSource, granularity, aggregate, start: startDate, end: endDate };
+		} = { source: statisticSource, granularity, aggregate, start, end };
 
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
@@ -189,11 +182,6 @@
 		}
 
 		return basePayload;
-	});
-
-	let dates = $derived({
-		start: page.url.searchParams.get('start') as string,
-		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
 
 	const createMetricCallback = async (payload: Object): Promise<void> => {

@@ -18,6 +18,7 @@
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
+	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -32,6 +33,8 @@
 	let editedStart = $state('');
 	let editedEnd = $state('');
 	let isUpdatingDates = $state(false);
+
+	let newTrainingMetricDialog: HTMLDialogElement;
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
@@ -430,13 +433,33 @@
 		<TrainingPeriodStatistics period={data.periodDetails} />
 	</div>
 </div>
+
 <div class="period_container">
 	<div
 		class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 	>
 		{#if data.metrics.length > 0}
 			<div bind:clientWidth={chartWidth}>
-				<h2 class=" px-4 pt-4 text-lg font-semibold">Training metrics</h2>
+				<div class="flex flex-row gap-2 pt-4">
+					<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
+					<div class="dropdown dropdown-end">
+						<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
+							⋮
+						</div>
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<ul
+							tabindex="0"
+							class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+						>
+							<li>
+								<button onclick={() => newTrainingMetricDialog.show()}>
+									<span>➕</span>
+									<span>New metric</span>
+								</button>
+							</li>
+						</ul>
+					</div>
+				</div>
 				{#if screenWidth < 700}
 					<TrainingMetricsCarousel metrics={data.metrics} height={chartHeight} />
 				{:else}
@@ -674,6 +697,21 @@
 		</form>
 	</dialog>
 {/if}
+
+<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
+	<div class="modal-box max-w-3xl">
+		<CreateTrainingMetric
+			callback={() => {
+				newTrainingMetricDialog.close();
+				invalidate(`app:training-period:${data.periodDetails.id}`);
+			}}
+			scope={{ kind: 'period', periodId: data.periodDetails.id }}
+		/>
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
 
 <style>
 	.period_container {
