@@ -35,24 +35,6 @@
 		});
 	});
 
-	let favoriteMetricId = $derived.by(() => {
-		const favoriteMetricPref = data.preferences.find((p) => p.key === 'favorite_metric');
-		return favoriteMetricPref?.value;
-	});
-
-	let sortedMetrics = $derived.by(() => {
-		// Sort to put favorite first if it exists
-		const sortedMetrics = [...data.metrics];
-		if (favoriteMetricId) {
-			sortedMetrics.sort((a, b) => {
-				if (a.id === favoriteMetricId) return -1;
-				if (b.id === favoriteMetricId) return 1;
-				return 0;
-			});
-		}
-		return sortedMetrics;
-	});
-
 	const moreActivitiesCallback = () => {
 		goto('/history');
 	};
@@ -105,15 +87,14 @@
 		<h2 class="px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 		{#if screenWidth < 700}
 			<TrainingMetricsCarousel
-				metrics={sortedMetrics}
+				metrics={data.metrics}
 				height={chartHeight}
-				{favoriteMetricId}
 				onUpdate={() => invalidate(`app:activities`)}
 				onDelete={() => invalidate(`app:activities`)}
 			/>
 		{:else}
 			<TrainingMetricsList
-				metrics={sortedMetrics}
+				metrics={data.metrics}
 				height={chartHeight}
 				onUpdate={() => invalidate(`app:activities`)}
 				onDelete={() => invalidate(`app:activities`)}

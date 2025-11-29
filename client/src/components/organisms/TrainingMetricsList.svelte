@@ -53,13 +53,11 @@
 					metric={metric.metric}
 					sports={metric.sports}
 					groupBy={metric.groupBy}
-					isFavorite={false}
 				/>
 				<TrainingMetricMenu
 					metric={{
 						id: metric.id,
-						name: metric.name || '',
-						isFavourite: false
+						name: metric.name || ''
 					}}
 					{onDelete}
 					{onUpdate}

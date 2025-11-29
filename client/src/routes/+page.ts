@@ -3,7 +3,6 @@ import {
 	fetchActivities,
 	fetchTrainingMetrics,
 	fetchTrainingPeriods,
-	fetchAllPreferences
 } from '$lib/api';
 import { fetchTrainingNotes } from '$lib/api/training';
 import { dayjs } from '$lib/duration';
@@ -13,11 +12,10 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 
 	const startDate = dayjs().startOf('isoWeek').subtract(3, 'weeks').toDate();
 
-	const [activities, metrics, trainingPeriods, preferences, trainingNotes] = await Promise.all([
+	const [activities, metrics, trainingPeriods,  trainingNotes] = await Promise.all([
 		fetchActivities(fetch, 10),
 		fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
 		fetchTrainingPeriods(fetch),
-		fetchAllPreferences(fetch),
 		fetchTrainingNotes(fetch, depends)
 	]);
 
@@ -37,7 +35,6 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 		activities,
 		metrics,
 		trainingPeriods,
-		preferences,
 		trainingNotes: filteredNotes
 	};
 };

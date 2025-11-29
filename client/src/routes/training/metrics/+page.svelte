@@ -18,8 +18,6 @@
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
 
-	let favoriteMetricId = $derived(data.preferences.find((p) => p.key === 'favorite_metric')?.value);
-
 	let metricsProps = $derived.by(() => {
 		let metrics = [];
 		for (let i = 0; i < data.metrics.length; i++) {
@@ -44,8 +42,7 @@
 				groupBy: metric.group_by,
 				unit: metric.unit,
 				id: metric.id,
-				showGroup: metric.group_by !== null,
-				isFavourite: metric.id === favoriteMetricId
+				showGroup: metric.group_by !== null
 			});
 		}
 		return metrics;
@@ -85,7 +82,6 @@
 					metric={metric.metric}
 					sports={metric.sports}
 					groupBy={metric.groupBy}
-					isFavorite={favoriteMetricId === metric.id}
 				/>
 				<div class="absolute right-4 bottom-[8px]">
 					<!-- Action menu dropdown -->

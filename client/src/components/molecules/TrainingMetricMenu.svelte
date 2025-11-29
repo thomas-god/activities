@@ -7,7 +7,6 @@
 	export type MetricProps = {
 		id: string;
 		name: string | null;
-		isFavourite: boolean;
 	};
 
 	let {
@@ -67,32 +66,12 @@
 			isUpdating = false;
 		}
 	}
-
-	const toggleFavoriteMetric = async (metricId: string): Promise<void> => {
-		if (metric.isFavourite) {
-			// Remove favorite
-			await deletePreference(fetch, 'favorite_metric');
-		} else {
-			// Set as favorite
-			await setPreference(fetch, {
-				key: 'favorite_metric',
-				value: metricId
-			});
-		}
-		invalidate('app:training-metrics');
-	};
 </script>
 
 <div class="dropdown dropdown-end">
 	<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">⋮</div>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow">
-		<li>
-			<button onclick={() => toggleFavoriteMetric(metric.id)}>
-				<span>{metric.isFavourite ? '⭐' : '☆'}</span>
-				<span>{metric.isFavourite ? 'Remove from favorites' : 'Set as favorite'}</span>
-			</button>
-		</li>
 		<li>
 			<button onclick={() => editNameDialog.show()}>
 				<span>✏️</span>

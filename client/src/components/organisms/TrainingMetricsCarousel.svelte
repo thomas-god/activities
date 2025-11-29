@@ -8,14 +8,12 @@
 		metrics,
 		height,
 		initialIndex = 0,
-		favoriteMetricId,
 		onUpdate,
 		onDelete
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
 		initialIndex?: number;
-		favoriteMetricId?: string | null;
 		onUpdate: () => void;
 		onDelete: () => void;
 	} = $props();
@@ -78,13 +76,11 @@
 				metric={currentMetric.metric}
 				sports={currentMetric.sports}
 				groupBy={currentMetric.groupBy}
-				isFavorite={currentMetric.id === favoriteMetricId}
 			/>
 			<TrainingMetricMenu
 				metric={{
 					id: currentMetric.id,
-					name: currentMetric.name || '',
-					isFavourite: currentMetric.id === favoriteMetricId
+					name: currentMetric.name || ''
 				}}
 				{onDelete}
 				{onUpdate}

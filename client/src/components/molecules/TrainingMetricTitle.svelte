@@ -13,18 +13,10 @@
 		metric: string;
 		sports?: string[];
 		groupBy: GroupByClause | null;
-		isFavorite?: boolean;
 	}
 
-	let {
-		name,
-		granularity,
-		aggregate,
-		metric,
-		sports,
-		groupBy,
-		isFavorite = false
-	}: TrainingMetricTitleProps = $props();
+	let { name, granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps =
+		$props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
@@ -86,7 +78,4 @@
 			</div>
 		</div>
 	</div>
-	{#if isFavorite}
-		<span class="text-sm" title="Favorite metric">⭐</span>
-	{/if}
 </div>
