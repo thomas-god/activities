@@ -202,7 +202,6 @@
 				? { type: 'global' }
 				: { type: 'trainingPeriod', trainingPeriodId: scope.periodId };
 		const body = JSON.stringify({
-			initial_date_range: dates,
 			scope: _scope,
 			...payload
 		});

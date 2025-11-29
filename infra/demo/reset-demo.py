@@ -365,8 +365,6 @@ def create_training_metric(
     source: dict[str, str],
     granularity: str,
     aggregate: str,
-    metric_start: str,
-    today: str,
     group_by: str | None = None,
 ) -> dict[str, Any] | None:
     """Create a training metric."""
@@ -376,7 +374,6 @@ def create_training_metric(
         "granularity": granularity,
         "aggregate": aggregate,
         "filters": {},
-        "initial_date_range": {"start": metric_start, "end": today},
         "scope": {"type": "global"},
     }
     if group_by:
@@ -534,8 +531,6 @@ def generate_demo_data() -> int:
         {"Statistic": "Calories"},
         "Weekly",
         "Sum",
-        metric_start,
-        today_str,
     )
 
     create_training_metric(
@@ -543,8 +538,6 @@ def generate_demo_data() -> int:
         {"Statistic": "Distance"},
         "Weekly",
         "Sum",
-        metric_start,
-        today_str,
         group_by="SportCategory",
     )
 
@@ -553,8 +546,6 @@ def generate_demo_data() -> int:
         {"Statistic": "Duration"},
         "Weekly",
         "Sum",
-        metric_start,
-        today_str,
         group_by="WorkoutType",
     )
 

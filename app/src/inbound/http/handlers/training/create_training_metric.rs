@@ -34,7 +34,6 @@ pub struct CreateTrainingMetricBody {
     filters: APITrainingMetricFilters,
     group_by: Option<APITrainingMetricGroupBy>,
     scope: ScopePayload,
-    initial_date_range: Option<DateRange>,
 }
 
 fn build_request(
@@ -54,7 +53,6 @@ fn build_request(
         body.filters.into(),
         body.group_by.map(TrainingMetricGroupBy::from),
         body.scope.into(),
-        body.initial_date_range,
     ))
 }
 

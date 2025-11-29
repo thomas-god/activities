@@ -46,10 +46,6 @@ where
     TMR: TrainingRepository,
     AR: ActivityRepository,
 {
-    /// Create a new training metric and compute its values on the user's activity history.
-    /// If [CreateTrainingMetricRequest::initial_date_range] is not None, this function computes the
-    /// metric value on that range before returning. The rest of the history is processed in the
-    /// background and may take some time depending on the history size.
     async fn create_metric(
         &self,
         req: CreateTrainingMetricRequest,
@@ -988,7 +984,6 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
             TrainingMetricScope::Global,
-            None,
         );
 
         let _ = service
@@ -1015,7 +1010,6 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricGroupBy::none(),
             TrainingMetricScope::Global,
-            None,
         );
 
         let _ = service

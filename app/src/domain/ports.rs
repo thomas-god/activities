@@ -554,7 +554,6 @@ pub struct CreateTrainingMetricRequest {
     filters: TrainingMetricFilters,
     group_by: Option<TrainingMetricGroupBy>,
     scope: TrainingMetricScope,
-    initial_date_range: Option<DateRange>,
 }
 
 impl CreateTrainingMetricRequest {
@@ -588,10 +587,6 @@ impl CreateTrainingMetricRequest {
 
     pub fn scope(&self) -> &TrainingMetricScope {
         &self.scope
-    }
-
-    pub fn initial_date_range(&self) -> &Option<DateRange> {
-        &self.initial_date_range
     }
 }
 
