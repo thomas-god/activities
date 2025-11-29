@@ -26,8 +26,12 @@ use crate::{
         http::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
-            handlers::training::utils::{
-                GroupedMetricValues, MetricsDateRange, convert_metric_values, fill_metric_values,
+            handlers::training::{
+                types::ScopePayload,
+                utils::{
+                    GroupedMetricValues, MetricsDateRange, convert_metric_values,
+                    fill_metric_values,
+                },
             },
         },
         parser::ParseFile,
@@ -84,6 +88,7 @@ pub struct ResponseBodyItem {
     sports: Vec<String>,
     values: GroupedMetricValues,
     group_by: Option<String>,
+    scope: ScopePayload,
 }
 
 fn to_response_body_item(
@@ -110,6 +115,7 @@ fn to_response_body_item(
             .unwrap_or_default(),
         values,
         group_by: definition.group_by().as_ref().map(|g| format!("{:?}", g)),
+        scope: metric.scope().into(),
     }
 }
 

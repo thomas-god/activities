@@ -1,5 +1,5 @@
 /// Mappings between domain types and types part of the HTTP API
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::models::{
     activity::{ActivityStatistic, Sport, TimeseriesMetric},
@@ -174,7 +174,7 @@ impl From<APITrainingPeriodSports> for TrainingPeriodSports {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ScopePayload {
     Global,
@@ -191,6 +191,17 @@ impl From<ScopePayload> for TrainingMetricScope {
             ScopePayload::TrainingPeriod { training_period_id } => {
                 TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from(&training_period_id))
             }
+        }
+    }
+}
+
+impl From<&TrainingMetricScope> for ScopePayload {
+    fn from(value: &TrainingMetricScope) -> Self {
+        match value {
+            TrainingMetricScope::Global => ScopePayload::Global,
+            TrainingMetricScope::TrainingPeriod(period) => ScopePayload::TrainingPeriod {
+                training_period_id: period.to_string(),
+            },
         }
     }
 }

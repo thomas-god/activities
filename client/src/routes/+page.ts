@@ -1,9 +1,5 @@
 import type { PageLoad } from './$types';
-import {
-	fetchActivities,
-	fetchTrainingMetrics,
-	fetchTrainingPeriods,
-} from '$lib/api';
+import { fetchActivities, fetchTrainingMetrics, fetchTrainingPeriods } from '$lib/api';
 import { fetchTrainingNotes } from '$lib/api/training';
 import { dayjs } from '$lib/duration';
 
@@ -12,7 +8,7 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 
 	const startDate = dayjs().startOf('isoWeek').subtract(3, 'weeks').toDate();
 
-	const [activities, metrics, trainingPeriods,  trainingNotes] = await Promise.all([
+	const [activities, metrics, trainingPeriods, trainingNotes] = await Promise.all([
 		fetchActivities(fetch, 10),
 		fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
 		fetchTrainingPeriods(fetch),

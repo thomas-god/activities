@@ -161,7 +161,7 @@ where
         Ok(values)
     }
 
-    /// Get training metric values for all registered training metrics for a given user.
+    /// Get training metric values for all registered training metrics for a given user and scope.
     async fn get_training_metrics_values(
         &self,
         user: &UserId,
