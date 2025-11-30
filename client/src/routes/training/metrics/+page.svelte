@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
-	import DateRangeSelector from '$components/organisms/DateRangeSelector.svelte';
+	import TrainingMetricsOptions from '$components/organisms/TrainingMetricsOptions.svelte';
 	import { dayjs } from '$lib/duration';
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
-
 	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 
 	let { data }: PageProps = $props();
@@ -73,7 +72,14 @@
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
-	<DateRangeSelector {dates} {datesUpdateCallback} periods={data.periods} />
+	<TrainingMetricsOptions
+		{dates}
+		{datesUpdateCallback}
+		periods={data.periods}
+		metricsOrderingScope={{ type: 'global' }}
+		metrics={data.metrics}
+		onMetricsReordered={() => invalidate('app:training-metrics')}
+	/>
 
 	{#each metricsProps as metric}
 		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">

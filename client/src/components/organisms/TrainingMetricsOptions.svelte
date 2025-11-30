@@ -1,15 +1,35 @@
 <script lang="ts">
 	import DateRange from '../molecules/DateRange.svelte';
+	import MetricsOrderingDialog from './MetricsOrderingDialog.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
 	import type { TrainingPeriodList } from '$lib/api';
+	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
 
 	interface Props {
 		dates: { start: string; end: string };
 		datesUpdateCallback: (newDates: { start: string; end: string }) => void;
 		periods?: TrainingPeriodList;
+		metricsOrderingScope: MetricsOrderingScope;
+		metrics: Array<{
+			id: string;
+			name: string | null;
+			granularity: string;
+			aggregate: any;
+			metric: string;
+		}>;
+		onMetricsReordered: () => void;
 	}
 
-	let { dates, datesUpdateCallback, periods = [] }: Props = $props();
+	let {
+		dates,
+		datesUpdateCallback,
+		periods = [],
+		metricsOrderingScope,
+		metrics,
+		onMetricsReordered
+	}: Props = $props();
+
+	let metricsOrderingDialog: MetricsOrderingDialog;
 
 	// Local state for DateRange component binding
 	let localDates = $state({ start: dates.start, end: dates.end });
@@ -61,8 +81,10 @@
 </script>
 
 <div class="rounded-box border-base-300 bg-base-100 p-2 pt-4 shadow-md sm:p-4">
-	<div class="pl-4">
-		<DateRange bind:dates={localDates} />
+	<div class="flex items-center justify-between gap-2">
+		<div class="pl-4">
+			<DateRange bind:dates={localDates} />
+		</div>
 	</div>
 	<div class="flex flex-row flex-wrap items-center gap-2 py-2">
 		<button
@@ -105,4 +127,14 @@
 			{/each}
 		</select>
 	</div>
+	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-ghost btn-sm">
+		🔢 Metrics order
+	</button>
 </div>
+
+<MetricsOrderingDialog
+	bind:this={metricsOrderingDialog}
+	scope={metricsOrderingScope}
+	{metrics}
+	onSaved={onMetricsReordered}
+/>
