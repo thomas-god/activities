@@ -202,8 +202,8 @@ fn core_routes<
         )
         .route(
             "/training/metrics/ordering",
-            post(get_training_metrics_ordering::<AS, PF, TS, US, PS>)
-                .put(set_training_metrics_ordering::<AS, PF, TS, US, PS>),
+            get(get_training_metrics_ordering::<AS, PF, TS, US, PS>)
+                .post(set_training_metrics_ordering::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/metric",

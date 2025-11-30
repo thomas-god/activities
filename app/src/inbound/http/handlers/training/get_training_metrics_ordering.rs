@@ -1,4 +1,8 @@
-use axum::{Extension, Json, extract::State, http::StatusCode};
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+    http::StatusCode,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -27,6 +31,9 @@ pub struct GetTrainingMetricsOrderingResponse {
     metric_ids: Vec<String>,
 }
 
+/// # Example
+/// GET /api/training/metrics/ordering?type=global
+/// GET /api/training/metrics/ordering?type=trainingPeriod&trainingPeriodId=5e410a51-9274-4a1d-bdaa-db69a1c4874b
 pub async fn get_training_metrics_ordering<
     AS: IActivityService,
     PF: ParseFile,
@@ -36,7 +43,7 @@ pub async fn get_training_metrics_ordering<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
-    Json(query): Json<GetTrainingMetricsOrderingQuery>,
+    Query(query): Query<GetTrainingMetricsOrderingQuery>,
 ) -> Result<Json<GetTrainingMetricsOrderingResponse>, (StatusCode, Json<serde_json::Value>)> {
     let scope = query.scope.into();
 
