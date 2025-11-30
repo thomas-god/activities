@@ -1185,6 +1185,12 @@ impl TryFrom<Vec<TrainingMetricId>> for TrainingMetricsOrdering {
     }
 }
 
+impl Default for TrainingMetricsOrdering {
+    fn default() -> Self {
+        Self(vec![])
+    }
+}
+
 impl TrainingMetricsOrdering {
     pub fn sort(&self, mut metrics: Vec<TrainingMetric>) -> Vec<TrainingMetric> {
         let mut sorted_metrics = Vec::new();

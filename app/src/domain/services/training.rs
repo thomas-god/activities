@@ -201,6 +201,14 @@ where
             return vec![];
         };
 
+        let ordering = self
+            .training_repository
+            .get_training_metrics_ordering(user, scope)
+            .await
+            .unwrap_or_default();
+
+        let metrics = ordering.sort(metrics);
+
         let mut res = vec![];
         for metric in metrics {
             // Align the date range to the metric's granularity to ensure complete bins
@@ -1157,6 +1165,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let mut activity_repository = MockActivityRepository::default();
         // When no date range is specified, it should query the user's history
@@ -1213,6 +1224,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let mut activity_repository = MockActivityRepository::default();
         // When no date range is specified, query user history
@@ -1308,6 +1322,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let mut activity_repository = MockActivityRepository::default();
         // Should list activities in the date range
@@ -1384,6 +1401,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let mut activity_repository = MockActivityRepository::default();
         // The date range will be aligned to week boundaries (Monday)
@@ -1460,6 +1480,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
@@ -1505,6 +1528,9 @@ mod tests_training_metrics_service {
                 ),
             )])
         });
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         // Expect call to get period metrics
         let test_period_id = period_id.clone();
@@ -1667,6 +1693,172 @@ mod tests_training_metrics_service {
 
         // Should return empty when both fail
         assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_returns_metrics_when_ordering_fails() {
+        let mut repository = MockTrainingRepository::new();
+
+        // Create two metrics
+        let metric_id_1 = TrainingMetricId::from("metric-1");
+        let metric_id_2 = TrainingMetricId::from("metric-2");
+
+        repository.expect_get_global_metrics().returning(move |_| {
+            Ok(vec![
+                TrainingMetric::new(
+                    metric_id_1.clone(),
+                    Some(TrainingMetricName::from("Metric 1")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_2.clone(),
+                    Some(TrainingMetricName::from("Metric 2")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
+                ),
+            ])
+        });
+
+        // Getting ordering returns an error
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| {
+                Err(GetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "ordering error"
+                )))
+            });
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_get_user_history_date_range()
+            .returning(|_| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &None,
+                &TrainingMetricScope::Global,
+            )
+            .await;
+
+        // Metrics should still be returned even when ordering fails
+        assert_eq!(res.len(), 2);
+        // Verify both metrics are present (order doesn't matter since ordering failed)
+        let ids: Vec<_> = res.iter().map(|(m, _)| m.id()).collect();
+        assert!(ids.contains(&&TrainingMetricId::from("metric-1")));
+        assert!(ids.contains(&&TrainingMetricId::from("metric-2")));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_applies_ordering() {
+        let mut repository = MockTrainingRepository::new();
+
+        // Create three metrics
+        let metric_id_1 = TrainingMetricId::from("metric-1");
+        let metric_id_2 = TrainingMetricId::from("metric-2");
+        let metric_id_3 = TrainingMetricId::from("metric-3");
+
+        // Clone for use in ordering closure
+        let ordering_id_1 = metric_id_1.clone();
+        let ordering_id_2 = metric_id_2.clone();
+        let ordering_id_3 = metric_id_3.clone();
+
+        // Return metrics in one order (1, 2, 3)
+        repository.expect_get_global_metrics().returning(move |_| {
+            Ok(vec![
+                TrainingMetric::new(
+                    metric_id_1.clone(),
+                    Some(TrainingMetricName::from("Metric 1")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_2.clone(),
+                    Some(TrainingMetricName::from("Metric 2")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
+                ),
+                TrainingMetric::new(
+                    metric_id_3.clone(),
+                    Some(TrainingMetricName::from("Metric 3")),
+                    TrainingMetricScope::Global,
+                    TrainingMetricDefinition::new(
+                        UserId::test_default(),
+                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        TrainingMetricGranularity::Daily,
+                        TrainingMetricAggregate::Sum,
+                        TrainingMetricFilters::empty(),
+                        TrainingMetricGroupBy::none(),
+                    ),
+                ),
+            ])
+        });
+
+        // Return ordering in different order: 3, 1, 2
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(move |_, _| {
+                Ok(TrainingMetricsOrdering::try_from(vec![
+                    ordering_id_3.clone(),
+                    ordering_id_1.clone(),
+                    ordering_id_2.clone(),
+                ])
+                .unwrap())
+            });
+
+        let mut activity_repository = MockActivityRepository::default();
+        activity_repository
+            .expect_get_user_history_date_range()
+            .returning(|_| Ok(None));
+
+        let activity_repository = Arc::new(Mutex::new(activity_repository));
+        let service = TrainingService::new(repository, activity_repository);
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &None,
+                &TrainingMetricScope::Global,
+            )
+            .await;
+
+        // Metrics should be returned in the order specified by ordering: 3, 1, 2
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].0.id(), &TrainingMetricId::from("metric-3"));
+        assert_eq!(res[1].0.id(), &TrainingMetricId::from("metric-1"));
+        assert_eq!(res[2].0.id(), &TrainingMetricId::from("metric-2"));
     }
 
     #[tokio::test]
