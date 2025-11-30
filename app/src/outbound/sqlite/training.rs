@@ -471,20 +471,96 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn get_training_metrics_ordering(
         &self,
-        _user: &UserId,
-        _scope: &TrainingMetricScope,
+        user: &UserId,
+        scope: &TrainingMetricScope,
     ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError> {
-        // TODO: Implement actual storage - for now return empty ordering
-        Ok(TrainingMetricsOrdering::try_from(vec![]).unwrap())
+        let period_id = match scope {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(id) => Some(id.to_string()),
+        };
+
+        let result = sqlx::query_as::<_, (String,)>(
+            r#"
+            SELECT metric_ids
+            FROM t_training_metrics_ordering
+            WHERE user_id = ?1 AND (training_period_id = ?2 OR (training_period_id IS NULL AND ?2 IS NULL))
+            "#,
+        )
+        .bind(user.to_string())
+        .bind(period_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| GetTrainingMetricsOrderingError::Unknown(e.into()))?;
+
+        match result {
+            Some((metric_ids_str,)) => {
+                let metric_ids: Vec<TrainingMetricId> = metric_ids_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|id| TrainingMetricId::from(id))
+                    .collect();
+
+                TrainingMetricsOrdering::try_from(metric_ids).map_err(|_| {
+                    GetTrainingMetricsOrderingError::Unknown(anyhow!(
+                        "Invalid ordering data in database"
+                    ))
+                })
+            }
+            None => Ok(TrainingMetricsOrdering::try_from(vec![]).unwrap()),
+        }
     }
 
     async fn set_training_metrics_ordering(
         &self,
-        _user: &UserId,
-        _scope: &TrainingMetricScope,
-        _ordering: TrainingMetricsOrdering,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+        ordering: TrainingMetricsOrdering,
     ) -> Result<(), SetTrainingMetricsOrderingError> {
-        // TODO: Implement actual storage - for now do nothing
+        let period_id = match scope {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(id) => Some(id.to_string()),
+        };
+
+        // Convert ordering to comma-separated string
+        let metric_ids_str = ordering
+            .ids()
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        // First, try to update existing row
+        let rows_affected = sqlx::query(
+            r#"
+            UPDATE t_training_metrics_ordering
+            SET metric_ids = ?3
+            WHERE user_id = ?1 AND (training_period_id = ?2 OR (training_period_id IS NULL AND ?2 IS NULL))
+            "#,
+        )
+        .bind(user.to_string())
+        .bind(&period_id)
+        .bind(&metric_ids_str)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| SetTrainingMetricsOrderingError::Unknown(e.into()))?
+        .rows_affected();
+
+        // If no rows were updated, insert a new row
+        if rows_affected == 0 {
+            sqlx::query(
+                r#"
+                INSERT INTO t_training_metrics_ordering (user_id, training_period_id, metric_ids)
+                VALUES (?1, ?2, ?3)
+                "#,
+            )
+            .bind(user.to_string())
+            .bind(period_id)
+            .bind(metric_ids_str)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| SetTrainingMetricsOrderingError::Unknown(e.into()))?;
+        }
+
         Ok(())
     }
 }
@@ -2462,5 +2538,319 @@ mod test_sqlite_training_repository {
                 .iter()
                 .any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric")))
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_returns_empty_when_not_set() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let scope = TrainingMetricScope::Global;
+
+        let ordering = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve empty ordering");
+
+        assert_eq!(ordering.ids().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get_training_metrics_ordering_global_scope() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let scope = TrainingMetricScope::Global;
+
+        // Create ordering with some metric IDs
+        let id1 = TrainingMetricId::new();
+        let id2 = TrainingMetricId::new();
+        let id3 = TrainingMetricId::new();
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![id1.clone(), id2.clone(), id3.clone()])
+                .expect("Should create ordering");
+
+        // Save ordering
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering.clone())
+            .await
+            .expect("Should save ordering");
+
+        // Retrieve ordering
+        let retrieved_ordering = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve ordering");
+
+        assert_eq!(retrieved_ordering.ids().len(), 3);
+        assert_eq!(retrieved_ordering.ids()[0], id1);
+        assert_eq!(retrieved_ordering.ids()[1], id2);
+        assert_eq!(retrieved_ordering.ids()[2], id3);
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get_training_metrics_ordering_period_scope() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+        let scope = TrainingMetricScope::TrainingPeriod(period_id);
+
+        // Create ordering with some metric IDs
+        let id1 = TrainingMetricId::new();
+        let id2 = TrainingMetricId::new();
+        let ordering = TrainingMetricsOrdering::try_from(vec![id1.clone(), id2.clone()])
+            .expect("Should create ordering");
+
+        // Save ordering
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering.clone())
+            .await
+            .expect("Should save ordering");
+
+        // Retrieve ordering
+        let retrieved_ordering = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve ordering");
+
+        assert_eq!(retrieved_ordering.ids().len(), 2);
+        assert_eq!(retrieved_ordering.ids()[0], id1);
+        assert_eq!(retrieved_ordering.ids()[1], id2);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metrics_ordering_scope_global() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let scope = TrainingMetricScope::Global;
+
+        // Create and save initial ordering
+        let id1 = TrainingMetricId::new();
+        let id2 = TrainingMetricId::new();
+        let ordering1 = TrainingMetricsOrdering::try_from(vec![id1.clone(), id2.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering1)
+            .await
+            .expect("Should save ordering");
+
+        // Update with new ordering
+        let id3 = TrainingMetricId::new();
+        let ordering2 = TrainingMetricsOrdering::try_from(vec![id3.clone(), id1.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering2)
+            .await
+            .expect("Should update ordering");
+
+        // Retrieve and verify updated ordering
+        let retrieved_ordering = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve ordering");
+
+        assert_eq!(retrieved_ordering.ids().len(), 2);
+        assert_eq!(retrieved_ordering.ids()[0], id3);
+        assert_eq!(retrieved_ordering.ids()[1], id1);
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metrics_ordering_scope_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+        let scope = TrainingMetricScope::TrainingPeriod(period_id);
+
+        // Create and save initial ordering
+        let id1 = TrainingMetricId::new();
+        let id2 = TrainingMetricId::new();
+        let ordering1 = TrainingMetricsOrdering::try_from(vec![id1.clone(), id2.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering1)
+            .await
+            .expect("Should save ordering");
+
+        // Update with new ordering
+        let id3 = TrainingMetricId::new();
+        let ordering2 = TrainingMetricsOrdering::try_from(vec![id3.clone(), id1.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering2)
+            .await
+            .expect("Should update ordering");
+
+        // Retrieve and verify updated ordering
+        let retrieved_ordering = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve ordering");
+
+        assert_eq!(retrieved_ordering.ids().len(), 2);
+        assert_eq!(retrieved_ordering.ids()[0], id3);
+        assert_eq!(retrieved_ordering.ids()[1], id1);
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_ordering_scopes_are_independent() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let period_id = TrainingPeriodId::new();
+
+        // Set global scope ordering
+        let global_id1 = TrainingMetricId::new();
+        let global_id2 = TrainingMetricId::new();
+        let global_ordering =
+            TrainingMetricsOrdering::try_from(vec![global_id1.clone(), global_id2.clone()])
+                .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &TrainingMetricScope::Global, global_ordering)
+            .await
+            .expect("Should save global ordering");
+
+        // Set period scope ordering
+        let period_id1 = TrainingMetricId::new();
+        let period_id2 = TrainingMetricId::new();
+        let period_ordering =
+            TrainingMetricsOrdering::try_from(vec![period_id1.clone(), period_id2.clone()])
+                .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(
+                &user_id,
+                &TrainingMetricScope::TrainingPeriod(period_id.clone()),
+                period_ordering,
+            )
+            .await
+            .expect("Should save period ordering");
+
+        // Verify both orderings are independent
+        let retrieved_global = repository
+            .get_training_metrics_ordering(&user_id, &TrainingMetricScope::Global)
+            .await
+            .expect("Should retrieve global ordering");
+
+        let retrieved_period = repository
+            .get_training_metrics_ordering(
+                &user_id,
+                &TrainingMetricScope::TrainingPeriod(period_id),
+            )
+            .await
+            .expect("Should retrieve period ordering");
+
+        assert_eq!(retrieved_global.ids().len(), 2);
+        assert_eq!(retrieved_global.ids()[0], global_id1);
+        assert_eq!(retrieved_global.ids()[1], global_id2);
+
+        assert_eq!(retrieved_period.ids().len(), 2);
+        assert_eq!(retrieved_period.ids()[0], period_id1);
+        assert_eq!(retrieved_period.ids()[1], period_id2);
+    }
+
+    #[tokio::test]
+    async fn test_training_metrics_ordering_users_are_isolated() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user1_id = UserId::test_default();
+        let user2_id = UserId::new();
+        let scope = TrainingMetricScope::Global;
+
+        // Set ordering for user1
+        let user1_id1 = TrainingMetricId::new();
+        let user1_ordering = TrainingMetricsOrdering::try_from(vec![user1_id1.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user1_id, &scope, user1_ordering)
+            .await
+            .expect("Should save user1 ordering");
+
+        // Set ordering for user2
+        let user2_id1 = TrainingMetricId::new();
+        let user2_ordering = TrainingMetricsOrdering::try_from(vec![user2_id1.clone()])
+            .expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user2_id, &scope, user2_ordering)
+            .await
+            .expect("Should save user2 ordering");
+
+        // Verify user1 ordering is not affected by user2
+        let retrieved_user1 = repository
+            .get_training_metrics_ordering(&user1_id, &scope)
+            .await
+            .expect("Should retrieve user1 ordering");
+
+        assert_eq!(retrieved_user1.ids().len(), 1);
+        assert_eq!(retrieved_user1.ids()[0], user1_id1);
+
+        // Verify user2 has their own ordering
+        let retrieved_user2 = repository
+            .get_training_metrics_ordering(&user2_id, &scope)
+            .await
+            .expect("Should retrieve user2 ordering");
+
+        assert_eq!(retrieved_user2.ids().len(), 1);
+        assert_eq!(retrieved_user2.ids()[0], user2_id1);
+    }
+
+    #[tokio::test]
+    async fn test_set_empty_training_metrics_ordering() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+        let user_id = UserId::test_default();
+        let scope = TrainingMetricScope::Global;
+
+        // Set ordering with metrics first
+        let id1 = TrainingMetricId::new();
+        let ordering1 =
+            TrainingMetricsOrdering::try_from(vec![id1.clone()]).expect("Should create ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, ordering1)
+            .await
+            .expect("Should save ordering");
+
+        // Now clear it by setting empty ordering
+        let empty_ordering =
+            TrainingMetricsOrdering::try_from(vec![]).expect("Should create empty ordering");
+
+        repository
+            .set_training_metrics_ordering(&user_id, &scope, empty_ordering)
+            .await
+            .expect("Should save empty ordering");
+
+        // Verify it's empty
+        let retrieved = repository
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await
+            .expect("Should retrieve ordering");
+
+        assert_eq!(retrieved.ids().len(), 0);
     }
 }

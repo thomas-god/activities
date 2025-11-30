@@ -1209,6 +1209,10 @@ impl TrainingMetricsOrdering {
         self.0.retain(|_id| _id != id);
         Self(self.0)
     }
+
+    pub fn ids(&self) -> &[TrainingMetricId] {
+        &self.0
+    }
 }
 
 #[cfg(test)]
