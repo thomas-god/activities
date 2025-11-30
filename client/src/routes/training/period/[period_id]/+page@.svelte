@@ -19,6 +19,7 @@
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
 	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
+	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -35,6 +36,7 @@
 	let isUpdatingDates = $state(false);
 
 	let newTrainingMetricDialog: HTMLDialogElement;
+	let metricsOrderingDialog: MetricsOrderingDialog;
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
@@ -333,6 +335,10 @@
 		selectedActivityPromise = null;
 		invalidate(`app:training-period:${data.periodDetails.id}`);
 	};
+
+	const openMetricsOrderingDialog = () => {
+		metricsOrderingDialog.open();
+	};
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -455,6 +461,12 @@
 								<button onclick={() => newTrainingMetricDialog.show()}>
 									<span>➕</span>
 									<span>New metric</span>
+								</button>
+							</li>
+							<li>
+								<button onclick={openMetricsOrderingDialog}>
+									<span>🔢</span>
+									<span>Reorder</span>
 								</button>
 							</li>
 						</ul>
@@ -722,6 +734,13 @@
 		<button>close</button>
 	</form>
 </dialog>
+
+<MetricsOrderingDialog
+	bind:this={metricsOrderingDialog}
+	scope={{ type: 'trainingPeriod', trainingPeriodId: data.periodDetails.id }}
+	metrics={data.metrics}
+	onSaved={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
+/>
 
 <style>
 	.period_container {
