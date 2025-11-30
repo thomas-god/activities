@@ -8,8 +8,9 @@ use crate::domain::{
         UserId,
         training::{
             ComputeMetricRequirement, TrainingMetric, TrainingMetricDefinition, TrainingMetricId,
-            TrainingMetricScope, TrainingMetricValues, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            TrainingMetricScope, TrainingMetricValues, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriodId,
         },
     },
     ports::{
@@ -18,7 +19,8 @@ use crate::domain::{
         CreateTrainingPeriodError, CreateTrainingPeriodRequest, DateRange,
         DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
         DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
-        GetTrainingNoteError, ITrainingService, ListActivitiesFilters, TrainingRepository,
+        GetTrainingMetricsOrderingError, GetTrainingNoteError, ITrainingService,
+        ListActivitiesFilters, SetTrainingMetricsOrderingError, TrainingRepository,
         UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
         UpdateTrainingMetricScopeError, UpdateTrainingMetricScopeRequest, UpdateTrainingNoteError,
         UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
@@ -650,6 +652,77 @@ where
             ))),
         }
     }
+
+    async fn get_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+    ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError> {
+        // If scope is TrainingPeriod, verify the period exists and belongs to user
+        if let Some(period_id) = scope.period() {
+            let period = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await;
+
+            match period {
+                None => {
+                    return Err(GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                        period_id,
+                    ));
+                }
+                Some(p) if p.user() != user => {
+                    return Err(
+                        GetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(
+                            user.clone(),
+                            period_id,
+                        ),
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        self.training_repository
+            .get_training_metrics_ordering(user, scope)
+            .await
+    }
+
+    async fn set_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+        ordering: TrainingMetricsOrdering,
+    ) -> Result<(), SetTrainingMetricsOrderingError> {
+        // If scope is TrainingPeriod, verify the period exists and belongs to user
+        if let Some(period_id) = scope.period() {
+            let period = self
+                .training_repository
+                .get_training_period(user, &period_id)
+                .await;
+
+            match period {
+                None => {
+                    return Err(SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                        period_id,
+                    ));
+                }
+                Some(p) if p.user() != user => {
+                    return Err(
+                        SetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(
+                            user.clone(),
+                            period_id,
+                        ),
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        self.training_repository
+            .set_training_metrics_ordering(user, scope, ordering)
+            .await
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -787,6 +860,19 @@ pub mod test_utils {
                 user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+            ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>;
+
+            async fn set_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+                ordering: TrainingMetricsOrdering,
+            ) -> Result<(), SetTrainingMetricsOrderingError>;
 
             async fn get_training_metric_values(
                 &self,
@@ -931,6 +1017,19 @@ pub mod test_utils {
                 &self,
                 note_id: &TrainingNoteId,
             ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+            ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>;
+
+            async fn set_training_metrics_ordering(
+                &self,
+                user: &UserId,
+                scope: &TrainingMetricScope,
+                ordering: TrainingMetricsOrdering,
+            ) -> Result<(), SetTrainingMetricsOrderingError>;
         }
     }
 }
@@ -3598,5 +3697,359 @@ mod test_training_service_metric_values {
         let values = result.unwrap();
         // With weekly granularity and sum aggregate, we should have one bin with the activity distance
         assert!(!values.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_metrics_ordering {
+    use super::*;
+    use crate::domain::models::training::{
+        TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
+    };
+    use crate::domain::ports::{GetTrainingMetricsOrderingError, SetTrainingMetricsOrderingError};
+    use crate::domain::services::activity::test_utils::MockActivityRepository;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+    use chrono::NaiveDate;
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_global_scope_ok() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering = TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("metric1"),
+            TrainingMetricId::from("metric2"),
+        ])
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(move |_, _| Ok(ordering.clone()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_ok());
+        let returned_ordering = result.unwrap();
+        assert_eq!(
+            returned_ordering,
+            TrainingMetricsOrdering::try_from(vec![
+                TrainingMetricId::from("metric1"),
+                TrainingMetricId::from("metric2"),
+            ])
+            .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_period_scope_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(move |_, _| Ok(ordering.clone()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_period_does_not_exist() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(id) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected TrainingPeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_user_does_not_own_period() {
+        let user_id = UserId::from("user1");
+        let other_user_id = UserId::from("user2");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            other_user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(u, p) => {
+                assert_eq!(u, user_id);
+                assert_eq!(p, period_id);
+            }
+            _ => panic!("Expected UserDoesNotOwnTrainingPeriod error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_ordering_repository_error() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _| {
+                Err(GetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .get_training_metrics_ordering(&user_id, &scope)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GetTrainingMetricsOrderingError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_global_scope_ok() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering = TrainingMetricsOrdering::try_from(vec![
+            TrainingMetricId::from("metric1"),
+            TrainingMetricId::from("metric2"),
+        ])
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_period_scope_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_period_does_not_exist() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(id) => {
+                assert_eq!(id, period_id);
+            }
+            _ => panic!("Expected TrainingPeriodDoesNotExist error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_user_does_not_own_period() {
+        let user_id = UserId::from("user1");
+        let other_user_id = UserId::from("user2");
+        let period_id = TrainingPeriodId::from("period1");
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let period = TrainingPeriod::new(
+            period_id.clone(),
+            other_user_id.clone(),
+            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            None,
+            "Test Period".to_string(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| Some(period.clone()));
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(u, p) => {
+                assert_eq!(u, user_id);
+                assert_eq!(p, period_id);
+            }
+            _ => panic!("Expected UserDoesNotOwnTrainingPeriod error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_training_metrics_ordering_repository_error() {
+        let user_id = UserId::from("user1");
+        let scope = TrainingMetricScope::Global;
+        let ordering =
+            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_set_training_metrics_ordering()
+            .times(1)
+            .returning(|_, _, _| {
+                Err(SetTrainingMetricsOrderingError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
+
+        let activity_repository = Arc::new(Mutex::new(MockActivityRepository::default()));
+        let service = TrainingService::new(training_repository, activity_repository);
+
+        let result = service
+            .set_training_metrics_ordering(&user_id, &scope, ordering)
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SetTrainingMetricsOrderingError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
     }
 }

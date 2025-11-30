@@ -12,9 +12,9 @@ use crate::domain::models::activity::{
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
     TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-    TrainingMetricName, TrainingMetricScope, TrainingMetricValues, TrainingNote,
-    TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-    TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+    TrainingMetricName, TrainingMetricScope, TrainingMetricValues, TrainingMetricsOrdering,
+    TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+    TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
     TrainingPeriodWithActivities,
 };
 
@@ -857,6 +857,19 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         user: &UserId,
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
+
+    fn get_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+    ) -> impl Future<Output = Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>> + Send;
+
+    fn set_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+        ordering: TrainingMetricsOrdering,
+    ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -889,6 +902,26 @@ pub enum UpdateMetricError {
 pub enum GetTrainingMetricValueError {
     #[error("Training metric {0:?} does not exist")]
     TrainingMetricDoesNotExists(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum GetTrainingMetricsOrderingError {
+    #[error("Training period {0} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
+    #[error("User {0} does not own training period {1}")]
+    UserDoesNotOwnTrainingPeriod(UserId, TrainingPeriodId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum SetTrainingMetricsOrderingError {
+    #[error("Training period {0} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
+    #[error("User {0} does not own training period {1}")]
+    UserDoesNotOwnTrainingPeriod(UserId, TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -1286,6 +1319,19 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
+
+    fn get_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+    ) -> impl Future<Output = Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError>> + Send;
+
+    fn set_training_metrics_ordering(
+        &self,
+        user: &UserId,
+        scope: &TrainingMetricScope,
+        ordering: TrainingMetricsOrdering,
+    ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
 }
 
 ///////////////////////////////////////////////////////////////////

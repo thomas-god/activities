@@ -11,14 +11,16 @@ use crate::domain::{
             ActivityMetricSource, TrainingMetric, TrainingMetricAggregate,
             TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
             TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-            TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     },
     ports::{
         DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
-        GetTrainingMetricsDefinitionsError, GetTrainingNoteError, SaveTrainingMetricError,
-        SaveTrainingNoteError, SaveTrainingPeriodError, TrainingRepository,
+        GetTrainingMetricsDefinitionsError, GetTrainingMetricsOrderingError, GetTrainingNoteError,
+        SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+        SetTrainingMetricsOrderingError, TrainingRepository,
         UpdateTrainingMetricScopeRepositoryError, UpdateTrainingNoteError,
     },
 };
@@ -465,6 +467,25 @@ impl TrainingRepository for SqliteTrainingRepository {
             .await
             .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
             .map(|_| ())
+    }
+
+    async fn get_training_metrics_ordering(
+        &self,
+        _user: &UserId,
+        _scope: &TrainingMetricScope,
+    ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError> {
+        // TODO: Implement actual storage - for now return empty ordering
+        Ok(TrainingMetricsOrdering::try_from(vec![]).unwrap())
+    }
+
+    async fn set_training_metrics_ordering(
+        &self,
+        _user: &UserId,
+        _scope: &TrainingMetricScope,
+        _ordering: TrainingMetricsOrdering,
+    ) -> Result<(), SetTrainingMetricsOrderingError> {
+        // TODO: Implement actual storage - for now do nothing
+        Ok(())
     }
 }
 
@@ -2255,7 +2276,10 @@ mod test_sqlite_training_repository {
             .expect("Should retrieve metrics");
 
         assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0].name(), &Some(TrainingMetricName::from("Global Metric")));
+        assert_eq!(
+            metrics[0].name(),
+            &Some(TrainingMetricName::from("Global Metric"))
+        );
         assert_eq!(metrics[0].scope(), &TrainingMetricScope::Global);
     }
 
@@ -2333,25 +2357,37 @@ mod test_sqlite_training_repository {
             .get_global_metrics(&user_id)
             .await
             .expect("Should retrieve global metrics");
-        
+
         let mut period_metrics = repository
             .get_period_metrics(&user_id, &period_id)
             .await
             .expect("Should retrieve period metrics");
-        
+
         global_metrics.append(&mut period_metrics);
         let metrics = global_metrics;
 
         assert_eq!(metrics.len(), 2);
-        
+
         // Should contain the global metric
-        assert!(metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric"))));
-        
+        assert!(
+            metrics
+                .iter()
+                .any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric")))
+        );
+
         // Should contain the period metric for our period
-        assert!(metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric"))));
-        
+        assert!(
+            metrics
+                .iter()
+                .any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric")))
+        );
+
         // Should NOT contain the metric for the other period
-        assert!(!metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Other Period Metric"))));
+        assert!(
+            !metrics
+                .iter()
+                .any(|m| m.name() == &Some(TrainingMetricName::from("Other Period Metric")))
+        );
     }
 
     #[tokio::test]
@@ -2408,7 +2444,7 @@ mod test_sqlite_training_repository {
             .get_global_metrics(&user_id)
             .await
             .expect("Should retrieve global metrics");
-        
+
         let period_metrics = repository
             .get_period_metrics(&user_id, &period_id)
             .await
@@ -2416,7 +2452,15 @@ mod test_sqlite_training_repository {
 
         assert_eq!(global_metrics.len(), 1);
         assert_eq!(period_metrics.len(), 1);
-        assert!(global_metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric"))));
-        assert!(period_metrics.iter().any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric"))));
+        assert!(
+            global_metrics
+                .iter()
+                .any(|m| m.name() == &Some(TrainingMetricName::from("Global Metric")))
+        );
+        assert!(
+            period_metrics
+                .iter()
+                .any(|m| m.name() == &Some(TrainingMetricName::from("Period Metric")))
+        );
     }
 }
