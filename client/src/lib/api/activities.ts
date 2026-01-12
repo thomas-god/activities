@@ -130,3 +130,35 @@ export async function fetchActivityDetails(
 
 	return null;
 }
+
+export type PostActivitiesResponse =
+	| {
+			type: 'success';
+	  }
+	| {
+			type: 'error';
+	  }
+	| { type: 'authentication-error' };
+
+export async function postActivities(body: FormData): Promise<PostActivitiesResponse> {
+	try {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
+			method: 'POST',
+			credentials: 'include',
+			mode: 'cors',
+			body
+		});
+
+		if (response.ok) {
+			return { type: 'success' };
+		}
+
+		if (response.status === 401) {
+			return { type: 'authentication-error' };
+		}
+
+		return { type: 'error' };
+	} catch (error) {
+		return { type: 'error' };
+	}
+}

@@ -126,6 +126,7 @@
 			<div class="py-8 text-center text-sm italic opacity-70">No metrics available.</div>
 		{:else}
 			<p class="mb-4 text-sm opacity-70">Drag and drop to reorder metrics.</p>
+			<!-- TODO: does not work for touch interactions, use arrows for smaller screens -->
 			<div role="list" class="space-y-2" aria-label="Training metrics list">
 				{#each metricsOrder as metricId, index (metricId)}
 					<div

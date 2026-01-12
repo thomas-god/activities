@@ -9,9 +9,7 @@ export interface MetricsOrderingResponse {
 	metric_ids: string[];
 }
 
-export async function getMetricsOrdering(
-	scope: MetricsOrderingScope
-): Promise<string[] | null> {
+export async function getMetricsOrdering(scope: MetricsOrderingScope): Promise<string[] | null> {
 	try {
 		const params = new URLSearchParams({ type: scope.type });
 		if (scope.type === 'trainingPeriod' && scope.trainingPeriodId) {

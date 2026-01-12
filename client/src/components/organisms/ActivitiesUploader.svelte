@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { PUBLIC_APP_URL } from '$env/static/public';
+	import { postActivities } from '$lib/api';
 
 	let { activitiesUploadedCallback }: { activitiesUploadedCallback: () => void } = $props();
 
 	let files: FileList | undefined = $state(undefined);
 	let file_upload_content = $state('');
-	let success = $state(false);
+	let formState: 'NotSent' | 'Pending' | 'Success' | 'Error' = $state('NotSent');
 
 	const checkCanUpload = (files: FileList | undefined): files is FileList => {
 		if (files) {
@@ -19,34 +19,35 @@
 		return checkCanUpload(files);
 	});
 
-	let pending = $state(false);
-	const postActivity = async (fileList: FileList | undefined) => {
-		if (!checkCanUpload(fileList)) {
+	const postActivitiesCallback = async () => {
+		if (!checkCanUpload(files)) {
 			return;
 		}
 
 		const formData = new FormData();
 
-		for (let i = 0; i < fileList.length; i++) {
-			const file = fileList.item(i)!;
+		for (let i = 0; i < files.length; i++) {
+			const file = files.item(i)!;
 			formData.append(file.name, file);
 		}
 
-		pending = true;
-		let res = await fetch(`${PUBLIC_APP_URL}/api/activity`, {
-			body: formData,
-			method: 'POST',
-			mode: 'cors',
-			credentials: 'include'
-		});
-		pending = false;
+		formState = 'Pending';
+		let res = await postActivities(formData);
 
-		if (res.status === 401) {
+		if (res.type === 'error') {
+			formState = 'Error';
+		}
+
+		if (res.type === 'success') {
+			formState = 'Success';
+		}
+
+		file_upload_content = '';
+
+		if (res.type === 'authentication-error') {
 			goto('/login');
 		}
 
-		success = true;
-		file_upload_content = '';
 		activitiesUploadedCallback();
 	};
 </script>
@@ -67,9 +68,9 @@
 		<button
 			class="btn rounded-lg btn-primary"
 			disabled={!can_upload}
-			onclick={() => postActivity(files)}
+			onclick={() => postActivitiesCallback()}
 		>
-			{#if pending}
+			{#if formState === 'Pending'}
 				<span class="loading loading-spinner"></span>
 			{:else}
 				Upload
@@ -77,9 +78,13 @@
 		</button>
 	</div>
 	<p class="label">.fit and .tcx files are supported, max 1 GB</p>
-	{#if success}
+	{#if formState === 'Success'}
 		<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
 			Files successfully uploaded !
+		</div>
+	{:else if formState === 'Error'}
+		<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
+			An error occurred when trying to upload activities files, try again later.
 		</div>
 	{/if}
 </fieldset>
