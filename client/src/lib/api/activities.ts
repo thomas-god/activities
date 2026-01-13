@@ -131,9 +131,27 @@ export async function fetchActivityDetails(
 	return null;
 }
 
+const PostActivitiesResponseSchema = z.object({
+	created_ids: z.array(z.string()),
+	unprocessable_files: z.array(
+		z.tuple([
+			z.string(),
+			z.enum([
+				'CannotReadContent',
+				'CannotProcessFile',
+				'DuplicatedActivity',
+				'IncoherentTimeseries',
+				'UnsupportedFileExtension',
+				'Unknown'
+			])
+		])
+	)
+});
+
 export type PostActivitiesResponse =
 	| {
 			type: 'success';
+			unprocessed: { file: string; reason: 'duplicated' | 'invalid' }[];
 	  }
 	| {
 			type: 'error';
@@ -150,7 +168,14 @@ export async function postActivities(body: FormData): Promise<PostActivitiesResp
 		});
 
 		if (response.ok) {
-			return { type: 'success' };
+			const data = PostActivitiesResponseSchema.parse(await response.json());
+			const unprocessed: { file: string; reason: 'duplicated' | 'invalid' }[] =
+				data.unprocessable_files.map(([file, reason]) => {
+					const mappedReason = reason === 'DuplicatedActivity' ? 'duplicated' : 'invalid';
+					return { file, reason: mappedReason };
+				});
+
+			return { type: 'success', unprocessed };
 		}
 
 		if (response.status === 401) {

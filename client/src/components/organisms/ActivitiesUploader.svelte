@@ -7,6 +7,8 @@
 	let files: FileList | undefined = $state(undefined);
 	let file_upload_content = $state('');
 	let formState: 'NotSent' | 'Pending' | 'Success' | 'Error' = $state('NotSent');
+	let duplicatedFiles: string[] = $state([]);
+	let invalidFiles: string[] = $state([]);
 
 	const checkCanUpload = (files: FileList | undefined): files is FileList => {
 		if (files) {
@@ -40,6 +42,13 @@
 
 		if (res.type === 'success') {
 			formState = 'Success';
+			for (const { file, reason } of res.unprocessed) {
+				if (reason === 'duplicated') {
+					duplicatedFiles.push(file);
+				} else {
+					invalidFiles.push(file);
+				}
+			}
 		}
 
 		file_upload_content = '';
@@ -82,6 +91,30 @@
 		<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
 			Files successfully uploaded !
 		</div>
+		{#if duplicatedFiles.length > 0}
+			<div class="mt-2 rounded-box bg-warning/20 p-3 text-warning-content">
+				Some files were already imported and have been skipped
+				<ul>
+					{#each duplicatedFiles as file}
+						<li>
+							{file}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+		{#if invalidFiles.length > 0}
+			<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
+				Some files could not be processed
+				<ul>
+					{#each invalidFiles as file}
+						<li>
+							{file}
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 	{:else if formState === 'Error'}
 		<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
 			An error occurred when trying to upload activities files, try again later.
