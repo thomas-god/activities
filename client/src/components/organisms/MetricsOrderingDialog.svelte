@@ -90,6 +90,28 @@
 		draggedIndex = null;
 	};
 
+	const moveMetricPositionUp = (currentIndex: number) => {
+		if (currentIndex === 0) {
+			return;
+		}
+
+		const newOrder = [...metricsOrder];
+		const [movedItem] = newOrder.splice(currentIndex, 1);
+		newOrder.splice(currentIndex - 1, 0, movedItem);
+		metricsOrder = newOrder;
+	};
+
+	const moveMetricPositionDown = (currentIndex: number) => {
+		if (currentIndex === metricsOrder.length - 1) {
+			return;
+		}
+
+		const newOrder = [...metricsOrder];
+		const [movedItem] = newOrder.splice(currentIndex, 1);
+		newOrder.splice(currentIndex + 1, 0, movedItem);
+		metricsOrder = newOrder;
+	};
+
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
 	const getMetricName = (metricId: string): string => {
@@ -126,7 +148,6 @@
 			<div class="py-8 text-center text-sm italic opacity-70">No metrics available.</div>
 		{:else}
 			<p class="mb-4 text-sm opacity-70">Drag and drop to reorder metrics.</p>
-			<!-- TODO: does not work for touch interactions, use arrows for smaller screens -->
 			<div role="list" class="space-y-2" aria-label="Training metrics list">
 				{#each metricsOrder as metricId, index (metricId)}
 					<div
@@ -139,7 +160,19 @@
 						class="flex cursor-move items-center gap-3 rounded-box bg-base-200 p-3 transition-colors hover:bg-base-300"
 						class:opacity-50={draggedIndex === index}
 					>
-						<span class="text-lg" aria-hidden="true">☰</span>
+						<span class="text-lg pointer-coarse:hidden" aria-hidden="true">☰</span>
+
+						<span class="text-lg pointer-fine:hidden" aria-hidden="true">
+							<button class="btn px-0 btn-ghost btn-sm" onclick={() => moveMetricPositionUp(index)}
+								>🔼</button
+							>
+						</span>
+						<span class="text-lg pointer-fine:hidden" aria-hidden="true">
+							<button
+								class="btn px-0 btn-ghost btn-sm"
+								onclick={() => moveMetricPositionDown(index)}>🔽</button
+							>
+						</span>
 						<span class="flex-1">{getMetricName(metricId)}</span>
 						<span class="badge badge-sm">{index + 1}</span>
 					</div>
