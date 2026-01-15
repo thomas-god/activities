@@ -187,3 +187,41 @@ export async function postActivities(body: FormData): Promise<PostActivitiesResp
 		return { type: 'error' };
 	}
 }
+
+/**
+ * Download all activities as a ZIP file
+ * @returns Promise that resolves when download is complete or rejects on error
+ */
+export async function downloadAllActivities(): Promise<void> {
+	const response = await fetch(`${PUBLIC_APP_URL}/api/activities/download`, {
+		method: 'GET',
+		credentials: 'include',
+		mode: 'cors'
+	});
+
+	if (response.status === 401) {
+		goto('/login');
+		throw new Error('Unauthorized');
+	}
+
+	if (!response.ok) {
+		throw new Error('Failed to download activities');
+	}
+
+	// Get the blob from the response
+	const blob = await response.blob();
+
+	// Create a temporary URL for the blob
+	const url = window.URL.createObjectURL(blob);
+
+	// Create a temporary anchor element and trigger download
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = 'activities.zip';
+	document.body.appendChild(a);
+	a.click();
+
+	// Clean up
+	window.URL.revokeObjectURL(url);
+	document.body.removeChild(a);
+}

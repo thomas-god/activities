@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ActivitiesList from '$components/organisms/ActivitiesList.svelte';
 	import ActivitiesCalendar from '$components/organisms/ActivitiesCalendar.svelte';
+	import DownloadActivitiesModal from '$components/molecules/DownloadActivitiesModal.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
@@ -14,6 +15,7 @@
 	let { data }: PageProps = $props();
 
 	let screenWidth = $state(0);
+	let showDownloadModal = $state(false);
 	let sorted_activities = $derived(
 		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
 	);
@@ -152,6 +154,10 @@
 		invalidate('app:activities');
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
+
+	const handleDownloadClick = () => {
+		showDownloadModal = true;
+	};
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -160,21 +166,31 @@
 	<!-- View Toggle -->
 	<div class="mb-4 flex flex-col justify-between gap-2 @sm:flex-row @sm:items-center">
 		<h1 class="text-2xl font-bold">Past activities</h1>
-		<div class="join">
+		<div class="flex gap-2">
 			<button
-				class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
-				onclick={() => setViewMode('list')}
+				class="btn btn-ghost btn-sm"
+				onclick={handleDownloadClick}
+				title="Download all activities as ZIP"
 			>
-				<span class="text-lg">☰</span>
-				<span class="ml-1">List</span>
+				<span class="text-lg">⬇️</span>
+				<span class="ml-1">Download</span>
 			</button>
-			<button
-				class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
-				onclick={() => setViewMode('calendar')}
-			>
-				<span class="text-lg">📅</span>
-				<span class="ml-1">Calendar</span>
-			</button>
+			<div class="join">
+				<button
+					class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
+					onclick={() => setViewMode('list')}
+				>
+					<span class="text-lg">☰</span>
+					<span class="ml-1">List</span>
+				</button>
+				<button
+					class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
+					onclick={() => setViewMode('calendar')}
+				>
+					<span class="text-lg">📅</span>
+					<span class="ml-1">Calendar</span>
+				</button>
+			</div>
 		</div>
 	</div>
 
@@ -237,3 +253,5 @@
 		/>
 	{/if}
 </div>
+
+<DownloadActivitiesModal bind:isOpen={showDownloadModal} activityCount={data.activities.length} />
