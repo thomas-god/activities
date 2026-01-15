@@ -6,7 +6,8 @@ mod preferences;
 mod training;
 
 pub(super) use activities::{
-    delete_activity, get_activity, list_activities, patch_activity, upload_activities,
+    delete_activity, get_activity, get_all_activities, list_activities, patch_activity,
+    upload_activities,
 };
 pub(super) use auth::{login_user, register_user, validate_login};
 pub(super) use preferences::{
