@@ -10,9 +10,10 @@ use crate::domain::{
     },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
-        DeleteActivityRequest, GetActivityError, IActivityService, ListActivitiesError,
-        ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest, RawDataRepository,
-        UpdateActivityFeedbackError, UpdateActivityFeedbackRequest, UpdateActivityNutritionError,
+        DeleteActivityRequest, GetActivityError, GetAllActivitiesError, GetAllActivitiesRequest,
+        IActivityService, ListActivitiesError, ListActivitiesFilters, ModifyActivityError,
+        ModifyActivityRequest, RawActivity, RawDataRepository, UpdateActivityFeedbackError,
+        UpdateActivityFeedbackRequest, UpdateActivityNutritionError,
         UpdateActivityNutritionRequest, UpdateActivityRpeError, UpdateActivityRpeRequest,
         UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
     },
@@ -327,6 +328,18 @@ where
 
         Ok(())
     }
+
+    async fn get_all_activities(
+        &self,
+        req: GetAllActivitiesRequest,
+    ) -> Result<Vec<RawActivity>, GetAllActivitiesError> {
+        self.activity_repository
+            .lock()
+            .await
+            .list_all_raw_activities(req.user())
+            .await
+            .map_err(|err| GetAllActivitiesError::Unknown(anyhow!(err)))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -344,8 +357,8 @@ pub mod test_utils {
         ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics, Sport,
     };
     use crate::domain::ports::{
-        DeleteActivityError, ListActivitiesError, ModifyActivityError, SaveActivityError,
-        SimilarActivityError,
+        DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, ListActivitiesError,
+        ModifyActivityError, RawActivity, SaveActivityError, SimilarActivityError,
     };
 
     mock! {
@@ -412,6 +425,11 @@ pub mod test_utils {
                 &self,
                 req: DeleteActivityRequest,
             ) -> Result<(), DeleteActivityError>;
+
+            async fn get_all_activities(
+                &self,
+                req: GetAllActivitiesRequest,
+            ) -> Result<Vec<RawActivity>, GetAllActivitiesError>;
         }
     }
 
@@ -505,6 +523,11 @@ pub mod test_utils {
                 user: &UserId,
                 filters: &ListActivitiesFilters
             ) -> Result<Vec<Activity>, ListActivitiesError>;
+
+            async fn list_all_raw_activities(
+                &self,
+                user: &UserId,
+            ) -> Result<Vec<RawActivity>, ListActivitiesError>;
 
             async fn list_activities_with_timeseries(
                 &self,
@@ -1402,5 +1425,28 @@ mod tests_activity_service {
 
         // Give any potential spawned task a chance to run (there shouldn't be any)
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_all_activities_ok() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_list_all_raw_activities()
+            .returning(|_| Ok(Vec::new()));
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let service = ActivityService::new(
+            Arc::new(Mutex::new(activity_repository)),
+            raw_data_repository,
+        );
+
+        let user = UserId::test_default();
+
+        let res = service
+            .get_all_activities(GetAllActivitiesRequest::new(user))
+            .await
+            .unwrap();
+
+        assert!(res.is_empty());
     }
 }

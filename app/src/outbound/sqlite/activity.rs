@@ -16,7 +16,7 @@ use crate::{
         },
         ports::{
             ActivityRepository, DateTimeRange, ListActivitiesError, ListActivitiesFilters,
-            RawDataRepository, SaveActivityError, SimilarActivityError,
+            RawActivity, RawDataRepository, SaveActivityError, SimilarActivityError,
         },
     },
     inbound::parser::ParseFile,
@@ -232,6 +232,36 @@ where
                     )
                     .collect()
             })
+    }
+
+    async fn list_all_raw_activities(
+        &self,
+        user: &UserId,
+    ) -> Result<Vec<RawActivity>, ListActivitiesError> {
+        let activities: Vec<ActivityId> = sqlx::query_as::<_, (ActivityId,)>(
+            "SELECT id
+            FROM t_activities
+            WHERE user_id = ?1;",
+        )
+        .bind(user)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(id,)| id)
+        .collect();
+
+        let mut files = Vec::new();
+        for id in activities {
+            if let Ok(res) = self.raw_data_repository.get_raw_data(&id).await {
+                files.push(RawActivity::new(
+                    format!("{id}.{}", res.extension()),
+                    res.raw_content(),
+                ));
+            }
+        }
+
+        Ok(files)
     }
 
     async fn list_activities_with_timeseries(
@@ -1686,5 +1716,124 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(date_range.start(), expected_start);
         assert_eq!(date_range.end().expect("End should be some"), *expected_end);
+    }
+
+    #[tokio::test]
+    async fn test_list_all_raw_activities_no_activities() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let res = repository
+            .list_all_raw_activities(&UserId::test_default())
+            .await
+            .expect("Should not err");
+
+        assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_all_raw_activities_no_activities_for_this_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .list_all_raw_activities(&UserId::from("another_user"))
+            .await
+            .expect("Should not err");
+
+        assert!(res.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_all_raw_activities_ok() {
+        let db_file = NamedTempFile::new().unwrap();
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_get_raw_data()
+            .times(1)
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![0, 1, 2])));
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repository,
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_timeseries();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+        let res = repository
+            .list_all_raw_activities(&UserId::test_default())
+            .await
+            .expect("Should not err");
+
+        assert_eq!(res.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_list_all_raw_activities_skip_missing_raw_files() {
+        let db_file = NamedTempFile::new().unwrap();
+        let activity_1 = build_activity_with_timeseries();
+        let activity_1_id = activity_1.id().clone();
+        let activity_2 = build_activity_with_timeseries();
+
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_get_raw_data()
+            .times(2)
+            .returning(move |id| {
+                if id == &activity_1_id {
+                    Ok(RawContent::new("fit".to_string(), vec![0, 1, 2]))
+                } else {
+                    Err(GetRawDataError::Unknown)
+                }
+            });
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repository,
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        repository
+            .save_activity(&activity_1)
+            .await
+            .expect("Insertion should have succeed");
+        repository
+            .save_activity(&activity_2)
+            .await
+            .expect("Insertion should have succeed");
+        let res = repository
+            .list_all_raw_activities(&UserId::test_default())
+            .await
+            .expect("Should not err");
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(
+            res.first().unwrap().name(),
+            format!("{}.fit", activity_1.id())
+        )
     }
 }

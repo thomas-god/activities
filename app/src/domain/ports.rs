@@ -316,6 +316,39 @@ impl ListActivitiesFilters {
     }
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct GetAllActivitiesRequest {
+    user: UserId,
+}
+
+impl GetAllActivitiesRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct RawActivity {
+    name: String,
+    content: Vec<u8>,
+}
+
+impl RawActivity {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn content(&self) -> &[u8] {
+        &self.content
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum GetAllActivitiesError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
@@ -373,6 +406,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteActivityRequest,
     ) -> impl Future<Output = Result<(), DeleteActivityError>> + Send;
+
+    fn get_all_activities(
+        &self,
+        req: GetAllActivitiesRequest,
+    ) -> impl Future<Output = Result<Vec<RawActivity>, GetAllActivitiesError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -453,6 +491,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
+
+    fn list_all_raw_activities(
+        &self,
+        user: &UserId,
+    ) -> impl Future<Output = Result<Vec<RawActivity>, ListActivitiesError>> + Send;
 
     fn list_activities_with_timeseries(
         &self,
