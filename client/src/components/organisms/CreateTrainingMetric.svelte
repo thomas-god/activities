@@ -35,6 +35,10 @@
 		{ id: 'speed-max', source: { Timeseries: ['Speed', 'Max'] } },
 		{ id: 'speed-min', source: { Timeseries: ['Speed', 'Min'] } },
 		{ id: 'speed-avg', source: { Timeseries: ['Speed', 'Average'] } },
+		// Pace timeseries
+		{ id: 'pace-max', source: { Timeseries: ['Pace', 'Max'] } },
+		{ id: 'pace-min', source: { Timeseries: ['Pace', 'Min'] } },
+		{ id: 'pace-avg', source: { Timeseries: ['Pace', 'Average'] } },
 		// Altitude timeseries
 		{ id: 'altitude-max', source: { Timeseries: ['Altitude', 'Max'] } },
 		{ id: 'altitude-min', source: { Timeseries: ['Altitude', 'Min'] } },
@@ -95,14 +99,16 @@
 			if (metric === 'Altitude') return 'm';
 			if (metric === 'Cadence') return 'rpm';
 			if (metric === 'Distance') return 'km';
+			if (metric === 'Pace') return 's/km';
 		}
 
 		return 's';
 	});
 
-	let previewFormat = $derived.by((): 'number' | 'duration' => {
+	let previewFormat = $derived.by((): 'number' | 'duration' | 'pace' => {
 		if (aggregate === 'NumberOfActivities') return 'number';
 		if (previewUnit === 's') return 'duration';
+		if (previewUnit === 's/km') return 'pace';
 		return 'number';
 	});
 
@@ -274,6 +280,11 @@
 					<option value="speed-max">Maximum speed</option>
 					<option value="speed-avg">Average speed</option>
 					<option value="speed-min">Minimum speed</option>
+				</optgroup>
+				<optgroup label="Pace">
+					<option value="pace-max">Maximum pace</option>
+					<option value="pace-avg">Average pace</option>
+					<option value="pace-min">Minimum pace</option>
 				</optgroup>
 				<optgroup label="Altitude">
 					<option value="altitude-max">Maximum altitude</option>
