@@ -7,6 +7,7 @@
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
+	import { metricValuesDisplayFormat } from '$lib/metric';
 
 	let { data }: PageProps = $props();
 
@@ -107,7 +108,7 @@
 				values={metric.values}
 				unit={metric.unit}
 				granularity={metric.granularity}
-				format={metric.unit === 's' ? 'duration' : 'number'}
+				format={metricValuesDisplayFormat(metric)}
 				showGroup={metric.showGroup}
 				groupBy={metric.groupBy}
 			/>

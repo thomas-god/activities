@@ -8,3 +8,10 @@ export const paceToString = (pace: number, pad = false): string => {
 
 	return `${pad ? minutes.toString().padStart(2, '0') : minutes}:${seconds.toString().padStart(2, '0')}`;
 };
+
+export const paceInSecondToString = (pace: number, pad = false): string => {
+	const minutes = Math.floor(pace / 60);
+	const seconds = Math.round(pace - minutes * 60);
+
+	return `${pad ? minutes.toString().padStart(2, '0') : minutes}:${seconds.toString().padStart(2, '0')}`;
+};

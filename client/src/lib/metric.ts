@@ -92,3 +92,13 @@ export const displayGroupName = (group: string, groupBy: GroupByClause | null): 
 			return getBonkStatusLabel(group as BonkStatus);
 	}
 };
+
+export const metricValuesDisplayFormat = (metric: {
+	aggregate: string;
+	unit: string;
+}): 'number' | 'duration' | 'pace' => {
+	if (metric.aggregate === 'NumberOfActivities') return 'number';
+	if (metric.unit === 's') return 'duration';
+	if (metric.unit === 's/km') return 'pace';
+	return 'number';
+};

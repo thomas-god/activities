@@ -3,6 +3,7 @@
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
 	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
+	import { metricValuesDisplayFormat } from '$lib/metric';
 
 	let {
 		metrics,
@@ -102,7 +103,7 @@
 			values={currentMetric.values}
 			unit={currentMetric.unit}
 			granularity={currentMetric.granularity}
-			format={currentMetric.unit === 's' ? 'duration' : 'number'}
+			format={metricValuesDisplayFormat(currentMetric)}
 			showGroup={currentMetric.showGroup}
 			groupBy={currentMetric.groupBy}
 		/>

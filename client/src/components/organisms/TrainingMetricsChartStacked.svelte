@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
 	import { displayGroupName, type GroupByClause } from '$lib/metric';
+	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
 
@@ -10,7 +11,7 @@
 		height: number;
 		unit: string;
 		granularity: string;
-		format: 'number' | 'duration';
+		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
 		groupBy: GroupByClause | null;
 	}
@@ -85,6 +86,11 @@
 		if (format === 'duration') {
 			return (value: d3.NumberValue, _idx: number) => {
 				return formatDurationCompactWithUnits(value.valueOf());
+			};
+		}
+		if (format === 'pace') {
+			return (value: d3.NumberValue, _idx: number) => {
+				return paceInSecondToString(value.valueOf());
 			};
 		}
 
@@ -225,6 +231,9 @@
 		}
 		if (unit === 'activities') {
 			return `${Math.round(value)} ${unit}`;
+		}
+		if (format === 'pace') {
+			return `${paceInSecondToString(value)} /km`;
 		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
