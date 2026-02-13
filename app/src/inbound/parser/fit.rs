@@ -130,6 +130,7 @@ fn extract_timeseries(
     let mut time = vec![];
     let mut active_time = vec![];
     let mut speed_values = vec![];
+    let mut pace_values = vec![];
     let mut power_values = vec![];
     let mut cadence_values = vec![];
     let mut distance_values = vec![];
@@ -226,7 +227,8 @@ fn extract_timeseries(
             }
             _ => None,
         });
-        speed_values.push(speed);
+        speed_values.push(speed.clone());
+        pace_values.push(speed.map(|val| val.inverse()).flatten());
 
         let power = message.fields.iter().find_map(|field| match field.kind {
             FitField::Record(RecordField::Power) => field.values.iter().find_map(|val| {
@@ -292,6 +294,7 @@ fn extract_timeseries(
 
     let metrics = vec![
         Timeseries::new(TimeseriesMetric::Speed, speed_values),
+        Timeseries::new(TimeseriesMetric::Pace, pace_values),
         Timeseries::new(TimeseriesMetric::Distance, distance_values),
         Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
         Timeseries::new(TimeseriesMetric::Power, power_values),

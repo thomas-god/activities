@@ -34,6 +34,7 @@ impl From<APIActivityStatistic> for ActivityStatistic {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub enum APITimeseriesMetric {
     Speed,
+    Pace,
     Power,
     HeartRate,
     Distance,
@@ -45,6 +46,7 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
     fn from(value: APITimeseriesMetric) -> Self {
         match value {
             APITimeseriesMetric::Speed => Self::Speed,
+            APITimeseriesMetric::Pace => Self::Pace,
             APITimeseriesMetric::Power => Self::Power,
             APITimeseriesMetric::HeartRate => Self::HeartRate,
             APITimeseriesMetric::Distance => Self::Distance,

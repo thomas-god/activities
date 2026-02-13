@@ -118,6 +118,7 @@ fn parse_timeseries(
 ) -> Result<ActivityTimeseries, super::ParseBytesError> {
     let mut time_values = Vec::new();
     let mut speed_values = vec![];
+    let mut pace_values = vec![];
     let mut power_values = vec![];
     let mut cadence_values = vec![];
     let mut distance_values = vec![];
@@ -147,7 +148,8 @@ fn parse_timeseries(
             .find(|elem| elem.has_tag_name("Speed"))
             .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
             .map(TimeseriesValue::Float);
-        speed_values.push(speed);
+        speed_values.push(speed.clone());
+        pace_values.push(speed.map(|val| val.inverse()).flatten());
 
         let distance = node
             .descendants()
@@ -192,6 +194,7 @@ fn parse_timeseries(
 
     let metrics = vec![
         Timeseries::new(TimeseriesMetric::Speed, speed_values),
+        Timeseries::new(TimeseriesMetric::Pace, pace_values),
         Timeseries::new(TimeseriesMetric::Distance, distance_values),
         Timeseries::new(TimeseriesMetric::HeartRate, heart_rate_values),
         Timeseries::new(TimeseriesMetric::Power, power_values),

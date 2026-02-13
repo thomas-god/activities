@@ -781,6 +781,8 @@ pub enum Unit {
     Kilometer,
     MeterPerSecond,
     KilometerPerHour,
+    SecondPerMeter,
+    SecondPerKilometer,
     Watt,
     BeatPerMinute,
     RevolutionPerMinute,
@@ -796,6 +798,8 @@ impl fmt::Display for Unit {
             Self::Kilometer => "km",
             Self::MeterPerSecond => "m/s",
             Self::KilometerPerHour => "km/h",
+            Self::SecondPerMeter => "s/m",
+            Self::SecondPerKilometer => "s/km",
             Self::Watt => "W",
             Self::BeatPerMinute => "bpm",
             Self::RevolutionPerMinute => "rpm",
@@ -972,6 +976,7 @@ pub enum TimeseriesMetric {
     Distance,
     Cadence,
     Altitude,
+    Pace,
 }
 
 impl ToUnit for TimeseriesMetric {
@@ -983,6 +988,7 @@ impl ToUnit for TimeseriesMetric {
             Self::Speed => Unit::MeterPerSecond,
             Self::Altitude => Unit::Meter,
             Self::Cadence => Unit::RevolutionPerMinute,
+            Self::Pace => Unit::SecondPerMeter,
         }
     }
 }
@@ -998,6 +1004,25 @@ impl From<&TimeseriesValue> for f64 {
         match value {
             TimeseriesValue::Int(val) => *val as f64,
             TimeseriesValue::Float(val) => *val,
+        }
+    }
+}
+
+impl TimeseriesValue {
+    pub fn inverse(&self) -> Option<TimeseriesValue> {
+        match self {
+            TimeseriesValue::Float(val) => {
+                if *val == 0. {
+                    return None;
+                }
+                return Some(Self::Float(1. / val));
+            }
+            TimeseriesValue::Int(val) => {
+                if *val == 0 {
+                    return None;
+                }
+                return Some(Self::Float(1. / *val as f64));
+            }
         }
     }
 }
@@ -1210,5 +1235,47 @@ mod test_timeseries {
         )];
 
         assert!(ActivityTimeseries::new(time, active_time, laps, metrics).is_err());
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_float() {
+        let value = TimeseriesValue::Float(2.0);
+        let inverse = value.inverse().unwrap();
+        assert_eq!(inverse, TimeseriesValue::Float(0.5));
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_float_zero() {
+        let value = TimeseriesValue::Float(0.0);
+        let inverse = value.inverse();
+        assert!(inverse.is_none());
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_int() {
+        let value = TimeseriesValue::Int(4);
+        let inverse = value.inverse().unwrap();
+        assert_eq!(inverse, TimeseriesValue::Float(0.25));
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_int_zero() {
+        let value = TimeseriesValue::Int(0);
+        let inverse = value.inverse();
+        assert!(inverse.is_none());
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_large_float() {
+        let value = TimeseriesValue::Float(1000.0);
+        let inverse = value.inverse().unwrap();
+        assert_eq!(inverse, TimeseriesValue::Float(0.001));
+    }
+
+    #[test]
+    fn test_timeseries_value_inverse_small_float() {
+        let value = TimeseriesValue::Float(0.25);
+        let inverse = value.inverse().unwrap();
+        assert_eq!(inverse, TimeseriesValue::Float(4.0));
     }
 }

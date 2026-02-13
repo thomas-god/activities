@@ -147,6 +147,7 @@ pub fn fill_metric_values(
 /// This function handles unit conversions for different metric types:
 /// - Distance: meters → kilometers (÷ 1000)
 /// - Speed: m/s → km/h (× 3.6)
+/// - Pace: s/m → s/km (× 1000)
 /// - Other metrics: no conversion
 ///
 /// Special case: When aggregate is NumberOfActivities, always returns Activity unit
@@ -215,6 +216,21 @@ pub fn convert_metric_values(
                             group_values
                                 .iter()
                                 .map(|(k, val)| (k.clone(), *val * 3.6))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+            TimeseriesMetric::Pace => (
+                Unit::SecondPerKilometer,
+                values
+                    .iter()
+                    .map(|(group, group_values)| {
+                        (
+                            group.clone(),
+                            group_values
+                                .iter()
+                                .map(|(k, val)| (k.clone(), *val * 1000.))
                                 .collect(),
                         )
                     })
@@ -670,6 +686,101 @@ mod tests {
         assert_eq!(
             converted_values.get("Running").unwrap().get("2025-09-24"),
             Some(&10.0)
+        );
+    }
+
+    #[test]
+    fn test_convert_metric_values_pace_timeseries_converts_to_s_per_km() {
+        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
+
+        // Pace should be converted from s/m to s/km (multiply by 1000)
+        let values = HashMap::from([(
+            "Running".to_string(),
+            HashMap::from([
+                ("2025-09-24".to_string(), 0.2),  // 0.2 s/m = 200 s/km = 3:20 min/km
+                ("2025-09-25".to_string(), 0.25), // 0.25 s/m = 250 s/km = 4:10 min/km
+            ]),
+        )]);
+
+        let (unit, converted_values) = convert_metric_values(
+            values,
+            &ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Pace,
+                TimeseriesAggregate::Average,
+            )),
+            &TrainingMetricAggregate::Average,
+        );
+
+        assert_eq!(unit, Unit::SecondPerKilometer);
+        assert_eq!(
+            converted_values.get("Running").unwrap().get("2025-09-24"),
+            Some(&200.0)
+        );
+        assert_eq!(
+            converted_values.get("Running").unwrap().get("2025-09-25"),
+            Some(&250.0)
+        );
+    }
+
+    #[test]
+    fn test_convert_metric_values_pace_with_multiple_groups() {
+        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
+
+        // Test pace conversion with multiple sports
+        let values = HashMap::from([
+            (
+                "Running".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 0.2)]), // 200 s/km
+            ),
+            (
+                "Cycling".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
+            ),
+        ]);
+
+        let (unit, converted_values) = convert_metric_values(
+            values,
+            &ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Pace,
+                TimeseriesAggregate::Average,
+            )),
+            &TrainingMetricAggregate::Average,
+        );
+
+        assert_eq!(unit, Unit::SecondPerKilometer);
+        assert_eq!(
+            converted_values.get("Running").unwrap().get("2025-09-24"),
+            Some(&200.0)
+        );
+        assert_eq!(
+            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            Some(&100.0)
+        );
+    }
+
+    #[test]
+    fn test_convert_metric_values_pace_zero_value() {
+        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
+
+        // Test that zero pace values are handled correctly (0 * 1000 = 0)
+        let values = HashMap::from([(
+            "Running".to_string(),
+            HashMap::from([("2025-09-24".to_string(), 0.0)]),
+        )]);
+
+        let (unit, converted_values) = convert_metric_values(
+            values,
+            &ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Pace,
+                TimeseriesAggregate::Average,
+            )),
+            &TrainingMetricAggregate::Average,
+        );
+
+        assert_eq!(unit, Unit::SecondPerKilometer);
+        assert_eq!(
+            converted_values.get("Running").unwrap().get("2025-09-24"),
+            Some(&0.0)
         );
     }
 }
