@@ -2,11 +2,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::models::{
-    activity::{ActivityStatistic, Sport, TimeseriesMetric},
+    activity::{ActivityStatistic, Sport, TimeseriesAggregate, TimeseriesMetric},
     training::{
-        ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
-        TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-        TrainingMetricScope, TrainingPeriodId, TrainingPeriodSports,
+        ActivityMetricSource, SportFilter, TrainingMetricAggregate, TrainingMetricFilters,
+        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 

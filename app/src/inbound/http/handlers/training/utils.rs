@@ -247,8 +247,10 @@ mod tests {
 
     use chrono::DateTime;
 
+    use crate::domain::models::activity::TimeseriesAggregate;
     use crate::domain::models::training::{
-        TrainingMetricBin, TrainingMetricGranularity, TrainingMetricValue, TrainingMetricValues,
+        TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity, TrainingMetricValue,
+        TrainingMetricValues,
     };
 
     use super::*;
@@ -471,7 +473,7 @@ mod tests {
             ]),
         )]);
 
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
+        use crate::domain::models::training::TrainingMetricAggregate;
 
         // Test with Distance source (which normally converts to Kilometer)
         let (unit, converted_values) = convert_metric_values(
@@ -537,8 +539,6 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_distance_timeseries_converts_to_kilometers() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
-
         // Distance timeseries should also be converted to kilometers
         let values = HashMap::from([(
             "Running".to_string(),
@@ -563,8 +563,6 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_speed_timeseries_converts_to_kmh() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
-
         // Speed should be converted from m/s to km/h
         let values = HashMap::from([(
             "Cycling".to_string(),
@@ -632,8 +630,6 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_power_timeseries_no_conversion() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
-
         // Power should keep its unit (watts) and values unchanged
         let values = HashMap::from([(
             "Cycling".to_string(),
@@ -691,8 +687,6 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_timeseries_converts_to_s_per_km() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
-
         // Pace should be converted from s/m to s/km (multiply by 1000)
         let values = HashMap::from([(
             "Running".to_string(),
@@ -724,7 +718,7 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_with_multiple_groups() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
+        use crate::domain::models::training::TrainingMetricAggregate;
 
         // Test pace conversion with multiple sports
         let values = HashMap::from([
@@ -760,8 +754,6 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_zero_value() {
-        use crate::domain::models::training::{TimeseriesAggregate, TrainingMetricAggregate};
-
         // Test that zero pace values are handled correctly (0 * 1000 = 0)
         let values = HashMap::from([(
             "Running".to_string(),

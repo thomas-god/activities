@@ -1027,6 +1027,48 @@ impl TimeseriesValue {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
+pub enum TimeseriesAggregate {
+    Min,
+    Max,
+    Average,
+    Sum,
+}
+
+impl TimeseriesAggregate {
+    pub fn value_from_timeseries(
+        &self,
+        metric: &TimeseriesMetric,
+        activity: &ActivityWithTimeseries,
+    ) -> Option<f64> {
+        let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
+            if m.metric() == metric {
+                Some(
+                    m.values()
+                        .iter()
+                        .filter_map(|val| val.as_ref().map(f64::from))
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        })?;
+        if values.is_empty() {
+            return None;
+        }
+        let length = values.len();
+        match self {
+            Self::Min => values.into_iter().reduce(f64::min),
+            Self::Max => values.into_iter().reduce(f64::max),
+            Self::Average => values
+                .into_iter()
+                .reduce(|acc, e| acc + e)
+                .map(|val| val / length as f64),
+            Self::Sum => values.into_iter().reduce(|acc, e| acc + e),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1277,5 +1319,132 @@ mod test_timeseries {
         let value = TimeseriesValue::Float(0.25);
         let inverse = value.inverse().unwrap();
         assert_eq!(inverse, TimeseriesValue::Float(4.0));
+    }
+
+    fn default_activity() -> ActivityWithTimeseries {
+        ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Cycling,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Power,
+                    vec![
+                        Some(TimeseriesValue::Int(10)),
+                        Some(TimeseriesValue::Int(20)),
+                        Some(TimeseriesValue::Int(30)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_no_metric_found() {
+        let metric = TimeseriesMetric::Speed;
+        let aggregate = TimeseriesAggregate::Min;
+        let activity = default_activity();
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_metric_is_empty() {
+        let metric = TimeseriesMetric::Power;
+        let aggregate = TimeseriesAggregate::Average;
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Cycling,
+                ActivityStatistics::default(),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![]),
+                TimeseriesActiveTime::new(vec![]),
+                vec![],
+                vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
+            )
+            .unwrap(),
+        );
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_min_value() {
+        let metric = TimeseriesMetric::Power;
+        let aggregate = TimeseriesAggregate::Min;
+        let activity = default_activity();
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), 10.)
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_max_value() {
+        let metric = TimeseriesMetric::Power;
+        let aggregate = TimeseriesAggregate::Max;
+        let activity = default_activity();
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), 30.)
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_average_value() {
+        let metric = TimeseriesMetric::Power;
+        let aggregate = TimeseriesAggregate::Average;
+        let activity = default_activity();
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), 20.)
+    }
+
+    #[test]
+    fn test_extract_aggregated_activity_metric_total_value() {
+        let metric = TimeseriesMetric::Power;
+        let aggregate = TimeseriesAggregate::Sum;
+        let activity = default_activity();
+
+        let res = aggregate.value_from_timeseries(&metric, &activity);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap(), 60.)
     }
 }

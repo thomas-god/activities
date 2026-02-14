@@ -572,12 +572,11 @@ mod test_sqlite_training_repository {
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
-        activity::{ActivityStatistic, Sport, TimeseriesMetric},
+        activity::{ActivityStatistic, Sport, TimeseriesAggregate, TimeseriesMetric},
         training::{
-            ActivityMetricSource, SportFilter, TimeseriesAggregate, TrainingMetricAggregate,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingNote, TrainingNoteContent,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            ActivityMetricSource, SportFilter, TrainingMetricAggregate, TrainingMetricFilters,
+            TrainingMetricGranularity, TrainingNote, TrainingNoteContent, TrainingNoteId,
+            TrainingNoteTitle, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     };
 

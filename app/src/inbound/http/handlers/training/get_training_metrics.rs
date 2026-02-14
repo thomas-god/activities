@@ -159,9 +159,8 @@ pub async fn get_training_metrics<
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::models::{
-        activity::{ActivityStatistic, TimeseriesMetric},
-        training::TimeseriesAggregate,
+    use crate::domain::models::activity::{
+        ActivityStatistic, TimeseriesAggregate, TimeseriesMetric,
     };
 
     use super::*;
