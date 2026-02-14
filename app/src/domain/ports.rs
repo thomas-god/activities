@@ -6,8 +6,8 @@ use thiserror::Error;
 use crate::domain::models::UserId;
 use crate::domain::models::activity::{
     Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
-    ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
-    Sport, WorkoutType,
+    ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+    ActivityWithTimeseries, Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
 };
 use crate::domain::models::training::{
     ActivityMetricSource, TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
@@ -349,6 +349,14 @@ pub enum GetAllActivitiesError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum GetActivityMetricError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 pub trait IActivityService: Clone + Send + Sync + 'static {
     fn create_activity(
         &self,
@@ -376,6 +384,19 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<ActivityWithTimeseries, GetActivityError>> + Send;
+
+    fn get_activity_metric(
+        &self,
+        activity_id: &ActivityId,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
+
+    fn get_activity_statistic(
+        &self,
+        activity_id: &ActivityId,
+        statistic: &ActivityStatistic,
+    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
 
     fn modify_activity(
         &self,
