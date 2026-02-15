@@ -143,7 +143,7 @@ pub async fn get_training_metrics<
         .training_metrics_service
         .get_training_metrics_values(
             user.user(),
-            &Some(DateRange::from(query.date_range())),
+            &DateRange::from(query.date_range()),
             &query.scope(),
         )
         .await;

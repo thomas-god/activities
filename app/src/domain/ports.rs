@@ -839,7 +839,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn get_training_metrics_values(
         &self,
         user: &UserId,
-        date_range: &Option<DateRange>,
+        date_range: &DateRange,
         scope: &TrainingMetricScope,
     ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
 

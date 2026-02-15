@@ -167,7 +167,7 @@ where
     async fn get_training_metrics_values(
         &self,
         user: &UserId,
-        date_range: &Option<DateRange>,
+        date_range: &DateRange,
         scope: &TrainingMetricScope,
     ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
         // Get metrics based on scope
@@ -211,45 +211,13 @@ where
 
         let mut res = vec![];
         for metric in metrics {
-            let aligned_date_range = date_range
-                .as_ref()
-                .map(|range| range.align_to(metric.definition().granularity()));
+            let aligned_date_range = date_range.align_to(metric.definition().granularity());
 
-            let values = match &aligned_date_range {
-                Some(range) => self
-                    .compute_training_metric_values(metric.definition(), range)
-                    .await
-                    .unwrap_or_default(),
-                None => {
-                    // If no date range specified, compute over entire user history
-                    let range = self
-                        .activity_repository
-                        .lock()
-                        .await
-                        .get_user_history_date_range(user)
-                        .await;
-                    match range {
-                        Ok(Some(history_range)) => {
-                            let bins = metric
-                                .definition()
-                                .granularity()
-                                .bins_from_datetime(&history_range);
-                            if let (Some(first), Some(last)) = (bins.first(), bins.last()) {
-                                let full_range = DateRange::new(*first.start(), *last.end());
-                                self.compute_training_metric_values(
-                                    metric.definition(),
-                                    &full_range,
-                                )
-                                .await
-                                .unwrap_or_default()
-                            } else {
-                                TrainingMetricValues::default()
-                            }
-                        }
-                        _ => TrainingMetricValues::default(),
-                    }
-                }
-            };
+            let values = self
+                .compute_training_metric_values(metric.definition(), &aligned_date_range)
+                .await
+                .unwrap_or_default();
+
             res.push((metric.clone(), values))
         }
 
@@ -769,7 +737,7 @@ pub mod test_utils {
             async fn get_training_metrics_values(
                 &self,
                 user: &UserId,
-                date_range: &Option<DateRange>,
+                date_range: &DateRange,
                 scope: &TrainingMetricScope,
             ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
 
@@ -1132,7 +1100,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
@@ -1164,15 +1135,18 @@ mod tests_training_metrics_service {
         let mut activity_repository = MockActivityRepository::default();
         // When no date range is specified, it should query the user's history
         activity_repository
-            .expect_get_user_history_date_range()
-            .returning(|_| Ok(None)); // No history, so no values
+            .expect_list_activities()
+            .returning(|_, __| Ok(vec![]));
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
@@ -1269,7 +1243,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
@@ -1356,10 +1333,10 @@ mod tests_training_metrics_service {
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
 
-        let date_range = Some(DateRange::new(
+        let date_range = DateRange::new(
             NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
             NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
-        ));
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1438,10 +1415,10 @@ mod tests_training_metrics_service {
         let service = TrainingService::new(repository, activity_repository);
 
         // Input date range: Wednesday to Thursday (mid-week)
-        let date_range = Some(DateRange::new(
+        let date_range = DateRange::new(
             NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(), // Wednesday
             NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(), // Thursday
-        ));
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1478,15 +1455,18 @@ mod tests_training_metrics_service {
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
-            .expect_get_user_history_date_range()
-            .returning(|_| Ok(None));
+            .expect_list_activities()
+            .returning(|_, __| Ok(vec![]));
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
@@ -1547,15 +1527,18 @@ mod tests_training_metrics_service {
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
-            .expect_get_user_history_date_range()
-            .returning(|_| Ok(None));
+            .expect_list_activities()
+            .returning(|_, __| Ok(vec![]));
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
 
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::TrainingPeriod(period_id),
             )
             .await;
@@ -1593,7 +1576,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::TrainingPeriod(period_id),
             )
             .await;
@@ -1641,7 +1627,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::TrainingPeriod(period_id),
             )
             .await;
@@ -1678,7 +1667,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::TrainingPeriod(period_id),
             )
             .await;
@@ -1737,8 +1729,8 @@ mod tests_training_metrics_service {
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
-            .expect_get_user_history_date_range()
-            .returning(|_| Ok(None));
+            .expect_list_activities()
+            .returning(|_, __| Ok(vec![]));
 
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
@@ -1746,7 +1738,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
@@ -1832,8 +1827,8 @@ mod tests_training_metrics_service {
 
         let mut activity_repository = MockActivityRepository::default();
         activity_repository
-            .expect_get_user_history_date_range()
-            .returning(|_| Ok(None));
+            .expect_list_activities()
+            .returning(|_, __| Ok(vec![]));
 
         let activity_repository = Arc::new(Mutex::new(activity_repository));
         let service = TrainingService::new(repository, activity_repository);
@@ -1841,7 +1836,10 @@ mod tests_training_metrics_service {
         let res = service
             .get_training_metrics_values(
                 &UserId::test_default(),
-                &None,
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
                 &TrainingMetricScope::Global,
             )
             .await;
