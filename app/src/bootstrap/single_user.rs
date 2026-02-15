@@ -29,7 +29,10 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         Parser,
         TrainingService<
             SqliteTrainingRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+            ActivityService<
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                FilesystemRawDataRepository,
+            >,
         >,
         DisabledUserService,
         PreferencesService<SqlitePreferencesRepository>,
@@ -72,6 +75,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         )
         .await?,
     ));
+    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository =
@@ -80,9 +84,9 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
 
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
-        activity_repository.clone(),
+        Arc::new(Mutex::new(activity_service.clone())),
     ));
-    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
+
     let user_service = DisabledUserService {};
     let preferences_service = build_preferences_service().await?;
 

@@ -33,7 +33,10 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         Parser,
         TrainingService<
             SqliteTrainingRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+            ActivityService<
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                FilesystemRawDataRepository,
+            >,
         >,
         UserService<
             MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
@@ -97,7 +100,10 @@ async fn build_activity_service() -> anyhow::Result<(
     Arc<
         TrainingService<
             SqliteTrainingRepository,
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+            ActivityService<
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                FilesystemRawDataRepository,
+            >,
         >,
     >,
 )> {
@@ -124,6 +130,7 @@ async fn build_activity_service() -> anyhow::Result<(
         )
         .await?,
     ));
+    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository =
@@ -132,9 +139,8 @@ async fn build_activity_service() -> anyhow::Result<(
 
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
-        activity_repository.clone(),
+        Arc::new(Mutex::new(activity_service.clone())),
     ));
-    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
     anyhow::Ok((activity_service, parser, training_metrics_service))
 }

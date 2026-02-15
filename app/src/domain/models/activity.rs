@@ -1015,13 +1015,13 @@ impl TimeseriesValue {
                 if *val == 0. {
                     return None;
                 }
-                return Some(Self::Float(1. / val));
+                Some(Self::Float(1. / val))
             }
             TimeseriesValue::Int(val) => {
                 if *val == 0 {
                     return None;
                 }
-                return Some(Self::Float(1. / *val as f64));
+                Some(Self::Float(1. / *val as f64))
             }
         }
     }

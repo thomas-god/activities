@@ -146,7 +146,7 @@ where
             }
         }
 
-        return Ok(res);
+        Ok(res)
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {

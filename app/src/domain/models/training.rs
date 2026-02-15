@@ -247,49 +247,24 @@ impl TrainingMetricDefinition {
 }
 
 impl TrainingMetricDefinition {
-    pub fn compute_values_from_timeseries(
-        &self,
-        activities: &[ActivityWithTimeseries],
-    ) -> TrainingMetricValues {
+    pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
         let activity_metrics = activities
             .iter()
-            .filter_map(|activity| {
-                if self.filters.matches(activity.activity()) {
-                    self.source
-                        .metric_from_activity_with_timeseries(activity)
-                        .map(|value| {
-                            (
-                                self.group_by.as_ref().and_then(|group_by| {
-                                    group_by.extract_group(activity.activity())
-                                }),
-                                value,
-                            )
-                        })
-                } else {
-                    None
-                }
-            })
-            .collect();
-        self.aggregate_metrics(activity_metrics)
-    }
-
-    pub fn compute_values(&self, activities: &[Activity]) -> TrainingMetricValues {
-        let activity_metrics = activities
-            .iter()
-            .filter_map(|activity| {
+            .filter_map(|(activity, metric_value)| {
                 if self.filters.matches(activity) {
-                    self.source
-                        .metric_from_activity(activity)
-                        .ok()
-                        .flatten()
-                        .map(|value| {
-                            (
-                                self.group_by
-                                    .as_ref()
-                                    .and_then(|group_by| group_by.extract_group(activity)),
-                                value,
-                            )
-                        })
+                    Some((
+                        self.group_by
+                            .as_ref()
+                            .and_then(|group_by| group_by.extract_group(activity)),
+                        ActivityMetric::new(
+                            *metric_value,
+                            *activity.start_time(),
+                            activity
+                                .statistics()
+                                .get(&ActivityStatistic::Duration)
+                                .cloned(),
+                        ),
+                    ))
                 } else {
                     None
                 }
@@ -1126,7 +1101,7 @@ impl TrainingNote {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
 pub struct TrainingMetricsOrdering(Vec<TrainingMetricId>);
 
 impl TryFrom<Vec<TrainingMetricId>> for TrainingMetricsOrdering {
@@ -1140,12 +1115,6 @@ impl TryFrom<Vec<TrainingMetricId>> for TrainingMetricsOrdering {
             }
         }
         Ok(Self(value))
-    }
-}
-
-impl Default for TrainingMetricsOrdering {
-    fn default() -> Self {
-        Self(vec![])
     }
 }
 
@@ -1420,55 +1389,10 @@ mod test_training_metrics {
     }
 
     #[test]
-    fn test_compute_training_metrics_from_timeseries() {
-        let activities = vec![default_activity()];
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Power,
-                TimeseriesAggregate::Average,
-            )),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::empty(),
-            TrainingMetricGroupBy::none(),
-        );
-
-        let metrics = metric_definition.compute_values_from_timeseries(&activities);
-
-        assert_eq!(
-            *metrics
-                .get(&TrainingMetricBin::from_granule("2025-09-01"))
-                .unwrap(),
-            TrainingMetricValue::Max(20.)
-        );
-    }
-
-    #[test]
-    fn test_compute_training_metrics_from_timeseries_with_filters() {
-        let activities = vec![default_activity()];
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Power,
-                TimeseriesAggregate::Average,
-            )),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
-            TrainingMetricGroupBy::none(),
-        );
-
-        let metrics = metric_definition.compute_values_from_timeseries(&activities);
-
-        assert!(metrics.is_empty());
-    }
-
-    #[test]
     fn test_compute_training_metrics_with_filters() {
-        let activities: Vec<Activity> = vec![default_activity()]
+        let activities: Vec<(Activity, f64)> = vec![default_activity()]
             .iter()
-            .map(|activity| activity.activity().clone())
+            .map(|activity| (activity.activity().clone(), 0.))
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
@@ -1486,9 +1410,9 @@ mod test_training_metrics {
 
     #[test]
     fn test_compute_training_metrics_with_group_by() {
-        let activities: Vec<Activity> = vec![default_activity()]
+        let activities: Vec<(Activity, f64)> = vec![default_activity()]
             .iter()
-            .map(|activity| activity.activity().clone())
+            .map(|activity| (activity.activity().clone(), 0.))
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
@@ -1500,30 +1424,6 @@ mod test_training_metrics {
         );
 
         let metrics = metric_definition.compute_values(&activities);
-
-        assert!(
-            metrics
-                .get(&TrainingMetricBin::new(
-                    "2025-09-01".to_string(),
-                    Some("Cycling".to_string())
-                ))
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn test_compute_training_metrics_from_timeseries_with_group_by() {
-        let activities = vec![default_activity()];
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
-            TrainingMetricFilters::empty(),
-            Some(TrainingMetricGroupBy::Sport),
-        );
-
-        let metrics = metric_definition.compute_values_from_timeseries(&activities);
 
         assert!(
             metrics
