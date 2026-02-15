@@ -10,6 +10,7 @@ use crate::domain::{
             Activity, ActivityId, ActivityStatistic, ActivityWithTimeseries, TimeseriesAggregate,
             TimeseriesMetric,
         },
+        training::ActivityMetricSource,
     },
     ports::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
@@ -118,6 +119,34 @@ where
         repository
             .list_activities_with_timeseries(user, filters)
             .await
+    }
+
+    async fn list_activities_with_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        source: &ActivityMetricSource,
+    ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
+        let repository = self.activity_repository.lock().await;
+        let activities = repository.list_activities(user, filters).await?;
+
+        let mut res = vec![];
+
+        for activity in activities.into_iter() {
+            if let Some(metric) = match source {
+                ActivityMetricSource::Statistic(statistic) => {
+                    activity.statistics().get(statistic).cloned()
+                }
+                ActivityMetricSource::Timeseries((metric, aggregate)) => repository
+                    .get_activity_with_timeseries(activity.id())
+                    .await?
+                    .and_then(|activity| aggregate.value_from_timeseries(metric, &activity)),
+            } {
+                res.push((activity, metric));
+            }
+        }
+
+        return Ok(res);
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
@@ -399,6 +428,7 @@ pub mod test_utils {
         ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics, Sport,
         TimeseriesMetric,
     };
+    use crate::domain::models::training::ActivityMetricSource;
     use crate::domain::ports::{
         DeleteActivityError, GetActivityMetricError, GetAllActivitiesError,
         GetAllActivitiesRequest, ListActivitiesError, ModifyActivityError, RawActivity,
@@ -439,6 +469,13 @@ pub mod test_utils {
                 &self,
                 activity_id: &ActivityId,
             ) -> Result<ActivityWithTimeseries, GetActivityError>;
+
+            async fn list_activities_with_metric(
+                &self,
+                user: &UserId,
+                filters: &ListActivitiesFilters,
+                source: &ActivityMetricSource,
+            ) -> Result<Vec<(Activity, f64)>, ListActivitiesError>;
 
             async fn get_activity_metric(
                 &self,
@@ -1654,6 +1691,194 @@ mod tests_activity_service {
                     .unwrap()
                     .is_some()
             )
+        }
+    }
+
+    mod test_activity_service_list_activities_with_metric {
+        use crate::domain::models::activity::{
+            ActiveTime, Timeseries, TimeseriesActiveTime, TimeseriesTime, TimeseriesValue,
+        };
+
+        use super::*;
+
+        fn default_activity() -> ActivityWithTimeseries {
+            ActivityWithTimeseries::new(
+                Activity::new(
+                    ActivityId::from("test_activity"),
+                    UserId::from("test_user".to_string()),
+                    None,
+                    ActivityStartTime::from_timestamp(0).unwrap(),
+                    Sport::Cycling,
+                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+                ActivityTimeseries::new(
+                    TimeseriesTime::new(vec![0, 1, 2]),
+                    TimeseriesActiveTime::new(vec![
+                        ActiveTime::Running(0),
+                        ActiveTime::Running(1),
+                        ActiveTime::Running(2),
+                    ]),
+                    vec![],
+                    vec![Timeseries::new(
+                        TimeseriesMetric::Cadence,
+                        vec![
+                            Some(TimeseriesValue::Int(10)),
+                            Some(TimeseriesValue::Int(20)),
+                            Some(TimeseriesValue::Int(30)),
+                        ],
+                    )],
+                )
+                .unwrap(),
+            )
+        }
+
+        #[tokio::test]
+        async fn test_no_activities_found() {
+            let mut activity_repository = MockActivityRepository::new();
+            activity_repository
+                .expect_list_activities()
+                .returning(|_, __| Ok(vec![]));
+
+            let raw_data_repository = MockRawDataRepository::default();
+
+            let service = ActivityService::new(
+                Arc::new(Mutex::new(activity_repository)),
+                raw_data_repository,
+            );
+
+            assert!(
+                service
+                    .list_activities_with_metric(
+                        &UserId::test_default(),
+                        &ListActivitiesFilters::empty(),
+                        &ActivityMetricSource::Statistic(ActivityStatistic::Calories)
+                    )
+                    .await
+                    .unwrap()
+                    .is_empty()
+            )
+        }
+
+        #[tokio::test]
+        async fn test_extract_statistic_metric_from_activity() {
+            let mut activity_repository = MockActivityRepository::new();
+            activity_repository
+                .expect_list_activities()
+                .returning(|_, __| Ok(vec![default_activity().activity().clone()]));
+
+            let raw_data_repository = MockRawDataRepository::default();
+
+            let service = ActivityService::new(
+                Arc::new(Mutex::new(activity_repository)),
+                raw_data_repository,
+            );
+
+            let res = service
+                .list_activities_with_metric(
+                    &UserId::test_default(),
+                    &ListActivitiesFilters::empty(),
+                    &ActivityMetricSource::Statistic(ActivityStatistic::Duration),
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.len(), 1);
+
+            let (_activity, metric) = res.first().unwrap();
+            assert_eq!(*metric, 1200.)
+        }
+
+        #[tokio::test]
+        async fn test_ignore_activity_without_target_statistic() {
+            let mut activity_repository = MockActivityRepository::new();
+            activity_repository
+                .expect_list_activities()
+                .returning(|_, __| Ok(vec![default_activity().activity().clone()]));
+
+            let raw_data_repository = MockRawDataRepository::default();
+
+            let service = ActivityService::new(
+                Arc::new(Mutex::new(activity_repository)),
+                raw_data_repository,
+            );
+
+            let res = service
+                .list_activities_with_metric(
+                    &UserId::test_default(),
+                    &ListActivitiesFilters::empty(),
+                    &ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                )
+                .await
+                .unwrap();
+            assert!(res.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_extract_timeseries_metric_from_activity() {
+            let mut activity_repository = MockActivityRepository::new();
+            activity_repository
+                .expect_list_activities()
+                .returning(|_, __| Ok(vec![default_activity().activity().clone()]));
+            activity_repository
+                .expect_get_activity_with_timeseries()
+                .returning(|_| Ok(Some(default_activity())));
+
+            let raw_data_repository = MockRawDataRepository::default();
+
+            let service = ActivityService::new(
+                Arc::new(Mutex::new(activity_repository)),
+                raw_data_repository,
+            );
+
+            let res = service
+                .list_activities_with_metric(
+                    &UserId::test_default(),
+                    &ListActivitiesFilters::empty(),
+                    &ActivityMetricSource::Timeseries((
+                        TimeseriesMetric::Cadence,
+                        TimeseriesAggregate::Max,
+                    )),
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.len(), 1);
+
+            let (_activity, metric) = res.first().unwrap();
+            assert_eq!(*metric, 30.)
+        }
+
+        #[tokio::test]
+        async fn test_ignore_activity_without_target_timeseries() {
+            let mut activity_repository = MockActivityRepository::new();
+            activity_repository
+                .expect_list_activities()
+                .returning(|_, __| Ok(vec![default_activity().activity().clone()]));
+            activity_repository
+                .expect_get_activity_with_timeseries()
+                .returning(|_| Ok(Some(default_activity())));
+
+            let raw_data_repository = MockRawDataRepository::default();
+
+            let service = ActivityService::new(
+                Arc::new(Mutex::new(activity_repository)),
+                raw_data_repository,
+            );
+
+            let res = service
+                .list_activities_with_metric(
+                    &UserId::test_default(),
+                    &ListActivitiesFilters::empty(),
+                    &ActivityMetricSource::Timeseries((
+                        TimeseriesMetric::Power,
+                        TimeseriesAggregate::Max,
+                    )),
+                )
+                .await
+                .unwrap();
+            assert!(res.is_empty());
         }
     }
 }

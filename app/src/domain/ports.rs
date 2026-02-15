@@ -375,6 +375,13 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
 
+    fn list_activities_with_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        source: &ActivityMetricSource,
+    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
+
     fn get_activity(
         &self,
         activity_id: &ActivityId,
