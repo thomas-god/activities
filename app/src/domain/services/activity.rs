@@ -130,23 +130,35 @@ where
         let repository = self.activity_repository.lock().await;
         let activities = repository.list_activities(user, filters).await?;
 
-        let mut res = vec![];
+        match source {
+            ActivityMetricSource::Statistic(statistic) => {
+                return Ok(activities
+                    .into_iter()
+                    .filter_map(|activity| {
+                        activity
+                            .statistics()
+                            .get(statistic)
+                            .cloned()
+                            .map(|value| (activity, value))
+                    })
+                    .collect());
+            }
+            ActivityMetricSource::Timeseries((metric, aggregate)) => {
+                let mut res = vec![];
 
-        for activity in activities.into_iter() {
-            if let Some(metric) = match source {
-                ActivityMetricSource::Statistic(statistic) => {
-                    activity.statistics().get(statistic).cloned()
+                for activity in activities.into_iter() {
+                    if let Some(metric) = repository
+                        .get_activity_with_timeseries(activity.id())
+                        .await?
+                        .and_then(|activity| aggregate.value_from_timeseries(metric, &activity))
+                    {
+                        res.push((activity, metric));
+                    }
                 }
-                ActivityMetricSource::Timeseries((metric, aggregate)) => repository
-                    .get_activity_with_timeseries(activity.id())
-                    .await?
-                    .and_then(|activity| aggregate.value_from_timeseries(metric, &activity)),
-            } {
-                res.push((activity, metric));
+
+                Ok(res)
             }
         }
-
-        Ok(res)
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
