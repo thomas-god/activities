@@ -211,17 +211,9 @@ where
 
         let mut res = vec![];
         for metric in metrics {
-            // Align the date range to the metric's granularity to ensure complete bins
-            // For example, if granularity is Weekly and date_range starts on Wednesday,
-            // we align it to the Monday of that week to include the full week's data
-            let aligned_date_range = date_range.as_ref().map(|range| {
-                let bins = metric.definition().granularity().bins(range);
-                if let (Some(first), Some(last)) = (bins.first(), bins.last()) {
-                    DateRange::new(*first.start(), *last.end())
-                } else {
-                    range.clone()
-                }
-            });
+            let aligned_date_range = date_range
+                .as_ref()
+                .map(|range| range.align_to(metric.definition().granularity()));
 
             let values = match &aligned_date_range {
                 Some(range) => self
