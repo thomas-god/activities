@@ -228,7 +228,7 @@ fn extract_timeseries(
             _ => None,
         });
         speed_values.push(speed.clone());
-        pace_values.push(speed.map(|val| val.inverse()).flatten());
+        pace_values.push(speed.and_then(|val| val.inverse()));
 
         let power = message.fields.iter().find_map(|field| match field.kind {
             FitField::Record(RecordField::Power) => field.values.iter().find_map(|val| {

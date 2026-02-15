@@ -149,7 +149,7 @@ fn parse_timeseries(
             .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
             .map(TimeseriesValue::Float);
         speed_values.push(speed.clone());
-        pace_values.push(speed.map(|val| val.inverse()).flatten());
+        pace_values.push(speed.and_then(|val| val.inverse()));
 
         let distance = node
             .descendants()

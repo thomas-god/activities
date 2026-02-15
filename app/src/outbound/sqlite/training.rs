@@ -497,7 +497,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                 let metric_ids: Vec<TrainingMetricId> = metric_ids_str
                     .split(',')
                     .filter(|s| !s.is_empty())
-                    .map(|id| TrainingMetricId::from(id))
+                    .map(TrainingMetricId::from)
                     .collect();
 
                 TrainingMetricsOrdering::try_from(metric_ids).map_err(|_| {
