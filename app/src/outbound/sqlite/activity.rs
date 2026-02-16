@@ -353,6 +353,7 @@ where
             LEFT FULL JOIN metrics ON t_activities.id = metrics.activity
             WHERE found IS NULL",
         );
+        builder.push(" AND user_id = ").push_bind(user);
 
         if let Some(date_range) = filters.date_range() {
             builder
@@ -393,8 +394,9 @@ where
             )
             SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback, value FROM t_activities
             LEFT FULL JOIN metrics ON t_activities.id = metrics.activity
-            WHERE found IS NOT NULL AND found IS TRUE;",
+            WHERE found IS NOT NULL AND found IS TRUE",
         );
+        builder.push(" AND user_id = ").push_bind(user);
 
         if let Some(date_range) = filters.date_range() {
             builder
@@ -2435,6 +2437,40 @@ mod test_sqlite_activity_repository {
         }
 
         #[tokio::test]
+        async fn test_list_activities_to_process_ignore_other_users() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+
+            // Activity not processed yet but for another user
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            assert!(
+                repository
+                    .get_activities_to_process_for_metric(
+                        &UserId::from("another-user"),
+                        &ListActivitiesFilters::empty(),
+                        &TimeseriesMetric::Cadence,
+                        &TimeseriesAggregate::Average
+                    )
+                    .await
+                    .unwrap()
+                    .is_empty(),
+            );
+        }
+
+        #[tokio::test]
         async fn test_get_activities_with_metrics_no_activities() {
             let db_file = NamedTempFile::new().unwrap();
             let raw_data_repository = MockRawDataRepository::new();
@@ -2524,6 +2560,47 @@ mod test_sqlite_activity_repository {
                 .unwrap();
             assert_eq!(rows.len(), 1);
             assert_eq!(rows.first().unwrap().1, 12.0)
+        }
+
+        #[tokio::test]
+        async fn test_get_activities_with_metrics_ignore_other_users() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+            // First activity Some(metric), but for another user
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("should save metric");
+
+            let rows = repository
+                .get_activities_with_metric(
+                    &UserId::from("another-user"),
+                    &ListActivitiesFilters::empty(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                )
+                .await
+                .unwrap();
+            assert!(rows.is_empty())
         }
     }
 }
