@@ -2602,5 +2602,56 @@ mod test_sqlite_activity_repository {
                 .unwrap();
             assert!(rows.is_empty())
         }
+
+        #[tokio::test]
+        async fn test_activity_deletion_cascade_on_metrics() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("should save metric");
+            assert_eq!(
+                sqlx::query_scalar::<_, u64>(
+                    "select count(*) from t_activities_timeseries_metrics;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                1
+            );
+            repository
+                .delete_activity(activity.id())
+                .await
+                .expect("deletion should succeed");
+            assert_eq!(
+                sqlx::query_scalar::<_, u64>(
+                    "select count(*) from t_activities_timeseries_metrics;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                0
+            );
+        }
     }
 }

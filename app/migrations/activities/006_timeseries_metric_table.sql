@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS t_activities_timeseries_metrics (
     aggregate TEXT,
     found BOOLEAN,
     value REAL,
-    FOREIGN KEY (activity) REFERENCES t_activities(id),
+    FOREIGN KEY (activity) REFERENCES t_activities(id) ON DELETE CASCADE,
     UNIQUE (activity, metric, aggregate)
 );
 
