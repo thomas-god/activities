@@ -26,6 +26,11 @@
 		}
 		return 'other';
 	};
+
+	const callback = async (newName: string) => {
+		title = newName;
+		onEditNameCallback(newName);
+	};
 </script>
 
 <div
@@ -36,7 +41,7 @@
 	</div>
 	<div class="flex flex-1 flex-col">
 		<div class="mb-1 text-lg font-semibold">
-			<EditableActivityName name={title} editCallback={onEditNameCallback} />
+			<EditableActivityName name={title} editCallback={callback} />
 		</div>
 		<div class="text-xs font-light">
 			{localiseDateTime(activity.start_time)}
