@@ -460,6 +460,16 @@ pub enum ListActivitiesError {
 }
 
 #[derive(Debug, Error)]
+pub enum UpdateActivityMetricError {
+    #[error("Activity {0} does not exist")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
 pub enum GetActivityError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
@@ -523,6 +533,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn save_activity(
         &self,
+        // TODO: une Activity sans timeseries devrait suffire normalement
         activity: &ActivityWithTimeseries,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
@@ -542,6 +553,31 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+
+    fn get_activities_with_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
+
+    fn get_activities_to_process_for_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> impl Future<Output = Result<Vec<ActivityId>, ListActivitiesError>> + Send;
+
+    fn update_activity_metric(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+        value: &Option<f64>,
+    ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
 
     fn get_activity(
         &self,

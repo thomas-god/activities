@@ -7,7 +7,8 @@ use crate::domain::models::{
     UserId,
     activity::{
         ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
-        ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport, WorkoutType,
+        ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
+        TimeseriesAggregate, TimeseriesMetric, WorkoutType,
     },
     preferences::{Preference, PreferenceKey},
     training::{
@@ -696,6 +697,82 @@ pub fn deserialize_preference(key: &PreferenceKey, value: &str) -> Result<Prefer
         PreferenceKey::FavoriteMetric => {
             let id = TrainingMetricId::from(value);
             Ok(Preference::FavoriteMetric(id))
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TimeseriesMetric {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesMetric {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Speed => "speed",
+            Self::Power => "power",
+            Self::HeartRate => "hr",
+            Self::Distance => "distance",
+            Self::Cadence => "cadence",
+            Self::Altitude => "altitude",
+            Self::Pace => "pace",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesMetric {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "speed" => Ok(Self::Speed),
+            "power" => Ok(Self::Power),
+            "hr" => Ok(Self::HeartRate),
+            "distance" => Ok(Self::Distance),
+            "cadence" => Ok(Self::Cadence),
+            "altitude" => Ok(Self::Altitude),
+            "pace" => Ok(Self::Pace),
+            _ => Err(format!("Unknown TimeseriesMetric: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TimeseriesAggregate {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesAggregate {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Average => "average",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::Sum => "sum",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesAggregate {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "average" => Ok(Self::Average),
+            "max" => Ok(Self::Max),
+            "min" => Ok(Self::Min),
+            "sum" => Ok(Self::Sum),
+            _ => Err(format!("Unknown TimeseriesAggregate: {}", s).into()),
         }
     }
 }

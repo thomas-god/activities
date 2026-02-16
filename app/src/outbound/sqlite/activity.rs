@@ -11,12 +11,13 @@ use crate::{
             activity::{
                 Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey,
                 ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistics,
-                ActivityWithTimeseries, Sport, WorkoutType,
+                ActivityWithTimeseries, Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
             },
         },
         ports::{
             ActivityRepository, DateTimeRange, ListActivitiesError, ListActivitiesFilters,
             RawActivity, RawDataRepository, SaveActivityError, SimilarActivityError,
+            UpdateActivityMetricError,
         },
     },
     inbound::parser::ParseFile,
@@ -33,6 +34,20 @@ type ActivityRow = (
     Option<WorkoutType>,
     Option<ActivityNutrition>,
     Option<ActivityFeedback>,
+);
+
+type ActivityRowWithMetric = (
+    ActivityId,
+    UserId,
+    Option<ActivityName>,
+    ActivityStartTime,
+    Sport,
+    ActivityStatistics,
+    Option<ActivityRpe>,
+    Option<WorkoutType>,
+    Option<ActivityNutrition>,
+    Option<ActivityFeedback>,
+    f64,
 );
 
 #[derive(Debug, Clone)]
@@ -283,6 +298,154 @@ where
         Ok(res)
     }
 
+    async fn update_activity_metric(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+        value: &Option<f64>,
+    ) -> Result<(), UpdateActivityMetricError> {
+        sqlx::query(
+            "INSERT INTO t_activities_timeseries_metrics
+            (activity, metric, aggregate, found, value)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT (activity, metric, aggregate)
+            DO UPDATE SET found=excluded.found, value=excluded.value;",
+        )
+        .bind(activity)
+        .bind(metric)
+        .bind(aggregate)
+        .bind(value.is_some())
+        .bind(value)
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(|err| match err {
+            sqlx::Error::Database(db_error) if db_error.is_foreign_key_violation() => {
+                UpdateActivityMetricError::ActivityDoesNotExist(activity.clone())
+            }
+            _ => UpdateActivityMetricError::Unknown(anyhow!(err)),
+        })
+    }
+
+    async fn get_activities_to_process_for_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> Result<Vec<ActivityId>, ListActivitiesError> {
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
+            "WITH metrics AS (
+	            SELECT * FROM t_activities_timeseries_metrics",
+        );
+        builder
+            .push(" WHERE t_activities_timeseries_metrics.metric = ")
+            .push_bind(metric);
+        builder
+            .push(" AND t_activities_timeseries_metrics.aggregate = ")
+            .push_bind(aggregate);
+        builder.push(
+            "
+            )
+            SELECT id FROM t_activities
+            LEFT FULL JOIN metrics ON t_activities.id = metrics.activity
+            WHERE found IS NULL",
+        );
+
+        if let Some(date_range) = filters.date_range() {
+            builder
+                .push(" AND start_time >= ")
+                .push_bind(date_range.start());
+            builder
+                .push(" AND start_time < ")
+                .push_bind(date_range.end());
+        }
+        let query = builder.build_query_as::<'_, (ActivityId,)>();
+
+        query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
+            .map(|rows| rows.into_iter().map(|(activity,)| activity).collect())
+    }
+
+    async fn get_activities_with_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
+            "WITH metrics AS (
+	            SELECT * FROM t_activities_timeseries_metrics",
+        );
+        builder
+            .push(" WHERE t_activities_timeseries_metrics.metric = ")
+            .push_bind(metric);
+        builder
+            .push(" AND t_activities_timeseries_metrics.aggregate = ")
+            .push_bind(aggregate);
+        builder.push(
+            "
+            )
+            SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback, value FROM t_activities
+            LEFT FULL JOIN metrics ON t_activities.id = metrics.activity
+            WHERE found IS NOT NULL AND found IS TRUE;",
+        );
+
+        if let Some(date_range) = filters.date_range() {
+            builder
+                .push(" AND start_time >= ")
+                .push_bind(date_range.start());
+            builder
+                .push(" AND start_time < ")
+                .push_bind(date_range.end());
+        }
+        let query = builder.build_query_as::<'_, ActivityRowWithMetric>();
+        query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
+            .map(|rows| {
+                rows.into_iter()
+                    .map(
+                        |(
+                            id,
+                            user_id,
+                            name,
+                            start_time,
+                            sport,
+                            statistics,
+                            rpe,
+                            workout_type,
+                            nutrition,
+                            feedback,
+                            metric_value,
+                        )| {
+                            (
+                                Activity::new(
+                                    id,
+                                    user_id,
+                                    name,
+                                    start_time,
+                                    sport,
+                                    statistics,
+                                    rpe,
+                                    workout_type,
+                                    nutrition,
+                                    feedback,
+                                ),
+                                metric_value,
+                            )
+                        },
+                    )
+                    .collect()
+            })
+    }
+
     async fn modify_activity_name(
         &self,
         id: &ActivityId,
@@ -392,10 +555,7 @@ where
         {
             Ok(row) => Ok(row.is_some()),
             Err(sqlx::Error::RowNotFound) => Ok(false),
-            Err(err) => {
-                tracing::warn!("hello?");
-                Err(SimilarActivityError::Unknown(anyhow!(err)))
-            }
+            Err(err) => Err(SimilarActivityError::Unknown(anyhow!(err))),
         }
     }
 
@@ -1835,5 +1995,535 @@ mod test_sqlite_activity_repository {
             res.first().unwrap().name(),
             format!("{}.fit", activity_1.id())
         )
+    }
+
+    mod test_sqlite_activity_repository_activity_metrics {
+
+        use super::*;
+
+        fn timeseries() -> ActivityTimeseries {
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Speed,
+                    vec![
+                        Some(TimeseriesValue::Float(1.3)),
+                        Some(TimeseriesValue::Float(1.45)),
+                        Some(TimeseriesValue::Float(1.15)),
+                        Some(TimeseriesValue::Float(2.45)),
+                    ],
+                )],
+            )
+            .unwrap()
+        }
+
+        fn test_activities() -> Vec<ActivityWithTimeseries> {
+            vec![
+                ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::from("activity-1"),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::new(
+                            "2025-09-03T00:00:00Z"
+                                .parse::<DateTime<FixedOffset>>()
+                                .unwrap(),
+                        ),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Calories,
+                            123.3,
+                        )])),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                    timeseries(),
+                ),
+                ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::from("activity-2"),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::new(
+                            "2025-09-04T00:00:00Z"
+                                .parse::<DateTime<FixedOffset>>()
+                                .unwrap(),
+                        ),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Calories,
+                            123.3,
+                        )])),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                    timeseries(),
+                ),
+                ActivityWithTimeseries::new(
+                    Activity::new(
+                        ActivityId::from("activity-3"),
+                        UserId::test_default(),
+                        None,
+                        ActivityStartTime::new(
+                            "2025-09-04T00:00:00Z"
+                                .parse::<DateTime<FixedOffset>>()
+                                .unwrap(),
+                        ),
+                        Sport::Cycling,
+                        ActivityStatistics::new(HashMap::from([(
+                            ActivityStatistic::Calories,
+                            123.3,
+                        )])),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                    timeseries(),
+                ),
+            ]
+        }
+
+        #[tokio::test]
+        async fn test_update_activity_metric_activity_does_not_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let res = repository
+                .update_activity_metric(
+                    &UserId::test_default(),
+                    &ActivityId::from("not-an-existing-activity"),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await;
+
+            let Err(UpdateActivityMetricError::ActivityDoesNotExist(id)) = res else {
+                unreachable!("Should be UpdateActivityMetricError::ActivityDoesNotExist(id)")
+            };
+
+            assert_eq!(id, ActivityId::from("not-an-existing-activity"))
+        }
+
+        #[tokio::test]
+        async fn test_update_activity_metric_ok() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = test_activities().first().cloned().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            repository
+                .update_activity_metric(
+                    &UserId::test_default(),
+                    &ActivityId::from("activity-1"),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("Should update activity's metric");
+            assert_eq!(
+                sqlx::query_as::<_, (bool, Option<f64>)>(
+                    "select found, value from t_activities_timeseries_metrics
+                    where activity = ?1
+                    and metric = ?2
+                    and aggregate = ?3;"
+                )
+                .bind(activity.id())
+                .bind(&TimeseriesMetric::Cadence)
+                .bind(&TimeseriesAggregate::Average)
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                (true, Some(12.))
+            )
+        }
+
+        #[tokio::test]
+        async fn test_update_activity_metric_ok_with_none() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = test_activities().first().cloned().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            repository
+                .update_activity_metric(
+                    &UserId::test_default(),
+                    &ActivityId::from("activity-1"),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &None,
+                )
+                .await
+                .expect("Should update activity's metric");
+            assert_eq!(
+                sqlx::query_as::<_, (bool, Option<f64>)>(
+                    "select found, value from t_activities_timeseries_metrics
+                    where activity = ?1
+                    and metric = ?2
+                    and aggregate = ?3;"
+                )
+                .bind(activity.id())
+                .bind(&TimeseriesMetric::Cadence)
+                .bind(&TimeseriesAggregate::Average)
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                (false, None)
+            )
+        }
+
+        #[tokio::test]
+        async fn test_update_activity_metric_existing_value_ok() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = test_activities().first().cloned().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            repository
+                .update_activity_metric(
+                    &UserId::test_default(),
+                    &ActivityId::from("activity-1"),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &None,
+                )
+                .await
+                .expect("Should update activity's metric");
+            repository
+                .update_activity_metric(
+                    &UserId::test_default(),
+                    &ActivityId::from("activity-1"),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(13.),
+                )
+                .await
+                .expect("Should update activity's metric that already exists");
+
+            assert_eq!(
+                sqlx::query_as::<_, (bool, Option<f64>)>(
+                    "select found, value from t_activities_timeseries_metrics
+                    where activity = ?1
+                    and metric = ?2
+                    and aggregate = ?3;"
+                )
+                .bind(activity.id())
+                .bind(&TimeseriesMetric::Cadence)
+                .bind(&TimeseriesAggregate::Average)
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                (true, Some(13.))
+            )
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_to_process_no_activities() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            assert!(
+                repository
+                    .get_activities_to_process_for_metric(
+                        &UserId::test_default(),
+                        &ListActivitiesFilters::empty(),
+                        &TimeseriesMetric::Cadence,
+                        &TimeseriesAggregate::Max
+                    )
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_to_process_metrics_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+            // First activity, Some(metric)
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("should save metric");
+
+            // Second activity, None metric
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &None,
+                )
+                .await
+                .expect("should save metric");
+
+            // Third activity, not processed yet
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            assert_eq!(
+                repository
+                    .get_activities_to_process_for_metric(
+                        &UserId::test_default(),
+                        &ListActivitiesFilters::empty(),
+                        &TimeseriesMetric::Cadence,
+                        &TimeseriesAggregate::Average
+                    )
+                    .await
+                    .unwrap(),
+                vec![ActivityId::from("activity-3")]
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_to_process_ignore_value_for_other_metrics() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+            // First activity, Some(other-metric)
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Power,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("should save metric");
+
+            // Second activity, Some(other-aggregate)
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Min,
+                    &None,
+                )
+                .await
+                .expect("should save metric");
+
+            // Third activity, not processed yet
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            assert_eq!(
+                repository
+                    .get_activities_to_process_for_metric(
+                        &UserId::test_default(),
+                        &ListActivitiesFilters::empty(),
+                        &TimeseriesMetric::Cadence,
+                        &TimeseriesAggregate::Average
+                    )
+                    .await
+                    .unwrap(),
+                vec![
+                    ActivityId::from("activity-1"),
+                    ActivityId::from("activity-2"),
+                    ActivityId::from("activity-3")
+                ]
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_activities_with_metrics_no_activities() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            assert!(
+                repository
+                    .get_activities_with_metric(
+                        &UserId::test_default(),
+                        &ListActivitiesFilters::empty(),
+                        &TimeseriesMetric::Cadence,
+                        &TimeseriesAggregate::Max
+                    )
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_activities_with_metrics_metrics_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let mut activities = test_activities().into_iter();
+            // First activity, Some(metric)
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &Some(12.),
+                )
+                .await
+                .expect("should save metric");
+
+            // Second activity, None metric, ignored
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+            repository
+                .update_activity_metric(
+                    activity.user(),
+                    activity.id(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                    &None,
+                )
+                .await
+                .expect("should save metric");
+
+            // Third activity, not processed yet, ignored
+            let activity = activities.next().unwrap();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("should save activity");
+
+            let rows = repository
+                .get_activities_with_metric(
+                    &UserId::test_default(),
+                    &ListActivitiesFilters::empty(),
+                    &TimeseriesMetric::Cadence,
+                    &TimeseriesAggregate::Average,
+                )
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows.first().unwrap().1, 12.0)
+        }
     }
 }

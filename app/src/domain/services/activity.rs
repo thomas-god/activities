@@ -44,6 +44,51 @@ where
             raw_data_repository,
         }
     }
+
+    async fn get_activities_with_statistic_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        statistic: &ActivityStatistic,
+    ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
+        let repository = self.activity_repository.lock().await;
+        let activities = repository.list_activities(user, filters).await?;
+
+        Ok(activities
+            .into_iter()
+            .filter_map(|activity| {
+                activity
+                    .statistics()
+                    .get(statistic)
+                    .cloned()
+                    .map(|value| (activity, value))
+            })
+            .collect())
+    }
+
+    async fn get_activities_with_timeseries_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
+        let repository = self.activity_repository.lock().await;
+        let activities = repository.list_activities(user, filters).await?;
+        let mut res = vec![];
+
+        for activity in activities.into_iter() {
+            if let Some(metric) = repository
+                .get_activity_with_timeseries(activity.id())
+                .await?
+                .and_then(|activity| aggregate.value_from_timeseries(metric, &activity))
+            {
+                res.push((activity, metric));
+            }
+        }
+
+        Ok(res)
+    }
 }
 
 impl<AR, RDR> IActivityService for ActivityService<AR, RDR>
@@ -127,36 +172,14 @@ where
         filters: &ListActivitiesFilters,
         source: &ActivityMetricSource,
     ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
-        let repository = self.activity_repository.lock().await;
-        let activities = repository.list_activities(user, filters).await?;
-
         match source {
             ActivityMetricSource::Statistic(statistic) => {
-                return Ok(activities
-                    .into_iter()
-                    .filter_map(|activity| {
-                        activity
-                            .statistics()
-                            .get(statistic)
-                            .cloned()
-                            .map(|value| (activity, value))
-                    })
-                    .collect());
+                self.get_activities_with_statistic_metric(user, filters, statistic)
+                    .await
             }
             ActivityMetricSource::Timeseries((metric, aggregate)) => {
-                let mut res = vec![];
-
-                for activity in activities.into_iter() {
-                    if let Some(metric) = repository
-                        .get_activity_with_timeseries(activity.id())
-                        .await?
-                        .and_then(|activity| aggregate.value_from_timeseries(metric, &activity))
-                    {
-                        res.push((activity, metric));
-                    }
-                }
-
-                Ok(res)
+                self.get_activities_with_timeseries_metric(user, filters, metric, aggregate)
+                    .await
             }
         }
     }
@@ -444,7 +467,7 @@ pub mod test_utils {
     use crate::domain::ports::{
         DeleteActivityError, GetActivityMetricError, GetAllActivitiesError,
         GetAllActivitiesRequest, ListActivitiesError, ModifyActivityError, RawActivity,
-        SaveActivityError, SimilarActivityError,
+        SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
 
     mock! {
@@ -640,6 +663,31 @@ pub mod test_utils {
                 user: &UserId,
                 filters: &ListActivitiesFilters
             ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
+
+            async fn get_activities_with_metric(
+                &self,
+                user: &UserId,
+                filters: &ListActivitiesFilters,
+                metric: &TimeseriesMetric,
+                aggregate: &TimeseriesAggregate,
+            ) -> Result<Vec<(Activity, f64)>, ListActivitiesError>;
+
+            async fn get_activities_to_process_for_metric(
+                &self,
+                user: &UserId,
+                filters: &ListActivitiesFilters,
+                metric: &TimeseriesMetric,
+                aggregate: &TimeseriesAggregate,
+            ) -> Result<Vec<ActivityId>, ListActivitiesError>;
+
+            async fn update_activity_metric(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+                metric: &TimeseriesMetric,
+                aggregate: &TimeseriesAggregate,
+                value: &Option<f64>,
+            ) -> Result<(), UpdateActivityMetricError>;
 
             async fn get_activity(
                 &self,
