@@ -637,7 +637,12 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Max,
-                TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                TrainingMetricFilters::new(
+                    Some(vec![SportFilter::Sport(Sport::Running)]),
+                    None,
+                    None,
+                    None,
+                ),
                 TrainingMetricGroupBy::none(),
             ),
         )
@@ -656,7 +661,12 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Max,
-                TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                TrainingMetricFilters::new(
+                    Some(vec![SportFilter::Sport(Sport::Running)]),
+                    None,
+                    None,
+                    None,
+                ),
                 Some(TrainingMetricGroupBy::Sport),
             ),
         )

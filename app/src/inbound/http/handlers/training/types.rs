@@ -142,7 +142,8 @@ pub struct APITrainingMetricFilters {
 
 impl From<APITrainingMetricFilters> for TrainingMetricFilters {
     fn from(value: APITrainingMetricFilters) -> Self {
-        Self::new(value.sports)
+        // TODO: update APITrainingMetricFilters to support new filter variants
+        Self::new(value.sports, None, None, None)
     }
 }
 

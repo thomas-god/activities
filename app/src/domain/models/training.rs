@@ -14,8 +14,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries, Sport,
-            SportCategory, TimeseriesAggregate, TimeseriesMetric, ToUnit, Unit,
+            Activity, ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries,
+            BonkStatus, Sport, SportCategory, TimeseriesAggregate, TimeseriesMetric, ToUnit, Unit,
+            WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -64,15 +65,35 @@ impl SportFilter {
 #[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
 pub struct TrainingMetricFilters {
     sports: Option<Vec<SportFilter>>,
+    workout_types: Option<Vec<WorkoutType>>,
+    bonked: Option<BonkStatus>,
+    rpes: Option<Vec<ActivityRpe>>,
 }
 
 impl TrainingMetricFilters {
     pub fn empty() -> Self {
-        Self { sports: None }
+        Self {
+            sports: None,
+            workout_types: None,
+            bonked: None,
+            rpes: None,
+        }
     }
 
     pub fn sports(&self) -> &Option<Vec<SportFilter>> {
         &self.sports
+    }
+
+    pub fn workout_types(&self) -> &Option<Vec<WorkoutType>> {
+        &self.workout_types
+    }
+
+    pub fn bonked(&self) -> &Option<BonkStatus> {
+        &self.bonked
+    }
+
+    pub fn rpes(&self) -> &Option<Vec<ActivityRpe>> {
+        &self.rpes
     }
 
     pub fn matches(&self, activity: &Activity) -> bool {
@@ -82,9 +103,45 @@ impl TrainingMetricFilters {
             .map(|sports| sports.iter().any(|filter| filter.matches(activity)))
             .unwrap_or(true);
 
-        // More explicit with multiple filters
-        #[allow(clippy::let_and_return)]
-        sport_matches
+        let workout_matches = self
+            .workout_types
+            .as_ref()
+            .map(|types| {
+                types.iter().any(|workout_type| {
+                    activity
+                        .workout_type()
+                        .map(|activity_workout_type| *workout_type == activity_workout_type)
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(true);
+
+        let bonk_status_matches = self
+            .bonked
+            .as_ref()
+            .map(|status| {
+                activity
+                    .nutrition()
+                    .as_ref()
+                    .map(|nutrition| nutrition.bonk_status() == *status)
+                    .unwrap_or(false)
+            })
+            .unwrap_or(true);
+
+        let rpes_matches = self
+            .rpes
+            .as_ref()
+            .map(|rpes| {
+                rpes.iter().any(|rpe| {
+                    activity
+                        .rpe()
+                        .map(|activity_rpe| *rpe == activity_rpe)
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(true);
+
+        sport_matches && workout_matches && bonk_status_matches && rpes_matches
     }
 }
 
@@ -1399,7 +1456,12 @@ mod test_training_metrics {
             ActivityMetricSource::Statistic(ActivityStatistic::Calories),
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
-            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+            TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                None,
+                None,
+                None,
+            ),
             TrainingMetricGroupBy::none(),
         );
 
@@ -1950,28 +2012,132 @@ mod test_granularity_bins {
 
 #[cfg(test)]
 mod test_training_metric_filters {
-    use crate::domain::models::activity::{ActivityId, ActivityStatistics};
+    use crate::domain::models::activity::{ActivityId, ActivityNutrition, ActivityStatistics};
 
     use super::*;
 
-    #[test]
-    fn test_sport_filter_matches_activity() {
-        let activity = Activity::new(
+    // Helper functions to reduce test boilerplate
+    fn default_start_time() -> ActivityStartTime {
+        ActivityStartTime::new(
+            "2025-09-03T00:00:00Z"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+        )
+    }
+
+    fn create_activity_with_sport(sport: Sport) -> Activity {
+        Activity::new(
             ActivityId::default(),
             UserId::test_default(),
             None,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            Sport::IndoorCycling,
+            default_start_time(),
+            sport,
             ActivityStatistics::default(),
             None,
             None,
             None,
             None,
-        );
+        )
+    }
+
+    fn create_activity_with_workout_type(workout_type: WorkoutType) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            default_start_time(),
+            Sport::Running,
+            ActivityStatistics::default(),
+            None,
+            Some(workout_type),
+            None,
+            None,
+        )
+    }
+
+    fn create_activity_with_bonk_status(bonk_status: BonkStatus) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            default_start_time(),
+            Sport::Running,
+            ActivityStatistics::default(),
+            None,
+            None,
+            Some(ActivityNutrition::new(bonk_status, None)),
+            None,
+        )
+    }
+
+    fn create_activity_with_rpe(rpe: ActivityRpe) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            default_start_time(),
+            Sport::Running,
+            ActivityStatistics::default(),
+            Some(rpe),
+            None,
+            None,
+            None,
+        )
+    }
+
+    fn create_activity_with_all_filters(
+        sport: Sport,
+        workout_type: WorkoutType,
+        bonk_status: BonkStatus,
+    ) -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            default_start_time(),
+            sport,
+            ActivityStatistics::default(),
+            Some(ActivityRpe::Eight),
+            Some(workout_type),
+            Some(ActivityNutrition::new(bonk_status, None)),
+            None,
+        )
+    }
+
+    fn create_activity_without_optional_fields() -> Activity {
+        Activity::new(
+            ActivityId::default(),
+            UserId::test_default(),
+            None,
+            default_start_time(),
+            Sport::Running,
+            ActivityStatistics::default(),
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    fn create_filter_with_sports(sports: Vec<SportFilter>) -> TrainingMetricFilters {
+        TrainingMetricFilters::new(Some(sports), None, None, None)
+    }
+
+    fn create_filter_with_workout_types(workout_types: Vec<WorkoutType>) -> TrainingMetricFilters {
+        TrainingMetricFilters::new(None, Some(workout_types), None, None)
+    }
+
+    fn create_filter_with_bonk_status(bonk_status: BonkStatus) -> TrainingMetricFilters {
+        TrainingMetricFilters::new(None, None, Some(bonk_status), None)
+    }
+
+    fn create_filter_with_rpes(rpes: Vec<ActivityRpe>) -> TrainingMetricFilters {
+        TrainingMetricFilters::new(None, None, None, Some(rpes))
+    }
+
+    #[test]
+    fn test_sport_filter_matches_activity() {
+        let activity = create_activity_with_sport(Sport::IndoorCycling);
 
         assert!(SportFilter::Sport(Sport::IndoorCycling).matches(&activity));
         assert!(!SportFilter::Sport(Sport::Cycling).matches(&activity));
@@ -1982,39 +2148,219 @@ mod test_training_metric_filters {
 
     #[test]
     fn test_filter_by_sport() {
-        let activity = Activity::new(
-            ActivityId::default(),
-            UserId::test_default(),
-            None,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            Sport::Cycling,
-            ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
-        );
+        let activity = create_activity_with_sport(Sport::Cycling);
 
         assert!(
-            TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Cycling)]))
-                .matches(&activity)
+            create_filter_with_sports(vec![SportFilter::Sport(Sport::Cycling)]).matches(&activity)
         );
         assert!(
-            TrainingMetricFilters::new(Some(vec![
+            create_filter_with_sports(vec![
                 SportFilter::Sport(Sport::Cycling),
                 SportFilter::Sport(Sport::Running)
-            ]))
+            ])
             .matches(&activity)
         );
         assert!(
-            !TrainingMetricFilters::new(Some(vec![SportFilter::Sport(Sport::Running)]))
-                .matches(&activity)
+            !create_filter_with_sports(vec![SportFilter::Sport(Sport::Running)]).matches(&activity)
         );
-        assert!(!TrainingMetricFilters::new(Some(vec![])).matches(&activity));
+        assert!(!create_filter_with_sports(vec![]).matches(&activity));
+    }
+
+    #[test]
+    fn test_filter_by_workout_type() {
+        let activity_with_workout = create_activity_with_workout_type(WorkoutType::Tempo);
+        let activity_without_workout = create_activity_without_optional_fields();
+
+        // Should match when activity has one of the specified workout types
+        assert!(
+            create_filter_with_workout_types(vec![WorkoutType::Tempo])
+                .matches(&activity_with_workout)
+        );
+        assert!(
+            create_filter_with_workout_types(vec![WorkoutType::Tempo, WorkoutType::Easy])
+                .matches(&activity_with_workout)
+        );
+
+        // Should not match when activity has different workout type
+        assert!(
+            !create_filter_with_workout_types(vec![WorkoutType::Easy])
+                .matches(&activity_with_workout)
+        );
+
+        // Should not match when activity has no workout type
+        assert!(
+            !create_filter_with_workout_types(vec![WorkoutType::Tempo])
+                .matches(&activity_without_workout)
+        );
+
+        // Empty list should not match anything
+        assert!(!create_filter_with_workout_types(vec![]).matches(&activity_with_workout));
+    }
+
+    #[test]
+    fn test_filter_by_bonked_status() {
+        let activity_bonked = create_activity_with_bonk_status(BonkStatus::Bonked);
+        let activity_not_bonked = create_activity_with_bonk_status(BonkStatus::None);
+        let activity_no_nutrition = create_activity_without_optional_fields();
+
+        // Should match when activity has matching bonk status
+        assert!(create_filter_with_bonk_status(BonkStatus::Bonked).matches(&activity_bonked));
+        assert!(create_filter_with_bonk_status(BonkStatus::None).matches(&activity_not_bonked));
+
+        // Should not match when bonk status is different
+        assert!(!create_filter_with_bonk_status(BonkStatus::Bonked).matches(&activity_not_bonked));
+        assert!(!create_filter_with_bonk_status(BonkStatus::None).matches(&activity_bonked));
+
+        // Should not match when activity has no nutrition data
+        assert!(
+            !create_filter_with_bonk_status(BonkStatus::Bonked).matches(&activity_no_nutrition)
+        );
+    }
+
+    #[test]
+    fn test_filter_by_rpe() {
+        let activity_rpe_eight = create_activity_with_rpe(ActivityRpe::Eight);
+        let activity_rpe_five = create_activity_with_rpe(ActivityRpe::Five);
+        let activity_no_rpe = create_activity_without_optional_fields();
+
+        // Should match when activity has one of the specified RPEs
+        assert!(create_filter_with_rpes(vec![ActivityRpe::Eight]).matches(&activity_rpe_eight));
+        assert!(
+            create_filter_with_rpes(vec![ActivityRpe::Eight, ActivityRpe::Five])
+                .matches(&activity_rpe_eight)
+        );
+        assert!(
+            create_filter_with_rpes(vec![ActivityRpe::Eight, ActivityRpe::Five])
+                .matches(&activity_rpe_five)
+        );
+
+        // Should not match when activity has different RPE
+        assert!(!create_filter_with_rpes(vec![ActivityRpe::Five]).matches(&activity_rpe_eight));
+        assert!(!create_filter_with_rpes(vec![ActivityRpe::Eight]).matches(&activity_rpe_five));
+
+        // Should not match when activity has no RPE
+        assert!(!create_filter_with_rpes(vec![ActivityRpe::Eight]).matches(&activity_no_rpe));
+
+        // Empty list should not match anything
+        assert!(!create_filter_with_rpes(vec![]).matches(&activity_rpe_eight));
+    }
+
+    #[test]
+    fn test_filter_by_multiple_criteria() {
+        let activity = create_activity_with_all_filters(
+            Sport::Running,
+            WorkoutType::Tempo,
+            BonkStatus::Bonked,
+        );
+
+        // Should match when all filters match
+        assert!(
+            TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                Some(vec![WorkoutType::Tempo]),
+                Some(BonkStatus::Bonked),
+                Some(vec![ActivityRpe::Eight])
+            )
+            .matches(&activity)
+        );
+
+        // Should not match when sport doesn't match
+        assert!(
+            !TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Cycling)]),
+                Some(vec![WorkoutType::Tempo]),
+                Some(BonkStatus::Bonked),
+                Some(vec![ActivityRpe::Eight])
+            )
+            .matches(&activity)
+        );
+
+        // Should not match when workout type doesn't match
+        assert!(
+            !TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                Some(vec![WorkoutType::Easy]),
+                Some(BonkStatus::Bonked),
+                Some(vec![ActivityRpe::Eight])
+            )
+            .matches(&activity)
+        );
+
+        // Should not match when bonk status doesn't match
+        assert!(
+            !TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                Some(vec![WorkoutType::Tempo]),
+                Some(BonkStatus::None),
+                Some(vec![ActivityRpe::Eight])
+            )
+            .matches(&activity)
+        );
+
+        // Should not match when RPE doesn't match
+        assert!(
+            !TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                Some(vec![WorkoutType::Tempo]),
+                Some(BonkStatus::None),
+                Some(vec![ActivityRpe::Nine])
+            )
+            .matches(&activity)
+        );
+    }
+
+    #[test]
+    fn test_filter_with_none_values_matches_any_activity() {
+        let activity_cycling = create_activity_with_sport(Sport::Cycling);
+        let activity_running = create_activity_with_sport(Sport::Running);
+        let activity_with_workout = create_activity_with_workout_type(WorkoutType::Tempo);
+        let activity_bonked = create_activity_with_bonk_status(BonkStatus::Bonked);
+        let activity_rpe_eight = create_activity_with_rpe(ActivityRpe::Eight);
+        let activity_minimal = create_activity_without_optional_fields();
+
+        // When sports filter is None, should match any sport
+        let filter_no_sport = TrainingMetricFilters::new(None, None, None, None);
+        assert!(filter_no_sport.matches(&activity_cycling));
+        assert!(filter_no_sport.matches(&activity_running));
+
+        // When workout_types filter is None, should match any workout type
+        let filter_no_workout = TrainingMetricFilters::new(
+            Some(vec![SportFilter::Sport(Sport::Running)]),
+            None,
+            None,
+            None,
+        );
+        assert!(filter_no_workout.matches(&activity_with_workout));
+        assert!(filter_no_workout.matches(&activity_minimal));
+
+        // When bonked filter is None, should match any bonk status
+        let filter_no_bonk = TrainingMetricFilters::new(
+            Some(vec![SportFilter::Sport(Sport::Running)]),
+            None,
+            None,
+            None,
+        );
+        assert!(filter_no_bonk.matches(&activity_bonked));
+        assert!(filter_no_bonk.matches(&activity_minimal));
+
+        // When rpe filter is None, should match any RPE
+        let filter_no_rpe = TrainingMetricFilters::new(
+            Some(vec![SportFilter::Sport(Sport::Running)]),
+            None,
+            None,
+            None,
+        );
+        assert!(filter_no_rpe.matches(&activity_rpe_eight));
+        assert!(filter_no_rpe.matches(&activity_minimal));
+
+        // Empty filter (all None) should match any activity
+        let empty_filter = TrainingMetricFilters::empty();
+        assert!(empty_filter.matches(&activity_cycling));
+        assert!(empty_filter.matches(&activity_running));
+        assert!(empty_filter.matches(&activity_with_workout));
+        assert!(empty_filter.matches(&activity_bonked));
+        assert!(empty_filter.matches(&activity_rpe_eight));
+        assert!(empty_filter.matches(&activity_minimal));
     }
 }
 
