@@ -2,7 +2,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::models::{
-    activity::{ActivityStatistic, Sport, TimeseriesAggregate, TimeseriesMetric},
+    activity::{
+        ActivityRpe, ActivityStatistic, BonkStatus, Sport, TimeseriesAggregate, TimeseriesMetric,
+        WorkoutType,
+    },
     training::{
         ActivityMetricSource, SportFilter, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope, TrainingPeriodId,
@@ -138,12 +141,14 @@ impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct APITrainingMetricFilters {
     sports: Option<Vec<SportFilter>>,
+    workout_types: Option<Vec<WorkoutType>>,
+    bonked: Option<BonkStatus>,
+    rpes: Option<Vec<ActivityRpe>>,
 }
 
 impl From<APITrainingMetricFilters> for TrainingMetricFilters {
     fn from(value: APITrainingMetricFilters) -> Self {
-        // TODO: update APITrainingMetricFilters to support new filter variants
-        Self::new(value.sports, None, None, None)
+        Self::new(value.sports, value.workout_types, value.bonked, value.rpes)
     }
 }
 
