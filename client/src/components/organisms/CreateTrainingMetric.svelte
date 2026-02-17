@@ -125,6 +125,39 @@
 
 	let requestPending = $state(false);
 
+	// Build filters object based on selected filter values
+	let activeFilters = $derived.by(() => {
+		let filters: any = {};
+
+		if (sportFilterSelected) {
+			const sportFilter = selectedSports.map((sport) => ({
+				Sport: sport
+			}));
+			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
+				SportCategory: category
+			}));
+			const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+				...sportFilter,
+				...sportCategoriesFilter
+			];
+			filters.sports = sportFilters;
+		}
+
+		if (workoutTypeFilterSelected && selectedWorkoutTypes.length > 0) {
+			filters.workout_types = selectedWorkoutTypes.map(workoutTypeToAPI);
+		}
+
+		if (bonkStatusFilterSelected && selectedBonkStatus !== null) {
+			filters.bonked = bonkStatusToAPI(selectedBonkStatus);
+		}
+
+		if (rpeFilterSelected && selectedRpes.length > 0) {
+			filters.rpes = selectedRpes;
+		}
+
+		return filters;
+	});
+
 	let previewRequest = $derived.by(() => {
 		const start = dayjs().subtract(3, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ');
 		const end = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
@@ -139,31 +172,8 @@
 			end: string;
 		} = { source: statisticSource, granularity, aggregate, start, end };
 
-		let filters: any = {};
-		if (sportFilterSelected) {
-			const sportFilter = selectedSports.map((sport) => ({
-				Sport: sport
-			}));
-			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
-				SportCategory: category
-			}));
-			const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
-				...sportFilter,
-				...sportCategoriesFilter
-			];
-			filters.sports = sportFilters;
-		}
-		if (workoutTypeFilterSelected && selectedWorkoutTypes.length > 0) {
-			filters.workout_types = selectedWorkoutTypes.map(workoutTypeToAPI);
-		}
-		if (bonkStatusFilterSelected && selectedBonkStatus !== null) {
-			filters.bonked = bonkStatusToAPI(selectedBonkStatus);
-		}
-		if (rpeFilterSelected && selectedRpes.length > 0) {
-			filters.rpes = selectedRpes;
-		}
-		if (Object.keys(filters).length > 0) {
-			payload = { ...payload, filters };
+		if (Object.keys(activeFilters).length > 0) {
+			payload = { ...payload, filters: activeFilters };
 		}
 
 		if (groupBy !== 'None') {
@@ -191,32 +201,13 @@
 			aggregate: typeof aggregate;
 			filters: {};
 			group_by?: Exclude<typeof groupBy, 'None'>;
-		} = { name: metricName.trim(), source: statisticSource, granularity, aggregate, filters: {} };
-
-		let filters: any = {};
-		if (sportFilterSelected) {
-			const sportFilter = selectedSports.map((sport) => ({
-				Sport: sport
-			}));
-			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
-				SportCategory: category
-			}));
-			const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
-				...sportFilter,
-				...sportCategoriesFilter
-			];
-			filters.sports = sportFilters;
-		}
-		if (workoutTypeFilterSelected && selectedWorkoutTypes.length > 0) {
-			filters.workout_types = selectedWorkoutTypes;
-		}
-		if (bonkStatusFilterSelected && selectedBonkStatus !== null) {
-			filters.bonked = selectedBonkStatus;
-		}
-		if (rpeFilterSelected && selectedRpes.length > 0) {
-			filters.rpes = selectedRpes;
-		}
-		basePayload = { ...basePayload, filters };
+		} = {
+			name: metricName.trim(),
+			source: statisticSource,
+			granularity,
+			aggregate,
+			filters: activeFilters
+		};
 
 		if (groupBy !== 'None') {
 			basePayload = { ...basePayload, group_by: groupBy };
