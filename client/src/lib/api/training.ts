@@ -63,6 +63,9 @@ const MetricsListItemSchemaGrouped = z.object({
 	granularity: z.string(),
 	aggregate: z.enum(metricAggregateFunctions),
 	sports: z.array(z.string()).optional(),
+	workout_types: z.array(z.string()).optional(),
+	bonked: z.string().nullable().optional(),
+	rpes: z.array(z.string()).optional(),
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
 	group_by: z.enum(groupByClauses).nullable(),
 	scope: z.discriminatedUnion('type', [

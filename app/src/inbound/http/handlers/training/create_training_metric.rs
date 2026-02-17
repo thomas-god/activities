@@ -50,7 +50,7 @@ fn build_request(
         body.source.into(),
         body.granularity.into(),
         body.aggregate.into(),
-        body.filters.into(),
+        body.filters.try_into()?,
         body.group_by.map(TrainingMetricGroupBy::from),
         body.scope.into(),
     ))
@@ -94,7 +94,7 @@ pub async fn create_training_metric<
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_create_training_metric {
 
     use super::*;
 
@@ -180,6 +180,24 @@ mod tests {
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
+            "scope": {"type": "global"}
+        }"#,
+            )
+            .is_ok()
+        );
+
+        assert!(
+            serde_json::from_str::<CreateTrainingMetricBody>(
+                r#"{
+            "name": "My Custom Metric",
+            "source": { "Statistic": "Calories"},
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {
+                "rpes":[1, 5],
+                "bonked": "Bonked",
+                "workout_types": ["Tempo", "Easy"]
+            },
             "scope": {"type": "global"}
         }"#,
             )

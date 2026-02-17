@@ -86,6 +86,9 @@ pub struct ResponseBodyItem {
     granularity: String,
     aggregate: String,
     sports: Vec<String>,
+    workout_types: Vec<String>,
+    bonked: Option<String>,
+    rpes: Vec<String>,
     values: GroupedMetricValues,
     group_by: Option<String>,
     scope: ScopePayload,
@@ -112,6 +115,23 @@ fn to_response_body_item(
             .sports()
             .as_ref()
             .map(|sports| sports.iter().map(|sport| sport.to_string()).collect())
+            .unwrap_or_default(),
+        workout_types: definition
+            .filters()
+            .workout_types()
+            .as_ref()
+            .map(|types| types.iter().map(|wt| wt.to_string()).collect())
+            .unwrap_or_default(),
+        bonked: definition
+            .filters()
+            .bonked()
+            .as_ref()
+            .map(|status| status.to_string()),
+        rpes: definition
+            .filters()
+            .rpes()
+            .as_ref()
+            .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect())
             .unwrap_or_default(),
         values,
         group_by: definition.group_by().as_ref().map(|g| format!("{:?}", g)),

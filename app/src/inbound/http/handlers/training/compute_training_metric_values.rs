@@ -87,7 +87,9 @@ pub async fn compute_training_metric_values<
     // Build the training metric definition from the request
     let filters = request
         .filters
-        .map(TrainingMetricFilters::from)
+        .map(TrainingMetricFilters::try_from)
+        .transpose()
+        .map_err(|_| StatusCode::BAD_REQUEST)?
         .unwrap_or_else(TrainingMetricFilters::empty);
 
     let group_by = request.group_by.map(|gb| gb.into());

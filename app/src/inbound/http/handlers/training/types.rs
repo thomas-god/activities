@@ -143,12 +143,28 @@ pub struct APITrainingMetricFilters {
     sports: Option<Vec<SportFilter>>,
     workout_types: Option<Vec<WorkoutType>>,
     bonked: Option<BonkStatus>,
-    rpes: Option<Vec<ActivityRpe>>,
+    rpes: Option<Vec<u8>>,
 }
 
-impl From<APITrainingMetricFilters> for TrainingMetricFilters {
-    fn from(value: APITrainingMetricFilters) -> Self {
-        Self::new(value.sports, value.workout_types, value.bonked, value.rpes)
+impl TryFrom<APITrainingMetricFilters> for TrainingMetricFilters {
+    type Error = String;
+    fn try_from(value: APITrainingMetricFilters) -> Result<Self, Self::Error> {
+        let rpes = value
+            .rpes
+            .map(|raw_rpes| {
+                raw_rpes
+                    .iter()
+                    .map(|&raw_rpe| ActivityRpe::try_from(raw_rpe))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?;
+
+        Ok(Self::new(
+            value.sports,
+            value.workout_types,
+            value.bonked,
+            rpes,
+        ))
     }
 }
 
