@@ -3,6 +3,9 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
+	import { WORKOUT_TYPE_LABELS, workoutTypeToAPI, type WorkoutType } from '$lib/workout-type';
+	import { BONK_STATUS_VALUES, bonkStatusToAPI, type BonkStatus } from '$lib/nutrition';
+	import { RPE_VALUES } from '$lib/rpe';
 	import SportsSelect from '../molecules/SportsSelect.svelte';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 
@@ -67,6 +70,12 @@
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
 	let sportFilterSelected = $state(false);
+	let selectedWorkoutTypes: WorkoutType[] = $state([]);
+	let workoutTypeFilterSelected = $state(false);
+	let selectedBonkStatus: BonkStatus | null = $state(null);
+	let bonkStatusFilterSelected = $state(false);
+	let selectedRpes: number[] = $state([]);
+	let rpeFilterSelected = $state(false);
 	let metricName = $state('');
 
 	let chartWidth: number = $state(0);
@@ -92,7 +101,7 @@
 			if (stat === 'Duration') return 's';
 			if (stat === 'NormalizedPower') return 'W';
 		} else if ('Timeseries' in source.source) {
-			const [metric, _] = source.source.Timeseries;
+			const [metric, _aggregate] = source.source.Timeseries;
 			if (metric === 'HeartRate') return 'bpm';
 			if (metric === 'Power') return 'W';
 			if (metric === 'Speed') return 'km/h';
@@ -128,6 +137,7 @@
 			end: string;
 		} = { source: statisticSource, granularity, aggregate, start, end };
 
+		let filters: any = {};
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
 				Sport: sport
@@ -135,11 +145,23 @@
 			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
 				SportCategory: category
 			}));
-			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+			const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
 				...sportFilter,
 				...sportCategoriesFilter
 			];
-			payload = { ...payload, filters: { sports: filters } };
+			filters.sports = sportFilters;
+		}
+		if (workoutTypeFilterSelected && selectedWorkoutTypes.length > 0) {
+			filters.workout_types = selectedWorkoutTypes.map(workoutTypeToAPI);
+		}
+		if (bonkStatusFilterSelected && selectedBonkStatus !== null) {
+			filters.bonked = bonkStatusToAPI(selectedBonkStatus);
+		}
+		if (rpeFilterSelected && selectedRpes.length > 0) {
+			filters.rpes = selectedRpes;
+		}
+		if (Object.keys(filters).length > 0) {
+			payload = { ...payload, filters };
 		}
 
 		if (groupBy !== 'None') {
@@ -169,6 +191,7 @@
 			group_by?: Exclude<typeof groupBy, 'None'>;
 		} = { name: metricName.trim(), source: statisticSource, granularity, aggregate, filters: {} };
 
+		let filters: any = {};
 		if (sportFilterSelected) {
 			const sportFilter = selectedSports.map((sport) => ({
 				Sport: sport
@@ -176,12 +199,22 @@
 			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
 				SportCategory: category
 			}));
-			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+			const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
 				...sportFilter,
 				...sportCategoriesFilter
 			];
-			basePayload = { ...basePayload, filters: { sports: filters } };
+			filters.sports = sportFilters;
 		}
+		if (workoutTypeFilterSelected && selectedWorkoutTypes.length > 0) {
+			filters.workout_types = selectedWorkoutTypes;
+		}
+		if (bonkStatusFilterSelected && selectedBonkStatus !== null) {
+			filters.bonked = selectedBonkStatus;
+		}
+		if (rpeFilterSelected && selectedRpes.length > 0) {
+			filters.rpes = selectedRpes;
+		}
+		basePayload = { ...basePayload, filters };
 
 		if (groupBy !== 'None') {
 			basePayload = { ...basePayload, group_by: groupBy };
@@ -353,6 +386,96 @@
 				{#if sportFilterSelected}
 					<div class="max-h-96 overflow-scroll">
 						<SportsSelect bind:selectedSports bind:selectedSportCategories />
+					</div>
+				{/if}
+
+				<div class="divider"></div>
+
+				<div class="mb-2 font-semibold">
+					<span class="pr-2"> Filter activities by workout type </span>
+					<input
+						type="checkbox"
+						bind:checked={workoutTypeFilterSelected}
+						class="toggle toggle-sm"
+					/>
+				</div>
+				{#if workoutTypeFilterSelected}
+					<div class="grid grid-cols-2 gap-2">
+						{#each WORKOUT_TYPE_LABELS as { value, label } (value)}
+							<label class="label cursor-pointer justify-start gap-2">
+								<input
+									type="checkbox"
+									class="checkbox checkbox-sm"
+									{value}
+									checked={selectedWorkoutTypes.includes(value)}
+									onchange={(e) => {
+										if (e.currentTarget.checked) {
+											selectedWorkoutTypes = [...selectedWorkoutTypes, value];
+										} else {
+											selectedWorkoutTypes = selectedWorkoutTypes.filter((wt) => wt !== value);
+										}
+									}}
+								/>
+								<span class="label-text text-xs">{label}</span>
+							</label>
+						{/each}
+					</div>
+				{/if}
+
+				<div class="divider"></div>
+
+				<div class="mb-2 font-semibold">
+					<span class="pr-2"> Filter activities by bonk status </span>
+					<input type="checkbox" bind:checked={bonkStatusFilterSelected} class="toggle toggle-sm" />
+				</div>
+				{#if bonkStatusFilterSelected}
+					<div class="flex gap-4">
+						{#each BONK_STATUS_VALUES as status (status)}
+							<label class="label cursor-pointer justify-start gap-2">
+								<input
+									type="radio"
+									name="bonk-status"
+									class="radio radio-sm"
+									value={status}
+									checked={selectedBonkStatus === status}
+									onchange={() => {
+										selectedBonkStatus = status;
+									}}
+								/>
+								<span class="label-text text-xs capitalize"
+									>{status === 'none' ? 'No bonk' : 'Bonked'}</span
+								>
+							</label>
+						{/each}
+					</div>
+				{/if}
+
+				<div class="divider"></div>
+
+				<div class="mb-2 font-semibold">
+					<span class="pr-2"> Filter activities by RPE </span>
+					<input type="checkbox" bind:checked={rpeFilterSelected} class="toggle toggle-sm" />
+				</div>
+				{#if rpeFilterSelected}
+					<div class="grid grid-cols-5 gap-2">
+						{#each RPE_VALUES as rpe (rpe)}
+							<label class="label cursor-pointer justify-start gap-2">
+								<input
+									type="checkbox"
+									class="checkbox checkbox-sm"
+									value={rpe}
+									checked={selectedRpes.includes(rpe)}
+									onchange={(e) => {
+										if (e.currentTarget.checked) {
+											selectedRpes = [...selectedRpes, rpe];
+										} else {
+											selectedRpes = selectedRpes.filter((r) => r !== rpe);
+										}
+									}}
+								/>
+								<span class="label-text text-xs">{rpe}/10</span>
+							</label>
+						{/each}
 					</div>
 				{/if}
 			</div>

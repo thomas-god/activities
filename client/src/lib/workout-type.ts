@@ -29,6 +29,23 @@ export const workoutTypeDisplay = (type: WorkoutType): string => {
 	}
 };
 
+export const workoutTypeToAPI = (type: WorkoutType): string => {
+	switch (type) {
+		case 'easy':
+			return 'Easy';
+		case 'tempo':
+			return 'Tempo';
+		case 'intervals':
+			return 'Intervals';
+		case 'long_run':
+			return 'LongRun';
+		case 'race':
+			return 'Race';
+		case 'cross_training':
+			return 'CrossTraining';
+	}
+};
+
 /**
  * All workout types with their display labels
  */

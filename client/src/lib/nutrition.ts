@@ -6,6 +6,15 @@ export type Nutrition = {
 	details: string | null;
 };
 
+export const bonkStatusToAPI = (status: BonkStatus): string => {
+	switch (status) {
+		case 'bonked':
+			return 'Bonked';
+		case 'none':
+			return 'None';
+	}
+};
+
 export const getBonkStatusLabel = (status: BonkStatus | null): string => {
 	if (status === null) return 'Not set';
 	switch (status) {
