@@ -3,10 +3,12 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import { WORKOUT_TYPE_LABELS, workoutTypeToAPI, type WorkoutType } from '$lib/workout-type';
-	import { BONK_STATUS_VALUES, bonkStatusToAPI, type BonkStatus } from '$lib/nutrition';
-	import { RPE_VALUES } from '$lib/rpe';
-	import SportsSelect from '../molecules/SportsSelect.svelte';
+	import { workoutTypeToAPI, type WorkoutType } from '$lib/workout-type';
+	import { bonkStatusToAPI, type BonkStatus } from '$lib/nutrition';
+	import SportFilter from '../molecules/SportFilter.svelte';
+	import WorkoutTypeFilter from '../molecules/WorkoutTypeFilter.svelte';
+	import BonkStatusFilter from '../molecules/BonkStatusFilter.svelte';
+	import RpeFilter from '../molecules/RpeFilter.svelte';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 
 	export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
@@ -379,105 +381,23 @@
 
 				<div class="divider"></div>
 
-				<div class="mb-2 font-semibold">
-					<span class="pr-2"> Filter activities by sports </span>
-					<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
-				</div>
-				{#if sportFilterSelected}
-					<div class="max-h-96 overflow-scroll">
-						<SportsSelect bind:selectedSports bind:selectedSportCategories />
-					</div>
-				{/if}
+				<SportFilter
+					bind:enabled={sportFilterSelected}
+					bind:selectedSports
+					bind:selectedSportCategories
+				/>
 
 				<div class="divider"></div>
 
-				<div class="mb-2 font-semibold">
-					<span class="pr-2"> Filter activities by workout type </span>
-					<input
-						type="checkbox"
-						bind:checked={workoutTypeFilterSelected}
-						class="toggle toggle-sm"
-					/>
-				</div>
-				{#if workoutTypeFilterSelected}
-					<div class="grid grid-cols-2 gap-2">
-						{#each WORKOUT_TYPE_LABELS as { value, label } (value)}
-							<label class="label cursor-pointer justify-start gap-2">
-								<input
-									type="checkbox"
-									class="checkbox checkbox-sm"
-									{value}
-									checked={selectedWorkoutTypes.includes(value)}
-									onchange={(e) => {
-										if (e.currentTarget.checked) {
-											selectedWorkoutTypes = [...selectedWorkoutTypes, value];
-										} else {
-											selectedWorkoutTypes = selectedWorkoutTypes.filter((wt) => wt !== value);
-										}
-									}}
-								/>
-								<span class="label-text text-xs">{label}</span>
-							</label>
-						{/each}
-					</div>
-				{/if}
+				<WorkoutTypeFilter bind:enabled={workoutTypeFilterSelected} bind:selectedWorkoutTypes />
 
 				<div class="divider"></div>
 
-				<div class="mb-2 font-semibold">
-					<span class="pr-2"> Filter activities by bonk status </span>
-					<input type="checkbox" bind:checked={bonkStatusFilterSelected} class="toggle toggle-sm" />
-				</div>
-				{#if bonkStatusFilterSelected}
-					<div class="flex gap-4">
-						{#each BONK_STATUS_VALUES as status (status)}
-							<label class="label cursor-pointer justify-start gap-2">
-								<input
-									type="radio"
-									name="bonk-status"
-									class="radio radio-sm"
-									value={status}
-									checked={selectedBonkStatus === status}
-									onchange={() => {
-										selectedBonkStatus = status;
-									}}
-								/>
-								<span class="label-text text-xs capitalize"
-									>{status === 'none' ? 'No bonk' : 'Bonked'}</span
-								>
-							</label>
-						{/each}
-					</div>
-				{/if}
+				<BonkStatusFilter bind:enabled={bonkStatusFilterSelected} bind:selectedBonkStatus />
 
 				<div class="divider"></div>
 
-				<div class="mb-2 font-semibold">
-					<span class="pr-2"> Filter activities by RPE </span>
-					<input type="checkbox" bind:checked={rpeFilterSelected} class="toggle toggle-sm" />
-				</div>
-				{#if rpeFilterSelected}
-					<div class="grid grid-cols-5 gap-2">
-						{#each RPE_VALUES as rpe (rpe)}
-							<label class="label cursor-pointer justify-start gap-2">
-								<input
-									type="checkbox"
-									class="checkbox checkbox-sm"
-									value={rpe}
-									checked={selectedRpes.includes(rpe)}
-									onchange={(e) => {
-										if (e.currentTarget.checked) {
-											selectedRpes = [...selectedRpes, rpe];
-										} else {
-											selectedRpes = selectedRpes.filter((r) => r !== rpe);
-										}
-									}}
-								/>
-								<span class="label-text text-xs">{rpe}/10</span>
-							</label>
-						{/each}
-					</div>
-				{/if}
+				<RpeFilter bind:enabled={rpeFilterSelected} bind:selectedRpes />
 			</div>
 		</details>
 
