@@ -16,9 +16,7 @@
 
 	let screenWidth = $state(0);
 	let showDownloadModal = $state(false);
-	let sorted_activities = $derived(
-		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
-	);
+
 	let selectedActivityId: string | null = $state(null);
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
 
@@ -195,63 +193,69 @@
 	</div>
 
 	<!-- View Content -->
-	{#if viewMode === 'list'}
-		<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
-			<div class="grow basis-0 overflow-y-auto">
-				<ActivitiesList
-					activityList={sorted_activities}
-					{initialRpe}
-					{initialWorkoutTypes}
-					{initialSportCategories}
-					{initialShowNotes}
-					onFiltersChange={handleFilterChange}
-					onActivitySelected={handleActivitySelected}
-					selectedActivity={selectedActivityId}
-				/>
-			</div>
-			{#if selectedActivityPromise && screenWidth >= 700}
-				<div
-					class="relative w-full grow basis-0 overflow-auto rounded-box bg-base-100 pt-4 shadow-md"
-				>
-					{#await selectedActivityPromise}
-						<div class="flex items-center justify-center">
-							<span class="loading loading-lg loading-spinner"></span>
-						</div>
-					{:then selectedActivity}
-						{#if selectedActivity}
-							<button onclick={() => handleActivitySelected(null)} class="absolute right-3"
-								>X</button
-							>
-							<ActivityDetails
-								activity={selectedActivity}
-								onActivityUpdated={() => handleActivityUpdated(selectedActivity.id)}
-								onActivityDeleted={handleActivityDeleted}
-								compact={true}
-							/>
-						{:else}
+	{#await data.activities}
+		<div class="flex w-full flex-col items-center p-4 pt-6">
+			<div class="loading loading-bars"></div>
+		</div>
+	{:then activities}
+		{#if viewMode === 'list'}
+			<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
+				<div class="grow basis-0 overflow-y-auto">
+					<ActivitiesList
+						activityList={activities}
+						{initialRpe}
+						{initialWorkoutTypes}
+						{initialSportCategories}
+						{initialShowNotes}
+						onFiltersChange={handleFilterChange}
+						onActivitySelected={handleActivitySelected}
+						selectedActivity={selectedActivityId}
+					/>
+				</div>
+				{#if selectedActivityPromise && screenWidth >= 700}
+					<div
+						class="relative w-full grow basis-0 overflow-auto rounded-box bg-base-100 pt-4 shadow-md"
+					>
+						{#await selectedActivityPromise}
+							<div class="flex items-center justify-center">
+								<span class="loading loading-lg loading-spinner"></span>
+							</div>
+						{:then selectedActivity}
+							{#if selectedActivity}
+								<button onclick={() => handleActivitySelected(null)} class="absolute right-3"
+									>X</button
+								>
+								<ActivityDetails
+									activity={selectedActivity}
+									onActivityUpdated={() => handleActivityUpdated(selectedActivity.id)}
+									onActivityDeleted={handleActivityDeleted}
+									compact={true}
+								/>
+							{:else}
+								<div
+									class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+								>
+									Failed to load activity
+								</div>
+							{/if}
+						{:catch error}
 							<div
 								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
 							>
-								Failed to load activity
+								Failed to load activity: {error.message}
 							</div>
-						{/if}
-					{:catch error}
-						<div
-							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-						>
-							Failed to load activity: {error.message}
-						</div>
-					{/await}
-				</div>
-			{/if}
-		</div>
-	{:else}
-		<ActivitiesCalendar
-			activityList={sorted_activities}
-			{currentMonth}
-			onMonthChange={handleMonthChange}
-		/>
-	{/if}
-</div>
+						{/await}
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<ActivitiesCalendar
+				activityList={activities}
+				{currentMonth}
+				onMonthChange={handleMonthChange}
+			/>
+		{/if}
 
-<DownloadActivitiesModal bind:isOpen={showDownloadModal} activityCount={data.activities.length} />
+		<DownloadActivitiesModal bind:isOpen={showDownloadModal} activityCount={activities.length} />
+	{/await}
+</div>
