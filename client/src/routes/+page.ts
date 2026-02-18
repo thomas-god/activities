@@ -9,18 +9,13 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 	const startDate = dayjs().startOf('isoWeek').subtract(3, 'weeks').toDate();
 	const endDate = dayjs().add(1, 'day').endOf('day').toDate();
 
-	const [activities, metrics, trainingPeriods, trainingNotes] = await Promise.all([
-		fetchActivities(fetch, undefined, startDate, endDate),
-		fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
-		fetchTrainingPeriods(fetch),
-		fetchTrainingNotes(fetch, depends, startDate, endDate)
-	]);
-
 	return {
-		activities,
-		metrics,
-		trainingPeriods,
-		trainingNotes
+		activitiesWithNotes: Promise.all([
+			fetchActivities(fetch, undefined, startDate, endDate),
+			fetchTrainingNotes(fetch, depends, startDate, endDate)
+		]),
+		metrics: fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
+		trainingPeriods: fetchTrainingPeriods(fetch)
 	};
 };
 

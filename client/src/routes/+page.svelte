@@ -22,18 +22,14 @@
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 
-	let sorted_activities = $derived(
-		data.activities.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
-	);
-
-	// Filter ongoing training periods (no end date or end date >= today)
-	let ongoingPeriods = $derived.by(() => {
-		const today = dayjs().startOf('day');
-		return data.trainingPeriods.filter((period) => {
-			if (period.end === null) return true;
-			return dayjs(period.end).isAfter(today) || dayjs(period.end).isSame(today);
-		});
-	});
+	// // Filter ongoing training periods (no end date or end date >= today)
+	// let ongoingPeriods = $derived.by(() => {
+	// 	const today = dayjs().startOf('day');
+	// 	return data.trainingPeriods.filter((period) => {
+	// 		if (period.end === null) return true;
+	// 		return dayjs(period.end).isAfter(today) || dayjs(period.end).isSame(today);
+	// 	});
+	// });
 
 	const moreActivitiesCallback = () => {
 		goto('/history');
@@ -65,54 +61,72 @@
 <svelte:window bind:innerWidth={screenWidth} />
 
 <div class="homepage_container">
-	{#if ongoingPeriods.length > 0}
-		<div
-			class={`item periods rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
-		>
-			<div class="p-4">
-				<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
-				<div class="flex flex-col gap-2">
-					{#each ongoingPeriods as period}
-						<TrainingPeriodCard {period} />
-					{/each}
+	{#await data.trainingPeriods}
+		<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+			<div class="loading loading-bars"></div>
+		</div>
+	{:then periods}
+		{#if periods.length > 0}
+			<div
+				class={`item periods rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
+			>
+				<div class="p-4">
+					<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
+					<div class="flex flex-col gap-2">
+						{#each periods as period}
+							<TrainingPeriodCard {period} />
+						{/each}
+					</div>
 				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
+	{/await}
 
 	<div
 		bind:clientWidth={chartWidth}
 		class={`item metric_chart rounded-box bg-base-100 shadow-md  ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 	>
 		<h2 class="px-4 pt-4 text-lg font-semibold">Training metrics</h2>
-		{#if screenWidth < 700}
-			<TrainingMetricsCarousel
-				metrics={data.metrics}
-				height={chartHeight}
-				onUpdate={() => invalidate(`app:activities`)}
-				onDelete={() => invalidate(`app:activities`)}
-			/>
-		{:else}
-			<TrainingMetricsList
-				metrics={data.metrics}
-				height={chartHeight}
-				onUpdate={() => invalidate(`app:activities`)}
-				onDelete={() => invalidate(`app:activities`)}
-			/>
-		{/if}
+		{#await data.metrics}
+			<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+				<div class="loading loading-bars"></div>
+			</div>
+		{:then metrics}
+			{#if screenWidth < 700}
+				<TrainingMetricsCarousel
+					{metrics}
+					height={chartHeight}
+					onUpdate={() => invalidate(`app:activities`)}
+					onDelete={() => invalidate(`app:activities`)}
+				/>
+			{:else}
+				<TrainingMetricsList
+					{metrics}
+					height={chartHeight}
+					onUpdate={() => invalidate(`app:activities`)}
+					onDelete={() => invalidate(`app:activities`)}
+				/>
+			{/if}
+		{/await}
 	</div>
 
 	<div class="item history">
 		<div>
-			<PastActivitiesList
-				activityList={sorted_activities}
-				trainingNotes={data.trainingNotes}
-				moreCallback={moreActivitiesCallback}
-				onNoteSave={handleNoteSave}
-				onNoteDelete={handleNoteDelete}
-				onActivityClick={handleActivityClick}
-				{selectedActivityId}
-			/>
+			{#await data.activitiesWithNotes}
+				<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+					<div class="loading loading-bars"></div>
+				</div>
+			{:then [activities, notes]}
+				<PastActivitiesList
+					activityList={activities}
+					trainingNotes={notes}
+					moreCallback={moreActivitiesCallback}
+					onNoteSave={handleNoteSave}
+					onNoteDelete={handleNoteDelete}
+					onActivityClick={handleActivityClick}
+					{selectedActivityId}
+				/>
+			{/await}
 		</div>
 	</div>
 

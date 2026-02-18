@@ -27,6 +27,10 @@
 		selectedActivityId?: string | null;
 	} = $props();
 
+	let sorted_activities = $derived(
+		activityList.toSorted((a, b) => (a.start_time < b.start_time ? 1 : -1))
+	);
+
 	let groupedItems = $derived.by(() => {
 		const now = dayjs();
 		const items = {
@@ -36,7 +40,7 @@
 		};
 
 		// Add activities to timeline
-		for (const activity of activityList) {
+		for (const activity of sorted_activities) {
 			const date = dayjs(activity.start_time);
 			const item: TimelineItem = {
 				type: 'activity',
