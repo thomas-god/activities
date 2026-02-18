@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::anyhow;
+use chrono::NaiveDate;
 use derive_more::Constructor;
 use tokio::sync::Mutex;
 
@@ -324,6 +325,16 @@ where
         user: &UserId,
     ) -> Vec<crate::domain::models::training::TrainingPeriod> {
         self.training_repository.get_training_periods(user).await
+    }
+
+    async fn get_active_training_periods(
+        &self,
+        user: &UserId,
+        ref_date: &NaiveDate,
+    ) -> Vec<crate::domain::models::training::TrainingPeriod> {
+        self.training_repository
+            .get_active_training_periods(user, ref_date)
+            .await
     }
 
     async fn get_training_period_with_activities(
@@ -750,6 +761,12 @@ pub mod test_utils {
                 user: &UserId,
             ) -> Vec<TrainingPeriod>;
 
+            async fn get_active_training_periods(
+                &self,
+                user: &UserId,
+                ref_date: &NaiveDate,
+            ) -> Vec<TrainingPeriod>;
+
             async fn get_training_period(
                 &self,
                 user: &UserId,
@@ -911,6 +928,12 @@ pub mod test_utils {
             async fn get_training_periods(
                 &self,
                 user: &UserId,
+            ) -> Vec<TrainingPeriod>;
+
+            async fn get_active_training_periods(
+                &self,
+                user: &UserId,
+                ref_date: &NaiveDate,
             ) -> Vec<TrainingPeriod>;
 
             async fn get_training_period(

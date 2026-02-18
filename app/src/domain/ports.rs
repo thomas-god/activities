@@ -914,6 +914,12 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
 
+    fn get_active_training_periods(
+        &self,
+        user: &UserId,
+        ref_date: &NaiveDate,
+    ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
+
     fn get_training_period(
         &self,
         user: &UserId,
@@ -1380,6 +1386,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn get_training_periods(
         &self,
         user: &UserId,
+    ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
+
+    fn get_active_training_periods(
+        &self,
+        user: &UserId,
+        ref_date: &NaiveDate,
     ) -> impl Future<Output = Vec<TrainingPeriod>> + Send;
 
     fn get_training_period(

@@ -318,6 +318,32 @@ impl TrainingRepository for SqliteTrainingRepository {
         .unwrap_or_default()
     }
 
+    async fn get_active_training_periods(
+        &self,
+        user: &UserId,
+        ref_date: &NaiveDate,
+    ) -> Vec<crate::domain::models::training::TrainingPeriod> {
+        sqlx::query_as::<_, TrainingPeriodRow>(
+            "SELECT id, user_id, start, end, name, sports, note
+            FROM t_training_periods
+            WHERE user_id = ?1
+              AND start <= ?2
+              AND (end IS NULL OR end >= ?2);",
+        )
+        .bind(user)
+        .bind(ref_date)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .filter_map(|(id, user_id, start, end, name, sports, note)| {
+                    TrainingPeriod::new(id, user_id, start, end, name, sports, note).ok()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+    }
+
     async fn delete_training_period(
         &self,
         period_id: &TrainingPeriodId,
@@ -1387,6 +1413,241 @@ mod test_sqlite_training_repository {
             .await;
 
         assert!(periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_training_periods_with_both_start_and_end() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period from 2025-10-01 to 2025-12-31
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-12-31".parse::<NaiveDate>().unwrap()),
+            "Q4 2025".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Test ref_date within period (should return the period)
+        let ref_date = "2025-11-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date)
+            .await;
+        assert_eq!(active_periods, vec![period.clone()]);
+
+        // Test ref_date on start date (should return the period)
+        let ref_date_start = "2025-10-01".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_start)
+            .await;
+        assert_eq!(active_periods, vec![period.clone()]);
+
+        // Test ref_date on end date (should return the period)
+        let ref_date_end = "2025-12-31".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_end)
+            .await;
+        assert_eq!(active_periods, vec![period.clone()]);
+
+        // Test ref_date before start (should return empty)
+        let ref_date_before = "2025-09-30".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_before)
+            .await;
+        assert!(active_periods.is_empty());
+
+        // Test ref_date after end (should return empty)
+        let ref_date_after = "2026-01-01".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_after)
+            .await;
+        assert!(active_periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_training_periods_with_no_end_date() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create a period starting 2025-10-01 with no end date
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-01".parse::<NaiveDate>().unwrap(),
+            None,
+            "Open-ended period".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Test ref_date after start (should return the period)
+        let ref_date = "2026-06-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date)
+            .await;
+        assert_eq!(active_periods, vec![period.clone()]);
+
+        // Test ref_date on start date (should return the period)
+        let ref_date_start = "2025-10-01".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_start)
+            .await;
+        assert_eq!(active_periods, vec![period.clone()]);
+
+        // Test ref_date before start (should return empty)
+        let ref_date_before = "2025-09-30".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period.user(), &ref_date_before)
+            .await;
+        assert!(active_periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_training_periods_multiple_periods() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Create multiple periods with different date ranges
+        let period1 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-01-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-03-31".parse::<NaiveDate>().unwrap()),
+            "Q1 2025".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let period2 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-04-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-06-30".parse::<NaiveDate>().unwrap()),
+            "Q2 2025".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        let period3 = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-07-01".parse::<NaiveDate>().unwrap(),
+            None,
+            "Q3 2025 onwards".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period1.clone())
+            .await
+            .expect("Should save period1");
+        repository
+            .save_training_period(period2.clone())
+            .await
+            .expect("Should save period2");
+        repository
+            .save_training_period(period3.clone())
+            .await
+            .expect("Should save period3");
+
+        // Test ref_date in period1 (should return only period1)
+        let ref_date = "2025-02-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period1.user(), &ref_date)
+            .await;
+        assert_eq!(active_periods, vec![period1]);
+
+        // Test ref_date in period2 (should return only period2)
+        let ref_date = "2025-05-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period2.user(), &ref_date)
+            .await;
+        assert_eq!(active_periods, vec![period2]);
+
+        // Test ref_date in period3 (should return only period3)
+        let ref_date = "2025-08-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(period3.user(), &ref_date)
+            .await;
+        assert_eq!(active_periods, vec![period3]);
+
+        // Test ref_date before all periods (should return empty)
+        let ref_date = "2024-12-31".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(&UserId::test_default(), &ref_date)
+            .await;
+        assert!(active_periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_training_periods_exclude_other_users() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = TrainingPeriod::new(
+            TrainingPeriodId::new(),
+            UserId::test_default(),
+            "2025-10-01".parse::<NaiveDate>().unwrap(),
+            Some("2025-12-31".parse::<NaiveDate>().unwrap()),
+            "Q4 2025".into(),
+            TrainingPeriodSports::new(None),
+            None,
+        )
+        .unwrap();
+
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        // Test with another user (should return empty)
+        let ref_date = "2025-11-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(&UserId::from("another_user".to_string()), &ref_date)
+            .await;
+        assert!(active_periods.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_active_training_periods_empty() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Test with no periods saved
+        let ref_date = "2025-11-15".parse::<NaiveDate>().unwrap();
+        let active_periods = repository
+            .get_active_training_periods(&UserId::test_default(), &ref_date)
+            .await;
+        assert!(active_periods.is_empty());
     }
 
     #[tokio::test]
