@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset, NaiveDate};
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{QueryBuilder, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::domain::{
     models::{
@@ -17,7 +17,7 @@ use crate::domain::{
         },
     },
     ports::{
-        DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
+        DateRange, DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
         GetTrainingMetricsDefinitionsError, GetTrainingMetricsOrderingError, GetTrainingNoteError,
         SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
         SetTrainingMetricsOrderingError, TrainingRepository,
@@ -419,14 +419,25 @@ impl TrainingRepository for SqliteTrainingRepository {
     async fn get_training_notes(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
-        let rows = sqlx::query_as::<_, TrainingNoteRow>(
-            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE user_id = ?1 ORDER BY created_at DESC;",
-        )
-        .bind(user.to_string())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
+        let mut builder = QueryBuilder::<'_, Sqlite>::new(
+            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE user_id = ",
+        );
+        builder.push_bind(user.to_string());
+
+        if let Some(range) = date_range {
+            builder.push(" AND date >= ").push_bind(range.start());
+            builder.push(" AND date < ").push_bind(range.end());
+        }
+
+        builder.push(" ORDER BY created_at DESC");
+
+        let rows = builder
+            .build_query_as::<TrainingNoteRow>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
 
         rows.into_iter()
             .map(|(id, user_id, title, content, date, created_at)| {
@@ -2077,7 +2088,7 @@ mod test_sqlite_training_repository {
 
         // Get notes for test user
         let notes = repository
-            .get_training_notes(&user_id)
+            .get_training_notes(&user_id, &None)
             .await
             .expect("Should retrieve notes");
 
@@ -2094,7 +2105,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let notes = repository
-            .get_training_notes(&UserId::new())
+            .get_training_notes(&UserId::new(), &None)
             .await
             .expect("Should not error");
 
@@ -2140,13 +2151,150 @@ mod test_sqlite_training_repository {
             .expect("Should save newer note");
 
         let notes = repository
-            .get_training_notes(&user_id)
+            .get_training_notes(&user_id, &None)
             .await
             .expect("Should retrieve notes");
 
         // Newer note should come first
         assert_eq!(notes[0].id(), newer_note.id());
         assert_eq!(notes[1].id(), older_note.id());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_notes_filters_by_date_range() {
+        use crate::domain::ports::DateRange;
+
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let user_id = UserId::test_default();
+
+        // Create notes with different dates
+        let note_jan_15 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("January 15")),
+            TrainingNoteContent::from("Note on Jan 15"),
+            TrainingNoteDate::try_from("2025-01-15").unwrap(),
+            Utc::now().into(),
+        );
+
+        let note_jan_20 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("January 20")),
+            TrainingNoteContent::from("Note on Jan 20"),
+            TrainingNoteDate::try_from("2025-01-20").unwrap(),
+            Utc::now().into(),
+        );
+
+        let note_jan_25 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("January 25")),
+            TrainingNoteContent::from("Note on Jan 25"),
+            TrainingNoteDate::try_from("2025-01-25").unwrap(),
+            Utc::now().into(),
+        );
+
+        let note_feb_01 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("February 1")),
+            TrainingNoteContent::from("Note on Feb 1"),
+            TrainingNoteDate::try_from("2025-02-01").unwrap(),
+            Utc::now().into(),
+        );
+
+        // Save all notes
+        repository
+            .save_training_note(note_jan_15.clone())
+            .await
+            .expect("Should save note");
+        repository
+            .save_training_note(note_jan_20.clone())
+            .await
+            .expect("Should save note");
+        repository
+            .save_training_note(note_jan_25.clone())
+            .await
+            .expect("Should save note");
+        repository
+            .save_training_note(note_feb_01.clone())
+            .await
+            .expect("Should save note");
+
+        // Filter notes from Jan 18 to Jan 31
+        let date_range = DateRange::new(
+            "2025-01-18".parse::<NaiveDate>().unwrap(),
+            "2025-01-31".parse::<NaiveDate>().unwrap(),
+        );
+        let notes = repository
+            .get_training_notes(&user_id, &Some(date_range))
+            .await
+            .expect("Should retrieve notes");
+
+        // Should only include note_jan_20 and note_jan_25
+        assert_eq!(notes.len(), 2);
+        assert!(notes.iter().any(|n| n.id() == note_jan_20.id()));
+        assert!(notes.iter().any(|n| n.id() == note_jan_25.id()));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_notes_date_range_end_is_exclusive() {
+        use crate::domain::ports::DateRange;
+
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let user_id = UserId::test_default();
+
+        // Create notes on different dates
+        let note_jan_19 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("January 19")),
+            TrainingNoteContent::from("Note on Jan 19"),
+            TrainingNoteDate::try_from("2025-01-19").unwrap(),
+            Utc::now().into(),
+        );
+
+        let note_jan_20 = TrainingNote::new(
+            TrainingNoteId::new(),
+            user_id.clone(),
+            Some(TrainingNoteTitle::from("January 20")),
+            TrainingNoteContent::from("Note on Jan 20"),
+            TrainingNoteDate::try_from("2025-01-20").unwrap(),
+            Utc::now().into(),
+        );
+
+        // Save notes
+        repository
+            .save_training_note(note_jan_19.clone())
+            .await
+            .expect("Should save note");
+        repository
+            .save_training_note(note_jan_20.clone())
+            .await
+            .expect("Should save note");
+
+        // Filter with end date = Jan 20 (end should be exclusive)
+        let date_range = DateRange::new(
+            "2025-01-15".parse::<NaiveDate>().unwrap(),
+            "2025-01-20".parse::<NaiveDate>().unwrap(),
+        );
+        let notes = repository
+            .get_training_notes(&user_id, &Some(date_range))
+            .await
+            .expect("Should retrieve notes");
+
+        // Should only include note_jan_19, not note_jan_20 (end is exclusive)
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].id(), note_jan_19.id());
     }
 
     #[tokio::test]

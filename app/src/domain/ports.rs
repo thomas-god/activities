@@ -960,6 +960,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn get_training_notes(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
 
     fn update_training_note(
@@ -1424,6 +1425,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn get_training_notes(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
 
     fn update_training_note(

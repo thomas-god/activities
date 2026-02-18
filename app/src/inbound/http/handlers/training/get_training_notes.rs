@@ -1,7 +1,12 @@
-use axum::{Extension, Json, extract::State, http::StatusCode};
-use serde::Serialize;
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+    http::StatusCode,
+};
+use chrono::{DateTime, FixedOffset, Local};
+use serde::{Deserialize, Serialize};
 
-use crate::domain::ports::{IActivityService, IPreferencesService};
+use crate::domain::ports::{DateRange, IActivityService, IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
@@ -10,6 +15,25 @@ use crate::{
     },
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct TrainingNotesQuery {
+    start: Option<DateTime<FixedOffset>>,
+    end: Option<DateTime<FixedOffset>>,
+}
+
+impl From<&TrainingNotesQuery> for Option<DateRange> {
+    fn from(value: &TrainingNotesQuery) -> Self {
+        value.start.map(|start| {
+            let start_date = start.date_naive();
+            let end_date = value
+                .end
+                .map(|e| e.date_naive())
+                .unwrap_or_else(|| Local::now().date_naive());
+            DateRange::new(start_date, end_date)
+        })
+    }
+}
 
 #[derive(Debug, Serialize)]
 pub struct TrainingNoteResponse {
@@ -47,10 +71,13 @@ pub async fn get_training_notes<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    Query(query): Query<TrainingNotesQuery>,
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
+    let date_range = Option::<DateRange>::from(&query);
+
     state
         .training_metrics_service
-        .get_training_notes(user.user())
+        .get_training_notes(user.user(), &date_range)
         .await
         .map(|notes| Json(notes.into_iter().map(TrainingNoteResponse::from).collect()))
         .map_err(StatusCode::from)

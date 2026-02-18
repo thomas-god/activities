@@ -545,8 +545,11 @@ where
     async fn get_training_notes(
         &self,
         user: &UserId,
+        date_range: &Option<DateRange>,
     ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
-        self.training_repository.get_training_notes(user).await
+        self.training_repository
+            .get_training_notes(user, date_range)
+            .await
     }
 
     async fn update_training_note(
@@ -793,6 +796,7 @@ pub mod test_utils {
             async fn get_training_notes(
                 &self,
                 user: &UserId,
+                date_range: &Option<DateRange>,
             ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
 
             async fn update_training_note(
@@ -952,6 +956,7 @@ pub mod test_utils {
             async fn get_training_notes(
                 &self,
                 user: &UserId,
+                date_range: &Option<DateRange>,
             ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
 
             async fn update_training_note(
