@@ -16,16 +16,17 @@ export const load: PageLoad = async ({ fetch, params, depends }) => {
 		redirect(307, '/');
 	}
 
-	// Fetch training notes (we'll filter them on the client side based on period dates)
+	// Fetch training notes and metrics for the same period date range
 	depends('app:training-notes');
-	const trainingNotes = await fetchTrainingNotes(fetch, depends);
-
-	// Fetch training metrics for the period date range
 	const startDate = dayjs(periodDetails.start).toDate();
 	const endDate = periodDetails.end ? dayjs(periodDetails.end).toDate() : new Date();
-	const metrics = await fetchTrainingMetrics(fetch, startDate, endDate, {
-		period: params.period_id
-	});
+
+	const [trainingNotes, metrics] = await Promise.all([
+		fetchTrainingNotes(fetch, depends, startDate, endDate),
+		fetchTrainingMetrics(fetch, startDate, endDate, {
+			period: params.period_id
+		})
+	]);
 
 	return { periodDetails, trainingNotes, metrics };
 };

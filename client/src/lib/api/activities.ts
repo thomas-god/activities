@@ -4,6 +4,7 @@ import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 import { BONK_STATUS_VALUES } from '$lib/nutrition';
+import { dayjs } from '$lib/duration';
 
 // =============================================================================
 // Schemas
@@ -79,12 +80,25 @@ export type ActivityDetails = z.infer<typeof ActivityDetailsSchema>;
  */
 export async function fetchActivities(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	limit?: number
+	limit?: number,
+	start?: Date | string,
+	end?: Date | string
 ): Promise<ActivityList> {
-	const url = limit
-		? `${PUBLIC_APP_URL}/api/activities?limit=${limit}`
-		: `${PUBLIC_APP_URL}/api/activities`;
+	const params = new URLSearchParams();
 
+	if (start) {
+		const startDate = dayjs(start).format('YYYY-MM-DD');
+		params.set('start_date', startDate);
+	}
+	if (end) {
+		const endDate = dayjs(end).format('YYYY-MM-DD');
+		params.set('end_date', endDate);
+	}
+	if (limit) {
+		params.set('limit', limit.toString());
+	}
+
+	const url = `${PUBLIC_APP_URL}/api/activities?${params.toString()}`;
 	const res = await fetch(url, {
 		method: 'GET',
 		mode: 'cors',

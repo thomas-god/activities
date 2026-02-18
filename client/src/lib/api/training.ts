@@ -78,6 +78,7 @@ const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);
 
 const TrainingNoteSchema = z.object({
 	id: z.string(),
+	title: z.string().nullable().optional(),
 	content: z.string(),
 	date: z.string(),
 	created_at: z.string()
@@ -217,14 +218,34 @@ export async function fetchTrainingMetrics(
 /**
  * Fetch all training notes for the current user
  * @param fetch - The fetch function from SvelteKit
+ * @param depends - The depends function from SvelteKit loader
+ * @param start - Optional start date for filtering notes
+ * @param end - Optional end date for filtering notes
  * @returns Array of training notes or empty array on error
  */
 export async function fetchTrainingNotes(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	depends: (...deps: `${string}:${string}`[]) => void
+	depends: (...deps: `${string}:${string}`[]) => void,
+	start?: Date | string,
+	end?: Date | string
 ): Promise<TrainingNotesList> {
 	depends('app:training-notes');
-	const res = await fetch(`${PUBLIC_APP_URL}/api/training/notes`, {
+
+	const params = new URLSearchParams();
+
+	if (start) {
+		const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
+		params.set('start', startDate);
+	}
+
+	if (end) {
+		const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
+		params.set('end', endDate);
+	}
+
+	const url = `${PUBLIC_APP_URL}/api/training/notes?${params.toString()}`;
+
+	const res = await fetch(url, {
 		method: 'GET',
 		mode: 'cors',
 		credentials: 'include'
