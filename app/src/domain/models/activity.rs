@@ -8,7 +8,6 @@ use std::{
 
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Display, From, Into};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -176,8 +175,12 @@ impl ActivityWithTimeseries {
         &self.timeseries
     }
 
-    pub fn active_duration(&self) -> Option<usize> {
-        self.timeseries.active_time.duration()
+    pub fn active_duration(&self) -> Option<f64> {
+        self.timeseries
+            .active_time
+            .duration()
+            .map(|duration| duration as f64)
+            .or_else(|| self.statistics().get(&ActivityStatistic::Duration).cloned())
     }
 }
 
@@ -1085,7 +1088,7 @@ impl TimeseriesAggregate {
             (TimeseriesMetric::Pace, Self::Average) => {
                 let (Some(distance), Some(duration)) = (
                     activity.statistics().get(&ActivityStatistic::Distance),
-                    activity.statistics().get(&ActivityStatistic::Duration),
+                    activity.active_duration(),
                 ) else {
                     return None;
                 };
@@ -1763,7 +1766,7 @@ mod test_timeseries {
     }
 
     #[test]
-    fn test_aggregate_average_pace_missing_duration() {
+    fn test_aggregate_average_pace_no_active_time_and_missing_duration() {
         let activity = ActivityWithTimeseries::new(
             Activity::new(
                 ActivityId::default(),
@@ -1784,9 +1787,9 @@ mod test_timeseries {
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
                 TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1800),
-                    ActiveTime::Running(3600),
+                    ActiveTime::Paused,
+                    ActiveTime::Paused,
+                    ActiveTime::Paused,
                 ]),
                 vec![],
                 vec![Timeseries::new(
@@ -1964,5 +1967,142 @@ mod test_timeseries {
         let active_time = TimeseriesActiveTime::new(vec![ActiveTime::Running(42)]);
 
         assert_eq!(active_time.duration(), Some(42));
+    }
+
+    #[test]
+    fn test_active_duration_from_timeseries() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 9999.0)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 100, 250, 500]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(100),
+                    ActiveTime::Running(250),
+                    ActiveTime::Running(500),
+                ]),
+                vec![],
+                vec![],
+            )
+            .unwrap(),
+        );
+
+        // Should return timeseries duration (500), not statistics duration (9999)
+        assert_eq!(activity.active_duration(), Some(500.0));
+    }
+
+    #[test]
+    fn test_active_duration_fallback_to_statistics() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 100, 250]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Paused,
+                    ActiveTime::Paused,
+                    ActiveTime::Paused,
+                ]),
+                vec![],
+                vec![],
+            )
+            .unwrap(),
+        );
+
+        // Timeseries has no running values, should fall back to statistics
+        assert_eq!(activity.active_duration(), Some(3600.0));
+    }
+
+    #[test]
+    fn test_active_duration_both_none() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::default(),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 100]),
+                TimeseriesActiveTime::new(vec![ActiveTime::Paused, ActiveTime::Paused]),
+                vec![],
+                vec![],
+            )
+            .unwrap(),
+        );
+
+        // No duration in either timeseries or statistics
+        assert_eq!(activity.active_duration(), None);
+    }
+
+    #[test]
+    fn test_active_duration_empty_timeseries_with_statistics() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1800.0)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![]),
+                TimeseriesActiveTime::new(vec![]),
+                vec![],
+                vec![],
+            )
+            .unwrap(),
+        );
+
+        // Empty timeseries, should use statistics
+        assert_eq!(activity.active_duration(), Some(1800.0));
     }
 }
