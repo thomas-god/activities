@@ -86,7 +86,6 @@ pub enum APITimeseriesAggregate {
     Min,
     Max,
     Average,
-    Sum,
 }
 
 impl From<APITimeseriesAggregate> for TimeseriesAggregate {
@@ -95,7 +94,6 @@ impl From<APITimeseriesAggregate> for TimeseriesAggregate {
             APITimeseriesAggregate::Min => Self::Min,
             APITimeseriesAggregate::Max => Self::Max,
             APITimeseriesAggregate::Average => Self::Average,
-            APITimeseriesAggregate::Sum => Self::Sum,
         }
     }
 }

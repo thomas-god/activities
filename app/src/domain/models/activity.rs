@@ -1032,7 +1032,6 @@ pub enum TimeseriesAggregate {
     Min,
     Max,
     Average,
-    Sum,
 }
 
 impl TimeseriesAggregate {
@@ -1064,7 +1063,6 @@ impl TimeseriesAggregate {
                 .into_iter()
                 .reduce(|acc, e| acc + e)
                 .map(|val| val / length as f64),
-            Self::Sum => values.into_iter().reduce(|acc, e| acc + e),
         }
     }
 }
@@ -1435,16 +1433,5 @@ mod test_timeseries {
         let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 20.)
-    }
-
-    #[test]
-    fn test_extract_aggregated_activity_metric_total_value() {
-        let metric = TimeseriesMetric::Power;
-        let aggregate = TimeseriesAggregate::Sum;
-        let activity = default_activity();
-
-        let res = aggregate.value_from_timeseries(&metric, &activity);
-        assert!(res.is_some());
-        assert_eq!(res.unwrap(), 60.)
     }
 }

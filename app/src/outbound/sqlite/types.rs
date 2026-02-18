@@ -757,7 +757,6 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesAggregate {
             Self::Average => "average",
             Self::Max => "max",
             Self::Min => "min",
-            Self::Sum => "sum",
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
@@ -771,7 +770,6 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesAggregate {
             "average" => Ok(Self::Average),
             "max" => Ok(Self::Max),
             "min" => Ok(Self::Min),
-            "sum" => Ok(Self::Sum),
             _ => Err(format!("Unknown TimeseriesAggregate: {}", s).into()),
         }
     }
