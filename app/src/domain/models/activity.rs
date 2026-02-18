@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt::{self},
     hash::Hash,
+    ops::Div,
     str::FromStr,
 };
 
@@ -869,6 +870,31 @@ impl ActivityTimeseries {
     pub fn metrics(&self) -> &[Timeseries] {
         &self.metrics
     }
+
+    /// Returns the numeric values for the requested metric, filtering out missing entries.
+    ///
+    /// This scans the stored timeseries for a matching metric and collects only the
+    /// present values, converting them to `f64`.
+    ///
+    /// # Trade-offs
+    /// - Missing samples are removed, so the resulting vector may be shorter than the
+    ///   original timeseries and no longer align by index with other metrics or time.
+    /// - Returning `None` indicates the metric was not found; an empty vector would
+    ///   indicate the metric exists but all values are missing.
+    pub fn metric_values(&self, metric: &TimeseriesMetric) -> Option<Vec<f64>> {
+        self.metrics.iter().find_map(|m| {
+            if m.metric() == metric {
+                Some(
+                    m.values()
+                        .iter()
+                        .filter_map(|val| val.as_ref().map(f64::from))
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// [TimeseriesTime] represents the relative timestamp of a timeseries, starting from the
@@ -1040,26 +1066,26 @@ impl TimeseriesAggregate {
         metric: &TimeseriesMetric,
         activity: &ActivityWithTimeseries,
     ) -> Option<f64> {
-        let values: Vec<f64> = activity.timeseries().metrics().iter().find_map(|m| {
-            if m.metric() == metric {
-                Some(
-                    m.values()
-                        .iter()
-                        .filter_map(|val| val.as_ref().map(f64::from))
-                        .collect(),
-                )
-            } else {
-                None
-            }
-        })?;
+        let values = activity.timeseries().metric_values(metric)?;
         if values.is_empty() {
             return None;
         }
         let length = values.len();
-        match self {
-            Self::Min => values.into_iter().reduce(f64::min),
-            Self::Max => values.into_iter().reduce(f64::max),
-            Self::Average => values
+
+        match (metric, self) {
+            (TimeseriesMetric::Pace, Self::Average) => {
+                let (Some(distance), Some(duration)) = (
+                    activity.statistics().get(&ActivityStatistic::Distance),
+                    activity.statistics().get(&ActivityStatistic::Duration),
+                ) else {
+                    return None;
+                };
+
+                Some(duration.div(distance))
+            }
+            (_, Self::Min) => values.into_iter().reduce(f64::min),
+            (_, Self::Max) => values.into_iter().reduce(f64::max),
+            (_, Self::Average) => values
                 .into_iter()
                 .reduce(|acc, e| acc + e)
                 .map(|val| val / length as f64),
@@ -1433,5 +1459,439 @@ mod test_timeseries {
         let res = aggregate.value_from_timeseries(&metric, &activity);
         assert!(res.is_some());
         assert_eq!(res.unwrap(), 20.)
+    }
+
+    #[test]
+    fn test_metric_values_existing_metric() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+            ]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Power,
+                vec![
+                    Some(TimeseriesValue::Int(100)),
+                    Some(TimeseriesValue::Int(200)),
+                    Some(TimeseriesValue::Int(300)),
+                ],
+            )],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::Power);
+        assert!(values.is_some());
+        assert_eq!(values.unwrap(), vec![100.0, 200.0, 300.0]);
+    }
+
+    #[test]
+    fn test_metric_values_nonexistent_metric() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+            ]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Power,
+                vec![
+                    Some(TimeseriesValue::Int(100)),
+                    Some(TimeseriesValue::Int(200)),
+                    Some(TimeseriesValue::Int(300)),
+                ],
+            )],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::HeartRate);
+        assert!(values.is_none());
+    }
+
+    #[test]
+    fn test_metric_values_with_none_values() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2, 3, 4]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+                ActiveTime::Running(3),
+                ActiveTime::Running(4),
+            ]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::HeartRate,
+                vec![
+                    Some(TimeseriesValue::Int(120)),
+                    None,
+                    Some(TimeseriesValue::Int(140)),
+                    None,
+                    Some(TimeseriesValue::Int(150)),
+                ],
+            )],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::HeartRate);
+        assert!(values.is_some());
+        assert_eq!(values.unwrap(), vec![120.0, 140.0, 150.0]);
+    }
+
+    #[test]
+    fn test_metric_values_mixed_int_and_float() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2, 3]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+                ActiveTime::Running(3),
+            ]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Speed,
+                vec![
+                    Some(TimeseriesValue::Float(5.5)),
+                    Some(TimeseriesValue::Int(6)),
+                    Some(TimeseriesValue::Float(6.5)),
+                    Some(TimeseriesValue::Int(7)),
+                ],
+            )],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::Speed);
+        assert!(values.is_some());
+        assert_eq!(values.unwrap(), vec![5.5, 6.0, 6.5, 7.0]);
+    }
+
+    #[test]
+    fn test_metric_values_empty_timeseries() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![]),
+            TimeseriesActiveTime::new(vec![]),
+            vec![],
+            vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::Power);
+        assert!(values.is_some());
+        assert_eq!(values.unwrap(), Vec::<f64>::new());
+    }
+
+    #[test]
+    fn test_metric_values_all_none_values() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+            ]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Cadence,
+                vec![None, None, None],
+            )],
+        )
+        .unwrap();
+
+        let values = timeseries.metric_values(&TimeseriesMetric::Cadence);
+        assert!(values.is_some());
+        assert_eq!(values.unwrap(), Vec::<f64>::new());
+    }
+
+    #[test]
+    fn test_metric_values_multiple_metrics() {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new(vec![0, 1, 2]),
+            TimeseriesActiveTime::new(vec![
+                ActiveTime::Running(0),
+                ActiveTime::Running(1),
+                ActiveTime::Running(2),
+            ]),
+            vec![],
+            vec![
+                Timeseries::new(
+                    TimeseriesMetric::Power,
+                    vec![
+                        Some(TimeseriesValue::Int(100)),
+                        Some(TimeseriesValue::Int(200)),
+                        Some(TimeseriesValue::Int(300)),
+                    ],
+                ),
+                Timeseries::new(
+                    TimeseriesMetric::HeartRate,
+                    vec![
+                        Some(TimeseriesValue::Int(120)),
+                        Some(TimeseriesValue::Int(130)),
+                        Some(TimeseriesValue::Int(140)),
+                    ],
+                ),
+                Timeseries::new(
+                    TimeseriesMetric::Cadence,
+                    vec![
+                        Some(TimeseriesValue::Int(80)),
+                        Some(TimeseriesValue::Int(85)),
+                        Some(TimeseriesValue::Int(90)),
+                    ],
+                ),
+            ],
+        )
+        .unwrap();
+
+        let power_values = timeseries.metric_values(&TimeseriesMetric::Power);
+        assert_eq!(power_values.unwrap(), vec![100.0, 200.0, 300.0]);
+
+        let hr_values = timeseries.metric_values(&TimeseriesMetric::HeartRate);
+        assert_eq!(hr_values.unwrap(), vec![120.0, 130.0, 140.0]);
+
+        let cadence_values = timeseries.metric_values(&TimeseriesMetric::Cadence);
+        assert_eq!(cadence_values.unwrap(), vec![80.0, 85.0, 90.0]);
+    }
+
+    #[test]
+    fn test_aggregate_average_pace_computed_from_statistics() {
+        // Average pace should be computed from distance and duration statistics
+        // not from averaging pace timeseries values
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([
+                    (ActivityStatistic::Distance, 10000.0), // 10 km in meters
+                    (ActivityStatistic::Duration, 3600.0),  // 1 hour in seconds
+                ])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1800, 3600]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1800),
+                    ActiveTime::Running(3600),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Pace,
+                    vec![
+                        Some(TimeseriesValue::Float(0.3)), // Different pace values
+                        Some(TimeseriesValue::Float(0.4)),
+                        Some(TimeseriesValue::Float(0.5)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        );
+
+        let result =
+            TimeseriesAggregate::Average.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+
+        assert!(result.is_some());
+        // Should be duration / distance = 3600 / 10000 = 0.36 s/m
+        assert_eq!(result.unwrap(), 0.36);
+    }
+
+    #[test]
+    fn test_aggregate_average_pace_missing_distance() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1800, 3600]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1800),
+                    ActiveTime::Running(3600),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Pace,
+                    vec![
+                        Some(TimeseriesValue::Float(0.3)),
+                        Some(TimeseriesValue::Float(0.4)),
+                        Some(TimeseriesValue::Float(0.5)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        );
+
+        let result =
+            TimeseriesAggregate::Average.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_average_pace_missing_duration() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1800, 3600]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1800),
+                    ActiveTime::Running(3600),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Pace,
+                    vec![
+                        Some(TimeseriesValue::Float(0.3)),
+                        Some(TimeseriesValue::Float(0.4)),
+                        Some(TimeseriesValue::Float(0.5)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        );
+
+        let result =
+            TimeseriesAggregate::Average.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_average_pace_missing_both_statistics() {
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::default(),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1800, 3600]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1800),
+                    ActiveTime::Running(3600),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Pace,
+                    vec![
+                        Some(TimeseriesValue::Float(0.3)),
+                        Some(TimeseriesValue::Float(0.4)),
+                        Some(TimeseriesValue::Float(0.5)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        );
+
+        let result =
+            TimeseriesAggregate::Average.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_min_max_pace_use_timeseries() {
+        // Min and Max pace should use timeseries values, not statistics
+        let activity = ActivityWithTimeseries::new(
+            Activity::new(
+                ActivityId::default(),
+                UserId::test_default(),
+                None,
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                Sport::Running,
+                ActivityStatistics::new(HashMap::from([
+                    (ActivityStatistic::Distance, 10000.0),
+                    (ActivityStatistic::Duration, 3600.0),
+                ])),
+                None,
+                None,
+                None,
+                None,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1800, 3600]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1800),
+                    ActiveTime::Running(3600),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Pace,
+                    vec![
+                        Some(TimeseriesValue::Float(0.3)),
+                        Some(TimeseriesValue::Float(0.4)),
+                        Some(TimeseriesValue::Float(0.5)),
+                    ],
+                )],
+            )
+            .unwrap(),
+        );
+
+        let min_result =
+            TimeseriesAggregate::Min.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+        assert_eq!(min_result.unwrap(), 0.3);
+
+        let max_result =
+            TimeseriesAggregate::Max.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
+        assert_eq!(max_result.unwrap(), 0.5);
     }
 }

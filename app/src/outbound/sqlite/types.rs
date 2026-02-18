@@ -719,7 +719,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TimeseriesMetric {
             Self::Distance => "distance",
             Self::Cadence => "cadence",
             Self::Altitude => "altitude",
-            Self::Pace => "pace",
+            Self::Pace => "pace-v2",
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
