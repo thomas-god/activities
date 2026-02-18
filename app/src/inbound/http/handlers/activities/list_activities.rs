@@ -4,14 +4,17 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
     domain::{
         models::activity::{Activity, ActivityStatistic, Sport},
-        ports::{IActivityService, IPreferencesService, ITrainingService, ListActivitiesFilters},
+        ports::{
+            DateRange, IActivityService, IPreferencesService, ITrainingService,
+            ListActivitiesFilters,
+        },
     },
     inbound::{
         http::{
@@ -25,11 +28,19 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct Filters {
     limit: Option<usize>,
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
 }
 
 impl From<Filters> for ListActivitiesFilters {
     fn from(value: Filters) -> Self {
-        Self::empty().set_limit(value.limit)
+        let date_range = match (value.start_date, value.end_date) {
+            (Some(start), Some(end)) => Some(DateRange::new(start, end)),
+            _ => None,
+        };
+        Self::empty()
+            .set_limit(value.limit)
+            .set_date_range(date_range)
     }
 }
 
