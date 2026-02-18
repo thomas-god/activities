@@ -8,6 +8,7 @@ use std::{
 
 use chrono::{DateTime, FixedOffset};
 use derive_more::{AsRef, Constructor, Display, From, Into};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -173,6 +174,10 @@ impl ActivityWithTimeseries {
 
     pub fn timeseries(&self) -> &ActivityTimeseries {
         &self.timeseries
+    }
+
+    pub fn active_duration(&self) -> Option<usize> {
+        self.timeseries.active_time.duration()
     }
 }
 
@@ -951,6 +956,10 @@ impl TimeseriesActiveTime {
 
     pub fn values(&self) -> &[ActiveTime] {
         &self.0
+    }
+
+    pub fn duration(&self) -> Option<usize> {
+        self.0.iter().rev().find_map(|dt| dt.value())
     }
 }
 
@@ -1893,5 +1902,67 @@ mod test_timeseries {
         let max_result =
             TimeseriesAggregate::Max.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
         assert_eq!(max_result.unwrap(), 0.5);
+    }
+
+    #[test]
+    fn test_active_time_duration_all_running() {
+        let active_time = TimeseriesActiveTime::new(vec![
+            ActiveTime::Running(0),
+            ActiveTime::Running(100),
+            ActiveTime::Running(250),
+            ActiveTime::Running(500),
+        ]);
+
+        assert_eq!(active_time.duration(), Some(500));
+    }
+
+    #[test]
+    fn test_active_time_duration_with_pauses_at_end() {
+        let active_time = TimeseriesActiveTime::new(vec![
+            ActiveTime::Running(0),
+            ActiveTime::Running(100),
+            ActiveTime::Running(250),
+            ActiveTime::Paused,
+            ActiveTime::Paused,
+        ]);
+
+        // Should skip the paused values and return the last running value
+        assert_eq!(active_time.duration(), Some(250));
+    }
+
+    #[test]
+    fn test_active_time_duration_with_mixed_pauses() {
+        let active_time = TimeseriesActiveTime::new(vec![
+            ActiveTime::Running(0),
+            ActiveTime::Paused,
+            ActiveTime::Running(50),
+            ActiveTime::Running(100),
+            ActiveTime::Paused,
+            ActiveTime::Running(150),
+        ]);
+
+        // Should return the last running value
+        assert_eq!(active_time.duration(), Some(150));
+    }
+
+    #[test]
+    fn test_active_time_duration_only_paused() {
+        let active_time = TimeseriesActiveTime::new(vec![ActiveTime::Paused, ActiveTime::Paused]);
+
+        assert_eq!(active_time.duration(), None);
+    }
+
+    #[test]
+    fn test_active_time_duration_empty() {
+        let active_time = TimeseriesActiveTime::new(vec![]);
+
+        assert_eq!(active_time.duration(), None);
+    }
+
+    #[test]
+    fn test_active_time_duration_single_running() {
+        let active_time = TimeseriesActiveTime::new(vec![ActiveTime::Running(42)]);
+
+        assert_eq!(active_time.duration(), Some(42));
     }
 }
