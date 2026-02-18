@@ -59,7 +59,7 @@
 
 	let selectedMetricSourceId = $state('duration');
 	let granularity: Granularity = $state('Weekly');
-	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' | 'NumberOfActivities' = $state('Sum');
+	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' | 'NumberOfActivities' = $state('Average');
 	let groupBy: 'None' | 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' =
 		$state('None');
 
