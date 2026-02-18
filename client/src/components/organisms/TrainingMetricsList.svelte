@@ -59,11 +59,9 @@
 					groupBy={metric.groupBy}
 				/>
 				<TrainingMetricMenu
-					metric={{
-						id: metric.id,
-						name: metric.name || '',
-						scope: metric.scope
-					}}
+					id={metric.id}
+					name={metric.name || ''}
+					scope={metric.scope}
 					{onDelete}
 					{onUpdate}
 				/>

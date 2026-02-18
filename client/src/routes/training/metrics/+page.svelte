@@ -8,6 +8,7 @@
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
+	import { groupMetricValues, metricScope } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -16,39 +17,6 @@
 	let dates = $derived({
 		start: page.url.searchParams.get('start') as string,
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
-	});
-
-	let metricsProps = $derived.by(() => {
-		let metrics = [];
-		for (let i = 0; i < data.metrics.length; i++) {
-			let metric = data.metrics.at(i);
-			if (metric === undefined) {
-				continue;
-			}
-			let values = [];
-			for (const [group, time_values] of Object.entries(metric.values)) {
-				for (const [dt, value] of Object.entries(time_values)) {
-					values.push({ time: dt, group, value });
-				}
-			}
-
-			let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
-
-			metrics.push({
-				values: values,
-				name: metric.name,
-				metric: metric.metric,
-				granularity: metric.granularity,
-				aggregate: metric.aggregate,
-				sports: metric.sports,
-				groupBy: metric.group_by,
-				unit: metric.unit,
-				id: metric.id,
-				showGroup: metric.group_by !== null,
-				scope
-			});
-		}
-		return metrics;
 	});
 
 	$effect(() => {
@@ -73,45 +41,53 @@
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
-	<TrainingMetricsOptions
-		{dates}
-		{datesUpdateCallback}
-		periods={data.periods}
-		metricsOrderingScope={{ type: 'global' }}
-		metrics={data.metrics}
-		onMetricsReordered={() => invalidate('app:training-metrics')}
-	/>
-
-	{#each metricsProps as metric}
-		<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
-			<div class="relative p-4 text-center">
-				<TrainingMetricTitle
-					name={metric.name}
-					granularity={metric.granularity}
-					aggregate={metric.aggregate}
-					metric={metric.metric}
-					sports={metric.sports}
-					groupBy={metric.groupBy}
-				/>
-				<div class="absolute right-4 bottom-[8px]">
-					<!-- Action menu dropdown -->
-					<TrainingMetricMenu
-						{metric}
-						onUpdate={() => invalidate('app:training-metrics')}
-						onDelete={() => invalidate('app:training-metrics')}
-					/>
-				</div>
-			</div>
-			<TrainingMetricsChartStacked
-				height={250}
-				width={chartWidth}
-				values={metric.values}
-				unit={metric.unit}
-				granularity={metric.granularity}
-				format={metricValuesDisplayFormat(metric)}
-				showGroup={metric.showGroup}
-				groupBy={metric.groupBy}
-			/>
+	{#await data.metrics}
+		<div class="flex w-full flex-col items-center p-4 pt-6">
+			<div class="loading loading-bars"></div>
 		</div>
-	{/each}
+	{:then metrics}
+		<TrainingMetricsOptions
+			{dates}
+			{datesUpdateCallback}
+			periods={data.periods}
+			metricsOrderingScope={{ type: 'global' }}
+			{metrics}
+			onMetricsReordered={() => invalidate('app:training-metrics')}
+		/>
+
+		{#each metrics as metric}
+			<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
+				<div class="relative p-4 text-center">
+					<TrainingMetricTitle
+						name={metric.name}
+						granularity={metric.granularity}
+						aggregate={metric.aggregate}
+						metric={metric.metric}
+						sports={metric.sports}
+						groupBy={metric.group_by}
+					/>
+					<div class="absolute right-4 bottom-[8px]">
+						<!-- Action menu dropdown -->
+						<TrainingMetricMenu
+							name={metric.name}
+							id={metric.id}
+							scope={metricScope(metric)}
+							onUpdate={() => invalidate('app:training-metrics')}
+							onDelete={() => invalidate('app:training-metrics')}
+						/>
+					</div>
+				</div>
+				<TrainingMetricsChartStacked
+					height={250}
+					width={chartWidth}
+					values={groupMetricValues(metric)}
+					unit={metric.unit}
+					granularity={metric.granularity}
+					format={metricValuesDisplayFormat(metric)}
+					showGroup={metric.group_by !== null}
+					groupBy={metric.group_by}
+				/>
+			</div>
+		{/each}
+	{/await}
 </div>

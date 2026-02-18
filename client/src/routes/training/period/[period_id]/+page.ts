@@ -22,6 +22,7 @@ export const load: PageLoad = async ({ fetch, params, depends }) => {
 	const endDate = periodDetails.end ? dayjs(periodDetails.end).toDate() : new Date();
 
 	const [trainingNotes, metrics] = await Promise.all([
+		// TODO: we should be able to fetch notes and metrics by period_id, without the need for an explicit
 		fetchTrainingNotes(fetch, depends, startDate, endDate),
 		fetchTrainingMetrics(fetch, startDate, endDate, {
 			period: params.period_id

@@ -82,11 +82,9 @@
 				groupBy={currentMetric.groupBy}
 			/>
 			<TrainingMetricMenu
-				metric={{
-					id: currentMetric.id,
-					name: currentMetric.name || '',
-					scope: currentMetric.scope
-				}}
+				id={currentMetric.id}
+				name={currentMetric.name || ''}
+				scope={currentMetric.scope}
 				{onDelete}
 				{onUpdate}
 			/>

@@ -6,8 +6,6 @@
 
 	let { data }: PageProps = $props();
 
-	let notes = $derived(data.notes.toSorted((a, b) => (a.date > b.date ? -1 : 1)));
-
 	const saveNote = async (noteId: string, content: string, date: string) => {
 		const success = await updateTrainingNote(noteId, content, date);
 		if (success) {
@@ -29,19 +27,25 @@
 			Training notes are personal observations, insights and decisions about your training.
 		</div>
 		<div>
-			{#each notes as note}
-				<div class="px-2 sm:px-4">
-					<TrainingNoteListItemCompact
-						{note}
-						onEdit={(content, date) => saveNote(note.id, content, date)}
-						onDelete={() => deleteNote(note.id)}
-					/>
+			{#await data.notes}
+				<div class="flex w-full flex-col items-center p-4 pt-6">
+					<div class="loading loading-bars"></div>
 				</div>
-			{:else}
-				<div class="italic text-sm text-center tracking-wide opacity-60 p-8">
-					No training notes yet. Click "+ New note" to create your first one.
-				</div>
-			{/each}
+			{:then notes}
+				{#each notes as note}
+					<div class="px-2 sm:px-4">
+						<TrainingNoteListItemCompact
+							{note}
+							onEdit={(content, date) => saveNote(note.id, content, date)}
+							onDelete={() => deleteNote(note.id)}
+						/>
+					</div>
+				{:else}
+					<div class="italic text-sm text-center tracking-wide opacity-60 p-8">
+						No training notes yet. Click "+ New note" to create your first one.
+					</div>
+				{/each}
+			{/await}
 		</div>
 	</div>
 </div>

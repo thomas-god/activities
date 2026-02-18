@@ -8,14 +8,17 @@ export const load: PageLoad = async ({ fetch, depends, url }) => {
 	const endDate = url.searchParams.get('end');
 
 	if (startDate === null) {
-		return { metrics: [] };
+		return { metrics: Promise.resolve([]) };
 	}
 
-	const [metrics] = await Promise.all([
-		fetchTrainingMetrics(fetch, startDate, endDate !== null ? endDate : undefined, 'global')
-	]);
-
-	return { metrics };
+	return {
+		metrics: fetchTrainingMetrics(
+			fetch,
+			startDate,
+			endDate !== null ? endDate : undefined,
+			'global'
+		)
+	};
 };
 
 export const prerender = false;

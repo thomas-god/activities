@@ -246,6 +246,19 @@ export async function fetchTrainingMetrics(
 	return [];
 }
 
+export const groupMetricValues = (metric: MetricsListItemGrouped) => {
+	let values = [];
+	for (const [group, time_values] of Object.entries(metric.values)) {
+		for (const [dt, value] of Object.entries(time_values)) {
+			values.push({ time: dt, group, value });
+		}
+	}
+	return values;
+};
+
+export const metricScope = (metric: MetricsListItemGrouped) =>
+	metric.scope.type === 'global' ? 'global' : 'local';
+
 /**
  * Fetch all training notes for the current user
  * @param fetch - The fetch function from SvelteKit

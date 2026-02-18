@@ -3,26 +3,28 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
 
-	export type MetricProps = {
-		id: string;
-		name: string | null;
-		scope: 'local' | 'global';
-	};
-
 	let {
-		metric,
+		name,
+		id,
+		scope,
 		onUpdate,
 		onDelete
-	}: { metric: MetricProps; onUpdate: () => void; onDelete: () => void } = $props();
+	}: {
+		id: string;
+		name: string | null;
+		scope: 'global' | 'local';
+		onUpdate: () => void;
+		onDelete: () => void;
+	} = $props();
 
 	let showDeleteModal = $state(false);
 	let isUpdating = $state(false);
-	let editedName = $state(metric.name || '');
+	let editedName = $state(name || '');
 	let editNameDialog: HTMLDialogElement;
 	let makeMetricGlobalDialog: HTMLDialogElement;
 
 	const deleteMetricCallback = async (): Promise<void> => {
-		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric.id}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
 			method: 'DELETE',
 			credentials: 'include',
 			mode: 'cors'
@@ -43,7 +45,7 @@
 
 		isUpdating = true;
 		try {
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric.id}`, {
+			const response = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
 				method: 'PATCH',
 				credentials: 'include',
 				mode: 'cors',
@@ -70,7 +72,7 @@
 
 	const makeMetricGlobal = async (): Promise<void> => {
 		const body = JSON.stringify({ scope: { type: 'global' } });
-		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric.id}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
 			method: 'PATCH',
 			credentials: 'include',
 			mode: 'cors',
@@ -97,7 +99,7 @@
 				<span>Edit name</span>
 			</button>
 		</li>
-		{#if metric.scope === 'local'}
+		{#if scope === 'local'}
 			<li>
 				<button onclick={() => makeMetricGlobalDialog.show()}>
 					<span>🌐</span>
@@ -159,7 +161,7 @@
 		<h3 class="text-lg font-bold">Make training metric global</h3>
 		<div class="py-4">
 			<span> This will make the metric </span>
-			<span class="italic">{metric.name}</span>
+			<span class="italic">{name}</span>
 			<span>available to all other training periods outside this one</span>
 		</div>
 		<div class="modal-action">
@@ -186,8 +188,8 @@
 	bind:isOpen={showDeleteModal}
 	title="Delete Training Metric"
 	description="Are you sure you want to delete this training metric?"
-	itemPreview={metric.name || 'Unnamed metric'}
-	warning={metric.scope === 'global'
+	itemPreview={name || 'Unnamed metric'}
+	warning={scope === 'global'
 		? 'This metric is defined globally, deleting it will remove it from other training metrics.'
 		: undefined}
 	onConfirm={deleteMetricCallback}
