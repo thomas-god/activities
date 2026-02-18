@@ -187,5 +187,8 @@
 	title="Delete Training Metric"
 	description="Are you sure you want to delete this training metric?"
 	itemPreview={metric.name || 'Unnamed metric'}
+	warning={metric.scope === 'global'
+		? 'This metric is defined globally, deleting it will remove it from other training metrics.'
+		: undefined}
 	onConfirm={deleteMetricCallback}
 />
