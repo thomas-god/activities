@@ -5,7 +5,6 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
-	import { dayjs } from '$lib/duration';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 	import {
 		fetchActivityDetails,
@@ -21,15 +20,6 @@
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
-
-	// // Filter ongoing training periods (no end date or end date >= today)
-	// let ongoingPeriods = $derived.by(() => {
-	// 	const today = dayjs().startOf('day');
-	// 	return data.trainingPeriods.filter((period) => {
-	// 		if (period.end === null) return true;
-	// 		return dayjs(period.end).isAfter(today) || dayjs(period.end).isSame(today);
-	// 	});
-	// });
 
 	const moreActivitiesCallback = () => {
 		goto('/history');
@@ -62,7 +52,7 @@
 
 <div class="homepage_container">
 	{#await data.trainingPeriods}
-		<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+		<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
 			<div class="loading loading-bars"></div>
 		</div>
 	{:then periods}
@@ -88,7 +78,7 @@
 	>
 		<h2 class="px-4 pt-4 text-lg font-semibold">Training metrics</h2>
 		{#await data.metrics}
-			<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+			<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
 				<div class="loading loading-bars"></div>
 			</div>
 		{:then metrics}
@@ -113,7 +103,7 @@
 	<div class="item history">
 		<div>
 			{#await data.activitiesWithNotes}
-				<div class="flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
+				<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
 					<div class="loading loading-bars"></div>
 				</div>
 			{:then [activities, notes]}

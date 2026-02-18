@@ -130,6 +130,37 @@ export async function fetchTrainingPeriods(
 }
 
 /**
+ * Fetch a list of active training periods
+ * @param fetch - The fetch function from SvelteKit
+ * @param refDate - Reference date to dermine wich periods are active
+ * @returns Array of training periods or empty array on error
+ */
+export async function fetchActiveTrainingPeriods(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	refDate: Date | string
+): Promise<TrainingPeriodList> {
+	const res = await fetch(
+		`${PUBLIC_APP_URL}/api/training/periods/active?ref_date=${dayjs(refDate).format('YYYY-MM-DD')}`,
+		{
+			method: 'GET',
+			mode: 'cors',
+			credentials: 'include'
+		}
+	);
+
+	if (res.status === 401) {
+		goto('/login');
+		return [];
+	}
+
+	if (res.status === 200) {
+		return TrainingPeriodListSchema.parse(await res.json());
+	}
+
+	return [];
+}
+
+/**
  * Fetch details for a specific training period including its activities
  * @param fetch - The fetch function from SvelteKit
  * @param periodId - The ID of the training period to fetch
