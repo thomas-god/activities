@@ -39,7 +39,7 @@
 
 <a
 	href={`/activity/${activity.id}`}
-	class={`item @container py-1 pr-1 ${categoryClass(activity.sport_category)} ${isSelected ? 'selected' : ''}`}
+	class={`item_container @container ${categoryClass(activity.sport_category)} ${isSelected ? 'selected' : ''}`}
 	onclick={handleClick}
 >
 	<div class={`flex flex-1 items-center pl-2 ${categoryClass(activity.sport_category)}`}>
@@ -76,40 +76,45 @@
 	</div>
 	{#if activity.feedback}
 		<div
-			class="my-0.5 ml-2 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+			class="mx-3 my-1 box-border flex flex-row gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
 		>
-			📝 {activity.feedback}
+			<div>📝</div>
+			<div>
+				{activity.feedback}
+			</div>
 		</div>
 	{/if}
 </a>
 
 <style>
-	.item:hover {
+	.item_container:hover {
 		background: #f7fafc;
 	}
 
-	.item {
+	.item_container {
+		padding-block: calc(var(--spacing) * 1);
+		padding-right: calc(var(--spacing) * 1);
 		box-sizing: border-box;
 		border-left: 4px solid transparent;
 		border-radius: 0px;
 	}
 
 	@media (min-width: 700px) {
-		.item.selected {
+		.item_container.selected {
 			background: #e6eef5;
 			border-left-width: 6px;
 		}
 	}
 
-	.item.cycling {
+	.item_container.cycling {
 		border-color: var(--color-cycling);
 	}
 
-	.item.running {
+	.item_container.running {
 		border-color: var(--color-running);
 	}
 
-	.item.other {
+	.item_container.other {
 		border-color: var(--color-other);
 	}
 

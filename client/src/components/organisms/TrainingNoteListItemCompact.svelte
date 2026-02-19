@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
+	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import type { TrainingNote } from '$lib/api/training';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 
@@ -52,37 +52,47 @@
 	};
 </script>
 
-<div
-	class="item note @container flex w-full flex-1 items-center border-l-4 border-l-orange-200 bg-orange-200/10 p-2 text-left"
->
-	<div class="flex flex-1 flex-col">
-		<div class="flex items-center gap-2">
-			<div class="text-xs font-light">
-				📝 {dayjs(note.date).format('MMM D, YYYY')}
-			</div>
-			<div class="dropdown dropdown-end">
-				<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">⋮</div>
-				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-				<ul
-					tabindex="0"
-					class="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow"
-				>
-					<li>
-						<button onclick={startEdit}>
-							<span>✏️</span>
-							<span>Edit</span>
-						</button>
-					</li>
-					<li>
-						<button onclick={confirmDelete} class="text-error">
-							<span>🗑️</span>
-							<span>Delete</span>
-						</button>
-					</li>
-				</ul>
+<div class="item_container @container flex w-full flex-1 flex-col items-stretch p-2 text-left">
+	<!-- Icon + Title and date -->
+	<div class="flex w-full flex-row justify-start">
+		<div class="icon">💭</div>
+		<div class="flex flex-1 flex-col">
+			<div class=" font-semibold">Note</div>
+			<div class="flex flex-row items-center gap-2">
+				<div class="text-xs font-light">
+					{formatRelativeDuration(dayjs(note.date), dayjs())} · {dayjs(note.date).format(
+						'MMM D, YYYY'
+					)}
+				</div>
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">⋮</div>
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow"
+					>
+						<li>
+							<button onclick={startEdit}>
+								<span>✏️</span>
+								<span>Edit</span>
+							</button>
+						</li>
+						<li>
+							<button onclick={confirmDelete} class="text-error">
+								<span>🗑️</span>
+								<span>Delete</span>
+							</button>
+						</li>
+					</ul>
+				</div>
 			</div>
 		</div>
-		<div class="my-2 pl-2 text-sm whitespace-pre-wrap italic opacity-80">
+	</div>
+	<div
+		class="mx-1 my-1 box-border flex flex-row gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+	>
+		<div>📝</div>
+		<div>
 			{note.content}
 		</div>
 	</div>
@@ -137,3 +147,27 @@
 	itemPreview={note.content.slice(0, 75) + (note.content.length > 75 ? '...' : '')}
 	onConfirm={handleDelete}
 />
+
+<style>
+	.item_container {
+		padding-block: calc(var(--spacing) * 1);
+		padding-right: calc(var(--spacing) * 1);
+		box-sizing: border-box;
+		border-left: 4px solid transparent;
+		border-radius: 0px;
+		border-color: var(--color-orange-300);
+	}
+
+	.icon {
+		width: 40px;
+		height: 40px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-right: 16px;
+		font-size: 20px;
+		flex-shrink: 0;
+		background-color: color-mix(in oklab, var(--color-orange-200) 60%, transparent);
+	}
+</style>
