@@ -158,6 +158,10 @@
 		</div>
 	{/if}
 
+	<div class="flex items-center justify-between pt-2 text-lg font-semibold tracking-wide">
+		<button class="btn btn-link btn-sm" onclick={moreCallback}> view all →</button>
+	</div>
+
 	{#if activityList.length === 0 && trainingNotes.length === 0}
 		<div class="p-4 pb-2 text-center text-sm tracking-wide italic opacity-60">
 			No activities or notes
