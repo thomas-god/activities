@@ -1,5 +1,4 @@
 import type { PageLoad } from './$types';
-import { redirect } from '@sveltejs/kit';
 import {
 	fetchTrainingPeriodDetails,
 	type TrainingPeriodDetails,
@@ -13,19 +12,12 @@ import {
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
 	depends(`app:training-period:${params.period_id}`);
-	const periodDetails = await fetchTrainingPeriodDetails(fetch, params.period_id);
 
-	if (periodDetails === null) {
-		redirect(307, '/');
-	}
-
-	depends('app:training-notes');
-	const [trainingNotes, metrics] = await Promise.all([
-		fetchTrainingPeriodNotes(fetch, params.period_id),
-		fetchTrainingPeriodMetrics(fetch, params.period_id)
-	]);
-
-	return { periodDetails, trainingNotes, metrics };
+	return {
+		periodDetails: fetchTrainingPeriodDetails(fetch, params.period_id),
+		trainingNotes: fetchTrainingPeriodNotes(fetch, params.period_id),
+		metrics: fetchTrainingPeriodMetrics(fetch, params.period_id)
+	};
 };
 
 export const prerender = false;

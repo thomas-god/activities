@@ -3,18 +3,17 @@
 	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { TrainingNote } from './+page';
-	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
+	import type { TrainingPeriodDetails } from './+page';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
-	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
-		type ActivityDetails as ActivityDetailsType
+		type ActivityDetails as ActivityDetailsType,
+		type ActivityList
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
@@ -23,6 +22,7 @@
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
+	import Timeline from '$components/organisms/Timeline.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -33,17 +33,17 @@
 
 	let newTrainingMetricDialog: HTMLDialogElement;
 	let metricsOrderingDialog: MetricsOrderingDialog;
+	let filtersDialog: HTMLDialogElement;
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
-	let filteredActivities = $derived(data.periodDetails.activities);
-	let filtersDialog: HTMLDialogElement;
+	let filteredActivities: ActivityList = $derived([]);
 
-	async function handleDelete() {
-		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+	async function handleDelete(periodId: string) {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
 			method: 'DELETE',
 			credentials: 'include',
 			mode: 'cors'
@@ -68,8 +68,8 @@
 		showEditDatesModal = true;
 	}
 
-	async function handleUpdateNote(note: string) {
-		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+	async function handleUpdateNote(periodId: string, note: string) {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
 			method: 'PATCH',
 			credentials: 'include',
 			mode: 'cors',
@@ -85,10 +85,10 @@
 		}
 	}
 
-	async function handleUpdateDates(start: string, end?: string) {
+	async function handleUpdateDates(periodId: string, start: string, end?: string) {
 		const body: { start: string; end?: string } = { start };
 		if (end) body.end = end;
-		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
 			method: 'PATCH',
 			credentials: 'include',
 			mode: 'cors',
@@ -104,8 +104,8 @@
 		}
 	}
 
-	async function handleUpdate(name: string) {
-		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+	async function handleUpdate(periodId: string, name: string) {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
 			method: 'PATCH',
 			credentials: 'include',
 			mode: 'cors',
@@ -121,58 +121,21 @@
 		}
 	}
 
-	// Filter training notes to only include those within the period date range
-	const periodNotes = $derived.by(() => {
-		const startDate = dayjs(data.periodDetails.start);
-		const endDate = data.periodDetails.end ? dayjs(data.periodDetails.end) : dayjs(); // If no end, use today
-
-		return data.trainingNotes.filter((note) => {
-			const noteDate = dayjs(note.date);
-			return (
-				(noteDate.isAfter(startDate, 'day') || noteDate.isSame(startDate, 'day')) &&
-				(noteDate.isBefore(endDate, 'day') || noteDate.isSame(endDate, 'day'))
-			);
-		});
-	});
-
-	// Merge activities and notes, sorted by date (most recent first)
-	type TimelineItem =
-		| { type: 'activity'; data: (typeof data.periodDetails.activities)[0]; date: string }
-		| { type: 'note'; data: TrainingNote; date: string };
-
-	const timeline = $derived.by((): TimelineItem[] => {
-		const items: TimelineItem[] = [
-			...filteredActivities.map((activity) => ({
-				type: 'activity' as const,
-				data: activity,
-				date: activity.start_time
-			})),
-			...periodNotes.map((note) => ({
-				type: 'note' as const,
-				data: note,
-				date: note.date
-			}))
-		];
-
-		return items.sort((a, b) => (a.date > b.date ? -1 : 1));
-	});
-
-	const saveNote = async (noteId: string, content: string, date: string) => {
+	const saveNoteCallback = async (noteId: string, content: string, date: string) => {
 		const success = await updateTrainingNote(noteId, content, date);
 		if (success) {
 			invalidate('app:training-notes');
 		}
 	};
 
-	const handleDeleteNote = async (noteId: string) => {
+	const deleteNoteCallback = async (noteId: string) => {
 		const success = await deleteTrainingNote(noteId);
 		if (success) {
 			invalidate('app:training-notes');
 		}
 	};
 
-	const sportsByCategory = $derived.by(() => {
-		const sports = data.periodDetails.sports;
+	const sportsByCategory = (sports: TrainingPeriodDetails['sports']) => {
 		// Map category -> { category, icon, sports[], showAll }
 		const categorySet: Set<SportCategory | 'Other'> = new Set(sports.categories);
 		const map = new Map<
@@ -227,7 +190,7 @@
 		}
 
 		return Array.from(map.values());
-	});
+	};
 
 	const formatPeriodDuration = (start: string, end: string | null): string => {
 		const startDate = dayjs(start);
@@ -250,7 +213,7 @@
 		return `${weeksText} ${daysText}`;
 	};
 
-	const handleActivityClick = (activityId: string) => {
+	const selectActivityCallback = (activityId: string) => {
 		// On mobile, navigate to activity page
 		if (screenWidth < 700) {
 			goto(`/activity/${activityId}`);
@@ -262,10 +225,10 @@
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
-	const handleActivityDeleted = () => {
+	const handleActivityDeleted = (periodId: string) => {
 		selectedActivityId = null;
 		selectedActivityPromise = null;
-		invalidate(`app:training-period:${data.periodDetails.id}`);
+		invalidate(`app:training-period:${periodId}`);
 	};
 
 	const openMetricsOrderingDialog = () => {
@@ -275,299 +238,314 @@
 
 <svelte:window bind:innerWidth={screenWidth} />
 
-<div class="item period-title @container mt-5 rounded-box bg-base-100 p-4 shadow-md">
-	<!-- Top row: Icon and Title/Date/Actions -->
-	<div class="flex items-center gap-3">
-		<!-- Icon -->
-		<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
+{#await data.periodDetails}
+	<div class="flex w-full flex-col items-center p-4 pt-6">
+		<div class="loading loading-bars"></div>
+	</div>
+{:then periodDetails}
+	{#if periodDetails !== null}
+		<div class="item period-title @container mt-5 rounded-box bg-base-100 p-4 shadow-md">
+			<!-- Top row: Icon and Title/Date/Actions -->
+			<div class="flex items-center gap-3">
+				<!-- Icon -->
+				<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
 
-		<!-- Title and date -->
-		<div class="flex-1">
-			<div class="text-lg font-semibold @lg:text-xl">{data.periodDetails.name}</div>
-			<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
-				<div class="opacity-70">
-					{dayjs(data.periodDetails.start).format('MMM D, YYYY')} · {data.periodDetails.end === null
-						? 'Ongoing'
-						: dayjs(data.periodDetails.end).format('MMM D, YYYY')}
-				</div>
-				{#if sportsByCategory.length > 0}
-					<div class="flex items-center gap-1.5">
-						<span class="opacity-50">·</span>
-						{#each sportsByCategory as group}
-							<div
-								class="tooltip tooltip-bottom text-base"
-								data-tip={group.showAll
-									? `${group.category} (all sub-sports)`
-									: `${group.category}: ${group.sports.join(', ')}`}
-							>
-								{group.icon}
+				<!-- Title and date -->
+				<div class="flex-1">
+					<div class="text-lg font-semibold @lg:text-xl">{periodDetails.name}</div>
+					<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
+						<div class="opacity-70">
+							{dayjs(periodDetails.start).format('MMM D, YYYY')} · {periodDetails.end === null
+								? 'Ongoing'
+								: dayjs(periodDetails.end).format('MMM D, YYYY')}
+						</div>
+						{#if sportsByCategory(periodDetails.sports).length > 0}
+							<div class="flex items-center gap-1.5">
+								<span class="opacity-50">·</span>
+								{#each sportsByCategory(periodDetails.sports) as group}
+									<div
+										class="tooltip tooltip-bottom text-base"
+										data-tip={group.showAll
+											? `${group.category} (all sub-sports)`
+											: `${group.category}: ${group.sports.join(', ')}`}
+									>
+										{group.icon}
+									</div>
+								{/each}
 							</div>
-						{/each}
+						{:else}
+							<div class="opacity-50">· All sports</div>
+						{/if}
+						<!-- Action menu dropdown (always inline) -->
+						<div class="dropdown dropdown-end">
+							<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
+								⋮
+							</div>
+							<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+							<ul
+								tabindex="0"
+								class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+							>
+								<li>
+									<button onclick={openEditModal}>
+										<span>✏️</span>
+										<span>Edit name</span>
+									</button>
+								</li>
+								<li>
+									<button onclick={openEditDatesModal}>
+										<span>📅</span>
+										<span>Edit dates</span>
+									</button>
+								</li>
+								<li>
+									<button onclick={() => (showDeleteModal = true)} class="text-error">
+										<span>🗑️</span>
+										<span>Delete</span>
+									</button>
+								</li>
+							</ul>
+						</div>
 					</div>
-				{:else}
-					<div class="opacity-50">· All sports</div>
-				{/if}
-				<!-- Action menu dropdown (always inline) -->
-				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
-						⋮
+					<div class="text-xs opacity-70">
+						{formatPeriodDuration(periodDetails.start, periodDetails.end)}
 					</div>
-					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-					<ul
-						tabindex="0"
-						class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
-					>
-						<li>
-							<button onclick={openEditModal}>
-								<span>✏️</span>
-								<span>Edit name</span>
-							</button>
-						</li>
-						<li>
-							<button onclick={openEditDatesModal}>
-								<span>📅</span>
-								<span>Edit dates</span>
-							</button>
-						</li>
-						<li>
-							<button onclick={() => (showDeleteModal = true)} class="text-error">
-								<span>🗑️</span>
-								<span>Delete</span>
-							</button>
-						</li>
-					</ul>
 				</div>
 			</div>
-			<div class="text-xs opacity-70">
-				{formatPeriodDuration(data.periodDetails.start, data.periodDetails.end)}
+
+			<!-- Period note section -->
+
+			<div class="my-4">
+				{#if periodDetails.note}
+					<div class="flex items-start gap-2">
+						<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
+							{periodDetails.note}
+							<button
+								class="btn btn-square btn-ghost btn-xs"
+								onclick={openEditNoteModal}
+								aria-label="Edit note"
+							>
+								✏️
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
+						<span>📝</span>
+						<span>Add period description</span>
+					</button>
+				{/if}
+			</div>
+
+			<div class="rounded bg-base-200 p-4">
+				<TrainingPeriodStatistics period={periodDetails} />
 			</div>
 		</div>
-	</div>
 
-	<!-- Period note section -->
-	<div class="my-4">
-		{#if data.periodDetails.note}
-			<div class="flex items-start gap-2">
-				<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
-					{data.periodDetails.note}
-					<button
-						class="btn btn-square btn-ghost btn-xs"
-						onclick={openEditNoteModal}
-						aria-label="Edit note"
-					>
-						✏️
-					</button>
+		<div class="period_container">
+			{#await data.metrics}
+				<div class="flex w-full flex-col items-center p-4 pt-6">
+					<div class="loading loading-bars"></div>
 				</div>
-			</div>
-		{:else}
-			<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-				<span>📝</span>
-				<span>Add period description</span>
-			</button>
-		{/if}
-	</div>
-
-	<div class="rounded bg-base-200 p-4">
-		<TrainingPeriodStatistics period={data.periodDetails} />
-	</div>
-</div>
-
-<div class="period_container">
-	<div
-		class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
-	>
-		{#if data.metrics.length > 0}
-			<div bind:clientWidth={chartWidth}>
-				<div class="flex flex-row gap-2 pt-4">
-					<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
-					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
-							⋮
-						</div>
-						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-						<ul
-							tabindex="0"
-							class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
-						>
-							<li>
-								<button onclick={() => newTrainingMetricDialog.show()}>
-									<span>➕</span>
-									<span>New metric</span>
-								</button>
-							</li>
-							<li>
-								<button onclick={openMetricsOrderingDialog}>
-									<span>🔢</span>
-									<span>Reorder</span>
-								</button>
-							</li>
-						</ul>
-					</div>
-				</div>
-				{#if screenWidth < 700}
-					<TrainingMetricsCarousel
-						metrics={data.metrics}
-						height={chartHeight}
-						onUpdate={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
-						onDelete={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
-					/>
-				{:else}
-					<TrainingMetricsList
-						metrics={data.metrics}
-						height={chartHeight}
-						onUpdate={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
-						onDelete={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
-					/>
-				{/if}
-			</div>
-		{:else}
-			<div class="text-center text-sm tracking-wide italic opacity-60">No training metrics</div>
-		{/if}
-	</div>
-
-	<div
-		class={`activity-details rounded-box bg-base-100 pt-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
-	>
-		{#if selectedActivityPromise}
-			{#await selectedActivityPromise}
-				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
-					<span class="loading loading-lg loading-spinner"></span>
-				</div>
-			{:then selectedActivity}
-				{#if selectedActivity}
-					<div class="relative w-full">
-						<button onclick={() => (selectedActivityId = null)} class="absolute right-3">X</button>
-						<ActivityDetails
-							activity={selectedActivity}
-							onActivityUpdated={() => {
-								invalidate(`app:training-period:${data.periodDetails.id}`);
-							}}
-							onActivityDeleted={handleActivityDeleted}
-							compact={true}
-						/>
-					</div>
-				{:else}
-					<div
-						class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-					>
-						Failed to load activity
-					</div>
-				{/if}
-			{:catch error}
+			{:then metrics}
 				<div
-					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+					class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 				>
-					Failed to load activity: {error.message}
+					{#if metrics.length > 0}
+						<div bind:clientWidth={chartWidth}>
+							<div class="flex flex-row gap-2 pt-4">
+								<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
+								<div class="dropdown dropdown-end">
+									<div
+										tabindex="0"
+										role="button"
+										class="btn btn-square opacity-100 btn-ghost btn-xs"
+									>
+										⋮
+									</div>
+									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+									<ul
+										tabindex="0"
+										class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+									>
+										<li>
+											<button onclick={() => newTrainingMetricDialog.show()}>
+												<span>➕</span>
+												<span>New metric</span>
+											</button>
+										</li>
+										<li>
+											<button onclick={openMetricsOrderingDialog}>
+												<span>🔢</span>
+												<span>Reorder</span>
+											</button>
+										</li>
+									</ul>
+								</div>
+							</div>
+							{#if screenWidth < 700}
+								<TrainingMetricsCarousel
+									{metrics}
+									height={chartHeight}
+									onUpdate={() => invalidate(`app:training-period:${periodDetails.id}`)}
+									onDelete={() => invalidate(`app:training-period:${periodDetails.id}`)}
+								/>
+							{:else}
+								<TrainingMetricsList
+									{metrics}
+									height={chartHeight}
+									onUpdate={() => invalidate(`app:training-period:${periodDetails.id}`)}
+									onDelete={() => invalidate(`app:training-period:${periodDetails.id}`)}
+								/>
+							{/if}
+						</div>
+					{:else}
+						<div class="text-center text-sm tracking-wide italic opacity-60">
+							No training metrics
+						</div>
+					{/if}
+				</div>
+
+				<MetricsOrderingDialog
+					bind:this={metricsOrderingDialog}
+					scope={{ type: 'trainingPeriod', trainingPeriodId: periodDetails.id }}
+					{metrics}
+					onSaved={() => invalidate(`app:training-period:${periodDetails.id}`)}
+				/>
+			{/await}
+
+			<div
+				class={`activity-details rounded-box bg-base-100 pt-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
+			>
+				{#if selectedActivityPromise}
+					{#await selectedActivityPromise}
+						<div
+							class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md"
+						>
+							<span class="loading loading-lg loading-spinner"></span>
+						</div>
+					{:then selectedActivity}
+						{#if selectedActivity}
+							<div class="relative w-full">
+								<button onclick={() => (selectedActivityId = null)} class="absolute right-3"
+									>X</button
+								>
+								<ActivityDetails
+									activity={selectedActivity}
+									onActivityUpdated={() => {
+										invalidate(`app:training-period:${periodDetails.id}`);
+									}}
+									onActivityDeleted={() => handleActivityDeleted(periodDetails.id)}
+									compact={true}
+								/>
+							</div>
+						{:else}
+							<div
+								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+							>
+								Failed to load activity
+							</div>
+						{/if}
+					{:catch error}
+						<div
+							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+						>
+							Failed to load activity: {error.message}
+						</div>
+					{/await}
+				{/if}
+			</div>
+			{#await data.trainingNotes}
+				<div class="flex w-full flex-col items-center p-4 pt-6">
+					<div class="loading loading-bars"></div>
+				</div>
+			{:then notes}
+				<!-- Activities section -->
+				<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
+					<div class="mb-4 flex items-center justify-between">
+						<h2 class="text-lg font-semibold">Activities & Notes</h2>
+						<button onclick={() => filtersDialog.showModal()} class="btn btn-ghost">⚙️</button>
+					</div>
+
+					<!--  TODO: we should harmonize returned activity's shapes between routes, and make sure
+						there is an explicit coupling/same schema used on the API side -->
+					<Timeline
+						activities={filteredActivities as TrainingPeriodDetails['activities']}
+						{notes}
+						{selectedActivityId}
+						{selectActivityCallback}
+						{saveNoteCallback}
+						{deleteNoteCallback}
+					/>
 				</div>
 			{/await}
-		{/if}
-	</div>
-
-	<!-- Activities section -->
-	<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
-		<div class="mb-4 flex items-center justify-between">
-			<h2 class="text-lg font-semibold">Activities & Notes</h2>
-			<button onclick={() => filtersDialog.showModal()} class="btn btn-ghost">⚙️</button>
 		</div>
 
-		{#if timeline.length > 0}
-			<div class="flex flex-col gap-0">
-				{#each timeline as item}
-					{#if item.type === 'activity'}
-						<ActivitiesListItem
-							activity={item.data}
-							showNote={true}
-							onClick={() => handleActivityClick(item.data.id)}
-							isSelected={selectedActivityId === item.data.id}
-						/>
-					{:else}
-						<TrainingNoteListItemCompact
-							note={item.data}
-							onEdit={(content, date) => saveNote(item.data.id, content, date)}
-							onDelete={() => handleDeleteNote(item.data.id)}
-						/>
-					{/if}
-				{/each}
+		<!-- Activities filters modal -->
+		<dialog id="modal-period-filters" class="modal" bind:this={filtersDialog}>
+			<div class="modal-box flex flex-col items-center">
+				<ActivitiesFilters
+					activities={periodDetails.activities}
+					onFilterChange={(activities) => {
+						filteredActivities = activities;
+					}}
+					showNotesFilter={false}
+					open={true}
+				/>
+				<button class="btn" onclick={() => filtersDialog.close()}>Close</button>
 			</div>
-		{:else}
-			<div class="py-8 text-center text-sm italic opacity-70">
-				No activities in this training period yet
+			<!-- To allow closing by clicking outside the modal -->
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+
+		<EditPeriodNameModal
+			bind:isOpen={showEditModal}
+			currentName={periodDetails.name}
+			onConfirm={(name) => handleUpdate(periodDetails.id, name)}
+		/>
+
+		<!-- Delete confirmation modal -->
+		<DeleteModal
+			bind:isOpen={showDeleteModal}
+			title="Delete Training Period"
+			description="Are you sure you want to delete this training period ? "
+			itemPreview={periodDetails.name}
+			onConfirm={() => handleDelete(periodDetails.id)}
+		/>
+
+		<EditPeriodDatesModal
+			bind:isOpen={showEditDatesModal}
+			currentStart={periodDetails.start}
+			currentEnd={periodDetails.end}
+			onConfirm={(start, end) => handleUpdateDates(periodDetails.id, start, end)}
+		/>
+
+		<EditPeriodNoteModal
+			bind:isOpen={showEditNoteModal}
+			currentNote={periodDetails.note}
+			onConfirm={(content) => handleUpdateNote(periodDetails.id, content)}
+		/>
+
+		<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
+			<div class="modal-box max-w-3xl">
+				<CreateTrainingMetric
+					callback={() => {
+						newTrainingMetricDialog.close();
+						invalidate(`app:training-period:${periodDetails.id}`);
+					}}
+					scope={{ kind: 'period', periodId: periodDetails.id }}
+				/>
 			</div>
-		{/if}
-	</div>
-</div>
-
-<!-- Activities filters modal -->
-<dialog id="modal-period-filters" class="modal" bind:this={filtersDialog}>
-	<div class="modal-box flex flex-col items-center">
-		<ActivitiesFilters
-			activities={data.periodDetails.activities}
-			onFilterChange={(activities) => {
-				const ids = activities.map((activity) => activity.id);
-				filteredActivities = data.periodDetails.activities.filter((activity) =>
-					ids.includes(activity.id)
-				);
-			}}
-			showNotesFilter={false}
-			open={true}
-		/>
-		<button class="btn" onclick={() => filtersDialog.close()}>Close</button>
-	</div>
-	<!-- To allow closing by clicking outside the modal -->
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<EditPeriodNameModal
-	bind:isOpen={showEditModal}
-	currentName={data.periodDetails.name}
-	onConfirm={handleUpdate}
-/>
-
-<!-- Delete confirmation modal -->
-<DeleteModal
-	bind:isOpen={showDeleteModal}
-	title="Delete Training Period"
-	description="Are you sure you want to delete this training period ? "
-	itemPreview={data.periodDetails.name}
-	onConfirm={handleDelete}
-/>
-
-<EditPeriodDatesModal
-	bind:isOpen={showEditDatesModal}
-	currentStart={data.periodDetails.start}
-	currentEnd={data.periodDetails.end}
-	onConfirm={handleUpdateDates}
-/>
-
-<EditPeriodNoteModal
-	bind:isOpen={showEditNoteModal}
-	currentNote={data.periodDetails.note}
-	onConfirm={handleUpdateNote}
-/>
-
-<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
-	<div class="modal-box max-w-3xl">
-		<CreateTrainingMetric
-			callback={() => {
-				newTrainingMetricDialog.close();
-				invalidate(`app:training-period:${data.periodDetails.id}`);
-			}}
-			scope={{ kind: 'period', periodId: data.periodDetails.id }}
-		/>
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<MetricsOrderingDialog
-	bind:this={metricsOrderingDialog}
-	scope={{ type: 'trainingPeriod', trainingPeriodId: data.periodDetails.id }}
-	metrics={data.metrics}
-	onSaved={() => invalidate(`app:training-period:${data.periodDetails.id}`)}
-/>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+	{:else}
+		<p>placeholder</p>
+	{/if}
+{/await}
 
 <style>
 	.period_container {
