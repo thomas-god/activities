@@ -20,20 +20,16 @@
 	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
 	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
+	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
+	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
+	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
 
 	let { data }: PageProps = $props();
 
 	let showDeleteModal = $state(false);
 	let showEditModal = $state(false);
-	let isUpdating = $state(false);
-	let editedName = $state('');
 	let showEditNoteModal = $state(false);
-	let editedNote = $state('');
-	let isUpdatingNote = $state(false);
 	let showEditDatesModal = $state(false);
-	let editedStart = $state('');
-	let editedEnd = $state('');
-	let isUpdatingDates = $state(false);
 
 	let newTrainingMetricDialog: HTMLDialogElement;
 	let metricsOrderingDialog: MetricsOrderingDialog;
@@ -61,131 +57,67 @@
 	}
 
 	function openEditModal() {
-		editedName = data.periodDetails.name;
 		showEditModal = true;
 	}
 
 	function openEditNoteModal() {
-		editedNote = data.periodDetails.note ?? '';
 		showEditNoteModal = true;
 	}
 
 	function openEditDatesModal() {
-		editedStart = data.periodDetails.start;
-		editedEnd = data.periodDetails.end ?? '';
 		showEditDatesModal = true;
 	}
 
-	async function handleUpdateNote() {
-		isUpdatingNote = true;
-		try {
-			const response = await fetch(
-				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
-				{
-					method: 'PATCH',
-					credentials: 'include',
-					mode: 'cors',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({ note: editedNote.trim() })
-				}
-			);
-
-			if (response.ok) {
-				// Reload the page to show updated content
-				window.location.reload();
-			} else {
-				const error = await response.json();
-				alert(error.error || 'Failed to update training period note');
-			}
-		} catch (error) {
-			alert('Error updating training period note');
-			console.error(error);
-		} finally {
-			isUpdatingNote = false;
+	async function handleUpdateNote(note: string) {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			mode: 'cors',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ note })
+		});
+		if (response.ok) {
+			window.location.reload();
+		} else {
+			const error = await response.json();
+			alert(error.error || 'Failed to update training period note');
+			throw new Error(error.error);
 		}
 	}
 
-	async function handleUpdateDates() {
-		if (!editedStart) {
-			alert('Start date is required');
-			return;
-		}
-
-		if (editedEnd && editedEnd < editedStart) {
-			alert('End date must be after start date');
-			return;
-		}
-
-		isUpdatingDates = true;
-		try {
-			const body: { start: string; end?: string } = { start: editedStart };
-			if (editedEnd) {
-				body.end = editedEnd;
-			}
-
-			const response = await fetch(
-				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
-				{
-					method: 'PATCH',
-					credentials: 'include',
-					mode: 'cors',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(body)
-				}
-			);
-
-			if (response.ok) {
-				// Reload the page to show updated content
-				window.location.reload();
-			} else {
-				const error = await response.json();
-				alert(error.error || 'Failed to update training period dates');
-			}
-		} catch (error) {
-			alert('Error updating training period dates');
-			console.error(error);
-		} finally {
-			isUpdatingDates = false;
+	async function handleUpdateDates(start: string, end?: string) {
+		const body: { start: string; end?: string } = { start };
+		if (end) body.end = end;
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			mode: 'cors',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body)
+		});
+		if (response.ok) {
+			window.location.reload();
+		} else {
+			const error = await response.json();
+			alert(error.error || 'Failed to update training period dates');
+			throw new Error(error.error);
 		}
 	}
 
-	async function handleUpdate() {
-		if (!editedName.trim()) {
-			alert('Name cannot be empty');
-			return;
-		}
-
-		isUpdating = true;
-		try {
-			const response = await fetch(
-				`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`,
-				{
-					method: 'PATCH',
-					credentials: 'include',
-					mode: 'cors',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({ name: editedName.trim() })
-				}
-			);
-
-			if (response.ok) {
-				// Reload the page to show updated content
-				window.location.reload();
-			} else {
-				const error = await response.json();
-				alert(error.error || 'Failed to update training period name');
-			}
-		} catch (error) {
-			alert('Error updating training period name');
-			console.error(error);
-		} finally {
-			isUpdating = false;
+	async function handleUpdate(name: string) {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${data.periodDetails.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			mode: 'cors',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name })
+		});
+		if (response.ok) {
+			window.location.reload();
+		} else {
+			const error = await response.json();
+			alert(error.error || 'Failed to update training period name');
+			throw new Error(error.error);
 		}
 	}
 
@@ -587,42 +519,11 @@
 	</form>
 </dialog>
 
-<!-- Edit name modal -->
-{#if showEditModal}
-	<dialog class="modal-open modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">Edit Training Period Name</h3>
-			<div class="py-4">
-				<label class="input">
-					<span class="label">Name</span>
-					<input
-						type="text"
-						bind:value={editedName}
-						placeholder="Enter period name"
-						class="w-full"
-						disabled={isUpdating}
-					/>
-				</label>
-			</div>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (showEditModal = false)} disabled={isUpdating}>
-					Cancel
-				</button>
-				<button class="btn btn-primary" onclick={handleUpdate} disabled={isUpdating}>
-					{#if isUpdating}
-						<span class="loading loading-sm loading-spinner"></span>
-						Updating...
-					{:else}
-						Update
-					{/if}
-				</button>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={() => (showEditModal = false)}>close</button>
-		</form>
-	</dialog>
-{/if}
+<EditPeriodNameModal
+	bind:isOpen={showEditModal}
+	currentName={data.periodDetails.name}
+	onConfirm={handleUpdate}
+/>
 
 <!-- Delete confirmation modal -->
 <DeleteModal
@@ -633,92 +534,18 @@
 	onConfirm={handleDelete}
 />
 
-<!-- Edit dates modal -->
-{#if showEditDatesModal}
-	<dialog class="modal-open modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">Edit Training Period Dates</h3>
-			<div class="space-y-4 py-4">
-				<label class="input">
-					<span class="label">Start Date</span>
-					<input
-						type="date"
-						bind:value={editedStart}
-						class="w-full text-right"
-						disabled={isUpdatingDates}
-						required
-					/>
-				</label>
-				<label class="input">
-					<span class="label">End Date (optional)</span>
-					<input
-						type="date"
-						bind:value={editedEnd}
-						class="w-full text-right"
-						disabled={isUpdatingDates}
-						min={editedStart}
-					/>
-				</label>
-				<p class="text-xs opacity-70">Leave end date empty for an ongoing period</p>
-			</div>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (showEditDatesModal = false)} disabled={isUpdatingDates}>
-					Cancel
-				</button>
-				<button class="btn btn-primary" onclick={handleUpdateDates} disabled={isUpdatingDates}>
-					{#if isUpdatingDates}
-						<span class="loading loading-sm loading-spinner"></span>
-						Updating...
-					{:else}
-						Update
-					{/if}
-				</button>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={() => (showEditDatesModal = false)}>close</button>
-		</form>
-	</dialog>
-{/if}
+<EditPeriodDatesModal
+	bind:isOpen={showEditDatesModal}
+	currentStart={data.periodDetails.start}
+	currentEnd={data.periodDetails.end}
+	onConfirm={handleUpdateDates}
+/>
 
-<!-- Edit note modal -->
-{#if showEditNoteModal}
-	<dialog class="modal-open modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">
-				{data.periodDetails.note ? 'Edit' : 'Add'} training period description
-			</h3>
-			<div class="py-4">
-				<label class="floating-label">
-					<textarea
-						bind:value={editedNote}
-						placeholder="Add a description of this training period..."
-						class="textarea w-full"
-						rows="6"
-						disabled={isUpdatingNote}
-					></textarea>
-					<span>Description</span>
-				</label>
-			</div>
-			<div class="modal-action">
-				<button class="btn" onclick={() => (showEditNoteModal = false)} disabled={isUpdatingNote}>
-					Cancel
-				</button>
-				<button class="btn btn-primary" onclick={handleUpdateNote} disabled={isUpdatingNote}>
-					{#if isUpdatingNote}
-						<span class="loading loading-sm loading-spinner"></span>
-						Saving...
-					{:else}
-						Save
-					{/if}
-				</button>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button onclick={() => (showEditNoteModal = false)}>close</button>
-		</form>
-	</dialog>
-{/if}
+<EditPeriodNoteModal
+	bind:isOpen={showEditNoteModal}
+	currentNote={data.periodDetails.note}
+	onConfirm={handleUpdateNote}
+/>
 
 <dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
 	<div class="modal-box max-w-3xl">
