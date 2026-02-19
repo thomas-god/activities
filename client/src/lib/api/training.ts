@@ -5,6 +5,7 @@ import { SportCategories, sports } from '$lib/sport';
 import { groupByClauses, metricAggregateFunctions } from '$lib/metric';
 import { dayjs } from '$lib/duration';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
+import { type Activity, ActivitySchema } from './activities';
 
 // =============================================================================
 // Schemas
@@ -24,23 +25,6 @@ const TrainingPeriodListItemSchema = z.object({
 
 const TrainingPeriodListSchema = z.array(TrainingPeriodListItemSchema);
 
-const TrainingPeriodActivityItemSchema = z.object({
-	id: z.string(),
-	name: z.string().nullable(),
-	sport: z.enum(sports),
-	sport_category: z.enum(SportCategories).nullable(),
-	duration: z
-		.number()
-		.nullable()
-		.transform((val) => val ?? 0), // Transform null to 0 for compatibility
-	distance: z.number().nullable(),
-	elevation: z.number().nullable(),
-	start_time: z.string(),
-	rpe: z.number().min(1).max(10).nullable(),
-	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
-	feedback: z.string().nullable()
-});
-
 const TrainingPeriodDetailsSchema = z.object({
 	id: z.string(),
 	start: z.string(),
@@ -51,7 +35,7 @@ const TrainingPeriodDetailsSchema = z.object({
 		categories: z.array(z.enum(SportCategories))
 	}),
 	note: z.string().nullable(),
-	activities: z.array(TrainingPeriodActivityItemSchema)
+	activities: z.array(ActivitySchema)
 });
 
 // Schema for the new API response with grouped values
@@ -92,7 +76,8 @@ const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 
 export type TrainingPeriodListItem = z.infer<typeof TrainingPeriodListItemSchema>;
 export type TrainingPeriodList = z.infer<typeof TrainingPeriodListSchema>;
-export type TrainingPeriodActivityItem = z.infer<typeof TrainingPeriodActivityItemSchema>;
+/** @deprecated Use `Activity` from `$lib/api` instead */
+export type TrainingPeriodActivityItem = Activity;
 export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
 export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped>;
 export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;

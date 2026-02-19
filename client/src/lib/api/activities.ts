@@ -15,58 +15,60 @@ const NutritionSchema = z.object({
 	details: z.string().nullable()
 });
 
-const ActivityListItemSchema = z.object({
+/**
+ * Canonical schema for an activity returned by the API.
+ * All quantity fields (duration, distance, elevation, …) are surfaced through
+ * `statistics` so that every endpoint returns an identical shape.
+ */
+export const ActivitySchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	sport: z.enum(sports),
 	sport_category: z.enum(SportCategories).nullable(),
-	duration: z.number(),
 	start_time: z.iso.datetime({ offset: true }),
 	rpe: z.number().min(1).max(10).nullable(),
 	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
-	feedback: z.string().nullable()
+	feedback: z.string().nullable(),
+	nutrition: NutritionSchema.nullable(),
+	statistics: z.record(z.string(), z.number())
 });
 
-const ActivityListSchema = z.array(ActivityListItemSchema);
+const ActivityListSchema = z.array(ActivitySchema);
 
-const ActivityDetailsSchema = z.object({
-	id: z.string(),
-	sport: z.enum(sports),
-	sport_category: z.enum(SportCategories).nullable(),
-	name: z.string().nullable(),
-	duration: z.number(),
-	start_time: z.iso.datetime({ offset: true }),
-	rpe: z.number().min(1).max(10).nullable(),
-	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
-	nutrition: NutritionSchema.nullable(),
-	feedback: z.string().nullable(),
-	statistics: z.record(z.string(), z.number()),
-	timeseries: z.object({
-		time: z.array(z.number()),
-		active_time: z.array(z.number().nullable()),
-		metrics: z.record(
-			z.string(),
-			z.object({
-				unit: z.string(),
-				values: z.array(z.number().nullable())
-			})
-		),
-		laps: z.array(
-			z.object({
-				start: z.number(),
-				end: z.number()
-			})
-		)
-	})
+const TimeseriesSchema = z.object({
+	time: z.array(z.number()),
+	active_time: z.array(z.number().nullable()),
+	metrics: z.record(
+		z.string(),
+		z.object({
+			unit: z.string(),
+			values: z.array(z.number().nullable())
+		})
+	),
+	laps: z.array(
+		z.object({
+			start: z.number(),
+			end: z.number()
+		})
+	)
+});
+
+/**
+ * Activity that includes its timeseries data. Structurally a superset of
+ * `Activity`, so it can be used anywhere an `Activity` is expected.
+ */
+const ActivityWithTimeseriesSchema = ActivitySchema.extend({
+	timeseries: TimeseriesSchema
 });
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export type ActivityListItem = z.infer<typeof ActivityListItemSchema>;
+export type Activity = z.infer<typeof ActivitySchema>;
 export type ActivityList = z.infer<typeof ActivityListSchema>;
-export type ActivityDetails = z.infer<typeof ActivityDetailsSchema>;
+export type ActivityWithTimeseries = z.infer<typeof ActivityWithTimeseriesSchema>;
+export type Timeseries = z.infer<typeof TimeseriesSchema>;
 
 // =============================================================================
 // API Functions
@@ -118,15 +120,15 @@ export async function fetchActivities(
 }
 
 /**
- * Fetch details for a specific activity
+ * Fetch details for a specific activity (includes timeseries)
  * @param fetch - The fetch function from SvelteKit
  * @param activityId - The ID of the activity to fetch
- * @returns Activity details or null on error
+ * @returns Activity with timeseries or null on error
  */
 export async function fetchActivityDetails(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	activityId: string
-): Promise<ActivityDetails | null> {
+): Promise<ActivityWithTimeseries | null> {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activityId}`, {
 		method: 'GET',
 		credentials: 'include',
@@ -139,7 +141,7 @@ export async function fetchActivityDetails(
 	}
 
 	if (res.status === 200) {
-		return ActivityDetailsSchema.parse(await res.json());
+		return ActivityWithTimeseriesSchema.parse(await res.json());
 	}
 
 	return null;

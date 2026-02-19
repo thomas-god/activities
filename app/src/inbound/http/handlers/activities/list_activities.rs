@@ -1,20 +1,14 @@
 use axum::{
-    Extension,
+    Extension, Json,
     extract::{Query, State},
     http::StatusCode,
-    response::IntoResponse,
 };
-use chrono::{DateTime, FixedOffset, NaiveDate};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use chrono::NaiveDate;
+use serde::Deserialize;
 
 use crate::{
-    domain::{
-        models::activity::{Activity, ActivityStatistic, Sport},
-        ports::{
-            DateRange, IActivityService, IPreferencesService, ITrainingService,
-            ListActivitiesFilters,
-        },
+    domain::ports::{
+        DateRange, IActivityService, IPreferencesService, ITrainingService, ListActivitiesFilters,
     },
     inbound::{
         http::{
@@ -24,6 +18,8 @@ use crate::{
         parser::ParseFile,
     },
 };
+
+use super::activity_schema::PublicActivity;
 
 #[derive(Debug, Deserialize)]
 pub struct Filters {
@@ -44,41 +40,6 @@ impl From<Filters> for ListActivitiesFilters {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseBody(Vec<ResponseBodyItem>);
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseBodyItem {
-    id: String,
-    sport: String,
-    sport_category: Option<String>,
-    name: Option<String>,
-    duration: Option<f64>,
-    start_time: DateTime<FixedOffset>,
-    rpe: Option<u8>,
-    workout_type: Option<String>,
-    feedback: Option<String>,
-}
-
-impl From<&Activity> for ResponseBodyItem {
-    fn from(activity: &Activity) -> Self {
-        Self {
-            id: activity.id().to_string(),
-            sport: activity.sport().to_string(),
-            sport_category: activity.sport().category().map(|cat| cat.to_string()),
-            name: activity.name().map(|name| name.to_string()),
-            start_time: *activity.start_time().date(),
-            duration: activity
-                .statistics()
-                .get(&ActivityStatistic::Duration)
-                .cloned(),
-            rpe: activity.rpe().map(|rpe| rpe.value()),
-            workout_type: activity.workout_type().map(|wt| wt.to_string()),
-            feedback: activity.feedback().as_ref().map(|f| f.to_string()),
-        }
-    }
-}
-
 pub async fn list_activities<
     AS: IActivityService,
     PF: ParseFile,
@@ -89,7 +50,7 @@ pub async fn list_activities<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Query(filters): Query<Filters>,
-) -> Result<impl IntoResponse, StatusCode> {
+) -> Result<Json<Vec<PublicActivity>>, StatusCode> {
     let Ok(res) = state
         .activity_service
         .list_activities(user.user(), &filters.into())
@@ -98,7 +59,5 @@ pub async fn list_activities<
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 
-    let body = ResponseBody(res.iter().map(ResponseBodyItem::from).collect());
-
-    Ok(json!(body).to_string())
+    Ok(Json(res.iter().map(PublicActivity::from).collect()))
 }

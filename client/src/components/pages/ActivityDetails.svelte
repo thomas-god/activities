@@ -16,10 +16,10 @@
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
 	import { sportDisplay } from '$lib/sport';
-	import type { ActivityDetails } from '$lib/api/activities';
+	import type { ActivityWithTimeseries } from '$lib/api/activities';
 
 	interface Props {
-		activity: ActivityDetails;
+		activity: ActivityWithTimeseries;
 		onActivityUpdated: () => void;
 		onActivityDeleted: () => void;
 		compact?: boolean;

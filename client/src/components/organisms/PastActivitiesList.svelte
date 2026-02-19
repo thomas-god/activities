@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
-	import type { ActivityList, ActivityListItem } from '$lib/api';
+	import type { ActivityList, Activity } from '$lib/api';
 	import type { TrainingNote, TrainingNotesList } from '$lib/api/training';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 	import TrainingNoteListItemCompact from './TrainingNoteListItemCompact.svelte';
 
 	type TimelineItem =
-		| { type: 'activity'; data: ActivityListItem; date: string }
+		| { type: 'activity'; data: Activity; date: string }
 		| { type: 'note'; data: TrainingNote; date: string };
 
 	let {

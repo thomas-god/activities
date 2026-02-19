@@ -6,10 +6,7 @@
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
-	import {
-		fetchActivityDetails,
-		type ActivityDetails as ActivityDetailsType
-	} from '$lib/api/activities';
+	import { fetchActivityDetails, type ActivityWithTimeseries } from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 
@@ -17,7 +14,7 @@
 
 	let chartWidth: number = $state(0);
 	let chartHeight = $derived(Math.max(250, Math.min(300, chartWidth * 0.6)));
-	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 
@@ -126,8 +123,8 @@
 				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
 					<span class="loading loading-lg loading-spinner"></span>
 				</div>
-			{:then activityDetails}
-				{#if activityDetails}
+			{:then activity}
+				{#if activity !== null}
 					<div class="relative w-full">
 						<button
 							onclick={() => {
@@ -137,7 +134,7 @@
 							class="absolute right-3">X</button
 						>
 						<ActivityDetails
-							activity={activityDetails}
+							{activity}
 							onActivityUpdated={() => {
 								invalidate('app:activities');
 							}}

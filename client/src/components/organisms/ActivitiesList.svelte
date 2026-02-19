@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ActivityList, ActivityListItem } from '$lib/api';
+	import type { ActivityList, Activity } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 	import ActivitiesFilters from '../molecules/ActivitiesFilters.svelte';
@@ -38,7 +38,7 @@
 	let historyEndMonth = dayjs().startOf('month');
 
 	let activitiesByMonth = $derived.by(() => {
-		const activities: Map<string, ActivityListItem[]> = new Map();
+		const activities: Map<string, Activity[]> = new Map();
 
 		let date = historyEndMonth;
 		while (date >= historyStartMonth) {

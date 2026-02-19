@@ -1,5 +1,5 @@
 import type { PageLoad } from './$types';
-import { fetchActivityDetails, type ActivityDetails } from '$lib/api';
+import { fetchActivityDetails, type ActivityWithTimeseries, type Timeseries } from '$lib/api';
 
 export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);
@@ -10,5 +10,4 @@ export const load: PageLoad = async ({ fetch, depends, params }) => {
 export const prerender = false;
 export const ssr = false;
 
-export type { ActivityDetails };
-export type Timeseries = ActivityDetails['timeseries'];
+export type { ActivityWithTimeseries as ActivityDetails, Timeseries };

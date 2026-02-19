@@ -1,3 +1,4 @@
+pub mod activity_schema;
 mod delete_activity;
 mod get_activity;
 mod get_all_activities;

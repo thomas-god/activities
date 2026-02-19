@@ -1,20 +1,12 @@
-use std::{collections::HashMap, ops::Mul};
-
 use axum::{
     Extension, Json,
     extract::{Path, State},
     http::StatusCode,
 };
-use chrono::{DateTime, FixedOffset};
-use serde::Serialize;
 
 use crate::{
     domain::{
-        models::activity::{
-            Activity, ActivityId, ActivityNutrition, ActivityStatistic, ActivityTimeseries,
-            ActivityWithTimeseries, Lap, Sport, Timeseries, TimeseriesMetric, TimeseriesValue,
-            ToUnit, Unit,
-        },
+        models::activity::ActivityId,
         ports::{IActivityService, IPreferencesService, ITrainingService},
     },
     inbound::{
@@ -26,176 +18,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct ResponseBody {
-    id: String,
-    sport: String,
-    sport_category: Option<String>,
-    name: Option<String>,
-    duration: Option<f64>,
-    start_time: DateTime<FixedOffset>,
-    rpe: Option<u8>,
-    workout_type: Option<String>,
-    nutrition: Option<NutritionBody>,
-    feedback: Option<String>,
-    statistics: HashMap<String, f64>,
-    timeseries: ActivityTimeseriesBody,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct NutritionBody {
-    bonk_status: String,
-    details: Option<String>,
-}
-
-impl From<&ActivityNutrition> for NutritionBody {
-    fn from(nutrition: &ActivityNutrition) -> Self {
-        Self {
-            bonk_status: nutrition.bonk_status().to_string(),
-            details: nutrition.details().map(|d| d.to_string()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct ActivityTimeseriesBody {
-    time: Vec<usize>,
-    active_time: Vec<Option<usize>>,
-    metrics: HashMap<String, TimeseriesBody>,
-    laps: Vec<LapBody>,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct TimeseriesBody {
-    unit: String,
-    values: Vec<Option<TimeseriesValueBody>>,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct LapBody {
-    start: usize,
-    end: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum TimeseriesValueBody {
-    Int(usize),
-    Float(f64),
-}
-
-impl Mul<f64> for TimeseriesValueBody {
-    type Output = TimeseriesValueBody;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        match self {
-            Self::Int(val) => Self::Float(val as f64 * rhs),
-            Self::Float(val) => Self::Float(val * rhs),
-        }
-    }
-}
-
-impl From<&TimeseriesValue> for TimeseriesValueBody {
-    fn from(value: &TimeseriesValue) -> Self {
-        match value {
-            TimeseriesValue::Int(val) => Self::Int(*val),
-            TimeseriesValue::Float(val) => Self::Float(*val),
-        }
-    }
-}
-
-impl From<&ActivityWithTimeseries> for ResponseBody {
-    fn from(activity: &ActivityWithTimeseries) -> Self {
-        Self {
-            id: activity.id().to_string(),
-            name: activity.name().map(|name| name.to_string()),
-            sport: activity.sport().to_string(),
-            sport_category: activity.sport().category().map(|cat| cat.to_string()),
-            start_time: *activity.start_time().date(),
-            duration: activity
-                .statistics()
-                .get(&ActivityStatistic::Duration)
-                .cloned(),
-            rpe: activity.rpe().as_ref().map(|r| u8::from(*r)),
-            workout_type: activity.workout_type().map(|wt| wt.to_string()),
-            nutrition: activity.nutrition().as_ref().map(NutritionBody::from),
-            feedback: activity.feedback().as_ref().map(|f| f.to_string()),
-            statistics: activity.statistics().items(),
-            timeseries: activity.timeseries().into(),
-        }
-    }
-}
-
-impl From<&ActivityTimeseries> for ActivityTimeseriesBody {
-    fn from(value: &ActivityTimeseries) -> Self {
-        Self {
-            time: value.time().values().into(),
-            active_time: value
-                .active_time()
-                .values()
-                .iter()
-                .map(|value| value.value())
-                .collect(),
-            metrics: extract_and_convert_metrics(value.metrics()),
-            laps: value.laps().iter().map(LapBody::from).collect(),
-        }
-    }
-}
-
-impl From<&Lap> for LapBody {
-    fn from(lap: &Lap) -> Self {
-        Self {
-            start: lap.start(),
-            end: lap.end(),
-        }
-    }
-}
-
-fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, TimeseriesBody> {
-    HashMap::from_iter(metrics.iter().map(|metric| {
-        let (unit, values) = match metric.metric() {
-            TimeseriesMetric::Speed => (
-                Unit::KilometerPerHour,
-                metric
-                    .values()
-                    .iter()
-                    .map(|val| {
-                        val.as_ref()
-                            .map(TimeseriesValueBody::from)
-                            .map(|val| val * 3.6)
-                    })
-                    .collect(),
-            ),
-            TimeseriesMetric::Distance => (
-                Unit::Kilometer,
-                metric
-                    .values()
-                    .iter()
-                    .map(|val| {
-                        val.as_ref()
-                            .map(TimeseriesValueBody::from)
-                            .map(|val| val * 0.001)
-                    })
-                    .collect(),
-            ),
-            _ => (
-                metric.metric().unit(),
-                metric
-                    .values()
-                    .iter()
-                    .map(|val| val.as_ref().map(TimeseriesValueBody::from))
-                    .collect(),
-            ),
-        };
-        (
-            metric.metric().to_string(),
-            TimeseriesBody {
-                unit: unit.to_string(),
-                values,
-            },
-        )
-    }))
-}
+use super::activity_schema::PublicActivityWithTimeseries;
 
 pub async fn get_activity<
     AS: IActivityService,
@@ -207,7 +30,7 @@ pub async fn get_activity<
     Extension(_user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(activity_id): Path<String>,
-) -> Result<Json<ResponseBody>, StatusCode> {
+) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
     let Ok(res) = state
         .activity_service
         .get_activity_with_timeseries(&ActivityId::from(&activity_id))
@@ -216,16 +39,15 @@ pub async fn get_activity<
         return Err(StatusCode::NOT_FOUND);
     };
 
-    let body = ResponseBody::from(&res);
-
-    Ok(Json(body))
+    Ok(Json(PublicActivityWithTimeseries::from(&res)))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{hash::Hash, sync::Arc, vec};
+    use std::{collections::HashMap, sync::Arc, vec};
 
     use axum::extract::Path;
+    use chrono::{DateTime, FixedOffset};
     use mockall::predicate::eq;
 
     use crate::{
@@ -233,7 +55,8 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+                    ActiveTime, Activity, ActivityId, ActivityStartTime, ActivityStatistic,
+                    ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
                     Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
                     TimeseriesValue,
                 },
@@ -246,12 +69,19 @@ mod tests {
             },
         },
         inbound::{
-            http::{CookieConfig, auth::test_utils::MockUserService},
+            http::{
+                CookieConfig,
+                auth::test_utils::MockUserService,
+                handlers::activities::activity_schema::{
+                    PublicActivity, PublicActivityTimeseries, PublicTimeseries,
+                    PublicTimeseriesValue,
+                },
+            },
             parser::test_utils::MockFileParser,
         },
     };
 
-    use super::*;
+    use super::{PublicActivityWithTimeseries, *};
 
     #[tokio::test]
     async fn test_get_activity_exists() {
@@ -323,31 +153,32 @@ mod tests {
         let response = response.unwrap();
         assert_eq!(
             response.0,
-            ResponseBody {
-                duration: Some(1200.),
-                id: target_id,
-                name: None,
-                sport: "IndoorCycling".to_string(),
-                sport_category: Some("Cycling".to_string()),
-                start_time: "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-                rpe: None,
-                workout_type: None,
-                nutrition: None,
-                feedback: None,
-                statistics: HashMap::from([("Duration".to_string(), 1200.)]),
-                timeseries: ActivityTimeseriesBody {
+            PublicActivityWithTimeseries {
+                activity: PublicActivity {
+                    id: target_id,
+                    name: None,
+                    sport: "IndoorCycling".to_string(),
+                    sport_category: Some("Cycling".to_string()),
+                    start_time: "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                    rpe: None,
+                    workout_type: None,
+                    nutrition: None,
+                    feedback: None,
+                    statistics: HashMap::from([("Duration".to_string(), 1200.)]),
+                },
+                timeseries: PublicActivityTimeseries {
                     time: vec![0, 1, 2],
                     active_time: vec![Some(0), Some(1), Some(2)],
                     metrics: HashMap::from([(
                         "Power".to_string(),
-                        TimeseriesBody {
+                        PublicTimeseries {
                             unit: "W".to_string(),
                             values: vec![
-                                Some(TimeseriesValueBody::Int(120)),
+                                Some(PublicTimeseriesValue::Int(120)),
                                 None,
-                                Some(TimeseriesValueBody::Int(130))
+                                Some(PublicTimeseriesValue::Int(130))
                             ]
                         }
                     )]),

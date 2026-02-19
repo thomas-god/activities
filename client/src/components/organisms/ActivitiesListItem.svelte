@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
-	import type { ActivityListItem } from '$lib/api';
+	import type { Activity } from '$lib/api';
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 
@@ -11,7 +11,7 @@
 		onClick,
 		isSelected = false
 	}: {
-		activity: ActivityListItem;
+		activity: Activity;
 		showNote?: boolean;
 		onClick?: () => void;
 		isSelected?: boolean;
@@ -72,7 +72,7 @@
 				</span>
 			{/if}
 			<span class="font-semibold sm:text-lg">
-				{formatDuration(activity.duration)}
+				{formatDuration(activity.statistics['Duration'] ?? 0)}
 			</span>
 		</div>
 	</div>

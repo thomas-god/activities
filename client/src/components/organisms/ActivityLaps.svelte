@@ -1,12 +1,12 @@
 <script lang="ts">
-	import type { ActivityDetails } from '$lib/api/activities';
+	import type { ActivityWithTimeseries } from '$lib/api/activities';
 	import { dayjs } from '$lib/duration';
 	import { paceToString, speedToPace } from '$lib/speed';
 
 	export type LapMetric = 'distance' | 'speed' | 'power' | 'heartRate' | 'pace';
 
 	interface Props {
-		activity: ActivityDetails;
+		activity: ActivityWithTimeseries;
 	}
 
 	let { activity }: Props = $props();

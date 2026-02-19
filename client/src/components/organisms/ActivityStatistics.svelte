@@ -1,10 +1,10 @@
 <script lang="ts">
-	import type { ActivityDetails } from '$lib/api';
+	import type { ActivityWithTimeseries } from '$lib/api';
 	import { formatDuration } from '$lib/duration';
 	import { paceToString, speedToPace } from '$lib/speed';
 	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
 
-	let { activity }: { activity: ActivityDetails } = $props();
+	let { activity }: { activity: ActivityWithTimeseries } = $props();
 
 	let statistics = $derived(new Map(Object.entries(activity.statistics)));
 

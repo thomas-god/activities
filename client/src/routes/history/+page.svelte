@@ -10,7 +10,7 @@
 	import type { SportCategory } from '$lib/sport';
 	import { fetchActivityDetails } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
-	import type { ActivityDetails as ActivityDetailsType } from '$lib/api/activities';
+	import type { ActivityWithTimeseries } from '$lib/api/activities';
 
 	let { data }: PageProps = $props();
 
@@ -18,7 +18,7 @@
 	let showDownloadModal = $state(false);
 
 	let selectedActivityId: string | null = $state(null);
-	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 
 	// View mode from URL parameter, default to 'list'
 	let viewMode = $derived(

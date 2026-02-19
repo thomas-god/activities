@@ -2,10 +2,10 @@
 	import { localiseDateTime } from '$lib/duration';
 	import EditableActivityName from '$components/molecules/EditableActivityName.svelte';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
-	import type { ActivityDetails } from '$lib/api/activities';
+	import type { Activity } from '$lib/api/activities';
 
 	interface Props {
-		activity: ActivityDetails;
+		activity: Activity;
 		onEditNameCallback: (newName: string) => Promise<void>;
 		onDeleteClickedCallback: () => void;
 		compact?: boolean;

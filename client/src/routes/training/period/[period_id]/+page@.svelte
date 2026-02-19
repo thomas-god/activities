@@ -12,8 +12,8 @@
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
-		type ActivityDetails as ActivityDetailsType,
-		type ActivityList
+		type ActivityList,
+		type ActivityWithTimeseries
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
@@ -37,7 +37,7 @@
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
-	let selectedActivityPromise: Promise<ActivityDetailsType | null> | null = $state(null);
+	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 	let filteredActivities: ActivityList = $derived([]);
@@ -467,10 +467,8 @@
 						<button onclick={() => filtersDialog.showModal()} class="btn btn-ghost">⚙️</button>
 					</div>
 
-					<!--  TODO: we should harmonize returned activity's shapes between routes, and make sure
-						there is an explicit coupling/same schema used on the API side -->
 					<Timeline
-						activities={filteredActivities as TrainingPeriodDetails['activities']}
+						activities={filteredActivities}
 						{notes}
 						{selectedActivityId}
 						{selectActivityCallback}

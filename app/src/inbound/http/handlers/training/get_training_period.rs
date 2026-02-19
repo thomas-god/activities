@@ -6,14 +6,15 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use chrono::{DateTime, FixedOffset, Local, NaiveDate};
+use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize, de};
 use serde_json::json;
 
+use crate::inbound::http::handlers::activities::activity_schema::PublicActivity;
 use crate::{
     domain::{
         models::{
-            activity::{Activity, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+            activity::{TimeseriesMetric, ToUnit, Unit},
             training::{
                 ActivityMetricSource, SportFilter, TrainingMetricDefinition,
                 TrainingMetricGranularity, TrainingMetricValues, TrainingPeriod, TrainingPeriodId,
@@ -39,49 +40,7 @@ pub struct ResponseBody {
     name: String,
     sports: ResponseSports,
     note: Option<String>,
-    activities: Vec<ActivityItem>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ActivityItem {
-    id: String,
-    sport: String,
-    sport_category: Option<String>,
-    name: Option<String>,
-    duration: Option<f64>,
-    distance: Option<f64>,
-    elevation: Option<f64>,
-    start_time: DateTime<FixedOffset>,
-    rpe: Option<u8>,
-    workout_type: Option<String>,
-    feedback: Option<String>,
-}
-
-impl From<&Activity> for ActivityItem {
-    fn from(activity: &Activity) -> Self {
-        Self {
-            id: activity.id().to_string(),
-            sport: activity.sport().to_string(),
-            sport_category: activity.sport().category().map(|cat| cat.to_string()),
-            name: activity.name().map(|name| name.to_string()),
-            start_time: *activity.start_time().date(),
-            duration: activity
-                .statistics()
-                .get(&ActivityStatistic::Duration)
-                .cloned(),
-            distance: activity
-                .statistics()
-                .get(&ActivityStatistic::Distance)
-                .cloned(),
-            elevation: activity
-                .statistics()
-                .get(&ActivityStatistic::Elevation)
-                .cloned(),
-            rpe: activity.rpe().map(|rpe| rpe.value()),
-            workout_type: activity.workout_type().map(|wt| wt.to_string()),
-            feedback: activity.feedback().as_ref().map(|f| f.to_string()),
-        }
-    }
+    activities: Vec<PublicActivity>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -133,10 +92,10 @@ pub async fn get_training_period<
     };
 
     let period = period_with_activities.period();
-    let activities: Vec<ActivityItem> = period_with_activities
+    let activities: Vec<PublicActivity> = period_with_activities
         .activities()
         .iter()
-        .map(ActivityItem::from)
+        .map(PublicActivity::from)
         .collect();
 
     let body = ResponseBody {

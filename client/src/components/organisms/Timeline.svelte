@@ -1,10 +1,5 @@
 <script lang="ts">
-	import type {
-		ActivityListItem,
-		TrainingNote,
-		TrainingNotesList,
-		TrainingPeriodDetails
-	} from '$lib/api';
+	import type { Activity, ActivityList, TrainingNote, TrainingNotesList } from '$lib/api';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 	import TrainingNoteListItemCompact from './TrainingNoteListItemCompact.svelte';
 
@@ -16,7 +11,7 @@
 		saveNoteCallback,
 		deleteNoteCallback
 	}: {
-		activities: TrainingPeriodDetails['activities'];
+		activities: ActivityList;
 		notes: TrainingNotesList;
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
@@ -26,7 +21,7 @@
 
 	// Merge activities and notes, sorted by date (most recent first)
 	type TimelineItem =
-		| { type: 'activity'; data: ActivityListItem; date: string }
+		| { type: 'activity'; data: Activity; date: string }
 		| { type: 'note'; data: TrainingNote; date: string };
 
 	const timeline = $derived.by((): TimelineItem[] => {
