@@ -15,13 +15,12 @@
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
-	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
 	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
-	import Timeline from '$components/organisms/Timeline.svelte';
+	import Timeline from '$components/pages/Timeline.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -32,14 +31,17 @@
 
 	let newTrainingMetricDialog: HTMLDialogElement;
 	let metricsOrderingDialog: MetricsOrderingDialog;
-	let filtersDialog: HTMLDialogElement;
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
 	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
-	let filteredActivities: ActivityList = $derived([]);
+	let filters = $state({
+		rpe: [],
+		workoutTypes: [],
+		sportCategories: []
+	});
 
 	async function handleDelete(periodId: string) {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
@@ -449,36 +451,18 @@
 				<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 					<div class="mb-4 flex items-center justify-between">
 						<h2 class="text-lg font-semibold">Activities & Notes</h2>
-						<button onclick={() => filtersDialog.showModal()} class="btn btn-ghost">⚙️</button>
 					</div>
 
 					<Timeline
-						activities={filteredActivities}
+						activities={periodDetails.activities}
 						{notes}
+						bind:filters
 						{selectedActivityId}
 						{selectActivityCallback}
 					/>
 				</div>
 			{/await}
 		</div>
-
-		<!-- Activities filters modal -->
-		<dialog id="modal-period-filters" class="modal" bind:this={filtersDialog}>
-			<div class="modal-box flex flex-col items-center">
-				<ActivitiesFilters
-					activities={periodDetails.activities}
-					onFilterChange={(activities) => {
-						filteredActivities = activities;
-					}}
-					open={true}
-				/>
-				<button class="btn" onclick={() => filtersDialog.close()}>Close</button>
-			</div>
-			<!-- To allow closing by clicking outside the modal -->
-			<form method="dialog" class="modal-backdrop">
-				<button>close</button>
-			</form>
-		</dialog>
 
 		<EditPeriodNameModal
 			bind:isOpen={showEditModal}

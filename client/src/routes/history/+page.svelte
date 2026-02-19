@@ -1,5 +1,4 @@
 <script lang="ts">
-	import ActivitiesList from '$components/organisms/ActivitiesList.svelte';
 	import ActivitiesCalendar from '$components/organisms/ActivitiesCalendar.svelte';
 	import DownloadActivitiesModal from '$components/molecules/DownloadActivitiesModal.svelte';
 	import type { PageProps } from './$types';
@@ -11,6 +10,7 @@
 	import { fetchActivityDetails } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { ActivityWithTimeseries } from '$lib/api/activities';
+	import Timeline from '$components/pages/Timeline.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -25,26 +25,39 @@
 		(page.url.searchParams.get('view') === 'calendar' ? 'calendar' : 'list') as 'list' | 'calendar'
 	);
 
-	// Parse filters from URL
-	let initialRpe = $derived.by(() => {
+	let filters = $derived.by(() => {
+		const filters: {
+			rpe: number[];
+			workoutTypes: WorkoutType[];
+			sportCategories: SportCategory[];
+		} = {
+			rpe: [],
+			workoutTypes: [],
+			sportCategories: []
+		};
+
+		// Parse RPE values
 		const rpeParam = page.url.searchParams.get('rpe');
-		if (!rpeParam) return [];
-		return rpeParam
-			.split(',')
-			.map(Number)
-			.filter((n) => !isNaN(n) && n >= 1 && n <= 10);
-	});
+		if (!!rpeParam) {
+			filters.rpe = rpeParam
+				.split(',')
+				.map(Number)
+				.filter((n) => !isNaN(n) && n >= 1 && n <= 10);
+		}
 
-	let initialWorkoutTypes = $derived.by(() => {
+		// Parse workout types
 		const wtParam = page.url.searchParams.get('workout_type');
-		if (!wtParam) return [];
-		return wtParam.split(',') as WorkoutType[];
-	});
+		if (!!wtParam) {
+			filters.workoutTypes = wtParam.split(',') as WorkoutType[];
+		}
 
-	let initialSportCategories = $derived.by(() => {
+		// Parse sport categories
 		const scParam = page.url.searchParams.get('sport_category');
-		if (!scParam) return [];
-		return scParam.split(',') as SportCategory[];
+		if (!!scParam) {
+			filters.sportCategories = scParam.split(',') as SportCategory[];
+		}
+
+		return filters;
 	});
 
 	// Current month from URL parameter, default to current month
@@ -108,7 +121,7 @@
 			url.searchParams.delete('sport_category');
 		}
 
-		goto(url, { replaceState: true, keepFocus: true });
+		goto(url, { replaceState: false, keepFocus: true });
 	};
 
 	const handleActivitySelected = (activityId: string | null) => {
@@ -180,22 +193,25 @@
 	</div>
 
 	<!-- View Content -->
-	{#await data.activities}
+	{#await Promise.all([data.activities, data.notes])}
 		<div class="flex w-full flex-col items-center p-4 pt-6">
 			<div class="loading loading-bars"></div>
 		</div>
-	{:then activities}
+	{:then [activities, notes]}
 		{#if viewMode === 'list'}
 			<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
-				<div class="grow basis-0 overflow-y-auto">
-					<ActivitiesList
-						activityList={activities}
-						{initialRpe}
-						{initialWorkoutTypes}
-						{initialSportCategories}
-						onFiltersChange={handleFilterChange}
-						onActivitySelected={handleActivitySelected}
-						selectedActivity={selectedActivityId}
+				<div class="mx-2 grow basis-0 overflow-y-auto rounded-box bg-base-100 p-4 shadow-md">
+					<Timeline
+						{activities}
+						{notes}
+						{selectedActivityId}
+						bind:filters={
+							() => filters,
+							(f) => {
+								handleFilterChange(f);
+							}
+						}
+						selectActivityCallback={handleActivitySelected}
 					/>
 				</div>
 				{#if selectedActivityPromise && screenWidth >= 700}

@@ -12,37 +12,17 @@
 
 	let {
 		activities,
-		onFilterChange,
-		initialRpe = [],
-		initialWorkoutTypes = [],
-		initialSportCategories = [],
-		open = false,
-		onFiltersStateChange
+		filters = $bindable(),
+		open = false
 	}: {
 		activities: ActivityList;
-		onFilterChange: (filteredActivities: ActivityList) => void;
-		initialRpe?: number[];
-		initialWorkoutTypes?: WorkoutType[];
-		initialSportCategories?: SportCategory[];
-		onFiltersStateChange?: (filters: {
+		filters: {
 			rpe: number[];
 			workoutTypes: WorkoutType[];
 			sportCategories: SportCategory[];
-		}) => void;
+		};
 		open?: boolean;
 	} = $props();
-
-	// Filter state - initialize from props
-	let selectedRpe = $state<number[]>(initialRpe);
-	let selectedWorkoutTypes = $state<WorkoutType[]>(initialWorkoutTypes);
-	let selectedSportCategories = $state<SportCategory[]>(initialSportCategories);
-
-	// Update state when initial values change (e.g., when navigating back/forward)
-	$effect(() => {
-		selectedRpe = initialRpe;
-		selectedWorkoutTypes = initialWorkoutTypes;
-		selectedSportCategories = initialSportCategories;
-	});
 
 	// Get unique sport categories from activities
 	let availableSportCategories = $derived.by(() => {
@@ -58,92 +38,62 @@
 		return Array.from(categories).sort();
 	});
 
-	// Filter activities
-	let filteredActivities = $derived.by(() => {
-		let filtered = activities;
+	// // Notify parent when filters change
+	// $effect(() => {
+	// 	onFilterChange(filteredActivities);
+	// });
 
-		// Filter by RPE
-		if (selectedRpe.length > 0) {
-			filtered = filtered.filter((activity) => {
-				return activity.rpe !== null && selectedRpe.includes(activity.rpe);
-			});
-		}
-
-		// Filter by workout type
-		if (selectedWorkoutTypes.length > 0) {
-			filtered = filtered.filter((activity) => {
-				return (
-					activity.workout_type !== null && selectedWorkoutTypes.includes(activity.workout_type)
-				);
-			});
-		}
-
-		// Filter by sport category
-		if (selectedSportCategories.length > 0) {
-			filtered = filtered.filter((activity) => {
-				const activityCategory = activity.sport_category || getSportCategory(activity.sport);
-				return activityCategory !== null && selectedSportCategories.includes(activityCategory);
-			});
-		}
-
-		return filtered;
-	});
-
-	// Notify parent when filters change
-	$effect(() => {
-		onFilterChange(filteredActivities);
-	});
-
-	// Helper function to notify URL change
-	const notifyFiltersChange = () => {
-		untrack(() => {
-			if (onFiltersStateChange !== undefined) {
-				onFiltersStateChange({
-					rpe: selectedRpe,
-					workoutTypes: selectedWorkoutTypes,
-					sportCategories: selectedSportCategories
-				});
-			}
-		});
-	};
+	// // Helper function to notify URL change
+	// const notifyFiltersChange = () => {
+	// 	untrack(() => {
+	// 		if (onFiltersStateChange !== undefined) {
+	// 			onFiltersStateChange({
+	// 				rpe: selectedRpe,
+	// 				workoutTypes: selectedWorkoutTypes,
+	// 				sportCategories: selectedSportCategories
+	// 			});
+	// 		}
+	// 	});
+	// };
 
 	// Toggle functions
 	const toggleRpe = (rpe: number) => {
-		if (selectedRpe.includes(rpe)) {
-			selectedRpe = selectedRpe.filter((r) => r !== rpe);
+		if (filters.rpe.includes(rpe)) {
+			filters = { ...filters, rpe: filters.rpe.filter((r) => r !== rpe) };
 		} else {
-			selectedRpe = [...selectedRpe, rpe];
+			filters = { ...filters, rpe: [...filters.rpe, rpe] };
 		}
-		notifyFiltersChange();
 	};
 
 	const toggleWorkoutType = (workoutType: WorkoutType) => {
-		if (selectedWorkoutTypes.includes(workoutType)) {
-			selectedWorkoutTypes = selectedWorkoutTypes.filter((wt) => wt !== workoutType);
+		if (filters.workoutTypes.includes(workoutType)) {
+			filters = { ...filters, workoutTypes: filters.workoutTypes.filter((r) => r !== workoutType) };
 		} else {
-			selectedWorkoutTypes = [...selectedWorkoutTypes, workoutType];
+			filters = { ...filters, workoutTypes: [...filters.workoutTypes, workoutType] };
 		}
-		notifyFiltersChange();
 	};
 
 	const toggleSportCategory = (category: SportCategory) => {
-		if (selectedSportCategories.includes(category)) {
-			selectedSportCategories = selectedSportCategories.filter((c) => c !== category);
+		if (filters.sportCategories.includes(category)) {
+			filters = {
+				...filters,
+				sportCategories: filters.sportCategories.filter((r) => r !== category)
+			};
 		} else {
-			selectedSportCategories = [...selectedSportCategories, category];
+			filters = { ...filters, sportCategories: [...filters.sportCategories, category] };
 		}
-		notifyFiltersChange();
 	};
 
 	const clearFilters = () => {
-		selectedRpe = [];
-		selectedWorkoutTypes = [];
-		selectedSportCategories = [];
-		notifyFiltersChange();
+		filters = {
+			rpe: [],
+			sportCategories: [],
+			workoutTypes: []
+		};
 	};
 
 	let hasActiveFilters = $derived(
-		selectedRpe.length > 0 || selectedWorkoutTypes.length > 0 || selectedSportCategories.length > 0
+		filters.rpe.length > 0 || filters.workoutTypes.length > 0 || filters.sportCategories.length > 0
 	);
 </script>
 
@@ -151,11 +101,6 @@
 	<summary class="collapse-title flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<h2 class="text-lg font-semibold">Filters</h2>
-			{#if hasActiveFilters}
-				<span class="badge badge-sm badge-primary">
-					{filteredActivities.length} / {activities.length}
-				</span>
-			{/if}
 		</div>
 	</summary>
 
@@ -168,7 +113,7 @@
 					<div class="flex flex-wrap gap-2">
 						{#each availableSportCategories as category}
 							<button
-								class={`btn btn-sm ${selectedSportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
+								class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
 								onclick={() => toggleSportCategory(category)}
 							>
 								<span class="text-lg">{sportCategoryIcons[category]}</span>
@@ -185,7 +130,7 @@
 				<div class="flex flex-wrap gap-2">
 					{#each WORKOUT_TYPE_LABELS as { value, label }}
 						<button
-							class={`btn btn-sm ${selectedWorkoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
+							class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
 							onclick={() => toggleWorkoutType(value)}
 						>
 							{label}
@@ -200,7 +145,7 @@
 				<div class="flex flex-wrap gap-2">
 					{#each RPE_VALUES as rpe}
 						<button
-							class={`btn btn-sm ${selectedRpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
+							class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
 							onclick={() => toggleRpe(rpe)}
 						>
 							{rpe}
