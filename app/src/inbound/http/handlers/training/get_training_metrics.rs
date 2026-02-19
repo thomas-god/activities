@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use axum::{
     Extension,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -171,6 +171,63 @@ pub async fn get_training_metrics<
     let body = ResponseBody(
         res.into_iter()
             .map(|metric| to_response_body_item(metric, query.date_range()))
+            .collect(),
+    );
+
+    Ok(json!(body).to_string())
+}
+
+/// Get all training metrics for a specific training period.
+///
+/// Returns all computed metrics that fall within the date range of the specified training period.
+/// For open-ended periods (no end date), includes today's activities.
+pub async fn get_training_period_metrics<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    UR: IUserService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    Path(period_id): Path<String>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let period_id = TrainingPeriodId::from(&period_id);
+
+    let period = state
+        .training_metrics_service
+        .get_training_period(user.user(), &period_id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let date_range_domain = period.range_default_tomorrow();
+    let date_range = MetricsDateRange {
+        start: date_range_domain
+            .start()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap()
+            .fixed_offset(),
+        end: Some(
+            date_range_domain
+                .end()
+                .and_hms_opt(23, 59, 59)
+                .unwrap()
+                .and_local_timezone(Local)
+                .unwrap()
+                .fixed_offset(),
+        ),
+    };
+
+    let res = state
+        .training_metrics_service
+        .get_training_period_metrics_values(user.user(), &period_id)
+        .await;
+
+    let body = ResponseBody(
+        res.into_iter()
+            .map(|metric| to_response_body_item(metric, &date_range))
             .collect(),
     );
 

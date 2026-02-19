@@ -1,6 +1,6 @@
 use axum::{
     Extension, Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
 };
 use chrono::{DateTime, FixedOffset, Local};
@@ -10,7 +10,7 @@ use crate::domain::ports::{DateRange, IActivityService, IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
-        models::training::TrainingNote,
+        models::training::{TrainingNote, TrainingPeriodId},
         ports::{GetTrainingNoteError, ITrainingService},
     },
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
@@ -81,4 +81,29 @@ pub async fn get_training_notes<
         .await
         .map(|notes| Json(notes.into_iter().map(TrainingNoteResponse::from).collect()))
         .map_err(StatusCode::from)
+}
+
+/// Get all training notes for a specific training period.
+///
+/// Returns all notes that fall within the date range of the specified training period.
+/// For open-ended periods (no end date), includes today's activities.
+pub async fn get_training_period_notes<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    UR: IUserService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    Path(period_id): Path<String>,
+) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
+    let period_id = TrainingPeriodId::from(&period_id);
+
+    state
+        .training_metrics_service
+        .get_training_period_notes(user.user(), &period_id)
+        .await
+        .map(|notes| Json(notes.into_iter().map(TrainingNoteResponse::from).collect()))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
