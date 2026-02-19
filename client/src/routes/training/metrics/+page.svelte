@@ -40,7 +40,7 @@
 	};
 </script>
 
-<div class="mx-auto flex flex-col gap-4">
+<div class="mx-auto flex flex-col gap-4 pt-5">
 	{#await data.metrics}
 		<div class="flex w-full flex-col items-center p-4 pt-6">
 			<div class="loading loading-bars"></div>
