@@ -47,11 +47,6 @@
 		return scParam.split(',') as SportCategory[];
 	});
 
-	let initialShowNotes = $derived.by(() => {
-		const param = page.url.searchParams.get('show_notes');
-		return param === null ? true : param === 'true';
-	});
-
 	// Current month from URL parameter, default to current month
 	let currentMonth = $derived.by(() => {
 		const monthParam = page.url.searchParams.get('month');
@@ -89,7 +84,6 @@
 		rpe: number[];
 		workoutTypes: WorkoutType[];
 		sportCategories: SportCategory[];
-		showNotes: boolean;
 	}) => {
 		const url = new URL(page.url);
 
@@ -112,13 +106,6 @@
 			url.searchParams.set('sport_category', filters.sportCategories.join(','));
 		} else {
 			url.searchParams.delete('sport_category');
-		}
-
-		// Update show notes preference
-		if (filters.showNotes) {
-			url.searchParams.set('show_notes', 'true');
-		} else {
-			url.searchParams.delete('show_notes');
 		}
 
 		goto(url, { replaceState: true, keepFocus: true });
@@ -206,7 +193,6 @@
 						{initialRpe}
 						{initialWorkoutTypes}
 						{initialSportCategories}
-						{initialShowNotes}
 						onFiltersChange={handleFilterChange}
 						onActivitySelected={handleActivitySelected}
 						selectedActivity={selectedActivityId}

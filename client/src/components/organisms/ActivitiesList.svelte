@@ -11,7 +11,6 @@
 		initialRpe = [],
 		initialWorkoutTypes = [],
 		initialSportCategories = [],
-		initialShowNotes = false,
 		onFiltersChange,
 		selectedActivity = null,
 		onActivitySelected
@@ -20,19 +19,16 @@
 		initialRpe?: number[];
 		initialWorkoutTypes?: WorkoutType[];
 		initialSportCategories?: SportCategory[];
-		initialShowNotes?: boolean;
 		onFiltersChange?: (filters: {
 			rpe: number[];
 			workoutTypes: WorkoutType[];
 			sportCategories: SportCategory[];
-			showNotes: boolean;
 		}) => void;
 		selectedActivity: string | null;
 		onActivitySelected?: (activityId: string) => void;
 	} = $props();
 
 	let filteredActivityList = $state<ActivityList>(activityList);
-	let showNotes = $state<boolean>(initialShowNotes);
 
 	let historyStartMonth = $derived(dayjs(filteredActivityList.at(-1)?.start_time).startOf('month'));
 	let historyEndMonth = dayjs().startOf('month');
@@ -62,9 +58,7 @@
 		rpe: number[];
 		workoutTypes: WorkoutType[];
 		sportCategories: SportCategory[];
-		showNotes: boolean;
 	}) => {
-		showNotes = filters.showNotes;
 		onFiltersChange?.(filters);
 	};
 
@@ -82,7 +76,6 @@
 		{initialRpe}
 		{initialWorkoutTypes}
 		{initialSportCategories}
-		bind:showNotes
 		onFiltersStateChange={handleFiltersStateChange}
 	/>
 	<div class="flex flex-col p-4 pt-0">
@@ -100,7 +93,6 @@
 						{#each activities as activity}
 							<ActivitiesListItem
 								{activity}
-								showNote={showNotes}
 								isSelected={activity.id === selectedActivity}
 								onClick={() => activityClickedCallback(activity.id)}
 							/>

@@ -48,7 +48,6 @@
 			{#if item.type === 'activity'}
 				<ActivitiesListItem
 					activity={item.data}
-					showNote={true}
 					onClick={() => selectActivityCallback(item.data.id)}
 					isSelected={selectedActivityId === item.data.id}
 				/>

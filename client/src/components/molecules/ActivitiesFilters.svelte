@@ -16,8 +16,6 @@
 		initialRpe = [],
 		initialWorkoutTypes = [],
 		initialSportCategories = [],
-		showNotes = $bindable(false),
-		showNotesFilter = true,
 		open = false,
 		onFiltersStateChange
 	}: {
@@ -26,15 +24,12 @@
 		initialRpe?: number[];
 		initialWorkoutTypes?: WorkoutType[];
 		initialSportCategories?: SportCategory[];
-		showNotes?: boolean;
 		onFiltersStateChange?: (filters: {
 			rpe: number[];
 			workoutTypes: WorkoutType[];
 			sportCategories: SportCategory[];
-			showNotes: boolean;
 		}) => void;
 		open?: boolean;
-		showNotesFilter?: boolean;
 	} = $props();
 
 	// Filter state - initialize from props
@@ -106,8 +101,7 @@
 				onFiltersStateChange({
 					rpe: selectedRpe,
 					workoutTypes: selectedWorkoutTypes,
-					sportCategories: selectedSportCategories,
-					showNotes
+					sportCategories: selectedSportCategories
 				});
 			}
 		});
@@ -138,11 +132,6 @@
 		} else {
 			selectedSportCategories = [...selectedSportCategories, category];
 		}
-		notifyFiltersChange();
-	};
-
-	const toggleShowNotes = () => {
-		showNotes = !showNotes;
 		notifyFiltersChange();
 	};
 
@@ -219,19 +208,6 @@
 					{/each}
 				</div>
 			</div>
-
-			<!-- Show Notes Toggle -->
-			{#if showNotesFilter}
-				<div>
-					<div class="mb-2 text-sm font-medium">Display</div>
-					<button
-						class={`btn btn-sm ${showNotes ? 'btn-primary' : 'btn-ghost'}`}
-						onclick={toggleShowNotes}
-					>
-						📝 {showNotes ? 'Hide' : 'Show'} Notes
-					</button>
-				</div>
-			{/if}
 
 			{#if hasActiveFilters}
 				<div>

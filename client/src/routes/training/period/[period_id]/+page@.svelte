@@ -487,7 +487,6 @@
 					onFilterChange={(activities) => {
 						filteredActivities = activities;
 					}}
-					showNotesFilter={false}
 					open={true}
 				/>
 				<button class="btn" onclick={() => filtersDialog.close()}>Close</button>

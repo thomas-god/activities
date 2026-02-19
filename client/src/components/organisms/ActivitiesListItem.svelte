@@ -7,12 +7,10 @@
 
 	let {
 		activity,
-		showNote = false,
 		onClick,
 		isSelected = false
 	}: {
 		activity: Activity;
-		showNote?: boolean;
 		onClick?: () => void;
 		isSelected?: boolean;
 	} = $props();
@@ -76,7 +74,7 @@
 			</span>
 		</div>
 	</div>
-	{#if showNote && activity.feedback}
+	{#if activity.feedback}
 		<div
 			class="my-0.5 ml-2 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
 		>
