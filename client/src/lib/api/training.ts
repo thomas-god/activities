@@ -308,6 +308,66 @@ export async function fetchTrainingNotes(
 }
 
 /**
+ * Fetch all training notes for a specific training period
+ * @param fetch - The fetch function from SvelteKit
+ * @param periodId - The ID of the training period
+ * @returns Array of training notes or empty array on error
+ */
+export async function fetchTrainingPeriodNotes(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	periodId: string
+): Promise<TrainingNotesList> {
+	const url = `${PUBLIC_APP_URL}/api/training/period/${periodId}/notes`;
+
+	const res = await fetch(url, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return [];
+	}
+
+	if (res.status === 200) {
+		return TrainingNotesListSchema.parse(await res.json());
+	}
+
+	return [];
+}
+
+/**
+ * Fetch all training metrics for a specific training period
+ * @param fetch - The fetch function from SvelteKit
+ * @param periodId - The ID of the training period
+ * @returns Array of grouped metrics or empty array on error
+ */
+export async function fetchTrainingPeriodMetrics(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	periodId: string
+): Promise<MetricsListGrouped> {
+	const url = `${PUBLIC_APP_URL}/api/training/period/${periodId}/metrics`;
+
+	const res = await fetch(url, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return [];
+	}
+
+	if (res.status === 200) {
+		return MetricsListSchemaGrouped.parse(await res.json());
+	}
+
+	return [];
+}
+
+/**
  * Create a new training note
  * @param content - The note content
  * @param date - The optional note date (defaults to today if not provided)
