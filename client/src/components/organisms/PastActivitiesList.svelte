@@ -13,16 +13,12 @@
 		activityList,
 		trainingNotes = [],
 		moreCallback,
-		onNoteSave,
-		onNoteDelete,
 		onActivityClick,
 		selectedActivityId = null
 	}: {
 		activityList: ActivityList;
 		trainingNotes?: TrainingNotesList;
 		moreCallback: () => void;
-		onNoteSave?: (noteId: string, content: string, date: string) => void;
-		onNoteDelete?: (noteId: string) => void;
 		onActivityClick?: (activityId: string) => void;
 		selectedActivityId?: string | null;
 	} = $props();
@@ -103,11 +99,7 @@
 						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
-					<TrainingNoteListItemCompact
-						note={item.data}
-						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
-						onDelete={() => onNoteDelete?.(item.data.id)}
-					/>
+					<TrainingNoteListItemCompact note={item.data} />
 				{/if}
 			{/each}
 		</div>
@@ -124,11 +116,7 @@
 						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
-					<TrainingNoteListItemCompact
-						note={item.data}
-						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
-						onDelete={() => onNoteDelete?.(item.data.id)}
-					/>
+					<TrainingNoteListItemCompact note={item.data} />
 				{/if}
 			{/each}
 		</div>
@@ -145,11 +133,7 @@
 						isSelected={selectedActivityId === item.data.id}
 					/>
 				{:else}
-					<TrainingNoteListItemCompact
-						note={item.data}
-						onEdit={(content, date) => onNoteSave?.(item.data.id, content, date)}
-						onDelete={() => onNoteDelete?.(item.data.id)}
-					/>
+					<TrainingNoteListItemCompact note={item.data} />
 				{/if}
 			{/each}
 		</div>

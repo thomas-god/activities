@@ -1,24 +1,8 @@
 <script lang="ts">
-	import { deleteTrainingNote, updateTrainingNote } from '$lib/api/training';
-	import { invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
 	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 
 	let { data }: PageProps = $props();
-
-	const saveNote = async (noteId: string, content: string, date: string) => {
-		const success = await updateTrainingNote(noteId, content, date);
-		if (success) {
-			invalidate('app:training-notes');
-		}
-	};
-
-	const deleteNote = async (noteId: string) => {
-		const success = await deleteTrainingNote(noteId);
-		if (success) {
-			invalidate('app:training-notes');
-		}
-	};
 </script>
 
 <div class="mx-auto flex flex-col gap-4">
@@ -34,11 +18,7 @@
 			{:then notes}
 				{#each notes as note}
 					<div class="px-2 sm:px-4">
-						<TrainingNoteListItemCompact
-							{note}
-							onEdit={(content, date) => saveNote(note.id, content, date)}
-							onDelete={() => deleteNote(note.id)}
-						/>
+						<TrainingNoteListItemCompact {note} />
 					</div>
 				{:else}
 					<div class="italic text-sm text-center tracking-wide opacity-60 p-8">

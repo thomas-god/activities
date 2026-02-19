@@ -7,16 +7,12 @@
 		activities,
 		notes,
 		selectedActivityId,
-		selectActivityCallback,
-		saveNoteCallback,
-		deleteNoteCallback
+		selectActivityCallback
 	}: {
 		activities: ActivityList;
 		notes: TrainingNotesList;
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
-		saveNoteCallback: (id: string, content: string, date: string) => void;
-		deleteNoteCallback: (id: string) => void;
 	} = $props();
 
 	// Merge activities and notes, sorted by date (most recent first)
@@ -52,11 +48,7 @@
 					isSelected={selectedActivityId === item.data.id}
 				/>
 			{:else}
-				<TrainingNoteListItemCompact
-					note={item.data}
-					onEdit={(content, date) => saveNoteCallback(item.data.id, content, date)}
-					onDelete={() => deleteNoteCallback(item.data.id)}
-				/>
+				<TrainingNoteListItemCompact note={item.data} />
 			{/if}
 		{/each}
 	</div>

@@ -1,16 +1,13 @@
 <script lang="ts">
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
-	import type { TrainingNote } from '$lib/api/training';
+	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
+	import { invalidate } from '$app/navigation';
 
 	let {
-		note,
-		onEdit,
-		onDelete
+		note
 	}: {
 		note: TrainingNote;
-		onEdit?: (content: string, date: string) => void;
-		onDelete?: () => void;
 	} = $props();
 
 	let showEditModal = $state(false);
@@ -32,23 +29,27 @@
 		editDate = '';
 	};
 
-	const saveEdit = async () => {
-		if (editContent.trim() === '') return;
-		isSaving = true;
-		await onEdit?.(editContent.trim(), editDate);
-		isSaving = false;
-		showEditModal = false;
-		editContent = '';
-		editDate = '';
-	};
-
 	const confirmDelete = (e: Event) => {
 		e.stopPropagation();
 		showDeleteModal = true;
 	};
 
-	const handleDelete = async () => {
-		await onDelete?.();
+	const saveNoteUpdates = async () => {
+		if (editContent.trim() === '') return;
+		isSaving = true;
+		await updateTrainingNote(note.id, editContent.trim(), editDate);
+		isSaving = false;
+		showEditModal = false;
+		editContent = '';
+		editDate = '';
+		invalidate('app:training-notes');
+	};
+
+	const deleteNote = async () => {
+		const success = await deleteTrainingNote(note.id);
+		if (success) {
+			invalidate('app:training-notes');
+		}
 	};
 </script>
 
@@ -121,7 +122,7 @@
 				<button class="btn" onclick={cancelEdit} disabled={isSaving}> Cancel </button>
 				<button
 					class="btn btn-primary"
-					onclick={saveEdit}
+					onclick={saveNoteUpdates}
 					disabled={editContent.trim() === '' || isSaving}
 				>
 					{#if isSaving}
@@ -145,7 +146,7 @@
 	title="Delete Training Note"
 	description="Are you sure you want to delete this note?"
 	itemPreview={note.content.slice(0, 75) + (note.content.length > 75 ? '...' : '')}
-	onConfirm={handleDelete}
+	onConfirm={deleteNote}
 />
 
 <style>

@@ -6,7 +6,6 @@
 	import type { TrainingPeriodDetails } from './+page';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
@@ -120,20 +119,6 @@
 			throw new Error(error.error);
 		}
 	}
-
-	const saveNoteCallback = async (noteId: string, content: string, date: string) => {
-		const success = await updateTrainingNote(noteId, content, date);
-		if (success) {
-			invalidate('app:training-notes');
-		}
-	};
-
-	const deleteNoteCallback = async (noteId: string) => {
-		const success = await deleteTrainingNote(noteId);
-		if (success) {
-			invalidate('app:training-notes');
-		}
-	};
 
 	const sportsByCategory = (sports: TrainingPeriodDetails['sports']) => {
 		// Map category -> { category, icon, sports[], showAll }
@@ -472,8 +457,6 @@
 						{notes}
 						{selectedActivityId}
 						{selectActivityCallback}
-						{saveNoteCallback}
-						{deleteNoteCallback}
 					/>
 				</div>
 			{/await}

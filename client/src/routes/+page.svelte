@@ -5,7 +5,6 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
-	import { updateTrainingNote, deleteTrainingNote } from '$lib/api/training';
 	import { fetchActivityDetails, type ActivityWithTimeseries } from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
@@ -20,16 +19,6 @@
 
 	const moreActivitiesCallback = () => {
 		goto('/history');
-	};
-
-	const handleNoteSave = async (noteId: string, content: string, date: string) => {
-		await updateTrainingNote(noteId, content, date);
-		await invalidate('app:training-notes');
-	};
-
-	const handleNoteDelete = async (noteId: string) => {
-		await deleteTrainingNote(noteId);
-		await invalidate('app:training-notes');
 	};
 
 	const handleActivityClick = async (activityId: string) => {
@@ -108,8 +97,6 @@
 					activityList={activities}
 					trainingNotes={notes}
 					moreCallback={moreActivitiesCallback}
-					onNoteSave={handleNoteSave}
-					onNoteDelete={handleNoteDelete}
 					onActivityClick={handleActivityClick}
 					{selectedActivityId}
 				/>
