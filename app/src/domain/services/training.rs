@@ -616,6 +616,52 @@ where
         }
     }
 
+    async fn get_training_period_notes(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> Result<Vec<TrainingNote>, GetTrainingNoteError> {
+        // Get the training period to verify it exists and belongs to the user
+        let Some(period) = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await
+        else {
+            return Err(GetTrainingNoteError::Unknown(anyhow::anyhow!(
+                "Training period not found"
+            )));
+        };
+
+        // Get the date range from the period (use range_default_tomorrow to include today)
+        let date_range = period.range_default_tomorrow();
+
+        // Fetch notes using the existing method
+        self.get_training_notes(user, &Some(date_range)).await
+    }
+
+    async fn get_training_period_metrics_values(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
+        // Get the training period to verify it exists and belongs to the user
+        let Some(period) = self
+            .training_repository
+            .get_training_period(user, period_id)
+            .await
+        else {
+            return vec![];
+        };
+
+        // Get the date range from the period (use range_default_tomorrow to include today)
+        let date_range = period.range_default_tomorrow();
+
+        // Get metrics with TrainingMetricScope::TrainingPeriod
+        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
+        self.get_training_metrics_values(user, &date_range, &scope)
+            .await
+    }
+
     async fn get_training_metrics_ordering(
         &self,
         user: &UserId,
@@ -830,6 +876,18 @@ pub mod test_utils {
                 user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<(), DeleteTrainingNoteError>;
+
+            async fn get_training_period_notes(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+            ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
+
+            async fn get_training_period_metrics_values(
+                &self,
+                user: &UserId,
+                period_id: &TrainingPeriodId,
+            ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
 
             async fn get_training_metrics_ordering(
                 &self,
@@ -3602,6 +3660,161 @@ mod test_training_service_training_note {
             Err(CreateTrainingNoteError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_notes_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+        let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let end = Some(NaiveDate::from_ymd_opt(2025, 1, 31).unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| {
+                use crate::domain::models::training::{TrainingPeriod, TrainingPeriodSports};
+                Some(
+                    TrainingPeriod::new(
+                        period_id_clone.clone(),
+                        UserId::from("user1"),
+                        start,
+                        end,
+                        "Test Period".to_string(),
+                        TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        // Mock get_training_notes - will be called with a date range
+        training_repository
+            .expect_get_training_notes()
+            .times(1)
+            .returning(|_, _| {
+                use chrono::Utc;
+                Ok(vec![TrainingNote::new(
+                    TrainingNoteId::new(),
+                    UserId::from("user1"),
+                    None,
+                    TrainingNoteContent::from("Test note"),
+                    TrainingNoteDate::today(),
+                    Utc::now().into(),
+                )])
+            });
+
+        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let service = TrainingService::new(training_repository, activity_service);
+
+        let result = service
+            .get_training_period_notes(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_ok());
+        let notes = result.unwrap();
+        assert_eq!(notes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_notes_period_not_found() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period to return None
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let service = TrainingService::new(training_repository, activity_service);
+
+        let result = service
+            .get_training_period_notes(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_metrics_values_ok() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+        let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let end = Some(NaiveDate::from_ymd_opt(2025, 1, 31).unwrap());
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period
+        let period_id_clone = period_id.clone();
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(move |_, _| {
+                use crate::domain::models::training::{TrainingPeriod, TrainingPeriodSports};
+                Some(
+                    TrainingPeriod::new(
+                        period_id_clone.clone(),
+                        UserId::from("user1"),
+                        start,
+                        end,
+                        "Test Period".to_string(),
+                        TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        // Mock get_global_metrics and get_period_metrics for metrics values computation
+        training_repository
+            .expect_get_global_metrics()
+            .returning(|_| Ok(vec![]));
+        training_repository
+            .expect_get_period_metrics()
+            .returning(|_, _| Ok(vec![]));
+        training_repository
+            .expect_get_training_metrics_ordering()
+            .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
+
+        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let service = TrainingService::new(training_repository, activity_service);
+
+        let result = service
+            .get_training_period_metrics_values(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_empty()); // Empty because we mocked no metrics
+    }
+
+    #[tokio::test]
+    async fn test_get_training_period_metrics_values_period_not_found() {
+        let user_id = UserId::from("user1");
+        let period_id = TrainingPeriodId::new();
+
+        let mut training_repository = MockTrainingRepository::new();
+
+        // Mock get_training_period to return None
+        training_repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let service = TrainingService::new(training_repository, activity_service);
+
+        let result = service
+            .get_training_period_metrics_values(&user_id, &period_id)
+            .await;
+
+        assert!(result.is_empty()); // Returns empty when period not found
     }
 }
 

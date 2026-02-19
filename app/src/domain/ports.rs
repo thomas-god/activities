@@ -984,6 +984,18 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
 
+    fn get_training_period_notes(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn get_training_period_metrics_values(
+        &self,
+        user: &UserId,
+        period_id: &TrainingPeriodId,
+    ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
+
     fn get_training_metrics_ordering(
         &self,
         user: &UserId,
