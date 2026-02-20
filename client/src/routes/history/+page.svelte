@@ -178,14 +178,14 @@
 					class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
 					onclick={() => setViewMode('list')}
 				>
-					<span class="text-lg">☰</span>
+					<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
 					<span class="ml-1">List</span>
 				</button>
 				<button
 					class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
 					onclick={() => setViewMode('calendar')}
 				>
-					<span class="text-lg">📅</span>
+					<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
 					<span class="ml-1">Calendar</span>
 				</button>
 			</div>

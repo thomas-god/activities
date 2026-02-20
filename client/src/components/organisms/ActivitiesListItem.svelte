@@ -76,9 +76,9 @@
 	</div>
 	{#if activity.feedback}
 		<div
-			class="mx-3 my-1 box-border flex flex-row gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+			class="mx-3 my-1 box-border flex flex-row items-start gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
 		>
-			<div>📝</div>
+			<div><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
 			<div>
 				{activity.feedback}
 			</div>

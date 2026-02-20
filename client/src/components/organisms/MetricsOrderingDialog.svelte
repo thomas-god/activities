@@ -157,22 +157,30 @@
 						ondragover={(e) => handleDragOver(e, index)}
 						ondragend={handleDragEnd}
 						aria-label={`${getMetricName(metricId)}, position ${index + 1} of ${metricsOrder.length}`}
-						class="flex cursor-move items-center gap-3 rounded-box bg-base-200 p-3 transition-colors hover:bg-base-300"
+						class="flex cursor-move items-center gap-1 rounded-box bg-base-200 p-3 transition-colors hover:bg-base-300"
 						class:opacity-50={draggedIndex === index}
 					>
-						<span class="text-lg pointer-coarse:hidden" aria-hidden="true">☰</span>
+						<img
+							src="/icons/list.svg"
+							class="h-5 w-5 pointer-coarse:hidden"
+							aria-hidden="true"
+							alt="List icon"
+						/>
 
-						<span class="text-lg pointer-fine:hidden" aria-hidden="true">
-							<button class="btn px-0 btn-ghost btn-sm" onclick={() => moveMetricPositionUp(index)}
-								>🔼</button
-							>
-						</span>
-						<span class="text-lg pointer-fine:hidden" aria-hidden="true">
-							<button
-								class="btn px-0 btn-ghost btn-sm"
-								onclick={() => moveMetricPositionDown(index)}>🔽</button
-							>
-						</span>
+						<button
+							class="btn px-0 btn-ghost btn-sm pointer-fine:hidden"
+							aria-hidden="true"
+							onclick={() => moveMetricPositionUp(index)}
+						>
+							<img src="/icons/up.svg" class="h-5 w-5" alt="Up arrow icon" />
+						</button>
+						<button
+							class="btn px-0 btn-ghost btn-sm pointer-fine:hidden"
+							aria-hidden="true"
+							onclick={() => moveMetricPositionDown(index)}
+						>
+							<img src="/icons/down.svg" class="h-5 w-5" alt="Down arrow icon" />
+						</button>
 						<span class="flex-1">{getMetricName(metricId)}</span>
 						<span class="badge badge-sm">{index + 1}</span>
 					</div>

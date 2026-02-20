@@ -56,7 +56,7 @@
 <div class="item_container @container flex w-full flex-1 flex-col items-stretch p-2 text-left">
 	<!-- Icon + Title and date -->
 	<div class="flex w-full flex-row justify-start">
-		<div class="icon">💭</div>
+		<div class="icon"><img src="/icons/think.svg" class="h-6 w-6" alt="Think buble icon" /></div>
 		<div class="flex flex-1 flex-col">
 			<div class=" font-semibold">Note</div>
 			<div class="flex flex-row items-center gap-2">
@@ -74,13 +74,13 @@
 					>
 						<li>
 							<button onclick={startEdit}>
-								<span>✏️</span>
+								<img src="/icons/edit.svg" class="h-4 w-4" alt="Edit icon" />
 								<span>Edit</span>
 							</button>
 						</li>
 						<li>
 							<button onclick={confirmDelete} class="text-error">
-								<span>🗑️</span>
+								<img src="/icons/delete.svg" class="h-4 w-4" alt="Delet icon" />
 								<span>Delete</span>
 							</button>
 						</li>
@@ -92,7 +92,7 @@
 	<div
 		class="mx-1 my-1 box-border flex flex-row gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
 	>
-		<div>📝</div>
+		<div><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
 		<div>
 			{note.content}
 		</div>
