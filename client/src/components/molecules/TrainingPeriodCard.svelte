@@ -53,7 +53,7 @@
 				</div>
 				<div class="flex flex-row items-center gap-2">
 					{#each sportIcons as icon}
-						<div class="text-sm">{icon}</div>
+						<img src={`/icons/${icon}`} class="h-5 w-5" alt={`${icon} icon`} />
 					{:else}
 						<div class="text-sm italic opacity-70">All sports</div>
 					{/each}

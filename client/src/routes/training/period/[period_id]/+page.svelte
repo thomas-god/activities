@@ -256,7 +256,7 @@
 											? `${group.category} (all sub-sports)`
 											: `${group.category}: ${group.sports.join(', ')}`}
 									>
-										{group.icon}
+										<img src={`/icons/${group.icon}`} class="h-5 w-5" alt="Sport icon" />
 									</div>
 								{/each}
 							</div>

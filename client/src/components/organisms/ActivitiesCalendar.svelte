@@ -199,7 +199,11 @@
 								class={`activity-details flex items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-base leading-none">
-									{getSportCategoryIcon(activity.sport_category)}
+									<img
+										src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+										class="h-4 w-4"
+										alt="Sport icon"
+									/>
 								</span>
 								<span class="flex-1 truncate">
 									{activity.name || sportDisplay(activity.sport)}
@@ -240,7 +244,11 @@
 								class={`activity-card flex items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 							>
 								<span class="text-2xl leading-none">
-									{getSportCategoryIcon(activity.sport_category)}
+									<img
+										src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+										class="h-6 w-6"
+										alt="Sport icon"
+									/>
 								</span>
 								<div class="flex-1">
 									<div class="font-medium">

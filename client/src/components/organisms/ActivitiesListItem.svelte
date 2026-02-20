@@ -44,7 +44,11 @@
 >
 	<div class={`flex flex-1 items-center pl-2 ${categoryClass(activity.sport_category)}`}>
 		<div class={`icon ${categoryClass(activity.sport_category)}`}>
-			{getSportCategoryIcon(activity.sport_category)}
+			<img
+				src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+				class="h-6 w-6"
+				alt="Sport icon"
+			/>
 		</div>
 		<div class="flex-1">
 			<div class="flex flex-col">

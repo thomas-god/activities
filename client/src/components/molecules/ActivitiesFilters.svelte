@@ -116,7 +116,11 @@
 								class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
 								onclick={() => toggleSportCategory(category)}
 							>
-								<span class="text-lg">{sportCategoryIcons[category]}</span>
+								<img
+									src={`/icons/${sportCategoryIcons[category]}`}
+									class="h-6 w-6"
+									alt="Menu icon"
+								/>
 								<span>{sportCategoryDisplay(category)}</span>
 							</button>
 						{/each}
