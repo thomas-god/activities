@@ -170,7 +170,7 @@
 				onclick={handleDownloadClick}
 				title="Download all activities as ZIP"
 			>
-				<span class="text-lg">⬇️</span>
+				<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
 				<span class="ml-1">Download</span>
 			</button>
 			<div class="join">

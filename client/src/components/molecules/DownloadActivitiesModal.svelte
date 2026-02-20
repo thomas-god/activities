@@ -58,7 +58,7 @@
 				<div class="modal-action">
 					<button class="btn btn-ghost" onclick={handleCancel}>Cancel</button>
 					<button class="btn btn-primary" onclick={handleConfirm}>
-						<span class="text-lg">⬇️</span>
+						<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
 						Download
 					</button>
 				</div>
