@@ -12,7 +12,8 @@
 		notes,
 		selectedActivityId,
 		selectActivityCallback,
-		filters = $bindable()
+		filters = $bindable(),
+		endDate = null
 	}: {
 		activities: ActivityList;
 		notes: TrainingNotesList;
@@ -23,6 +24,7 @@
 		};
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
+		endDate?: string | null;
 	} = $props();
 
 	let filteredActivities = $derived.by(() => {
@@ -79,7 +81,8 @@
 
 	const timelineByMonth: Map<string, TimelineItem[]> = $derived.by(() => {
 		let timelineStartMonth = dayjs(timeline.at(-1)?.date).startOf('month');
-		let timelineEndMonth = dayjs().startOf('month');
+		let timelineEndMonth =
+			endDate === null ? dayjs().startOf('month') : dayjs(endDate).startOf('month');
 
 		const timelineByMonth = new Map();
 		let date = timelineEndMonth;

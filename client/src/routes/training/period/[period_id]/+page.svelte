@@ -447,6 +447,7 @@
 						bind:filters
 						{selectedActivityId}
 						{selectActivityCallback}
+						endDate={periodDetails.end}
 					/>
 				</div>
 			{/await}
