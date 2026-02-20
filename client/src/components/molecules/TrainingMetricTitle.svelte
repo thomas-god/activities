@@ -48,8 +48,8 @@
 	});
 </script>
 
-<div class="flex items-center justify-center gap-1.5">
-	<div class="text-base font-medium">
+<div class="flex flex-row items-center justify-center gap-1.5">
+	<div class="font-medium">
 		{#if name}
 			{name}
 		{:else}
@@ -61,7 +61,9 @@
 		{/if}
 	</div>
 	<div class="dropdown-hover dropdown dropdown-end dropdown-bottom">
-		<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">ℹ️</div>
+		<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">
+			<img src="/icons/info.svg" class="h-6 w-6" alt="Information icon" />
+		</div>
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
 			tabindex="0"

@@ -128,7 +128,8 @@
 		</select>
 	</div>
 	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-ghost btn-sm">
-		🔢 Metrics order
+		<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
+		Metrics order
 	</button>
 </div>
 
