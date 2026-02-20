@@ -6,9 +6,8 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
-	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
-	import { groupMetricValues, metricScope } from '$lib/api';
+	import { groupMetricValues } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -55,27 +54,10 @@
 			onMetricsReordered={() => invalidate('app:training-metrics')}
 		/>
 
-		{#each metrics as metric}
+		{#each metrics as metric (metric.id)}
 			<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
 				<div class="relative p-4 text-center">
-					<TrainingMetricTitle
-						name={metric.name}
-						granularity={metric.granularity}
-						aggregate={metric.aggregate}
-						metric={metric.metric}
-						sports={metric.sports}
-						groupBy={metric.group_by}
-					/>
-					<div class="absolute right-4 bottom-[8px]">
-						<!-- Action menu dropdown -->
-						<TrainingMetricMenu
-							name={metric.name}
-							id={metric.id}
-							scope={metricScope(metric)}
-							onUpdate={() => invalidate('app:training-metrics')}
-							onDelete={() => invalidate('app:training-metrics')}
-						/>
-					</div>
+					<TrainingMetricTitle {metric} />
 				</div>
 				<TrainingMetricsChartStacked
 					height={250}

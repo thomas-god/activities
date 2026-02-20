@@ -2,21 +2,16 @@
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
-	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
 
 	let {
 		metrics,
 		height,
-		initialIndex = 0,
-		onUpdate,
-		onDelete
+		initialIndex = 0
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
 		initialIndex?: number;
-		onUpdate: () => void;
-		onDelete: () => void;
 	} = $props();
 
 	let chartWidth: number = $state(300);
@@ -46,7 +41,8 @@
 			groupBy: metric.group_by,
 			unit: metric.unit,
 			showGroup: metric.group_by !== null,
-			scope
+			scope,
+			initialMetric: metric
 		};
 	});
 
@@ -73,21 +69,7 @@
 			←
 		</button>
 		<div class="flex flex-1 flex-row justify-center text-center">
-			<TrainingMetricTitle
-				name={currentMetric.name}
-				granularity={currentMetric.granularity}
-				aggregate={currentMetric.aggregate}
-				metric={currentMetric.metric}
-				sports={currentMetric.sports}
-				groupBy={currentMetric.groupBy}
-			/>
-			<TrainingMetricMenu
-				id={currentMetric.id}
-				name={currentMetric.name || ''}
-				scope={currentMetric.scope}
-				{onDelete}
-				{onUpdate}
-			/>
+			<TrainingMetricTitle metric={currentMetric.initialMetric} />
 		</div>
 		<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
 			→

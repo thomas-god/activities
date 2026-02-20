@@ -1,22 +1,10 @@
 <script lang="ts">
-	import {
-		aggregateFunctionDisplay,
-		groupByClauseDisplay,
-		type GroupByClause,
-		type MetricAggregateFunction
-	} from '$lib/metric';
+	import { invalidate } from '$app/navigation';
+	import { metricScope, type MetricsListItemGrouped } from '$lib/api';
+	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/metric';
+	import TrainingMetricMenu from './TrainingMetricMenu.svelte';
 
-	interface TrainingMetricTitleProps {
-		name?: string | null;
-		granularity: string;
-		aggregate: MetricAggregateFunction;
-		metric: string;
-		sports?: string[];
-		groupBy: GroupByClause | null;
-	}
-
-	let { name, granularity, aggregate, metric, sports, groupBy }: TrainingMetricTitleProps =
-		$props();
+	let { metric }: { metric: MetricsListItemGrouped } = $props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
@@ -24,22 +12,22 @@
 		const lines = [];
 
 		// Source metric
-		lines.push({ label: 'Metric', value: metric });
+		lines.push({ label: 'Metric', value: metric.metric });
 
 		// Granularity
-		lines.push({ label: 'Granularity', value: capitalize(granularity.toLowerCase()) });
+		lines.push({ label: 'Granularity', value: capitalize(metric.granularity.toLowerCase()) });
 
 		// Aggregate function
-		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[aggregate] });
+		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
 
 		// Group by if present
-		if (groupBy) {
-			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(groupBy) });
+		if (metric.group_by) {
+			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(metric.group_by) });
 		}
 
 		// Sports filter
-		if (sports && sports.length > 0) {
-			lines.push({ label: 'Sports', value: sports.join(', ') });
+		if (metric.sports && metric.sports.length > 0) {
+			lines.push({ label: 'Sports', value: metric.sports.join(', ') });
 		} else {
 			lines.push({ label: 'Sports', value: 'All sports' });
 		}
@@ -48,36 +36,50 @@
 	});
 </script>
 
-<div class="flex flex-row items-center justify-center gap-1.5">
-	<div class="font-medium">
-		{#if name}
-			{name}
-		{:else}
-			{capitalize(granularity.toLowerCase())}
-			{aggregateFunctionDisplay[aggregate]}
-			{#if aggregate !== 'NumberOfActivities'}
-				{metric.toLowerCase()}
+<div class="relative w-full p-4 text-center">
+	<div class="flex flex-row items-center justify-center gap-1.5">
+		<div class=" font-medium">
+			{#if metric.name}
+				{metric.name}
+			{:else}
+				{capitalize(metric.granularity.toLowerCase())}
+				{aggregateFunctionDisplay[metric.aggregate]}
+				{#if metric.aggregate !== 'NumberOfActivities'}
+					{metric.metric.toLowerCase()}
+				{/if}
 			{/if}
-		{/if}
-	</div>
-	<div class="dropdown-hover dropdown dropdown-end dropdown-bottom">
-		<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">
-			<img src="/icons/info.svg" class="h-6 w-6" alt="Information icon" />
 		</div>
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-		<div
-			tabindex="0"
-			class="dropdown-content z-10 rounded-box bg-base-200 p-3 shadow-lg"
-			style="min-width: 200px;"
-		>
-			<div class="space-y-1 text-left text-sm">
-				{#each tooltipLines as line}
-					<div class="flex gap-2">
-						<span class="font-semibold">{line.label}:</span>
-						<span class="text-base-content/80">{line.value}</span>
+
+		<div class="absolute right-4 bottom-[16px] flex flex-row items-center gap-0.5">
+			<!-- Action menu dropdown -->
+
+			<div class="dropdown-hover dropdown dropdown-end dropdown-bottom">
+				<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">
+					<img src="/icons/info.svg" class="h-5 w-5" alt="Information icon" />
+				</div>
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<div
+					tabindex="0"
+					class="dropdown-content z-10 rounded-box bg-base-200 p-3 shadow-lg"
+					style="min-width: 200px;"
+				>
+					<div class="space-y-1 text-left text-sm">
+						{#each tooltipLines as line}
+							<div class="flex gap-2">
+								<span class="font-semibold">{line.label}:</span>
+								<span class="text-base-content/80">{line.value}</span>
+							</div>
+						{/each}
 					</div>
-				{/each}
+				</div>
 			</div>
+			<TrainingMetricMenu
+				name={metric.name}
+				id={metric.id}
+				scope={metricScope(metric)}
+				onUpdate={() => invalidate('app:training-metrics')}
+				onDelete={() => invalidate('app:training-metrics')}
+			/>
 		</div>
 	</div>
 </div>

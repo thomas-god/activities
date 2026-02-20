@@ -92,7 +92,9 @@
 </script>
 
 <div class="dropdown dropdown-end">
-	<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">⋮</div>
+	<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">
+		<img src="/icons/menu.svg" alt="Menu icon" class="h-5 w-5" />
+	</div>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul
 		tabindex="0"

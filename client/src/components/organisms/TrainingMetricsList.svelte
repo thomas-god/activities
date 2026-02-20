@@ -2,14 +2,11 @@
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
-	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
 
 	let {
 		metrics,
-		height,
-		onDelete,
-		onUpdate
+		height
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
@@ -40,7 +37,8 @@
 				groupBy: metric.group_by,
 				unit: metric.unit,
 				showGroup: metric.group_by !== null,
-				scope
+				scope,
+				initialMetric: metric
 			};
 		})
 	);
@@ -49,23 +47,7 @@
 <div class="flex flex-col items-center gap-0">
 	{#each metricProps as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-			<div class="flex flex-row justify-center">
-				<TrainingMetricTitle
-					name={metric.name}
-					granularity={metric.granularity}
-					aggregate={metric.aggregate}
-					metric={metric.metric}
-					sports={metric.sports}
-					groupBy={metric.groupBy}
-				/>
-				<TrainingMetricMenu
-					id={metric.id}
-					name={metric.name || ''}
-					scope={metric.scope}
-					{onDelete}
-					{onUpdate}
-				/>
-			</div>
+			<TrainingMetricTitle metric={metric.initialMetric} />
 
 			<TrainingMetricsChartStacked
 				{height}

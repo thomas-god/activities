@@ -9,11 +9,7 @@
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
-	import {
-		fetchActivityDetails,
-		type ActivityList,
-		type ActivityWithTimeseries
-	} from '$lib/api/activities';
+	import { fetchActivityDetails, type ActivityWithTimeseries } from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
@@ -368,12 +364,7 @@
 								</div>
 							</div>
 							{#if screenWidth < 700}
-								<TrainingMetricsCarousel
-									{metrics}
-									height={chartHeight}
-									onUpdate={() => invalidate(`app:training-period:${periodDetails.id}`)}
-									onDelete={() => invalidate(`app:training-period:${periodDetails.id}`)}
-								/>
+								<TrainingMetricsCarousel {metrics} height={chartHeight} />
 							{:else}
 								<TrainingMetricsList
 									{metrics}
