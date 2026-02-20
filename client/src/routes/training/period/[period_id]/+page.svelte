@@ -21,6 +21,8 @@
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
 	import Timeline from '$components/pages/Timeline.svelte';
+	import EditButton from '$components/atoms/EditButton.svelte';
+	import DeleteButton from '$components/atoms/DeleteButton.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -235,7 +237,9 @@
 			<!-- Top row: Icon and Title/Date/Actions -->
 			<div class="flex items-center gap-3">
 				<!-- Icon -->
-				<div class="text-2xl leading-none @lg:text-3xl">🗓️</div>
+				<div class="text-2xl leading-none @lg:text-3xl">
+					<img src="/icons/calendar.svg" class="h-8 w-8 @lg:h-10 @lg:w-10" alt="" />
+				</div>
 
 				<!-- Title and date -->
 				<div class="flex-1">
@@ -271,25 +275,18 @@
 							<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 							<ul
 								tabindex="0"
-								class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
+								class="dropdown-content menu z-[1] flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 							>
 								<li>
-									<button onclick={openEditModal}>
-										<span>✏️</span>
-										<span>Edit name</span>
-									</button>
+									<EditButton callback={openEditModal} text="Edit name" size="normal" />
 								</li>
 								<li>
-									<button onclick={openEditDatesModal}>
-										<span>📅</span>
-										<span>Edit dates</span>
-									</button>
+									<button class="btn btn-ghost" onclick={openEditDatesModal}
+										><img src="/icons/calendar.svg" class="h-4 w-4" alt="Edit icon" />Edit dates</button
+									>
 								</li>
 								<li>
-									<button onclick={() => (showDeleteModal = true)} class="text-error">
-										<span>🗑️</span>
-										<span>Delete</span>
-									</button>
+									<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
 								</li>
 							</ul>
 						</div>
@@ -305,20 +302,20 @@
 			<div class="my-4">
 				{#if periodDetails.note}
 					<div class="flex items-start gap-2">
-						<div class="flex-1 rounded bg-base-200 p-3 text-sm whitespace-pre-wrap">
-							{periodDetails.note}
-							<button
-								class="btn btn-square btn-ghost btn-xs"
-								onclick={openEditNoteModal}
-								aria-label="Edit note"
-							>
-								✏️
-							</button>
+						<div class="flex-1 rounded bg-base-200 p-3">
+							<div class=" flex flex-row items-center italic">
+								<span class="pr-0.5 text-sm"> Period description </span>
+
+								<EditButton callback={openEditNoteModal} />
+							</div>
+							<div class="text-sm whitespace-pre-wrap">
+								{periodDetails.note}
+							</div>
 						</div>
 					</div>
 				{:else}
 					<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-						<span>📝</span>
+						<img src="/icons/note.svg" class="h-4 w-4" alt="" />
 						<span>Add period description</span>
 					</button>
 				{/if}
@@ -357,13 +354,13 @@
 									>
 										<li>
 											<button onclick={() => newTrainingMetricDialog.show()}>
-												<span>➕</span>
+												<img src="/icons/plus.svg" class="h-4 w-4" alt="" />
 												<span>New metric</span>
 											</button>
 										</li>
 										<li>
 											<button onclick={openMetricsOrderingDialog}>
-												<span>🔢</span>
+												<img src="/icons/order.svg" class="h-4 w-4" alt="" />
 												<span>Reorder</span>
 											</button>
 										</li>
