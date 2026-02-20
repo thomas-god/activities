@@ -200,14 +200,22 @@
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
 <p class="flex justify-center pt-2 text-xs sm:text-base">
 	{#if zoomedIn}
-		<button onclick={resetZoom}>🔄</button>
+		<button onclick={resetZoom}
+			><img src="/icons/undo.svg" class="h-5 w-5" alt="Reset zoom" /></button
+		>
 	{/if}
-	<span class="px-1.5">
-		⌚ {formatDuration(nearestValues.time)}
+	<span class="inline-flex items-center gap-1 px-1.5">
+		<img src="/icons/clock.svg" class="h-4 w-4" alt="Clock icon" />{formatDuration(
+			nearestValues.time
+		)}
 	</span>
 	{#if nearestValues.distance !== undefined && nearestValues.distance !== null}
-		<span class="px-1.5">
-			📏 {nearestValues.distance.toFixed(2)} km
+		<span class="inline-flex items-center gap-1 px-1.5">
+			<img
+				src="/icons/distance.svg"
+				class="h-4 w-4"
+				alt="Distance icon"
+			/>{nearestValues.distance.toFixed(2)} km
 		</span>
 	{/if}
 	{#each nearestValues.values as value}
