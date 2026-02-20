@@ -1,4 +1,7 @@
 <script lang="ts">
+	import EditButton from '$components/atoms/EditButton.svelte';
+	import SaveButton from '$components/atoms/SaveButton.svelte';
+
 	let {
 		name: initialName,
 		editCallback
@@ -37,15 +40,15 @@
 			placeholder="Leave empty to use sport name"
 		/>
 		<div class="flex gap-2">
-			<button class="btn btn-sm btn-primary" onclick={handleSave}>💾 Save</button>
+			<SaveButton callback={handleSave} text="Save" />
 			<button class="btn btn-ghost btn-sm" onclick={handleCancel}>Cancel</button>
 		</div>
 	</div>
 {:else}
-	<div>
-		<span>
+	<div class="flex flex-row items-center">
+		<span class="pr-0.5">
 			{displayName}
 		</span>
-		<button class="btn pl-0 opacity-75 btn-ghost btn-xs" onclick={startEditing}> ✏️ </button>
+		<EditButton callback={startEditing} />
 	</div>
 {/if}

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EditButton from '$components/atoms/EditButton.svelte';
+	import SaveButton from '$components/atoms/SaveButton.svelte';
 	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '$lib/rpe';
 
 	let {
@@ -40,18 +42,16 @@
 			{/each}
 		</div>
 		<div class="flex gap-2">
-			<button class="btn btn-sm btn-primary" onclick={handleSave}>💾 Save</button>
+			<SaveButton callback={handleSave} text="Save" />
 			<button class="btn btn-ghost btn-sm" onclick={handleCancel}>Cancel</button>
 		</div>
 	</div>
 {:else}
 	<div class="flex flex-col gap-2">
-		<div class="flex flex-row text-sm font-medium">
-			<span>RPE</span>
+		<div class="flex flex-row items-center text-sm font-medium">
+			<span class="pr-0.5">RPE</span>
 			{#if rpe !== null}
-				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
-					✏️ Edit
-				</button>
+				<EditButton callback={() => (editMode = true)} />
 			{/if}
 		</div>
 		{#if rpe === null}

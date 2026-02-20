@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EditButton from '$components/atoms/EditButton.svelte';
+	import SaveButton from '$components/atoms/SaveButton.svelte';
 	import {
 		WORKOUT_TYPE_LABELS,
 		getWorkoutTypeLabel,
@@ -49,18 +51,16 @@
 			{/each}
 		</div>
 		<div class="flex gap-2">
-			<button class="btn btn-sm btn-primary" onclick={handleSave}>💾 Save</button>
+			<SaveButton callback={handleSave} text="Save" />
 			<button class="btn btn-ghost btn-sm" onclick={handleCancel}>Cancel</button>
 		</div>
 	</div>
 {:else}
 	<div class="flex flex-col gap-2">
-		<div class="flex flex-row text-sm font-medium">
-			<span> Workout Type </span>
+		<div class="flex flex-row items-center text-sm font-medium">
+			<span class="pr-0.5">Workout Type</span>
 			{#if workoutType !== null}
-				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
-					✏️ Edit
-				</button>
+				<EditButton callback={() => (editMode = true)} />
 			{/if}
 		</div>
 		{#if workoutType === null}

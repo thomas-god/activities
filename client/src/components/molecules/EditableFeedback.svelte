@@ -1,4 +1,7 @@
 <script lang="ts">
+	import EditButton from '$components/atoms/EditButton.svelte';
+	import SaveButton from '$components/atoms/SaveButton.svelte';
+
 	let {
 		feedback: initialFeedback,
 		editCallback
@@ -37,7 +40,7 @@
 			></textarea>
 		</div>
 		<div class="flex gap-2">
-			<button class="btn btn-sm btn-primary" onclick={handleSave}>💾 Save</button>
+			<SaveButton callback={handleSave} text="Save" />
 			<button class="btn btn-ghost btn-sm" onclick={handleCancel}>Cancel</button>
 			{#if feedback}
 				<button
@@ -53,12 +56,10 @@
 	</div>
 {:else}
 	<div class="flex flex-col gap-2">
-		<div class="flex flex-row text-sm font-medium">
-			<span>Note</span>
+		<div class="flex flex-row items-center text-sm font-medium">
+			<span class="pr-0.5">Note</span>
 			{#if feedback !== null && feedback !== ''}
-				<button class="btn ml-auto btn-ghost btn-xs" onclick={() => (editMode = true)}>
-					✏️ Edit
-				</button>
+				<EditButton callback={() => (editMode = true)} />
 			{/if}
 		</div>
 		{#if feedback === null || feedback === ''}
