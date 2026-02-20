@@ -38,7 +38,7 @@
 
 		if (duration !== undefined) {
 			rows.push({
-				icon: '⌛',
+				icon: 'duration.svg',
 				label: 'Duration',
 				value: formatDuration(duration),
 				unit: ''
@@ -47,7 +47,7 @@
 
 		if (distance !== undefined) {
 			rows.push({
-				icon: '📏',
+				icon: 'distance.svg',
 				label: 'Distance',
 				value: `${distance.toFixed(3)}`,
 				unit: 'km'
@@ -58,7 +58,7 @@
 		if (averageSpeed !== undefined) {
 			if (activity.sport_category === 'Running') {
 				rows.push({
-					icon: '⚡',
+					icon: 'pace.svg',
 					label: 'Pace',
 					value: paceToString(averagePace!),
 					unit: '/km',
@@ -66,7 +66,7 @@
 				});
 			} else {
 				rows.push({
-					icon: '⚡',
+					icon: 'pace.svg',
 					label: 'Speed',
 					value: `${averageSpeed.toFixed(2)}`,
 					unit: 'km/h',
@@ -77,7 +77,7 @@
 
 		if (elevation !== undefined) {
 			rows.push({
-				icon: '⛰️',
+				icon: 'elevation.svg',
 				label: 'Elevation',
 				value: `${elevation.toFixed(0)}`,
 				unit: 'm'
@@ -86,7 +86,7 @@
 
 		if (avgHeartRate !== undefined && maxHeartRate !== undefined) {
 			rows.push({
-				icon: '❤️',
+				icon: 'cardio.svg',
 				label: 'Heart rate',
 				value: `${avgHeartRate.toFixed(0)} / ${maxHeartRate.toFixed(0)}`,
 				unit: 'bpm',
@@ -96,7 +96,7 @@
 
 		if (calories !== undefined) {
 			rows.push({
-				icon: '🔥',
+				icon: 'calories.svg',
 				label: 'Calories',
 				value: `${calories.toFixed(0)}`,
 				unit: 'kcal'
@@ -105,7 +105,7 @@
 
 		if (averagePower !== undefined && weightedAveragePower !== undefined) {
 			rows.push({
-				icon: '⚙️',
+				icon: 'power.svg',
 				label: 'Power',
 				value: `${averagePower.toFixed(0)} / ${weightedAveragePower.toFixed(0)}`,
 				unit: 'W',
@@ -121,7 +121,7 @@
 	<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
 		{#each statRows as row}
 			<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
-				<div class="text-2xl">{row.icon}</div>
+				<img src={`/icons/${row.icon}`} class="h-6 w-6" alt={`${row.label} icon`} />
 				<div class=" flex-1 font-medium">{row.label}</div>
 				<div class="text-right {row.legend ? '' : 'self-center'}">
 					<div class="text-lg font-semibold">{row.value || '-'} {row.unit}</div>
