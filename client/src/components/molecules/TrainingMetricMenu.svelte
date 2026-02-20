@@ -104,7 +104,7 @@
 		{#if scope === 'local'}
 			<li>
 				<button onclick={() => makeMetricGlobalDialog.show()} class="btn btn-ghost">
-					<img src="/icons/globe.svg" class="h-4 w-4" alt="" />
+					<img src="/icons/globe.svg" class="h-4 w-4" alt="Globe icon" />
 					<span>Make metric global</span>
 				</button>
 			</li>

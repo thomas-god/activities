@@ -41,7 +41,7 @@
 </script>
 
 <a href={`/training/period/${period.id}`} class="item flex flex-1 items-center py-1">
-	<div class="icon"><img src="/icons/calendar.svg" class="h-6 w-6" alt="" /></div>
+	<div class="icon"><img src="/icons/calendar.svg" class="h-6 w-6" alt="Calendar icon" /></div>
 	<div class="flex-1">
 		<div class="flex flex-col">
 			<div class=" font-semibold">{period.name}</div>

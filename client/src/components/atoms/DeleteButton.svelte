@@ -3,6 +3,6 @@
 </script>
 
 <button onclick={callback} class="btn text-error btn-ghost">
-	<img src="/icons/delete.svg" class="h-4 w-4" alt="" />
+	<img src="/icons/delete.svg" class="h-4 w-4" alt="Delete icon" />
 	<span>{text}</span>
 </button>

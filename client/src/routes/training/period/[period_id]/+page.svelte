@@ -238,7 +238,7 @@
 			<div class="flex items-center gap-3">
 				<!-- Icon -->
 				<div class="text-2xl leading-none @lg:text-3xl">
-					<img src="/icons/calendar.svg" class="h-8 w-8 @lg:h-10 @lg:w-10" alt="" />
+					<img src="/icons/calendar.svg" class="h-8 w-8 @lg:h-10 @lg:w-10" alt="Calendar icon" />
 				</div>
 
 				<!-- Title and date -->
@@ -315,7 +315,7 @@
 					</div>
 				{:else}
 					<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-						<img src="/icons/note.svg" class="h-4 w-4" alt="" />
+						<img src="/icons/note.svg" class="h-4 w-4" alt="Memo icon" />
 						<span>Add period description</span>
 					</button>
 				{/if}
@@ -354,13 +354,13 @@
 									>
 										<li>
 											<button onclick={() => newTrainingMetricDialog.show()}>
-												<img src="/icons/plus.svg" class="h-4 w-4" alt="" />
+												<img src="/icons/plus.svg" class="h-4 w-4" alt="Plus sign icon" />
 												<span>New metric</span>
 											</button>
 										</li>
 										<li>
 											<button onclick={openMetricsOrderingDialog}>
-												<img src="/icons/order.svg" class="h-4 w-4" alt="" />
+												<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
 												<span>Reorder</span>
 											</button>
 										</li>
