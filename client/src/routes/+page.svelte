@@ -69,12 +69,7 @@
 			</div>
 		{:then metrics}
 			{#if screenWidth < 700}
-				<TrainingMetricsCarousel
-					{metrics}
-					height={chartHeight}
-					onUpdate={() => invalidate(`app:activities`)}
-					onDelete={() => invalidate(`app:activities`)}
-				/>
+				<TrainingMetricsCarousel {metrics} height={chartHeight} />
 			{:else}
 				<TrainingMetricsList
 					{metrics}

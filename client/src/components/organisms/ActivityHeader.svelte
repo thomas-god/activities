@@ -49,8 +49,8 @@
 			{sportDisplay(activity.sport)}
 
 			<div class="dropdown dropdown-end ml-0">
-				<button tabindex="0" class="btn btn-circle btn-ghost btn-xs" aria-label="More options">
-					⋮
+				<button tabindex="0" class="btn btn-ghost btn-xs" aria-label="More options">
+					<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
 				</button>
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<ul

@@ -266,7 +266,7 @@
 						<!-- Action menu dropdown (always inline) -->
 						<div class="dropdown dropdown-end">
 							<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
-								⋮
+								<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
 							</div>
 							<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 							<ul
@@ -341,7 +341,7 @@
 										role="button"
 										class="btn btn-square opacity-100 btn-ghost btn-xs"
 									>
-										⋮
+										<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
 									</div>
 									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<ul
