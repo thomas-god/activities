@@ -123,7 +123,5 @@
 		{/each}
 	</div>
 {:else}
-	<div class="py-8 text-center text-sm italic opacity-70">
-		No activities in this training period yet
-	</div>
+	<div class="py-8 text-center text-sm italic opacity-70">No activities or notes found</div>
 {/if}

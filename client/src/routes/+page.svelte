@@ -42,20 +42,22 @@
 			<div class="loading loading-bars"></div>
 		</div>
 	{:then periods}
-		{#if periods.length > 0}
-			<div
-				class={`item periods rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
-			>
-				<div class="p-4">
-					<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
-					<div class="flex flex-col gap-2">
-						{#each periods as period}
-							<TrainingPeriodCard {period} />
-						{/each}
-					</div>
+		<div
+			class={`item periods rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
+		>
+			<div class="w-full p-4">
+				<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
+				<div class="flex flex-col gap-2">
+					{#each periods as period}
+						<TrainingPeriodCard {period} />
+					{:else}
+						<div class="p-2 pb-2 text-center text-sm tracking-wide italic opacity-60">
+							No ongoing training periods.
+						</div>
+					{/each}
 				</div>
 			</div>
-		{/if}
+		</div>
 	{/await}
 
 	<div

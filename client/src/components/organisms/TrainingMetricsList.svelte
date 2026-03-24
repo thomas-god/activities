@@ -65,6 +65,6 @@
 			{/if}
 		</div>
 	{:else}
-		<div class="p-3 text-center text-sm italic opacity-90">No training metrics</div>
+		<div class="p-3 text-center text-sm tracking-wide italic opacity-60">No training metrics</div>
 	{/each}
 </div>
