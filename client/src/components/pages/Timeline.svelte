@@ -3,59 +3,20 @@
 	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
 	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 	import { dayjs } from '$lib/duration';
-	import ActivitiesFilters from '$components/molecules/ActivitiesFilters.svelte';
-	import type { WorkoutType } from '$lib/workout-type';
-	import { getSportCategory, type SportCategory } from '$lib/sport';
 
 	let {
 		activities,
 		notes,
 		selectedActivityId,
 		selectActivityCallback,
-		filters = $bindable(),
 		endDate = null
 	}: {
 		activities: ActivityList;
 		notes: TrainingNotesList;
-		filters: {
-			rpe: number[];
-			workoutTypes: WorkoutType[];
-			sportCategories: SportCategory[];
-		};
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
 		endDate?: string | null;
 	} = $props();
-
-	let filteredActivities = $derived.by(() => {
-		let filtered = activities;
-
-		// Filter by RPE
-		if (filters.rpe.length > 0) {
-			filtered = filtered.filter((activity) => {
-				return activity.rpe !== null && filters.rpe.includes(activity.rpe);
-			});
-		}
-
-		// Filter by workout type
-		if (filters.workoutTypes.length > 0) {
-			filtered = filtered.filter((activity) => {
-				return (
-					activity.workout_type !== null && filters.workoutTypes.includes(activity.workout_type)
-				);
-			});
-		}
-
-		// Filter by sport category
-		if (filters.sportCategories.length > 0) {
-			filtered = filtered.filter((activity) => {
-				const activityCategory = activity.sport_category || getSportCategory(activity.sport);
-				return activityCategory !== null && filters.sportCategories.includes(activityCategory);
-			});
-		}
-
-		return filtered;
-	});
 
 	// Merge activities and notes, sorted by date (most recent first)
 	type TimelineItem =
@@ -64,7 +25,7 @@
 
 	const timeline = $derived.by((): TimelineItem[] => {
 		const items: TimelineItem[] = [
-			...filteredActivities.map((activity) => ({
+			...activities.map((activity) => ({
 				type: 'activity' as const,
 				data: activity,
 				date: activity.start_time
@@ -100,7 +61,6 @@
 	});
 </script>
 
-<ActivitiesFilters {activities} bind:filters />
 {#if timeline.length > 0}
 	<div class="flex flex-col gap-0">
 		{#each timelineByMonth as [month, items]}

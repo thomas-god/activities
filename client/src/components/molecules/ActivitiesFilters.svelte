@@ -8,21 +8,23 @@
 		sportCategoryIcons,
 		type SportCategory
 	} from '$lib/sport';
-	import { untrack } from 'svelte';
+	import { filterActivities, type ActivitiesFilters } from '$lib/filters';
 
 	let {
 		activities,
-		filters = $bindable(),
-		open = false
+		filteredActivities = $bindable(),
+		filters = $bindable()
 	}: {
 		activities: ActivityList;
-		filters: {
-			rpe: number[];
-			workoutTypes: WorkoutType[];
-			sportCategories: SportCategory[];
-		};
-		open?: boolean;
+		filteredActivities: ActivityList;
+		filters: ActivitiesFilters;
 	} = $props();
+
+	let dialogElement: HTMLDialogElement;
+
+	$effect(() => {
+		filteredActivities = filterActivities(activities, filters);
+	});
 
 	// Get unique sport categories from activities
 	let availableSportCategories = $derived.by(() => {
@@ -37,24 +39,6 @@
 		}
 		return Array.from(categories).sort();
 	});
-
-	// // Notify parent when filters change
-	// $effect(() => {
-	// 	onFilterChange(filteredActivities);
-	// });
-
-	// // Helper function to notify URL change
-	// const notifyFiltersChange = () => {
-	// 	untrack(() => {
-	// 		if (onFiltersStateChange !== undefined) {
-	// 			onFiltersStateChange({
-	// 				rpe: selectedRpe,
-	// 				workoutTypes: selectedWorkoutTypes,
-	// 				sportCategories: selectedSportCategories
-	// 			});
-	// 		}
-	// 	});
-	// };
 
 	// Toggle functions
 	const toggleRpe = (rpe: number) => {
@@ -97,83 +81,108 @@
 	);
 </script>
 
-<details class="collapse-arrow collapse" bind:open>
-	<summary class="collapse-title flex items-center justify-between">
-		<div class="flex items-center gap-2">
-			<h2 class="text-lg font-semibold">Filters</h2>
-		</div>
-	</summary>
+<button
+	onclick={() => dialogElement.showModal()}
+	class={`btn ${hasActiveFilters ? 'btn-warning' : 'btn-ghost'} btn-sm`}
+	><img src="/icons/filter.svg" alt="Filter icon" class="h-5 w-5" />
+	<span class="ml-1 hidden sm:inline">Filters</span></button
+>
 
-	<div class=" collapse-content mx-4 pt-0">
-		<div class="flex flex-col gap-4">
-			<!-- Sport Category Filter -->
-			{#if availableSportCategories.length > 0}
+<dialog class="modal" bind:this={dialogElement}>
+	<div class="modal-box">
+		<summary class="collapse-title flex items-center justify-between">
+			<div class="flex items-center gap-2">
+				<h2 class="text-lg font-semibold">
+					Filters
+					{#if hasActiveFilters}
+						<span class="text-sm font-light">
+							({filteredActivities.length}/{activities.length} activities)
+						</span>
+					{/if}
+				</h2>
+			</div>
+		</summary>
+
+		<div class="mx-4 pt-0">
+			<div class="flex flex-col gap-4">
+				<!-- Sport Category Filter -->
+				{#if availableSportCategories.length > 0}
+					<div>
+						<div class="mb-2 text-sm font-medium">Sport</div>
+						<div class="flex flex-wrap gap-2">
+							{#each availableSportCategories as category}
+								<button
+									class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
+									onclick={() => toggleSportCategory(category)}
+								>
+									<img
+										src={`/icons/${sportCategoryIcons[category]}`}
+										class="h-6 w-6"
+										alt="Menu icon"
+									/>
+									<span>{sportCategoryDisplay(category)}</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Workout Type Filter -->
 				<div>
-					<div class="mb-2 text-sm font-medium">Sport</div>
+					<div class="mb-2 text-sm font-medium">Workout Type</div>
 					<div class="flex flex-wrap gap-2">
-						{#each availableSportCategories as category}
+						{#each WORKOUT_TYPE_LABELS as { value, label }}
 							<button
-								class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
-								onclick={() => toggleSportCategory(category)}
+								class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
+								onclick={() => toggleWorkoutType(value)}
 							>
-								<img
-									src={`/icons/${sportCategoryIcons[category]}`}
-									class="h-6 w-6"
-									alt="Menu icon"
-								/>
-								<span>{sportCategoryDisplay(category)}</span>
+								{label}
 							</button>
 						{/each}
 					</div>
 				</div>
-			{/if}
 
-			<!-- Workout Type Filter -->
-			<div>
-				<div class="mb-2 text-sm font-medium">Workout Type</div>
-				<div class="flex flex-wrap gap-2">
-					{#each WORKOUT_TYPE_LABELS as { value, label }}
-						<button
-							class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
-							onclick={() => toggleWorkoutType(value)}
-						>
-							{label}
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- RPE Filter -->
-			<div>
-				<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
-				<div class="flex flex-wrap gap-2">
-					{#each RPE_VALUES as rpe}
-						<button
-							class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
-							onclick={() => toggleRpe(rpe)}
-						>
-							{rpe}
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			{#if hasActiveFilters}
+				<!-- RPE Filter -->
 				<div>
-					<button
-						class="btn btn-sm"
-						onclick={(e) => {
-							e.preventDefault();
-							clearFilters();
-						}}
-					>
-						Clear all filters
-					</button>
+					<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
+					<div class="flex flex-wrap gap-2">
+						{#each RPE_VALUES as rpe}
+							<button
+								class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
+								onclick={() => toggleRpe(rpe)}
+							>
+								{rpe}
+							</button>
+						{/each}
+					</div>
 				</div>
-			{/if}
+
+				{#if hasActiveFilters}
+					<div>
+						<button
+							class="btn btn-sm"
+							onclick={(e) => {
+								e.preventDefault();
+								clearFilters();
+							}}
+						>
+							Clear all filters
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<div class="modal-action">
+			<form method="dialog">
+				<button class="btn" onclick={() => dialogElement.close()}>Close</button>
+			</form>
 		</div>
 	</div>
-</details>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
 
 <style>
 	.rpe-easy {

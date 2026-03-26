@@ -27,7 +27,9 @@
 	let showEditNoteModal = $state(false);
 	let showEditDatesModal = $state(false);
 
+	// svelte-ignore non_reactive_update
 	let newTrainingMetricDialog: HTMLDialogElement;
+	// svelte-ignore non_reactive_update
 	let metricsOrderingDialog: MetricsOrderingDialog;
 
 	let chartWidth: number = $state(300);
@@ -35,11 +37,6 @@
 	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
-	let filters = $state({
-		rpe: [],
-		workoutTypes: [],
-		sportCategories: []
-	});
 
 	async function handleDelete(periodId: string) {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
@@ -444,7 +441,6 @@
 					<Timeline
 						activities={periodDetails.activities}
 						{notes}
-						bind:filters
 						{selectedActivityId}
 						{selectActivityCallback}
 						endDate={periodDetails.end}

@@ -9,8 +9,10 @@
 	import type { SportCategory } from '$lib/sport';
 	import { fetchActivityDetails } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
-	import type { ActivityWithTimeseries } from '$lib/api/activities';
+	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
 	import Timeline from '$components/pages/Timeline.svelte';
+	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
+	import type { ActivitiesFilters } from '$lib/filters';
 
 	let { data }: PageProps = $props();
 
@@ -25,12 +27,9 @@
 		(page.url.searchParams.get('view') === 'calendar' ? 'calendar' : 'list') as 'list' | 'calendar'
 	);
 
+	let filteredActivities: ActivityList = $state([]);
 	let filters = $derived.by(() => {
-		const filters: {
-			rpe: number[];
-			workoutTypes: WorkoutType[];
-			sportCategories: SportCategory[];
-		} = {
+		const filters: ActivitiesFilters = {
 			rpe: [],
 			workoutTypes: [],
 			sportCategories: []
@@ -163,7 +162,7 @@
 <div class="@container mx-2 mt-5 sm:mx-auto">
 	<!-- View Toggle -->
 	<div class="mb-4 flex flex-col justify-between gap-2 @sm:flex-row @sm:items-center">
-		<h1 class="text-2xl font-bold">Past activities</h1>
+		<h1 class="hidden text-2xl font-bold sm:block">Past activities</h1>
 		<div class="flex gap-2">
 			<button
 				class="btn btn-ghost btn-sm"
@@ -171,7 +170,7 @@
 				title="Download all activities as ZIP"
 			>
 				<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
-				<span class="ml-1">Download</span>
+				<span class="ml-1 hidden sm:inline">Download</span>
 			</button>
 			<div class="join">
 				<button
@@ -179,16 +178,28 @@
 					onclick={() => setViewMode('list')}
 				>
 					<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
-					<span class="ml-1">List</span>
+					<span class="ml-1 hidden sm:inline">List</span>
 				</button>
 				<button
 					class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
 					onclick={() => setViewMode('calendar')}
 				>
 					<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
-					<span class="ml-1">Calendar</span>
+					<span class="ml-1 hidden sm:inline">Calendar</span>
 				</button>
 			</div>
+			{#await data.activities then activities}
+				<ActivitiesFiltersComponent
+					{activities}
+					bind:filteredActivities
+					bind:filters={
+						() => filters,
+						(f) => {
+							handleFilterChange(f);
+						}
+					}
+				/>
+			{/await}
 		</div>
 	</div>
 
@@ -202,15 +213,9 @@
 			<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
 				<div class="mx-2 grow basis-0 overflow-y-auto rounded-box bg-base-100 p-4 shadow-md">
 					<Timeline
-						{activities}
+						activities={filteredActivities}
 						{notes}
 						{selectedActivityId}
-						bind:filters={
-							() => filters,
-							(f) => {
-								handleFilterChange(f);
-							}
-						}
 						selectActivityCallback={handleActivitySelected}
 					/>
 				</div>
@@ -252,7 +257,7 @@
 			</div>
 		{:else}
 			<ActivitiesCalendar
-				activityList={activities}
+				activityList={filteredActivities}
 				{currentMonth}
 				onMonthChange={handleMonthChange}
 			/>
