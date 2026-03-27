@@ -13,11 +13,13 @@
 	let {
 		activities,
 		filteredActivities = $bindable(),
-		filters = $bindable()
+		filters = $bindable(),
+		showLabel = true
 	}: {
 		activities: ActivityList;
 		filteredActivities: ActivityList;
 		filters: ActivitiesFilters;
+		showLabel?: boolean;
 	} = $props();
 
 	let dialogElement: HTMLDialogElement;
@@ -85,8 +87,10 @@
 	onclick={() => dialogElement.showModal()}
 	class={`btn ${hasActiveFilters ? 'btn-warning' : 'btn-ghost'} btn-sm`}
 	><img src="/icons/filter.svg" alt="Filter icon" class="h-5 w-5" />
-	<span class="ml-1 hidden sm:inline">Filters</span></button
->
+	{#if showLabel}
+		<span class="ml-1 hidden sm:inline">Filters</span>
+	{/if}
+</button>
 
 <dialog class="modal" bind:this={dialogElement}>
 	<div class="modal-box">
@@ -103,7 +107,7 @@
 			</div>
 		</summary>
 
-		<div class="mx-4 pt-0">
+		<div class="mx-2 pt-0">
 			<div class="flex flex-col gap-4">
 				<!-- Sport Category Filter -->
 				{#if availableSportCategories.length > 0}
