@@ -25,6 +25,9 @@
 	let marginBottom = 20;
 	let axisWidth = 30;
 
+	let hasDistance = $derived(distance !== undefined && distance.some((d) => d !== null));
+	let xAxisMode: 'time' | 'distance' = $state('time');
+
 	let numberOfMetrics = $derived(Math.min(metrics.length, 3));
 	let timeScale = $derived.by(() => {
 		if (numberOfMetrics === 1) {
@@ -47,9 +50,15 @@
 
 	// Start by defining the x (time) scale and axis, common to all metrics
 	let gx: SVGGElement;
-	let x_min = $derived(time.at(0)!);
-	let x_max = $derived(time.at(-1)!);
-	let max_zoom = $derived((x_max - x_min) / 60);
+	let x_min = $derived(
+		xAxisMode === 'time' ? time[0] : (distance!.find((d) => d !== null) as number)
+	);
+	let x_max = $derived(
+		xAxisMode === 'time' ? time[time.length - 1] : (distance!.findLast((d) => d !== null) as number)
+	);
+	let max_zoom = $derived(
+		xAxisMode === 'time' ? Math.max(1, (x_max - x_min) / 60) : Math.max(1, (x_max - x_min) / 0.1)
+	);
 	let xScale = $derived(d3.scaleLinear([x_min, x_max], timeScale));
 	let zoomedXScale = $derived(xScale);
 	let maxTicks = $derived(Math.min(8, Math.floor(width / 70)));
@@ -70,7 +79,9 @@
 			g.call(
 				d3
 					.axisBottom(x)
-					.tickFormat((time, _) => formatDuration(time.valueOf()))
+					.tickFormat((val, _) =>
+						xAxisMode === 'time' ? formatDuration(val.valueOf()) : val.valueOf().toFixed(1)
+					)
 					.tickValues(generateTicks(x, maxTicks))
 			)
 	);
@@ -103,7 +114,8 @@
 			} else if (idx === 2) {
 				order = 'third';
 			}
-			let values = extractMetricValues(time, metric.values);
+			const xArr = xAxisMode === 'time' ? time : (distance ?? time);
+			let values = extractMetricValues(xArr, metric.values);
 
 			metricsProps.push({
 				values,
@@ -116,12 +128,13 @@
 		return metricsProps;
 	});
 
-	const extractMetricValues = (time: number[], values: Array<number | null>) => {
+	const extractMetricValues = (xArr: (number | null)[], values: Array<number | null>) => {
 		let v = [];
-		for (let i = 0; i < time.length; i++) {
+		for (let i = 0; i < xArr.length; i++) {
+			let x = xArr[i];
 			let val = values[i];
-			if (val !== null) {
-				v.push([time[i], val]);
+			if (x !== null && val !== null) {
+				v.push([x, val]);
 			}
 		}
 		return v as Array<[number, number]>;
@@ -164,6 +177,12 @@
 		zoomedIn = false;
 	};
 
+	const setXAxisMode = (mode: 'time' | 'distance') => {
+		if (xAxisMode === mode) return;
+		xAxisMode = mode;
+		d3.select(svgElement).call(zoom.transform, d3.zoomIdentity);
+	};
+
 	$effect(() => {
 		d3.select(svgElement).call(zoom);
 	});
@@ -174,12 +193,27 @@
 	};
 
 	const bisector = d3.bisector<[number, number], number>((point) => point[0]);
+	let dataLookup = $derived.by(() => {
+		const arr: { time: number; distance: number | null; xVal: number }[] = [];
+		for (let i = 0; i < time.length; i++) {
+			const xVal = xAxisMode === 'time' ? time[i] : (distance?.[i] ?? null);
+			if (xVal !== null) {
+				arr.push({ time: time[i], distance: distance?.[i] ?? null, xVal });
+			}
+		}
+		return arr;
+	});
+	const dataLookupBisector = d3.bisector<
+		{ time: number; distance: number | null; xVal: number },
+		number
+	>((p) => p.xVal);
 	let nearestValues = $derived.by(() => {
 		let offset = tooltipXOffset === undefined ? zoomedXScale.range()[0] : tooltipXOffset;
+		const xValue = zoomedXScale.invert(offset!);
+		const nearest = dataLookup[dataLookupBisector.center(dataLookup, xValue)];
 
 		const values = metricsProps.map((metric) => {
-			const nearestValue =
-				metric.values[bisector.center(metric.values, zoomedXScale.invert(offset!))];
+			const nearestValue = metric.values[bisector.center(metric.values, xValue)];
 			return {
 				metric: metric.name,
 				value: nearestValue[1],
@@ -188,22 +222,18 @@
 			};
 		});
 
-		const nearestDistance =
-			distance === undefined ? undefined : distance.at(zoomedXScale.invert(offset));
-
-		return { time: zoomedXScale.invert(offset!), distance: nearestDistance, values };
+		return {
+			time: nearest?.time ?? xValue,
+			distance: nearest?.distance ?? null,
+			values
+		};
 	});
 
 	let smoothing = $state(5);
 </script>
 
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
-<p class="flex justify-center pt-2 text-xs sm:text-base">
-	{#if zoomedIn}
-		<button onclick={resetZoom}
-			><img src="/icons/undo.svg" class="h-5 w-5" alt="Reset zoom" /></button
-		>
-	{/if}
+<div class="flex flex-wrap justify-center pt-2 text-xs sm:text-base">
 	<span class="inline-flex items-center gap-1 px-1.5">
 		<img src="/icons/clock.svg" class="h-4 w-4" alt="Clock icon" />{formatDuration(
 			nearestValues.time
@@ -224,7 +254,7 @@
 			{value.unit}
 		</span>
 	{/each}
-</p>
+</div>
 <svg
 	bind:this={svgElement}
 	{width}
@@ -268,3 +298,36 @@
 		/>
 	{/if}
 </svg>
+{#if hasDistance || zoomedIn}
+	<div class="flex justify-start gap-2 pt-2 pl-2 text-xs sm:text-sm">
+		{#if hasDistance}
+			<span class="inline-flex overflow-hidden rounded border border-base-300">
+				<button
+					onclick={() => setXAxisMode('time')}
+					class="inline-flex items-center gap-1 px-1.5 py-0.5 {xAxisMode === 'time'
+						? 'bg-base-300 font-semibold'
+						: 'opacity-50'}"
+					title="Show by time"
+				>
+					<img src="/icons/clock.svg" class="h-3.5 w-3.5" alt="" />Time
+				</button>
+				<button
+					onclick={() => setXAxisMode('distance')}
+					class="inline-flex items-center gap-1 px-1.5 py-0.5 {xAxisMode === 'distance'
+						? 'bg-base-300 font-semibold'
+						: 'opacity-50'}"
+					title="Show by distance"
+				>
+					<img src="/icons/distance.svg" class="h-3.5 w-3.5" alt="" />Distance
+				</button>
+			</span>
+		{/if}
+		{#if zoomedIn}
+			<button
+				onclick={resetZoom}
+				class="inline-flex items-center gap-1 opacity-70 hover:opacity-100"
+				><img src="/icons/undo.svg" class="h-4 w-4" alt="Reset zoom" />Reset zoom</button
+			>
+		{/if}
+	</div>
+{/if}
