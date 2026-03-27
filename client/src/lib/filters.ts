@@ -8,6 +8,53 @@ export interface ActivitiesFilters {
 	sportCategories: SportCategory[];
 }
 
+export const filtersFromSearchParams = (params: URLSearchParams): ActivitiesFilters => {
+	const filters: ActivitiesFilters = { rpe: [], workoutTypes: [], sportCategories: [] };
+
+	const rpeParam = params.get('rpe');
+	if (rpeParam) {
+		filters.rpe = rpeParam
+			.split(',')
+			.map(Number)
+			.filter((n) => !isNaN(n) && n >= 1 && n <= 10);
+	}
+
+	const wtParam = params.get('workout_type');
+	if (wtParam) {
+		filters.workoutTypes = wtParam.split(',') as WorkoutType[];
+	}
+
+	const scParam = params.get('sport_category');
+	if (scParam) {
+		filters.sportCategories = scParam.split(',') as SportCategory[];
+	}
+
+	return filters;
+};
+
+export const applyFiltersToSearchParams = (
+	params: URLSearchParams,
+	filters: ActivitiesFilters
+): void => {
+	if (filters.rpe.length > 0) {
+		params.set('rpe', filters.rpe.join(','));
+	} else {
+		params.delete('rpe');
+	}
+
+	if (filters.workoutTypes.length > 0) {
+		params.set('workout_type', filters.workoutTypes.join(','));
+	} else {
+		params.delete('workout_type');
+	}
+
+	if (filters.sportCategories.length > 0) {
+		params.set('sport_category', filters.sportCategories.join(','));
+	} else {
+		params.delete('sport_category');
+	}
+};
+
 export const filterActivities = (
 	activities: Activity[],
 	filters: ActivitiesFilters

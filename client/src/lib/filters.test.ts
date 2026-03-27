@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Activity, ActivityList } from './api';
-import { filterActivities } from './filters';
+import type { Activity } from './api';
+import {
+	filterActivities,
+	filtersFromSearchParams,
+	applyFiltersToSearchParams,
+	type ActivitiesFilters
+} from './filters';
 
 const makeActivity = (overrides: Partial<Activity> = {}): Activity => ({
 	id: 'test-id',
@@ -164,5 +169,120 @@ describe('filterActivities', () => {
 
 			expect(result).toEqual([activity]);
 		});
+	});
+});
+
+describe('filtersFromSearchParams', () => {
+	it('returns empty filters when params are absent', () => {
+		const params = new URLSearchParams();
+		expect(filtersFromSearchParams(params)).toEqual({
+			rpe: [],
+			workoutTypes: [],
+			sportCategories: []
+		});
+	});
+
+	it('parses a single RPE value', () => {
+		const params = new URLSearchParams('rpe=7');
+		expect(filtersFromSearchParams(params).rpe).toEqual([7]);
+	});
+
+	it('parses multiple RPE values', () => {
+		const params = new URLSearchParams('rpe=3,7,9');
+		expect(filtersFromSearchParams(params).rpe).toEqual([3, 7, 9]);
+	});
+
+	it('ignores RPE values outside the 1-10 range', () => {
+		const params = new URLSearchParams('rpe=0,5,11');
+		expect(filtersFromSearchParams(params).rpe).toEqual([5]);
+	});
+
+	it('ignores non-numeric RPE values', () => {
+		const params = new URLSearchParams('rpe=abc,5,NaN');
+		expect(filtersFromSearchParams(params).rpe).toEqual([5]);
+	});
+
+	it('parses workout types', () => {
+		const params = new URLSearchParams('workout_type=easy,tempo');
+		expect(filtersFromSearchParams(params).workoutTypes).toEqual(['easy', 'tempo']);
+	});
+
+	it('parses sport categories', () => {
+		const params = new URLSearchParams('sport_category=Running,Cycling');
+		expect(filtersFromSearchParams(params).sportCategories).toEqual(['Running', 'Cycling']);
+	});
+
+	it('parses all three filters together', () => {
+		const params = new URLSearchParams('rpe=5&workout_type=tempo&sport_category=Running');
+		expect(filtersFromSearchParams(params)).toEqual({
+			rpe: [5],
+			workoutTypes: ['tempo'],
+			sportCategories: ['Running']
+		});
+	});
+});
+
+describe('applyFiltersToSearchParams', () => {
+	it('sets rpe param when rpe filter is non-empty', () => {
+		const params = new URLSearchParams();
+		applyFiltersToSearchParams(params, { rpe: [3, 7], workoutTypes: [], sportCategories: [] });
+		expect(params.get('rpe')).toBe('3,7');
+	});
+
+	it('deletes rpe param when rpe filter is empty', () => {
+		const params = new URLSearchParams('rpe=5');
+		applyFiltersToSearchParams(params, { rpe: [], workoutTypes: [], sportCategories: [] });
+		expect(params.has('rpe')).toBe(false);
+	});
+
+	it('sets workout_type param when workoutTypes filter is non-empty', () => {
+		const params = new URLSearchParams();
+		applyFiltersToSearchParams(params, {
+			rpe: [],
+			workoutTypes: ['easy', 'tempo'],
+			sportCategories: []
+		});
+		expect(params.get('workout_type')).toBe('easy,tempo');
+	});
+
+	it('deletes workout_type param when workoutTypes filter is empty', () => {
+		const params = new URLSearchParams('workout_type=easy');
+		applyFiltersToSearchParams(params, { rpe: [], workoutTypes: [], sportCategories: [] });
+		expect(params.has('workout_type')).toBe(false);
+	});
+
+	it('sets sport_category param when sportCategories filter is non-empty', () => {
+		const params = new URLSearchParams();
+		applyFiltersToSearchParams(params, { rpe: [], workoutTypes: [], sportCategories: ['Running'] });
+		expect(params.get('sport_category')).toBe('Running');
+	});
+
+	it('deletes sport_category param when sportCategories filter is empty', () => {
+		const params = new URLSearchParams('sport_category=Running');
+		applyFiltersToSearchParams(params, { rpe: [], workoutTypes: [], sportCategories: [] });
+		expect(params.has('sport_category')).toBe(false);
+	});
+
+	it('sets all three params when all filters are non-empty', () => {
+		const params = new URLSearchParams();
+		applyFiltersToSearchParams(params, {
+			rpe: [5],
+			workoutTypes: ['tempo'],
+			sportCategories: ['Cycling']
+		});
+		expect(params.get('rpe')).toBe('5');
+		expect(params.get('workout_type')).toBe('tempo');
+		expect(params.get('sport_category')).toBe('Cycling');
+	});
+
+	it('round-trips: applyFiltersToSearchParams then filtersFromSearchParams returns the original filters', () => {
+		const original: ActivitiesFilters = {
+			rpe: [4, 8],
+			workoutTypes: ['race'],
+			sportCategories: ['Running']
+		};
+		const params = new URLSearchParams();
+		applyFiltersToSearchParams(params, original);
+		expect(filtersFromSearchParams(params)).toEqual(original);
 	});
 });

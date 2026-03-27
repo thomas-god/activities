@@ -5,13 +5,12 @@
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
-	import type { WorkoutType } from '$lib/workout-type';
-	import type { SportCategory } from '$lib/sport';
 	import { fetchActivityDetails } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
 	import Timeline from '$components/pages/Timeline.svelte';
 	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
+	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
 
 	let { data }: PageProps = $props();
@@ -28,36 +27,7 @@
 	);
 
 	let filteredActivities: ActivityList = $state([]);
-	let filters = $derived.by(() => {
-		const filters: ActivitiesFilters = {
-			rpe: [],
-			workoutTypes: [],
-			sportCategories: []
-		};
-
-		// Parse RPE values
-		const rpeParam = page.url.searchParams.get('rpe');
-		if (!!rpeParam) {
-			filters.rpe = rpeParam
-				.split(',')
-				.map(Number)
-				.filter((n) => !isNaN(n) && n >= 1 && n <= 10);
-		}
-
-		// Parse workout types
-		const wtParam = page.url.searchParams.get('workout_type');
-		if (!!wtParam) {
-			filters.workoutTypes = wtParam.split(',') as WorkoutType[];
-		}
-
-		// Parse sport categories
-		const scParam = page.url.searchParams.get('sport_category');
-		if (!!scParam) {
-			filters.sportCategories = scParam.split(',') as SportCategory[];
-		}
-
-		return filters;
-	});
+	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
 
 	// Current month from URL parameter, default to current month
 	let currentMonth = $derived.by(() => {
@@ -92,34 +62,9 @@
 		goto(url, { replaceState: true, keepFocus: true });
 	};
 
-	const handleFilterChange = (filters: {
-		rpe: number[];
-		workoutTypes: WorkoutType[];
-		sportCategories: SportCategory[];
-	}) => {
+	const handleFilterChange = (filters: ActivitiesFilters) => {
 		const url = new URL(page.url);
-
-		// Update RPE filter
-		if (filters.rpe.length > 0) {
-			url.searchParams.set('rpe', filters.rpe.join(','));
-		} else {
-			url.searchParams.delete('rpe');
-		}
-
-		// Update workout type filter
-		if (filters.workoutTypes.length > 0) {
-			url.searchParams.set('workout_type', filters.workoutTypes.join(','));
-		} else {
-			url.searchParams.delete('workout_type');
-		}
-
-		// Update sport category filter
-		if (filters.sportCategories.length > 0) {
-			url.searchParams.set('sport_category', filters.sportCategories.join(','));
-		} else {
-			url.searchParams.delete('sport_category');
-		}
-
+		applyFiltersToSearchParams(url.searchParams, filters);
 		goto(url, { replaceState: false, keepFocus: true });
 	};
 
