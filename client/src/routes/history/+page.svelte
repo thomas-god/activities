@@ -104,19 +104,11 @@
 
 <svelte:window bind:innerWidth={screenWidth} />
 
-<div class="@container mt-5 sm:mx-auto">
+<div class="@container mt-5 rounded-box bg-base-100 p-4 shadow-md sm:mx-auto">
 	<!-- View Toggle -->
 	<div class="mb-4 flex flex-col justify-between gap-2 @sm:flex-row @sm:items-center">
-		<h1 class="hidden text-2xl font-bold sm:block">Past activities</h1>
-		<div class="flex gap-2">
-			<button
-				class="btn btn-ghost btn-sm"
-				onclick={handleDownloadClick}
-				title="Download all activities as ZIP"
-			>
-				<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
-				<span class="ml-1 hidden sm:inline">Download</span>
-			</button>
+		<h1 class="hidden text-2xl font-bold sm:block">History</h1>
+		<div class="flex gap-0.5 sm:gap-2">
 			<div class="join">
 				<button
 					class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
@@ -145,6 +137,14 @@
 					}
 				/>
 			{/await}
+			<button
+				class="btn btn-ghost btn-sm"
+				onclick={handleDownloadClick}
+				title="Download all activities as ZIP"
+			>
+				<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
+				<span class="ml-1 hidden sm:inline">Download</span>
+			</button>
 		</div>
 	</div>
 
@@ -156,7 +156,7 @@
 	{:then [activities, notes]}
 		{#if viewMode === 'list'}
 			<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
-				<div class="grow basis-0 overflow-y-auto rounded-box bg-base-100 p-4 shadow-md">
+				<div class="grow basis-0 overflow-y-auto">
 					<Timeline
 						activities={filteredActivities}
 						{notes}
