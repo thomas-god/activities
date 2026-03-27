@@ -144,11 +144,6 @@
 		align-items: center;
 		gap: calc(var(--spacing) * 3);
 		margin-top: calc(var(--spacing) * 5);
-		padding-inline: calc(var(--spacing) * 1);
-
-		@media (min-width: 400px) {
-			padding-inline: calc(var(--spacing) * 2);
-		}
 	}
 
 	.item {

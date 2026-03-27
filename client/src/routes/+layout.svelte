@@ -62,25 +62,25 @@
 		{#if ['/', '/history'].includes(page.url.pathname)}
 			<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 				<button
-					class="btn w-32 rounded-lg btn-sm btn-primary sm:w-36 sm:btn-md"
+					class="btn w-36 rounded-lg btn-sm btn-primary sm:btn-md"
 					onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
 				>
 				<button
-					class="btn w-32 rounded-lg btn-sm btn-primary sm:w-36 sm:btn-md"
+					class="btn w-36 rounded-lg btn-sm btn-primary sm:btn-md"
 					onclick={() => newTrainingNoteDialog.showModal()}>+ New note</button
 				>
 			</div>
 		{:else if page.url.pathname === '/training/metrics'}
-			<div class="btn-create">
+			<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 				<button
-					class="btn w-full rounded-lg btn-primary"
+					class="btn w-46 rounded-lg btn-sm btn-primary sm:btn-md"
 					onclick={() => createTrainingMetricDialog.showModal()}>+ New training metric</button
 				>
 			</div>
 		{:else if page.url.pathname.startsWith('/training/period')}
-			<div class="btn-create">
+			<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 				<button
-					class="btn w-full rounded-lg btn-primary"
+					class="btn w-46 rounded-lg btn-sm btn-primary sm:btn-md"
 					onclick={() => createTrainingPeriodDialog.showModal()}>+ New training period</button
 				>
 			</div>
