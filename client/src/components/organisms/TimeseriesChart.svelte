@@ -2,7 +2,7 @@
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
 	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
-	import { matchMetric, textColors } from '$lib/colors';
+	import { formatMetricValue, matchMetric, textColors } from '$lib/colors';
 	import { untrack } from 'svelte';
 
 	export interface Metric {
@@ -220,7 +220,7 @@
 	{/if}
 	{#each nearestValues.values as value}
 		<span class={`px-1.5 ${textColors[value.metric]}`}>
-			{value.metric}: {value.value.toFixed(2)}
+			{value.metric}: {formatMetricValue(value.value, value.metric)}
 			{value.unit}
 		</span>
 	{/each}

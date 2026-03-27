@@ -36,3 +36,11 @@ export const matchMetric = (name: string): Metric => {
 	}
 	return 'Cadence';
 };
+
+export const formatMetricValue = (value: number, metric: Metric): string => {
+	if (['HeartRate', 'Power', 'Altitude', 'Cadence'].includes(metric)) {
+		return value.toFixed(0);
+	} else {
+		return value.toFixed(2);
+	}
+};
