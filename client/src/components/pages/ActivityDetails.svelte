@@ -12,6 +12,7 @@
 	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
 	import ActivityLaps from '$components/organisms/ActivityLaps.svelte';
 	import ActivityHeader from '$components/organisms/ActivityHeader.svelte';
+	import PowerCurve from '$components/organisms/PowerCurve.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
@@ -48,6 +49,10 @@
 	let active_distance = $derived(
 		'Distance' in active_metrics.metrics ? active_metrics.metrics['Distance'].values : undefined
 	);
+	let powerValues = $derived(
+		'Power' in active_metrics.metrics ? active_metrics.metrics['Power'].values : null
+	);
+	let hasPowerData = $derived(powerValues !== null && powerValues.some((v) => v !== null));
 
 	let metricOptions: { option: Metric; display: string }[] = [
 		{ option: 'HeartRate', display: 'Heart rate' },
@@ -280,6 +285,19 @@
 			{/if}
 		</div>
 	</details>
+
+	{#if hasPowerData}
+		<details class={`collapse-arrow collapse ${sectionClass}`} open>
+			<summary class="collapse-title text-lg font-semibold">Power curve</summary>
+			<div class="collapse-content px-0">
+				<div class="px-2 pb-2">
+					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
+						<PowerCurve powerValues={powerValues!} width={chartWidth} height={chartHeight} />
+					</div>
+				</div>
+			</div>
+		</details>
+	{/if}
 
 	<details class={`collapse-arrow collapse ${sectionClass}`} open>
 		<summary class="collapse-title text-lg font-semibold">Laps</summary>
