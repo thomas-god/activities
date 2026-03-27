@@ -358,6 +358,13 @@ fn extract_pause_event(
     Some((pause_event, timestamp))
 }
 
+/// Extract [Lap]'s information from a `DataMessage`.
+///
+/// The [LapField::Timestamp] of the message may for some providers correspond to the actual lap
+/// event and thus to the lap's end time, but for others all [Lap] messages are in the beginning of
+/// the file and have the same [LapField::Timestamp] corresponding to the activity's start.
+/// Thus we use [LapField::StartTime] with [LapField::TotalElapsedTime] to compute a lap' start and
+/// end.
 fn extract_lap(message: &DataMessage, reference_timestamp: u32) -> Option<Lap> {
     let start_timestamp = message
         .fields
@@ -370,20 +377,20 @@ fn extract_lap(message: &DataMessage, reference_timestamp: u32) -> Option<Lap> {
             })
         })?;
 
-    let end_timestamp = message
+    let lap_duration = message
         .fields
         .iter()
-        .find(|field| field.kind == FitField::Lap(LapField::Timestamp))
+        .find(|field| field.kind == FitField::Lap(LapField::TotalElapsedTime))
         .and_then(|field| {
             field.values.iter().find_map(|value| match value {
-                DataValue::DateTime(dt) => Some(*dt),
+                DataValue::Float32(dt) => Some(*dt as u32),
                 _ => None,
             })
         })?;
 
     Some(Lap::new(
         (start_timestamp - reference_timestamp) as usize,
-        (end_timestamp - reference_timestamp) as usize,
+        (start_timestamp + lap_duration - reference_timestamp) as usize,
     ))
 }
 
