@@ -143,7 +143,7 @@ fn format_source(source: &ActivityMetricSource) -> String {
     match source {
         ActivityMetricSource::Statistic(stat) => stat.to_string(),
         ActivityMetricSource::Timeseries((metric, aggregate)) => {
-            format!("{aggregate:?} {metric:?}")
+            format!("Activity {aggregate:?} {metric:?}")
         }
     }
 }
@@ -255,7 +255,7 @@ mod tests {
                 TimeseriesMetric::Distance,
                 TimeseriesAggregate::Max
             ))),
-            "Max Distance".to_string()
+            "Activity Max Distance".to_string()
         );
     }
 

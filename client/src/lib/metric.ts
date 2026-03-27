@@ -21,7 +21,7 @@ export const metricAggregateFunctions = [
 export type MetricAggregateFunction = (typeof metricAggregateFunctions)[number];
 
 export const aggregateFunctionDisplay: Record<MetricAggregateFunction, string> = {
-	Average: 'activity average',
+	Average: 'average',
 	Max: 'maximum',
 	Min: 'minimum',
 	Sum: 'total',

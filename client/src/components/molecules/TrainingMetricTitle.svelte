@@ -12,10 +12,10 @@
 		const lines = [];
 
 		// Source metric
-		lines.push({ label: 'Metric', value: metric.metric });
+		lines.push({ label: 'Source', value: metric.metric.toLocaleLowerCase() });
 
 		// Granularity
-		lines.push({ label: 'Granularity', value: capitalize(metric.granularity.toLowerCase()) });
+		lines.push({ label: 'Granularity', value: metric.granularity.toLowerCase() });
 
 		// Aggregate function
 		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
@@ -27,9 +27,12 @@
 
 		// Sports filter
 		if (metric.sports && metric.sports.length > 0) {
-			lines.push({ label: 'Sports', value: metric.sports.join(', ') });
+			lines.push({
+				label: 'Filters',
+				value: metric.sports.map((s) => s.toLocaleLowerCase()).join(', ')
+			});
 		} else {
-			lines.push({ label: 'Sports', value: 'All sports' });
+			lines.push({ label: 'Filters', value: 'all sports' });
 		}
 
 		return lines;
@@ -65,7 +68,7 @@
 				>
 					<div class="space-y-1 text-left text-sm">
 						{#each tooltipLines as line}
-							<div class="flex gap-2">
+							<div>
 								<span class="font-semibold">{line.label}:</span>
 								<span class="text-base-content/80">{line.value}</span>
 							</div>
