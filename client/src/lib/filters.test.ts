@@ -126,19 +126,43 @@ describe('filterActivities', () => {
 		});
 	});
 
-	describe('multiple filters (OR logic)', () => {
-		it('includes an activity that matches any one of the active filters', () => {
-			const activityByRpe = makeActivity({ id: '1', rpe: 6 });
-			const activityByWorkout = makeActivity({ id: '2', workout_type: 'easy' });
-			const activityByCategory = makeActivity({ id: '3', sport_category: 'Cycling' });
-			const noMatch = makeActivity({ id: '4', rpe: 3, workout_type: 'race', sport_category: null });
+	describe('multiple filters (AND logic)', () => {
+		it('includes an activity that matches all active filters', () => {
+			const activity = makeActivity({ rpe: 6, workout_type: 'tempo', sport_category: 'Running' });
 
-			const result = filterActivities(
-				[activityByRpe, activityByWorkout, activityByCategory, noMatch],
-				{ rpe: [6], workoutTypes: ['easy'], sportCategories: ['Cycling'] }
-			);
+			const result = filterActivities([activity], {
+				rpe: [6],
+				workoutTypes: ['tempo'],
+				sportCategories: ['Running']
+			});
 
-			expect(result).toEqual([activityByRpe, activityByWorkout, activityByCategory]);
+			expect(result).toEqual([activity]);
+		});
+
+		it('excludes an activity that matches some but not all active filters', () => {
+			const matchesRpeOnly = makeActivity({ id: '1', rpe: 6, workout_type: 'race' });
+			const matchesWorkoutOnly = makeActivity({ id: '2', rpe: 3, workout_type: 'easy' });
+
+			const result = filterActivities([matchesRpeOnly, matchesWorkoutOnly], {
+				...noFilters,
+				rpe: [6],
+				workoutTypes: ['easy']
+			});
+
+			expect(result).toEqual([]);
+		});
+
+		it('ignores unset filters', () => {
+			const activity = makeActivity({ rpe: 6, workout_type: 'tempo', sport_category: 'Cycling' });
+
+			const result = filterActivities([activity], {
+				...noFilters,
+				rpe: [6],
+				workoutTypes: ['tempo']
+				// sportCategories not set — should not affect result
+			});
+
+			expect(result).toEqual([activity]);
 		});
 	});
 });

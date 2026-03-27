@@ -22,25 +22,25 @@ export const filterActivities = (
 	}
 
 	return activities.filter((activity) => {
-		if (filters.rpe.length > 0 && activity.rpe !== null && filters.rpe.includes(activity.rpe)) {
-			return true;
+		if (filters.rpe.length > 0) {
+			if (activity.rpe === null || !filters.rpe.includes(activity.rpe)) {
+				return false;
+			}
 		}
 
-		if (
-			filters.workoutTypes.length > 0 &&
-			activity.workout_type !== null &&
-			filters.workoutTypes.includes(activity.workout_type)
-		) {
-			return true;
+		if (filters.workoutTypes.length > 0) {
+			if (activity.workout_type === null || !filters.workoutTypes.includes(activity.workout_type)) {
+				return false;
+			}
 		}
 
 		if (filters.sportCategories.length > 0) {
 			const activityCategory = activity.sport_category || getSportCategory(activity.sport);
-			if (activityCategory !== null && filters.sportCategories.includes(activityCategory)) {
-				return true;
+			if (activityCategory === null || !filters.sportCategories.includes(activityCategory)) {
+				return false;
 			}
 		}
 
-		return false;
+		return true;
 	});
 };
