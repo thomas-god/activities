@@ -9,7 +9,11 @@
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
-	import { fetchActivityDetails, type ActivityWithTimeseries } from '$lib/api/activities';
+	import {
+		fetchActivityDetails,
+		type ActivityList,
+		type ActivityWithTimeseries
+	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
@@ -19,6 +23,13 @@
 	import Timeline from '$components/pages/Timeline.svelte';
 	import EditButton from '$components/atoms/EditButton.svelte';
 	import DeleteButton from '$components/atoms/DeleteButton.svelte';
+	import {
+		applyFiltersToSearchParams,
+		filtersFromSearchParams,
+		type ActivitiesFilters
+	} from '$lib/filters';
+	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
+	import { page } from '$app/state';
 
 	let { data }: PageProps = $props();
 
@@ -37,6 +48,15 @@
 	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
+
+	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
+	let filteredActivities: ActivityList = $state([]);
+
+	const handleFilterChange = (filters: ActivitiesFilters) => {
+		const url = new URL(page.url);
+		applyFiltersToSearchParams(url.searchParams, filters);
+		goto(url, { replaceState: false, keepFocus: true });
+	};
 
 	async function handleDelete(periodId: string) {
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
@@ -436,10 +456,21 @@
 				<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 					<div class="mb-4 flex items-center justify-between">
 						<h2 class="text-lg font-semibold">Activities & Notes</h2>
+						<ActivitiesFiltersComponent
+							activities={periodDetails.activities}
+							bind:filteredActivities
+							showLabel={false}
+							bind:filters={
+								() => filters,
+								(f) => {
+									handleFilterChange(f);
+								}
+							}
+						/>
 					</div>
 
 					<Timeline
-						activities={periodDetails.activities}
+						activities={filteredActivities}
 						{notes}
 						{selectedActivityId}
 						{selectActivityCallback}
