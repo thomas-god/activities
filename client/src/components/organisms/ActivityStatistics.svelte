@@ -16,11 +16,19 @@
 		}
 		return value / 1000;
 	});
-	let duration = $derived(statistics.get('Duration'));
+	let duration = $derived(activity.timeseries.active_time.at(-1) ?? undefined);
 	let elevation = $derived(statistics.get('Elevation'));
 	let avgHeartRate = $derived(timeseriesAvg(activity.timeseries.metrics, 'HeartRate'));
 	let maxHeartRate = $derived(timeseriesMaximum(activity.timeseries.metrics, 'HeartRate'));
-	let averageSpeed = $derived(timeseriesAvg(activity.timeseries.metrics, 'Speed'));
+	let averageSpeed = $derived.by(() => {
+		if (duration === undefined) {
+			return undefined;
+		}
+		if (distance === undefined) {
+			return undefined;
+		}
+		return distance / (duration / 3600);
+	});
 	let averagePace = $derived(averageSpeed === undefined ? undefined : speedToPace(averageSpeed));
 	let averagePower = $derived(timeseriesAvg(activity.timeseries.metrics, 'Power'));
 	let weightedAveragePower = $derived(timeseriesQuarticAvg(activity.timeseries.metrics, 'Power'));
