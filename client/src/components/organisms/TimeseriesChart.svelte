@@ -4,6 +4,7 @@
 	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
 	import { formatMetricValue, matchMetric, textColors } from '$lib/colors';
 	import { untrack } from 'svelte';
+	import type { ActivityWithTimeseries } from '$lib/api';
 
 	export interface Metric {
 		name: string;
@@ -17,9 +18,10 @@
 		metrics: Array<Metric>;
 		width: number;
 		height: number;
+		selectedLap: ActivityWithTimeseries['timeseries']['laps'][number] | null;
 	}
 
-	let { time, metrics, height, width, distance }: TimeseriesChartProps = $props();
+	let { time, metrics, height, width, distance, selectedLap }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -230,6 +232,21 @@
 	});
 
 	let smoothing = $state(5);
+
+	const timeBisector = d3.bisector<number, number>((t) => t);
+	let lapXValues = $derived.by(() => {
+		if (selectedLap === null) return null;
+		if (xAxisMode === 'time') {
+			return [selectedLap.start, selectedLap.end];
+		} else {
+			const startIdx = timeBisector.center(time, selectedLap.start);
+			const endIdx = timeBisector.center(time, selectedLap.end);
+			const startDist = distance?.[startIdx] ?? null;
+			const endDist = distance?.[endIdx] ?? null;
+			if (startDist === null || endDist === null) return null;
+			return [startDist, endDist];
+		}
+	});
 </script>
 
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
@@ -273,6 +290,20 @@
 		/>
 	</clipPath>
 
+	{#if lapXValues !== null}
+		{@const lapX0 = Math.max(zoomedXScale(lapXValues[0]), margins.left)}
+		{@const lapX1 = Math.min(zoomedXScale(lapXValues[1]), width - margins.right)}
+		{#if lapX1 > lapX0}
+			<rect
+				x={lapX0}
+				y={marginTop}
+				width={lapX1 - lapX0}
+				height={height - marginTop - marginBottom}
+				fill="currentColor"
+				class="text-base-content/10"
+			/>
+		{/if}
+	{/if}
 	{#each metricsProps as props}
 		<TimseriesLine
 			range={props.range}

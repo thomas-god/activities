@@ -7,9 +7,11 @@
 
 	interface Props {
 		activity: ActivityWithTimeseries;
+		selectedLap: ActivityWithTimeseries['timeseries']['laps'][number] | null;
+		onLapSelectedCallback: (lap: ActivityWithTimeseries['timeseries']['laps'][number]) => void;
 	}
 
-	let { activity }: Props = $props();
+	let { activity, selectedLap = $bindable(), onLapSelectedCallback }: Props = $props();
 
 	let laps = $derived(activity.timeseries.laps);
 	let metrics: LapMetric[] = $derived.by(() => {
@@ -151,7 +153,7 @@
 
 {#if laps.length > 0}
 	<div class="overflow-x-auto px-4 pb-4">
-		<table class="table w-full table-sm">
+		<table class="table w-full table-zebra table-sm">
 			<thead>
 				<tr>
 					<th>Lap</th>
@@ -166,7 +168,11 @@
 			</thead>
 			<tbody>
 				{#each laps as lap, index}
-					<tr>
+					<tr
+						class="hover:bg-base-300"
+						onmouseenter={() => (selectedLap = lap)}
+						onclick={() => onLapSelectedCallback(lap)}
+					>
 						<td>{index + 1}</td>
 
 						<td>{formatDuration(lap.end - lap.start)}</td>

@@ -31,6 +31,11 @@
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
 
+	let selectedLap: ActivityWithTimeseries['timeseries']['laps'][number] | null = $state(null);
+	const onLapSelectedCallback = (lap: ActivityWithTimeseries['timeseries']['laps'][number]) => {
+		console.log(lap);
+	};
+
 	// Calculate responsive chart height based on width
 	let chartHeight = $derived.by(() => {
 		if (chartWidth < 640) {
@@ -279,10 +284,19 @@
 							metrics={selectedMetrics}
 							height={chartHeight}
 							width={chartWidth}
+							{selectedLap}
 						/>
 					</div>
 				</div>
 			{/if}
+		</div>
+	</details>
+
+	<details class={`collapse-arrow collapse ${sectionClass}`} open>
+		<summary class="collapse-title text-lg font-semibold">Laps</summary>
+		<div class="collapse-content">
+			<!-- TODO: no y scroll ? -->
+			<ActivityLaps {activity} bind:selectedLap {onLapSelectedCallback} />
 		</div>
 	</details>
 
@@ -298,14 +312,6 @@
 			</div>
 		</details>
 	{/if}
-
-	<details class={`collapse-arrow collapse ${sectionClass}`} open>
-		<summary class="collapse-title text-lg font-semibold">Laps</summary>
-		<div class="collapse-content">
-			<!-- TODO: no y scroll ? -->
-			<ActivityLaps {activity} />
-		</div>
-	</details>
 </div>
 
 <!-- Delete confirmation modal -->
