@@ -21,6 +21,37 @@
 		selectedLap: ActivityWithTimeseries['timeseries']['laps'][number] | null;
 	}
 
+	export function zoomToLap(lap: ActivityWithTimeseries['timeseries']['laps'][number] | null) {
+		if (lap === null) {
+			resetZoom();
+			return;
+		}
+
+		let lapStart: number;
+		let lapEnd: number;
+
+		if (xAxisMode === 'time') {
+			lapStart = lap.start;
+			lapEnd = lap.end;
+		} else {
+			const startIdx = timeBisector.center(time, lap.start);
+			const endIdx = timeBisector.center(time, lap.end);
+			const startDist = distance?.[startIdx] ?? null;
+			const endDist = distance?.[endIdx] ?? null;
+			if (startDist === null || endDist === null) return;
+			lapStart = startDist;
+			lapEnd = endDist;
+		}
+
+		const lapDuration = lapEnd - lapStart;
+		if (lapDuration <= 0) return;
+
+		// Compute transform so lapStart maps to the left edge and lapEnd to the right edge
+		const k = Math.min((x_max - x_min) / lapDuration, max_zoom);
+		const tx = timeScale[0] - k * xScale(lapStart);
+		d3.select(svgElement).call(zoom.transform, d3.zoomIdentity.translate(tx, 0).scale(k));
+	}
+
 	let { time, metrics, height, width, distance, selectedLap }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;

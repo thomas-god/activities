@@ -30,10 +30,13 @@
 
 	let chartWidth: number = $state(0);
 	let showDeleteModal = $state(false);
+	let chart: ReturnType<typeof TimeseriesChart> | null = $state(null);
 
 	let selectedLap: ActivityWithTimeseries['timeseries']['laps'][number] | null = $state(null);
 	const onLapSelectedCallback = (lap: ActivityWithTimeseries['timeseries']['laps'][number]) => {
-		console.log(lap);
+		if (chart) {
+			chart.zoomToLap(lap);
+		}
 	};
 
 	// Calculate responsive chart height based on width
@@ -279,6 +282,7 @@
 				<div class="px-2 pb-2">
 					<div class=" w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<TimeseriesChart
+							bind:this={chart}
 							time={active_metrics.time}
 							distance={active_distance}
 							metrics={selectedMetrics}
