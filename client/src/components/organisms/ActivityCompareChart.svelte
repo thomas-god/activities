@@ -2,6 +2,7 @@
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
 	import type { ActivityWithTimeseries } from '$lib/api';
+	import { paceInSecondToString } from '$lib/speed';
 
 	interface Props {
 		activities: ActivityWithTimeseries[];
@@ -16,6 +17,20 @@
 	const marginBottom = 28;
 	const marginLeft = 48;
 	const marginRight = 12;
+
+	let coeff = $derived.by(() => {
+		if (metric === 'Pace') {
+			return 1000; // s:m -> s:km
+		}
+		return 1;
+	});
+
+	let fmtYTick = $derived.by(() => {
+		if (metric === 'Pace') {
+			return (v: number) => paceInSecondToString(v);
+		}
+		return (v: number) => v.toString();
+	});
 
 	// Stable unique clip-path id per component instance
 	const clipId = `compare-clip-${Math.random().toString(36).slice(2)}`;
@@ -51,7 +66,7 @@
 			if (values.length === 0) continue;
 			result.push({
 				activity,
-				values,
+				values: values.map(([t, v]) => [t, v * coeff]),
 				color: palette[colorIdx % palette.length],
 				label: activity.name ?? activity.start_time.slice(0, 10)
 			});
@@ -60,9 +75,14 @@
 		return result;
 	});
 
-	let unit = $derived(
-		activities.find((a) => a.timeseries.metrics[metric])?.timeseries.metrics[metric]?.unit ?? ''
-	);
+	let unit = $derived.by(() => {
+		const unit =
+			activities.find((a) => a.timeseries.metrics[metric])?.timeseries.metrics[metric]?.unit ?? '';
+		if (metric === 'Pace') {
+			return 'min:km'; // s:m -> s:km
+		}
+		return unit;
+	});
 
 	let innerWidth = $derived(width - marginLeft - marginRight);
 	let innerHeight = $derived(height - marginTop - marginBottom);
@@ -107,7 +127,12 @@
 	});
 
 	$effect(() => {
-		d3.select(gy).call(d3.axisLeft(yScale).ticks(5));
+		d3.select(gy).call(
+			d3
+				.axisLeft(yScale)
+				.ticks(5)
+				.tickFormat((v, _idx) => fmtYTick(v.valueOf()))
+		);
 	});
 
 	let linePaths = $derived.by(() => {

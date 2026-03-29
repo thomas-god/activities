@@ -147,7 +147,7 @@ pub fn fill_metric_values(
 /// This function handles unit conversions for different metric types:
 /// - Distance: meters → kilometers (÷ 1000)
 /// - Speed: m/s → km/h (× 3.6)
-/// - Pace: s/m → s/km (× 1000)
+/// - Pace: s:m → s:km (× 1000)
 /// - Other metrics: no conversion
 ///
 /// Special case: When aggregate is NumberOfActivities, always returns Activity unit
@@ -687,12 +687,12 @@ mod tests {
 
     #[test]
     fn test_convert_metric_values_pace_timeseries_converts_to_s_per_km() {
-        // Pace should be converted from s/m to s/km (multiply by 1000)
+        // Pace should be converted from s:m to s:km (multiply by 1000)
         let values = HashMap::from([(
             "Running".to_string(),
             HashMap::from([
-                ("2025-09-24".to_string(), 0.2),  // 0.2 s/m = 200 s/km = 3:20 min/km
-                ("2025-09-25".to_string(), 0.25), // 0.25 s/m = 250 s/km = 4:10 min/km
+                ("2025-09-24".to_string(), 0.2),  // 0.2 s:m = 200 s/km = 3:20 min/km
+                ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
             ]),
         )]);
 

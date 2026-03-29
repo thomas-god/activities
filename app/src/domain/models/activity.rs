@@ -807,7 +807,7 @@ impl fmt::Display for Unit {
             Self::Kilometer => "km",
             Self::MeterPerSecond => "m/s",
             Self::KilometerPerHour => "km/h",
-            Self::SecondPerMeter => "s/m",
+            Self::SecondPerMeter => "s:m",
             Self::SecondPerKilometer => "s/km",
             Self::Watt => "W",
             Self::BeatPerMinute => "bpm",
@@ -1716,7 +1716,7 @@ mod test_timeseries {
             TimeseriesAggregate::Average.value_from_timeseries(&TimeseriesMetric::Pace, &activity);
 
         assert!(result.is_some());
-        // Should be duration / distance = 3600 / 10000 = 0.36 s/m
+        // Should be duration / distance = 3600 / 10000 = 0.36 s:m
         assert_eq!(result.unwrap(), 0.36);
     }
 
