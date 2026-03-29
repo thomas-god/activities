@@ -4,14 +4,16 @@
 	let {
 		availableOptions,
 		selectedOptions = $bindable(),
-		maxSelected
+		maxSelected,
+		useMetricColors = true
 	}: {
 		availableOptions: Array<{ option: Metric; display: string }>;
 		selectedOptions: Array<{ option: Metric; display: string }>;
-		maxSelected: number;
+		maxSelected?: number;
+		useMetricColors?: boolean;
 	} = $props();
 
-	let options = $state(
+	let options = $derived(
 		availableOptions.map((option) => ({
 			selected:
 				selectedOptions.find((selectedOption) => selectedOption.display === option.display) !==
@@ -32,10 +34,10 @@
 <div class="@container flex flex-wrap gap-1">
 	{#each options as option}
 		<input
-			class={`btn btn-xs @sm:btn-sm ${option.option.toLocaleLowerCase()}`}
+			class={`btn btn-xs @sm:btn-sm ${useMetricColors ? option.option.toLocaleLowerCase() : ''}`}
 			type="checkbox"
 			bind:checked={option.selected}
-			disabled={(!option.selected && numberSelectedOptions >= maxSelected) ||
+			disabled={(!option.selected && !!maxSelected && numberSelectedOptions >= maxSelected) ||
 				(option.selected && numberSelectedOptions === 1)}
 			aria-label={option.display}
 			onchange={onInput}

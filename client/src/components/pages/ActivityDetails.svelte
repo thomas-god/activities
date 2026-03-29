@@ -6,7 +6,7 @@
 	import EditableWorkoutType from '$components/molecules/EditableWorkoutType.svelte';
 	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
 	import EditableFeedback from '$components/molecules/EditableFeedback.svelte';
-	import MultiSelect from '$components/molecules/MultiSelect.svelte';
+	import MetricsMultiSelect from '$components/molecules/MetricsMultiSelect.svelte';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
@@ -276,7 +276,7 @@
 		<summary class="collapse-title text-lg font-semibold">Metrics</summary>
 		<div class="collapse-content px-0">
 			<fieldset class="fieldset px-4">
-				<MultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
+				<MetricsMultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
 			</fieldset>
 			{#if selectedMetrics}
 				<div class="px-2 pb-2">
