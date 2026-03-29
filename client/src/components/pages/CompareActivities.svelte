@@ -6,6 +6,16 @@
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
+	let offsets: Record<string, number> = $state({});
+
+	// Drop stale offset entries when the activities list changes
+	$effect(() => {
+		const ids = new Set(activities.map((a) => a.id));
+		for (const id of Object.keys(offsets)) {
+			if (!ids.has(id)) delete offsets[id];
+		}
+	});
+
 	let chartWidth = $state(0);
 	let chartHeight = $derived.by(() => {
 		if (chartWidth < 640) return 240;
@@ -49,13 +59,15 @@
 		useMetricColors={false}
 	/>
 	<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-		{#each selectedMetricOptions as metric}
+		{#each selectedMetricOptions as metric, idx}
 			<h2 class="text-center text-lg">{metric.display}</h2>
 			<ActivityCompareChart
 				{activities}
 				metric={metric.option}
 				width={chartWidth}
 				height={chartHeight}
+				{offsets}
+				showOffsetControls={idx === 0}
 			/>
 		{/each}
 	</div>

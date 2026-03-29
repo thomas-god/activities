@@ -9,9 +9,11 @@
 		metric: string;
 		width: number;
 		height: number;
+		offsets: Record<string, number>;
+		showOffsetControls?: boolean;
 	}
 
-	let { activities, metric, width, height }: Props = $props();
+	let { activities, metric, width, height, offsets, showOffsetControls = true }: Props = $props();
 
 	const marginTop = 16;
 	const marginBottom = 28;
@@ -34,6 +36,11 @@
 		}
 		return (v: number) => v.toFixed(0);
 	});
+
+	const fmtOffset = (s: number): string => {
+		if (s === 0) return '0:00';
+		return (s < 0 ? '-' : '+') + formatDuration(Math.abs(s));
+	};
 
 	// Stable unique clip-path id per component instance
 	const clipId = `compare-clip-${Math.random().toString(36).slice(2)}`;
@@ -67,9 +74,10 @@
 				}
 			}
 			if (values.length === 0) continue;
+			const offset = offsets[activity.id] ?? 0;
 			result.push({
 				activity,
-				values: values.map(([t, v]) => [t, v * coeff]),
+				values: values.map(([t, v]) => [t + offset, v * coeff]),
 				color: palette[colorIdx % palette.length],
 				label: activity.name ?? activity.start_time.slice(0, 10)
 			});
@@ -90,16 +98,25 @@
 	let innerWidth = $derived(width - marginLeft - marginRight);
 	let innerHeight = $derived(height - marginTop - marginBottom);
 
-	let xMax = $derived.by(() => {
-		let max = 0;
+	let xMin = $derived.by(() => {
+		let min = Infinity;
 		for (const s of series) {
-			const last = s.values.at(-1)?.[0] ?? 0;
-			if (last > max) max = last;
+			const first = s.values[0]?.[0] ?? Infinity;
+			if (first < min) min = first;
 		}
-		return max || 1;
+		return isFinite(min) ? min : 0;
 	});
 
-	let xScale = $derived(d3.scaleLinear([0, xMax], [marginLeft, marginLeft + innerWidth]));
+	let xMax = $derived.by(() => {
+		let max = -Infinity;
+		for (const s of series) {
+			const last = s.values.at(-1)?.[0] ?? -Infinity;
+			if (last > max) max = last;
+		}
+		return isFinite(max) && max > xMin ? max : xMin + 1;
+	});
+
+	let xScale = $derived(d3.scaleLinear([xMin, xMax], [marginLeft, marginLeft + innerWidth]));
 
 	let yExtent = $derived.by((): [number, number] => {
 		let min = Infinity;
@@ -146,7 +163,8 @@
 		return series.map((s) => ({
 			d: lineGen(s.values) ?? '',
 			color: s.color,
-			label: s.label
+			label: s.label,
+			id: s.activity.id
 		}));
 	});
 
@@ -290,14 +308,42 @@
 	{/if}
 </div>
 
-<!-- Legend -->
+<!-- Legend + offset controls -->
 {#if linePaths.length > 0}
-	<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm" style="padding-left:{marginLeft}px">
-		{#each linePaths as { color, label }}
-			<span class="flex items-center gap-1.5">
-				<span class="inline-block h-0.5 w-5 rounded-full" style="background-color:{color}"></span>
-				{label}
-			</span>
+	<div
+		class="mt-2 space-y-1.5 text-sm"
+		style="padding-left:{marginLeft}px; padding-right:{marginRight}px"
+	>
+		{#each linePaths as { color, label, id }}
+			<div class="flex items-center gap-2">
+				<span class="inline-block h-0.5 w-5 shrink-0 rounded-full" style="background-color:{color}"
+				></span>
+				<span class="w-28 shrink-0 truncate opacity-75">{label}</span>
+				{#if series.length > 1 && showOffsetControls}
+					<input
+						type="range"
+						min="-3600"
+						max="3600"
+						step="10"
+						class="range flex-1 range-xs"
+						value={offsets[id] ?? 0}
+						oninput={(e) => {
+							offsets[id] = Number((e.target as HTMLInputElement).value);
+						}}
+					/>
+					<span class="w-14 shrink-0 text-right font-mono text-xs opacity-60"
+						>{fmtOffset(offsets[id] ?? 0)}</span
+					>
+					{#if (offsets[id] ?? 0) !== 0}
+						<button
+							class="btn px-1 opacity-50 btn-ghost btn-xs"
+							onclick={() => {
+								offsets[id] = 0;
+							}}>✕</button
+						>
+					{/if}
+				{/if}
+			</div>
 		{/each}
 	</div>
 {/if}
