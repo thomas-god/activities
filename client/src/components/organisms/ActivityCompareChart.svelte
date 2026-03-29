@@ -29,7 +29,10 @@
 		if (metric === 'Pace') {
 			return (v: number) => paceInSecondToString(v);
 		}
-		return (v: number) => v.toString();
+		if (metric === 'Speed') {
+			return (v: number) => v.toFixed(2);
+		}
+		return (v: number) => v.toFixed(0);
 	});
 
 	// Stable unique clip-path id per component instance
@@ -275,7 +278,7 @@
 						style="background-color:{row.color}"
 					></span>
 					<span class="truncate opacity-75">{row.label}</span>
-					<span class="ml-auto font-medium">{row.yVal.toFixed(1)}</span>
+					<span class="ml-auto font-medium">{fmtYTick(row.yVal)} {unit}</span>
 				</div>
 			{/each}
 		</div>
