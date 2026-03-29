@@ -33,6 +33,7 @@
 
 <div class="@container flex flex-wrap gap-1">
 	{#each options as option}
+		<!-- svelte-ignore binding_property_non_reactive -->
 		<input
 			class={`btn btn-xs @sm:btn-sm ${useMetricColors ? option.option.toLocaleLowerCase() : ''}`}
 			type="checkbox"
