@@ -10,7 +10,7 @@
 		selectedActivities = $bindable()
 	}: { activities: ActivityList; selectedActivities: ActivityList } = $props();
 
-	let selectedIds: string[] = $state([]);
+	let selectedIds: string[] = $derived(selectedActivities.map((a) => a.id));
 	onMount(() => {
 		if (page.url.searchParams.get('activities') !== null) {
 			selectedIds = page.url.searchParams.get('activities')!.split(',');
