@@ -1,7 +1,9 @@
 <script lang="ts">
 	import ActivitiesSelect from '$components/molecules/ActivitiesSelect.svelte';
+	import MetricsMultiSelect from '$components/molecules/MetricsMultiSelect.svelte';
 	import ActivityCompareChart from '$components/organisms/ActivityCompareChart.svelte';
 	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
+	import type { Metric } from '$lib/colors';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -22,6 +24,33 @@
 		if (chartWidth < 1024) return 320;
 		return 400;
 	});
+
+	let metricOptions: { option: Metric; display: string }[] = [
+		{ option: 'HeartRate', display: 'Heart rate' },
+		{ option: 'Speed', display: 'Speed' },
+		{ option: 'Power', display: 'Power' },
+		{ option: 'Altitude', display: 'Altitude' },
+		{ option: 'Cadence', display: 'Cadence' }
+	];
+
+	let availableOptions = $derived.by(() => {
+		let options = [];
+		const activityHasMetric = (activity: ActivityWithTimeseries, targetMetric: string) => {
+			for (const metric in activity.timeseries.metrics) {
+				if (metric === targetMetric) {
+					return activity.timeseries.metrics[metric].values.some((value) => value !== null);
+				}
+			}
+			return false;
+		};
+		for (const option of metricOptions) {
+			if (loadedActivities.some((activity) => activityHasMetric(activity, option.option))) {
+				options.push(option);
+			}
+		}
+		return options;
+	});
+	let selectedOptions = $derived(availableOptions);
 </script>
 
 {#await data.activities}
@@ -42,12 +71,13 @@
 {/await}
 
 {#if loadedActivities.length > 0}
+	<MetricsMultiSelect {availableOptions} bind:selectedOptions useMetricColors={false} />
 	<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-		{#each ['HeartRate', 'Power', 'Altitude', 'Cadence', 'Pace', 'Speed'] as metric}
-			<h2 class="text-center text-lg">{metric}</h2>
+		{#each selectedOptions as metric}
+			<h2 class="text-center text-lg">{metric.display}</h2>
 			<ActivityCompareChart
 				activities={loadedActivities}
-				{metric}
+				metric={metric.option}
 				width={chartWidth}
 				height={chartHeight}
 			/>

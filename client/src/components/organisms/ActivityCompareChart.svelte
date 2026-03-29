@@ -208,7 +208,12 @@
 	>
 		<defs>
 			<clipPath id={clipId}>
-				<rect x={marginLeft} y={marginTop} width={innerWidth} height={innerHeight} />
+				<rect
+					x={marginLeft}
+					y={marginTop}
+					width={Math.max(innerWidth, 0)}
+					height={Math.max(innerHeight, 0)}
+				/>
 			</clipPath>
 		</defs>
 
