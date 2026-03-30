@@ -20,7 +20,7 @@
 {#await data.activities}
 	<div class="loading-dots"></div>
 {:then activities}
-	<div class="rounded-box bg-base-100 p-4 shadow-md">
+	<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
 		<ActivitiesSelect
 			{activities}
 			bind:selectedActivities={

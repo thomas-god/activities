@@ -3,17 +3,17 @@
 	import { formatDuration } from '$lib/duration';
 	import type { ActivityWithTimeseries } from '$lib/api';
 	import { paceInSecondToString } from '$lib/speed';
+	import type { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {
 		activities: ActivityWithTimeseries[];
 		metric: string;
 		width: number;
 		height: number;
-		offsets: Record<string, number>;
-		showOffsetControls?: boolean;
+		offsets: SvelteMap<string, number>;
 	}
 
-	let { activities, metric, width, height, offsets, showOffsetControls = true }: Props = $props();
+	let { activities, metric, width, height, offsets }: Props = $props();
 
 	const marginTop = 16;
 	const marginBottom = 28;
@@ -36,11 +36,6 @@
 		}
 		return (v: number) => v.toFixed(0);
 	});
-
-	const fmtOffset = (s: number): string => {
-		if (s === 0) return '0:00';
-		return (s < 0 ? '-' : '+') + formatDuration(Math.abs(s));
-	};
 
 	// Stable unique clip-path id per component instance
 	const clipId = `compare-clip-${Math.random().toString(36).slice(2)}`;
@@ -74,7 +69,7 @@
 				}
 			}
 			if (values.length === 0) continue;
-			const offset = offsets[activity.id] ?? 0;
+			const offset = offsets.get(activity.id) ?? 0;
 			result.push({
 				activity,
 				values: values.map(([t, v]) => [t + offset, v * coeff]),
@@ -310,39 +305,12 @@
 
 <!-- Legend + offset controls -->
 {#if linePaths.length > 0}
-	<div
-		class="mt-2 space-y-1.5 text-sm"
-		style="padding-left:{marginLeft}px; padding-right:{marginRight}px"
-	>
-		{#each linePaths as { color, label, id }}
+	<div class="mt-2 flex flex-row flex-wrap gap-3 pl-12 text-sm">
+		{#each linePaths as { color, label }}
 			<div class="flex items-center gap-2">
 				<span class="inline-block h-0.5 w-5 shrink-0 rounded-full" style="background-color:{color}"
 				></span>
-				<span class="w-28 shrink-0 truncate opacity-75">{label}</span>
-				{#if series.length > 1 && showOffsetControls}
-					<input
-						type="range"
-						min="-3600"
-						max="3600"
-						step="10"
-						class="range flex-1 range-xs"
-						value={offsets[id] ?? 0}
-						oninput={(e) => {
-							offsets[id] = Number((e.target as HTMLInputElement).value);
-						}}
-					/>
-					<span class="w-14 shrink-0 text-right font-mono text-xs opacity-60"
-						>{fmtOffset(offsets[id] ?? 0)}</span
-					>
-					{#if (offsets[id] ?? 0) !== 0}
-						<button
-							class="btn px-1 opacity-50 btn-ghost btn-xs"
-							onclick={() => {
-								offsets[id] = 0;
-							}}>✕</button
-						>
-					{/if}
-				{/if}
+				<span class="truncate opacity-75">{label}</span>
 			</div>
 		{/each}
 	</div>
