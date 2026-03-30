@@ -12,6 +12,7 @@
 		height: number;
 		offsets: SvelteMap<string, number>;
 		zoomDomain?: [number, number] | null;
+		smoothingWindow?: number; // seconds, 0 = no smoothing
 	}
 
 	let {
@@ -20,8 +21,28 @@
 		width,
 		height,
 		offsets,
-		zoomDomain = $bindable(null)
+		zoomDomain = $bindable(null),
+		smoothingWindow = 5
 	}: Props = $props();
+
+	// Centered rolling average over a time window (seconds)
+	function smooth(values: [number, number][], windowSec: number): [number, number][] {
+		if (windowSec <= 0 || values.length === 0) return values;
+		const half = windowSec / 2;
+		return values.map(([t, v], i) => {
+			let sum = v;
+			let count = 1;
+			for (let j = i - 1; j >= 0 && t - values[j][0] <= half; j--) {
+				sum += values[j][1];
+				count++;
+			}
+			for (let j = i + 1; j < values.length && values[j][0] - t <= half; j++) {
+				sum += values[j][1];
+				count++;
+			}
+			return [t, sum / count];
+		});
+	}
 
 	const marginTop = 16;
 	const marginBottom = 28;
@@ -78,9 +99,10 @@
 			}
 			if (values.length === 0) continue;
 			const offset = offsets.get(activity.id) ?? 0;
+			const rawValues: [number, number][] = values.map(([t, v]) => [t + offset, v * coeff]);
 			result.push({
 				activity,
-				values: values.map(([t, v]) => [t + offset, v * coeff]),
+				values: smooth(rawValues, smoothingWindow),
 				color: palette[colorIdx % palette.length],
 				label: activity.name ?? activity.start_time.slice(0, 10)
 			});
