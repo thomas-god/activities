@@ -3,6 +3,7 @@
 	import EditableActivityName from '$components/molecules/EditableActivityName.svelte';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 	import type { Activity } from '$lib/api/activities';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		activity: Activity;
@@ -63,7 +64,13 @@
 				>
 					<li>
 						<button onclick={onDeleteClickedCallback} class="text-error">
-							🗑️ Delete Activity
+							<img src="/icons/delete.svg" alt="Bin delete icon" class="h-6 w-6" /> Delete Activity
+						</button>
+					</li>
+
+					<li>
+						<button onclick={() => goto(`/activities/compare?activities=${activity.id}`)}>
+							<img src="/icons/chart.svg" alt="Chart icon" class="h-6 w-6" /> Compare to others
 						</button>
 					</li>
 				</ul>
