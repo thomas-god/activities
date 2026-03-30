@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import ActivitiesFilters from './ActivitiesFilters.svelte';
 	import { emptyFilters } from '$lib/filters';
+	import { getSportCategoryIcon } from '$lib/sport';
 
 	let {
 		activities,
@@ -62,26 +63,34 @@
 
 <h2 class="text-lg">Selected activities</h2>
 {#each selectedActivities as activity}
-	<p>
+	<div class="flex flex-row items-center gap-2 py-0.5">
+		<div>
+			<img
+				src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+				class="h-6 w-6"
+				alt="Sport icon"
+			/>
+		</div>
 		<button
 			class="btn mr-1 btn-xs btn-secondary"
 			onclick={() => {
 				removeActivity(activity);
 			}}>-</button
 		>
-		{activity.name || activity.sport}
-		<span class="text-sm tracking-wide italic opacity-70"
-			>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
-		>
-	</p>
+		<div>
+			{activity.name || activity.sport}
+		</div>
+		<div class="text-sm tracking-wide italic opacity-70">
+			{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
+		</div>
+	</div>
 {:else}
 	<p class="italic">No activity selected</p>
 {/each}
 
-<div class="flex flex-row items-center gap-1">
+<div class="flex flex-row items-center">
 	<h2 class="text-lg">Available activities</h2>
-	<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
-	<div>
+	<div class="pr-1 pl-3">
 		<label class="input input-sm">
 			<svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 				<g
@@ -98,21 +107,31 @@
 			<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
 		</label>
 	</div>
+	<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
 </div>
 <div class="max-h-64 overflow-scroll">
 	{#each filteredActivities as activity (activity.id)}
 		{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
-			<div>
+			<div class="flex flex-row items-center gap-2 py-0.5">
+				<div>
+					<img
+						src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+						class="h-6 w-6"
+						alt="Sport icon"
+					/>
+				</div>
 				<button
 					class="btn mr-1 btn-xs btn-primary"
 					onclick={() => {
 						selectActivity(activity);
 					}}>+</button
 				>
-				{activity.name || activity.sport}
-				<span class="text-sm tracking-wide italic opacity-70"
-					>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
-				>
+				<div>
+					{activity.name || activity.sport}
+				</div>
+				<div class="text-sm tracking-wide italic opacity-70">
+					{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
+				</div>
 			</div>
 		{/if}
 	{/each}
