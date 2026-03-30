@@ -11,9 +11,17 @@
 		width: number;
 		height: number;
 		offsets: SvelteMap<string, number>;
+		zoomDomain?: [number, number] | null;
 	}
 
-	let { activities, metric, width, height, offsets }: Props = $props();
+	let {
+		activities,
+		metric,
+		width,
+		height,
+		offsets,
+		zoomDomain = $bindable(null)
+	}: Props = $props();
 
 	const marginTop = 16;
 	const marginBottom = 28;
@@ -111,7 +119,9 @@
 		return isFinite(max) && max > xMin ? max : xMin + 1;
 	});
 
-	let xScale = $derived(d3.scaleLinear([xMin, xMax], [marginLeft, marginLeft + innerWidth]));
+	let xScale = $derived(
+		d3.scaleLinear(zoomDomain ?? [xMin, xMax], [marginLeft, marginLeft + innerWidth])
+	);
 
 	let yExtent = $derived.by((): [number, number] => {
 		let min = Infinity;
@@ -131,6 +141,38 @@
 
 	let gx: SVGGElement;
 	let gy: SVGGElement;
+	let svgElement: SVGSVGElement;
+
+	// Clamp a candidate domain to [xMin, xMax], sliding it if it exceeds bounds
+	function clampDomain(lo: number, hi: number): [number, number] | null {
+		const span = hi - lo;
+		if (span >= xMax - xMin) return null; // fully zoomed out → reset
+		if (lo < xMin) return [xMin, xMin + span];
+		if (hi > xMax) return [xMax - span, xMax];
+		return [lo, hi];
+	}
+
+	// Wheel-to-zoom: add listener imperatively so we can opt out of passive mode
+	$effect(() => {
+		if (!svgElement) return;
+		function handleWheel(e: WheelEvent) {
+			const rect = svgElement.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			if (x < marginLeft || x > marginLeft + innerWidth) return;
+			e.preventDefault();
+			const xData = xScale.invert(x);
+			const [lo, hi] = (zoomDomain ?? [xMin, xMax]) as [number, number];
+			const factor = e.deltaY > 0 ? 1.25 : 1 / 1.25;
+			zoomDomain = clampDomain(xData - (xData - lo) * factor, xData + (hi - xData) * factor);
+		}
+		svgElement.addEventListener('wheel', handleWheel, { passive: false });
+		return () => svgElement.removeEventListener('wheel', handleWheel);
+	});
+
+	// Drag-to-pan state
+	let isDragging = $state(false);
+	let dragStartX: number | null = null;
+	let dragStartDomain: [number, number] | null = null;
 
 	$effect(() => {
 		d3.select(gx).call(
@@ -167,6 +209,50 @@
 	const bisector = d3.bisector<[number, number], number>((p) => p[0]);
 	let mouseX: number | null = $state(null);
 
+	function onPointerDown(e: PointerEvent) {
+		const svg = e.currentTarget as SVGSVGElement;
+		const rect = svg.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		if (x < marginLeft || x > marginLeft + innerWidth) return;
+		isDragging = true;
+		dragStartX = x;
+		dragStartDomain = (zoomDomain ?? [xMin, xMax]) as [number, number];
+		svg.setPointerCapture(e.pointerId);
+		mouseX = null;
+	}
+
+	function onPointerMove(e: PointerEvent) {
+		const svg = e.currentTarget as SVGSVGElement;
+		const rect = svg.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		if (isDragging && dragStartX !== null && dragStartDomain !== null) {
+			const domainWidth = dragStartDomain[1] - dragStartDomain[0];
+			const dataPerPixel = domainWidth / innerWidth;
+			const delta = (x - dragStartX) * dataPerPixel;
+			zoomDomain = clampDomain(dragStartDomain[0] - delta, dragStartDomain[1] - delta);
+		} else {
+			if (x >= marginLeft && x <= marginLeft + innerWidth) {
+				mouseX = x;
+			} else {
+				mouseX = null;
+			}
+		}
+	}
+
+	function onPointerUp() {
+		isDragging = false;
+		dragStartX = null;
+		dragStartDomain = null;
+	}
+
+	function onPointerLeave() {
+		if (!isDragging) mouseX = null;
+	}
+
+	function onDblClick() {
+		zoomDomain = null;
+	}
+
 	let tooltipData = $derived.by(() => {
 		if (mouseX === null) return null;
 		const xValue = xScale.invert(mouseX);
@@ -192,32 +278,21 @@
 		}
 		return mouseX + 12;
 	});
-
-	function onMouseMove(e: MouseEvent) {
-		const svg = e.currentTarget as SVGSVGElement;
-		const rect = svg.getBoundingClientRect();
-		const x = e.clientX - rect.left;
-		if (x >= marginLeft && x <= marginLeft + innerWidth) {
-			mouseX = x;
-		} else {
-			mouseX = null;
-		}
-	}
-
-	function onMouseLeave() {
-		mouseX = null;
-	}
 </script>
 
 <div class="relative">
 	<svg
 		{width}
 		{height}
-		onmousemove={onMouseMove}
-		onmouseleave={onMouseLeave}
+		bind:this={svgElement}
+		onpointerdown={onPointerDown}
+		onpointermove={onPointerMove}
+		onpointerup={onPointerUp}
+		onpointerleave={onPointerLeave}
+		ondblclick={onDblClick}
 		role="img"
 		aria-label="Activity comparison chart"
-		style="cursor:crosshair"
+		style="cursor:{isDragging ? 'grabbing' : 'crosshair'}"
 	>
 		<defs>
 			<clipPath id={clipId}>

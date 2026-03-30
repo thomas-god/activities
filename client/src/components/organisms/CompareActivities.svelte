@@ -10,6 +10,7 @@
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
 	let offsets: SvelteMap<string, number> = $state(new SvelteMap());
+	let zoomDomain: [number, number] | null = $state(null);
 	let offsetsDialogElement: HTMLDialogElement;
 	let offsetsDialogElementWidth = $state(0);
 	let offsetsDialogMetric = $state('Altitude');
@@ -63,6 +64,9 @@
 {#if activities.length > 0}
 	<h2 class="pb-1 text-lg">
 		Metrics
+		{#if zoomDomain !== null}
+			<button class="btn btn-ghost btn-xs" onclick={() => (zoomDomain = null)}>Reset zoom</button>
+		{/if}
 		<button class="btn btn-ghost btn-sm" onclick={() => offsetsDialogElement.show()}>
 			<img src="/icons/power.svg" alt="Cog icon" class="h-6 w-6" />
 		</button>
@@ -81,6 +85,7 @@
 				width={chartWidth}
 				height={chartHeight}
 				{offsets}
+				bind:zoomDomain
 			/>
 		{/each}
 	</div>
