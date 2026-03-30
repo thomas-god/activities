@@ -8,6 +8,14 @@ export interface ActivitiesFilters {
 	sportCategories: SportCategory[];
 }
 
+export const emptyFilters = (): ActivitiesFilters => {
+	return {
+		rpe: [],
+		workoutTypes: [],
+		sportCategories: []
+	};
+};
+
 export const filtersFromSearchParams = (params: URLSearchParams): ActivitiesFilters => {
 	const filters: ActivitiesFilters = { rpe: [], workoutTypes: [], sportCategories: [] };
 

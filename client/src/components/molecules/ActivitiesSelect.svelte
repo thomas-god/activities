@@ -4,11 +4,27 @@
 	import { type Activity, type ActivityList } from '$lib/api';
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import { onMount } from 'svelte';
+	import ActivitiesFilters from './ActivitiesFilters.svelte';
+	import { emptyFilters } from '$lib/filters';
 
 	let {
 		activities,
 		selectedActivities = $bindable()
 	}: { activities: ActivityList; selectedActivities: ActivityList } = $props();
+
+	let filteredActivities: ActivityList = $state([]);
+	let filters = $state(emptyFilters());
+	let searchText: null | string = $state(null);
+
+	let activityMatchesSearch = (activity: Activity): boolean => {
+		if (searchText === null || searchText.trim() === '') {
+			return true;
+		}
+		if (activity.name !== null) {
+			return activity.name.includes(searchText.trim());
+		}
+		return false;
+	};
 
 	let selectedIds: string[] = $derived(selectedActivities.map((a) => a.id));
 	onMount(() => {
@@ -47,33 +63,55 @@
 <h2 class="text-lg">Selected activities</h2>
 {#each selectedActivities as activity}
 	<p>
-		{activity.name || activity.sport}
-		<span class="text-sm tracking-wide italic opacity-70"
-			>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
-		>
 		<button
+			class="btn mr-1 btn-xs btn-secondary"
 			onclick={() => {
 				removeActivity(activity);
 			}}>-</button
+		>
+		{activity.name || activity.sport}
+		<span class="text-sm tracking-wide italic opacity-70"
+			>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
 		>
 	</p>
 {:else}
 	<p class="italic">No activity selected</p>
 {/each}
 
-<h2 class="mt-2 text-lg">Available activities</h2>
-<div class="max-h-64 overflow-scroll">
-	{#each activities as activity (activity.id)}
-		{#if !selectedIds.includes(activity.id)}
-			<div>
-				{activity.name || activity.sport}
-				<span class="text-sm tracking-wide italic opacity-70"
-					>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
+<div class="flex flex-row items-center gap-1">
+	<h2 class="text-lg">Available activities</h2>
+	<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
+	<div>
+		<label class="input input-sm">
+			<svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+				<g
+					stroke-linejoin="round"
+					stroke-linecap="round"
+					stroke-width="2.5"
+					fill="none"
+					stroke="currentColor"
 				>
+					<circle cx="11" cy="11" r="8"></circle>
+					<path d="m21 21-4.3-4.3"></path>
+				</g>
+			</svg>
+			<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
+		</label>
+	</div>
+</div>
+<div class="max-h-64 overflow-scroll">
+	{#each filteredActivities as activity (activity.id)}
+		{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
+			<div>
 				<button
+					class="btn mr-1 btn-xs btn-primary"
 					onclick={() => {
 						selectActivity(activity);
 					}}>+</button
+				>
+				{activity.name || activity.sport}
+				<span class="text-sm tracking-wide italic opacity-70"
+					>{formatRelativeDuration(dayjs(activity.start_time), dayjs())}</span
 				>
 			</div>
 		{/if}
