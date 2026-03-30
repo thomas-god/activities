@@ -22,7 +22,7 @@
 			return true;
 		}
 		if (activity.name !== null) {
-			return activity.name.includes(searchText.trim());
+			return activity.name.toLowerCase().includes(searchText.trim().toLowerCase());
 		}
 		return false;
 	};
