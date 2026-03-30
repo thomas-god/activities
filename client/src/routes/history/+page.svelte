@@ -165,9 +165,7 @@
 					/>
 				</div>
 				{#if selectedActivityPromise && screenWidth >= 700}
-					<div
-						class="relative w-full grow basis-0 overflow-auto rounded-box bg-base-100 pt-4 shadow-md"
-					>
+					<div class="relative w-full grow basis-0 overflow-auto pt-4">
 						{#await selectedActivityPromise}
 							<div class="flex items-center justify-center">
 								<span class="loading loading-lg loading-spinner"></span>
