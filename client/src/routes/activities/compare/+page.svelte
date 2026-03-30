@@ -1,6 +1,6 @@
 <script lang="ts">
 	import ActivitiesSelect from '$components/molecules/ActivitiesSelect.svelte';
-	import CompareActivities from '$components/pages/CompareActivities.svelte';
+	import CompareActivities from '$components/organisms/CompareActivities.svelte';
 	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
 	import type { PageProps } from './$types';
 
@@ -20,20 +20,24 @@
 {#await data.activities}
 	<div class="loading-dots"></div>
 {:then activities}
-	<ActivitiesSelect
-		{activities}
-		bind:selectedActivities={
-			() => selectedActivities,
-			(activities) => {
-				selectedActivities = activities;
-				activitiesDetailsPromise = Promise.all(
-					activities.map((activity) => fetchActivityDetails(fetch, activity.id))
-				);
+	<div class="rounded-box bg-base-100 p-4 shadow-md">
+		<ActivitiesSelect
+			{activities}
+			bind:selectedActivities={
+				() => selectedActivities,
+				(activities) => {
+					selectedActivities = activities;
+					activitiesDetailsPromise = Promise.all(
+						activities.map((activity) => fetchActivityDetails(fetch, activity.id))
+					);
+				}
 			}
-		}
-	/>
+		/>
+	</div>
 {/await}
 
 {#if loadedActivities.length > 0}
-	<CompareActivities activities={loadedActivities} />
+	<div class="mt-4 rounded-box bg-base-100 p-4 shadow-md">
+		<CompareActivities activities={loadedActivities} />
+	</div>
 {/if}

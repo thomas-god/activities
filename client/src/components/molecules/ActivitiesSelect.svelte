@@ -61,36 +61,38 @@
 	};
 </script>
 
-<h2 class="text-lg">Selected activities</h2>
-{#each selectedActivities as activity}
-	<div class="flex flex-row items-center gap-2 py-0.5">
-		<div>
-			<img
-				src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-				class="h-6 w-6"
-				alt="Sport icon"
-			/>
+<h2 class="mb-1 text-lg">Selected activities</h2>
+<div class="overflow-scroll">
+	{#each selectedActivities as activity}
+		<div class="flex flex-row items-center gap-2 py-0.5">
+			<div class="shrink-0">
+				<img
+					src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+					class="h-6 w-6"
+					alt="Sport icon"
+				/>
+			</div>
+			<button
+				class="btn mr-1 shrink-0 btn-xs btn-secondary"
+				onclick={() => {
+					removeActivity(activity);
+				}}>-</button
+			>
+			<div class="shrink-0">
+				{activity.name || activity.sport}
+			</div>
+			<div class="shrink-0 text-sm tracking-wide italic opacity-70">
+				{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
+			</div>
 		</div>
-		<button
-			class="btn mr-1 btn-xs btn-secondary"
-			onclick={() => {
-				removeActivity(activity);
-			}}>-</button
-		>
-		<div>
-			{activity.name || activity.sport}
-		</div>
-		<div class="text-sm tracking-wide italic opacity-70">
-			{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
-		</div>
-	</div>
-{:else}
-	<p class="italic">No activity selected</p>
-{/each}
+	{:else}
+		<p class="italic">No activity selected</p>
+	{/each}
+</div>
 
-<div class="flex flex-row items-center">
+<div class="mt-3 mb-1 flex flex-row flex-wrap items-center gap-2">
 	<h2 class="text-lg">Available activities</h2>
-	<div class="pr-1 pl-3">
+	<div class="flex flex-row gap-1">
 		<label class="input input-sm">
 			<svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 				<g
@@ -106,14 +108,14 @@
 			</svg>
 			<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
 		</label>
+		<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
 	</div>
-	<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
 </div>
 <div class="max-h-64 overflow-scroll">
 	{#each filteredActivities as activity (activity.id)}
 		{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
 			<div class="flex flex-row items-center gap-2 py-0.5">
-				<div>
+				<div class="shrink-0">
 					<img
 						src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
 						class="h-6 w-6"
@@ -121,15 +123,15 @@
 					/>
 				</div>
 				<button
-					class="btn mr-1 btn-xs btn-primary"
+					class="btn mr-1 shrink-0 btn-xs btn-primary"
 					onclick={() => {
 						selectActivity(activity);
 					}}>+</button
 				>
-				<div>
+				<div class="shrink-0">
 					{activity.name || activity.sport}
 				</div>
-				<div class="text-sm tracking-wide italic opacity-70">
+				<div class="shrink-0 text-sm tracking-wide italic opacity-70">
 					{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
 				</div>
 			</div>

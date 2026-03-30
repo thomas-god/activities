@@ -53,6 +53,7 @@
 </script>
 
 {#if activities.length > 0}
+	<h2 class="pb-1 text-lg">Metrics</h2>
 	<MetricsMultiSelect
 		availableOptions={possibleMetricOptions}
 		bind:selectedOptions={selectedMetricOptions}
@@ -60,7 +61,7 @@
 	/>
 	<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 		{#each selectedMetricOptions as metric, idx}
-			<h2 class="text-center text-lg">{metric.display}</h2>
+			<h2 class="mt-2 mb-1 text-center text-lg">{metric.display}</h2>
 			<ActivityCompareChart
 				{activities}
 				metric={metric.option}
