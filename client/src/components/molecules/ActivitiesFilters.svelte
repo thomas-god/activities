@@ -9,6 +9,7 @@
 		type SportCategory
 	} from '$lib/sport';
 	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
+	import type { RangeFilter } from '$lib/filters';
 
 	let {
 		activities,
@@ -74,8 +75,51 @@
 		filters = emptyFilters();
 	};
 
+	// Compute per-field min/max from the activity list for placeholder hints
+	let activityDurationRange = $derived.by(() => {
+		const values = activities
+			.map((a) => a.statistics['Duration'])
+			.filter((v): v is number => v !== undefined);
+		if (values.length === 0) return null;
+		return { min: Math.min(...values) / 60, max: Math.max(...values) / 60 };
+	});
+
+	let activityDistanceRange = $derived.by(() => {
+		const values = activities
+			.map((a) => a.statistics['Distance'])
+			.filter((v): v is number => v !== undefined);
+		if (values.length === 0) return null;
+		return { min: Math.min(...values) / 1000, max: Math.max(...values) / 1000 };
+	});
+
+	let activityElevationRange = $derived.by(() => {
+		const values = activities
+			.map((a) => a.statistics['Elevation'])
+			.filter((v): v is number => v !== undefined);
+		if (values.length === 0) return null;
+		return { min: Math.min(...values), max: Math.max(...values) };
+	});
+
+	const setDurationRange = (range: RangeFilter) => {
+		filters = { ...filters, durationRange: range };
+	};
+	const setDistanceRange = (range: RangeFilter) => {
+		filters = { ...filters, distanceRange: range };
+	};
+	const setElevationRange = (range: RangeFilter) => {
+		filters = { ...filters, elevationRange: range };
+	};
+
 	let hasActiveFilters = $derived(
-		filters.rpe.length > 0 || filters.workoutTypes.length > 0 || filters.sportCategories.length > 0
+		filters.rpe.length > 0 ||
+			filters.workoutTypes.length > 0 ||
+			filters.sportCategories.length > 0 ||
+			filters.durationRange.min !== null ||
+			filters.durationRange.max !== null ||
+			filters.distanceRange.min !== null ||
+			filters.distanceRange.max !== null ||
+			filters.elevationRange.min !== null ||
+			filters.elevationRange.max !== null
 	);
 </script>
 
@@ -154,6 +198,132 @@
 								{rpe}
 							</button>
 						{/each}
+					</div>
+				</div>
+
+				<!-- Duration Range Filter -->
+				<div>
+					<div class="mb-2 text-sm font-medium">Duration (minutes)</div>
+					<div class="flex items-center gap-2">
+						<input
+							type="number"
+							min="0"
+							placeholder={activityDurationRange !== null
+								? Math.floor(activityDurationRange.min).toString()
+								: 'Min'}
+							value={filters.durationRange.min !== null ? filters.durationRange.min / 60 : ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setDurationRange({
+									...filters.durationRange,
+									min: isNaN(v) ? null : v * 60
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
+						<span class="text-sm text-base-content/60">—</span>
+						<input
+							type="number"
+							min="0"
+							placeholder={activityDurationRange !== null
+								? Math.ceil(activityDurationRange.max).toString()
+								: 'Max'}
+							value={filters.durationRange.max !== null ? filters.durationRange.max / 60 : ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setDurationRange({
+									...filters.durationRange,
+									max: isNaN(v) ? null : v * 60
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
+					</div>
+				</div>
+
+				<!-- Distance Range Filter -->
+				<div>
+					<div class="mb-2 text-sm font-medium">Distance (km)</div>
+					<div class="flex items-center gap-2">
+						<input
+							type="number"
+							min="0"
+							step="1"
+							placeholder={activityDistanceRange !== null
+								? activityDistanceRange.min.toFixed(0)
+								: 'Min'}
+							value={filters.distanceRange.min !== null
+								? (filters.distanceRange.min / 1000).toFixed(0)
+								: ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setDistanceRange({
+									...filters.distanceRange,
+									min: isNaN(v) ? null : v * 1000
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
+						<span class="text-sm text-base-content/60">—</span>
+						<input
+							type="number"
+							min="0"
+							step="1"
+							placeholder={activityDistanceRange !== null
+								? activityDistanceRange.max.toFixed(0)
+								: 'Max'}
+							value={filters.distanceRange.max !== null
+								? (filters.distanceRange.max / 1000).toFixed(0)
+								: ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setDistanceRange({
+									...filters.distanceRange,
+									max: isNaN(v) ? null : v * 1000
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
+					</div>
+				</div>
+
+				<!-- Elevation Range Filter -->
+				<div>
+					<div class="mb-2 text-sm font-medium">Elevation gained (m)</div>
+					<div class="flex items-center gap-2">
+						<input
+							type="number"
+							min="0"
+							placeholder={activityElevationRange !== null
+								? Math.floor(activityElevationRange.min).toString()
+								: 'Min'}
+							value={filters.elevationRange.min !== null ? filters.elevationRange.min : ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setElevationRange({
+									...filters.elevationRange,
+									min: isNaN(v) ? null : v
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
+						<span class="text-sm text-base-content/60">—</span>
+						<input
+							type="number"
+							min="0"
+							placeholder={activityElevationRange !== null
+								? Math.ceil(activityElevationRange.max).toString()
+								: 'Max'}
+							value={filters.elevationRange.max !== null ? filters.elevationRange.max : ''}
+							oninput={(e) => {
+								const v = e.currentTarget.valueAsNumber;
+								setElevationRange({
+									...filters.elevationRange,
+									max: isNaN(v) ? null : v
+								});
+							}}
+							class="input-bordered input input-sm w-28"
+						/>
 					</div>
 				</div>
 
