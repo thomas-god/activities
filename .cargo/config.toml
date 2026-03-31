@@ -1,4 +1,4 @@
 [env]
 SERVER_PORT="3001"
-ALLOW_ORIGIN="http://127.0.0.1:5173"
+ALLOW_ORIGIN="http://localhost:5173"
 ACTIVITIES_DATA_PATH="./data"
