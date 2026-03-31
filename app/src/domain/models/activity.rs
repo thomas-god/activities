@@ -797,6 +797,7 @@ pub enum Unit {
     RevolutionPerMinute,
     Second,
     NumberOfActivities,
+    Degree,
 }
 
 impl fmt::Display for Unit {
@@ -814,6 +815,7 @@ impl fmt::Display for Unit {
             Self::RevolutionPerMinute => "rpm",
             Self::Second => "s",
             Self::NumberOfActivities => "activities",
+            Self::Degree => "°",
         };
 
         write!(f, "{}", unit)
@@ -1015,6 +1017,8 @@ pub enum TimeseriesMetric {
     Cadence,
     Altitude,
     Pace,
+    Latitude,
+    Longitude,
 }
 
 impl ToUnit for TimeseriesMetric {
@@ -1027,6 +1031,8 @@ impl ToUnit for TimeseriesMetric {
             Self::Altitude => Unit::Meter,
             Self::Cadence => Unit::RevolutionPerMinute,
             Self::Pace => Unit::SecondPerMeter,
+            Self::Latitude => Unit::Degree,
+            Self::Longitude => Unit::Degree,
         }
     }
 }

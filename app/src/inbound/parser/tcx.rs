@@ -124,6 +124,8 @@ fn parse_timeseries(
     let mut distance_values = vec![];
     let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
+    let mut latitude_values = vec![];
+    let mut longitude_values = vec![];
 
     for node in doc.descendants() {
         if !node.has_tag_name("Trackpoint") {
@@ -142,6 +144,32 @@ fn parse_timeseries(
             continue;
         };
         time_values.push(time);
+
+        let latitude = node
+            .descendants()
+            .find_map(|elem| {
+                if !elem.has_tag_name("Position") {
+                    return None;
+                }
+                elem.children()
+                    .find(|child| child.has_tag_name("LatitudeDegrees"))
+            })
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        latitude_values.push(latitude);
+
+        let longitude = node
+            .descendants()
+            .find_map(|elem| {
+                if !elem.has_tag_name("Position") {
+                    return None;
+                }
+                elem.children()
+                    .find(|child| child.has_tag_name("LongitudeDegrees"))
+            })
+            .and_then(|elem| elem.text().and_then(|txt| txt.parse::<f64>().ok()))
+            .map(TimeseriesValue::Float);
+        longitude_values.push(longitude);
 
         let speed = node
             .descendants()
@@ -200,6 +228,8 @@ fn parse_timeseries(
         Timeseries::new(TimeseriesMetric::Power, power_values),
         Timeseries::new(TimeseriesMetric::Cadence, cadence_values),
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
+        Timeseries::new(TimeseriesMetric::Longitude, longitude_values),
+        Timeseries::new(TimeseriesMetric::Latitude, latitude_values),
     ];
 
     // TCX does not support pauses, so active time = time
@@ -577,6 +607,32 @@ mod test_txc_parser {
                 Some(TimeseriesValue::Float(100.)),
                 Some(TimeseriesValue::Float(100.)),
                 Some(TimeseriesValue::Float(100.))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Latitude)
+                .expect("Should have a Latitude timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(0.0))
+            ]
+        );
+        assert_eq!(
+            timeseries
+                .metrics()
+                .iter()
+                .find(|metric| metric.metric() == &TimeseriesMetric::Longitude)
+                .expect("Should have a Longitude timeseries")
+                .values(),
+            &vec![
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(0.0)),
+                Some(TimeseriesValue::Float(0.0))
             ]
         );
     }

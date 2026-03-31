@@ -136,6 +136,8 @@ fn extract_timeseries(
     let mut distance_values = vec![];
     let mut altitude_values = vec![];
     let mut heart_rate_values = vec![];
+    let mut latitude_values = vec![];
+    let mut longitude_values = vec![];
 
     let mut laps = vec![];
 
@@ -290,6 +292,38 @@ fn extract_timeseries(
             _ => None,
         });
         altitude_values.push(altitude);
+
+        let latitude = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::PositionLat) => field.values.iter().find_map(|val| {
+                if val.is_invalid() {
+                    return None;
+                }
+                match val {
+                    DataValue::Sint32(latitude) => Some(TimeseriesValue::Float(
+                        (*latitude as f64) * 180. / (2.0 as f64).powi(31),
+                    )),
+                    _ => None,
+                }
+            }),
+            _ => None,
+        });
+        latitude_values.push(latitude);
+
+        let longitude = message.fields.iter().find_map(|field| match field.kind {
+            FitField::Record(RecordField::PositionLong) => field.values.iter().find_map(|val| {
+                if val.is_invalid() {
+                    return None;
+                }
+                match val {
+                    DataValue::Sint32(longitude) => Some(TimeseriesValue::Float(
+                        (*longitude as f64) * 180. / (2.0 as f64).powi(31),
+                    )),
+                    _ => None,
+                }
+            }),
+            _ => None,
+        });
+        longitude_values.push(longitude);
     }
 
     let metrics = vec![
@@ -300,6 +334,8 @@ fn extract_timeseries(
         Timeseries::new(TimeseriesMetric::Power, power_values),
         Timeseries::new(TimeseriesMetric::Cadence, cadence_values),
         Timeseries::new(TimeseriesMetric::Altitude, altitude_values),
+        Timeseries::new(TimeseriesMetric::Longitude, longitude_values),
+        Timeseries::new(TimeseriesMetric::Latitude, latitude_values),
     ];
 
     ActivityTimeseries::new(
@@ -1148,5 +1184,137 @@ mod tests {
                 Lap::new(3683, 3983),
             ]
         );
+    }
+
+    #[test]
+    fn test_extract_timeseries_latitude_longitude_conversion() {
+        // Sint32 value 536870912 == 2^29, converts to 45.0 degrees
+        // Sint32 value -536870912 converts to -45.0 degrees
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Record,
+            fields: vec![
+                DataMessageField {
+                    kind: FitField::Record(RecordField::Timestamp),
+                    values: vec![DataValue::DateTime(10)],
+                },
+                DataMessageField {
+                    kind: FitField::Record(RecordField::PositionLat),
+                    values: vec![DataValue::Sint32(536870912)],
+                },
+                DataMessageField {
+                    kind: FitField::Record(RecordField::PositionLong),
+                    values: vec![DataValue::Sint32(-536870912)],
+                },
+            ],
+        }];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages).unwrap();
+
+        let latitude = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                TimeseriesMetric::Latitude => Some(metric.values()),
+                _ => None,
+            })
+            .unwrap();
+
+        let longitude = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                TimeseriesMetric::Longitude => Some(metric.values()),
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(
+            *latitude.first().unwrap(),
+            Some(TimeseriesValue::Float(45.0))
+        );
+        assert_eq!(
+            *longitude.first().unwrap(),
+            Some(TimeseriesValue::Float(-45.0))
+        );
+    }
+
+    #[test]
+    fn test_extract_timeseries_skip_invalid_latitude_longitude_values() {
+        // i32::MAX (0x7FFFFFFF) is the FIT invalid sentinel for Sint32 fields
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::PositionLat),
+                        values: vec![DataValue::Sint32(536870912)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::PositionLong),
+                        values: vec![DataValue::Sint32(-536870912)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Record,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::Timestamp),
+                        values: vec![DataValue::DateTime(11)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::PositionLat),
+                        values: vec![DataValue::Sint32(i32::MAX)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Record(RecordField::PositionLong),
+                        values: vec![DataValue::Sint32(i32::MAX)],
+                    },
+                ],
+            },
+        ];
+        let reference = 10;
+
+        let timeseries = extract_timeseries(reference, &messages).unwrap();
+
+        let latitude = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                TimeseriesMetric::Latitude => Some(metric.values()),
+                _ => None,
+            })
+            .unwrap();
+
+        let longitude = timeseries
+            .metrics()
+            .iter()
+            .find_map(|metric| match metric.metric() {
+                TimeseriesMetric::Longitude => Some(metric.values()),
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(timeseries.time().len(), 2);
+
+        assert_eq!(
+            *latitude.first().unwrap(),
+            Some(TimeseriesValue::Float(45.0))
+        );
+        assert_eq!(*latitude.get(1).unwrap(), None);
+
+        assert_eq!(
+            *longitude.first().unwrap(),
+            Some(TimeseriesValue::Float(-45.0))
+        );
+        assert_eq!(*longitude.get(1).unwrap(), None);
     }
 }
