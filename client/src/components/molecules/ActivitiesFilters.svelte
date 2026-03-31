@@ -8,7 +8,7 @@
 		sportCategoryIcons,
 		type SportCategory
 	} from '$lib/sport';
-	import { filterActivities, type ActivitiesFilters } from '$lib/filters';
+	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
 
 	let {
 		activities,
@@ -71,11 +71,7 @@
 	};
 
 	const clearFilters = () => {
-		filters = {
-			rpe: [],
-			sportCategories: [],
-			workoutTypes: []
-		};
+		filters = emptyFilters();
 	};
 
 	let hasActiveFilters = $derived(
