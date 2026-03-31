@@ -13,6 +13,7 @@
 	import ActivityLaps from '$components/organisms/ActivityLaps.svelte';
 	import ActivityHeader from '$components/organisms/ActivityHeader.svelte';
 	import PowerCurve from '$components/organisms/PowerCurve.svelte';
+	import ActivityMap from '$components/organisms/ActivityMap.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
 	import type { Nutrition } from '$lib/nutrition';
@@ -52,6 +53,12 @@
 			return 400;
 		}
 	});
+
+	let hasGpsData = $derived(
+		'Latitude' in activity.timeseries.metrics &&
+			'Longitude' in activity.timeseries.metrics &&
+			activity.timeseries.metrics['Latitude'].values.some((v) => v !== null)
+	);
 
 	let active_metrics = $derived(convertTimeseriesToActiveTime(activity.timeseries));
 	let active_distance = $derived(
@@ -303,6 +310,17 @@
 			<ActivityLaps {activity} bind:selectedLap {onLapSelectedCallback} />
 		</div>
 	</details>
+
+	{#if hasGpsData}
+		<details class={`collapse-arrow collapse ${sectionClass}`} open>
+			<summary class="collapse-title text-lg font-semibold">Map</summary>
+			<div class="collapse-content px-0">
+				<div class="h-80 px-2 pb-2">
+					<ActivityMap timeseries={activity.timeseries} />
+				</div>
+			</div>
+		</details>
+	{/if}
 
 	{#if hasPowerData}
 		<details class={`collapse-arrow collapse ${sectionClass}`} open>
