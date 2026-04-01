@@ -152,7 +152,7 @@
 </script>
 
 {#if laps.length > 0}
-	<div class="overflow-x-auto px-4 pb-4">
+	<div class="overflow-x-auto">
 		<table class="table w-full table-zebra table-sm" onmouseleave={() => (selectedLap = null)}>
 			<thead>
 				<tr>

@@ -333,8 +333,7 @@
 
 	<details class={`collapse-arrow collapse ${sectionClass}`} open>
 		<summary class="collapse-title text-lg font-semibold">Laps</summary>
-		<div class="collapse-content">
-			<!-- TODO: no y scroll ? -->
+		<div class="collapse-content overflow-x-scroll">
 			<ActivityLaps {activity} bind:selectedLap {onLapSelectedCallback} />
 		</div>
 	</details>
