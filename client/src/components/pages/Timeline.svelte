@@ -65,7 +65,9 @@
 	<div class="flex flex-col gap-0">
 		{#each timelineByMonth as [month, items]}
 			<div class="flex flex-col">
-				<div class="my-3 text-xs font-semibold tracking-wide text-base-content/60 uppercase">
+				<div
+					class="sticky top-0 bg-base-100 py-2 text-xs font-semibold tracking-wide text-base-content/60 uppercase"
+				>
 					{month} - {items.filter((item) => item.type === 'activity').length} activities
 				</div>
 				{#each items as item}
