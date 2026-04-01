@@ -8,11 +8,18 @@
 	interface Props {
 		activity: Activity;
 		onEditNameCallback: (newName: string) => Promise<void>;
+		onDownloadCallback: () => Promise<void>;
 		onDeleteClickedCallback: () => void;
 		compact?: boolean;
 	}
 
-	let { activity, onEditNameCallback, onDeleteClickedCallback, compact = false }: Props = $props();
+	let {
+		activity,
+		onEditNameCallback,
+		onDeleteClickedCallback,
+		onDownloadCallback,
+		compact = false
+	}: Props = $props();
 
 	let title = $derived(
 		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
@@ -62,6 +69,11 @@
 					tabindex="0"
 					class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
 				>
+					<li>
+						<button onclick={onDownloadCallback}>
+							<img src="/icons/download.svg" alt="Download arrow icon" class="h-6 w-6" /> Download
+						</button>
+					</li>
 					<li>
 						<button onclick={onDeleteClickedCallback} class="text-error">
 							<img src="/icons/delete.svg" alt="Bin delete icon" class="h-6 w-6" /> Delete Activity

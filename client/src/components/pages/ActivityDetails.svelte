@@ -104,6 +104,33 @@
 		});
 	});
 
+	const onDownloadCallback = async (): Promise<void> => {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}/download`, {
+			method: 'GET',
+			mode: 'cors',
+			credentials: 'include'
+		});
+		if (response.status === 401) {
+			goto('/login');
+			throw new Error('Unauthorized');
+		}
+
+		if (!response.ok) {
+			throw new Error('Failed to download activities');
+		}
+
+		const disposition = response.headers.get('Content-Disposition');
+		const filename = disposition?.match(/filename="([^"]+)"/)?.[1] ?? activity.name ?? activity.id;
+
+		const blob = await response.blob();
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
 	const deleteActivityCallback = async (): Promise<void> => {
 		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}`, {
 			method: 'DELETE',
@@ -247,6 +274,7 @@
 		{activity}
 		onEditNameCallback={updateActivityNameCallback}
 		onDeleteClickedCallback={openDeleteModal}
+		{onDownloadCallback}
 		{compact}
 	/>
 
