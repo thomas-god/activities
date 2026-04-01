@@ -5,10 +5,12 @@
 
 	let {
 		activityList,
+		onActivitySelected,
 		currentMonth = dayjs().startOf('month'),
 		onMonthChange
 	}: {
 		activityList: ActivityList;
+		onActivitySelected: (id: string) => void;
 		currentMonth?: ReturnType<typeof dayjs>;
 		onMonthChange?: (month: ReturnType<typeof dayjs>) => void;
 	} = $props();
@@ -181,21 +183,21 @@
 				<!-- Mobile: Show only colored dots -->
 				<div class="flex flex-wrap gap-0.5 sm:hidden">
 					{#each day.activities.slice(0, 6) as activity}
-						<a
-							href={`/activity/${activity.id}`}
-							class={`activity-dot h-2 w-2 rounded-full ${activitySportCategoryClass(activity.sport_category)}`}
+						<button
+							onclick={() => onActivitySelected(activity.id)}
+							class={`activity-dot h-2 w-2 cursor-pointer rounded-full ${activitySportCategoryClass(activity.sport_category)}`}
 							title={activity.name || sportDisplay(activity.sport)}
 							aria-label={activity.name || sportDisplay(activity.sport)}
-						></a>
+						></button>
 					{/each}
 				</div>
 
 				<!-- Desktop: Show activity details -->
 				<div class="hidden flex-col gap-1 sm:flex">
 					{#each day.activities.slice(0, 3) as activity}
-						<a
-							href={`/activity/${activity.id}`}
-							class={`activity-details flex items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
+						<button
+							onclick={() => onActivitySelected(activity.id)}
+							class={`activity-details flex cursor-pointer items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 						>
 							<span class="text-base leading-none">
 								<img
@@ -210,7 +212,7 @@
 							<span class="text-xs opacity-60">
 								{formatDuration(activity.statistics['Duration'] ?? 0)}
 							</span>
-						</a>
+						</button>
 					{/each}
 					{#if day.activities.length > 3}
 						<div class="px-2 text-xs opacity-60">+{day.activities.length - 3} more</div>
@@ -222,7 +224,7 @@
 
 	<!-- Mobile: Selected Day Activities Card -->
 	{#if selectedDay}
-		<div class="mt-4 rounded-lg bg-base-200 p-4 sm:hidden">
+		<div class="mt-4 rounded-lg bg-base-200 p-4">
 			<div class="mb-3 flex items-center justify-between">
 				<h3 class="text-base font-semibold">
 					{dayjs(selectedDay).format('dddd, MMMM D')}
@@ -238,9 +240,9 @@
 			{#if selectedDayActivities.length > 0}
 				<div class="flex flex-col gap-2">
 					{#each selectedDayActivities as activity}
-						<a
-							href={`/activity/${activity.id}`}
-							class={`activity-card flex items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
+						<button
+							onclick={() => onActivitySelected(activity.id)}
+							class={`activity-card flex cursor-pointer items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 						>
 							<span class="text-2xl leading-none">
 								<img
@@ -260,7 +262,7 @@
 								</div>
 							</div>
 							<span class="text-lg opacity-40">›</span>
-						</a>
+						</button>
 					{/each}
 				</div>
 			{:else}
