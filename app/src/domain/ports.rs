@@ -317,6 +317,29 @@ impl ListActivitiesFilters {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct GetRawActivityRequest {
+    activity: ActivityId,
+    user: UserId,
+}
+
+impl GetRawActivityRequest {
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum GetRawActivityError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct GetAllActivitiesRequest {
     user: UserId,
 }
@@ -340,6 +363,10 @@ impl RawActivity {
 
     pub fn content(&self) -> &[u8] {
         &self.content
+    }
+
+    pub fn as_vec(self) -> Vec<u8> {
+        self.content
     }
 }
 
@@ -435,7 +462,12 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         req: DeleteActivityRequest,
     ) -> impl Future<Output = Result<(), DeleteActivityError>> + Send;
 
-    fn get_all_activities(
+    fn get_raw_activity(
+        &self,
+        req: GetRawActivityRequest,
+    ) -> impl Future<Output = Result<RawActivity, GetRawActivityError>> + Send;
+
+    fn get_all_raw_activities(
         &self,
         req: GetAllActivitiesRequest,
     ) -> impl Future<Output = Result<Vec<RawActivity>, GetAllActivitiesError>> + Send;
@@ -542,6 +574,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
+
+    fn get_raw_activity(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+    ) -> impl Future<Output = Result<RawActivity, GetRawActivityError>> + Send;
 
     fn list_all_raw_activities(
         &self,

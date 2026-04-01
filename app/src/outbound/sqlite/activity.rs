@@ -15,9 +15,9 @@ use crate::{
             },
         },
         ports::{
-            ActivityRepository, DateTimeRange, ListActivitiesError, ListActivitiesFilters,
-            RawActivity, RawDataRepository, SaveActivityError, SimilarActivityError,
-            UpdateActivityMetricError,
+            ActivityRepository, DateTimeRange, GetRawActivityError, ListActivitiesError,
+            ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
+            SimilarActivityError, UpdateActivityMetricError,
         },
     },
     inbound::parser::ParseFile,
@@ -247,6 +247,38 @@ where
                     )
                     .collect()
             })
+    }
+
+    async fn get_raw_activity(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+    ) -> Result<RawActivity, GetRawActivityError> {
+        let Some(_) = sqlx::query_as::<_, (ActivityId,)>(
+            "SELECT id
+            FROM t_activities
+            WHERE user_id = ?1 and id = ?2
+            LIMIT 1;",
+        )
+        .bind(user)
+        .bind(activity)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|err| GetRawActivityError::Unknown(anyhow!(err)))?
+        else {
+            return Err(GetRawActivityError::ActivityDoesNotExist(activity.clone()));
+        };
+
+        let content = self
+            .raw_data_repository
+            .get_raw_data(activity)
+            .await
+            .map_err(|err| GetRawActivityError::Unknown(anyhow!(err)))?;
+
+        Ok(RawActivity::new(
+            format!("{}.{}", activity, content.extension()),
+            content.raw_content(),
+        ))
     }
 
     async fn list_all_raw_activities(
@@ -2652,6 +2684,119 @@ mod test_sqlite_activity_repository {
                 .unwrap(),
                 0
             );
+        }
+    }
+
+    mod test_sqlite_activity_repository_get_raw_activity {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_get_raw_activity() {
+            let db_file = NamedTempFile::new().unwrap();
+            let mut raw_data_repository = MockRawDataRepository::new();
+            raw_data_repository
+                .expect_get_raw_data()
+                .times(1)
+                .returning(|_| Ok(RawContent::new("fit".to_string(), vec![0, 1, 2])));
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = build_activity_with_timeseries();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Insertion should have succeed");
+
+            let res = repository
+                .get_raw_activity(activity.user(), activity.id())
+                .await
+                .expect("Should not err");
+            assert_eq!(res.name(), format!("{}.fit", &activity.id()));
+            assert_eq!(res.content(), &[0, 1, 2]);
+        }
+
+        #[tokio::test]
+        async fn test_get_raw_activity_activity_does_not_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let Err(GetRawActivityError::ActivityDoesNotExist(id)) = repository
+                .get_raw_activity(&UserId::from("test_user"), &ActivityId::from("test_id"))
+                .await
+            else {
+                unreachable!("Should Err(GetRawActivityError::ActivityDoesNotExist(id))")
+            };
+            assert_eq!(id, ActivityId::from("test_id"))
+        }
+
+        #[tokio::test]
+        async fn test_get_raw_activity_activity_does_not_exist_for_that_user() {
+            let db_file = NamedTempFile::new().unwrap();
+            let raw_data_repository = MockRawDataRepository::new();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = build_activity_with_timeseries();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Insertion should have succeed");
+
+            let Err(GetRawActivityError::ActivityDoesNotExist(id)) = repository
+                .get_raw_activity(&UserId::from("another_user"), activity.id())
+                .await
+            else {
+                unreachable!("Should Err(GetRawActivityError::ActivityDoesNotExist(id))")
+            };
+            assert_eq!(id, *activity.id())
+        }
+
+        #[tokio::test]
+        async fn test_get_raw_activity_activity_raw_file_does_not_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let mut raw_data_repository = MockRawDataRepository::new();
+            raw_data_repository
+                .expect_get_raw_data()
+                .times(1)
+                .returning(|_| Err(GetRawDataError::Unknown));
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                raw_data_repository,
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = build_activity_with_timeseries();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Insertion should have succeed");
+
+            let Err(GetRawActivityError::Unknown(_err)) = repository
+                .get_raw_activity(activity.user(), activity.id())
+                .await
+            else {
+                unreachable!("Should Err(GetRawActivityError::Unknown(_))")
+            };
         }
     }
 }

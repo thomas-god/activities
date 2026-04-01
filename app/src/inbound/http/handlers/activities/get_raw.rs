@@ -1,4 +1,5 @@
 use axum::body::Body;
+use axum::extract::{Path, Query};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::{
     Extension,
@@ -8,6 +9,8 @@ use axum::{
 };
 use std::io::Write;
 
+use crate::domain::models::activity::ActivityId;
+use crate::domain::ports::{GetRawActivityError, GetRawActivityRequest};
 use crate::{
     domain::ports::{
         GetAllActivitiesRequest, IActivityService, IPreferencesService, ITrainingService,
@@ -21,7 +24,7 @@ use crate::{
     },
 };
 
-pub async fn get_all_activities<
+pub async fn get_all_raw_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
@@ -35,7 +38,7 @@ pub async fn get_all_activities<
 
     let activities = state
         .activity_service
-        .get_all_activities(request)
+        .get_all_raw_activities(request)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -69,6 +72,47 @@ pub async fn get_all_activities<
     Ok(response)
 }
 
+pub async fn get_raw_activity<
+    AS: IActivityService,
+    PF: ParseFile,
+    TMS: ITrainingService,
+    UR: IUserService,
+    PS: IPreferencesService,
+>(
+    Extension(user): Extension<AuthenticatedUser>,
+    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    Path(activity): Path<String>,
+) -> Result<Response, StatusCode> {
+    let request = GetRawActivityRequest::new(ActivityId::from(&activity), user.user().clone());
+
+    let activity = state
+        .activity_service
+        .get_raw_activity(request)
+        .await
+        .map_err(|err| match err {
+            GetRawActivityError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            GetRawActivityError::ActivityDoesNotExist(_) => StatusCode::NOT_FOUND,
+        })?;
+
+    let content_type = if activity.name().ends_with(".tcx") {
+        "application/xml"
+    } else {
+        "application/octet-stream"
+    };
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, content_type)
+        .header(
+            CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", activity.name()),
+        )
+        .body(Body::from(activity.as_vec()))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(response)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,12 +131,14 @@ mod tests {
         let authenticated_user = AuthenticatedUser::new(user.clone());
 
         let mut activity_service = MockActivityService::new();
-        activity_service.expect_get_all_activities().returning(|_| {
-            Ok(vec![
-                RawActivity::new("activity1.fit".to_string(), vec![1, 2, 3]),
-                RawActivity::new("activity2.tcx".to_string(), vec![4, 5, 6]),
-            ])
-        });
+        activity_service
+            .expect_get_all_raw_activities()
+            .returning(|_| {
+                Ok(vec![
+                    RawActivity::new("activity1.fit".to_string(), vec![1, 2, 3]),
+                    RawActivity::new("activity2.tcx".to_string(), vec![4, 5, 6]),
+                ])
+            });
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
@@ -103,7 +149,7 @@ mod tests {
             cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
-        let response = get_all_activities(Extension(authenticated_user), State(state))
+        let response = get_all_raw_activities(Extension(authenticated_user), State(state))
             .await
             .unwrap();
 
@@ -123,11 +169,13 @@ mod tests {
         let authenticated_user = AuthenticatedUser::new(user.clone());
 
         let mut activity_service = MockActivityService::new();
-        activity_service.expect_get_all_activities().returning(|_| {
-            Err(crate::domain::ports::GetAllActivitiesError::Unknown(
-                anyhow::anyhow!("error"),
-            ))
-        });
+        activity_service
+            .expect_get_all_raw_activities()
+            .returning(|_| {
+                Err(crate::domain::ports::GetAllActivitiesError::Unknown(
+                    anyhow::anyhow!("error"),
+                ))
+            });
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
@@ -138,7 +186,7 @@ mod tests {
             cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
-        let result = get_all_activities(Extension(authenticated_user), State(state)).await;
+        let result = get_all_raw_activities(Extension(authenticated_user), State(state)).await;
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -151,7 +199,7 @@ mod tests {
 
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_get_all_activities()
+            .expect_get_all_raw_activities()
             .returning(|_| Ok(vec![]));
 
         let state = AppState {
@@ -163,7 +211,7 @@ mod tests {
             cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
-        let response = get_all_activities(Extension(authenticated_user), State(state))
+        let response = get_all_raw_activities(Extension(authenticated_user), State(state))
             .await
             .unwrap();
 

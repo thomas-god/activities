@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use axum::extract::DefaultBodyLimit;
-use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
+use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderValue, Method};
 
 use axum::routing::{delete, get, patch};
@@ -20,11 +20,11 @@ use handlers::{
     compute_training_metric_values, create_training_metric, create_training_note,
     create_training_period, delete_activity, delete_preference, delete_training_metric,
     delete_training_note, delete_training_period, get_active_training_periods, get_activity,
-    get_all_activities, get_all_preferences, get_preference, get_training_metric_values,
-    get_training_metrics, get_training_metrics_ordering, get_training_note, get_training_notes,
-    get_training_period, get_training_period_metrics, get_training_period_notes,
-    get_training_periods, list_activities, patch_activity, set_preference,
-    set_training_metrics_ordering, update_training_metric, update_training_note,
+    get_all_preferences, get_all_raw_activities, get_preference, get_raw_activity,
+    get_training_metric_values, get_training_metrics, get_training_metrics_ordering,
+    get_training_note, get_training_notes, get_training_period, get_training_period_metrics,
+    get_training_period_notes, get_training_periods, list_activities, patch_activity,
+    set_preference, set_training_metrics_ordering, update_training_metric, update_training_note,
     update_training_period, upload_activities,
 };
 
@@ -137,7 +137,8 @@ impl<
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()
-                .allow_headers([CONTENT_TYPE, COOKIE, SET_COOKIE])
+                .allow_headers([CONTENT_TYPE, COOKIE, SET_COOKIE, CONTENT_DISPOSITION])
+                .expose_headers([CONTENT_DISPOSITION])
                 .allow_origin([origin])
                 .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
                 .allow_credentials(true),
@@ -187,7 +188,11 @@ fn core_routes<
         .route("/activities", get(list_activities::<AS, PF, TS, US, PS>))
         .route(
             "/activities/download",
-            get(get_all_activities::<AS, PF, TS, US, PS>),
+            get(get_all_raw_activities::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/activity/{activity_id}/download",
+            get(get_raw_activity::<AS, PF, TS, US, PS>),
         )
         .route(
             "/activity/{activity_id}",
