@@ -5,7 +5,11 @@
 	import type { PageProps } from './$types';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
-	import { fetchActivityDetails, type ActivityWithTimeseries } from '$lib/api/activities';
+	import {
+		fetchActivityDetails,
+		type ActivityList,
+		type ActivityWithTimeseries
+	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 
@@ -32,6 +36,14 @@
 		selectedActivityId = activityId;
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
+
+	let activities: ActivityList = $state([]);
+
+	$effect(() => {
+		// No direct let activities = $derived(await data.activities), as we could not reactivelly
+		// udpate activities locally
+		data.activities.then((a) => (activities = a));
+	});
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -85,11 +97,11 @@
 
 	<div class="item history">
 		<div>
-			{#await data.activitiesWithNotes}
+			{#await Promise.all([data.activities, data.notes])}
 				<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
 					<div class="loading loading-bars"></div>
 				</div>
-			{:then [activities, notes]}
+			{:then [_, notes]}
 				<PastActivitiesList
 					activityList={activities}
 					trainingNotes={notes}
@@ -119,8 +131,11 @@
 						>
 						<ActivityDetails
 							{activity}
-							onActivityUpdated={() => {
-								invalidate('app:activities');
+							onActivityUpdated={(updatedActivity) => {
+								const idx = activities.findIndex((activity) => activity.id === updatedActivity.id);
+								if (idx > -1) {
+									activities[idx] = updatedActivity;
+								}
 							}}
 							onActivityDeleted={() => {
 								invalidate('app:activities');

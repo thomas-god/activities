@@ -26,6 +26,10 @@
 		(page.url.searchParams.get('view') === 'calendar' ? 'calendar' : 'list') as 'list' | 'calendar'
 	);
 
+	let activities: ActivityList = $state([]);
+	$effect(() => {
+		data.activities.then((a) => (activities = a));
+	});
 	let filteredActivities: ActivityList = $state([]);
 	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
 
@@ -86,15 +90,17 @@
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
-	const handleActivityDeleted = () => {
+	const handleActivityDeleted = (activiyId: string) => {
 		selectedActivityId = null;
 		selectedActivityPromise = null;
-		invalidate('app:activities');
+		activities = activities.filter((activity) => activity.id !== activiyId);
 	};
 
-	const handleActivityUpdated = (activityId: string) => {
-		invalidate('app:activities');
-		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
+	const handleActivityUpdated = (updatedActivity: ActivityWithTimeseries) => {
+		let idx = activities.findIndex((activity) => activity.id === updatedActivity.id);
+		if (idx > -1) {
+			activities[idx] = updatedActivity;
+		}
 	};
 
 	const handleDownloadClick = () => {
@@ -125,7 +131,7 @@
 					<span class="ml-1 hidden sm:inline">Calendar</span>
 				</button>
 			</div>
-			{#await data.activities then activities}
+			{#await data.activities then _}
 				<ActivitiesFiltersComponent
 					{activities}
 					bind:filteredActivities
@@ -153,7 +159,7 @@
 		<div class="flex w-full flex-col items-center p-4 pt-6">
 			<div class="loading loading-bars"></div>
 		</div>
-	{:then [activities, notes]}
+	{:then [_, notes]}
 		{#if viewMode === 'list'}
 			<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
 				<div class="grow basis-0 overflow-y-auto">
@@ -177,8 +183,8 @@
 								>
 								<ActivityDetails
 									activity={selectedActivity}
-									onActivityUpdated={() => handleActivityUpdated(selectedActivity.id)}
-									onActivityDeleted={handleActivityDeleted}
+									onActivityUpdated={handleActivityUpdated}
+									onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
 									compact={true}
 								/>
 							{:else}

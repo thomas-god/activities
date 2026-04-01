@@ -1,9 +1,5 @@
 import type { PageLoad } from './$types';
-import {
-	fetchTrainingPeriodDetails,
-	type TrainingPeriodDetails,
-	type TrainingPeriodActivityItem
-} from '$lib/api';
+import { fetchTrainingPeriodDetails, type TrainingPeriodDetails, type Activity } from '$lib/api';
 import {
 	fetchTrainingPeriodNotes,
 	fetchTrainingPeriodMetrics,
@@ -22,5 +18,3 @@ export const load: PageLoad = async ({ fetch, params, depends }) => {
 
 export const prerender = false;
 export const ssr = false;
-
-export type { TrainingPeriodDetails, TrainingPeriodActivityItem, TrainingNote };

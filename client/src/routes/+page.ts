@@ -10,10 +10,8 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 	const endDate = dayjs().add(1, 'day').endOf('day').toDate();
 
 	return {
-		activitiesWithNotes: Promise.all([
-			fetchActivities(fetch, undefined, startDate, endDate),
-			fetchTrainingNotes(fetch, depends, startDate, endDate)
-		]),
+		activities: fetchActivities(fetch, undefined, startDate, endDate),
+		notes: fetchTrainingNotes(fetch, depends, startDate, endDate),
 		metrics: fetchTrainingMetrics(fetch, startDate, undefined, 'global'),
 		trainingPeriods: fetchActiveTrainingPeriods(fetch, new Date())
 	};

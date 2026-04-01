@@ -3,7 +3,6 @@
 	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
 	import type { PageProps } from './$types';
-	import type { TrainingPeriodDetails } from './+page';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
@@ -30,6 +29,7 @@
 	} from '$lib/filters';
 	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
+	import type { TrainingPeriodDetails } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -49,6 +49,10 @@
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
 
+	let activities: ActivityList = $state([]);
+	$effect(() => {
+		data.periodDetails.then((details) => (activities = details!.activities));
+	});
 	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
 	let filteredActivities: ActivityList = $state([]);
 
@@ -227,10 +231,17 @@
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
-	const handleActivityDeleted = (periodId: string) => {
+	const handleActivityDeleted = (activiyId: string) => {
 		selectedActivityId = null;
 		selectedActivityPromise = null;
-		invalidate(`app:training-period:${periodId}`);
+		activities = activities.filter((activity) => activity.id !== activiyId);
+	};
+
+	const handleActivityUpdated = (updatedActivity: ActivityWithTimeseries) => {
+		let idx = activities.findIndex((activity) => activity.id === updatedActivity.id);
+		if (idx > -1) {
+			activities[idx] = updatedActivity;
+		}
 	};
 
 	const openMetricsOrderingDialog = () => {
@@ -424,10 +435,8 @@
 								>
 								<ActivityDetails
 									activity={selectedActivity}
-									onActivityUpdated={() => {
-										invalidate(`app:training-period:${periodDetails.id}`);
-									}}
-									onActivityDeleted={() => handleActivityDeleted(periodDetails.id)}
+									onActivityUpdated={handleActivityUpdated}
+									onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
 									compact={true}
 								/>
 							</div>
@@ -457,7 +466,7 @@
 					<div class="mb-4 flex items-center justify-between">
 						<h2 class="text-lg font-semibold">Activities & Notes</h2>
 						<ActivitiesFiltersComponent
-							activities={periodDetails.activities}
+							{activities}
 							bind:filteredActivities
 							showLabel={false}
 							bind:filters={

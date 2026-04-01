@@ -22,7 +22,7 @@
 
 	interface Props {
 		activity: ActivityWithTimeseries;
-		onActivityUpdated: () => void;
+		onActivityUpdated: (updatedActivity: ActivityWithTimeseries) => void;
 		onActivityDeleted: () => void;
 		compact?: boolean;
 	}
@@ -170,7 +170,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.name = newName;
-			onActivityUpdated();
+			onActivityUpdated(activity);
 		}
 	};
 
@@ -188,7 +188,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.rpe = newRpe;
-			onActivityUpdated();
+			onActivityUpdated(activity);
 		}
 	};
 
@@ -209,7 +209,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.workout_type = newWorkoutType;
-			onActivityUpdated();
+			onActivityUpdated(activity);
 		}
 	};
 
@@ -237,7 +237,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.nutrition = newNutrition;
-			onActivityUpdated();
+			onActivityUpdated(activity);
 		}
 	};
 
@@ -260,7 +260,7 @@
 		// Update local state
 		if (res.ok) {
 			activity.feedback = newFeedback;
-			onActivityUpdated();
+			onActivityUpdated(activity);
 		}
 	};
 
