@@ -40,7 +40,8 @@
 				return ['heartRate'];
 		}
 	});
-	const showMetrics = $derived(metrics.length > 0);
+	const colTemplate = $derived(`auto auto ${metrics.map(() => '1fr').join(' ')}`);
+	let hoveredLapIndex = $state<number | null>(null);
 
 	function formatDuration(seconds: number): string {
 		const d = dayjs.duration(seconds, 'seconds');
@@ -152,38 +153,71 @@
 </script>
 
 {#if laps.length > 0}
-	<div class="touch-auto overflow-x-auto">
-		<table class="table w-full table-zebra table-sm" onmouseleave={() => (selectedLap = null)}>
-			<thead>
-				<tr>
-					<th>Lap</th>
+	<div
+		role="grid"
+		tabindex="-1"
+		class="grid overflow-x-scroll text-sm"
+		style="grid-template-columns: {colTemplate}"
+		onmouseleave={() => {
+			selectedLap = null;
+			hoveredLapIndex = null;
+		}}
+	>
+		<div role="row" class="contents">
+			<div role="columnheader" class="border-b border-base-300 px-3 py-2 font-semibold">Lap</div>
+			<div role="columnheader" class="border-b border-base-300 px-3 py-2 font-semibold">
+				Duration
+			</div>
+			{#each metrics as metric}
+				<div role="columnheader" class="border-b border-base-300 px-3 py-2 font-semibold">
+					{getMetricLabel(metric)}
+				</div>
+			{/each}
+		</div>
 
-					<th>Duration</th>
-					{#if showMetrics}
-						{#each metrics as metric}
-							<th>{getMetricLabel(metric)}</th>
-						{/each}
-					{/if}
-				</tr>
-			</thead>
-			<tbody>
-				{#each laps as lap, index}
-					<tr
-						class="hover:bg-base-300"
-						onmouseenter={() => (selectedLap = lap)}
-						onclick={() => onLapSelectedCallback(lap)}
+		{#each laps as lap, index}
+			{@const isHovered = hoveredLapIndex === index}
+			{@const isOdd = index % 2 === 1}
+			<div
+				role="row"
+				tabindex="0"
+				class="contents cursor-pointer"
+				onmouseenter={() => {
+					hoveredLapIndex = index;
+					selectedLap = lap;
+				}}
+				onclick={() => onLapSelectedCallback(lap)}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') onLapSelectedCallback(lap);
+				}}
+			>
+				<div
+					role="gridcell"
+					class="px-3 py-2"
+					class:bg-base-200={isOdd && !isHovered}
+					class:bg-base-300={isHovered}
+				>
+					{index + 1}
+				</div>
+				<div
+					role="gridcell"
+					class="px-3 py-2"
+					class:bg-base-200={isOdd && !isHovered}
+					class:bg-base-300={isHovered}
+				>
+					{formatDuration(lap.end - lap.start)}
+				</div>
+				{#each metrics as metric}
+					<div
+						role="gridcell"
+						class="px-3 py-2"
+						class:bg-base-200={isOdd && !isHovered}
+						class:bg-base-300={isHovered}
 					>
-						<td>{index + 1}</td>
-
-						<td>{formatDuration(lap.end - lap.start)}</td>
-						{#if showMetrics}
-							{#each metrics as metric}
-								<td>{calculateLapMetric(lap.start, lap.end, metric) ?? '-'}</td>
-							{/each}
-						{/if}
-					</tr>
+						{calculateLapMetric(lap.start, lap.end, metric) ?? '-'}
+					</div>
 				{/each}
-			</tbody>
-		</table>
+			</div>
+		{/each}
 	</div>
 {/if}
