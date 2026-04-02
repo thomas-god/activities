@@ -43,6 +43,9 @@
 
 		// Always add an explicit point for the full active duration so that a
 		// 59-min ride doesn't stop at the 30-min marker.
+		// There's some edge cases for which the average value for the activity's duration is
+		// greater than the previous point on the power curve, making the power curve is not
+		// decreasing (e.g. [10,0,10] -> avg(2) = (10+0)/2 = 5 but avg(3) = (10+0+10)/3 = 6.66 > avg(2))
 		const lastFixed = result.length > 0 ? result[result.length - 1][0] : 0;
 		if (active.length > lastFixed) {
 			const totalSum = active.reduce((a, b) => a + b, 0);
