@@ -9,12 +9,6 @@
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
-	let offsets: SvelteMap<string, number> = $state(new SvelteMap());
-	let zoomDomain: [number, number] | null = $state(null);
-	let offsetsDialogElement: HTMLDialogElement;
-	let offsetsDialogElementWidth = $state(0);
-	let offsetsDialogMetric = $state('Altitude');
-
 	// Drop stale offset entries when the activities list changes
 	$effect(() => {
 		const ids = new Set(activities.map((a) => a.id));
@@ -59,6 +53,17 @@
 	});
 	// svelte-ignore state_referenced_locally
 	let selectedMetricOptions = $state(possibleMetricOptions);
+
+	let offsets: SvelteMap<string, number> = $state(new SvelteMap());
+	let zoomDomain: [number, number] | null = $state(null);
+	let offsetsDialogElement: HTMLDialogElement;
+	let offsetsDialogElementWidth = $state(0);
+	// svelte-ignore state_referenced_locally
+	let offsetsDialogMetric = $state(
+		possibleMetricOptions.find(({ option }) => option === 'Altitude') !== undefined
+			? 'Altitude'
+			: possibleMetricOptions.at(0)?.option
+	);
 </script>
 
 {#if activities.length > 0}
@@ -112,13 +117,19 @@
 			}))}
 		/>
 		<div bind:clientWidth={offsetsDialogElementWidth}>
-			<ActivityCompareChart
-				{activities}
-				metric={offsetsDialogMetric}
-				width={offsetsDialogElementWidth}
-				height={chartHeight}
-				{offsets}
-			/>
+			{#if offsetsDialogMetric}
+				<ActivityCompareChart
+					{activities}
+					metric={offsetsDialogMetric}
+					width={offsetsDialogElementWidth}
+					height={chartHeight}
+					{offsets}
+				/>
+			{:else}
+				<p class="text-center text-sm tracking-wide italic opacity-60">
+					Select a reference metric from the list
+				</p>
+			{/if}
 		</div>
 	</div>
 	<form method="dialog" class="modal-backdrop">
