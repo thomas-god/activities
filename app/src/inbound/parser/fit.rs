@@ -139,7 +139,7 @@ fn extract_timeseries(
     let mut latitude_values = vec![];
     let mut longitude_values = vec![];
 
-    let mut laps = vec![];
+    let mut laps: Vec<Lap> = vec![];
 
     let mut pauses_duration = 0;
     let mut paused = false;
@@ -173,7 +173,13 @@ fn extract_timeseries(
 
         if message.message_kind == MesgNum::Lap {
             if let Some(lap) = extract_lap(message, reference_timestamp) {
-                laps.push(lap);
+                if laps
+                    .iter()
+                    .find(|l| (l.start() == lap.start()) && (l.end() == lap.end()))
+                    .is_none()
+                {
+                    laps.push(lap);
+                }
             } else {
                 continue;
             }
@@ -1316,5 +1322,91 @@ mod tests {
             Some(TimeseriesValue::Float(-45.0))
         );
         assert_eq!(*longitude.get(1).unwrap(), None);
+    }
+
+    #[test]
+    fn test_extract_timeseries_deduplicates_laps() {
+        let reference = 10u32;
+        // Two identical lap messages: same start time, same duration
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Lap,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::StartTime),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        values: vec![DataValue::Float32(300.)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Lap,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::StartTime),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        values: vec![DataValue::Float32(300.)],
+                    },
+                ],
+            },
+        ];
+
+        let timeseries = extract_timeseries(reference, &messages).unwrap();
+
+        assert_eq!(timeseries.laps().len(), 1);
+        assert_eq!(timeseries.laps(), &vec![Lap::new(0, 300)]);
+    }
+
+    #[test]
+    fn test_extract_timeseries_keeps_distinct_laps() {
+        let reference = 10u32;
+        // Two lap messages with different start times
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Lap,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::StartTime),
+                        values: vec![DataValue::DateTime(10)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        values: vec![DataValue::Float32(300.)],
+                    },
+                ],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Lap,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::StartTime),
+                        values: vec![DataValue::DateTime(310)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        values: vec![DataValue::Float32(200.)],
+                    },
+                ],
+            },
+        ];
+
+        let timeseries = extract_timeseries(reference, &messages).unwrap();
+
+        // start=10-10=0, end=10+300-10=300  |  start=310-10=300, end=310+200-10=500
+        assert_eq!(timeseries.laps().len(), 2);
+        assert_eq!(
+            timeseries.laps(),
+            &vec![Lap::new(0, 300), Lap::new(300, 500)]
+        );
     }
 }
