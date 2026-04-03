@@ -5,7 +5,7 @@ export const prerender = true;
 export const ssr = false;
 
 export const load: PageLoad = async ({ fetch, depends }) => {
-	depends('app:training-metrics');
+	depends('app:training-periods');
 
 	const periods = await fetchTrainingPeriods(fetch);
 

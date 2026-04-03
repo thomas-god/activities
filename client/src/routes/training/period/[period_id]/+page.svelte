@@ -70,6 +70,7 @@
 		});
 
 		if (response.ok) {
+			await invalidate('app:training-periods');
 			await goto('/training/periods');
 		} else {
 			throw new Error('Failed to delete training period');
@@ -301,15 +302,15 @@
 								tabindex="0"
 								class="dropdown-content menu z-[1] flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 							>
-								<li>
+								<li class="w-full">
 									<EditButton callback={openEditModal} text="Edit name" size="normal" />
 								</li>
-								<li>
+								<li class="w-full">
 									<button class="btn btn-ghost" onclick={openEditDatesModal}
 										><img src="/icons/calendar.svg" class="h-4 w-4" alt="Edit icon" />Edit dates</button
 									>
 								</li>
-								<li>
+								<li class="w-full">
 									<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
 								</li>
 							</ul>
@@ -532,7 +533,11 @@
 			</form>
 		</dialog>
 	{:else}
-		<p>placeholder</p>
+		<p class="pt-4 pl-4 text-sm tracking-wide italic opacity-80">
+			Error while loading training period's details. <a class="link" href="/training/periods">
+				Go back to periods.
+			</a>
+		</p>
 	{/if}
 {/await}
 

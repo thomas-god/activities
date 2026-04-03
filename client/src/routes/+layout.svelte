@@ -31,6 +31,7 @@
 	};
 
 	const createTrainingPeriodCallback = () => {
+		invalidate('app:training-periods');
 		createTrainingPeriodDialog.close();
 	};
 
