@@ -432,7 +432,7 @@
 							format={previewFormat}
 							showGroup={groupBy !== 'None'}
 							groupBy={groupBy !== 'None' ? groupBy : null}
-							stacked={aggregate === 'Sum'}
+							stacked={aggregate === 'Sum' || aggregate === 'NumberOfActivities'}
 						/>
 					</div>
 				{:else}

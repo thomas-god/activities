@@ -58,7 +58,7 @@
 				format={metricValuesDisplayFormat(metric)}
 				showGroup={metric.showGroup}
 				groupBy={metric.groupBy}
-				stacked={metric.aggregate === 'Sum'}
+				stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
 			/>
 
 			{#if idx !== metricProps.length - 1}

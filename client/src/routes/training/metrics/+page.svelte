@@ -68,7 +68,7 @@
 					format={metricValuesDisplayFormat(metric)}
 					showGroup={metric.group_by !== null}
 					groupBy={metric.group_by}
-					stacked={metric.aggregate === 'Sum'}
+					stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
 				/>
 			</div>
 		{/each}
