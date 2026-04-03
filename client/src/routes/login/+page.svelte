@@ -67,7 +67,9 @@
 	</div>
 {:else}
 	{#await promise}
-		<span class="loading loading-xl loading-spinner"></span>
+		<div class="flex w-full flex-row items-center justify-center pt-6">
+			<div class="loading loading-xl loading-spinner"></div>
+		</div>
 	{:then}
 		<div class="card mx-2 mt-6 rounded-box bg-base-100 p-4 sm:mx-auto sm:w-sm">
 			<p>You're going to receive an email containing an authentication link to login!</p>
