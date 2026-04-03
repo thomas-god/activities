@@ -306,7 +306,7 @@ fn extract_timeseries(
                 }
                 match val {
                     DataValue::Sint32(latitude) => Some(TimeseriesValue::Float(
-                        (*latitude as f64) * 180. / (2.0 as f64).powi(31),
+                        (*latitude as f64) * 180. / (2.0_f64).powi(31),
                     )),
                     _ => None,
                 }
@@ -322,7 +322,7 @@ fn extract_timeseries(
                 }
                 match val {
                     DataValue::Sint32(longitude) => Some(TimeseriesValue::Float(
-                        (*longitude as f64) * 180. / (2.0 as f64).powi(31),
+                        (*longitude as f64) * 180. / (2.0_f64).powi(31),
                     )),
                     _ => None,
                 }
