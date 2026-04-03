@@ -895,26 +895,16 @@ impl TrainingPeriod {
         &self.end
     }
 
-    /// Returns a DateRange for this training period.
-    /// For open-ended periods (no end date), defaults to today as the end date.
-    /// Note: DateRange end is exclusive, so we add 1 day to the period's end date to include it.
-    /// For open-ended periods, this will NOT include today's activities.
+    /// Returns a DateRange for this training period, ending today for open-ended periods.
     pub fn range_default_today(&self) -> DateRange {
-        let end = self
-            .end
-            .map(|date| date + Days::new(1))
-            .unwrap_or_else(|| Utc::now().date_naive());
+        let end = self.end.unwrap_or_else(|| Utc::now().date_naive());
         DateRange::new(self.start, end)
     }
 
-    /// Returns a DateRange for this training period.
-    /// For open-ended periods (no end date), defaults to tomorrow as the end date.
-    /// Note: DateRange end is exclusive, so we add 1 day to the period's end date to include it.
-    /// For open-ended periods, this WILL include today's activities.
+    /// Returns a DateRange for this training period, ending tomorrow for open-ended periods.
     pub fn range_default_tomorrow(&self) -> DateRange {
         let end = self
             .end
-            .map(|date| date + Days::new(1))
             .unwrap_or_else(|| Utc::now().date_naive() + Days::new(1));
         DateRange::new(self.start, end)
     }
@@ -2585,10 +2575,9 @@ mod test_training_period {
         .unwrap();
 
         // Both methods should return the same result when end date is specified
-        // Since DateRange is exclusive at the end, we expect end + 1 day
         let range_today = period.range_default_today();
         let range_tomorrow = period.range_default_tomorrow();
-        let expected_end = end.unwrap() + Days::new(1);
+        let expected_end = end.unwrap();
 
         assert_eq!(range_today.start(), &start);
         assert_eq!(range_today.end(), &expected_end);

@@ -653,7 +653,6 @@ where
             return vec![];
         };
 
-        // Get the date range from the period (use range_default_tomorrow to include today)
         let date_range = period.range_default_tomorrow();
 
         // Get metrics with TrainingMetricScope::TrainingPeriod
