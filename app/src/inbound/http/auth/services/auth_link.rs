@@ -30,7 +30,7 @@ where
         let auth_link = AuthLink::new(
             req.user().clone(),
             auth_token.clone(),
-            Utc::now() + TimeDelta::minutes(5),
+            Utc::now() + TimeDelta::minutes(15),
         );
         let Ok(hashed_auth_link) = auth_link.as_hash() else {
             return GenerateAuthLinkResult::Retry;
