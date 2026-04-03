@@ -12,6 +12,7 @@ use crate::{
         http::{
             AppState, AuthLinkValidationResult,
             auth::{AuthToken, IUserService},
+            handlers::auth::build_session_cookie,
         },
         parser::ParseFile,
     },
@@ -31,26 +32,9 @@ pub async fn validate_login<
 
     match state.user_service.validate_auth_link(token).await {
         Ok(AuthLinkValidationResult::Success(session)) => {
-            let Ok(expire_at) =
-                OffsetDateTime::from_unix_timestamp(session.expire_at().timestamp())
-            else {
-                tracing::warn!(
-                    "Unable to build cookie expire_at from datetime: {:?}",
-                    session.expire_at()
-                );
+            let Some(cookie) = build_session_cookie(&state.cookie_config, &session) else {
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             };
-
-            let mut builder = Cookie::build(("session_token", session.token().to_string()))
-                .expires(expire_at)
-                .secure(state.cookie_config.secure)
-                .http_only(state.cookie_config.http_only)
-                .same_site(state.cookie_config.same_site)
-                .path("/");
-            if let Some(domain) = state.cookie_config.domain.clone() {
-                builder = builder.domain(domain);
-            }
-            let cookie = builder.build();
 
             let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
             (headers, StatusCode::OK).into_response()

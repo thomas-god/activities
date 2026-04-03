@@ -15,6 +15,7 @@ use tower_http::cors::CorsLayer;
 use crate::config::Config;
 use crate::domain::ports::{IActivityService, IPreferencesService, ITrainingService};
 
+use crate::inbound::http::handlers::{DefaultUserExtractor, cookie_auth_middleware};
 use crate::inbound::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, create_training_metric, create_training_note,
@@ -297,14 +298,12 @@ fn core_routes<
         );
 
     if cfg!(feature = "single-user") {
-        router = router.route_layer(axum::middleware::from_extractor::<
-            crate::inbound::http::auth::DefaultUserExtractor,
-        >());
+        router = router.route_layer(axum::middleware::from_extractor::<DefaultUserExtractor>());
     } else {
-        router = router.route_layer(axum::middleware::from_extractor_with_state::<
-            crate::inbound::http::auth::CookieUserExtractor<US>,
-            AppState<AS, PF, TS, US, PS>,
-        >(state.clone()));
+        router = router.route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            cookie_auth_middleware::<US, AS, PF, TS, PS>,
+        ));
     }
 
     router

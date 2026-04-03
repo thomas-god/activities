@@ -171,8 +171,8 @@ mod tests {
         },
         inbound::{
             http::{
-                CookieConfig,
-                auth::{DefaultUserExtractor, test_utils::MockUserService},
+                CookieConfig, auth::test_utils::MockUserService,
+                handlers::auth::DefaultUserExtractor,
             },
             parser::test_utils::MockFileParser,
         },

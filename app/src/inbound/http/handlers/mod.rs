@@ -9,7 +9,10 @@ pub(super) use activities::{
     delete_activity, get_activity, get_all_raw_activities, get_raw_activity, list_activities,
     patch_activity, upload_activities,
 };
-pub(super) use auth::{login_user, register_user, validate_login};
+pub(super) use auth::{
+    CookieUserExtractor, DefaultUserExtractor, cookie_auth_middleware, login_user, register_user,
+    validate_login,
+};
 pub(super) use preferences::{
     delete_preference, get_all_preferences, get_preference, set_preference,
 };

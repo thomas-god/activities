@@ -6,9 +6,9 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        AuthLinkValidationResult, AuthToken, EmailAddress, GenerateAuthLinkRequest,
-        GenerateAuthLinkResult, IAuthLinkService, ISessionService, IUserService, SessionToken,
-        UserLoginResult, UserRegistrationResult,
+        AuthLinkValidationResult, AuthToken, CheckSessionResult, EmailAddress,
+        GenerateAuthLinkRequest, GenerateAuthLinkResult, IAuthLinkService, ISessionService,
+        IUserService, SessionToken, UserLoginResult, UserRegistrationResult,
     },
 };
 
@@ -101,7 +101,7 @@ where
             .map(AuthLinkValidationResult::Success)
     }
 
-    async fn check_session_token(&self, token: &SessionToken) -> Result<UserId, ()> {
+    async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
         self.session_service
             .lock()
             .await
@@ -389,10 +389,7 @@ mod test_user_service_login_user {
 pub struct DisabledUserService {}
 
 impl IUserService for DisabledUserService {
-    async fn check_session_token(
-        &self,
-        _token: &SessionToken,
-    ) -> Result<crate::domain::models::UserId, ()> {
+    async fn check_session_token(&self, _token: &SessionToken) -> Result<CheckSessionResult, ()> {
         panic!("User service is disabled")
     }
 
@@ -558,7 +555,7 @@ mod test_user_service_check_session_token {
         let mut session = MockSessionService::new();
         session
             .expect_check_session_token()
-            .returning(|_| Ok(UserId::test_default()));
+            .returning(|_| Ok(CheckSessionResult::new(UserId::test_default(), None)));
 
         let service = UserService::new(
             Arc::new(Mutex::new(MockAuthLinkService::new())),
@@ -572,7 +569,7 @@ mod test_user_service_check_session_token {
             ))
             .await;
 
-        assert_eq!(res.unwrap(), UserId::test_default());
+        assert_eq!(*res.unwrap().user(), UserId::test_default());
     }
 
     #[tokio::test]

@@ -7,10 +7,13 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        GenerateSessionTokenResult, HashedSession, HashedSessionToken, ISessionService, Session,
-        SessionToken,
+        CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
+        ISessionService, Session, SessionToken,
     },
 };
+
+const SESSION_DURATION: i64 = 30;
+const SESSION_REFRESH_WINDOW: i64 = 7;
 
 #[derive(Debug, Clone, Constructor)]
 pub struct SessionService<SR> {
@@ -26,7 +29,7 @@ where
         user: &UserId,
     ) -> Result<GenerateSessionTokenResult, ()> {
         let token = SessionToken::new();
-        let expire_at = Utc::now() + TimeDelta::days(30);
+        let expire_at = Utc::now() + TimeDelta::days(SESSION_DURATION);
         let session = Session::new(user.clone(), token.clone(), expire_at);
         let Ok(hashed_session) = session.as_hash() else {
             return Err(());
@@ -44,7 +47,7 @@ where
         }
     }
 
-    async fn check_session_token(&self, token: &SessionToken) -> Result<UserId, ()> {
+    async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
         let repository = self.session_repository.lock().await;
 
         let sessions = repository.get_all_sessions().await;
@@ -61,10 +64,29 @@ where
             }
         }
 
-        match found {
-            Some(session) => Ok(session.user().clone()),
-            None => Err(()),
+        let Some(session) = found else {
+            return Err(());
+        };
+        let user = session.user.clone();
+
+        let refresh_threshold = *session.expire_at() - TimeDelta::days(SESSION_REFRESH_WINDOW);
+        if now >= refresh_threshold {
+            let new_token = SessionToken::new();
+            let new_expire_at = now + TimeDelta::days(SESSION_DURATION);
+            let new_session = Session::new(user.clone(), new_token.clone(), new_expire_at);
+            if let Ok(hashed) = new_session.as_hash()
+                && repository.store_session(&hashed).await.is_ok()
+            {
+                let _ = repository.delete_session_by_hash(session.hash()).await;
+                let refreshed = Some(GenerateSessionTokenResult::new(new_token, new_expire_at));
+                return Ok(CheckSessionResult { user, refreshed });
+            }
         }
+
+        Ok(CheckSessionResult {
+            user,
+            refreshed: None,
+        })
     }
 }
 
@@ -151,13 +173,13 @@ mod test_session_service_check_session_token {
     async fn test_ok_path() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let hased_token = token.as_hash().unwrap();
-        let cloned_hashed_token = hased_token.clone();
+        let hashed_token = token.as_hash().unwrap();
+        let cloned_hashed_token = hashed_token.clone();
         repository.expect_get_all_sessions().returning(move || {
             vec![HashedSession::new(
                 UserId::test_default(),
                 cloned_hashed_token.clone(),
-                Utc::now() + TimeDelta::minutes(5),
+                Utc::now() + TimeDelta::days(30),
             )]
         });
         repository.expect_delete_session_by_hash().times(0);
@@ -166,7 +188,7 @@ mod test_session_service_check_session_token {
 
         let res = service.check_session_token(&token).await;
 
-        assert_eq!(res, Ok(UserId::test_default()));
+        assert_eq!(res.expect("Should ok").user(), &UserId::test_default());
     }
 
     #[tokio::test]
@@ -180,7 +202,7 @@ mod test_session_service_check_session_token {
 
         let res = service.check_session_token(&token).await;
 
-        assert_eq!(res, Err(()));
+        assert!(res.is_err());
     }
 
     #[tokio::test]
@@ -207,6 +229,6 @@ mod test_session_service_check_session_token {
 
         let res = service.check_session_token(&token).await;
 
-        assert_eq!(res, Err(()));
+        assert!(res.is_err());
     }
 }
