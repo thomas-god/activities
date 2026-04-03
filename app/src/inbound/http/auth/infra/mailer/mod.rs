@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::inbound::http::auth::{EmailAddress, MagicLink, services::magic_link::MailProvider};
+use crate::inbound::http::auth::{AuthLink, EmailAddress, services::auth_link::MailProvider};
 
 #[cfg(feature = "multi-user")]
 pub mod smtp;
@@ -9,15 +9,15 @@ pub mod smtp;
 pub struct DoNothingMailProvider {}
 
 impl MailProvider for DoNothingMailProvider {
-    async fn send_magic_link_email(
+    async fn send_auth_link_email(
         &self,
         email: &EmailAddress,
-        _magic_link: &MagicLink,
+        _auth_link: &AuthLink,
     ) -> Result<(), ()> {
         tracing::info!(
             "Dummy send to {email:?} for token: {:?} to user {:?}",
-            _magic_link.token(),
-            _magic_link.user()
+            _auth_link.token(),
+            _auth_link.user()
         );
         Ok(())
     }

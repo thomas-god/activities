@@ -1,7 +1,7 @@
-pub mod magic_link;
+pub mod auth_link;
 pub mod session;
 pub mod user;
 
-pub use magic_link::MagicLinkService;
+pub use auth_link::AuthLinkService;
 pub use session::SessionService;
 pub use user::{DisabledUserService, UserService};

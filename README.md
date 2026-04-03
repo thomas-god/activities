@@ -15,7 +15,7 @@ give access to your instance:
 
 - _multi-user_: allows multiple users to use your instance using an email-based
   password-less authentication process. You will need a valid SMTP server for
-  sending emails containing magic link to users.
+  sending emails containing auth link to users.
 - _single-user_: allows a single user to use the instance without an
   authentication step, and thus does not require an external email server to
   work. Note that there is **NO authentication process** for this version, so be
@@ -94,7 +94,7 @@ from a file
 | ACTIVITIES_MAILER_USERNAME | yes      | SMTP username                                                                                                                                   |                         |
 | ACTIVITIES_MAILER_PASSWORD | yes      | SMTP password                                                                                                                                   |                         |
 | ACTIVITIES_MAILER_RELAY    | yes      | SMTP server                                                                                                                                     |                         |
-| ACTIVITIES_MAILER_DOMAIN   | yes      | The domain on which your instance is hosted. Used to craft the magic link url. Can be a different domain than the one used by your SMTP server. | https://app.your.domain |
+| ACTIVITIES_MAILER_DOMAIN   | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server. | https://app.your.domain |
 
 ## Upload your training history
 

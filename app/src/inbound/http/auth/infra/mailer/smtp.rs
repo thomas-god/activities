@@ -13,7 +13,7 @@ use lettre::{
 use serde_json::json;
 use thiserror::Error;
 
-use crate::inbound::http::auth::{EmailAddress, MagicLink, services::magic_link::MailProvider};
+use crate::inbound::http::auth::{AuthLink, EmailAddress, services::auth_link::MailProvider};
 
 #[derive(Debug, Clone)]
 pub struct SMTPEmailProvider {
@@ -44,7 +44,7 @@ impl SMTPEmailProvider {
         // Load mails templates
         let mut handlebars = Handlebars::new();
         handlebars
-            .register_template_string("magic_link", include_str!("templates/magic_link_email.hbs"))
+            .register_template_string("auth_link", include_str!("templates/auth_link_email.hbs"))
             .map_err(|_| SMTPEmailProviderCreationError::TemplateFileError)?;
         handlebars.register_helper("link-helper", Box::new(link_helper));
 
@@ -63,43 +63,40 @@ impl SMTPEmailProvider {
         })
     }
 
-    fn render_magic_link_template(
+    fn render_auth_link_template(
         &self,
-        magic_link_url: &str,
+        auth_link_url: &str,
         user_email: &str,
     ) -> Result<String, ()> {
         let data = json!({
-            "MAGIC_LINK_URL": magic_link_url,
+            "AUTH_LINK_URL": auth_link_url,
             "USER_EMAIL": user_email,
         });
 
-        let rendered = self
-            .handlebars
-            .render("magic_link", &data)
-            .map_err(|_| ())?;
+        let rendered = self.handlebars.render("auth_link", &data).map_err(|_| ())?;
         Ok(rendered)
     }
 }
 
 impl MailProvider for SMTPEmailProvider {
-    async fn send_magic_link_email(
+    async fn send_auth_link_email(
         &self,
         email: &EmailAddress,
-        magic_link: &MagicLink,
+        auth_link: &AuthLink,
     ) -> Result<(), ()> {
-        let link = format!("{}/login/{}", self.domain, magic_link.token());
+        let link = format!("{}/login/{}", self.domain, auth_link.token());
 
         let text_body = format!(
             "Hello!\n\nClick this link to sign in to your account:\n{}\n\nThis link expires in 15 minutes.\n\nIf you didn't request this, you can ignore this email.",
             link
         );
 
-        let html_body = self.render_magic_link_template(&link, &email.to_string())?;
+        let html_body = self.render_auth_link_template(&link, &email.to_string())?;
 
         let email = Message::builder()
             .from(Mailbox::new(None, self.from.clone()))
             .to(Mailbox::new(None, email.value().parse().map_err(|_| ())?))
-            .subject("Your magic link for activities.training")
+            .subject("Your auth link for activities.training")
             .multipart(
                 MultiPart::alternative()
                     .singlepart(
@@ -148,7 +145,7 @@ fn link_helper(
     let escaped_url = handlebars::html_escape(&url);
 
     let html = format!(
-        r#"<a href="{}" class="magic-link-button">{}</a>"#,
+        r#"<a href="{}" class="auth-link-button">{}</a>"#,
         escaped_url, escaped_text
     );
 
@@ -171,7 +168,7 @@ mod test {
         handlebars
             .register_template_string(
                 "test",
-                "{{link-helper  \"Sign In to Your Account\" MAGIC_LINK_URL}}",
+                "{{link-helper  \"Sign In to Your Account\" AUTH_LINK_URL}}",
             )
             .unwrap();
 
@@ -179,10 +176,10 @@ mod test {
             handlebars
                 .render(
                     "test",
-                    &json!({"MAGIC_LINK_URL": "127.0.0.1:5173/login/alongandsecuretoken"})
+                    &json!({"AUTH_LINK_URL": "127.0.0.1:5173/login/alongandsecuretoken"})
                 )
                 .unwrap(),
-            "<a href=\"127.0.0.1:5173/login/alongandsecuretoken\" class=\"magic-link-button\">Sign In to Your Account</a>"
+            "<a href=\"127.0.0.1:5173/login/alongandsecuretoken\" class=\"auth-link-button\">Sign In to Your Account</a>"
         );
     }
 }

@@ -34,14 +34,12 @@ pub use self::auth::infra::mailer::smtp::SMTPEmailProvider;
 pub use self::auth::infra::{
     mailer::DoNothingMailProvider,
     sqlite::{
-        magic_link::SqliteMagicLinkRepository, session::SqliteSessionRepository,
+        auth_link::SqliteAuthLinkRepository, session::SqliteSessionRepository,
         user::SqliteUserRepository,
     },
 };
-pub use self::auth::services::{
-    DisabledUserService, MagicLinkService, SessionService, UserService,
-};
-pub use self::auth::{IUserService, MagicLinkValidationResult, UserLoginResult};
+pub use self::auth::services::{AuthLinkService, DisabledUserService, SessionService, UserService};
+pub use self::auth::{AuthLinkValidationResult, IUserService, UserLoginResult};
 
 mod auth;
 mod handlers;
@@ -329,7 +327,7 @@ fn login_routes<
             post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US, PS>),
         )
         .route(
-            "/login/validate/{magic_token}",
+            "/login/validate/{auth_token}",
             post(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US, PS>),
         )
 }

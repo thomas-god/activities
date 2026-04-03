@@ -10,8 +10,8 @@ use crate::{
     },
     inbound::{
         http::{
-            HttpServer, MagicLinkService, SMTPEmailProvider, SessionService,
-            SqliteMagicLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
+            AuthLinkService, HttpServer, SMTPEmailProvider, SessionService,
+            SqliteAuthLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
         },
         parser::Parser,
     },
@@ -39,7 +39,7 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
             >,
         >,
         UserService<
-            MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
+            AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
             SqliteUserRepository,
             SessionService<SqliteSessionRepository>,
         >,
@@ -147,7 +147,7 @@ async fn build_activity_service() -> anyhow::Result<(
 
 async fn build_user_service() -> anyhow::Result<
     UserService<
-        MagicLinkService<SqliteMagicLinkRepository, SMTPEmailProvider>,
+        AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
         SqliteUserRepository,
         SessionService<SqliteSessionRepository>,
     >,
@@ -158,13 +158,13 @@ async fn build_user_service() -> anyhow::Result<
         tokio::fs::create_dir_all(&db_dir).await?;
     }
 
-    let magic_db = db_dir.clone().join("magic_link.db");
-    let magic_link_repository = Arc::new(Mutex::new(
-        SqliteMagicLinkRepository::new(&format!("sqlite:{}", magic_db.to_string_lossy())).await?,
+    let auth_db = db_dir.clone().join("auth_link.db");
+    let auth_link_repository = Arc::new(Mutex::new(
+        SqliteAuthLinkRepository::new(&format!("sqlite:{}", auth_db.to_string_lossy())).await?,
     ));
     let mail_provider = Arc::new(build_mailer()?);
-    let magic_link_service = Arc::new(Mutex::new(MagicLinkService::new(
-        magic_link_repository,
+    let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
+        auth_link_repository,
         mail_provider,
     )));
 
@@ -178,7 +178,7 @@ async fn build_user_service() -> anyhow::Result<
         SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?,
     ));
     let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
-    let user_service = UserService::new(magic_link_service, user_repository, session_service);
+    let user_service = UserService::new(auth_link_service, user_repository, session_service);
 
     Ok(user_service)
 }

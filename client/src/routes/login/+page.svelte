@@ -70,7 +70,7 @@
 		<span class="loading loading-xl loading-spinner"></span>
 	{:then}
 		<div class="card mx-2 mt-6 rounded-box bg-base-100 p-4 sm:mx-auto sm:w-sm">
-			<p>You're going to receive an email containing a magic link to login!</p>
+			<p>You're going to receive an email containing an authentication link to login!</p>
 		</div>
 	{/await}
 {/if}

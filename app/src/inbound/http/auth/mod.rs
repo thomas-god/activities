@@ -83,10 +83,10 @@ impl TryFrom<String> for EmailAddress {
 }
 
 #[derive(Clone, Debug)]
-pub struct MagicToken(String);
+pub struct AuthToken(String);
 
 #[allow(clippy::new_without_default)]
-impl MagicToken {
+impl AuthToken {
     pub fn new() -> Self {
         let mut rng = rand::rng();
         let mut random_bytes = [0u8; 24];
@@ -99,33 +99,33 @@ impl MagicToken {
         self.0.as_bytes()
     }
 
-    pub fn as_hash(&self) -> Result<HashedMagicToken, ()> {
+    pub fn as_hash(&self) -> Result<HashedAuthToken, ()> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         match argon2.hash_password(self.0.as_bytes(), &salt) {
-            Ok(hash) => Ok(HashedMagicToken::new(hash.to_string())),
+            Ok(hash) => Ok(HashedAuthToken::new(hash.to_string())),
             Err(_err) => Err(()),
         }
     }
 }
 
-impl std::fmt::Display for MagicToken {
+impl std::fmt::Display for AuthToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl From<String> for MagicToken {
+impl From<String> for AuthToken {
     fn from(value: String) -> Self {
         Self(value)
     }
 }
 
 #[derive(Clone, Debug, Constructor, PartialEq)]
-pub struct HashedMagicToken(String);
+pub struct HashedAuthToken(String);
 
-impl HashedMagicToken {
-    pub fn verify_token(&self, token: &MagicToken) -> bool {
+impl HashedAuthToken {
+    pub fn verify_token(&self, token: &AuthToken) -> bool {
         let Ok(hashed_password) = PasswordHash::new(&self.0) else {
             return false;
         };
@@ -137,25 +137,25 @@ impl HashedMagicToken {
     }
 }
 
-impl std::fmt::Display for HashedMagicToken {
+impl std::fmt::Display for HashedAuthToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[derive(Clone, Debug, Constructor)]
-pub struct MagicLink {
+pub struct AuthLink {
     user: UserId,
-    token: MagicToken,
+    token: AuthToken,
     expire_at: chrono::DateTime<Utc>,
 }
 
-impl MagicLink {
+impl AuthLink {
     pub fn user(&self) -> &UserId {
         &self.user
     }
 
-    pub fn token(&self) -> &MagicToken {
+    pub fn token(&self) -> &AuthToken {
         &self.token
     }
 
@@ -163,11 +163,11 @@ impl MagicLink {
         &self.expire_at
     }
 
-    pub fn as_hash(&self) -> Result<HashedMagicLink, ()> {
+    pub fn as_hash(&self) -> Result<HashedAuthLink, ()> {
         let Ok(hash) = self.token().as_hash() else {
             return Err(());
         };
-        Ok(HashedMagicLink::new(
+        Ok(HashedAuthLink::new(
             self.user().clone(),
             hash,
             *self.expire_at(),
@@ -176,18 +176,18 @@ impl MagicLink {
 }
 
 #[derive(Clone, Debug, Constructor)]
-pub struct HashedMagicLink {
+pub struct HashedAuthLink {
     user: UserId,
-    hash: HashedMagicToken,
+    hash: HashedAuthToken,
     expire_at: chrono::DateTime<Utc>,
 }
 
-impl HashedMagicLink {
+impl HashedAuthLink {
     pub fn user(&self) -> &UserId {
         &self.user
     }
 
-    pub fn hash(&self) -> &HashedMagicToken {
+    pub fn hash(&self) -> &HashedAuthToken {
         &self.hash
     }
 
@@ -337,7 +337,7 @@ pub enum UserLoginResult {
 }
 
 #[derive(Debug, Clone)]
-pub enum MagicLinkValidationResult {
+pub enum AuthLinkValidationResult {
     Success(GenerateSessionTokenResult),
     Invalid,
 }
@@ -350,10 +350,10 @@ pub trait IUserService: Clone + Send + Sync + 'static {
 
     fn login_user(&self, email: EmailAddress) -> impl Future<Output = UserLoginResult> + Send;
 
-    fn validate_magic_link(
+    fn validate_auth_link(
         &self,
-        magic_token: MagicToken,
-    ) -> impl Future<Output = Result<MagicLinkValidationResult, ()>> + Send;
+        token: AuthToken,
+    ) -> impl Future<Output = Result<AuthLinkValidationResult, ()>> + Send;
 
     fn check_session_token(
         &self,
@@ -362,12 +362,12 @@ pub trait IUserService: Clone + Send + Sync + 'static {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct GenerateMagicLinkRequest {
+pub struct GenerateAuthLinkRequest {
     user: UserId,
     email: EmailAddress,
 }
 
-impl GenerateMagicLinkRequest {
+impl GenerateAuthLinkRequest {
     pub fn user(&self) -> &UserId {
         &self.user
     }
@@ -378,24 +378,24 @@ impl GenerateMagicLinkRequest {
 }
 
 #[derive(Debug, Clone)]
-pub enum GenerateMagicLinkResult {
-    /// [GenerateMagicLinkResult::Success] covers all functional cases, regardless of user actually
+pub enum GenerateAuthLinkResult {
+    /// [GenerateAuthLinkResult::Success] covers all functional cases, regardless of user actually
     /// existing to not leak that information.
     Success,
-    /// [GenerateMagicLinkResult::Retry] only covers infrastructure related issues for which the
-    /// user can actually retry (e.g. we fail to send the email containing the magic link).
+    /// [GenerateAuthLinkResult::Retry] only covers infrastructure related issues for which the
+    /// user can actually retry (e.g. we fail to send the email containing the auth link).
     Retry,
 }
 
-pub trait IMagicLinkService: Clone + Send + Sync + 'static {
-    fn generate_magic_link(
+pub trait IAuthLinkService: Clone + Send + Sync + 'static {
+    fn generate_auth_link(
         &self,
-        req: GenerateMagicLinkRequest,
-    ) -> impl Future<Output = GenerateMagicLinkResult> + Send;
+        req: GenerateAuthLinkRequest,
+    ) -> impl Future<Output = GenerateAuthLinkResult> + Send;
 
-    fn validate_magic_token(
+    fn validate_auth_token(
         &self,
-        token: &MagicToken,
+        token: &AuthToken,
     ) -> impl Future<Output = Result<Option<UserId>, ()>> + Send;
 }
 
@@ -497,10 +497,10 @@ pub mod test_utils {
                 email: EmailAddress
             ) -> UserLoginResult;
 
-            async fn validate_magic_link(
+            async fn validate_auth_link(
                 &self,
-                magic_token: MagicToken,
-            ) -> Result<MagicLinkValidationResult, ()>;
+                token: AuthToken,
+            ) -> Result<AuthLinkValidationResult, ()>;
 
             async fn check_session_token(
                 &self,
@@ -510,21 +510,21 @@ pub mod test_utils {
     }
 
     mock! {
-        pub MagicLinkService {}
+        pub AuthLinkService {}
 
-        impl Clone for MagicLinkService {
+        impl Clone for AuthLinkService {
             fn clone(&self) -> Self;
         }
 
-        impl IMagicLinkService for MagicLinkService {
-            async fn generate_magic_link(
+        impl IAuthLinkService for AuthLinkService {
+            async fn generate_auth_link(
                 &self,
-                req: GenerateMagicLinkRequest
-            ) -> GenerateMagicLinkResult;
+                req: GenerateAuthLinkRequest
+            ) -> GenerateAuthLinkResult;
 
-            async fn validate_magic_token(
+            async fn validate_auth_token(
                 &self,
-                token: &MagicToken
+                token: &AuthToken
             ) -> Result<Option<UserId>, ()>;
         }
     }
@@ -594,11 +594,11 @@ mod test {
     }
 
     #[test]
-    fn test_magic_link_expiry() {
+    fn test_auth_link_expiry() {
         let expire_at = chrono::Utc::now();
-        let link = HashedMagicLink::new(
+        let link = HashedAuthLink::new(
             UserId::test_default(),
-            MagicToken::new().as_hash().unwrap(),
+            AuthToken::new().as_hash().unwrap(),
             expire_at,
         );
         assert!(link.is_expired(&(expire_at + TimeDelta::seconds(1))));

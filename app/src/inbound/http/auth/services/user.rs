@@ -6,22 +6,22 @@ use tokio::sync::Mutex;
 use crate::{
     domain::models::UserId,
     inbound::http::auth::{
-        EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, IMagicLinkService,
-        ISessionService, IUserService, MagicLinkValidationResult, MagicToken, SessionToken,
+        AuthLinkValidationResult, AuthToken, EmailAddress, GenerateAuthLinkRequest,
+        GenerateAuthLinkResult, IAuthLinkService, ISessionService, IUserService, SessionToken,
         UserLoginResult, UserRegistrationResult,
     },
 };
 
 #[derive(Debug, Clone, Constructor)]
 pub struct UserService<MLS, UR, SS> {
-    magic_link_service: Arc<Mutex<MLS>>,
+    auth_link_service: Arc<Mutex<MLS>>,
     user_repository: Arc<Mutex<UR>>,
     session_service: Arc<Mutex<SS>>,
 }
 
 impl<MLS, UR, SS> IUserService for UserService<MLS, UR, SS>
 where
-    MLS: IMagicLinkService,
+    MLS: IAuthLinkService,
     UR: UserRepository,
     SS: ISessionService,
 {
@@ -40,17 +40,17 @@ where
             Err(()) => return UserRegistrationResult::Retry,
         };
 
-        let req = GenerateMagicLinkRequest::new(user, email);
+        let req = GenerateAuthLinkRequest::new(user, email);
         let res = self
-            .magic_link_service
+            .auth_link_service
             .lock()
             .await
-            .generate_magic_link(req)
+            .generate_auth_link(req)
             .await;
 
         match res {
-            GenerateMagicLinkResult::Success => UserRegistrationResult::Success,
-            GenerateMagicLinkResult::Retry => UserRegistrationResult::Retry,
+            GenerateAuthLinkResult::Success => UserRegistrationResult::Success,
+            GenerateAuthLinkResult::Retry => UserRegistrationResult::Retry,
         }
     }
 
@@ -67,32 +67,29 @@ where
             Err(()) => return UserLoginResult::Retry,
         };
 
-        let req = GenerateMagicLinkRequest::new(user, email);
+        let req = GenerateAuthLinkRequest::new(user, email);
         match self
-            .magic_link_service
+            .auth_link_service
             .lock()
             .await
-            .generate_magic_link(req)
+            .generate_auth_link(req)
             .await
         {
-            GenerateMagicLinkResult::Success => UserLoginResult::Success,
-            GenerateMagicLinkResult::Retry => UserLoginResult::Retry,
+            GenerateAuthLinkResult::Success => UserLoginResult::Success,
+            GenerateAuthLinkResult::Retry => UserLoginResult::Retry,
         }
     }
 
-    async fn validate_magic_link(
-        &self,
-        magic_token: MagicToken,
-    ) -> Result<MagicLinkValidationResult, ()> {
+    async fn validate_auth_link(&self, token: AuthToken) -> Result<AuthLinkValidationResult, ()> {
         let user = match self
-            .magic_link_service
+            .auth_link_service
             .lock()
             .await
-            .validate_magic_token(&magic_token)
+            .validate_auth_token(&token)
             .await
         {
             Ok(Some(user)) => user,
-            Ok(None) => return Ok(MagicLinkValidationResult::Invalid),
+            Ok(None) => return Ok(AuthLinkValidationResult::Invalid),
             _ => return Err(()),
         };
 
@@ -101,7 +98,7 @@ where
             .await
             .generate_session_token(&user)
             .await
-            .map(MagicLinkValidationResult::Success)
+            .map(AuthLinkValidationResult::Success)
     }
 
     async fn check_session_token(&self, token: &SessionToken) -> Result<UserId, ()> {
@@ -159,9 +156,9 @@ mod test_user_service_register_new_user {
     use crate::{
         domain::models::UserId,
         inbound::http::auth::{
-            EmailAddress, GenerateMagicLinkResult, UserRegistrationResult,
+            EmailAddress, GenerateAuthLinkResult, UserRegistrationResult,
             services::user::test_utils::MockUserRepository,
-            test_utils::{MockMagicLinkService, MockSessionService},
+            test_utils::{MockAuthLinkService, MockSessionService},
         },
     };
 
@@ -169,12 +166,12 @@ mod test_user_service_register_new_user {
 
     #[tokio::test]
     async fn test_ok_path() {
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_generate_magic_link()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
             .times(1)
             .withf(|link| link.email() == &EmailAddress::try_from("test@mail.test").unwrap())
-            .returning(|_| GenerateMagicLinkResult::Success);
+            .returning(|_| GenerateAuthLinkResult::Success);
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Ok(None));
         user.expect_store_user_with_mail()
@@ -183,7 +180,7 @@ mod test_user_service_register_new_user {
             .returning(|_, _| Ok(()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -196,19 +193,19 @@ mod test_user_service_register_new_user {
     }
 
     #[tokio::test]
-    async fn test_magic_link_retry() {
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_generate_magic_link()
+    async fn test_auth_link_retry() {
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
             .times(1)
-            .returning(|_| GenerateMagicLinkResult::Retry);
+            .returning(|_| GenerateAuthLinkResult::Retry);
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Ok(None));
         user.expect_store_user_with_mail()
             .times(1)
             .returning(|_, __| Ok(()));
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -227,11 +224,11 @@ mod test_user_service_register_new_user {
         user.expect_store_user_with_mail()
             .times(1)
             .returning(|_, __| Err(()));
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link.expect_generate_magic_link().times(0);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -249,14 +246,14 @@ mod test_user_service_register_new_user {
         user.expect_get_user_by_email()
             .returning(|_| Ok(Some(UserId::test_default())));
         user.expect_store_user_with_mail().times(0);
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_generate_magic_link()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
             .withf(|link| link.user() == &UserId::test_default())
-            .returning(|_| GenerateMagicLinkResult::Success);
+            .returning(|_| GenerateAuthLinkResult::Success);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -273,11 +270,11 @@ mod test_user_service_register_new_user {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Err(()));
         user.expect_store_user_with_mail().times(0);
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link.expect_generate_magic_link().times(0);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -294,7 +291,7 @@ mod test_user_service_register_new_user {
 mod test_user_service_login_user {
     use crate::inbound::http::auth::{
         services::user::test_utils::MockUserRepository,
-        test_utils::{MockMagicLinkService, MockSessionService},
+        test_utils::{MockAuthLinkService, MockSessionService},
     };
 
     use super::*;
@@ -304,15 +301,15 @@ mod test_user_service_login_user {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
             .returning(|_| Ok(Some(UserId::test_default())));
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_generate_magic_link()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
             .times(1)
             .withf(|link| link.email() == &"test@mail.test".try_into().unwrap())
-            .returning(|_| GenerateMagicLinkResult::Success);
+            .returning(|_| GenerateAuthLinkResult::Success);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -328,11 +325,11 @@ mod test_user_service_login_user {
     async fn test_user_does_not_exist() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Ok(None));
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link.expect_generate_magic_link().times(0);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -348,11 +345,11 @@ mod test_user_service_login_user {
     async fn test_cannot_check_if_user_exist() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email().returning(|_| Err(()));
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link.expect_generate_magic_link().times(0);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link.expect_generate_auth_link().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -365,17 +362,17 @@ mod test_user_service_login_user {
     }
 
     #[tokio::test]
-    async fn test_when_magic_link_retry() {
+    async fn test_when_auth_link_retry() {
         let mut user = MockUserRepository::new();
         user.expect_get_user_by_email()
             .returning(|_| Ok(Some(UserId::test_default())));
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_generate_magic_link()
-            .returning(|_| GenerateMagicLinkResult::Retry);
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_generate_auth_link()
+            .returning(|_| GenerateAuthLinkResult::Retry);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(MockSessionService::new())),
         );
@@ -407,22 +404,22 @@ impl IUserService for DisabledUserService {
         panic!("User service is disabled")
     }
 
-    async fn validate_magic_link(
+    async fn validate_auth_link(
         &self,
-        _magic_token: MagicToken,
-    ) -> Result<crate::inbound::http::MagicLinkValidationResult, ()> {
+        _token: AuthToken,
+    ) -> Result<crate::inbound::http::AuthLinkValidationResult, ()> {
         panic!("User service is disabled")
     }
 }
 
 #[cfg(test)]
-mod test_user_service_validate_magic_link {
+mod test_user_service_validate_auth_link {
     use chrono::{TimeDelta, Utc};
 
     use crate::inbound::http::auth::{
-        GenerateSessionTokenResult, MagicLinkValidationResult, MagicToken, SessionToken,
+        AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, SessionToken,
         services::user::test_utils::MockUserRepository,
-        test_utils::{MockMagicLinkService, MockSessionService},
+        test_utils::{MockAuthLinkService, MockSessionService},
     };
 
     use super::*;
@@ -430,9 +427,9 @@ mod test_user_service_validate_magic_link {
     #[tokio::test]
     async fn test_ok_path() {
         let user = MockUserRepository::new();
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_validate_magic_token()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_validate_auth_token()
             .returning(|_| Ok(Some(UserId::test_default())));
         let mut session = MockSessionService::new();
         let session_token = SessionToken::new();
@@ -451,17 +448,17 @@ mod test_user_service_validate_magic_link {
             });
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(session)),
         );
 
         let res = service
-            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
+            .validate_auth_link(AuthToken("a very long and secure auth token".to_string()))
             .await;
 
-        let Ok(MagicLinkValidationResult::Success(session)) = res else {
-            unreachable!("Should have return a Ok(MagicLinkValidationResult::Success(_))")
+        let Ok(AuthLinkValidationResult::Success(session)) = res else {
+            unreachable!("Should have return a Ok(AuthLinkValidationResult::Success(_))")
         };
         assert!(
             session_token
@@ -473,48 +470,48 @@ mod test_user_service_validate_magic_link {
     }
 
     #[tokio::test]
-    async fn test_magic_token_rejected() {
+    async fn test_auth_token_rejected() {
         let user = MockUserRepository::new();
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_validate_magic_token()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_validate_auth_token()
             .returning(|_| Ok(None));
         let mut session = MockSessionService::new();
         session.expect_generate_session_token().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(session)),
         );
 
         let res = service
-            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
+            .validate_auth_link(AuthToken("a very long and secure auth token".to_string()))
             .await;
 
-        let Ok(MagicLinkValidationResult::Invalid) = res else {
-            unreachable!("Should have return a Ok(MagicLinkValidationResult::Invalid)")
+        let Ok(AuthLinkValidationResult::Invalid) = res else {
+            unreachable!("Should have return a Ok(AuthLinkValidationResult::Invalid)")
         };
     }
 
     #[tokio::test]
-    async fn test_cannot_check_magic_token() {
+    async fn test_cannot_check_auth_token() {
         let user = MockUserRepository::new();
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_validate_magic_token()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_validate_auth_token()
             .returning(|_| Err(()));
         let mut session = MockSessionService::new();
         session.expect_generate_session_token().times(0);
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(session)),
         );
 
         let res = service
-            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
+            .validate_auth_link(AuthToken("a very long and secure auth token".to_string()))
             .await;
 
         assert!(res.is_err())
@@ -523,9 +520,9 @@ mod test_user_service_validate_magic_link {
     #[tokio::test]
     async fn test_cannot_generate_session_token() {
         let user = MockUserRepository::new();
-        let mut magic_link = MockMagicLinkService::new();
-        magic_link
-            .expect_validate_magic_token()
+        let mut auth_link = MockAuthLinkService::new();
+        auth_link
+            .expect_validate_auth_token()
             .returning(|_| Ok(Some(UserId::test_default())));
         let mut session = MockSessionService::new();
         session
@@ -533,13 +530,13 @@ mod test_user_service_validate_magic_link {
             .returning(|_| Err(()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(magic_link)),
+            Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
             Arc::new(Mutex::new(session)),
         );
 
         let res = service
-            .validate_magic_link(MagicToken("a very long and secure magic token".to_string()))
+            .validate_auth_link(AuthToken("a very long and secure auth token".to_string()))
             .await;
 
         assert!(res.is_err())
@@ -551,7 +548,7 @@ mod test_user_service_check_session_token {
     use crate::inbound::http::auth::{
         SessionToken,
         services::user::test_utils::MockUserRepository,
-        test_utils::{MockMagicLinkService, MockSessionService},
+        test_utils::{MockAuthLinkService, MockSessionService},
     };
 
     use super::*;
@@ -564,7 +561,7 @@ mod test_user_service_check_session_token {
             .returning(|_| Ok(UserId::test_default()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(MockMagicLinkService::new())),
+            Arc::new(Mutex::new(MockAuthLinkService::new())),
             Arc::new(Mutex::new(MockUserRepository::new())),
             Arc::new(Mutex::new(session)),
         );
@@ -584,7 +581,7 @@ mod test_user_service_check_session_token {
         session.expect_check_session_token().returning(|_| Err(()));
 
         let service = UserService::new(
-            Arc::new(Mutex::new(MockMagicLinkService::new())),
+            Arc::new(Mutex::new(MockAuthLinkService::new())),
             Arc::new(Mutex::new(MockUserRepository::new())),
             Arc::new(Mutex::new(session)),
         );

@@ -6,69 +6,69 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::inbound::http::auth::{
-    EmailAddress, GenerateMagicLinkRequest, GenerateMagicLinkResult, HashedMagicLink,
-    HashedMagicToken, IMagicLinkService, MagicLink, MagicToken,
+    AuthLink, AuthToken, EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult,
+    HashedAuthLink, HashedAuthToken, IAuthLinkService,
 };
 
 #[derive(Debug, Clone, Constructor)]
-pub struct MagicLinkService<SR, MP>
+pub struct AuthLinkService<SR, MP>
 where
-    SR: MagicLinkRepository,
+    SR: AuthLinkRepository,
     MP: MailProvider,
 {
-    magic_link_repository: Arc<Mutex<SR>>,
+    auth_link_repository: Arc<Mutex<SR>>,
     mail_provider: Arc<MP>,
 }
 
-impl<SR, MP> IMagicLinkService for MagicLinkService<SR, MP>
+impl<SR, MP> IAuthLinkService for AuthLinkService<SR, MP>
 where
-    SR: MagicLinkRepository,
+    SR: AuthLinkRepository,
     MP: MailProvider,
 {
-    async fn generate_magic_link(&self, req: GenerateMagicLinkRequest) -> GenerateMagicLinkResult {
-        let magic_token = MagicToken::new();
-        let magic_link = MagicLink::new(
+    async fn generate_auth_link(&self, req: GenerateAuthLinkRequest) -> GenerateAuthLinkResult {
+        let auth_token = AuthToken::new();
+        let auth_link = AuthLink::new(
             req.user().clone(),
-            magic_token.clone(),
+            auth_token.clone(),
             Utc::now() + TimeDelta::minutes(5),
         );
-        let Ok(hashed_magic_link) = magic_link.as_hash() else {
-            return GenerateMagicLinkResult::Retry;
+        let Ok(hashed_auth_link) = auth_link.as_hash() else {
+            return GenerateAuthLinkResult::Retry;
         };
 
-        let repository = self.magic_link_repository.lock().await;
+        let repository = self.auth_link_repository.lock().await;
 
-        let Ok(()) = repository.store_magic_link(&hashed_magic_link).await else {
-            return GenerateMagicLinkResult::Retry;
+        let Ok(()) = repository.store_auth_link(&hashed_auth_link).await else {
+            return GenerateAuthLinkResult::Retry;
         };
 
         let Ok(()) = self
             .mail_provider
-            .send_magic_link_email(req.email(), &magic_link)
+            .send_auth_link_email(req.email(), &auth_link)
             .await
         else {
             let _ = repository
-                .delete_magic_link_by_hash(hashed_magic_link.hash())
+                .delete_auth_link_by_hash(hashed_auth_link.hash())
                 .await;
-            return GenerateMagicLinkResult::Retry;
+            return GenerateAuthLinkResult::Retry;
         };
 
-        GenerateMagicLinkResult::Success
+        GenerateAuthLinkResult::Success
     }
 
-    async fn validate_magic_token(
+    async fn validate_auth_token(
         &self,
-        token: &MagicToken,
+        token: &AuthToken,
     ) -> Result<Option<crate::domain::models::UserId>, ()> {
-        let repository = self.magic_link_repository.lock().await;
-        let links = repository.get_all_magic_links().await;
+        let repository = self.auth_link_repository.lock().await;
+        let links = repository.get_all_auth_links().await;
 
         let mut found = None;
 
         let now = Utc::now();
         for link in links {
             if link.is_expired(&now) {
-                let _ = repository.delete_magic_link_by_hash(link.hash()).await;
+                let _ = repository.delete_auth_link_by_hash(link.hash()).await;
                 continue;
             }
             if link.hash().verify_token(token) {
@@ -77,7 +77,7 @@ where
         }
 
         if let Some(link) = &found {
-            let _ = repository.delete_magic_link_by_hash(link.hash()).await;
+            let _ = repository.delete_auth_link_by_hash(link.hash()).await;
         }
 
         Ok(found.map(|link| link.user().clone()))
@@ -85,30 +85,30 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-pub enum MagicLinkRepositoryError {
+pub enum AuthLinkRepositoryError {
     #[error("An error occured with the session repository")]
     Error,
 }
 
-pub trait MagicLinkRepository: Clone + Send + Sync + 'static {
-    fn store_magic_link(
+pub trait AuthLinkRepository: Clone + Send + Sync + 'static {
+    fn store_auth_link(
         &self,
-        link: &HashedMagicLink,
-    ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
+        link: &HashedAuthLink,
+    ) -> impl Future<Output = Result<(), AuthLinkRepositoryError>> + Send;
 
-    fn get_all_magic_links(&self) -> impl Future<Output = Vec<HashedMagicLink>> + Send;
+    fn get_all_auth_links(&self) -> impl Future<Output = Vec<HashedAuthLink>> + Send;
 
-    fn delete_magic_link_by_hash(
+    fn delete_auth_link_by_hash(
         &self,
-        hash: &HashedMagicToken,
-    ) -> impl Future<Output = Result<(), MagicLinkRepositoryError>> + Send;
+        hash: &HashedAuthToken,
+    ) -> impl Future<Output = Result<(), AuthLinkRepositoryError>> + Send;
 }
 
 pub trait MailProvider: Clone + Send + Sync + 'static {
-    fn send_magic_link_email(
+    fn send_auth_link_email(
         &self,
         email: &EmailAddress,
-        magic_link: &MagicLink,
+        auth_link: &AuthLink,
     ) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
@@ -125,18 +125,18 @@ mod test_utils {
             fn clone(&self) -> Self;
         }
 
-        impl MagicLinkRepository for SessionRepository {
-            async fn store_magic_link(
+        impl AuthLinkRepository for SessionRepository {
+            async fn store_auth_link(
                 &self,
-                link: &HashedMagicLink,
-            ) -> Result<(), MagicLinkRepositoryError>;
+                link: &HashedAuthLink,
+            ) -> Result<(), AuthLinkRepositoryError>;
 
-            async fn get_all_magic_links(&self) -> Vec<HashedMagicLink>;
+            async fn get_all_auth_links(&self) -> Vec<HashedAuthLink>;
 
-            async fn delete_magic_link_by_hash(
+            async fn delete_auth_link_by_hash(
                 &self,
-                hash: &HashedMagicToken,
-            ) -> Result<(), MagicLinkRepositoryError>;
+                hash: &HashedAuthToken,
+            ) -> Result<(), AuthLinkRepositoryError>;
         }
     }
 
@@ -148,75 +148,75 @@ mod test_utils {
         }
 
         impl MailProvider for MailProvider {
-            async fn send_magic_link_email(
+            async fn send_auth_link_email(
                 &self,
                 email: &EmailAddress,
-                magic_link: &MagicLink,
+                auth_link: &AuthLink,
             ) -> Result<(), ()>;
         }
     }
 }
 
 #[cfg(test)]
-mod test_magic_link_service_generate_magic_link {
+mod test_auth_link_service_generate_auth_link {
 
     use crate::{
         domain::models::UserId,
         inbound::http::auth::{
-            GenerateMagicLinkRequest,
-            services::magic_link::test_utils::{MockMailProvider, MockSessionRepository},
+            GenerateAuthLinkRequest,
+            services::auth_link::test_utils::{MockMailProvider, MockSessionRepository},
         },
     };
 
     use super::*;
 
     #[tokio::test]
-    async fn test_return_failure_if_storing_magic_link_err() {
+    async fn test_return_failure_if_storing_auth_link_err() {
         let mut repository = MockSessionRepository::new();
         repository
-            .expect_store_magic_link()
-            .returning(|_| Err(MagicLinkRepositoryError::Error));
+            .expect_store_auth_link()
+            .returning(|_| Err(AuthLinkRepositoryError::Error));
         let mut email_provider = MockMailProvider::new();
-        email_provider.expect_send_magic_link_email().times(0);
+        email_provider.expect_send_auth_link_email().times(0);
         let service =
-            MagicLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
 
-        let req = GenerateMagicLinkRequest::new(
+        let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
             EmailAddress::try_from("test@email.test").unwrap(),
         );
 
-        let res = service.generate_magic_link(req).await;
+        let res = service.generate_auth_link(req).await;
 
-        let GenerateMagicLinkResult::Retry = res else {
-            unreachable!("Should have return a GenerateMagicLinkResult::Retry")
+        let GenerateAuthLinkResult::Retry = res else {
+            unreachable!("Should have return a GenerateAuthLinkResult::Retry")
         };
     }
 
     #[tokio::test]
-    async fn test_return_failure_and_delete_magic_link_if_sending_magic_link_err() {
+    async fn test_return_failure_and_delete_auth_link_if_sending_auth_link_err() {
         let mut repository = MockSessionRepository::new();
-        repository.expect_store_magic_link().returning(|_| Ok(()));
+        repository.expect_store_auth_link().returning(|_| Ok(()));
         repository
-            .expect_delete_magic_link_by_hash()
+            .expect_delete_auth_link_by_hash()
             .times(1)
             .returning(|_| Ok(()));
         let mut email_provider = MockMailProvider::new();
         email_provider
-            .expect_send_magic_link_email()
+            .expect_send_auth_link_email()
             .returning(|_, _| Err(()));
         let service =
-            MagicLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
 
-        let req = GenerateMagicLinkRequest::new(
+        let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
             EmailAddress::try_from("test@email.com").unwrap(),
         );
 
-        let res = service.generate_magic_link(req).await;
+        let res = service.generate_auth_link(req).await;
 
-        let GenerateMagicLinkResult::Retry = res else {
-            unreachable!("Should have return a GenerateMagicLinkResult::Retry")
+        let GenerateAuthLinkResult::Retry = res else {
+            unreachable!("Should have return a GenerateAuthLinkResult::Retry")
         };
     }
 
@@ -224,42 +224,42 @@ mod test_magic_link_service_generate_magic_link {
     async fn test_ok_store_link_and_send_email() {
         let mut repository = MockSessionRepository::new();
         repository
-            .expect_store_magic_link()
+            .expect_store_auth_link()
             .times(1)
             .withf(|link| link.user() == &UserId::test_default())
             .returning(|_| Ok(()));
 
         let mut email_provider = MockMailProvider::new();
         email_provider
-            .expect_send_magic_link_email()
+            .expect_send_auth_link_email()
             .times(1)
-            .withf(|mail, magic_link| {
+            .withf(|mail, auth_link| {
                 mail == &"test@email.test".try_into().unwrap()
-                    && magic_link.user() == &UserId::test_default()
+                    && auth_link.user() == &UserId::test_default()
             })
             .returning(|_, _| Ok(()));
 
         let service =
-            MagicLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
+            AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
 
-        let req = GenerateMagicLinkRequest::new(
+        let req = GenerateAuthLinkRequest::new(
             UserId::test_default(),
             EmailAddress::try_from("test@email.test").unwrap(),
         );
 
-        let res = service.generate_magic_link(req).await;
+        let res = service.generate_auth_link(req).await;
 
-        let GenerateMagicLinkResult::Success = res else {
-            unreachable!("Should have return a GenerateMagicLinkResult::Success")
+        let GenerateAuthLinkResult::Success = res else {
+            unreachable!("Should have return a GenerateAuthLinkResult::Success")
         };
     }
 }
 
 #[cfg(test)]
-mod test_magic_link_service_validate_magic_link {
+mod test_auth_link_service_validate_auth_link {
     use crate::{
         domain::models::UserId,
-        inbound::http::auth::services::magic_link::test_utils::{
+        inbound::http::auth::services::auth_link::test_utils::{
             MockMailProvider, MockSessionRepository,
         },
     };
@@ -269,11 +269,11 @@ mod test_magic_link_service_validate_magic_link {
     #[tokio::test]
     async fn test_ok_matching_link_found() {
         let mut repository = MockSessionRepository::new();
-        let token = MagicToken::new();
+        let token = AuthToken::new();
         let hashed_token = token.as_hash().unwrap();
         let hashed_token_clone = hashed_token.clone();
-        repository.expect_get_all_magic_links().returning(move || {
-            vec![HashedMagicLink::new(
+        repository.expect_get_all_auth_links().returning(move || {
+            vec![HashedAuthLink::new(
                 UserId::test_default(),
                 hashed_token_clone.clone(),
                 Utc::now() + TimeDelta::minutes(5),
@@ -281,17 +281,17 @@ mod test_magic_link_service_validate_magic_link {
         });
         let token_clone = token.clone();
         repository
-            .expect_delete_magic_link_by_hash()
+            .expect_delete_auth_link_by_hash()
             .times(1)
             .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
-        let service = MagicLinkService::new(
+        let service = AuthLinkService::new(
             Arc::new(Mutex::new(repository)),
             Arc::new(MockMailProvider::new()),
         );
 
-        let res = service.validate_magic_token(&token).await;
+        let res = service.validate_auth_token(&token).await;
 
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), Some(UserId::test_default()));
@@ -300,16 +300,16 @@ mod test_magic_link_service_validate_magic_link {
     #[tokio::test]
     async fn test_no_matching_link_found() {
         let mut repository = MockSessionRepository::new();
-        let token = MagicToken::new();
-        repository.expect_get_all_magic_links().returning(Vec::new);
-        repository.expect_delete_magic_link_by_hash().times(0);
+        let token = AuthToken::new();
+        repository.expect_get_all_auth_links().returning(Vec::new);
+        repository.expect_delete_auth_link_by_hash().times(0);
 
-        let service = MagicLinkService::new(
+        let service = AuthLinkService::new(
             Arc::new(Mutex::new(repository)),
             Arc::new(MockMailProvider::new()),
         );
 
-        let res = service.validate_magic_token(&token).await;
+        let res = service.validate_auth_token(&token).await;
 
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), None);
@@ -318,11 +318,11 @@ mod test_magic_link_service_validate_magic_link {
     #[tokio::test]
     async fn test_matching_link_found_but_expired() {
         let mut repository = MockSessionRepository::new();
-        let token = MagicToken::new();
+        let token = AuthToken::new();
         let hashed_token = token.as_hash().unwrap();
         let hashed_token_clone = hashed_token.clone();
-        repository.expect_get_all_magic_links().returning(move || {
-            vec![HashedMagicLink::new(
+        repository.expect_get_all_auth_links().returning(move || {
+            vec![HashedAuthLink::new(
                 UserId::test_default(),
                 hashed_token_clone.clone(),
                 Utc::now() - TimeDelta::minutes(5),
@@ -330,17 +330,17 @@ mod test_magic_link_service_validate_magic_link {
         });
         let token_clone = token.clone();
         repository
-            .expect_delete_magic_link_by_hash()
+            .expect_delete_auth_link_by_hash()
             .times(1)
             .withf(move |hash| hash.verify_token(&token_clone))
             .returning(|_| Ok(()));
 
-        let service = MagicLinkService::new(
+        let service = AuthLinkService::new(
             Arc::new(Mutex::new(repository)),
             Arc::new(MockMailProvider::new()),
         );
 
-        let res = service.validate_magic_token(&token).await;
+        let res = service.validate_auth_token(&token).await;
 
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), None);

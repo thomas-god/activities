@@ -10,8 +10,8 @@ use crate::{
     domain::ports::{IActivityService, IPreferencesService, ITrainingService},
     inbound::{
         http::{
-            AppState, MagicLinkValidationResult,
-            auth::{IUserService, MagicToken},
+            AppState, AuthLinkValidationResult,
+            auth::{AuthToken, IUserService},
         },
         parser::ParseFile,
     },
@@ -25,12 +25,12 @@ pub async fn validate_login<
     PS: IPreferencesService,
 >(
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
-    Path(magic_token): Path<String>,
+    Path(auth_token): Path<String>,
 ) -> impl IntoResponse {
-    let token = MagicToken::from(magic_token);
+    let token = AuthToken::from(auth_token);
 
-    match state.user_service.validate_magic_link(token).await {
-        Ok(MagicLinkValidationResult::Success(session)) => {
+    match state.user_service.validate_auth_link(token).await {
+        Ok(AuthLinkValidationResult::Success(session)) => {
             let Ok(expire_at) =
                 OffsetDateTime::from_unix_timestamp(session.expire_at().timestamp())
             else {
@@ -55,7 +55,7 @@ pub async fn validate_login<
             let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
             (headers, StatusCode::OK).into_response()
         }
-        Ok(MagicLinkValidationResult::Invalid) => StatusCode::UNAUTHORIZED.into_response(),
+        Ok(AuthLinkValidationResult::Invalid) => StatusCode::UNAUTHORIZED.into_response(),
         Err(()) => StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }
 }
