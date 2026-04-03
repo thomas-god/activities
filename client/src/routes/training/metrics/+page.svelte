@@ -68,6 +68,7 @@
 					format={metricValuesDisplayFormat(metric)}
 					showGroup={metric.group_by !== null}
 					groupBy={metric.group_by}
+					stacked={metric.aggregate === 'Sum'}
 				/>
 			</div>
 		{/each}

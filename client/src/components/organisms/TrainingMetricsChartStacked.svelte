@@ -14,6 +14,7 @@
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
 		groupBy: GroupByClause | null;
+		stacked?: boolean;
 	}
 
 	let {
@@ -24,7 +25,8 @@
 		granularity,
 		format,
 		groupBy,
-		showGroup = true
+		showGroup = true,
+		stacked = true
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -101,18 +103,20 @@
 		if (values.length === 0) {
 			return [];
 		}
-		const maxGroupValue = values
-			.reduce<Map<string, number>>((groupValues, value) => {
-				if (groupValues.has(value.time)) {
-					groupValues.set(value.time, groupValues.get(value.time)! + value.value);
-				} else {
-					groupValues.set(value.time, value.value);
-				}
+		const maxGroupValue = stacked
+			? values
+					.reduce<Map<string, number>>((groupValues, value) => {
+						if (groupValues.has(value.time)) {
+							groupValues.set(value.time, groupValues.get(value.time)! + value.value);
+						} else {
+							groupValues.set(value.time, value.value);
+						}
 
-				return groupValues;
-			}, new Map<string, number>())
-			.entries()
-			.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1];
+						return groupValues;
+					}, new Map<string, number>())
+					.entries()
+					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
+			: (d3.max(values, (v) => v.value) ?? 0);
 		return d3.ticks(0, maxGroupValue, 6);
 	};
 
@@ -122,18 +126,20 @@
 		}
 		if (format === 'duration') {
 			const dt = 600;
-			const maxDuration = values
-				.reduce<Map<string, number>>((times, value) => {
-					if (times.has(value.time)) {
-						times.set(value.time, times.get(value.time)! + value.value);
-					} else {
-						times.set(value.time, value.value);
-					}
+			const maxDuration = stacked
+				? values
+						.reduce<Map<string, number>>((times, value) => {
+							if (times.has(value.time)) {
+								times.set(value.time, times.get(value.time)! + value.value);
+							} else {
+								times.set(value.time, value.value);
+							}
 
-					return times;
-				}, new Map<string, number>())
-				.entries()
-				.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1];
+							return times;
+						}, new Map<string, number>())
+						.entries()
+						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
+				: (d3.max(values, (v) => v.value) ?? 0);
 			const roundedUpMaxDuration = Math.ceil(maxDuration / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
 			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
@@ -183,7 +189,12 @@
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([0, d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!])
+			.domain([
+				0,
+				stacked
+					? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
+					: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!
+			])
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
@@ -200,6 +211,8 @@
 	let groups = $derived(
 		Array.from(d3.union(values.map((v) => displayGroupName(v.group, groupBy)))).sort()
 	);
+
+	let xGroup = $derived(d3.scaleBand().domain(groups).range([0, x.bandwidth()]).padding(0.1));
 
 	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 
@@ -271,10 +284,20 @@
 					})
 				)
 				.join('rect')
-				.attr('x', (stackedDataPoint: any) => x(stackedDataPoint.data[0])!)
-				.attr('y', (stackedDataPoint: any) => y(stackedDataPoint[1]))
-				.attr('height', (stackedDataPoint: any) => y(stackedDataPoint[0]) - y(stackedDataPoint[1]))
-				.attr('width', x.bandwidth())
+				.attr('x', (stackedDataPoint: any) =>
+					stacked
+						? x(stackedDataPoint.data[0])!
+						: x(stackedDataPoint.data[0])! + xGroup(stackedDataPoint.key)!
+				)
+				.attr('y', (stackedDataPoint: any) =>
+					stacked ? y(stackedDataPoint[1]) : y(stackedDataPoint[1] - stackedDataPoint[0])
+				)
+				.attr('height', (stackedDataPoint: any) =>
+					stacked
+						? y(stackedDataPoint[0]) - y(stackedDataPoint[1])
+						: y(0) - y(stackedDataPoint[1] - stackedDataPoint[0])
+				)
+				.attr('width', stacked ? x.bandwidth() : xGroup.bandwidth())
 				.attr('stroke', 'none')
 				.on('mouseenter', function (event: MouseEvent, stackedDataPoint: any) {
 					// Show tooltip
@@ -286,8 +309,12 @@
 					const total = values.filter((v) => v.time === time).reduce((sum, v) => sum + v.value, 0);
 
 					// Use SVG coordinates directly
-					const xPos = x(stackedDataPoint.data[0])! + x.bandwidth() / 2;
-					const yPos = y(stackedDataPoint[1]);
+					const xPos = stacked
+						? x(stackedDataPoint.data[0])! + x.bandwidth() / 2
+						: x(stackedDataPoint.data[0])! + xGroup(stackedDataPoint.key)! + xGroup.bandwidth() / 2;
+					const yPos = stacked
+						? y(stackedDataPoint[1])
+						: y(stackedDataPoint[1] - stackedDataPoint[0]);
 
 					// Check if there's enough space above the bar for tooltip (need ~100px)
 					const tooltipHeight = 100;
@@ -417,7 +444,7 @@
 								{/if}
 								<span>{formatTooltipValue(tooltip.value)}</span>
 							</div>
-							{#if showGroup && tooltip.total !== tooltip.value}
+							{#if showGroup && tooltip.total !== tooltip.value && stacked}
 								<div class="text-xs opacity-60">
 									<span>Total</span>
 									<span>•</span>

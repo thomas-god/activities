@@ -86,6 +86,7 @@
 			format={metricValuesDisplayFormat(currentMetric)}
 			showGroup={currentMetric.showGroup}
 			groupBy={currentMetric.groupBy}
+			stacked={currentMetric.aggregate === 'Sum'}
 		/>
 	</div>
 
