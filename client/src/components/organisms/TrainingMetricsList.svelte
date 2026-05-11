@@ -49,17 +49,21 @@
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 			<TrainingMetricTitle metric={metric.initialMetric} />
 
-			<TrainingMetricsChartStacked
-				{height}
-				width={chartWidth}
-				values={metric.values}
-				unit={metric.unit}
-				granularity={metric.granularity}
-				format={metricValuesDisplayFormat(metric)}
-				showGroup={metric.showGroup}
-				groupBy={metric.groupBy}
-				stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-			/>
+			{#if metric.values.length > 0}
+				<TrainingMetricsChartStacked
+					{height}
+					width={chartWidth}
+					values={metric.values}
+					unit={metric.unit}
+					granularity={metric.granularity}
+					format={metricValuesDisplayFormat(metric)}
+					showGroup={metric.showGroup}
+					groupBy={metric.groupBy}
+					stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+				/>
+			{:else}
+				<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
+			{/if}
 
 			{#if idx !== metricProps.length - 1}
 				<div class="divider"></div>
