@@ -138,7 +138,7 @@ async fn build_activity_service() -> anyhow::Result<(
 
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
-        Arc::new(Mutex::new(activity_service.clone())),
+        activity_service.clone(),
     ));
 
     anyhow::Ok((activity_service, parser, training_metrics_service))

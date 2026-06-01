@@ -1,7 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
 
-use tokio::sync::Mutex;
-
 use crate::{
     config::{Config, load_env},
     domain::services::{
@@ -82,7 +80,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
 
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
-        Arc::new(Mutex::new(activity_service.clone())),
+        activity_service.clone(),
     ));
 
     let user_service = DisabledUserService {};

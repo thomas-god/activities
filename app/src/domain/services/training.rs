@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use chrono::NaiveDate;
 use derive_more::Constructor;
-use tokio::sync::Mutex;
 
 use crate::domain::{
     models::{
@@ -41,7 +38,7 @@ where
     AS: IActivityService,
 {
     training_repository: TR,
-    activity_service: Arc<Mutex<AS>>,
+    activity_service: AS,
 }
 
 impl<TMR, AS> ITrainingService for TrainingService<TMR, AS>
@@ -132,8 +129,6 @@ where
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
         let activities = self
             .activity_service
-            .lock()
-            .await
             .list_activities_with_metric(
                 definition.user(),
                 &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
@@ -353,13 +348,7 @@ where
         let filters =
             ListActivitiesFilters::empty().set_date_range(Some(period.range_default_tomorrow()));
 
-        let Ok(activities) = self
-            .activity_service
-            .lock()
-            .await
-            .list_activities(user, &filters)
-            .await
-        else {
+        let Ok(activities) = self.activity_service.list_activities(user, &filters).await else {
             return None;
         };
 
@@ -1072,7 +1061,6 @@ pub mod test_utils {
 mod tests_training_metrics_service {
 
     use anyhow::anyhow;
-    use tokio::sync::Mutex;
 
     use super::*;
     use crate::domain::models::activity::{
@@ -1103,7 +1091,7 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, activities);
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1129,7 +1117,7 @@ mod tests_training_metrics_service {
             .expect_save_training_metric_definition()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         let activities = MockActivityService::new();
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activities)));
+        let service = TrainingService::new(repository, activities);
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1157,7 +1145,7 @@ mod tests_training_metrics_service {
             )))
         });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::new()));
+        let activity_service = MockActivityService::new();
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1201,7 +1189,7 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metric()
             .returning(|_, _, _| Ok(vec![]));
 
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(repository, activity_service);
 
         let res = service
             .get_training_metrics_values(
@@ -1266,7 +1254,7 @@ mod tests_training_metrics_service {
                 Ok(vec![])
             });
 
-        let service = TrainingService::new(repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(repository, activity_service);
 
         let res = service
             .get_training_metrics_values(
@@ -1337,7 +1325,7 @@ mod tests_training_metrics_service {
             })
             .returning(|_, _, _| Ok(vec![]));
 
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         let date_range = DateRange::new(
@@ -1418,7 +1406,7 @@ mod tests_training_metrics_service {
                 )])
             });
 
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         // Input date range: Wednesday to Thursday (mid-week)
@@ -1464,7 +1452,7 @@ mod tests_training_metrics_service {
         activity_service
             .expect_list_activities_with_metric()
             .returning(|_, _, _| Ok(vec![]));
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1536,7 +1524,7 @@ mod tests_training_metrics_service {
         activity_service
             .expect_list_activities_with_metric()
             .returning(|_, _, _| Ok(vec![]));
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1577,7 +1565,7 @@ mod tests_training_metrics_service {
         });
 
         // Period metrics won't be called since global fails first
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1628,7 +1616,7 @@ mod tests_training_metrics_service {
                 )))
             });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1668,7 +1656,7 @@ mod tests_training_metrics_service {
                 )))
             });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1739,7 +1727,7 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metric()
             .returning(|_, _, _| Ok(vec![]));
 
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1837,7 +1825,7 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metric()
             .returning(|_, _, _| Ok(vec![]));
 
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
 
         let res = service
@@ -1863,7 +1851,7 @@ mod tests_training_metrics_service {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| Ok(None));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = DeleteTrainingMetricRequest::new(
@@ -1893,7 +1881,7 @@ mod tests_training_metrics_service {
             )))
         });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = DeleteTrainingMetricRequest::new(
@@ -1929,7 +1917,7 @@ mod tests_training_metrics_service {
             .withf(|id| id == &TrainingMetricId::from("test"))
             .returning(|_| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = DeleteTrainingMetricRequest::new(
@@ -1947,7 +1935,7 @@ mod tests_training_metrics_service {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| Ok(None));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricNameRequest::new(
@@ -1978,7 +1966,7 @@ mod tests_training_metrics_service {
             )))
         });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricNameRequest::new(
@@ -2019,7 +2007,7 @@ mod tests_training_metrics_service {
             })
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricNameRequest::new(
@@ -2054,7 +2042,7 @@ mod tests_training_metrics_service {
             })
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricScopeRequest::new(
@@ -2072,7 +2060,7 @@ mod tests_training_metrics_service {
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_definition().returning(|_| Ok(None));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricScopeRequest::new(
@@ -2102,7 +2090,7 @@ mod tests_training_metrics_service {
             )))
         });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricScopeRequest::new(
@@ -2137,7 +2125,7 @@ mod tests_training_metrics_service {
             .expect_get_training_period()
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let period_id = TrainingPeriodId::new();
@@ -2193,7 +2181,7 @@ mod tests_training_metrics_service {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = UpdateTrainingMetricScopeRequest::new(
@@ -2229,7 +2217,7 @@ mod test_training_service_period {
             .expect_save_training_period()
             .times(1)
             .returning(|_| Ok(()));
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = CreateTrainingPeriodRequest::new(
@@ -2253,7 +2241,7 @@ mod test_training_service_period {
             .expect_save_training_period()
             .times(1)
             .returning(|_| Err(SaveTrainingPeriodError::Unknown(anyhow!("repo error"))));
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let req = CreateTrainingPeriodRequest::new(
@@ -2277,7 +2265,7 @@ mod test_training_service_period {
             .expect_get_training_period()
             .times(1)
             .returning(|_, _| None);
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
         let result = service
@@ -2381,8 +2369,7 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _| Ok(activities_clone.clone()));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2489,8 +2476,7 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _| Ok(activities_clone.clone()));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2604,8 +2590,7 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _| Ok(activities_clone.clone()));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2726,8 +2711,7 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _| Ok(activities_clone.clone()));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2824,8 +2808,7 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _| Ok(activities_clone.clone()));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2877,8 +2860,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
 
-        let service =
-            TrainingService::new(training_repository, Arc::new(Mutex::new(activity_service)));
+        let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
             .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
@@ -2914,7 +2896,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
@@ -2934,7 +2916,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = DeleteTrainingPeriodRequest::new(user_id.clone(), period_id.clone());
@@ -2972,7 +2954,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(move |_, _| Some(period));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = DeleteTrainingPeriodRequest::new(other_user_id.clone(), period_id.clone());
@@ -3014,7 +2996,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_| Err(anyhow!("database error")));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
@@ -3057,7 +3039,7 @@ mod test_training_service_period {
             .withf(move |id, name| id == &period_id_clone && name == "Updated Period Name")
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
@@ -3078,7 +3060,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id.clone(), new_name);
@@ -3117,7 +3099,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(move |_, _| Some(period));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req =
@@ -3161,7 +3143,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _| Err(anyhow!("database error")));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
@@ -3205,7 +3187,7 @@ mod test_training_service_period {
             .withf(move |id, note| id == &period_id_clone && note == &new_note_clone)
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3244,7 +3226,7 @@ mod test_training_service_period {
             .withf(move |id, note| id == &period_id_clone && note.is_none())
             .returning(|_, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3265,7 +3247,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id.clone(), new_note);
@@ -3304,7 +3286,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(move |_, _| Some(period));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req =
@@ -3348,7 +3330,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _| Err(anyhow!("database error")));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3396,7 +3378,7 @@ mod test_training_service_period {
             })
             .returning(|_, _, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3439,7 +3421,7 @@ mod test_training_service_period {
             })
             .returning(|_, _, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3472,7 +3454,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(move |_, _| Some(period));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3498,7 +3480,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req =
@@ -3539,7 +3521,7 @@ mod test_training_service_period {
             .times(1)
             .return_once(move |_, _| Some(period));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodDatesRequest::new(
@@ -3588,7 +3570,7 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _, _| Err(anyhow!("database error")));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3626,7 +3608,7 @@ mod test_training_service_training_note {
             .times(1)
             .returning(|_| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
@@ -3648,7 +3630,7 @@ mod test_training_service_training_note {
             .times(1)
             .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
@@ -3707,7 +3689,7 @@ mod test_training_service_training_note {
                 )])
             });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3732,7 +3714,7 @@ mod test_training_service_training_note {
             .times(1)
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3783,7 +3765,7 @@ mod test_training_service_training_note {
             .expect_get_training_metrics_ordering()
             .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3806,7 +3788,7 @@ mod test_training_service_training_note {
             .times(1)
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3849,7 +3831,7 @@ mod test_training_service_metric_values {
             .times(1)
             .return_once(move |_| Ok(None));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3888,7 +3870,7 @@ mod test_training_service_metric_values {
             .times(1)
             .return_once(move |_| Ok(Some(definition)));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3926,7 +3908,7 @@ mod test_training_service_metric_values {
             .returning(|_, _, _| Ok(vec![]));
 
         let training_repository = MockTrainingRepository::new();
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -3977,7 +3959,7 @@ mod test_training_service_metric_values {
             .returning(move |_, _, _| Ok(vec![(activity.clone(), 0.)]));
 
         let training_repository = MockTrainingRepository::new();
-        let activity_service = Arc::new(Mutex::new(activity_service));
+        let activity_service = activity_service;
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4019,7 +4001,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(move |_, _| Ok(ordering.clone()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4067,7 +4049,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(move |_, _| Ok(ordering.clone()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4089,7 +4071,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4129,7 +4111,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(move |_, _| Some(period.clone()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4161,7 +4143,7 @@ mod test_training_service_metrics_ordering {
                 )))
             });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4191,7 +4173,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(|_, _, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4230,7 +4212,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(|_, _, _| Ok(()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4254,7 +4236,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(|_, _| None);
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4296,7 +4278,7 @@ mod test_training_service_metrics_ordering {
             .times(1)
             .returning(move |_, _| Some(period.clone()));
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
@@ -4330,7 +4312,7 @@ mod test_training_service_metrics_ordering {
                 )))
             });
 
-        let activity_service = Arc::new(Mutex::new(MockActivityService::default()));
+        let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
