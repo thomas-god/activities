@@ -66,7 +66,7 @@ def delete_all_periods() -> None:
     for period in periods:
         period_id = period["id"]
         del_response = requests.delete(f"{API_URL}/training/period/{period_id}")
-        if del_response.status_code == 200:
+        if del_response.status_code == 204:
             print(f"Deleted period: {period_id}")
         else:
             print(f"Failed to delete period {period_id}: {del_response.status_code}")
@@ -84,7 +84,7 @@ def delete_all_notes() -> None:
     for note in notes:
         note_id = note["id"]
         del_response = requests.delete(f"{API_URL}/training/note/{note_id}")
-        if del_response.status_code == 200:
+        if del_response.status_code == 204:
             print(f"Deleted note: {note_id}")
         else:
             print(f"Failed to delete note {note_id}: {del_response.status_code}")
@@ -95,7 +95,7 @@ def delete_all_metrics() -> None:
     print("Deleting all existing training metrics...")
     try:
         response = requests.get(
-            f"{API_URL}/training/metrics?start=2020-01-01T00:00:00%2B00:00"
+            f"{API_URL}/training/metrics?start=2020-01-01T00:00:00%2B00:00&scope=global"
         )
         if response.status_code != 200:
             print(f"Failed to fetch metrics: {response.status_code}")
