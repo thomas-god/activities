@@ -8,8 +8,9 @@ use crate::{
     domain::{
         models::training::TrainingMetricId,
         ports::{
-            DeleteTrainingMetricError, DeleteTrainingMetricRequest, IActivityService,
-            IPreferencesService, ITrainingService,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{DeleteTrainingMetricError, DeleteTrainingMetricRequest, ITrainingService},
         },
     },
     inbound::{

@@ -5,7 +5,9 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{
-    domain::ports::{IActivityService, IPreferencesService, ITrainingService},
+    domain::ports::{
+        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    },
     inbound::{
         http::{
             AppState, UserLoginResult,

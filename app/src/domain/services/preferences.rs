@@ -3,7 +3,7 @@ use crate::domain::{
         UserId,
         preferences::{Preference, PreferenceKey},
     },
-    ports::{
+    ports::preferences::{
         DeletePreferenceError, GetPreferenceError, IPreferencesService, PreferencesRepository,
         SetPreferenceError,
     },
@@ -82,6 +82,8 @@ where
 pub mod tests_utils {
     use mockall::mock;
 
+    use crate::domain::ports::preferences::SavePreferenceError;
+
     use super::*;
 
     mock! {
@@ -140,7 +142,7 @@ pub mod tests_utils {
                 &self,
                 user: &UserId,
                 preference: &Preference,
-            ) -> Result<(), crate::domain::ports::SavePreferenceError>;
+            ) -> Result<(), SavePreferenceError>;
 
             async fn delete_preference(
                 &self,

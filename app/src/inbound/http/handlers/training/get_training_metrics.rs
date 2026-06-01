@@ -20,7 +20,10 @@ use crate::{
                 TrainingMetricScope, TrainingMetricValues, TrainingPeriodId,
             },
         },
-        ports::{DateRange, IActivityService, IPreferencesService, ITrainingService},
+        ports::{
+            DateRange, activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{

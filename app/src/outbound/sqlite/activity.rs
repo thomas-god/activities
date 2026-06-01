@@ -15,9 +15,12 @@ use crate::{
             },
         },
         ports::{
-            ActivityRepository, DateTimeRange, GetRawActivityError, ListActivitiesError,
-            ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
-            SimilarActivityError, UpdateActivityMetricError,
+            DateTimeRange,
+            activity::{
+                ActivityRepository, GetRawActivityError, ListActivitiesError,
+                ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
+                SimilarActivityError, UpdateActivityMetricError,
+            },
         },
     },
     inbound::parser::ParseFile,
@@ -638,7 +641,10 @@ mod test_sqlite_activity_repository {
                     TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
-            ports::{DateRange, GetRawDataError, RawContent, test_utils::MockRawDataRepository},
+            ports::{
+                DateRange,
+                activity::{GetRawDataError, RawContent, test_utils::MockRawDataRepository},
+            },
         },
         inbound::parser::{ParseBytesError, ParsedFileContent, test_utils::MockFileParser},
     };

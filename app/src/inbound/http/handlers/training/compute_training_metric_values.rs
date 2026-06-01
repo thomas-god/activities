@@ -9,8 +9,10 @@ use crate::{
             TrainingMetricFilters, TrainingMetricGranularity,
         },
         ports::{
-            ComputeTrainingMetricValuesError, DateRange, IActivityService, IPreferencesService,
-            ITrainingService,
+            DateRange,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{ComputeTrainingMetricValuesError, ITrainingService},
         },
     },
     inbound::{

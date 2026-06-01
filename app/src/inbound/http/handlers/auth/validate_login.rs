@@ -7,7 +7,9 @@ use axum_extra::extract::cookie::Cookie;
 use cookie::time::OffsetDateTime;
 
 use crate::{
-    domain::ports::{IActivityService, IPreferencesService, ITrainingService},
+    domain::ports::{
+        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    },
     inbound::{
         http::{
             AppState, AuthLinkValidationResult,

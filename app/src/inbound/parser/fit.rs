@@ -1161,10 +1161,9 @@ mod tests {
                 .active_time()
                 .values()
                 .iter()
-                .rev()
-                .next()
+                .next_back()
                 .map(|val| val.value().unwrap()),
-            res.timeseries.time().values().iter().rev().next().cloned()
+            res.timeseries.time().values().iter().next_back().cloned()
         );
     }
 

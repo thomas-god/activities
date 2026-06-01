@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         models::training::TrainingMetricId,
-        ports::{IActivityService, IPreferencesService, ITrainingService},
+        ports::{
+            activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{

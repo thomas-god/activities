@@ -11,7 +11,10 @@ use serde_json::json;
 use crate::{
     domain::{
         models::training::{SportFilter, TrainingPeriod, TrainingPeriodSports},
-        ports::{IActivityService, IPreferencesService, ITrainingService},
+        ports::{
+            activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{

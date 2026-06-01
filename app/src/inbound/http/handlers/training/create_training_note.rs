@@ -2,12 +2,12 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::models::training::{TrainingNoteDate, TrainingNoteTitle};
-use crate::domain::ports::{IActivityService, IPreferencesService};
+use crate::domain::ports::{activity::IActivityService, preferences::IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
         models::{UserId, training::TrainingNoteContent},
-        ports::{CreateTrainingNoteError, CreateTrainingNoteRequest, ITrainingService},
+        ports::training::{CreateTrainingNoteError, CreateTrainingNoteRequest, ITrainingService},
     },
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
 };

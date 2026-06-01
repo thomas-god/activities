@@ -7,7 +7,7 @@ use crate::{
             UserId,
             activity::{ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport},
         },
-        ports::{CreateActivityRequest, RawContent},
+        ports::activity::{CreateActivityRequest, RawContent},
     },
     inbound::parser::{fit::try_fit_bytes_into_domain, tcx::try_tcx_bytes_into_domain},
 };

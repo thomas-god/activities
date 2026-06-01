@@ -6,9 +6,9 @@ use crate::{
     domain::{
         models::{UserId, training::TrainingMetricFilters},
         ports::{
-            CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingPeriodError,
-            CreateTrainingPeriodRequest, DateRange, IActivityService, IPreferencesService,
-            ITrainingService,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{CreateTrainingPeriodError, CreateTrainingPeriodRequest, ITrainingService},
         },
     },
     inbound::{

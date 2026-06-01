@@ -11,13 +11,15 @@ use crate::{
             ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityRpe, BonkStatus,
             WorkoutType,
         },
-        ports::{
-            IActivityService, IPreferencesService, ITrainingService, ModifyActivityError,
-            ModifyActivityRequest, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
+        ports::activity::{
+            IActivityService, ModifyActivityError, ModifyActivityRequest,
+            UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
             UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
             UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
-            UpdateActivityWorkoutTypeRequest, UpdateMetricsForActivityRequest,
+            UpdateActivityWorkoutTypeRequest,
         },
+        ports::preferences::IPreferencesService,
+        ports::training::ITrainingService,
     },
     inbound::{
         http::{

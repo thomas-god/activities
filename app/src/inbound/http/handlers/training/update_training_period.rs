@@ -7,10 +7,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::models::training::TrainingPeriodId;
-use crate::domain::ports::{
-    IActivityService, IPreferencesService, ITrainingService, UpdateTrainingPeriodDatesError,
-    UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
-    UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
+
+use crate::domain::ports::activity::IActivityService;
+use crate::domain::ports::preferences::IPreferencesService;
+use crate::domain::ports::training::{
+    ITrainingService, UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+    UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
     UpdateTrainingPeriodNoteRequest,
 };
 use crate::inbound::http::AppState;

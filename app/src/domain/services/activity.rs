@@ -9,7 +9,7 @@ use crate::domain::{
         },
         training::ActivityMetricSource,
     },
-    ports::{
+    ports::activity::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, GetActivityMetricError, GetAllActivitiesError,
         GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, IActivityService,
@@ -433,7 +433,7 @@ pub mod test_utils {
         TimeseriesMetric,
     };
     use crate::domain::models::training::ActivityMetricSource;
-    use crate::domain::ports::{
+    use crate::domain::ports::activity::{
         DeleteActivityError, GetActivityMetricError, GetAllActivitiesError,
         GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,
         ModifyActivityError, RawActivity, SaveActivityError, SimilarActivityError,
@@ -738,7 +738,7 @@ mod tests_activity_service {
                 ActivityName, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
             },
         },
-        ports::{
+        ports::activity::{
             DeleteActivityError, DeleteActivityRequest, GetRawDataError, ModifyActivityError,
             ModifyActivityRequest, RawContent, SaveActivityError, SaveRawDataError,
         },

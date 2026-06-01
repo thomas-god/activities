@@ -6,9 +6,9 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::domain::models::training::TrainingPeriodId;
+use crate::domain::ports::training::{DeleteTrainingPeriodError, DeleteTrainingPeriodRequest};
 use crate::domain::ports::{
-    DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, IActivityService, IPreferencesService,
-    ITrainingService,
+    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 use crate::inbound::http::AppState;
 use crate::inbound::http::auth::{AuthenticatedUser, IUserService};

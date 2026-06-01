@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     models::{preferences::Preference, training::TrainingMetricId},
-    ports::{DeletePreferenceError, GetPreferenceError, SetPreferenceError},
+    ports::preferences::{DeletePreferenceError, GetPreferenceError, SetPreferenceError},
 };
 
 #[derive(Debug, Serialize)]

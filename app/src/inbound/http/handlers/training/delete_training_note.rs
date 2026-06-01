@@ -4,12 +4,14 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::ports::{IActivityService, IPreferencesService};
-use crate::inbound::parser::ParseFile;
+use crate::{domain::ports::training::DeleteTrainingNoteError, inbound::parser::ParseFile};
 use crate::{
     domain::{
         models::training::TrainingNoteId,
-        ports::{DeleteTrainingNoteError, ITrainingService},
+        ports::{
+            activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
 };

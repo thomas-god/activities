@@ -8,7 +8,10 @@ use serde::Deserialize;
 
 use crate::{
     domain::ports::{
-        DateRange, IActivityService, IPreferencesService, ITrainingService, ListActivitiesFilters,
+        DateRange,
+        activity::{IActivityService, ListActivitiesFilters},
+        preferences::IPreferencesService,
+        training::ITrainingService,
     },
     inbound::{
         http::{

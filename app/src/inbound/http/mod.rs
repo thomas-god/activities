@@ -13,7 +13,9 @@ use tokio::net;
 use tower_http::cors::CorsLayer;
 
 use crate::config::Config;
-use crate::domain::ports::{IActivityService, IPreferencesService, ITrainingService};
+use crate::domain::ports::{
+    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+};
 
 use crate::inbound::http::handlers::{DefaultUserExtractor, cookie_auth_middleware};
 use crate::inbound::parser::ParseFile;

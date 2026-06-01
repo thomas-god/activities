@@ -9,7 +9,7 @@ use crate::{
             UserId,
             preferences::{Preference, PreferenceKey},
         },
-        ports::{PreferencesRepository, SavePreferenceError},
+        ports::preferences::{PreferencesRepository, SavePreferenceError},
     },
     outbound::sqlite::types::{deserialize_preference, serialize_preference_value},
 };

@@ -8,8 +8,9 @@ use crate::{
             training::{TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName},
         },
         ports::{
-            CreateTrainingMetricError, CreateTrainingMetricRequest, DateRange, IActivityService,
-            IPreferencesService, ITrainingService,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{CreateTrainingMetricError, CreateTrainingMetricRequest, ITrainingService},
         },
     },
     inbound::{

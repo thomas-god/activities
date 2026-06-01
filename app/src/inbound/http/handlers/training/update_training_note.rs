@@ -5,14 +5,14 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::domain::ports::{IActivityService, IPreferencesService};
+use crate::domain::ports::{activity::IActivityService, preferences::IPreferencesService};
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::{
         models::training::{
             TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
         },
-        ports::{ITrainingService, UpdateTrainingNoteError},
+        ports::training::{ITrainingService, UpdateTrainingNoteError},
     },
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
 };

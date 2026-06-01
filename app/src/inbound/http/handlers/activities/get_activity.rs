@@ -7,7 +7,10 @@ use axum::{
 use crate::{
     domain::{
         models::activity::ActivityId,
-        ports::{IActivityService, IPreferencesService, ITrainingService},
+        ports::{
+            activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{
@@ -61,7 +64,7 @@ mod tests {
                     TimeseriesValue,
                 },
             },
-            ports::GetActivityError,
+            ports::activity::GetActivityError,
             services::{
                 activity::test_utils::MockActivityService,
                 preferences::tests_utils::MockPreferencesService,

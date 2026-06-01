@@ -9,9 +9,12 @@ use crate::domain::models::training::{
     TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingPeriodId,
 };
 use crate::domain::ports::{
-    IActivityService, IPreferencesService, ITrainingService, UpdateTrainingMetricNameError,
-    UpdateTrainingMetricNameRequest, UpdateTrainingMetricScopeError,
-    UpdateTrainingMetricScopeRequest,
+    activity::IActivityService,
+    preferences::IPreferencesService,
+    training::{
+        ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
+        UpdateTrainingMetricScopeError, UpdateTrainingMetricScopeRequest,
+    },
 };
 use crate::inbound::http::AppState;
 use crate::inbound::http::auth::{AuthenticatedUser, IUserService};

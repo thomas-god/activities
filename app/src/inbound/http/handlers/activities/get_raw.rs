@@ -10,10 +10,12 @@ use axum::{
 use std::io::Write;
 
 use crate::domain::models::activity::ActivityId;
-use crate::domain::ports::{GetRawActivityError, GetRawActivityRequest};
+use crate::domain::ports::activity::{GetRawActivityError, GetRawActivityRequest};
 use crate::{
     domain::ports::{
-        GetAllActivitiesRequest, IActivityService, IPreferencesService, ITrainingService,
+        activity::{GetAllActivitiesRequest, IActivityService},
+        preferences::IPreferencesService,
+        training::ITrainingService,
     },
     inbound::{
         http::{
@@ -117,7 +119,8 @@ pub async fn get_raw_activity<
 mod tests {
     use super::*;
     use crate::domain::{
-        models::UserId, ports::RawActivity, services::activity::test_utils::MockActivityService,
+        models::UserId, ports::activity::RawActivity,
+        services::activity::test_utils::MockActivityService,
         services::preferences::tests_utils::MockPreferencesService,
         services::training::test_utils::MockTrainingService,
     };
@@ -172,9 +175,11 @@ mod tests {
         activity_service
             .expect_get_all_raw_activities()
             .returning(|_| {
-                Err(crate::domain::ports::GetAllActivitiesError::Unknown(
-                    anyhow::anyhow!("error"),
-                ))
+                Err(
+                    crate::domain::ports::activity::GetAllActivitiesError::Unknown(
+                        anyhow::anyhow!("error"),
+                    ),
+                )
             });
 
         let state = AppState {

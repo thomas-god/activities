@@ -13,8 +13,10 @@ use crate::{
     domain::{
         models::training::TrainingMetricId,
         ports::{
-            DateRange, GetTrainingMetricValuesError, IActivityService, IPreferencesService,
-            ITrainingService,
+            DateRange,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{GetTrainingMetricValuesError, ITrainingService},
         },
     },
     inbound::{

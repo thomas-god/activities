@@ -11,7 +11,11 @@ use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    domain::ports::{CreateActivityError, IActivityService, IPreferencesService, ITrainingService},
+    domain::ports::{
+        activity::{CreateActivityError, IActivityService},
+        preferences::IPreferencesService,
+        training::ITrainingService,
+    },
     inbound::{
         http::{
             AppState,
@@ -328,7 +332,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_upload_with_unprocessable_files() {
-        use crate::domain::ports::CreateActivityError;
+        use crate::domain::ports::activity::CreateActivityError;
 
         let mut seq = Sequence::new();
         let mut service = MockActivityService::new();

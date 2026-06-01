@@ -1,9 +1,11 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
-use crate::domain::ports::{IActivityService, IPreferencesService};
+use crate::domain::ports::{
+    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+};
 use crate::inbound::parser::ParseFile;
 use crate::{
-    domain::{models::preferences::Preference, ports::ITrainingService},
+    domain::models::preferences::Preference,
     inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
 };
 

@@ -17,7 +17,10 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::{
     domain::{
         models::UserId,
-        ports::{IActivityService, IPreferencesService, ITrainingService},
+        ports::{
+            activity::IActivityService, preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{AppState, CookieConfig, IUserService, auth::GenerateSessionTokenResult},

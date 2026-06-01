@@ -12,18 +12,22 @@ use crate::domain::{
         },
     },
     ports::{
-        ComputeTrainingMetricValuesError, CreateTrainingMetricError, CreateTrainingMetricRequest,
-        CreateTrainingNoteError, CreateTrainingNoteRequest, CreateTrainingPeriodError,
-        CreateTrainingPeriodRequest, DateRange, DeleteTrainingMetricError,
-        DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-        DeleteTrainingPeriodRequest, GetTrainingMetricValuesError, GetTrainingMetricsOrderingError,
-        GetTrainingNoteError, IActivityService, ITrainingService, ListActivitiesFilters,
-        SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
-        UpdateTrainingMetricNameRequest, UpdateTrainingMetricScopeError,
-        UpdateTrainingMetricScopeRequest, UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
-        UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
-        UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
-        UpdateTrainingPeriodNoteRequest,
+        DateRange,
+        activity::{IActivityService, ListActivitiesFilters},
+        training::{
+            ComputeTrainingMetricValuesError, CreateTrainingMetricError,
+            CreateTrainingMetricRequest, CreateTrainingNoteError, CreateTrainingNoteRequest,
+            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteTrainingMetricError,
+            DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
+            DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
+            GetTrainingMetricsOrderingError, GetTrainingNoteError, ITrainingService,
+            SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
+            UpdateTrainingMetricNameRequest, UpdateTrainingMetricScopeError,
+            UpdateTrainingMetricScopeRequest, UpdateTrainingNoteError,
+            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+        },
     },
 };
 
@@ -737,7 +741,7 @@ pub mod test_utils {
             TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
             TrainingPeriodWithActivities,
         },
-        ports::{
+        ports::training::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
             DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
             GetDefinitionError, GetTrainingMetricsDefinitionsError, GetTrainingNoteError,
@@ -1078,7 +1082,7 @@ mod tests_training_metrics_service {
                 TrainingMetricId, TrainingMetricName, TrainingPeriod, TrainingPeriodSports,
             },
         },
-        ports::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
+        ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::training::test_utils::MockTrainingRepository,
     };
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -2202,7 +2206,10 @@ mod test_training_service_period {
 
     use crate::domain::{
         models::training::{TrainingPeriod, TrainingPeriodSports},
-        ports::{CreateTrainingPeriodRequest, ListActivitiesError, SaveTrainingPeriodError},
+        ports::{
+            activity::ListActivitiesError,
+            training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
+        },
         services::{
             activity::test_utils::MockActivityService, training::test_utils::MockTrainingRepository,
         },
@@ -3369,7 +3376,7 @@ mod test_training_service_period {
 
         let period_id_clone = period_id.clone();
         let new_start_clone = new_start;
-        let new_end_clone = new_end.clone();
+        let new_end_clone = new_end;
         training_repository
             .expect_update_training_period_dates()
             .times(1)
@@ -3588,7 +3595,7 @@ mod test_training_service_period {
 mod test_training_service_training_note {
     use super::*;
     use crate::domain::models::training::TrainingNoteContent;
-    use crate::domain::ports::{
+    use crate::domain::ports::training::{
         CreateTrainingNoteError, CreateTrainingNoteRequest, SaveTrainingNoteError,
     };
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -3811,7 +3818,7 @@ mod test_training_service_metric_values {
         ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
         TrainingMetricGranularity,
     };
-    use crate::domain::ports::GetTrainingMetricValuesError;
+    use crate::domain::ports::training::GetTrainingMetricValuesError;
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use std::collections::HashMap;
@@ -3979,7 +3986,9 @@ mod test_training_service_metrics_ordering {
     use crate::domain::models::training::{
         TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::domain::ports::{GetTrainingMetricsOrderingError, SetTrainingMetricsOrderingError};
+    use crate::domain::ports::training::{
+        GetTrainingMetricsOrderingError, SetTrainingMetricsOrderingError,
+    };
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use anyhow::anyhow;

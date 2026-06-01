@@ -1437,7 +1437,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_compute_training_metrics_with_filters() {
-        let activities: Vec<(Activity, f64)> = vec![default_activity()]
+        let activities: Vec<(Activity, f64)> = [default_activity()]
             .iter()
             .map(|activity| (activity.activity().clone(), 0.))
             .collect();
@@ -1462,7 +1462,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_compute_training_metrics_with_group_by() {
-        let activities: Vec<(Activity, f64)> = vec![default_activity()]
+        let activities: Vec<(Activity, f64)> = [default_activity()]
             .iter()
             .map(|activity| (activity.activity().clone(), 0.))
             .collect();
@@ -2561,13 +2561,13 @@ mod test_training_period {
         let id = TrainingPeriodId::new();
         let user = UserId::test_default();
         let start = "2025-10-17".parse::<NaiveDate>().unwrap();
-        let end = Some("2025-10-21".parse::<NaiveDate>().unwrap());
+        let end = "2025-10-21".parse::<NaiveDate>().unwrap();
 
         let period = TrainingPeriod::new(
             id,
             user,
             start,
-            end,
+            Some(end),
             "test period".to_string(),
             TrainingPeriodSports::new(None),
             None,
@@ -2577,7 +2577,7 @@ mod test_training_period {
         // Both methods should return the same result when end date is specified
         let range_today = period.range_default_today();
         let range_tomorrow = period.range_default_tomorrow();
-        let expected_end = end.unwrap();
+        let expected_end = end;
 
         assert_eq!(range_today.start(), &start);
         assert_eq!(range_today.end(), &expected_end);
@@ -2790,7 +2790,7 @@ mod test_training_metrics_ordering {
             None,
         );
 
-        let ids = vec!["a", "c", "b", "d"];
+        let ids = ["a", "c", "b", "d"];
 
         ids.iter()
             .map(|id| {

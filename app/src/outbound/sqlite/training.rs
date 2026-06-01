@@ -17,11 +17,14 @@ use crate::domain::{
         },
     },
     ports::{
-        DateRange, DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
-        GetTrainingMetricsDefinitionsError, GetTrainingMetricsOrderingError, GetTrainingNoteError,
-        SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
-        SetTrainingMetricsOrderingError, TrainingRepository,
-        UpdateTrainingMetricScopeRepositoryError, UpdateTrainingNoteError,
+        DateRange,
+        training::{
+            DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
+            GetTrainingMetricsDefinitionsError, GetTrainingMetricsOrderingError,
+            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
+            SaveTrainingPeriodError, SetTrainingMetricsOrderingError, TrainingRepository,
+            UpdateTrainingMetricScopeRepositoryError, UpdateTrainingNoteError,
+        },
     },
 };
 
@@ -257,7 +260,7 @@ impl TrainingRepository for SqliteTrainingRepository {
     async fn save_training_period(
         &self,
         period: crate::domain::models::training::TrainingPeriod,
-    ) -> Result<(), crate::domain::ports::SaveTrainingPeriodError> {
+    ) -> Result<(), crate::domain::ports::training::SaveTrainingPeriodError> {
         sqlx::query("INSERT INTO t_training_periods VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);")
             .bind(period.id())
             .bind(period.user())
@@ -1331,7 +1334,7 @@ mod test_sqlite_training_repository {
 
         assert!(
             repository
-                .get_training_period(&&UserId::test_default(), &TrainingPeriodId::new())
+                .get_training_period(&UserId::test_default(), &TrainingPeriodId::new())
                 .await
                 .is_none()
         );
@@ -2016,7 +2019,7 @@ mod test_sqlite_training_repository {
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
         let result = repository
-            .update_training_period_dates(period.id(), new_start, new_end.clone())
+            .update_training_period_dates(period.id(), new_start, new_end)
             .await;
         assert!(result.is_ok());
 
@@ -2078,7 +2081,7 @@ mod test_sqlite_training_repository {
 
         // Create a period
         let period = build_training_period();
-        let original_end = period.end().clone();
+        let original_end = period.end();
         repository
             .save_training_period(period.clone())
             .await
@@ -2087,7 +2090,7 @@ mod test_sqlite_training_repository {
         // Update only the start date, keeping the original end
         let new_start = "2025-10-15".parse::<NaiveDate>().unwrap();
         let result = repository
-            .update_training_period_dates(period.id(), new_start, original_end.clone())
+            .update_training_period_dates(period.id(), new_start, *original_end)
             .await;
         assert!(result.is_ok());
 
@@ -2098,7 +2101,7 @@ mod test_sqlite_training_repository {
         assert!(fetched.is_some());
         let fetched_period = fetched.unwrap();
         assert_eq!(fetched_period.start(), &new_start);
-        assert_eq!(fetched_period.end(), &original_end);
+        assert_eq!(fetched_period.end(), original_end);
     }
 
     #[tokio::test]
@@ -2153,7 +2156,7 @@ mod test_sqlite_training_repository {
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
         let result = repository
-            .update_training_period_dates(period1.id(), new_start, new_end.clone())
+            .update_training_period_dates(period1.id(), new_start, new_end)
             .await;
         assert!(result.is_ok());
 
