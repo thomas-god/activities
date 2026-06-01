@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use anyhow::anyhow;
-use tokio::sync::Mutex;
 
 use crate::domain::{
     models::{
@@ -29,7 +26,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    activity_repository: Arc<Mutex<AR>>,
+    activity_repository: AR,
     raw_data_repository: RDR,
 }
 
@@ -38,7 +35,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    pub fn new(activity_repository: Arc<Mutex<AR>>, raw_data_repository: RDR) -> Self {
+    pub fn new(activity_repository: AR, raw_data_repository: RDR) -> Self {
         Self {
             activity_repository,
             raw_data_repository,
@@ -51,8 +48,10 @@ where
         filters: &ListActivitiesFilters,
         statistic: &ActivityStatistic,
     ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
-        let repository = self.activity_repository.lock().await;
-        let activities = repository.list_activities(user, filters).await?;
+        let activities = self
+            .activity_repository
+            .list_activities(user, filters)
+            .await?;
 
         Ok(activities
             .into_iter()
@@ -73,23 +72,28 @@ where
         metric: &TimeseriesMetric,
         aggregate: &TimeseriesAggregate,
     ) -> Result<Vec<(Activity, f64)>, ListActivitiesError> {
-        let repository = self.activity_repository.lock().await;
-
         // First, compute target metric for activities not yet processed
-        let activities_to_process = repository
+        let activities_to_process = self
+            .activity_repository
             .get_activities_to_process_for_metric(user, filters, metric, aggregate)
             .await
             .unwrap_or_default();
         for activity_id in activities_to_process.iter() {
-            if let Ok(Some(activity)) = repository.get_activity_with_timeseries(activity_id).await {
+            if let Ok(Some(activity)) = self
+                .activity_repository
+                .get_activity_with_timeseries(activity_id)
+                .await
+            {
                 let metric_value = aggregate.value_from_timeseries(metric, &activity);
-                let _ = repository
+                let _ = self
+                    .activity_repository
                     .update_activity_metric(user, activity.id(), metric, aggregate, &metric_value)
                     .await;
             }
         }
 
-        return repository
+        return self
+            .activity_repository
             .get_activities_with_metric(user, filters, metric, aggregate)
             .await;
     }
@@ -122,8 +126,8 @@ where
         let activity_with_timeseries =
             ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
 
-        let activity_repository = self.activity_repository.lock().await;
-        if activity_repository
+        if self
+            .activity_repository
             .similar_activity_exists(&activity.natural_key())
             .await
             .map_err(|err| {
@@ -142,7 +146,7 @@ where
             })?;
 
         // Persist activity
-        activity_repository
+        self.activity_repository
             .save_activity(&activity_with_timeseries)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
@@ -155,8 +159,9 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
-        let repository = self.activity_repository.lock().await;
-        repository.list_activities(user, filters).await
+        self.activity_repository
+            .list_activities(user, filters)
+            .await
     }
 
     async fn list_activities_with_timeseries(
@@ -164,8 +169,7 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
-        let repository = self.activity_repository.lock().await;
-        repository
+        self.activity_repository
             .list_activities_with_timeseries(user, filters)
             .await
     }
@@ -189,8 +193,7 @@ where
     }
 
     async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
-        let repository = self.activity_repository.lock().await;
-        match repository.get_activity(activity_id).await {
+        match self.activity_repository.get_activity(activity_id).await {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
             Err(err) => Err(GetActivityError::Unknown(err)),
@@ -201,8 +204,11 @@ where
         &self,
         activity_id: &ActivityId,
     ) -> Result<ActivityWithTimeseries, GetActivityError> {
-        let repository = self.activity_repository.lock().await;
-        match repository.get_activity_with_timeseries(activity_id).await {
+        match self
+            .activity_repository
+            .get_activity_with_timeseries(activity_id)
+            .await
+        {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
             Err(err) => Err(GetActivityError::Unknown(err)),
@@ -215,8 +221,8 @@ where
         metric: &TimeseriesMetric,
         aggregate: &TimeseriesAggregate,
     ) -> Result<Option<f64>, GetActivityMetricError> {
-        let repository = self.activity_repository.lock().await;
-        let Some(activity) = repository
+        let Some(activity) = self
+            .activity_repository
             .get_activity_with_timeseries(activity_id)
             .await
             .map_err(|err| anyhow!(err))?
@@ -234,8 +240,8 @@ where
         activity_id: &ActivityId,
         statistic: &ActivityStatistic,
     ) -> Result<Option<f64>, GetActivityMetricError> {
-        let repository = self.activity_repository.lock().await;
-        let Some(activity) = repository
+        let Some(activity) = self
+            .activity_repository
             .get_activity(activity_id)
             .await
             .map_err(|err| anyhow!(err))?
@@ -249,13 +255,7 @@ where
     }
 
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(ModifyActivityError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -270,8 +270,6 @@ where
 
         let _ = self
             .activity_repository
-            .lock()
-            .await
             .modify_activity_name(req.activity(), req.name().cloned())
             .await;
 
@@ -282,13 +280,7 @@ where
         &self,
         req: UpdateActivityRpeRequest,
     ) -> Result<(), UpdateActivityRpeError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(UpdateActivityRpeError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -303,8 +295,6 @@ where
 
         let _ = self
             .activity_repository
-            .lock()
-            .await
             .update_activity_rpe(req.activity(), req.rpe().cloned())
             .await;
 
@@ -315,13 +305,7 @@ where
         &self,
         req: UpdateActivityWorkoutTypeRequest,
     ) -> Result<(), UpdateActivityWorkoutTypeError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(UpdateActivityWorkoutTypeError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -336,8 +320,6 @@ where
 
         let _ = self
             .activity_repository
-            .lock()
-            .await
             .update_activity_workout_type(req.activity(), req.workout_type().cloned())
             .await;
 
@@ -348,13 +330,7 @@ where
         &self,
         req: UpdateActivityNutritionRequest,
     ) -> Result<(), UpdateActivityNutritionError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(UpdateActivityNutritionError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -369,8 +345,6 @@ where
 
         let _ = self
             .activity_repository
-            .lock()
-            .await
             .update_activity_nutrition(req.activity(), req.nutrition().clone())
             .await;
 
@@ -381,13 +355,7 @@ where
         &self,
         req: UpdateActivityFeedbackRequest,
     ) -> Result<(), UpdateActivityFeedbackError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(UpdateActivityFeedbackError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -402,8 +370,6 @@ where
 
         let _ = self
             .activity_repository
-            .lock()
-            .await
             .update_activity_feedback(req.activity(), req.feedback().as_ref().cloned())
             .await;
 
@@ -411,13 +377,7 @@ where
     }
 
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
-        let Ok(Some(activity)) = self
-            .activity_repository
-            .lock()
-            .await
-            .get_activity(req.activity())
-            .await
-        else {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(DeleteActivityError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -431,8 +391,6 @@ where
         }
 
         self.activity_repository
-            .lock()
-            .await
             .delete_activity(req.activity())
             .await?;
 
@@ -444,8 +402,6 @@ where
         req: GetRawActivityRequest,
     ) -> Result<RawActivity, GetRawActivityError> {
         self.activity_repository
-            .lock()
-            .await
             .get_raw_activity(req.user(), req.activity())
             .await
     }
@@ -455,8 +411,6 @@ where
         req: GetAllActivitiesRequest,
     ) -> Result<Vec<RawActivity>, GetAllActivitiesError> {
         self.activity_repository
-            .lock()
-            .await
             .list_all_raw_activities(req.user())
             .await
             .map_err(|err| GetAllActivitiesError::Unknown(anyhow!(err)))
@@ -772,11 +726,10 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests_activity_service {
-    use std::{collections::HashMap, sync::Arc};
+    use std::collections::HashMap;
 
     use anyhow::anyhow;
     use mockall::mock;
-    use tokio::sync::Mutex;
 
     use crate::domain::{
         models::{
@@ -840,10 +793,7 @@ mod tests_activity_service {
 
         let raw_data_repository = MockRawDataRepository::new();
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -872,10 +822,7 @@ mod tests_activity_service {
             .expect_save_raw_data()
             .returning(|_, __| Ok(()));
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -898,10 +845,7 @@ mod tests_activity_service {
         raw_data_repository
             .expect_save_raw_data()
             .returning(|_, _| Ok(()));
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -923,10 +867,7 @@ mod tests_activity_service {
             .expect_save_raw_data()
             .returning(|_, _| Err(SaveRawDataError::Unknown));
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = default_activity_request();
 
@@ -943,10 +884,7 @@ mod tests_activity_service {
             .returning(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req =
             ModifyActivityRequest::new(UserId::test_default(), ActivityId::from("test"), None);
@@ -978,10 +916,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req =
             ModifyActivityRequest::new("test_user".into(), ActivityId::from("test_activity"), None);
@@ -1021,10 +956,7 @@ mod tests_activity_service {
             .returning(|_, __| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = ModifyActivityRequest::new(
             UserId::test_default(),
@@ -1061,10 +993,7 @@ mod tests_activity_service {
             .returning(|_, _| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityRpeRequest::new(
             UserId::test_default(),
@@ -1086,10 +1015,7 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityRpeRequest::new(
             UserId::test_default(),
@@ -1126,10 +1052,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityRpeRequest::new(
             UserId::test_default(),
@@ -1174,10 +1097,7 @@ mod tests_activity_service {
             .returning(|_, _| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityFeedbackRequest::new(
             UserId::test_default(),
@@ -1199,10 +1119,7 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityFeedbackRequest::new(
             UserId::test_default(),
@@ -1239,10 +1156,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityFeedbackRequest::new(
             UserId::test_default(),
@@ -1284,10 +1198,7 @@ mod tests_activity_service {
             .returning(|_, _| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityWorkoutTypeRequest::new(
             UserId::test_default(),
@@ -1309,10 +1220,7 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityWorkoutTypeRequest::new(
             UserId::test_default(),
@@ -1349,10 +1257,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = UpdateActivityWorkoutTypeRequest::new(
             UserId::test_default(),
@@ -1393,10 +1298,7 @@ mod tests_activity_service {
             .returning(|_, _| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let nutrition =
             ActivityNutrition::new(BonkStatus::Bonked, Some("2 gels, 500ml water".to_string()));
@@ -1420,10 +1322,7 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let nutrition = ActivityNutrition::new(BonkStatus::None, None);
         let req = UpdateActivityNutritionRequest::new(
@@ -1461,10 +1360,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let nutrition =
             ActivityNutrition::new(BonkStatus::Bonked, Some("Forgot to eat".to_string()));
@@ -1491,10 +1387,7 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = DeleteActivityRequest::new(UserId::test_default(), ActivityId::from("test"));
 
@@ -1525,10 +1418,7 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = DeleteActivityRequest::new(
             "test_user".to_string().into(),
@@ -1568,10 +1458,7 @@ mod tests_activity_service {
 
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = DeleteActivityRequest::new(
             "test_user".to_string().into(),
@@ -1594,10 +1481,7 @@ mod tests_activity_service {
             .return_once(move |_| Ok(None));
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let req = DeleteActivityRequest::new(user_id.clone(), activity_id.clone());
 
@@ -1616,10 +1500,7 @@ mod tests_activity_service {
             .returning(|_| Ok(Vec::new()));
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(
-            Arc::new(Mutex::new(activity_repository)),
-            raw_data_repository,
-        );
+        let service = ActivityService::new(activity_repository, raw_data_repository);
 
         let user = UserId::test_default();
 
@@ -1683,10 +1564,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             assert!(
                 service
@@ -1710,10 +1588,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             assert!(
                 service
@@ -1737,10 +1612,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             assert!(
                 service
@@ -1763,10 +1635,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             assert!(
                 service
@@ -1834,10 +1703,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             assert!(
                 service
@@ -1861,10 +1727,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             let res = service
                 .list_activities_with_metric(
@@ -1889,10 +1752,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
 
             let res = service
                 .list_activities_with_metric(
@@ -1932,10 +1792,7 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(
-                Arc::new(Mutex::new(activity_repository)),
-                raw_data_repository,
-            );
+            let service = ActivityService::new(activity_repository, raw_data_repository);
             let res = service
                 .list_activities_with_metric(
                     &UserId::test_default(),

@@ -332,7 +332,7 @@ where
 
     async fn update_activity_metric(
         &self,
-        user: &UserId,
+        _user: &UserId,
         activity: &ActivityId,
         metric: &TimeseriesMetric,
         aggregate: &TimeseriesAggregate,

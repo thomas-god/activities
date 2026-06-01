@@ -67,14 +67,12 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
     let raw_data_repository = FilesystemRawDataRepository::new(raw_data_dir);
 
     let activity_db = db_dir.clone().join("activities.db");
-    let activity_repository = Arc::new(Mutex::new(
-        SqliteActivityRepository::new(
-            &format!("sqlite:{}", activity_db.to_string_lossy()),
-            raw_data_repository.clone(),
-            parser.clone(),
-        )
-        .await?,
-    ));
+    let activity_repository = SqliteActivityRepository::new(
+        &format!("sqlite:{}", activity_db.to_string_lossy()),
+        raw_data_repository.clone(),
+        parser.clone(),
+    )
+    .await?;
     let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
