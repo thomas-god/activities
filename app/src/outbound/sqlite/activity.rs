@@ -122,12 +122,22 @@ where
     FP: ParseFile,
 {
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
         sqlx::query("DELETE FROM t_activities WHERE id = ?1")
             .bind(activity)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map(|_| ())
-            .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))
+            .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))?;
+
+        sqlx::query("DELETE FROM t_activities_v2 WHERE id = ?1")
+            .bind(activity)
+            .execute(&mut *tx)
+            .await
+            .map(|_| ())
+            .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, anyhow::Error> {
@@ -488,13 +498,25 @@ where
         id: &ActivityId,
         name: Option<ActivityName>,
     ) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
+
         sqlx::query("UPDATE t_activities SET name = ?1 WHERE id = ?2;")
-            .bind(name)
+            .bind(name.clone())
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|err| anyhow!(err))
-            .map(|_| ())
+            .map(|_| ())?;
+
+        sqlx::query("UPDATE t_activities_v2 SET name = ?1 WHERE id = ?2;")
+            .bind(name)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn update_activity_rpe(
@@ -502,13 +524,25 @@ where
         id: &ActivityId,
         rpe: Option<ActivityRpe>,
     ) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
+
         sqlx::query("UPDATE t_activities SET rpe = ?1 WHERE id = ?2;")
             .bind(rpe)
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|err| anyhow!(err))
-            .map(|_| ())
+            .map(|_| ())?;
+
+        sqlx::query("UPDATE t_activities_v2 SET rpe = ?1 WHERE id = ?2;")
+            .bind(rpe)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn update_activity_workout_type(
@@ -516,13 +550,25 @@ where
         id: &ActivityId,
         workout_type: Option<WorkoutType>,
     ) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
+
         sqlx::query("UPDATE t_activities SET workout_type = ?1 WHERE id = ?2;")
             .bind(workout_type)
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|err| anyhow!(err))
-            .map(|_| ())
+            .map(|_| ())?;
+
+        sqlx::query("UPDATE t_activities_v2 SET workout_type = ?1 WHERE id = ?2;")
+            .bind(workout_type)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn update_activity_nutrition(
@@ -530,13 +576,25 @@ where
         id: &ActivityId,
         nutrition: Option<ActivityNutrition>,
     ) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
+
         sqlx::query("UPDATE t_activities SET nutrition = ?1 WHERE id = ?2;")
-            .bind(nutrition)
+            .bind(nutrition.clone())
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|err| anyhow!(err))
-            .map(|_| ())
+            .map(|_| ())?;
+
+        sqlx::query("UPDATE t_activities_v2 SET nutrition = ?1 WHERE id = ?2;")
+            .bind(nutrition)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn update_activity_feedback(
@@ -544,23 +602,41 @@ where
         id: &ActivityId,
         feedback: Option<ActivityFeedback>,
     ) -> Result<(), anyhow::Error> {
+        let mut tx = self.pool.begin().await.map_err(|err| anyhow!(err))?;
+
         sqlx::query("UPDATE t_activities SET feedback = ?1 WHERE id = ?2;")
-            .bind(feedback)
+            .bind(feedback.clone())
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|err| anyhow!(err))
-            .map(|_| ())
+            .map(|_| ())?;
+
+        sqlx::query("UPDATE t_activities_v2 SET feedback = ?1 WHERE id = ?2;")
+            .bind(feedback)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|err| anyhow!(err))
+            .map(|_| ())?;
+
+        tx.commit().await.map_err(|err| anyhow!(err))
     }
 
     async fn save_activity(
         &self,
         activity: &ActivityWithTimeseries,
     ) -> Result<(), SaveActivityError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|err| SaveActivityError::Unknown(err.into()))?;
+
         sqlx::query(
             "INSERT INTO t_activities VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
-    );",
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+            );",
         )
         .bind(activity.id())
         .bind(activity.user())
@@ -573,12 +649,41 @@ where
         .bind(activity.workout_type())
         .bind(activity.nutrition())
         .bind(activity.feedback())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map(|_| ())
         .map_err(|err| {
             SaveActivityError::Unknown(anyhow!("Unanble to save activity {}. {err}", activity.id()))
-        })
+        })?;
+
+        sqlx::query(
+            "INSERT INTO t_activities_v2 (
+                id, user_id, name, start_time, sport, natural_key, rpe, workout_type, nutrition, feedback
+            )
+            VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+            );",
+        )
+        .bind(activity.id())
+        .bind(activity.user())
+        .bind(activity.name())
+        .bind(activity.start_time().date())
+        .bind(activity.sport())
+        .bind(activity.natural_key())
+        .bind(activity.rpe())
+        .bind(activity.workout_type())
+        .bind(activity.nutrition())
+        .bind(activity.feedback())
+        .execute(&mut *tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            SaveActivityError::Unknown(anyhow!("Unanble to save activity {}. {err}", activity.id()))
+        })?;
+
+        tx.commit()
+            .await
+            .map_err(|err| SaveActivityError::Unknown(err.into()))
     }
 
     async fn similar_activity_exists(
@@ -2804,5 +2909,354 @@ mod test_sqlite_activity_repository {
                 unreachable!("Should Err(GetRawActivityError::Unknown(_))")
             };
         }
+    }
+
+    mod test_t_activities_v2_double_writes {
+
+        use super::*;
+
+        #[tokio::test]
+        async fn test_activity_duplicated_on_insert() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let activity = build_activity_with_timeseries();
+            assert_eq!(
+                sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
+                    .fetch_one(&repository.pool)
+                    .await
+                    .unwrap(),
+                0,
+                "t_activities_v2 should be intially empty"
+            );
+
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Should have succeed");
+
+            assert_eq!(
+                sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
+                    .fetch_one(&repository.pool)
+                    .await
+                    .unwrap(),
+                1,
+                "Should have made a double write on t_activities_v2"
+            );
+
+            assert_eq!(
+                sqlx::query_scalar::<_, ActivityId>("select id from t_activities_v2 limit 1;")
+                    .fetch_one(&repository.pool)
+                    .await
+                    .unwrap(),
+                *activity.id()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, UserId>("select user_id from t_activities_v2 limit 1;")
+                    .fetch_one(&repository.pool)
+                    .await
+                    .unwrap(),
+                *activity.user()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, Option<ActivityName>>(
+                    "select name from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                activity.name().cloned()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, ActivityStartTime>(
+                    "select start_time from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.start_time()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, Sport>("select sport from t_activities_v2 limit 1;")
+                    .fetch_one(&repository.pool)
+                    .await
+                    .unwrap(),
+                *activity.sport()
+            );
+
+            assert_eq!(
+                sqlx::query_scalar::<_, ActivityNaturalKey>(
+                    "select natural_key from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                activity.natural_key()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                    "select rpe from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.rpe()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, Option<WorkoutType>>(
+                    "select workout_type from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.workout_type()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                    "select nutrition from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.nutrition()
+            );
+
+            assert_eq!(
+                sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                    "select feedback from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.feedback()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_name_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_name = async || {
+            sqlx::query_scalar::<_, Option<ActivityName>>(
+                "select name from t_activities_v2 where id = ?1;",
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap()
+        };
+
+        assert_eq!(get_name().await, activity.name().cloned());
+
+        let new_name = Some(ActivityName::from("test"));
+        repository
+            .modify_activity_name(activity.id(), new_name.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(get_name().await, new_name);
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_rpe_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_rpe = async || {
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                "select rpe from t_activities_v2 where id = ?1;",
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap()
+        };
+
+        assert_eq!(get_rpe().await, *activity.rpe());
+
+        let new_rpe = Some(ActivityRpe::Eight);
+        repository
+            .update_activity_rpe(activity.id(), new_rpe)
+            .await
+            .unwrap();
+
+        assert_eq!(get_rpe().await, new_rpe);
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_workout_type_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_workout_type = async || {
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities_v2 where id = ?1;",
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap()
+        };
+
+        assert_eq!(get_workout_type().await, *activity.workout_type());
+
+        let new_workout_type = Some(WorkoutType::CrossTraining);
+        repository
+            .update_activity_workout_type(activity.id(), new_workout_type)
+            .await
+            .unwrap();
+
+        assert_eq!(get_workout_type().await, new_workout_type);
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_nutrition_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_nutrition = async || {
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities_v2 where id = ?1;",
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap()
+        };
+
+        assert_eq!(get_nutrition().await, *activity.nutrition());
+
+        let new_nutrtion = Some(ActivityNutrition::new(BonkStatus::Bonked, None));
+        repository
+            .update_activity_nutrition(activity.id(), new_nutrtion.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(get_nutrition().await, new_nutrtion);
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_feedback_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_feedback = async || {
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities_v2 where id = ?1;",
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap()
+        };
+
+        assert_eq!(get_feedback().await, *activity.feedback());
+
+        let new_feedback = Some(ActivityFeedback::from("test"));
+        repository
+            .update_activity_feedback(activity.id(), new_feedback.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(get_feedback().await, new_feedback);
+    }
+
+    #[tokio::test]
+    async fn test_delete_activity_double_write() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity_with_timeseries();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Should have succeed");
+
+        let get_activity_count = async || {
+            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2 where id = ?1;")
+                .bind(activity.id())
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap()
+        };
+
+        assert_eq!(get_activity_count().await, 1);
+
+        repository.delete_activity(activity.id()).await.unwrap();
+
+        assert_eq!(get_activity_count().await, 0);
     }
 }
