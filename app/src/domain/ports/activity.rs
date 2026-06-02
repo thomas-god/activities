@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -8,8 +10,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityName,
-            ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+            Activity, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2,
+            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
             ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
             TimeseriesAggregate, TimeseriesMetric, WorkoutType,
         },
@@ -41,6 +43,18 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         filters: &ListActivitiesFilters,
         source: &ActivityMetricSource,
     ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
+
+    fn list_activities_with_metrics_v2(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metrics: &[ActivityMetricV2],
+    ) -> impl Future<
+        Output = Result<
+            Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>,
+            ListActivitiesError,
+        >,
+    > + Send;
 
     fn get_activity(
         &self,
@@ -546,6 +560,25 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         aggregate: &TimeseriesAggregate,
         value: &Option<f64>,
     ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
+
+    fn update_activity_metric_v2(
+        &self,
+        activity: &ActivityId,
+        metric: &ActivityMetricV2,
+        value: &Option<f64>,
+    ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
+
+    fn get_activities_with_metrics_v2(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metrics: &[ActivityMetricV2],
+    ) -> impl Future<
+        Output = Result<
+            Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>,
+            ListActivitiesError,
+        >,
+    > + Send;
 
     fn get_activity(
         &self,

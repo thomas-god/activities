@@ -9,9 +9,10 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey,
-                ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistics,
-                ActivityWithTimeseries, Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+                Activity, ActivityFeedback, ActivityId, ActivityMetricV2, ActivityName,
+                ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+                ActivityStatistics, ActivityWithTimeseries, Sport, TimeseriesAggregate,
+                TimeseriesMetric, WorkoutType,
             },
         },
         ports::{
@@ -372,6 +373,30 @@ where
             }
             _ => UpdateActivityMetricError::Unknown(anyhow!(err)),
         })
+    }
+
+    async fn update_activity_metric_v2(
+        &self,
+        activity: &ActivityId,
+        metric: &ActivityMetricV2,
+        value: &Option<f64>,
+    ) -> Result<(), UpdateActivityMetricError> {
+        todo!()
+    }
+
+    async fn get_activities_with_metrics_v2(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metrics: &[ActivityMetricV2],
+    ) -> Result<
+        Vec<(
+            Activity,
+            std::collections::HashMap<ActivityMetricV2, Option<f64>>,
+        )>,
+        ListActivitiesError,
+    > {
+        todo!()
     }
 
     async fn get_activities_to_process_for_metric(

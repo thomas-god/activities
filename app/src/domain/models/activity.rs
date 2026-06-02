@@ -848,20 +848,29 @@ pub enum ActivityMetricV2 {
     MinHeartRate,
     AvgHeartRate,
 
-    MinCadence,
     MaxCadence,
+    MinCadence,
     AvgCadence,
 
-    MinAltitude,
     MaxAltitude,
+    MinAltitude,
     AvgAltitude,
 
-    MinPace,
     MaxPace,
+    MinPace,
     AvgPace,
 }
 
 impl ActivityMetricV2 {
+    pub fn compute_value(&self, activity: &ActivityWithTimeseries) -> Option<f64> {
+        match self.source() {
+            ActivityMetricSource::Statistic(stat) => activity.statistics().get(&stat).cloned(),
+            ActivityMetricSource::Timeseries((metric, aggregate)) => {
+                aggregate.value_from_timeseries(&metric, activity)
+            }
+        }
+    }
+
     pub fn source(&self) -> ActivityMetricSource {
         match self {
             // Raw stats
@@ -913,11 +922,11 @@ impl ActivityMetricV2 {
                 TimeseriesAggregate::Average,
             )),
 
-            Self::MinCadence => ActivityMetricSource::Timeseries((
+            Self::MaxCadence => ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Cadence,
                 TimeseriesAggregate::Max,
             )),
-            Self::MaxCadence => ActivityMetricSource::Timeseries((
+            Self::MinCadence => ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Cadence,
                 TimeseriesAggregate::Min,
             )),
@@ -926,11 +935,11 @@ impl ActivityMetricV2 {
                 TimeseriesAggregate::Average,
             )),
 
-            Self::MinAltitude => ActivityMetricSource::Timeseries((
+            Self::MaxAltitude => ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Altitude,
                 TimeseriesAggregate::Max,
             )),
-            Self::MaxAltitude => ActivityMetricSource::Timeseries((
+            Self::MinAltitude => ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Altitude,
                 TimeseriesAggregate::Min,
             )),
@@ -939,10 +948,10 @@ impl ActivityMetricV2 {
                 TimeseriesAggregate::Average,
             )),
 
-            Self::MinPace => {
+            Self::MaxPace => {
                 ActivityMetricSource::Timeseries((TimeseriesMetric::Pace, TimeseriesAggregate::Max))
             }
-            Self::MaxPace => {
+            Self::MinPace => {
                 ActivityMetricSource::Timeseries((TimeseriesMetric::Pace, TimeseriesAggregate::Min))
             }
             Self::AvgPace => ActivityMetricSource::Timeseries((
