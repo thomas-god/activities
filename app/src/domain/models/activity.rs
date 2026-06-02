@@ -823,6 +823,137 @@ impl fmt::Display for Unit {
 }
 
 ///////////////////////////////////////////////////////////////////
+// New activity metric to mask the difference between stats and timeseries sources
+///////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, Serialize, Deserialize)]
+pub enum ActivityMetricV2 {
+    // Raw stats
+    Duration,
+    Calories,
+    Elevation,
+    Distance,
+    NormalizedPower,
+
+    // Derived from timeseries
+    MaxSpeed,
+    MinSpeed,
+    AvgSpeed,
+
+    MaxPower,
+    MinPower,
+    AvgPower,
+
+    MaxHeartRate,
+    MinHeartRate,
+    AvgHeartRate,
+
+    MinCadence,
+    MaxCadence,
+    AvgCadence,
+
+    MinAltitude,
+    MaxAltitude,
+    AvgAltitude,
+
+    MinPace,
+    MaxPace,
+    AvgPace,
+}
+
+impl ActivityMetricV2 {
+    pub fn source(&self) -> ActivityMetricSource {
+        match self {
+            // Raw stats
+            Self::Duration => ActivityMetricSource::Statistic(ActivityStatistic::Duration),
+            Self::Calories => ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            Self::Elevation => ActivityMetricSource::Statistic(ActivityStatistic::Elevation),
+            Self::Distance => ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            Self::NormalizedPower => {
+                ActivityMetricSource::Statistic(ActivityStatistic::NormalizedPower)
+            }
+
+            // Derived from timeseries
+            Self::MaxSpeed => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Speed,
+                TimeseriesAggregate::Max,
+            )),
+            Self::MinSpeed => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Speed,
+                TimeseriesAggregate::Min,
+            )),
+            Self::AvgSpeed => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Speed,
+                TimeseriesAggregate::Average,
+            )),
+
+            Self::MaxPower => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Power,
+                TimeseriesAggregate::Max,
+            )),
+            Self::MinPower => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Power,
+                TimeseriesAggregate::Min,
+            )),
+            Self::AvgPower => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Power,
+                TimeseriesAggregate::Average,
+            )),
+
+            Self::MaxHeartRate => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::HeartRate,
+                TimeseriesAggregate::Max,
+            )),
+            Self::MinHeartRate => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::HeartRate,
+                TimeseriesAggregate::Min,
+            )),
+            Self::AvgHeartRate => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::HeartRate,
+                TimeseriesAggregate::Average,
+            )),
+
+            Self::MinCadence => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Cadence,
+                TimeseriesAggregate::Max,
+            )),
+            Self::MaxCadence => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Cadence,
+                TimeseriesAggregate::Min,
+            )),
+            Self::AvgCadence => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Cadence,
+                TimeseriesAggregate::Average,
+            )),
+
+            Self::MinAltitude => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Max,
+            )),
+            Self::MaxAltitude => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Min,
+            )),
+            Self::AvgAltitude => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Altitude,
+                TimeseriesAggregate::Average,
+            )),
+
+            Self::MinPace => {
+                ActivityMetricSource::Timeseries((TimeseriesMetric::Pace, TimeseriesAggregate::Max))
+            }
+            Self::MaxPace => {
+                ActivityMetricSource::Timeseries((TimeseriesMetric::Pace, TimeseriesAggregate::Min))
+            }
+            Self::AvgPace => ActivityMetricSource::Timeseries((
+                TimeseriesMetric::Pace,
+                TimeseriesAggregate::Average,
+            )),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
 
