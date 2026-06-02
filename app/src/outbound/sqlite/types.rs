@@ -6,9 +6,9 @@ use sqlx::{Database, encode::IsNull, error::BoxDynError};
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityFeedback, ActivityId, ActivityMetricSource, ActivityName, ActivityNaturalKey,
-        ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-        Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+        ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2, ActivityName,
+        ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistic,
+        ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
     },
     preferences::{Preference, PreferenceKey},
     training::{
@@ -773,6 +773,92 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesAggregate {
             "max" => Ok(Self::Max),
             "min" => Ok(Self::Min),
             _ => Err(format!("Unknown TimeseriesAggregate: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityMetricV2 {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricV2 {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Duration => "duration",
+            Self::Calories => "calories",
+            Self::Elevation => "elevation",
+            Self::Distance => "distance",
+            Self::NormalizedPower => "normalized-power",
+
+            Self::MaxSpeed => "max-speed",
+            Self::MinSpeed => "min-speed",
+            Self::AvgSpeed => "avg-speed",
+
+            Self::MaxPower => "max-power",
+            Self::MinPower => "min-power",
+            Self::AvgPower => "avg-power",
+
+            Self::MaxHeartRate => "max-hr",
+            Self::MinHeartRate => "min-hr",
+            Self::AvgHeartRate => "avg-hr",
+
+            Self::MaxCadence => "max-cadence",
+            Self::MinCadence => "min-cadence",
+            Self::AvgCadence => "avg-cadence",
+
+            Self::MaxAltitude => "max-altitude",
+            Self::MinAltitude => "min-altitude",
+            Self::AvgAltitude => "avg-altitude",
+
+            Self::MaxPace => "max-pace",
+            Self::MinPace => "min-pace",
+            Self::AvgPace => "avg-pace",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricV2 {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "duration" => Ok(Self::Duration),
+            "calories" => Ok(Self::Calories),
+            "elevation" => Ok(Self::Elevation),
+            "distance" => Ok(Self::Distance),
+            "normalized-power" => Ok(Self::NormalizedPower),
+
+            "max-speed" => Ok(Self::MaxSpeed),
+            "min-speed" => Ok(Self::MinSpeed),
+            "avg-speed" => Ok(Self::AvgSpeed),
+
+            "max-power" => Ok(Self::MaxPower),
+            "min-power" => Ok(Self::MinPower),
+            "avg-power" => Ok(Self::AvgPower),
+
+            "max-hr" => Ok(Self::MaxHeartRate),
+            "min-hr" => Ok(Self::MinHeartRate),
+            "avg-hr" => Ok(Self::AvgHeartRate),
+
+            "max-cadence" => Ok(Self::MaxCadence),
+            "min-cadence" => Ok(Self::MinCadence),
+            "avg-cadence" => Ok(Self::AvgCadence),
+
+            "max-altitude" => Ok(Self::MaxAltitude),
+            "min-altitude" => Ok(Self::MinAltitude),
+            "avg-altitude" => Ok(Self::AvgAltitude),
+
+            "max-pace" => Ok(Self::MaxPace),
+            "min-pace" => Ok(Self::MinPace),
+            "avg-pace" => Ok(Self::AvgPace),
+
+            _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }
     }
 }

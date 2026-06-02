@@ -226,7 +226,7 @@ where
 
             for metric in missing_metrics {
                 let value = metric.compute_value(&activity_with_timeseries);
-                activity_metrics.insert(metric.clone(), value);
+                activity_metrics.insert(*metric, value);
 
                 self.activity_repository
                     .update_activity_metric_v2(activity.id(), metric, &value)

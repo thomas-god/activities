@@ -1,8 +1,8 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset};
-use sqlx::{Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{Execute, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::{
     domain::{
@@ -79,6 +79,42 @@ impl<R, FP> SqliteActivityRepository<R, FP> {
             raw_data_repository,
             file_parser,
         })
+    }
+
+    pub async fn metric_rowid(&self, metric: &ActivityMetricV2) -> Result<i64, anyhow::Error> {
+        if let Some(rowid) = sqlx::query_scalar::<_, i64>(
+            "
+            SELECT rowid FROM t_activities_metrics WHERE metric = ?1 LIMIT 1;
+        ",
+        )
+        .bind(metric)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|err| anyhow!(err))?
+        {
+            return Ok(rowid);
+        }
+
+        if let Some(rowid) = sqlx::query_scalar::<_, i64>(
+            "
+            INSERT INTO t_activities_metrics (metric)
+            VALUES (?1)
+            ON CONFLICT (metric) DO NOTHING
+            RETURNING rowid;
+        ",
+        )
+        .bind(metric)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|err| anyhow!(err))?
+        {
+            return Ok(rowid);
+        };
+
+        Err(anyhow!(
+            "Unable to insert {:} into t_activities_metrics",
+            metric
+        ))
     }
 }
 
@@ -381,7 +417,37 @@ where
         metric: &ActivityMetricV2,
         value: &Option<f64>,
     ) -> Result<(), UpdateActivityMetricError> {
-        todo!()
+        let activity_rowid = sqlx::query_scalar::<_, i64>(
+            "
+            SELECT rowid FROM t_activities_v2 WHERE id = ?1 LIMIT 1;
+        ",
+        )
+        .bind(activity)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_err| UpdateActivityMetricError::ActivityDoesNotExist(activity.clone()))?;
+
+        let metric_rowid = self.metric_rowid(metric).await?;
+
+        sqlx::query(
+            "INSERT INTO t_activities_metrics_values
+            (activity_rowid, metric_rowid, value)
+            VALUES (?1, ?2, ?3)
+            ON CONFLICT (activity_rowid, metric_rowid)
+            DO UPDATE SET value=excluded.value;",
+        )
+        .bind(activity_rowid)
+        .bind(metric_rowid)
+        .bind(value)
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(|err| match err {
+            sqlx::Error::Database(db_error) if db_error.is_foreign_key_violation() => {
+                UpdateActivityMetricError::ActivityDoesNotExist(activity.clone())
+            }
+            _ => UpdateActivityMetricError::Unknown(anyhow!(err)),
+        })
     }
 
     async fn get_activities_with_metrics_v2(
@@ -389,14 +455,60 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
         metrics: &[ActivityMetricV2],
-    ) -> Result<
-        Vec<(
-            Activity,
-            std::collections::HashMap<ActivityMetricV2, Option<f64>>,
-        )>,
-        ListActivitiesError,
-    > {
-        todo!()
+    ) -> Result<Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>, ListActivitiesError> {
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new("
+        SELECT
+            t_activities_v2.id,
+            t_activities_metrics.metric,
+            t_activities_metrics_values.value
+        FROM t_activities_v2
+        JOIN t_activities_metrics_values ON t_activities_metrics_values.activity_rowid = t_activities_v2.rowid
+        JOIN t_activities_metrics ON t_activities_metrics_values.metric_rowid = t_activities_metrics.rowid");
+
+        builder
+            .push(" WHERE t_activities_v2.user_id = ")
+            .push_bind(user);
+
+        if let Some(date_range) = filters.date_range() {
+            builder
+                .push(" AND t_activities_v2.start_time >= ")
+                .push_bind(date_range.start());
+            builder
+                .push(" AND t_activities_v2.start_time < ")
+                .push_bind(date_range.end());
+        }
+
+        builder.push(" AND t_activities_metrics.metric IN (");
+        for (idx, metric) in metrics.iter().enumerate() {
+            builder.push(" ").push_bind(metric);
+            if idx < metrics.len() - 1 {
+                builder.push(",");
+            }
+        }
+        builder.push(") ");
+        let query = builder.build_query_as::<'_, (ActivityId, ActivityMetricV2, Option<f64>)>();
+        let mut metrics_values: HashMap<ActivityId, Vec<(ActivityMetricV2, Option<f64>)>> =
+            HashMap::new();
+        for (activity, metric, value) in query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?
+        {
+            match metrics_values.get_mut(&activity) {
+                Some(vals) => vals.push((metric, value)),
+                None => {
+                    metrics_values.insert(activity, vec![(metric, value)]);
+                }
+            }
+        }
+
+        let mut res = vec![];
+        for activity in self.list_activities(user, filters).await? {
+            let metrics = metrics_values.remove(activity.id()).unwrap_or_default();
+            res.push((activity, HashMap::from_iter(metrics)));
+        }
+
+        Ok(res)
     }
 
     async fn get_activities_to_process_for_metric(
@@ -3283,5 +3395,105 @@ mod test_sqlite_activity_repository {
         repository.delete_activity(activity.id()).await.unwrap();
 
         assert_eq!(get_activity_count().await, 0);
+    }
+    mod test_activity_metrics_v2 {
+        use super::*;
+
+        #[tokio::test]
+        async fn test_update_activity_metric_value() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repo = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+            let activity = build_activity_with_timeseries();
+
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeed");
+
+            // No initial metric values
+            let res = repo
+                .get_activities_with_metrics_v2(
+                    activity.user(),
+                    &ListActivitiesFilters::empty(),
+                    &[ActivityMetricV2::AvgPower],
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.len(), 1);
+            let (_actvity, metrics) = res.first().unwrap();
+            assert!(metrics.is_empty(),);
+
+            // Insert a metric value
+            repo.update_activity_metric_v2(activity.id(), &ActivityMetricV2::AvgPower, &Some(1.2))
+                .await
+                .expect("Should have succeeded");
+
+            let res = repo
+                .get_activities_with_metrics_v2(
+                    activity.user(),
+                    &ListActivitiesFilters::empty(),
+                    &[ActivityMetricV2::AvgPower],
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.len(), 1);
+            let (_actvity, metrics) = res.first().unwrap();
+            assert_eq!(
+                metrics,
+                &HashMap::from([(ActivityMetricV2::AvgPower, Some(1.2))])
+            );
+
+            // Update a metric value
+            repo.update_activity_metric_v2(activity.id(), &ActivityMetricV2::AvgPower, &None)
+                .await
+                .expect("Should have succeeded");
+
+            let res = repo
+                .get_activities_with_metrics_v2(
+                    activity.user(),
+                    &ListActivitiesFilters::empty(),
+                    &[ActivityMetricV2::AvgPower],
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.len(), 1);
+            let (_actvity, metrics) = res.first().unwrap();
+            assert_eq!(
+                metrics,
+                &HashMap::from([(ActivityMetricV2::AvgPower, None)])
+            );
+        }
+
+        #[tokio::test]
+        async fn test_update_metric_value_activity_does_not_exist() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let UpdateActivityMetricError::ActivityDoesNotExist(id) = repository
+                .update_activity_metric_v2(
+                    &ActivityId::from("non-existing-activity"),
+                    &ActivityMetricV2::AvgPower,
+                    &Some(1.2),
+                )
+                .await
+                .unwrap_err()
+            else {
+                unreachable!(
+                    "Should have returned UpdateActivityMetricError::ActivityDoesNotExist(id)"
+                )
+            };
+            assert_eq!(id, ActivityId::from("non-existing-activity"));
+        }
     }
 }
