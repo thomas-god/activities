@@ -13,11 +13,10 @@ use serde_json::json;
 use crate::{
     domain::{
         models::{
-            activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+            activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
             training::{
-                ActivityMetricSource, SportFilter, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricValues, TrainingPeriod,
-                TrainingPeriodSports,
+                SportFilter, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricValues, TrainingPeriod, TrainingPeriodSports,
             },
         },
         ports::{

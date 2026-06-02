@@ -5,10 +5,10 @@ use serde::Deserialize;
 
 use crate::domain::{
     models::{
-        activity::{ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
+        activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
         training::{
-            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricBin,
-            TrainingMetricGranularity, TrainingMetricValues,
+            TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
+            TrainingMetricValues,
         },
     },
     ports::DateRange,

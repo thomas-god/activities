@@ -6,16 +6,16 @@ use sqlx::{Database, encode::IsNull, error::BoxDynError};
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey, ActivityNutrition,
-        ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
-        TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+        ActivityFeedback, ActivityId, ActivityMetricSource, ActivityName, ActivityNaturalKey,
+        ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+        Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
     },
     preferences::{Preference, PreferenceKey},
     training::{
-        ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
-        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
-        TrainingMetricValue, TrainingNoteContent, TrainingNoteDate, TrainingNoteId,
-        TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
+        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricValue,
+        TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 

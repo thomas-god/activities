@@ -1075,11 +1075,11 @@ mod tests_training_metrics_service {
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::{
         models::{
-            activity::ActivityStatistic,
+            activity::{ActivityMetricSource, ActivityStatistic},
             training::{
-                ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-                TrainingMetricId, TrainingMetricName, TrainingPeriod, TrainingPeriodSports,
+                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
+                TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
+                TrainingMetricName, TrainingPeriod, TrainingPeriodSports,
             },
         },
         ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -3812,11 +3812,11 @@ mod test_training_service_metric_values {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityId, ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
+        Activity, ActivityId, ActivityMetricSource, ActivityStartTime, ActivityStatistic,
+        ActivityStatistics, Sport,
     };
     use crate::domain::models::training::{
-        ActivityMetricSource, TrainingMetricAggregate, TrainingMetricFilters,
-        TrainingMetricGranularity,
+        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
     };
     use crate::domain::ports::training::GetTrainingMetricValuesError;
     use crate::domain::services::activity::test_utils::MockActivityService;

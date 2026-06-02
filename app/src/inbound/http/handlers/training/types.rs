@@ -3,13 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::models::{
     activity::{
-        ActivityRpe, ActivityStatistic, BonkStatus, Sport, TimeseriesAggregate, TimeseriesMetric,
-        WorkoutType,
+        ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus, Sport,
+        TimeseriesAggregate, TimeseriesMetric, WorkoutType,
     },
     training::{
-        ActivityMetricSource, SportFilter, TrainingMetricAggregate, TrainingMetricFilters,
-        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope, TrainingPeriodId,
-        TrainingPeriodSports,
+        SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricGroupBy, TrainingMetricScope, TrainingPeriodId, TrainingPeriodSports,
     },
 };
 

@@ -1111,6 +1111,45 @@ impl TimeseriesAggregate {
     }
 }
 
+/// An [ActivityMetric] represents the value of an [ActivityMetricSource] extracted from
+/// a single [ActivityWithTimeseries]. On top of the metric value, it contains metadata like
+/// the activity start time and duration that can be used in later computations.
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct ActivityMetric {
+    value: f64,
+    activity_start_time: ActivityStartTime,
+    activity_duration: Option<f64>,
+}
+
+impl ActivityMetric {
+    pub fn value(&self) -> &f64 {
+        &self.value
+    }
+
+    pub fn activity_start_time(&self) -> &ActivityStartTime {
+        &self.activity_start_time
+    }
+
+    pub fn activity_duration(&self) -> &Option<f64> {
+        &self.activity_duration
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ActivityMetricSource {
+    Statistic(ActivityStatistic),
+    Timeseries((TimeseriesMetric, TimeseriesAggregate)),
+}
+
+impl ToUnit for ActivityMetricSource {
+    fn unit(&self) -> Unit {
+        match self {
+            Self::Statistic(stat) => stat.unit(),
+            Self::Timeseries((metric, _)) => metric.unit(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

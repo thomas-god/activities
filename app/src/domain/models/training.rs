@@ -14,9 +14,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityWithTimeseries,
-            BonkStatus, Sport, SportCategory, TimeseriesAggregate, TimeseriesMetric, ToUnit, Unit,
-            WorkoutType,
+            Activity, ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic,
+            BonkStatus, Sport, SportCategory, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -297,10 +296,6 @@ impl TrainingMetricDefinition {
     pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
         &self.group_by
     }
-
-    pub fn source_requirement(&self) -> ComputeMetricRequirement {
-        self.source.input_min_requirement()
-    }
 }
 
 impl TrainingMetricDefinition {
@@ -348,97 +343,6 @@ pub struct DateGranule {
     end: NaiveDate,
 }
 
-/// An [ActivityMetric] represents the value of an [ActivityMetricSource] extracted from
-/// a single [ActivityWithTimeseries]. On top of the metric value, it contains metadata like
-/// the activity start time and duration that can be used in later computations.
-#[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct ActivityMetric {
-    value: f64,
-    activity_start_time: ActivityStartTime,
-    activity_duration: Option<f64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ActivityMetricSource {
-    Statistic(ActivityStatistic),
-    Timeseries((TimeseriesMetric, TimeseriesAggregate)),
-}
-
-#[derive(Debug, Clone)]
-pub enum ComputeMetricRequirement {
-    Activity,
-    ActivityWithTimeseries,
-}
-
-#[derive(Debug, Clone, Error)]
-pub enum ComputeMetricError {
-    #[error(
-        "Trying to compute a timseries-based metric without supplying the activity's timeseries"
-    )]
-    MissingTimeseries,
-}
-
-impl ActivityMetricSource {
-    /// What is the minimum required to compute this metric activity values.
-    pub fn input_min_requirement(&self) -> ComputeMetricRequirement {
-        match self {
-            Self::Statistic(_) => ComputeMetricRequirement::Activity,
-            Self::Timeseries(_) => ComputeMetricRequirement::ActivityWithTimeseries,
-        }
-    }
-
-    pub fn metric_from_activity_with_timeseries(
-        &self,
-        activity: &ActivityWithTimeseries,
-    ) -> Option<ActivityMetric> {
-        match self {
-            Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
-            Self::Timeseries((metric, aggregate)) => {
-                aggregate.value_from_timeseries(metric, activity)
-            }
-        }
-        .map(|value| {
-            ActivityMetric::new(
-                value,
-                *activity.start_time(),
-                activity
-                    .statistics()
-                    .get(&ActivityStatistic::Duration)
-                    .cloned(),
-            )
-        })
-    }
-
-    pub fn metric_from_activity(
-        &self,
-        activity: &Activity,
-    ) -> Result<Option<ActivityMetric>, ComputeMetricError> {
-        Ok(match self {
-            Self::Statistic(statistic) => activity.statistics().get(statistic).cloned(),
-            Self::Timeseries(_) => return Err(ComputeMetricError::MissingTimeseries),
-        }
-        .map(|value| {
-            ActivityMetric::new(
-                value,
-                *activity.start_time(),
-                activity
-                    .statistics()
-                    .get(&ActivityStatistic::Duration)
-                    .cloned(),
-            )
-        }))
-    }
-}
-
-impl ToUnit for ActivityMetricSource {
-    fn unit(&self) -> Unit {
-        match self {
-            Self::Statistic(stat) => stat.unit(),
-            Self::Timeseries((metric, _)) => metric.unit(),
-        }
-    }
-}
-
 fn group_metrics_by_bin(
     granularity: &TrainingMetricGranularity,
     metrics: Vec<(Option<String>, ActivityMetric)>,
@@ -446,7 +350,7 @@ fn group_metrics_by_bin(
     let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetric>> = HashMap::new();
     for (group, value) in metrics {
         let bin = TrainingMetricBin::new(
-            granularity.datetime_key(value.activity_start_time.date()),
+            granularity.datetime_key(value.activity_start_time().date()),
             group,
         );
         grouped_values.entry(bin).or_default().push(value);
@@ -602,18 +506,18 @@ impl TrainingMetricAggregate {
             TrainingMetricAggregate::Min => TrainingMetricValue::Min(
                 activity_metrics
                     .into_iter()
-                    .fold(f64::MAX, |min, metric| min.min(metric.value)),
+                    .fold(f64::MAX, |min, metric| min.min(*metric.value())),
             ),
             TrainingMetricAggregate::Max => TrainingMetricValue::Max(
                 activity_metrics
                     .into_iter()
-                    .fold(f64::MIN, |max, metric| max.max(metric.value)),
+                    .fold(f64::MIN, |max, metric| max.max(*metric.value())),
             ),
             TrainingMetricAggregate::Average => {
                 let number_of_metrics = activity_metrics.len();
                 let sum = activity_metrics
                     .into_iter()
-                    .fold(0., |sum, metric| sum + metric.value);
+                    .fold(0., |sum, metric| sum + *metric.value());
 
                 TrainingMetricValue::Average {
                     value: sum / number_of_metrics as f64,
@@ -624,7 +528,7 @@ impl TrainingMetricAggregate {
             TrainingMetricAggregate::Sum => TrainingMetricValue::Sum(
                 activity_metrics
                     .into_iter()
-                    .fold(0., |sum, metric| sum + metric.value),
+                    .fold(0., |sum, metric| sum + *metric.value()),
             ),
             TrainingMetricAggregate::NumberOfActivities => {
                 TrainingMetricValue::NumberOfActivities(activity_metrics.len())
@@ -634,12 +538,12 @@ impl TrainingMetricAggregate {
 
     pub fn initial_value(&self, new_metric: &ActivityMetric) -> Option<TrainingMetricValue> {
         Some(match self {
-            Self::Max => TrainingMetricValue::Max(new_metric.value),
-            Self::Min => TrainingMetricValue::Min(new_metric.value),
-            Self::Sum => TrainingMetricValue::Sum(new_metric.value),
+            Self::Max => TrainingMetricValue::Max(*new_metric.value()),
+            Self::Min => TrainingMetricValue::Min(*new_metric.value()),
+            Self::Sum => TrainingMetricValue::Sum(*new_metric.value()),
             Self::Average => TrainingMetricValue::Average {
-                value: new_metric.value,
-                sum: new_metric.value,
+                value: *new_metric.value(),
+                sum: *new_metric.value(),
                 number_of_elements: 1,
             },
             Self::NumberOfActivities => TrainingMetricValue::NumberOfActivities(1),
@@ -656,19 +560,19 @@ impl TrainingMetricAggregate {
                 let TrainingMetricValue::Min(min) = previous_value else {
                     return None;
                 };
-                Some(TrainingMetricValue::Min(min.min(new_metric.value)))
+                Some(TrainingMetricValue::Min(min.min(*new_metric.value())))
             }
             Self::Max => {
                 let TrainingMetricValue::Max(max) = previous_value else {
                     return None;
                 };
-                Some(TrainingMetricValue::Max(max.max(new_metric.value)))
+                Some(TrainingMetricValue::Max(max.max(*new_metric.value())))
             }
             Self::Sum => {
                 let TrainingMetricValue::Sum(sum) = previous_value else {
                     return None;
                 };
-                Some(TrainingMetricValue::Sum(sum + new_metric.value))
+                Some(TrainingMetricValue::Sum(sum + *new_metric.value()))
             }
             Self::Average => {
                 let TrainingMetricValue::Average {
@@ -680,9 +584,9 @@ impl TrainingMetricAggregate {
                     return None;
                 };
                 Some(TrainingMetricValue::Average {
-                    sum: *sum + new_metric.value,
+                    sum: *sum + *new_metric.value(),
                     number_of_elements: *number_of_elements + 1,
-                    value: (*sum + new_metric.value) / (*number_of_elements as f64 + 1.),
+                    value: (*sum + *new_metric.value()) / (*number_of_elements as f64 + 1.),
                 })
             }
             Self::NumberOfActivities => {
@@ -1202,8 +1106,8 @@ mod test_training_metrics {
         UserId,
         activity::{
             ActiveTime, Activity, ActivityId, ActivityStartTime, ActivityStatistics,
-            ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesTime,
-            TimeseriesValue,
+            ActivityTimeseries, ActivityWithTimeseries, Sport, Timeseries, TimeseriesActiveTime,
+            TimeseriesMetric, TimeseriesTime, TimeseriesValue,
         },
     };
 
@@ -1559,6 +1463,8 @@ mod test_training_metrics {
 #[cfg(test)]
 mod test_training_metric_aggregate_initial_value {
 
+    use crate::domain::models::activity::ActivityStartTime;
+
     use super::*;
 
     #[test]
@@ -1628,6 +1534,8 @@ mod test_training_metric_aggregate_initial_value {
 
 #[cfg(test)]
 mod test_training_metric_aggregate_update_value {
+
+    use crate::domain::models::activity::ActivityStartTime;
 
     use super::*;
 
@@ -2002,7 +1910,9 @@ mod test_granularity_bins {
 
 #[cfg(test)]
 mod test_training_metric_filters {
-    use crate::domain::models::activity::{ActivityId, ActivityNutrition, ActivityStatistics};
+    use crate::domain::models::activity::{
+        ActivityId, ActivityNutrition, ActivityStartTime, ActivityStatistics,
+    };
 
     use super::*;
 
@@ -2357,7 +2267,7 @@ mod test_training_metric_filters {
 #[cfg(test)]
 mod test_training_period {
 
-    use crate::domain::models::activity::{ActivityId, ActivityStatistics};
+    use crate::domain::models::activity::{ActivityId, ActivityStartTime, ActivityStatistics};
 
     use super::*;
 
@@ -2646,7 +2556,8 @@ mod test_training_period {
 #[cfg(test)]
 mod test_training_metric_group_by {
     use crate::domain::models::activity::{
-        ActivityId, ActivityNutrition, ActivityRpe, ActivityStatistics, BonkStatus, WorkoutType,
+        ActivityId, ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistics,
+        BonkStatus, WorkoutType,
     };
 
     use super::*;

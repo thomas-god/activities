@@ -8,15 +8,103 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityFeedback, ActivityId, ActivityName, ActivityNaturalKey,
-            ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistic,
-            ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
-            TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+            Activity, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityName,
+            ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+            ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+            Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
         },
-        training::ActivityMetricSource,
     },
     ports::{DateRange, DateTimeRange},
 };
+
+pub trait IActivityService: Clone + Send + Sync + 'static {
+    fn create_activity(
+        &self,
+        req: CreateActivityRequest,
+    ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
+
+    fn list_activities(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
+
+    fn list_activities_with_timeseries(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+
+    fn list_activities_with_metric(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        source: &ActivityMetricSource,
+    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
+
+    fn get_activity(
+        &self,
+        activity_id: &ActivityId,
+    ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
+
+    fn get_activity_with_timeseries(
+        &self,
+        activity_id: &ActivityId,
+    ) -> impl Future<Output = Result<ActivityWithTimeseries, GetActivityError>> + Send;
+
+    fn get_activity_metric(
+        &self,
+        activity_id: &ActivityId,
+        metric: &TimeseriesMetric,
+        aggregate: &TimeseriesAggregate,
+    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
+
+    fn get_activity_statistic(
+        &self,
+        activity_id: &ActivityId,
+        statistic: &ActivityStatistic,
+    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
+
+    fn modify_activity(
+        &self,
+        req: ModifyActivityRequest,
+    ) -> impl Future<Output = Result<(), ModifyActivityError>> + Send;
+
+    fn update_activity_rpe(
+        &self,
+        req: UpdateActivityRpeRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityRpeError>> + Send;
+
+    fn update_activity_workout_type(
+        &self,
+        req: UpdateActivityWorkoutTypeRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityWorkoutTypeError>> + Send;
+
+    fn update_activity_nutrition(
+        &self,
+        req: UpdateActivityNutritionRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityNutritionError>> + Send;
+
+    fn update_activity_feedback(
+        &self,
+        req: UpdateActivityFeedbackRequest,
+    ) -> impl Future<Output = Result<(), UpdateActivityFeedbackError>> + Send;
+
+    fn delete_activity(
+        &self,
+        req: DeleteActivityRequest,
+    ) -> impl Future<Output = Result<(), DeleteActivityError>> + Send;
+
+    fn get_raw_activity(
+        &self,
+        req: GetRawActivityRequest,
+    ) -> impl Future<Output = Result<RawActivity, GetRawActivityError>> + Send;
+
+    fn get_all_raw_activities(
+        &self,
+        req: GetAllActivitiesRequest,
+    ) -> impl Future<Output = Result<Vec<RawActivity>, GetAllActivitiesError>> + Send;
+}
 
 #[derive(Debug, Clone)]
 pub struct CreateActivityRequest {
@@ -378,95 +466,6 @@ pub enum GetActivityMetricError {
     ActivityDoesNotExist(ActivityId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
-}
-
-pub trait IActivityService: Clone + Send + Sync + 'static {
-    fn create_activity(
-        &self,
-        req: CreateActivityRequest,
-    ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
-
-    fn list_activities(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
-
-    fn list_activities_with_timeseries(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
-
-    fn list_activities_with_metric(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        source: &ActivityMetricSource,
-    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
-
-    fn get_activity(
-        &self,
-        activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
-
-    fn get_activity_with_timeseries(
-        &self,
-        activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<ActivityWithTimeseries, GetActivityError>> + Send;
-
-    fn get_activity_metric(
-        &self,
-        activity_id: &ActivityId,
-        metric: &TimeseriesMetric,
-        aggregate: &TimeseriesAggregate,
-    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
-
-    fn get_activity_statistic(
-        &self,
-        activity_id: &ActivityId,
-        statistic: &ActivityStatistic,
-    ) -> impl Future<Output = Result<Option<f64>, GetActivityMetricError>> + Send;
-
-    fn modify_activity(
-        &self,
-        req: ModifyActivityRequest,
-    ) -> impl Future<Output = Result<(), ModifyActivityError>> + Send;
-
-    fn update_activity_rpe(
-        &self,
-        req: UpdateActivityRpeRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityRpeError>> + Send;
-
-    fn update_activity_workout_type(
-        &self,
-        req: UpdateActivityWorkoutTypeRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityWorkoutTypeError>> + Send;
-
-    fn update_activity_nutrition(
-        &self,
-        req: UpdateActivityNutritionRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityNutritionError>> + Send;
-
-    fn update_activity_feedback(
-        &self,
-        req: UpdateActivityFeedbackRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityFeedbackError>> + Send;
-
-    fn delete_activity(
-        &self,
-        req: DeleteActivityRequest,
-    ) -> impl Future<Output = Result<(), DeleteActivityError>> + Send;
-
-    fn get_raw_activity(
-        &self,
-        req: GetRawActivityRequest,
-    ) -> impl Future<Output = Result<RawActivity, GetRawActivityError>> + Send;
-
-    fn get_all_raw_activities(
-        &self,
-        req: GetAllActivitiesRequest,
-    ) -> impl Future<Output = Result<Vec<RawActivity>, GetAllActivitiesError>> + Send;
 }
 
 #[derive(Debug, Error)]

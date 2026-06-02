@@ -4,9 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
-        models::training::{
-            ActivityMetricSource, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricFilters, TrainingMetricGranularity,
+        models::{
+            activity::ActivityMetricSource,
+            training::{
+                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
+                TrainingMetricGranularity,
+            },
         },
         ports::{
             DateRange,

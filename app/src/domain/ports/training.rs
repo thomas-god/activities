@@ -8,15 +8,14 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityWithTimeseries},
+        activity::{Activity, ActivityId, ActivityMetricSource, ActivityWithTimeseries},
         training::{
-            ActivityMetricSource, TrainingMetric, TrainingMetricAggregate,
-            TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-            TrainingMetricValues, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-            TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-            TrainingPeriodWithActivities,
+            TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+            TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricValues,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
         },
     },
     ports::DateRange,

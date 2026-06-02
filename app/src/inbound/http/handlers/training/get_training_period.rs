@@ -14,11 +14,10 @@ use crate::inbound::http::handlers::activities::activity_schema::PublicActivity;
 use crate::{
     domain::{
         models::{
-            activity::{TimeseriesMetric, ToUnit, Unit},
+            activity::{ActivityMetricSource, TimeseriesMetric, ToUnit, Unit},
             training::{
-                ActivityMetricSource, SportFilter, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricValues, TrainingPeriod, TrainingPeriodId,
-                TrainingPeriodSports,
+                SportFilter, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricValues, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
             },
         },
         ports::{

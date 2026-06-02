@@ -4,10 +4,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityId, ActivityStatistic, ActivityWithTimeseries, TimeseriesAggregate,
-            TimeseriesMetric,
+            Activity, ActivityId, ActivityMetricSource, ActivityStatistic, ActivityWithTimeseries,
+            TimeseriesAggregate, TimeseriesMetric,
         },
-        training::ActivityMetricSource,
     },
     ports::activity::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
@@ -429,10 +428,9 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics, Sport,
-        TimeseriesMetric,
+        ActivityMetricSource, ActivityName, ActivityNaturalKey, ActivityStartTime,
+        ActivityStatistics, Sport, TimeseriesMetric,
     };
-    use crate::domain::models::training::ActivityMetricSource;
     use crate::domain::ports::activity::{
         DeleteActivityError, GetActivityMetricError, GetAllActivitiesError,
         GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,

@@ -7,13 +7,13 @@ use sqlx::{QueryBuilder, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 use crate::domain::{
     models::{
         UserId,
+        activity::ActivityMetricSource,
         training::{
-            ActivityMetricSource, TrainingMetric, TrainingMetricAggregate,
-            TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+            TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricsOrdering,
+            TrainingNote, TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -612,11 +612,13 @@ mod test_sqlite_training_repository {
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
-        activity::{ActivityStatistic, Sport, TimeseriesAggregate, TimeseriesMetric},
+        activity::{
+            ActivityMetricSource, ActivityStatistic, Sport, TimeseriesAggregate, TimeseriesMetric,
+        },
         training::{
-            ActivityMetricSource, SportFilter, TrainingMetricAggregate, TrainingMetricFilters,
-            TrainingMetricGranularity, TrainingNote, TrainingNoteContent, TrainingNoteId,
-            TrainingNoteTitle, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
+            TrainingPeriodId, TrainingPeriodSports,
         },
     };
 
