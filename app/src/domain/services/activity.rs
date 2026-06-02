@@ -10,10 +10,10 @@ use crate::domain::{
     },
     ports::activity::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
-        DeleteActivityRequest, GetActivityError, GetActivityMetricError, GetAllActivitiesError,
-        GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, IActivityService,
-        ListActivitiesError, ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest,
-        RawActivity, RawDataRepository, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
+        DeleteActivityRequest, GetActivityError, GetAllActivitiesError, GetAllActivitiesRequest,
+        GetRawActivityError, GetRawActivityRequest, IActivityService, ListActivitiesError,
+        ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest, RawActivity,
+        RawDataRepository, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
         UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
         UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
     },
@@ -214,45 +214,6 @@ where
         }
     }
 
-    async fn get_activity_metric(
-        &self,
-        activity_id: &ActivityId,
-        metric: &TimeseriesMetric,
-        aggregate: &TimeseriesAggregate,
-    ) -> Result<Option<f64>, GetActivityMetricError> {
-        let Some(activity) = self
-            .activity_repository
-            .get_activity_with_timeseries(activity_id)
-            .await
-            .map_err(|err| anyhow!(err))?
-        else {
-            return Err(GetActivityMetricError::ActivityDoesNotExist(
-                activity_id.clone(),
-            ));
-        };
-
-        Ok(aggregate.value_from_timeseries(metric, &activity))
-    }
-
-    async fn get_activity_statistic(
-        &self,
-        activity_id: &ActivityId,
-        statistic: &ActivityStatistic,
-    ) -> Result<Option<f64>, GetActivityMetricError> {
-        let Some(activity) = self
-            .activity_repository
-            .get_activity(activity_id)
-            .await
-            .map_err(|err| anyhow!(err))?
-        else {
-            return Err(GetActivityMetricError::ActivityDoesNotExist(
-                activity_id.clone(),
-            ));
-        };
-
-        Ok(activity.statistics().get(statistic).cloned())
-    }
-
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
         let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(ModifyActivityError::ActivityDoesNotExist(
@@ -432,10 +393,9 @@ pub mod test_utils {
         ActivityStatistics, Sport, TimeseriesMetric,
     };
     use crate::domain::ports::activity::{
-        DeleteActivityError, GetActivityMetricError, GetAllActivitiesError,
-        GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,
-        ModifyActivityError, RawActivity, SaveActivityError, SimilarActivityError,
-        UpdateActivityMetricError,
+        DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
+        GetRawActivityRequest, ListActivitiesError, ModifyActivityError, RawActivity,
+        SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
 
     mock! {
@@ -479,19 +439,6 @@ pub mod test_utils {
                 filters: &ListActivitiesFilters,
                 source: &ActivityMetricSource,
             ) -> Result<Vec<(Activity, f64)>, ListActivitiesError>;
-
-            async fn get_activity_metric(
-                &self,
-                activity_id: &ActivityId,
-                metric: &TimeseriesMetric,
-                aggregate: &TimeseriesAggregate,
-            ) -> Result<Option<f64>, GetActivityMetricError>;
-
-            async fn get_activity_statistic(
-                &self,
-                activity_id: &ActivityId,
-                statistic: &ActivityStatistic,
-            ) -> Result<Option<f64>, GetActivityMetricError>;
 
             async fn modify_activity(
                 &self,
@@ -1508,144 +1455,6 @@ mod tests_activity_service {
             .unwrap();
 
         assert!(res.is_empty());
-    }
-
-    mod test_activity_service_get_activity_metric {
-        use crate::domain::models::activity::{
-            ActiveTime, ActivityStatistic, Timeseries, TimeseriesActiveTime, TimeseriesTime,
-            TimeseriesValue,
-        };
-
-        use super::*;
-
-        fn default_activity() -> ActivityWithTimeseries {
-            ActivityWithTimeseries::new(
-                Activity::new(
-                    ActivityId::from("test_activity"),
-                    UserId::from("test_user".to_string()),
-                    None,
-                    ActivityStartTime::from_timestamp(0).unwrap(),
-                    Sport::Cycling,
-                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-                ActivityTimeseries::new(
-                    TimeseriesTime::new(vec![0, 1, 2]),
-                    TimeseriesActiveTime::new(vec![
-                        ActiveTime::Running(0),
-                        ActiveTime::Running(1),
-                        ActiveTime::Running(2),
-                    ]),
-                    vec![],
-                    vec![Timeseries::new(
-                        TimeseriesMetric::Cadence,
-                        vec![
-                            Some(TimeseriesValue::Int(10)),
-                            Some(TimeseriesValue::Int(20)),
-                            Some(TimeseriesValue::Int(30)),
-                        ],
-                    )],
-                )
-                .unwrap(),
-            )
-        }
-
-        #[tokio::test]
-        async fn test_activity_does_not_have_timeseries_for_this_metric() {
-            let mut activity_repository = MockActivityRepository::new();
-            activity_repository
-                .expect_get_activity_with_timeseries()
-                .returning(|_| Ok(Some(default_activity())));
-
-            let raw_data_repository = MockRawDataRepository::default();
-
-            let service = ActivityService::new(activity_repository, raw_data_repository);
-
-            assert!(
-                service
-                    .get_activity_metric(
-                        &ActivityId::from("test_activity"),
-                        &TimeseriesMetric::Power,
-                        &TimeseriesAggregate::Average
-                    )
-                    .await
-                    .unwrap()
-                    .is_none()
-            )
-        }
-
-        #[tokio::test]
-        async fn test_activity_has_timeseries_for_this_metric() {
-            let mut activity_repository = MockActivityRepository::new();
-            activity_repository
-                .expect_get_activity_with_timeseries()
-                .returning(|_| Ok(Some(default_activity())));
-
-            let raw_data_repository = MockRawDataRepository::default();
-
-            let service = ActivityService::new(activity_repository, raw_data_repository);
-
-            assert!(
-                service
-                    .get_activity_metric(
-                        &ActivityId::from("test_activity"),
-                        &TimeseriesMetric::Cadence,
-                        &TimeseriesAggregate::Average
-                    )
-                    .await
-                    .unwrap()
-                    .is_some()
-            )
-        }
-
-        #[tokio::test]
-        async fn test_activity_does_not_have_this_statistics() {
-            let mut activity_repository = MockActivityRepository::new();
-            activity_repository
-                .expect_get_activity()
-                .returning(|_| Ok(Some(default_activity().activity().clone())));
-
-            let raw_data_repository = MockRawDataRepository::default();
-
-            let service = ActivityService::new(activity_repository, raw_data_repository);
-
-            assert!(
-                service
-                    .get_activity_statistic(
-                        &ActivityId::from("test_activity"),
-                        &ActivityStatistic::Calories,
-                    )
-                    .await
-                    .unwrap()
-                    .is_none()
-            )
-        }
-
-        #[tokio::test]
-        async fn test_activity_has_this_statistics() {
-            let mut activity_repository = MockActivityRepository::new();
-            activity_repository
-                .expect_get_activity()
-                .returning(|_| Ok(Some(default_activity().activity().clone())));
-
-            let raw_data_repository = MockRawDataRepository::default();
-
-            let service = ActivityService::new(activity_repository, raw_data_repository);
-
-            assert!(
-                service
-                    .get_activity_statistic(
-                        &ActivityId::from("test_activity"),
-                        &ActivityStatistic::Duration,
-                    )
-                    .await
-                    .unwrap()
-                    .is_some()
-            )
-        }
     }
 
     mod test_activity_service_list_activities_with_metric {
