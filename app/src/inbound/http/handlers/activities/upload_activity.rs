@@ -165,7 +165,10 @@ mod tests {
         domain::{
             models::{
                 UserId,
-                activity::{Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport},
+                activity::{
+                    Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
+                    Sport,
+                },
             },
             services::{
                 activity::test_utils::MockActivityService,
@@ -197,6 +200,7 @@ mod tests {
                     expected_id_clone.clone(),
                     UserId::test_default(),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::default(),
                     Sport::Running,
                     ActivityStatistics::default(),
                 ))
@@ -254,6 +258,7 @@ mod tests {
                     expected_id1_clone.clone(),
                     UserId::test_default(),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::default(),
                     Sport::Running,
                     ActivityStatistics::default(),
                 ))
@@ -267,6 +272,7 @@ mod tests {
                     expected_id2_clone.clone(),
                     UserId::test_default(),
                     ActivityStartTime::from_timestamp(2000).unwrap(),
+                    ActivityDuration::default(),
                     Sport::Cycling,
                     ActivityStatistics::default(),
                 ))
@@ -333,6 +339,7 @@ mod tests {
                     expected_id_clone.clone(),
                     UserId::test_default(),
                     ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::default(),
                     Sport::Running,
                     ActivityStatistics::default(),
                 ))

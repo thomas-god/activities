@@ -58,10 +58,10 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, Activity, ActivityId, ActivityStartTime, ActivityStatistic,
-                    ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
-                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-                    TimeseriesValue,
+                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
+                    ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+                    ActivityWithTimeseries, Sport, Timeseries, TimeseriesActiveTime,
+                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::activity::GetActivityError,
@@ -102,6 +102,7 @@ mod tests {
                                 .parse::<DateTime<FixedOffset>>()
                                 .unwrap(),
                         ),
+                        ActivityDuration::from(1200.),
                         Sport::IndoorCycling,
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Duration,

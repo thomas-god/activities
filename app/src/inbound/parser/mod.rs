@@ -58,6 +58,7 @@ impl ParsedFileContent {
             user.clone(),
             self.sport,
             self.start_time,
+            self.duration,
             self.statistics,
             self.timeseries,
             RawContent::new(self.extension, self.raw_content),

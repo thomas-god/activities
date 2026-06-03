@@ -10,10 +10,10 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2,
-            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-            ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries, Sport,
-            TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+            Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricSource,
+            ActivityMetricV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+            Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -112,6 +112,7 @@ pub struct CreateActivityRequest {
     user: UserId,
     sport: Sport,
     start_time: ActivityStartTime,
+    duration: ActivityDuration,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
     raw_content: RawContent,
@@ -122,6 +123,7 @@ impl CreateActivityRequest {
         user: UserId,
         sport: Sport,
         start_time: ActivityStartTime,
+        duration: ActivityDuration,
         statistics: ActivityStatistics,
         timeseries: ActivityTimeseries,
         raw_content: RawContent,
@@ -130,6 +132,7 @@ impl CreateActivityRequest {
             user,
             sport,
             start_time,
+            duration,
             statistics,
             timeseries,
             raw_content,
@@ -142,6 +145,10 @@ impl CreateActivityRequest {
 
     pub fn start_time(&self) -> &ActivityStartTime {
         &self.start_time
+    }
+
+    pub fn duration(&self) -> &ActivityDuration {
+        &self.duration
     }
 
     pub fn raw_content(self) -> RawContent {

@@ -9,10 +9,10 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityFeedback, ActivityId, ActivityMetricV2, ActivityName,
-                ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-                ActivityStatistics, ActivityWithTimeseries, Sport, TimeseriesAggregate,
-                TimeseriesMetric, WorkoutType,
+                Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
+                ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+                ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityWithTimeseries,
+                Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
             },
         },
         ports::{
@@ -199,18 +199,24 @@ where
                 workout_type,
                 nutrition,
                 feedback,
-            )) => Ok(Some(Activity::new(
+            )) => {
+                let duration = statistics
+                    .get(&ActivityStatistic::Duration)
+                    .map_or_else(ActivityDuration::default, |d| ActivityDuration::from(*d));
+
+                Ok(Some(Activity::new(
                 id,
                 user_id,
                 name,
                 start_time,
+                duration,
                 sport,
                 statistics,
                 rpe,
                 workout_type,
                 nutrition,
                 feedback,
-            ))),
+            )))},
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(anyhow!(err)),
         }
@@ -281,11 +287,17 @@ where
                             nutrition,
                             feedback,
                         )| {
+                            let duration = statistics
+                                .get(&ActivityStatistic::Duration)
+                                .map_or_else(ActivityDuration::default, |d| {
+                                    ActivityDuration::from(*d)
+                                });
                             Activity::new(
                                 id,
                                 user_id,
                                 name,
                                 start_time,
+                                duration,
                                 sport,
                                 statistics,
                                 rpe,
@@ -609,12 +621,18 @@ where
                             feedback,
                             metric_value,
                         )| {
+                            let duration = statistics
+                                .get(&ActivityStatistic::Duration)
+                                .map_or_else(ActivityDuration::default, |d| {
+                                    ActivityDuration::from(*d)
+                                });
                             (
                                 Activity::new(
                                     id,
                                     user_id,
                                     name,
                                     start_time,
+                                    duration,
                                     sport,
                                     statistics,
                                     rpe,
@@ -878,9 +896,10 @@ mod test_sqlite_activity_repository {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, ActivityNutrition, ActivityStartTime, ActivityStatistic,
-                    ActivityStatistics, ActivityTimeseries, BonkStatus, Sport, Timeseries,
-                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, ActivityDuration, ActivityNutrition, ActivityStartTime,
+                    ActivityStatistic, ActivityStatistics, ActivityTimeseries, BonkStatus, Sport,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue,
                 },
             },
             ports::{
@@ -915,6 +934,7 @@ mod test_sqlite_activity_repository {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
@@ -925,6 +945,7 @@ mod test_sqlite_activity_repository {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::new(*start),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
@@ -2308,6 +2329,7 @@ mod test_sqlite_activity_repository {
                                 .parse::<DateTime<FixedOffset>>()
                                 .unwrap(),
                         ),
+                        ActivityDuration::default(),
                         Sport::Cycling,
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Calories,
@@ -2325,6 +2347,7 @@ mod test_sqlite_activity_repository {
                                 .parse::<DateTime<FixedOffset>>()
                                 .unwrap(),
                         ),
+                        ActivityDuration::default(),
                         Sport::Cycling,
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Calories,
@@ -2342,6 +2365,7 @@ mod test_sqlite_activity_repository {
                                 .parse::<DateTime<FixedOffset>>()
                                 .unwrap(),
                         ),
+                        ActivityDuration::default(),
                         Sport::Cycling,
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Calories,

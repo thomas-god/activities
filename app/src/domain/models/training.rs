@@ -14,8 +14,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic,
-            BonkStatus, Sport, SportCategory, WorkoutType,
+            Activity, ActivityMetric, ActivityMetricSource, ActivityRpe, BonkStatus, Sport,
+            SportCategory, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -311,10 +311,7 @@ impl TrainingMetricDefinition {
                         ActivityMetric::new(
                             *metric_value,
                             *activity.start_time(),
-                            activity
-                                .statistics()
-                                .get(&ActivityStatistic::Duration)
-                                .cloned(),
+                            *activity.duration(),
                         ),
                     ))
                 } else {
@@ -1105,9 +1102,10 @@ mod test_training_metrics {
     use crate::domain::models::{
         UserId,
         activity::{
-            ActiveTime, Activity, ActivityId, ActivityStartTime, ActivityStatistics,
-            ActivityTimeseries, ActivityWithTimeseries, Sport, Timeseries, TimeseriesActiveTime,
-            TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+            ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
+            ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+            Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+            TimeseriesValue,
         },
     };
 
@@ -1123,6 +1121,7 @@ mod test_training_metrics {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             ),
@@ -1156,7 +1155,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(120.),
+            ActivityDuration::from(120.),
         );
         let metric_2 = ActivityMetric::new(
             18.1,
@@ -1165,7 +1164,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(120.),
+            ActivityDuration::from(120.),
         );
 
         let metric_3 = ActivityMetric::new(
@@ -1175,7 +1174,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(120.),
+            ActivityDuration::from(120.),
         );
         let metrics = vec![
             (None, metric_1.clone()),
@@ -1207,7 +1206,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(12.),
+            ActivityDuration::from(12.),
         );
         let metric_2 = ActivityMetric::new(
             18.1,
@@ -1216,7 +1215,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(12.),
+            ActivityDuration::from(12.),
         );
         let metric_3 = ActivityMetric::new(
             67.1,
@@ -1225,7 +1224,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            Some(12.),
+            ActivityDuration::from(12.),
         );
         let metrics = vec![
             (None, metric_1.clone()),
@@ -1257,7 +1256,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            None,
+            ActivityDuration::default(),
         );
         let metric_2 = ActivityMetric::new(
             18.1,
@@ -1266,7 +1265,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            None,
+            ActivityDuration::default(),
         );
         let metric_3 = ActivityMetric::new(
             67.1,
@@ -1275,7 +1274,7 @@ mod test_training_metrics {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
-            None,
+            ActivityDuration::default(),
         );
         let metrics = vec![
             (None, metric_1.clone()),
@@ -1310,7 +1309,7 @@ mod test_training_metrics {
                             .parse::<DateTime<FixedOffset>>()
                             .unwrap(),
                     ),
-                    None,
+                    ActivityDuration::default(),
                 ),
                 ActivityMetric::new(
                     1.3,
@@ -1319,7 +1318,7 @@ mod test_training_metrics {
                             .parse::<DateTime<FixedOffset>>()
                             .unwrap(),
                     ),
-                    None,
+                    ActivityDuration::default(),
                 ),
             ],
         )]);
@@ -1458,7 +1457,7 @@ mod test_training_metrics {
 #[cfg(test)]
 mod test_training_metric_aggregate_initial_value {
 
-    use crate::domain::models::activity::ActivityStartTime;
+    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime};
 
     use super::*;
 
@@ -1468,7 +1467,7 @@ mod test_training_metric_aggregate_initial_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1483,7 +1482,7 @@ mod test_training_metric_aggregate_initial_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1498,7 +1497,7 @@ mod test_training_metric_aggregate_initial_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1513,7 +1512,7 @@ mod test_training_metric_aggregate_initial_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1530,7 +1529,7 @@ mod test_training_metric_aggregate_initial_value {
 #[cfg(test)]
 mod test_training_metric_aggregate_update_value {
 
-    use crate::domain::models::activity::ActivityStartTime;
+    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime};
 
     use super::*;
 
@@ -1543,7 +1542,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1559,7 +1558,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1582,7 +1581,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         let aggregate = TrainingMetricAggregate::Min;
@@ -1599,7 +1598,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1615,7 +1614,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         assert_eq!(
@@ -1639,7 +1638,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         for previous in previous_values_wrong_variant {
@@ -1654,7 +1653,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         let Some(TrainingMetricValue::Sum(sum)) = aggregate.update_value(&previous, &new_metric)
@@ -1679,7 +1678,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         for previous in previous_values_wrong_variant {
@@ -1698,7 +1697,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         let Some(TrainingMetricValue::Average {
@@ -1725,7 +1724,7 @@ mod test_training_metric_aggregate_update_value {
         let new_metric = ActivityMetric::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
-            Some(1200.),
+            ActivityDuration::from(1200.),
         );
 
         for previous in previous_values_wrong_variant {
@@ -1906,8 +1905,8 @@ mod test_granularity_bins {
 #[cfg(test)]
 mod test_training_metric_filters {
     use crate::domain::models::activity::{
-        ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityStartTime,
-        ActivityStatistics,
+        ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
+        ActivityStartTime, ActivityStatistics,
     };
 
     use super::*;
@@ -1926,6 +1925,7 @@ mod test_training_metric_filters {
             ActivityId::default(),
             UserId::test_default(),
             default_start_time(),
+            ActivityDuration::default(),
             sport,
             ActivityStatistics::default(),
         )
@@ -1937,6 +1937,7 @@ mod test_training_metric_filters {
             UserId::test_default(),
             ActivityName::empty(),
             default_start_time(),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::default(),
             ActivityRpe::empty(),
@@ -1952,6 +1953,7 @@ mod test_training_metric_filters {
             UserId::test_default(),
             ActivityName::empty(),
             default_start_time(),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::default(),
             ActivityRpe::empty(),
@@ -1967,6 +1969,7 @@ mod test_training_metric_filters {
             UserId::test_default(),
             ActivityName::empty(),
             default_start_time(),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::default(),
             Some(rpe),
@@ -1986,6 +1989,7 @@ mod test_training_metric_filters {
             UserId::test_default(),
             ActivityName::empty(),
             default_start_time(),
+            ActivityDuration::default(),
             sport,
             ActivityStatistics::default(),
             Some(ActivityRpe::Eight),
@@ -2000,6 +2004,7 @@ mod test_training_metric_filters {
             ActivityId::default(),
             UserId::test_default(),
             default_start_time(),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::default(),
         )
@@ -2253,7 +2258,9 @@ mod test_training_metric_filters {
 #[cfg(test)]
 mod test_training_period {
 
-    use crate::domain::models::activity::{ActivityId, ActivityStartTime, ActivityStatistics};
+    use crate::domain::models::activity::{
+        ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
+    };
 
     use super::*;
 
@@ -2314,6 +2321,7 @@ mod test_training_period {
             ActivityId::default(),
             UserId::test_default(),
             ActivityStartTime::new(start.parse::<DateTime<FixedOffset>>().unwrap()),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::new(HashMap::new()),
         )
@@ -2328,6 +2336,7 @@ mod test_training_period {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
+            ActivityDuration::default(),
             sport,
             ActivityStatistics::new(HashMap::new()),
         )
@@ -2532,8 +2541,8 @@ mod test_training_period {
 #[cfg(test)]
 mod test_training_metric_group_by {
     use crate::domain::models::activity::{
-        ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityRpe,
-        ActivityStartTime, ActivityStatistics, BonkStatus, WorkoutType,
+        ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
+        ActivityRpe, ActivityStartTime, ActivityStatistics, BonkStatus, WorkoutType,
     };
 
     use super::*;
@@ -2549,6 +2558,7 @@ mod test_training_metric_group_by {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
+            ActivityDuration::default(),
             Sport::TrailRunning,
             ActivityStatistics::new(HashMap::new()),
             Some(ActivityRpe::Six),
@@ -2593,6 +2603,7 @@ mod test_training_metric_group_by {
                     .parse::<DateTime<FixedOffset>>()
                     .unwrap(),
             ),
+            ActivityDuration::default(),
             Sport::Golf,
             ActivityStatistics::new(HashMap::new()),
         );
@@ -2660,6 +2671,8 @@ mod test_training_metric_group_by {
 
 #[cfg(test)]
 mod test_training_metrics_ordering {
+    use crate::domain::models::activity::ActivityStatistic;
+
     use super::*;
 
     fn generate_test_metrics() -> Vec<TrainingMetric> {

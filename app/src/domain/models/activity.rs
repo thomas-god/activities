@@ -24,6 +24,7 @@ pub struct Activity {
     user: UserId,
     name: Option<ActivityName>,
     start_time: ActivityStartTime,
+    duration: ActivityDuration,
     sport: Sport,
     statistics: ActivityStatistics,
     rpe: Option<ActivityRpe>,
@@ -40,6 +41,7 @@ impl Activity {
         user: UserId,
         name: Option<ActivityName>,
         start_time: ActivityStartTime,
+        duration: ActivityDuration,
         sport: Sport,
         statistics: ActivityStatistics,
         rpe: Option<ActivityRpe>,
@@ -53,6 +55,7 @@ impl Activity {
             name,
             start_time,
             sport,
+            duration,
             statistics,
             rpe,
             workout_type,
@@ -66,6 +69,7 @@ impl Activity {
         id: ActivityId,
         user: UserId,
         start_time: ActivityStartTime,
+        duration: ActivityDuration,
         sport: Sport,
         statistics: ActivityStatistics,
     ) -> Self {
@@ -74,6 +78,7 @@ impl Activity {
             user,
             name: ActivityName::empty(),
             start_time,
+            duration,
             sport,
             statistics,
             rpe: ActivityRpe::empty(),
@@ -87,13 +92,12 @@ impl Activity {
     /// identical natural keys should be considered identical/duplicate regardless of their
     /// technical [Activity::id].
     pub fn natural_key(&self) -> ActivityNaturalKey {
-        let duration = self
-            .statistics
-            .get(&ActivityStatistic::Duration)
-            .unwrap_or(&0.);
         ActivityNaturalKey(format!(
             "{}:{}:{}:{}",
-            self.user, self.sport, self.start_time, duration
+            self.user,
+            self.sport,
+            self.start_time,
+            self.duration.as_f64()
         ))
     }
 
@@ -111,6 +115,10 @@ impl Activity {
 
     pub fn start_time(&self) -> &ActivityStartTime {
         &self.start_time
+    }
+
+    pub fn duration(&self) -> &ActivityDuration {
+        &self.duration
     }
 
     pub fn sport(&self) -> &Sport {
@@ -169,6 +177,10 @@ impl ActivityWithTimeseries {
         self.activity.start_time()
     }
 
+    pub fn duration(&self) -> &ActivityDuration {
+        self.activity.duration()
+    }
+
     pub fn sport(&self) -> &Sport {
         self.activity.sport()
     }
@@ -197,12 +209,11 @@ impl ActivityWithTimeseries {
         &self.timeseries
     }
 
-    pub fn active_duration(&self) -> Option<f64> {
-        self.timeseries
-            .active_time
-            .duration()
-            .map(|duration| duration as f64)
-            .or_else(|| self.statistics().get(&ActivityStatistic::Duration).cloned())
+    pub fn active_duration(&self) -> ActivityDuration {
+        self.timeseries.active_time.duration().map_or_else(
+            || self.activity.duration,
+            |duration| ActivityDuration::from(duration as f64),
+        )
     }
 }
 
@@ -514,6 +525,12 @@ impl ActivityStartTime {
 
 #[derive(Clone, Debug, Display, PartialEq, PartialOrd, From, Into, Copy, Constructor, Default)]
 pub struct ActivityDuration(f64);
+
+impl ActivityDuration {
+    pub fn as_f64(&self) -> &f64 {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum Sport {
@@ -1281,14 +1298,18 @@ impl TimeseriesAggregate {
 
         match (metric, self) {
             (TimeseriesMetric::Pace, Self::Average) => {
-                let (Some(distance), Some(duration)) = (
+                let (Some(distance), duration) = (
                     activity.statistics().get(&ActivityStatistic::Distance),
                     activity.active_duration(),
                 ) else {
                     return None;
                 };
 
-                Some(duration.div(distance))
+                if duration == ActivityDuration::from(0.0) {
+                    return None;
+                }
+
+                Some(duration.as_f64().div(distance))
             }
             (_, Self::Min) => values.into_iter().reduce(f64::min),
             (_, Self::Max) => values.into_iter().reduce(f64::max),
@@ -1307,7 +1328,7 @@ impl TimeseriesAggregate {
 pub struct ActivityMetric {
     value: f64,
     activity_start_time: ActivityStartTime,
-    activity_duration: Option<f64>,
+    activity_duration: ActivityDuration,
 }
 
 impl ActivityMetric {
@@ -1319,7 +1340,7 @@ impl ActivityMetric {
         &self.activity_start_time
     }
 
-    pub fn activity_duration(&self) -> &Option<f64> {
+    pub fn activity_duration(&self) -> &ActivityDuration {
         &self.activity_duration
     }
 }
@@ -1350,6 +1371,7 @@ mod tests {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::default(),
         );
@@ -1357,6 +1379,7 @@ mod tests {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::default(),
         );
@@ -1370,6 +1393,7 @@ mod tests {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::default(),
         );
@@ -1377,6 +1401,7 @@ mod tests {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::default(),
         );
@@ -1390,6 +1415,7 @@ mod tests {
             ActivityId::new(),
             UserId::test_default(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::default(),
         );
@@ -1397,6 +1423,7 @@ mod tests {
             ActivityId::new(),
             "another_user".to_string().into(),
             ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
             Sport::Cycling,
             ActivityStatistics::default(),
         );
@@ -1571,6 +1598,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             ),
@@ -1618,6 +1646,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
             ),
@@ -1875,6 +1904,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([
                     (ActivityStatistic::Distance, 10000.0), // 10 km in meters
@@ -1920,6 +1950,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
             ),
@@ -1950,7 +1981,7 @@ mod test_timeseries {
     }
 
     #[test]
-    fn test_aggregate_average_pace_no_active_time_and_missing_duration() {
+    fn test_aggregate_average_pace_no_active_time_and_duration_is_zero() {
         let activity = ActivityWithTimeseries::new(
             Activity::new_empty(
                 ActivityId::default(),
@@ -1960,6 +1991,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::from(0.0),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
             ),
@@ -2000,6 +2032,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2041,6 +2074,7 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([
                     (ActivityStatistic::Distance, 10000.0),
@@ -2149,8 +2183,9 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::from(9999.0),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 9999.0)])),
+                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250, 500]),
@@ -2166,12 +2201,12 @@ mod test_timeseries {
             .unwrap(),
         );
 
-        // Should return timeseries duration (500), not statistics duration (9999)
-        assert_eq!(activity.active_duration(), Some(500.0));
+        // Should return timeseries duration (500), not activity's duration (9999)
+        assert_eq!(activity.active_duration(), ActivityDuration::from(500.0));
     }
 
     #[test]
-    fn test_active_duration_fallback_to_statistics() {
+    fn test_active_duration_fallback_to_activity_duration() {
         let activity = ActivityWithTimeseries::new(
             Activity::new_empty(
                 ActivityId::default(),
@@ -2181,8 +2216,9 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::from(3600.0),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
+                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250]),
@@ -2197,12 +2233,12 @@ mod test_timeseries {
             .unwrap(),
         );
 
-        // Timeseries has no running values, should fall back to statistics
-        assert_eq!(activity.active_duration(), Some(3600.0));
+        // Timeseries has no running values, should fall back to activity's duration
+        assert_eq!(activity.active_duration(), ActivityDuration::from(3600.0));
     }
 
     #[test]
-    fn test_active_duration_both_none() {
+    fn test_active_duration_empty_timeseries_fallback_to_activity_duration() {
         let activity = ActivityWithTimeseries::new(
             Activity::new_empty(
                 ActivityId::default(),
@@ -2212,35 +2248,9 @@ mod test_timeseries {
                         .parse::<DateTime<FixedOffset>>()
                         .unwrap(),
                 ),
+                ActivityDuration::from(1800.0),
                 Sport::Running,
                 ActivityStatistics::default(),
-            ),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 100]),
-                TimeseriesActiveTime::new(vec![ActiveTime::Paused, ActiveTime::Paused]),
-                vec![],
-                vec![],
-            )
-            .unwrap(),
-        );
-
-        // No duration in either timeseries or statistics
-        assert_eq!(activity.active_duration(), None);
-    }
-
-    #[test]
-    fn test_active_duration_empty_timeseries_with_statistics() {
-        let activity = ActivityWithTimeseries::new(
-            Activity::new_empty(
-                ActivityId::default(),
-                UserId::test_default(),
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                Sport::Running,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1800.0)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
@@ -2252,6 +2262,6 @@ mod test_timeseries {
         );
 
         // Empty timeseries, should use statistics
-        assert_eq!(activity.active_duration(), Some(1800.0));
+        assert_eq!(activity.active_duration(), ActivityDuration::from(1800.0));
     }
 }

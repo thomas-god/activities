@@ -1068,7 +1068,7 @@ mod tests_training_metrics_service {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
     };
 
     use crate::domain::ports::DateRange;
@@ -1398,6 +1398,7 @@ mod tests_training_metrics_service {
                             .and_utc()
                             .fixed_offset(),
                         ),
+                        ActivityDuration::default(),
                         Sport::Running,
                         stats,
                     ),
@@ -2200,7 +2201,10 @@ mod test_training_service_period {
     use chrono::NaiveDate;
 
     use crate::domain::{
-        models::training::{TrainingPeriod, TrainingPeriodSports},
+        models::{
+            activity::ActivityDuration,
+            training::{TrainingPeriod, TrainingPeriodSports},
+        },
         ports::{
             activity::ListActivitiesError,
             training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
@@ -2297,6 +2301,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2312,6 +2317,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
             ),
@@ -2327,6 +2333,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
             ),
@@ -2388,6 +2395,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2403,6 +2411,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
             ),
@@ -2418,6 +2427,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
             ),
@@ -2485,6 +2495,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2500,6 +2511,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::TrailRunning,
                 ActivityStatistics::default(),
             ),
@@ -2515,6 +2527,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
             ),
@@ -2592,6 +2605,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2608,6 +2622,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2624,6 +2639,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2693,6 +2709,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Running,
                 ActivityStatistics::default(),
             ),
@@ -2710,6 +2727,7 @@ mod test_training_service_period {
                         .unwrap(),
                 )
                 .unwrap(),
+                ActivityDuration::default(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
             ),
@@ -3737,8 +3755,8 @@ mod test_training_service_metric_values {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityId, ActivityMetricSource, ActivityStartTime, ActivityStatistic,
-        ActivityStatistics, Sport,
+        Activity, ActivityDuration, ActivityId, ActivityMetricSource, ActivityStartTime,
+        ActivityStatistic, ActivityStatistics, Sport,
     };
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
@@ -3875,6 +3893,7 @@ mod test_training_service_metric_values {
             ActivityId::new(),
             user_id.clone(),
             ActivityStartTime::from_timestamp(1705315200).unwrap(), // 2024-01-15T10:00:00Z
+            ActivityDuration::default(),
             Sport::Running,
             ActivityStatistics::new(stats_map),
         );
