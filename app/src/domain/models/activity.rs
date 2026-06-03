@@ -512,6 +512,9 @@ impl ActivityStartTime {
     }
 }
 
+#[derive(Clone, Debug, Display, PartialEq, PartialOrd, From, Into, Copy, Constructor, Default)]
+pub struct ActivityDuration(f64);
+
 #[derive(Clone, Debug, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum Sport {
     Running,

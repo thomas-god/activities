@@ -6,9 +6,9 @@ use roxmltree::Document;
 
 use crate::{
     domain::models::activity::{
-        ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-        Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-        TimeseriesValue,
+        ActiveTime, ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+        ActivityTimeseries, Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
+        TimeseriesTime, TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -23,6 +23,7 @@ pub fn try_tcx_bytes_into_domain(
         .map_err(|_err| ParseBytesError::InvalidContent)?;
 
     let start_time = find_activity_start_time(&doc).ok_or(ParseBytesError::NoStartTimeFound)?;
+    let duration = find_activity_duration(&doc);
     let sport = find_sport(&doc);
     let statistics = find_activity_statistics(&doc);
     let timeseries = parse_timeseries(&doc, start_time.date())?;
@@ -30,6 +31,7 @@ pub fn try_tcx_bytes_into_domain(
     Ok(ParsedFileContent::new(
         sport,
         start_time,
+        duration,
         statistics,
         timeseries,
         SupportedExtension::TCX.suffix().to_string(),
@@ -63,6 +65,11 @@ fn find_activity_start_time(doc: &Document) -> Option<ActivityStartTime> {
     let start_time = start_time_nodes.min()?;
 
     Some(ActivityStartTime::new(start_time))
+}
+
+fn find_activity_duration(doc: &Document) -> ActivityDuration {
+    accumulate_lap_tag_values(doc, "TotalTimeSeconds")
+        .map_or_else(ActivityDuration::default, ActivityDuration::from)
 }
 
 fn accumulate_lap_tag_values(doc: &Document, tag: &str) -> Option<f64> {
@@ -280,14 +287,14 @@ fn parse_laps(doc: &Document, reference_time: &DateTime<FixedOffset>) -> Vec<Lap
 }
 
 #[cfg(test)]
-mod test_txc_parser {
+mod test_tcx_parser {
 
     use std::fs;
 
     use chrono::{DateTime, FixedOffset};
 
     use crate::{
-        domain::models::activity::{ActivityStartTime, ActivityStatistic, Lap},
+        domain::models::activity::{ActivityDuration, ActivityStartTime, ActivityStatistic, Lap},
         inbound::parser::ParseBytesError,
     };
 
@@ -302,7 +309,10 @@ mod test_txc_parser {
 
     #[test]
     fn test_parse_file_content_with_trailing_whitespaces() {
-        let file = "    <root StartTime=\"2017-01-05T09:29:35.000Z\"/>   "
+        let file = "    <root StartTime=\"2017-01-05T09:29:35.000Z\">
+            <Lap StartTime=\"2024-08-28T07:12:54.000Z\" >
+                <TotalTimeSeconds>22574.324</TotalTimeSeconds>
+            </Lap></root>    "
             .to_string()
             .into_bytes();
         try_tcx_bytes_into_domain(file).expect("Should have returned Ok");
@@ -412,6 +422,65 @@ mod test_txc_parser {
                 &roxmltree::Document::parse("<Lap StartTime=\"not-a-valid-date-time\" />").unwrap()
             ),
             None
+        );
+    }
+
+    #[test]
+    fn test_find_activity_duration() {
+        assert_eq!(
+            find_activity_duration(
+                &roxmltree::Document::parse(
+                    "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\" >
+                    <TotalTimeSeconds>22574.324</TotalTimeSeconds>
+                </Lap></root>"
+                )
+                .unwrap()
+            ),
+            ActivityDuration::from(22574.324)
+        );
+
+        assert_eq!(
+            find_activity_duration(
+                &roxmltree::Document::parse(
+                    "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\" >
+                </Lap></root>"
+                )
+                .unwrap()
+            ),
+            ActivityDuration::default()
+        );
+
+        assert_eq!(
+            find_activity_duration(
+                &roxmltree::Document::parse(
+                    "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\" >
+                    <TotalTimeSeconds>12.3</TotalTimeSeconds>
+                </Lap>
+                <Lap StartTime=\"2024-08-28T07:12:55.000Z\" >
+                    <TotalTimeSeconds>45.6</TotalTimeSeconds>
+                </Lap></root>"
+                )
+                .unwrap()
+            ),
+            ActivityDuration::from(12.3 + 45.6)
+        );
+
+        assert_eq!(
+            find_activity_duration(
+                &roxmltree::Document::parse(
+                    "<root>
+                <Lap StartTime=\"2024-08-28T07:12:54.000Z\" >
+                </Lap>
+                <Lap StartTime=\"2024-08-28T07:12:55.000Z\" >
+                    <TotalTimeSeconds>45.6</TotalTimeSeconds>
+                </Lap></root>"
+                )
+                .unwrap()
+            ),
+            ActivityDuration::from(45.6)
         );
     }
 

@@ -1824,6 +1824,7 @@ mod test_sqlite_activity_repository {
         ParsedFileContent::new(
             Sport::Cycling,
             ActivityStartTime::from_timestamp(120).unwrap(),
+            ActivityDuration::from(0.0),
             ActivityStatistics::new(HashMap::new()),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),

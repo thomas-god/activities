@@ -10,9 +10,9 @@ use fit_parser::{
 
 use crate::{
     domain::models::activity::{
-        ActiveTime, ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-        Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-        TimeseriesValue,
+        ActiveTime, ActivityDuration, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+        ActivityTimeseries, Lap, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
+        TimeseriesTime, TimeseriesValue,
     },
     inbound::parser::{ParseBytesError, ParsedFileContent, SupportedExtension},
 };
@@ -28,6 +28,8 @@ pub fn try_fit_bytes_into_domain(bytes: Vec<u8>) -> Result<ParsedFileContent, Pa
     let (start_time, reference_timestamp) =
         extract_start_time(&messages).ok_or(ParseBytesError::NoStartTimeFound)?;
 
+    let duration = extract_duration(&messages);
+
     let sport = extract_sport(&messages);
 
     let timeseries = extract_timeseries(reference_timestamp, &messages)?;
@@ -37,6 +39,7 @@ pub fn try_fit_bytes_into_domain(bytes: Vec<u8>) -> Result<ParsedFileContent, Pa
     Ok(ParsedFileContent::new(
         sport,
         start_time,
+        duration,
         statistics,
         timeseries,
         SupportedExtension::FIT.suffix().to_string(),
@@ -93,6 +96,11 @@ fn extract_start_time(messages: &[DataMessage]) -> Option<(ActivityStartTime, u3
         ActivityStartTime::new(start_datetime_with_offset),
         *start_timestamp,
     ))
+}
+
+fn extract_duration(messages: &[DataMessage]) -> ActivityDuration {
+    find_field_value_as_float(messages, &FitField::Session(SessionField::TotalElapsedTime))
+        .map_or_else(ActivityDuration::default, ActivityDuration::from)
 }
 
 fn extract_sport(messages: &[DataMessage]) -> Sport {
@@ -606,7 +614,7 @@ impl From<(&FitSport, Option<&FitSubSport>)> for Sport {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_fit_parser {
     use std::fs;
 
     use assert_approx_eq::assert_approx_eq;
@@ -1147,6 +1155,82 @@ mod tests {
                     .unwrap()
             )
         )
+    }
+
+    #[test]
+    fn test_extract_start_time_fails_when_missing_session_start_time() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Session,
+                fields: vec![],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Activity,
+                fields: vec![
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::Timestamp),
+                        values: vec![DataValue::DateTime(983187416)],
+                    },
+                    DataMessageField {
+                        kind: FitField::Activity(ActivityField::LocalTimestamp),
+                        values: vec![DataValue::DateTime(983191016)],
+                    },
+                ],
+            },
+        ];
+
+        assert!(extract_start_time(&messages).is_none());
+    }
+
+    #[test]
+    fn test_extract_start_time_fails_when_missing_activity_timestamp() {
+        let messages = vec![
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Session,
+                fields: vec![DataMessageField {
+                    kind: FitField::Session(SessionField::StartTime),
+                    values: vec![DataValue::DateTime(983185076)],
+                }],
+            },
+            DataMessage {
+                local_message_type: 0,
+                message_kind: MesgNum::Activity,
+                fields: vec![DataMessageField {
+                    kind: FitField::Activity(ActivityField::LocalTimestamp),
+                    values: vec![DataValue::DateTime(983191016)],
+                }],
+            },
+        ];
+
+        assert!(extract_start_time(&messages).is_none());
+    }
+
+    #[test]
+    fn test_extract_duration_fails_when_missing_session_elapsed_time() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Session,
+            fields: vec![DataMessageField {
+                kind: FitField::Session(SessionField::TotalElapsedTime),
+                values: vec![DataValue::Float64(12.3)],
+            }],
+        }];
+
+        assert_eq!(extract_duration(&messages), ActivityDuration::from(12.3));
+    }
+
+    #[test]
+    fn test_extract_duration_ok() {
+        let messages = vec![DataMessage {
+            local_message_type: 0,
+            message_kind: MesgNum::Session,
+            fields: vec![],
+        }];
+
+        assert_eq!(extract_duration(&messages), ActivityDuration::default());
     }
 
     #[test]

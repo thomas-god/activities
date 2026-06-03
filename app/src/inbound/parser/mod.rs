@@ -5,7 +5,9 @@ use crate::{
     domain::{
         models::{
             UserId,
-            activity::{ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport},
+            activity::{
+                ActivityDuration, ActivityStartTime, ActivityStatistics, ActivityTimeseries, Sport,
+            },
         },
         ports::activity::{CreateActivityRequest, RawContent},
     },
@@ -19,6 +21,7 @@ pub mod tcx;
 pub struct ParsedFileContent {
     sport: Sport,
     start_time: ActivityStartTime,
+    duration: ActivityDuration,
     statistics: ActivityStatistics,
     timeseries: ActivityTimeseries,
     extension: String,
@@ -28,6 +31,10 @@ pub struct ParsedFileContent {
 impl ParsedFileContent {
     pub fn start_time(&self) -> &ActivityStartTime {
         &self.start_time
+    }
+
+    pub fn duration(&self) -> &ActivityDuration {
+        &self.duration
     }
 
     pub fn raw_content(&self) -> &[u8] {
@@ -156,6 +163,7 @@ pub mod test_utils {
                 Ok(ParsedFileContent::new(
                     Sport::Cycling,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
+                    ActivityDuration::from(3.0),
                     ActivityStatistics::default(),
                     ActivityTimeseries::default(),
                     "fit".to_string(),
