@@ -61,6 +61,28 @@ impl Activity {
         }
     }
 
+    /// Create a new [Activity] with its optional fields set to None.
+    pub fn new_empty(
+        id: ActivityId,
+        user: UserId,
+        start_time: ActivityStartTime,
+        sport: Sport,
+        statistics: ActivityStatistics,
+    ) -> Self {
+        Self {
+            id,
+            user,
+            name: ActivityName::empty(),
+            start_time,
+            sport,
+            statistics,
+            rpe: ActivityRpe::empty(),
+            workout_type: WorkoutType::empty(),
+            nutrition: ActivityNutrition::empty(),
+            feedback: ActivityFeedback::empty(),
+        }
+    }
+
     /// An [Activity]'s natural key if a key generated from its defining fields. Two activities with
     /// identical natural keys should be considered identical/duplicate regardless of their
     /// technical [Activity::id].
@@ -219,6 +241,12 @@ impl From<&str> for ActivityName {
     }
 }
 
+impl ActivityName {
+    pub fn empty() -> Option<ActivityName> {
+        None
+    }
+}
+
 /// Rate of Perceived Exertion (RPE) - a value from 1 to 10
 #[derive(Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ActivityRpe {
@@ -235,12 +263,14 @@ pub enum ActivityRpe {
 }
 
 impl ActivityRpe {
+    pub fn empty() -> Option<ActivityRpe> {
+        None
+    }
+
     pub fn range(&self) -> ActivityRpeRange {
         ActivityRpeRange::from(self)
     }
-}
 
-impl ActivityRpe {
     pub fn value(&self) -> u8 {
         *self as u8
     }
@@ -326,6 +356,12 @@ pub enum WorkoutType {
     CrossTraining,
 }
 
+impl WorkoutType {
+    pub fn empty() -> Option<WorkoutType> {
+        None
+    }
+}
+
 impl FromStr for WorkoutType {
     type Err = String;
 
@@ -402,6 +438,12 @@ pub struct ActivityNutrition {
 }
 
 impl ActivityNutrition {
+    pub fn empty() -> Option<ActivityNutrition> {
+        None
+    }
+}
+
+impl ActivityNutrition {
     pub fn bonk_status(&self) -> BonkStatus {
         self.bonk_status
     }
@@ -435,6 +477,10 @@ impl From<String> for ActivityFeedback {
 }
 
 impl ActivityFeedback {
+    pub fn empty() -> Option<ActivityFeedback> {
+        None
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1297,29 +1343,19 @@ mod tests {
 
     #[test]
     fn test_different_activities_different_natural_keys() {
-        let first_activity = Activity::new(
+        let first_activity = Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
-        let second_activity = Activity::new(
+        let second_activity = Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Running,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -1327,29 +1363,19 @@ mod tests {
 
     #[test]
     fn test_similar_activities_same_natural_keys() {
-        let first_activity = Activity::new(
+        let first_activity = Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
-        let second_activity = Activity::new(
+        let second_activity = Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());
@@ -1357,29 +1383,19 @@ mod tests {
 
     #[test]
     fn test_same_activity_different_user_natural_keys_not_equal() {
-        let first_activity = Activity::new(
+        let first_activity = Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
-        let second_activity = Activity::new(
+        let second_activity = Activity::new_empty(
             ActivityId::new(),
             "another_user".to_string().into(),
-            None,
             ActivityStartTime::from_timestamp(0).unwrap(),
             Sport::Cycling,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -1544,10 +1560,9 @@ mod test_timeseries {
 
     fn default_activity() -> ActivityWithTimeseries {
         ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1555,10 +1570,6 @@ mod test_timeseries {
                 ),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -1596,10 +1607,9 @@ mod test_timeseries {
         let metric = TimeseriesMetric::Power;
         let aggregate = TimeseriesAggregate::Average;
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1607,10 +1617,6 @@ mod test_timeseries {
                 ),
                 Sport::Cycling,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
@@ -1858,10 +1864,9 @@ mod test_timeseries {
         // Average pace should be computed from distance and duration statistics
         // not from averaging pace timeseries values
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1872,10 +1877,6 @@ mod test_timeseries {
                     (ActivityStatistic::Distance, 10000.0), // 10 km in meters
                     (ActivityStatistic::Duration, 3600.0),  // 1 hour in seconds
                 ])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -1908,10 +1909,9 @@ mod test_timeseries {
     #[test]
     fn test_aggregate_average_pace_missing_distance() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1919,10 +1919,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -1953,10 +1949,9 @@ mod test_timeseries {
     #[test]
     fn test_aggregate_average_pace_no_active_time_and_missing_duration() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1964,10 +1959,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -1998,10 +1989,9 @@ mod test_timeseries {
     #[test]
     fn test_aggregate_average_pace_missing_both_statistics() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2009,10 +1999,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2044,10 +2030,9 @@ mod test_timeseries {
     fn test_aggregate_min_max_pace_use_timeseries() {
         // Min and Max pace should use timeseries values, not statistics
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2058,10 +2043,6 @@ mod test_timeseries {
                     (ActivityStatistic::Distance, 10000.0),
                     (ActivityStatistic::Duration, 3600.0),
                 ])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2157,10 +2138,9 @@ mod test_timeseries {
     #[test]
     fn test_active_duration_from_timeseries() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2168,10 +2148,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 9999.0)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250, 500]),
@@ -2194,10 +2170,9 @@ mod test_timeseries {
     #[test]
     fn test_active_duration_fallback_to_statistics() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2205,10 +2180,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250]),
@@ -2230,10 +2201,9 @@ mod test_timeseries {
     #[test]
     fn test_active_duration_both_none() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2241,10 +2211,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100]),
@@ -2262,10 +2228,9 @@ mod test_timeseries {
     #[test]
     fn test_active_duration_empty_timeseries_with_statistics() {
         let activity = ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -2273,10 +2238,6 @@ mod test_timeseries {
                 ),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1800.0)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),

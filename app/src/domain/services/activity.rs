@@ -111,18 +111,12 @@ where
     ) -> Result<Activity, CreateActivityError> {
         // Create activity from request
         let id = ActivityId::new();
-        let activity = Activity::new(
+        let activity = Activity::new_empty(
             id.clone(),
             req.user().clone(),
-            None,
             *req.start_time(),
             *req.sport(),
             req.statistics().clone(),
-            // RPE, WorkoutType, Nutrition and Feedback are set to None for new activities
-            None,
-            None,
-            None,
-            None,
         );
         let activity_with_timeseries =
             ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
@@ -551,17 +545,12 @@ pub mod test_utils {
 
         pub fn default_create_activity(&mut self) {
             self.expect_create_activity().returning(|_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     ActivityId::new(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
         }
@@ -571,17 +560,12 @@ pub mod test_utils {
 
         pub fn default_get_activity(&mut self) {
             self.expect_get_activity().returning(|_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     ActivityId::new(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
         }
@@ -914,17 +898,12 @@ mod tests_activity_service {
     async fn test_activity_service_modify_activity_not_owned_by_user() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -947,17 +926,12 @@ mod tests_activity_service {
     async fn test_activity_service_modify_activity_ok() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -987,17 +961,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -1050,17 +1019,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 "other_user".into(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -1088,17 +1052,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -1154,17 +1113,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 "other_user".into(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -1192,17 +1146,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -1255,17 +1204,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 "other_user".into(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -1293,17 +1237,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -1358,17 +1297,12 @@ mod tests_activity_service {
 
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 "other_user".into(),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Running,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -1416,17 +1350,12 @@ mod tests_activity_service {
     async fn test_activity_service_delete_activity_not_owned_by_user() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().return_once(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::from("another_user".to_string()),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
 
@@ -1451,17 +1380,12 @@ mod tests_activity_service {
     async fn test_activity_service_delete_activity_ok() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new(
+            Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::from("test_user".to_string()),
-                None,
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::new()),
-                None,
-                None,
-                None,
-                None,
             )))
         });
         activity_repository
@@ -1536,17 +1460,12 @@ mod tests_activity_service {
 
         fn default_activity() -> ActivityWithTimeseries {
             ActivityWithTimeseries::new(
-                Activity::new(
+                Activity::new_empty(
                     ActivityId::from("test_activity"),
                     UserId::from("test_user".to_string()),
-                    None,
                     ActivityStartTime::from_timestamp(0).unwrap(),
                     Sport::Cycling,
                     ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
-                    None,
-                    None,
-                    None,
-                    None,
                 ),
                 ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),
@@ -1698,17 +1617,12 @@ mod tests_activity_service {
 
         fn default_activity() -> ActivityWithTimeseries {
             ActivityWithTimeseries::new(
-                Activity::new(
+                Activity::new_empty(
                     ActivityId::from("test_activity"),
                     UserId::from("test_user".to_string()),
-                    None,
                     ActivityStartTime::from_timestamp(0).unwrap(),
                     Sport::Cycling,
                     ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
-                    None,
-                    None,
-                    None,
-                    None,
                 ),
                 ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),

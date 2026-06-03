@@ -193,17 +193,12 @@ mod tests {
             .expect_create_activity()
             .times(1)
             .returning(move |_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     expected_id_clone.clone(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
 
@@ -255,17 +250,12 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(move |_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     expected_id1_clone.clone(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
         service
@@ -273,17 +263,12 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(move |_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     expected_id2_clone.clone(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(2000).unwrap(),
                     Sport::Cycling,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
 
@@ -344,17 +329,12 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(move |_| {
-                Ok(Activity::new(
+                Ok(Activity::new_empty(
                     expected_id_clone.clone(),
                     UserId::test_default(),
-                    None,
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     Sport::Running,
                     ActivityStatistics::default(),
-                    None,
-                    None,
-                    None,
-                    None,
                 ))
             });
         service

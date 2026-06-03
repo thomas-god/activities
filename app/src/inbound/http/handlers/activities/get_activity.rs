@@ -94,10 +94,9 @@ mod tests {
             .expect_get_activity_with_timeseries()
             .returning(|_| {
                 Ok(ActivityWithTimeseries::new(
-                    Activity::new(
+                    Activity::new_empty(
                         ActivityId::from("target_id"),
                         UserId::test_default(),
-                        None,
                         ActivityStartTime::new(
                             "2025-09-03T00:00:00Z"
                                 .parse::<DateTime<FixedOffset>>()
@@ -108,10 +107,6 @@ mod tests {
                             ActivityStatistic::Duration,
                             1200.,
                         )])),
-                        None,
-                        None,
-                        None,
-                        None,
                     ),
                     ActivityTimeseries::new(
                         TimeseriesTime::new(vec![0, 1, 2]),

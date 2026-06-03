@@ -1387,10 +1387,9 @@ mod tests_training_metrics_service {
             .returning(|_, _, _| {
                 let stats = ActivityStatistics::default();
                 Ok(vec![(
-                    Activity::new(
+                    Activity::new_empty(
                         ActivityId::from("test"),
                         UserId::test_default(),
-                        None,
                         ActivityStartTime::new(
                             NaiveDateTime::new(
                                 NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
@@ -1401,10 +1400,6 @@ mod tests_training_metrics_service {
                         ),
                         Sport::Running,
                         stats,
-                        None,
-                        None,
-                        None,
-                        None,
                     ),
                     0.,
                 )])
@@ -2290,10 +2285,9 @@ mod test_training_service_period {
 
         // Create test activities with different sports and dates
         let activities = vec![
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-18T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2305,15 +2299,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-19T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2325,15 +2314,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-20T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2345,10 +2329,6 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
         ];
 
@@ -2396,10 +2376,9 @@ mod test_training_service_period {
 
         // Create test activities with different sports
         let activities = vec![
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-18T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2411,15 +2390,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-19T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2431,15 +2405,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-20T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2451,10 +2420,6 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Swimming,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
         ];
 
@@ -2508,10 +2473,9 @@ mod test_training_service_period {
 
         // Create test activities with different sports in the Running category
         let activities = vec![
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-18T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2523,15 +2487,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-19T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2543,15 +2502,10 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::TrailRunning,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-20T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2563,10 +2517,6 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
         ];
 
@@ -2630,10 +2580,9 @@ mod test_training_service_period {
         // Create activities with dates both inside and outside the period
         let activities = vec![
             // Before period
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-16T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2645,16 +2594,11 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             // Inside period
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-18T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2666,16 +2610,11 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             // After period
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     "2025-10-22T10:00:00Z"
                         .parse::<chrono::DateTime<chrono::Utc>>()
@@ -2687,10 +2626,6 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
         ];
 
@@ -2745,10 +2680,9 @@ mod test_training_service_period {
         // because the date range filter is exclusive of the end date
         let activities = vec![
             // Yesterday - should be included
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     yesterday
                         .and_hms_opt(10, 0, 0)
@@ -2761,16 +2695,11 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Running,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
             // Today - should be included (this is the bug we're fixing)
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::new(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::from_timestamp(
                     today
                         .and_hms_opt(14, 30, 0)
@@ -2783,10 +2712,6 @@ mod test_training_service_period {
                 .unwrap(),
                 Sport::Cycling,
                 ActivityStatistics::default(),
-                None,
-                None,
-                None,
-                None,
             ),
         ];
 
@@ -3946,17 +3871,12 @@ mod test_training_service_metric_values {
         let mut stats_map = HashMap::new();
         stats_map.insert(ActivityStatistic::Distance, 10000.0);
 
-        let activity = Activity::new(
+        let activity = Activity::new_empty(
             ActivityId::new(),
             user_id.clone(),
-            None,
             ActivityStartTime::from_timestamp(1705315200).unwrap(), // 2024-01-15T10:00:00Z
             Sport::Running,
             ActivityStatistics::new(stats_map),
-            None,
-            None,
-            None,
-            None,
         );
 
         let mut activity_service = MockActivityService::default();

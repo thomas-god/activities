@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset};
-use sqlx::{Execute, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
 
 use crate::{
     domain::{
@@ -911,32 +911,22 @@ mod test_sqlite_activity_repository {
     }
 
     fn build_activity() -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
     fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::new(),
             UserId::test_default(),
-            None,
             ActivityStartTime::new(*start),
             Sport::Cycling,
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
@@ -2309,10 +2299,9 @@ mod test_sqlite_activity_repository {
         fn test_activities() -> Vec<ActivityWithTimeseries> {
             vec![
                 ActivityWithTimeseries::new(
-                    Activity::new(
+                    Activity::new_empty(
                         ActivityId::from("activity-1"),
                         UserId::test_default(),
-                        None,
                         ActivityStartTime::new(
                             "2025-09-03T00:00:00Z"
                                 .parse::<DateTime<FixedOffset>>()
@@ -2323,18 +2312,13 @@ mod test_sqlite_activity_repository {
                             ActivityStatistic::Calories,
                             123.3,
                         )])),
-                        None,
-                        None,
-                        None,
-                        None,
                     ),
                     timeseries(),
                 ),
                 ActivityWithTimeseries::new(
-                    Activity::new(
+                    Activity::new_empty(
                         ActivityId::from("activity-2"),
                         UserId::test_default(),
-                        None,
                         ActivityStartTime::new(
                             "2025-09-04T00:00:00Z"
                                 .parse::<DateTime<FixedOffset>>()
@@ -2345,18 +2329,13 @@ mod test_sqlite_activity_repository {
                             ActivityStatistic::Calories,
                             123.3,
                         )])),
-                        None,
-                        None,
-                        None,
-                        None,
                     ),
                     timeseries(),
                 ),
                 ActivityWithTimeseries::new(
-                    Activity::new(
+                    Activity::new_empty(
                         ActivityId::from("activity-3"),
                         UserId::test_default(),
-                        None,
                         ActivityStartTime::new(
                             "2025-09-04T00:00:00Z"
                                 .parse::<DateTime<FixedOffset>>()
@@ -2367,10 +2346,6 @@ mod test_sqlite_activity_repository {
                             ActivityStatistic::Calories,
                             123.3,
                         )])),
-                        None,
-                        None,
-                        None,
-                        None,
                     ),
                     timeseries(),
                 ),

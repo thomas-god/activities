@@ -1115,10 +1115,9 @@ mod test_training_metrics {
 
     fn default_activity() -> ActivityWithTimeseries {
         ActivityWithTimeseries::new(
-            Activity::new(
+            Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
-                None,
                 ActivityStartTime::new(
                     "2025-09-03T00:00:00Z"
                         .parse::<DateTime<FixedOffset>>()
@@ -1126,10 +1125,6 @@ mod test_training_metrics {
                 ),
                 Sport::Cycling,
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-                None,
-                None,
-                None,
-                None,
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -1911,7 +1906,8 @@ mod test_granularity_bins {
 #[cfg(test)]
 mod test_training_metric_filters {
     use crate::domain::models::activity::{
-        ActivityId, ActivityNutrition, ActivityStartTime, ActivityStatistics,
+        ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityStartTime,
+        ActivityStatistics,
     };
 
     use super::*;
@@ -1926,17 +1922,12 @@ mod test_training_metric_filters {
     }
 
     fn create_activity_with_sport(sport: Sport) -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::default(),
             UserId::test_default(),
-            None,
             default_start_time(),
             sport,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
@@ -1944,14 +1935,14 @@ mod test_training_metric_filters {
         Activity::new(
             ActivityId::default(),
             UserId::test_default(),
-            None,
+            ActivityName::empty(),
             default_start_time(),
             Sport::Running,
             ActivityStatistics::default(),
-            None,
+            ActivityRpe::empty(),
             Some(workout_type),
-            None,
-            None,
+            ActivityNutrition::empty(),
+            ActivityFeedback::empty(),
         )
     }
 
@@ -1959,14 +1950,14 @@ mod test_training_metric_filters {
         Activity::new(
             ActivityId::default(),
             UserId::test_default(),
-            None,
+            ActivityName::empty(),
             default_start_time(),
             Sport::Running,
             ActivityStatistics::default(),
-            None,
-            None,
+            ActivityRpe::empty(),
+            WorkoutType::empty(),
             Some(ActivityNutrition::new(bonk_status, None)),
-            None,
+            ActivityFeedback::empty(),
         )
     }
 
@@ -1974,14 +1965,14 @@ mod test_training_metric_filters {
         Activity::new(
             ActivityId::default(),
             UserId::test_default(),
-            None,
+            ActivityName::empty(),
             default_start_time(),
             Sport::Running,
             ActivityStatistics::default(),
             Some(rpe),
-            None,
-            None,
-            None,
+            WorkoutType::empty(),
+            ActivityNutrition::empty(),
+            ActivityFeedback::empty(),
         )
     }
 
@@ -1993,29 +1984,24 @@ mod test_training_metric_filters {
         Activity::new(
             ActivityId::default(),
             UserId::test_default(),
-            None,
+            ActivityName::empty(),
             default_start_time(),
             sport,
             ActivityStatistics::default(),
             Some(ActivityRpe::Eight),
             Some(workout_type),
             Some(ActivityNutrition::new(bonk_status, None)),
-            None,
+            ActivityFeedback::empty(),
         )
     }
 
     fn create_activity_without_optional_fields() -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::default(),
             UserId::test_default(),
-            None,
             default_start_time(),
             Sport::Running,
             ActivityStatistics::default(),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
@@ -2324,25 +2310,19 @@ mod test_training_period {
     }
 
     fn activity_with_start_time(start: &str) -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::default(),
             UserId::test_default(),
-            None,
             ActivityStartTime::new(start.parse::<DateTime<FixedOffset>>().unwrap()),
             Sport::Running,
             ActivityStatistics::new(HashMap::new()),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
     fn activity_with_sport(sport: Sport) -> Activity {
-        Activity::new(
+        Activity::new_empty(
             ActivityId::default(),
             UserId::test_default(),
-            None,
             ActivityStartTime::new(
                 "2025-10-01T12:00:00+02:00"
                     .parse::<DateTime<FixedOffset>>()
@@ -2350,10 +2330,6 @@ mod test_training_period {
             ),
             sport,
             ActivityStatistics::new(HashMap::new()),
-            None,
-            None,
-            None,
-            None,
         )
     }
 
@@ -2556,8 +2532,8 @@ mod test_training_period {
 #[cfg(test)]
 mod test_training_metric_group_by {
     use crate::domain::models::activity::{
-        ActivityId, ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistics,
-        BonkStatus, WorkoutType,
+        ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityRpe,
+        ActivityStartTime, ActivityStatistics, BonkStatus, WorkoutType,
     };
 
     use super::*;
@@ -2567,7 +2543,7 @@ mod test_training_metric_group_by {
         let activity = Activity::new(
             ActivityId::default(),
             UserId::test_default(),
-            None,
+            ActivityName::empty(),
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
@@ -2578,7 +2554,7 @@ mod test_training_metric_group_by {
             Some(ActivityRpe::Six),
             Some(WorkoutType::Intervals),
             Some(ActivityNutrition::new(BonkStatus::Bonked, None)),
-            None,
+            ActivityFeedback::empty(),
         );
 
         assert_eq!(
@@ -2609,10 +2585,9 @@ mod test_training_metric_group_by {
 
     #[test]
     fn test_extract_group_from_activity_none() {
-        let activity = Activity::new(
+        let activity = Activity::new_empty(
             ActivityId::default(),
             UserId::test_default(),
-            None,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
                     .parse::<DateTime<FixedOffset>>()
@@ -2620,10 +2595,6 @@ mod test_training_metric_group_by {
             ),
             Sport::Golf,
             ActivityStatistics::new(HashMap::new()),
-            None,
-            None,
-            None,
-            None,
         );
 
         assert_eq!(
