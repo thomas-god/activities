@@ -6,9 +6,10 @@ use sqlx::{Database, encode::IsNull, error::BoxDynError};
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2, ActivityName,
-        ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityStatistic,
-        ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+        ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2,
+        ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+        ActivityStatistic, ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric,
+        WorkoutType,
     },
     preferences::{Preference, PreferenceKey},
     training::{
@@ -860,5 +861,28 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricV2 {
 
             _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for ActivityDuration {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <f64 as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityDuration {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        args.push(sqlx::sqlite::SqliteArgumentValue::Double(*self.as_f64()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityDuration {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <f64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::from(s))
     }
 }

@@ -813,16 +813,17 @@ where
 
         sqlx::query(
             "INSERT INTO t_activities_v2 (
-                id, user_id, name, start_time, sport, natural_key, rpe, workout_type, nutrition, feedback
+                id, user_id, name, start_time, duration, sport, natural_key, rpe, workout_type, nutrition, feedback
             )
             VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
             );",
         )
         .bind(activity.id())
         .bind(activity.user())
         .bind(activity.name())
         .bind(activity.start_time().date())
+        .bind(activity.duration())
         .bind(activity.sport())
         .bind(activity.natural_key())
         .bind(activity.rpe())
@@ -3117,6 +3118,15 @@ mod test_sqlite_activity_repository {
                 .await
                 .unwrap(),
                 *activity.start_time()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, ActivityDuration>(
+                    "select duration from t_activities_v2 limit 1;"
+                )
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+                *activity.duration()
             );
             assert_eq!(
                 sqlx::query_scalar::<_, Sport>("select sport from t_activities_v2 limit 1;")
