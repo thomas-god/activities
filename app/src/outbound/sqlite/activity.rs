@@ -11,7 +11,7 @@ use crate::{
             activity::{
                 Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
                 ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-                ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityWithTimeseries,
+                ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityWithParsedData,
                 Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
             },
         },
@@ -127,7 +127,7 @@ where
         &self,
         id: &ActivityId,
         activity: Activity,
-    ) -> Result<ActivityWithTimeseries, anyhow::Error> {
+    ) -> Result<ActivityWithParsedData, anyhow::Error> {
         let raw_data = match self.raw_data_repository.get_raw_data(id).await {
             Ok(raw_data) => raw_data,
             Err(err) => return Err(anyhow!(err)),
@@ -146,9 +146,10 @@ where
             Err(err) => return Err(anyhow!(err)),
         };
 
-        Ok(ActivityWithTimeseries::new(
+        Ok(ActivityWithParsedData::new(
             activity,
             parsed_content.timeseries().clone(),
+            parsed_content.statistics().clone(),
         ))
     }
 }
@@ -225,7 +226,7 @@ where
     async fn get_activity_with_timeseries(
         &self,
         id: &ActivityId,
-    ) -> Result<Option<ActivityWithTimeseries>, anyhow::Error> {
+    ) -> Result<Option<ActivityWithParsedData>, anyhow::Error> {
         let activity = match self.get_activity(id).await {
             Ok(Some(activity)) => activity,
             Ok(None) => return Ok(None),
@@ -377,7 +378,7 @@ where
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-    ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
+    ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError> {
         let activities = self.list_activities(user, filters).await?;
 
         let mut res = vec![];
@@ -780,7 +781,7 @@ where
 
     async fn save_activity(
         &self,
-        activity: &ActivityWithTimeseries,
+        activity: &ActivityWithParsedData,
     ) -> Result<(), SaveActivityError> {
         let mut tx = self
             .pool
@@ -952,8 +953,8 @@ mod test_sqlite_activity_repository {
         )
     }
 
-    fn build_activity_with_timeseries() -> ActivityWithTimeseries {
-        ActivityWithTimeseries::new(
+    fn build_activity_with_timeseries() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
             build_activity(),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
@@ -975,13 +976,14 @@ mod test_sqlite_activity_repository {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
     }
 
     fn build_activity_with_timeseries_starting_at(
         start: &DateTime<FixedOffset>,
-    ) -> ActivityWithTimeseries {
-        ActivityWithTimeseries::new(
+    ) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
             build_activity_starting_at(start),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2, 3]),
@@ -1003,6 +1005,7 @@ mod test_sqlite_activity_repository {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
     }
 
@@ -2319,9 +2322,9 @@ mod test_sqlite_activity_repository {
             .unwrap()
         }
 
-        fn test_activities() -> Vec<ActivityWithTimeseries> {
+        fn test_activities() -> Vec<ActivityWithParsedData> {
             vec![
-                ActivityWithTimeseries::new(
+                ActivityWithParsedData::new(
                     Activity::new_empty(
                         ActivityId::from("activity-1"),
                         UserId::test_default(),
@@ -2338,8 +2341,9 @@ mod test_sqlite_activity_repository {
                         )])),
                     ),
                     timeseries(),
+                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
                 ),
-                ActivityWithTimeseries::new(
+                ActivityWithParsedData::new(
                     Activity::new_empty(
                         ActivityId::from("activity-2"),
                         UserId::test_default(),
@@ -2356,8 +2360,9 @@ mod test_sqlite_activity_repository {
                         )])),
                     ),
                     timeseries(),
+                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
                 ),
-                ActivityWithTimeseries::new(
+                ActivityWithParsedData::new(
                     Activity::new_empty(
                         ActivityId::from("activity-3"),
                         UserId::test_default(),
@@ -2374,6 +2379,7 @@ mod test_sqlite_activity_repository {
                         )])),
                     ),
                     timeseries(),
+                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
                 ),
             ]
         }

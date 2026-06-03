@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetricSource, ActivityWithTimeseries},
+        activity::{Activity, ActivityId, ActivityMetricSource, ActivityWithParsedData},
         training::{
             TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
@@ -78,11 +78,11 @@ pub enum CreateTrainingMetricError {
 #[derive(Debug, Clone, Constructor)]
 pub struct UpdateMetricsValuesRequest {
     user: UserId,
-    new_activities: Vec<ActivityWithTimeseries>,
+    new_activities: Vec<ActivityWithParsedData>,
 }
 
 impl UpdateMetricsValuesRequest {
-    pub fn new_activities(&self) -> &[ActivityWithTimeseries] {
+    pub fn new_activities(&self) -> &[ActivityWithParsedData] {
         &self.new_activities
     }
 

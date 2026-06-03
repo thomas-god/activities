@@ -4,7 +4,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 
 use crate::domain::models::activity::{
-    Activity, ActivityNutrition, ActivityTimeseries, ActivityWithTimeseries, Lap, Timeseries,
+    Activity, ActivityNutrition, ActivityTimeseries, ActivityWithParsedData, Lap, Timeseries,
     TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
 };
 
@@ -202,8 +202,8 @@ pub struct PublicActivityWithTimeseries {
     pub timeseries: PublicActivityTimeseries,
 }
 
-impl From<&ActivityWithTimeseries> for PublicActivityWithTimeseries {
-    fn from(activity: &ActivityWithTimeseries) -> Self {
+impl From<&ActivityWithParsedData> for PublicActivityWithTimeseries {
+    fn from(activity: &ActivityWithParsedData) -> Self {
         Self {
             activity: PublicActivity::from(activity.activity()),
             timeseries: activity.timeseries().into(),

@@ -1103,7 +1103,7 @@ mod test_training_metrics {
         UserId,
         activity::{
             ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
-            ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+            ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
             Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
             TimeseriesValue,
         },
@@ -1111,8 +1111,8 @@ mod test_training_metrics {
 
     use super::*;
 
-    fn default_activity() -> ActivityWithTimeseries {
-        ActivityWithTimeseries::new(
+    fn default_activity() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -1143,6 +1143,7 @@ mod test_training_metrics {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
     }
 

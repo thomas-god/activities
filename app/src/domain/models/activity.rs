@@ -146,13 +146,15 @@ impl Activity {
     }
 }
 
+/// [Activity] enriched with data parsed from the raw file ([ActivityTimeseries], [ActivityStatistics]).
 #[derive(Clone, Debug, Constructor)]
-pub struct ActivityWithTimeseries {
+pub struct ActivityWithParsedData {
     activity: Activity,
     timeseries: ActivityTimeseries,
+    statistics: ActivityStatistics,
 }
 
-impl ActivityWithTimeseries {
+impl ActivityWithParsedData {
     pub fn activity(&self) -> &Activity {
         &self.activity
     }
@@ -186,7 +188,7 @@ impl ActivityWithTimeseries {
     }
 
     pub fn statistics(&self) -> &ActivityStatistics {
-        self.activity.statistics()
+        &self.statistics
     }
 
     pub fn rpe(&self) -> &Option<ActivityRpe> {
@@ -928,7 +930,7 @@ pub enum ActivityMetricV2 {
 }
 
 impl ActivityMetricV2 {
-    pub fn compute_value(&self, activity: &ActivityWithTimeseries) -> Option<f64> {
+    pub fn compute_value(&self, activity: &ActivityWithParsedData) -> Option<f64> {
         match self.source() {
             ActivityMetricSource::Statistic(stat) => activity.statistics().get(&stat).cloned(),
             ActivityMetricSource::Timeseries((metric, aggregate)) => {
@@ -1288,7 +1290,7 @@ impl TimeseriesAggregate {
     pub fn value_from_timeseries(
         &self,
         metric: &TimeseriesMetric,
-        activity: &ActivityWithTimeseries,
+        activity: &ActivityWithParsedData,
     ) -> Option<f64> {
         let values = activity.timeseries().metric_values(metric)?;
         if values.is_empty() {
@@ -1588,8 +1590,8 @@ mod test_timeseries {
         assert_eq!(inverse, TimeseriesValue::Float(4.0));
     }
 
-    fn default_activity() -> ActivityWithTimeseries {
-        ActivityWithTimeseries::new(
+    fn default_activity() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -1620,6 +1622,7 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
         )
     }
 
@@ -1637,7 +1640,7 @@ mod test_timeseries {
     fn test_extract_aggregated_activity_metric_metric_is_empty() {
         let metric = TimeseriesMetric::Power;
         let aggregate = TimeseriesAggregate::Average;
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -1657,6 +1660,7 @@ mod test_timeseries {
                 vec![Timeseries::new(TimeseriesMetric::Power, vec![])],
             )
             .unwrap(),
+            ActivityStatistics::default(),
         );
 
         let res = aggregate.value_from_timeseries(&metric, &activity);
@@ -1895,7 +1899,7 @@ mod test_timeseries {
     fn test_aggregate_average_pace_computed_from_statistics() {
         // Average pace should be computed from distance and duration statistics
         // not from averaging pace timeseries values
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -1929,6 +1933,10 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([
+                (ActivityStatistic::Distance, 10000.0), // 10 km in meters
+                (ActivityStatistic::Duration, 3600.0),  // 1 hour in seconds
+            ])),
         );
 
         let result =
@@ -1941,7 +1949,7 @@ mod test_timeseries {
 
     #[test]
     fn test_aggregate_average_pace_missing_distance() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -1972,6 +1980,7 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
         );
 
         let result =
@@ -1982,7 +1991,7 @@ mod test_timeseries {
 
     #[test]
     fn test_aggregate_average_pace_no_active_time_and_duration_is_zero() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2013,6 +2022,7 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
         );
 
         let result =
@@ -2023,7 +2033,7 @@ mod test_timeseries {
 
     #[test]
     fn test_aggregate_average_pace_missing_both_statistics() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2054,6 +2064,7 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::default(),
         );
 
         let result =
@@ -2065,7 +2076,7 @@ mod test_timeseries {
     #[test]
     fn test_aggregate_min_max_pace_use_timeseries() {
         // Min and Max pace should use timeseries values, not statistics
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2099,6 +2110,10 @@ mod test_timeseries {
                 )],
             )
             .unwrap(),
+            ActivityStatistics::new(HashMap::from([
+                (ActivityStatistic::Distance, 10000.0),
+                (ActivityStatistic::Duration, 3600.0),
+            ])),
         );
 
         let min_result =
@@ -2174,7 +2189,7 @@ mod test_timeseries {
 
     #[test]
     fn test_active_duration_from_timeseries() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2199,6 +2214,7 @@ mod test_timeseries {
                 vec![],
             )
             .unwrap(),
+            ActivityStatistics::default(),
         );
 
         // Should return timeseries duration (500), not activity's duration (9999)
@@ -2207,7 +2223,7 @@ mod test_timeseries {
 
     #[test]
     fn test_active_duration_fallback_to_activity_duration() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2231,6 +2247,7 @@ mod test_timeseries {
                 vec![],
             )
             .unwrap(),
+            ActivityStatistics::default(),
         );
 
         // Timeseries has no running values, should fall back to activity's duration
@@ -2239,7 +2256,7 @@ mod test_timeseries {
 
     #[test]
     fn test_active_duration_empty_timeseries_fallback_to_activity_duration() {
-        let activity = ActivityWithTimeseries::new(
+        let activity = ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::default(),
                 UserId::test_default(),
@@ -2259,6 +2276,7 @@ mod test_timeseries {
                 vec![],
             )
             .unwrap(),
+            ActivityStatistics::default(),
         );
 
         // Empty timeseries, should use statistics

@@ -7,7 +7,7 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityId, ActivityMetricSource, ActivityMetricV2, ActivityStatistic,
-            ActivityWithTimeseries, TimeseriesAggregate, TimeseriesMetric,
+            ActivityWithParsedData, TimeseriesAggregate, TimeseriesMetric,
         },
     },
     ports::activity::{
@@ -119,8 +119,11 @@ where
             *req.sport(),
             req.statistics().clone(),
         );
-        let activity_with_timeseries =
-            ActivityWithTimeseries::new(activity.clone(), req.timeseries().clone());
+        let activity_with_parsed_data = ActivityWithParsedData::new(
+            activity.clone(),
+            req.timeseries().clone(),
+            req.statistics().clone(),
+        );
 
         if self
             .activity_repository
@@ -143,7 +146,7 @@ where
 
         // Persist activity
         self.activity_repository
-            .save_activity(&activity_with_timeseries)
+            .save_activity(&activity_with_parsed_data)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
 
@@ -164,7 +167,7 @@ where
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-    ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError> {
+    ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError> {
         self.activity_repository
             .list_activities_with_timeseries(user, filters)
             .await
@@ -244,7 +247,7 @@ where
     async fn get_activity_with_timeseries(
         &self,
         activity_id: &ActivityId,
-    ) -> Result<ActivityWithTimeseries, GetActivityError> {
+    ) -> Result<ActivityWithParsedData, GetActivityError> {
         match self
             .activity_repository
             .get_activity_with_timeseries(activity_id)
@@ -463,7 +466,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters
-            ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
+            ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError>;
 
             async fn get_activity(
                 &self,
@@ -473,7 +476,7 @@ pub mod test_utils {
             async fn get_activity_with_timeseries(
                 &self,
                 activity_id: &ActivityId,
-            ) -> Result<ActivityWithTimeseries, GetActivityError>;
+            ) -> Result<ActivityWithParsedData, GetActivityError>;
 
             async fn list_activities_with_metric(
                 &self,
@@ -605,7 +608,7 @@ pub mod test_utils {
 
             async fn save_activity(
                 &self,
-                activity: &ActivityWithTimeseries,
+                activity: &ActivityWithParsedData,
             ) -> Result<(), SaveActivityError>;
 
             async fn list_activities(
@@ -629,7 +632,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters
-            ) -> Result<Vec<ActivityWithTimeseries>, ListActivitiesError>;
+            ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError>;
 
             async fn get_activities_with_metric(
                 &self,
@@ -678,7 +681,7 @@ pub mod test_utils {
             async fn get_activity_with_timeseries(
                 &self,
                 id: &ActivityId,
-            ) -> Result<Option<ActivityWithTimeseries>, anyhow::Error>;
+            ) -> Result<Option<ActivityWithParsedData>, anyhow::Error>;
 
             async fn modify_activity_name(
                 &self,
@@ -1476,8 +1479,8 @@ mod tests_activity_service {
 
         use super::*;
 
-        fn default_activity() -> ActivityWithTimeseries {
-            ActivityWithTimeseries::new(
+        fn default_activity() -> ActivityWithParsedData {
+            ActivityWithParsedData::new(
                 Activity::new_empty(
                     ActivityId::from("test_activity"),
                     UserId::from("test_user".to_string()),
@@ -1504,6 +1507,7 @@ mod tests_activity_service {
                     )],
                 )
                 .unwrap(),
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
             )
         }
 
@@ -1634,8 +1638,8 @@ mod tests_activity_service {
 
         use super::*;
 
-        fn default_activity() -> ActivityWithTimeseries {
-            ActivityWithTimeseries::new(
+        fn default_activity() -> ActivityWithParsedData {
+            ActivityWithParsedData::new(
                 Activity::new_empty(
                     ActivityId::from("test_activity"),
                     UserId::from("test_user".to_string()),
@@ -1662,6 +1666,7 @@ mod tests_activity_service {
                     )],
                 )
                 .unwrap(),
+                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
             )
         }
 

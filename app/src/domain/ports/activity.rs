@@ -12,7 +12,7 @@ use crate::domain::{
         activity::{
             Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricSource,
             ActivityMetricV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithTimeseries,
+            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
             Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
         },
     },
@@ -35,7 +35,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+    ) -> impl Future<Output = Result<Vec<ActivityWithParsedData>, ListActivitiesError>> + Send;
 
     fn list_activities_with_metric(
         &self,
@@ -64,7 +64,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
     fn get_activity_with_timeseries(
         &self,
         activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<ActivityWithTimeseries, GetActivityError>> + Send;
+    ) -> impl Future<Output = Result<ActivityWithParsedData, GetActivityError>> + Send;
 
     fn modify_activity(
         &self,
@@ -517,7 +517,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn save_activity(
         &self,
         // TODO: une Activity sans timeseries devrait suffire normalement
-        activity: &ActivityWithTimeseries,
+        activity: &ActivityWithParsedData,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
     fn list_activities(
@@ -541,7 +541,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<ActivityWithTimeseries>, ListActivitiesError>> + Send;
+    ) -> impl Future<Output = Result<Vec<ActivityWithParsedData>, ListActivitiesError>> + Send;
 
     fn get_activities_with_metric(
         &self,
@@ -595,7 +595,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn get_activity_with_timeseries(
         &self,
         id: &ActivityId,
-    ) -> impl Future<Output = Result<Option<ActivityWithTimeseries>, anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, anyhow::Error>> + Send;
 
     fn modify_activity_name(
         &self,

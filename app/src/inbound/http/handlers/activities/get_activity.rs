@@ -60,7 +60,7 @@ mod tests {
                 activity::{
                     ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
                     ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-                    ActivityWithTimeseries, Sport, Timeseries, TimeseriesActiveTime,
+                    ActivityWithParsedData, Sport, Timeseries, TimeseriesActiveTime,
                     TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
@@ -93,7 +93,7 @@ mod tests {
         service
             .expect_get_activity_with_timeseries()
             .returning(|_| {
-                Ok(ActivityWithTimeseries::new(
+                Ok(ActivityWithParsedData::new(
                     Activity::new_empty(
                         ActivityId::from("target_id"),
                         UserId::test_default(),
@@ -127,6 +127,7 @@ mod tests {
                         )],
                     )
                     .unwrap(),
+                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
                 ))
             });
         let file_parser = MockFileParser::test_default();
