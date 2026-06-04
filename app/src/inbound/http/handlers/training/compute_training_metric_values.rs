@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         models::{
-            activity::ActivityMetricSource,
+            activity::{ActivityMetricSource, ActivityMetricV2},
             training::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
                 TrainingMetricGranularity,
@@ -15,7 +15,9 @@ use crate::{
             DateRange,
             activity::IActivityService,
             preferences::IPreferencesService,
-            training::{ComputeTrainingMetricValuesError, ITrainingService},
+            training::{
+                ComputeTrainingMetricValuesError, GetTrainingMetricValuesRequest, ITrainingService,
+            },
         },
     },
     inbound::{
@@ -41,7 +43,7 @@ use crate::{
 /// Request body for computing training metric values
 #[derive(Debug, Deserialize)]
 pub struct ComputeMetricValuesRequest {
-    source: APITrainingMetricSource,
+    metric: ActivityMetricV2,
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
     #[serde(default)]
@@ -89,7 +91,6 @@ pub async fn compute_training_metric_values<
 ) -> Result<impl IntoResponse, StatusCode> {
     let date_range = DateRange::from(&request);
 
-    // Build the training metric definition from the request
     let filters = request
         .filters
         .map(TrainingMetricFilters::try_from)
@@ -99,8 +100,6 @@ pub async fn compute_training_metric_values<
 
     let group_by = request.group_by.map(|gb| gb.into());
 
-    // Convert request types before they are moved
-    let source: ActivityMetricSource = request.source.into();
     let granularity: TrainingMetricGranularity = request.granularity.into();
     let aggregate: TrainingMetricAggregate = request.aggregate.into();
     let range = MetricsDateRange {
@@ -108,23 +107,23 @@ pub async fn compute_training_metric_values<
         end: request.end,
     };
 
-    let definition = TrainingMetricDefinition::new(
-        user.user().clone(),
-        source.clone(),
-        granularity.clone(),
-        aggregate.clone(),
+    let req = GetTrainingMetricValuesRequest::ByDefinition {
+        user: user.user().clone(),
+        metric: request.metric.clone(),
+        granularity: granularity.clone(),
+        aggregate: aggregate.clone(),
         filters,
         group_by,
-    );
+    };
 
     let values = state
         .training_metrics_service
-        .compute_training_metric_values(&definition, &date_range)
+        .get_training_metric_values(req, &date_range)
         .await
         .map_err(StatusCode::from)?;
 
     let values = fill_metric_values(&granularity, values, &range);
-    let (_, values) = convert_metric_values(values, &source, &aggregate);
+    let (_, values) = convert_metric_values(values, &request.metric.source(), &aggregate);
 
     Ok(Json(ResponseBody { values }))
 }
@@ -139,7 +138,7 @@ mod tests {
         // Test with only required fields
         // Demonstrates basic JSON format for the request
         let json = r#"{
-            "source": {"Statistic": "Calories"},
+            "metric": "Calories",
             "granularity": "Daily",
             "aggregate": "Sum",
             "start": "2024-01-01T00:00:00+00:00"
@@ -157,12 +156,12 @@ mod tests {
     fn test_request_deserialize_all_fields() {
         // Test with all fields provided
         // Demonstrates complete JSON format including:
-        // - Statistic source (alternative: {"Timeseries": ["Speed", "Average"]})
+        // - Metric: ActivityMetricV2::AvgSpeed
         // - Optional end date
         // - Optional group_by (values: Sport, SportCategory, WorkoutType, RpeRange, Bonked)
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
-            "source": {"Statistic": "Calories"},
+            "metric": "AvgSpeed",
             "granularity": "Daily",
             "aggregate": "Sum",
             "start": "2024-01-01T00:00:00+00:00",

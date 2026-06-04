@@ -14,7 +14,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetricSource, ActivityRpe, BonkStatus, Sport,
+            Activity, ActivityMetric, ActivityMetricV2, ActivityRpe, BonkStatus, Sport,
             SportCategory, WorkoutType,
         },
     },
@@ -265,7 +265,7 @@ impl TrainingMetricScope {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     user: UserId,
-    source: ActivityMetricSource,
+    metric: ActivityMetricV2,
     granularity: TrainingMetricGranularity,
     granularity_aggregate: TrainingMetricAggregate,
     filters: TrainingMetricFilters,
@@ -277,8 +277,8 @@ impl TrainingMetricDefinition {
         &self.user
     }
 
-    pub fn source(&self) -> &ActivityMetricSource {
-        &self.source
+    pub fn metric(&self) -> &ActivityMetricV2 {
+        &self.metric
     }
 
     pub fn granularity(&self) -> &TrainingMetricGranularity {
@@ -1342,7 +1342,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricV2::Calories,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::new(
@@ -1367,7 +1367,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricV2::Calories,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Max,
             TrainingMetricFilters::empty(),
@@ -2672,14 +2672,13 @@ mod test_training_metric_group_by {
 
 #[cfg(test)]
 mod test_training_metrics_ordering {
-    use crate::domain::models::activity::ActivityStatistic;
 
     use super::*;
 
     fn generate_test_metrics() -> Vec<TrainingMetric> {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            ActivityMetricV2::Distance,
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Sum,
             TrainingMetricFilters::empty(),

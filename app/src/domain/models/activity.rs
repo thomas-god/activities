@@ -1123,6 +1123,14 @@ impl TryFrom<&ActivityMetricSource> for ActivityMetricV2 {
     }
 }
 
+impl TryFrom<ActivityMetricSource> for ActivityMetricV2 {
+    type Error = String;
+
+    fn try_from(value: ActivityMetricSource) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
 ///////////////////////////////////////////////////////////////////
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////

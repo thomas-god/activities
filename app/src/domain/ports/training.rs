@@ -1,6 +1,3 @@
-///////////////////////////////////////////////////////////////////
-/// TRAINING SERVICE
-///////////////////////////////////////////////////////////////////
 use chrono::NaiveDate;
 use derive_more::Constructor;
 use thiserror::Error;
@@ -8,7 +5,7 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetricSource, ActivityWithParsedData},
+        activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
         training::{
             TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
@@ -25,7 +22,7 @@ use crate::domain::{
 pub struct CreateTrainingMetricRequest {
     user: UserId,
     name: TrainingMetricName,
-    source: ActivityMetricSource,
+    metric: ActivityMetricV2,
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
     filters: TrainingMetricFilters,
@@ -42,8 +39,8 @@ impl CreateTrainingMetricRequest {
         &self.name
     }
 
-    pub fn source(&self) -> &ActivityMetricSource {
-        &self.source
+    pub fn metric(&self) -> &ActivityMetricV2 {
+        &self.metric
     }
 
     pub fn granularity(&self) -> &TrainingMetricGranularity {
@@ -65,6 +62,18 @@ impl CreateTrainingMetricRequest {
     pub fn scope(&self) -> &TrainingMetricScope {
         &self.scope
     }
+}
+
+pub enum GetTrainingMetricValuesRequest {
+    ByTrainingMetricId(UserId, TrainingMetricId),
+    ByDefinition {
+        user: UserId,
+        metric: ActivityMetricV2,
+        granularity: TrainingMetricGranularity,
+        aggregate: TrainingMetricAggregate,
+        filters: TrainingMetricFilters,
+        group_by: Option<TrainingMetricGroupBy>,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -221,6 +230,10 @@ pub enum UpdateTrainingMetricScopeError {
     Unknown(#[from] anyhow::Error),
 }
 
+///////////////////////////////////////////////////////////////////
+/// TRAINING SERVICE
+///////////////////////////////////////////////////////////////////
+
 pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
@@ -246,16 +259,9 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
 
     fn get_training_metric_values(
         &self,
-        user: &UserId,
-        metric_id: &TrainingMetricId,
+        req: GetTrainingMetricValuesRequest,
         date_range: &DateRange,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValuesError>> + Send;
-
-    fn compute_training_metric_values(
-        &self,
-        definition: &TrainingMetricDefinition,
-        date_range: &DateRange,
-    ) -> impl Future<Output = Result<TrainingMetricValues, ComputeTrainingMetricValuesError>> + Send;
 
     fn update_training_metric_name(
         &self,
@@ -708,6 +714,10 @@ pub enum DeleteTrainingNoteError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
+
+///////////////////////////////////////////////////////////////////
+/// TRAINING REPOSITORY
+///////////////////////////////////////////////////////////////////
 
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_training_metric_definition(

@@ -16,7 +16,9 @@ use crate::{
             DateRange,
             activity::IActivityService,
             preferences::IPreferencesService,
-            training::{GetTrainingMetricValuesError, ITrainingService},
+            training::{
+                GetTrainingMetricValuesError, GetTrainingMetricValuesRequest, ITrainingService,
+            },
         },
     },
     inbound::{
@@ -75,9 +77,11 @@ pub async fn get_training_metric_values<
     let metric_id = TrainingMetricId::from(&metric_id);
     let date_range = DateRange::from(&query);
 
+    let req = GetTrainingMetricValuesRequest::ByTrainingMetricId(user.user().clone(), metric_id);
+
     let values = state
         .training_metrics_service
-        .get_training_metric_values(user.user(), &metric_id, &date_range)
+        .get_training_metric_values(req, &date_range)
         .await
         .map_err(StatusCode::from)?;
 

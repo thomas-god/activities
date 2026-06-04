@@ -104,12 +104,16 @@ fn to_response_body_item(
     let (metric, metric_values) = metric;
     let definition = metric.definition();
     let values = fill_metric_values(definition.granularity(), metric_values, range);
-    let (unit, values) = convert_metric_values(values, definition.source(), definition.aggregate());
+    let (unit, values) = convert_metric_values(
+        values,
+        &definition.metric().source(),
+        definition.aggregate(),
+    );
 
     ResponseBodyItem {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
-        metric: format_source(definition.source()),
+        metric: format_source(&definition.metric().source()),
         unit: unit.to_string(),
         granularity: definition.granularity().to_string(),
         aggregate: definition.aggregate().to_string(),

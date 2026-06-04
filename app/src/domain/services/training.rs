@@ -20,13 +20,14 @@ use crate::domain::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteTrainingMetricError,
             DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
             DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
-            GetTrainingMetricsOrderingError, GetTrainingNoteError, ITrainingService,
-            SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
-            UpdateTrainingMetricNameRequest, UpdateTrainingMetricScopeError,
-            UpdateTrainingMetricScopeRequest, UpdateTrainingNoteError,
-            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
-            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
-            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+            GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
+            ITrainingService, SetTrainingMetricsOrderingError, TrainingRepository,
+            UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
+            UpdateTrainingMetricScopeError, UpdateTrainingMetricScopeRequest,
+            UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
+            UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
+            UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
+            UpdateTrainingPeriodNoteRequest,
         },
     },
 };
@@ -45,6 +46,41 @@ where
     activity_service: AS,
 }
 
+impl<TR, AS> TrainingService<TR, AS>
+where
+    TR: TrainingRepository,
+    AS: IActivityService,
+{
+    /// Compute training metric values from a [TrainingMetricDefinition] and a [DateRange] using
+    /// activities within the [DateRange].
+    async fn compute_training_metric_values(
+        &self,
+        definition: &TrainingMetricDefinition,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let activities = self
+            .activity_service
+            .list_activities_with_metrics_v2(
+                definition.user(),
+                &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
+                &[*definition.metric()],
+            )
+            .await
+            .map_err(|err| anyhow!(err))?
+            .into_iter()
+            .filter_map(|(activity, values)| {
+                if let Some(Some(value)) = values.get(definition.metric()).cloned() {
+                    Some((activity, value))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(definition.compute_values(&activities))
+    }
+}
+
 impl<TMR, AS> ITrainingService for TrainingService<TMR, AS>
 where
     TMR: TrainingRepository,
@@ -57,7 +93,7 @@ where
         let id = TrainingMetricId::new();
         let definition = TrainingMetricDefinition::new(
             req.user().clone(),
-            req.source().clone(),
+            req.metric().clone(),
             req.granularity().clone(),
             req.aggregate().clone(),
             req.filters().clone(),
@@ -124,26 +160,6 @@ where
         Ok(())
     }
 
-    /// Compute training metric values from a [TrainingMetricDefinition] and a [DateRange] using
-    /// activities within the [DateRange].
-    async fn compute_training_metric_values(
-        &self,
-        definition: &TrainingMetricDefinition,
-        date_range: &DateRange,
-    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
-        let activities = self
-            .activity_service
-            .list_activities_with_metric(
-                definition.user(),
-                &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
-                definition.source(),
-            )
-            .await
-            .map_err(|err| anyhow!(err))?;
-
-        Ok(definition.compute_values(&activities))
-    }
-
     /// Get training metric values for all registered training metrics for a given user and scope.
     async fn get_training_metrics_values(
         &self,
@@ -205,31 +221,40 @@ where
         res
     }
 
-    /// Get training metric values for a given registered training metric.
     async fn get_training_metric_values(
         &self,
-        user: &UserId,
-        metric_id: &TrainingMetricId,
+        req: GetTrainingMetricValuesRequest,
         date_range: &DateRange,
     ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError> {
-        let definition = self
-            .training_repository
-            .get_definition(metric_id)
-            .await
-            .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?;
-
-        match definition {
-            Some(def) if def.user() == user => self
-                .compute_training_metric_values(&def, date_range)
+        let definition = match req {
+            GetTrainingMetricValuesRequest::ByDefinition {
+                user,
+                metric,
+                granularity,
+                aggregate,
+                filters,
+                group_by,
+            } => TrainingMetricDefinition::new(
+                user,
+                metric,
+                granularity,
+                aggregate,
+                filters,
+                group_by,
+            ),
+            GetTrainingMetricValuesRequest::ByTrainingMetricId(_user, id) => self
+                .training_repository
+                .get_definition(&id)
                 .await
-                .map_err(GetTrainingMetricValuesError::from),
-            Some(_) => Err(GetTrainingMetricValuesError::Unknown(anyhow::anyhow!(
-                "Training metric does not belong to user"
-            ))),
-            None => Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
-                metric_id.clone(),
-            )),
-        }
+                .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?
+                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
+                    id,
+                ))?,
+        };
+
+        self.compute_training_metric_values(&definition, date_range)
+            .await
+            .map_err(GetTrainingMetricValuesError::from)
     }
 
     async fn delete_metric(
@@ -744,10 +769,11 @@ pub mod test_utils {
         ports::training::{
             CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
             DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-            GetDefinitionError, GetTrainingMetricsDefinitionsError, GetTrainingNoteError,
-            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
-            UpdateTrainingMetricScopeError, UpdateTrainingMetricScopeRepositoryError,
-            UpdateTrainingMetricScopeRequest, UpdateTrainingNoteError,
+            GetDefinitionError, GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
+            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
+            SaveTrainingPeriodError, UpdateTrainingMetricScopeError,
+            UpdateTrainingMetricScopeRepositoryError, UpdateTrainingMetricScopeRequest,
+            UpdateTrainingNoteError,
         },
     };
 
@@ -896,16 +922,9 @@ pub mod test_utils {
 
             async fn get_training_metric_values(
                 &self,
-                user: &UserId,
-                metric_id: &TrainingMetricId,
+                req: GetTrainingMetricValuesRequest,
                 date_range: &DateRange,
             ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError>;
-
-            async fn compute_training_metric_values(
-                &self,
-                definition: &TrainingMetricDefinition,
-                date_range: &DateRange,
-            ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError>;
         }
     }
 
@@ -1064,23 +1083,23 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests_training_metrics_service {
 
+    use std::collections::HashMap;
+
     use anyhow::anyhow;
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
+        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityStartTime,
+        ActivityStatistics, Sport,
     };
 
     use crate::domain::ports::DateRange;
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::{
-        models::{
-            activity::{ActivityMetricSource, ActivityStatistic},
-            training::{
-                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
-                TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-                TrainingMetricName, TrainingPeriod, TrainingPeriodSports,
-            },
+        models::training::{
+            TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
+            TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
+            TrainingPeriod, TrainingPeriodSports,
         },
         ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::training::test_utils::MockTrainingRepository,
@@ -1100,7 +1119,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricV2::Calories,
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
@@ -1126,7 +1145,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+            ActivityMetricV2::Calories,
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty(),
@@ -1175,7 +1194,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    ActivityMetricV2::Calories,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Average,
                     TrainingMetricFilters::empty(),
@@ -1190,7 +1209,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
         // When no date range is specified, it should query the user's history
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| Ok(vec![]));
 
         let service = TrainingService::new(repository, activity_service);
@@ -1216,7 +1235,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    ActivityMetricV2::Calories,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Average,
                     TrainingMetricFilters::empty(),
@@ -1237,7 +1256,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    ActivityMetricV2::Calories,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1252,7 +1271,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
 
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| {
                 // Empty as no activity has this metric
                 Ok(vec![])
@@ -1281,7 +1300,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    ActivityMetricV2::Calories,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1303,7 +1322,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                    ActivityMetricV2::Calories,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Average,
                     TrainingMetricFilters::empty(),
@@ -1318,7 +1337,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
         // Should list activities in the date range
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .withf(|_, filters, _| {
                 // The date range should be aligned to full days (Sep 24-26)
                 filters.date_range().is_some()
@@ -1358,7 +1377,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                    ActivityMetricV2::Distance,
                     TrainingMetricGranularity::Weekly, // Weekly granularity
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1375,7 +1394,7 @@ mod tests_training_metrics_service {
         // Input: Wed Sep 24 to Thu Sep 25, 2025
         // Should be aligned to: Mon Sep 22 to Mon Sep 29, 2025
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .withf(|_, filters, _| {
                 let Some(range) = filters.date_range() else {
                     return false;
@@ -1402,7 +1421,7 @@ mod tests_training_metrics_service {
                         Sport::Running,
                         stats,
                     ),
-                    0.,
+                    HashMap::from([(ActivityMetricV2::Distance, Some(0.))]),
                 )])
             });
 
@@ -1436,7 +1455,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                    ActivityMetricV2::Distance,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1450,7 +1469,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
@@ -1487,7 +1506,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                    ActivityMetricV2::Distance,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1511,7 +1530,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new()),
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Duration),
+                        ActivityMetricV2::Duration,
                         TrainingMetricGranularity::Weekly,
                         TrainingMetricAggregate::Average,
                         TrainingMetricFilters::empty(),
@@ -1522,7 +1541,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
@@ -1596,7 +1615,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                    ActivityMetricV2::Distance,
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Sum,
                     TrainingMetricFilters::empty(),
@@ -1690,7 +1709,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        ActivityMetricV2::Distance,
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
                         TrainingMetricFilters::empty(),
@@ -1703,7 +1722,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        ActivityMetricV2::Distance,
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
                         TrainingMetricFilters::empty(),
@@ -1724,7 +1743,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
@@ -1772,7 +1791,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        ActivityMetricV2::Distance,
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
                         TrainingMetricFilters::empty(),
@@ -1785,7 +1804,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        ActivityMetricV2::Distance,
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
                         TrainingMetricFilters::empty(),
@@ -1798,7 +1817,7 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+                        ActivityMetricV2::Distance,
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
                         TrainingMetricFilters::empty(),
@@ -1822,7 +1841,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
@@ -1873,7 +1892,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "other_user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -1904,7 +1923,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -1958,7 +1977,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "other_user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -1991,7 +2010,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -2027,7 +2046,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -2082,7 +2101,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "other_user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -2114,7 +2133,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -2150,7 +2169,7 @@ mod tests_training_metrics_service {
         repository.expect_get_definition().returning(|_| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                ActivityMetricSource::Statistic(ActivityStatistic::Calories),
+                ActivityMetricV2::Calories,
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
                 TrainingMetricFilters::empty(),
@@ -3755,7 +3774,7 @@ mod test_training_service_metric_values {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityMetricSource, ActivityStartTime,
+        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityStartTime,
         ActivityStatistic, ActivityStatistics, Sport,
     };
     use crate::domain::models::training::{
@@ -3784,53 +3803,15 @@ mod test_training_service_metric_values {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
-        let result = service
-            .get_training_metric_values(&user_id, &metric_id, &date_range)
-            .await;
+        let req =
+            GetTrainingMetricValuesRequest::ByTrainingMetricId(user_id.clone(), metric_id.clone());
+
+        let result = service.get_training_metric_values(req, &date_range).await;
 
         assert!(result.is_err());
         match result {
             Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(_)) => {}
             _ => panic!("Expected TrainingMetricDoesNotExists error"),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_get_training_metric_values_wrong_user() {
-        let user_id = UserId::from("user1");
-        let other_user_id = UserId::from("user2");
-        let metric_id = TrainingMetricId::new();
-        let date_range = DateRange::new(
-            "2024-01-01".parse::<NaiveDate>().unwrap(),
-            "2024-12-31".parse::<NaiveDate>().unwrap(),
-        );
-
-        let definition = TrainingMetricDefinition::new(
-            other_user_id,
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricFilters::empty(),
-            None,
-        );
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_definition()
-            .times(1)
-            .return_once(move |_| Ok(Some(definition)));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let result = service
-            .get_training_metric_values(&user_id, &metric_id, &date_range)
-            .await;
-
-        assert!(result.is_err());
-        match result {
-            Err(GetTrainingMetricValuesError::Unknown(_)) => {}
-            _ => panic!("Expected Unknown error"),
         }
     }
 
@@ -3844,7 +3825,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id,
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            ActivityMetricV2::Distance,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
             TrainingMetricFilters::empty(),
@@ -3853,7 +3834,7 @@ mod test_training_service_metric_values {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .times(1)
             .returning(|_, _, _| Ok(vec![]));
 
@@ -3878,7 +3859,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id.clone(),
-            ActivityMetricSource::Statistic(ActivityStatistic::Distance),
+            ActivityMetricV2::Distance,
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
             TrainingMetricFilters::empty(),
@@ -3900,9 +3881,14 @@ mod test_training_service_metric_values {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metric()
+            .expect_list_activities_with_metrics_v2()
             .times(1)
-            .returning(move |_, _, _| Ok(vec![(activity.clone(), 0.)]));
+            .returning(move |_, _, _| {
+                Ok(vec![(
+                    activity.clone(),
+                    HashMap::from([(ActivityMetricV2::Distance, Some(0.))]),
+                )])
+            });
 
         let training_repository = MockTrainingRepository::new();
         let activity_service = activity_service;
