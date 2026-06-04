@@ -36,7 +36,7 @@ pub async fn get_activity<
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
     let Ok(res) = state
         .activity_service
-        .get_activity_with_timeseries(&ActivityId::from(&activity_id))
+        .get_activity_with_parsed_data(&ActivityId::from(&activity_id))
         .await
     else {
         return Err(StatusCode::NOT_FOUND);
@@ -91,7 +91,7 @@ mod tests {
         let target_id = "target_id".to_string();
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_timeseries()
+            .expect_get_activity_with_parsed_data()
             .returning(|_| {
                 Ok(ActivityWithParsedData::new(
                     Activity::new_empty(
@@ -192,7 +192,7 @@ mod tests {
     async fn test_get_activity_does_not_exist() {
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_timeseries()
+            .expect_get_activity_with_parsed_data()
             .with(eq(ActivityId::from("target_id")))
             .returning(|_| {
                 Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(

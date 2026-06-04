@@ -31,7 +31,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
 
-    fn list_activities_with_timeseries(
+    fn list_activities_with_parsed_data(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
@@ -61,7 +61,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
 
-    fn get_activity_with_timeseries(
+    fn get_activity_with_parsed_data(
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<ActivityWithParsedData, GetActivityError>> + Send;

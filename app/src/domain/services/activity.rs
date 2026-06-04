@@ -163,7 +163,7 @@ where
             .await
     }
 
-    async fn list_activities_with_timeseries(
+    async fn list_activities_with_parsed_data(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
@@ -244,7 +244,7 @@ where
         }
     }
 
-    async fn get_activity_with_timeseries(
+    async fn get_activity_with_parsed_data(
         &self,
         activity_id: &ActivityId,
     ) -> Result<ActivityWithParsedData, GetActivityError> {
@@ -462,7 +462,7 @@ pub mod test_utils {
                 filters: &ListActivitiesFilters
             ) -> Result<Vec<Activity>, ListActivitiesError>;
 
-            async fn list_activities_with_timeseries(
+            async fn list_activities_with_parsed_data(
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters
@@ -473,7 +473,7 @@ pub mod test_utils {
                 activity_id: &ActivityId,
             ) -> Result<Activity, GetActivityError>;
 
-            async fn get_activity_with_timeseries(
+            async fn get_activity_with_parsed_data(
                 &self,
                 activity_id: &ActivityId,
             ) -> Result<ActivityWithParsedData, GetActivityError>;
