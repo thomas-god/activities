@@ -26,7 +26,6 @@ impl From<DeleteTrainingMetricError> for StatusCode {
     fn from(value: DeleteTrainingMetricError) -> Self {
         match value {
             DeleteTrainingMetricError::MetricDoesNotExist(_) => Self::NOT_FOUND,
-            DeleteTrainingMetricError::UserDoesNotOwnTrainingMetric(_, _) => Self::FORBIDDEN,
             _ => Self::UNPROCESSABLE_ENTITY,
         }
     }

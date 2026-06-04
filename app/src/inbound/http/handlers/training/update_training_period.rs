@@ -66,16 +66,6 @@ pub async fn update_training_period<
                 )
                     .into_response();
             }
-            Err(UpdateTrainingPeriodNameError::UserDoesNotOwnPeriod(_, _)) => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    axum::Json(ErrorResponse {
-                        error: "You do not have permission to update this training period"
-                            .to_string(),
-                    }),
-                )
-                    .into_response();
-            }
             Err(UpdateTrainingPeriodNameError::Unknown(e)) => {
                 eprintln!("Error updating training period name: {:?}", e);
                 return (
@@ -105,16 +95,6 @@ pub async fn update_training_period<
                     StatusCode::NOT_FOUND,
                     axum::Json(ErrorResponse {
                         error: "Training period does not exist".to_string(),
-                    }),
-                )
-                    .into_response();
-            }
-            Err(UpdateTrainingPeriodNoteError::UserDoesNotOwnPeriod(_, _)) => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    axum::Json(ErrorResponse {
-                        error: "You do not have permission to update this training period"
-                            .to_string(),
                     }),
                 )
                     .into_response();
@@ -155,16 +135,6 @@ pub async fn update_training_period<
                     StatusCode::NOT_FOUND,
                     axum::Json(ErrorResponse {
                         error: "Training period does not exist".to_string(),
-                    }),
-                )
-                    .into_response();
-            }
-            Err(UpdateTrainingPeriodDatesError::UserDoesNotOwnPeriod(_, _)) => {
-                return (
-                    StatusCode::FORBIDDEN,
-                    axum::Json(ErrorResponse {
-                        error: "You do not have permission to update this training period"
-                            .to_string(),
                     }),
                 )
                     .into_response();

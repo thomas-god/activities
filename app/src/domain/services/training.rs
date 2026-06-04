@@ -93,7 +93,7 @@ where
         let id = TrainingMetricId::new();
         let definition = TrainingMetricDefinition::new(
             req.user().clone(),
-            req.metric().clone(),
+            *req.metric(),
             req.granularity().clone(),
             req.aggregate().clone(),
             req.filters().clone(),
@@ -117,25 +117,15 @@ where
         req: UpdateTrainingMetricScopeRequest,
     ) -> Result<(), UpdateTrainingMetricScopeError> {
         // Get the metric to verify it exists and check ownership
-        let Some(definition) = self
+        let Some(_definition) = self
             .training_repository
-            .get_definition(req.metric_id())
+            .get_definition(req.user(), req.metric_id())
             .await?
         else {
             return Err(UpdateTrainingMetricScopeError::MetricDoesNotExist(
                 req.metric_id().clone(),
             ));
         };
-
-        // Verify user owns the metric
-        if definition.user() != req.user() {
-            return Err(
-                UpdateTrainingMetricScopeError::UserDoesNotOwnTrainingMetric(
-                    req.user().clone(),
-                    req.metric_id().clone(),
-                ),
-            );
-        }
 
         // If scope is TrainingPeriod, verify the period exists and belongs to user
         if let Some(period_id) = req.scope().period() {
@@ -153,7 +143,7 @@ where
 
         // Update the metric scope
         self.training_repository
-            .update_training_metric_scope(req.metric_id(), req.scope())
+            .update_training_metric_scope(req.user(), req.metric_id(), req.scope())
             .await
             .map_err(|err| UpdateTrainingMetricScopeError::Unknown(err.into()))?;
 
@@ -242,9 +232,9 @@ where
                 filters,
                 group_by,
             ),
-            GetTrainingMetricValuesRequest::ByTrainingMetricId(_user, id) => self
+            GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
                 .training_repository
-                .get_definition(&id)
+                .get_definition(&user, &id)
                 .await
                 .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?
                 .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
@@ -261,60 +251,18 @@ where
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> Result<(), DeleteTrainingMetricError> {
-        let Some(definition) = self
-            .training_repository
-            .get_definition(req.metric())
-            .await?
-        else {
-            return Err(DeleteTrainingMetricError::MetricDoesNotExist(
-                req.metric().clone(),
-            ));
-        };
-
-        if definition.user() != req.user() {
-            return Err(DeleteTrainingMetricError::UserDoesNotOwnTrainingMetric(
-                req.user().clone(),
-                req.metric().clone(),
-            ));
-        }
-
         self.training_repository
-            .delete_definition(req.metric())
-            .await?;
-
-        Ok(())
+            .delete_definition(req.user(), req.metric())
+            .await
     }
 
     async fn update_training_metric_name(
         &self,
         req: UpdateTrainingMetricNameRequest,
     ) -> Result<(), UpdateTrainingMetricNameError> {
-        // Get the metric to verify it exists and check ownership
-        let Some(definition) = self
-            .training_repository
-            .get_definition(req.metric_id())
-            .await?
-        else {
-            return Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
-                req.metric_id().clone(),
-            ));
-        };
-
-        // Verify user owns the metric
-        if definition.user() != req.user() {
-            return Err(UpdateTrainingMetricNameError::UserDoesNotOwnTrainingMetric(
-                req.user().clone(),
-                req.metric_id().clone(),
-            ));
-        }
-
-        // Update the metric name
         self.training_repository
-            .update_training_metric_name(req.metric_id(), req.name().clone())
+            .update_training_metric_name(req.user(), req.metric_id(), req.name().clone())
             .await
-            .map_err(UpdateTrainingMetricNameError::Unknown)?;
-
-        Ok(())
     }
 
     async fn create_training_period(
@@ -397,121 +345,33 @@ where
         &self,
         req: DeleteTrainingPeriodRequest,
     ) -> Result<(), DeleteTrainingPeriodError> {
-        // Get the period to verify it exists and check ownership
-        let Some(period) = self
-            .training_repository
-            .get_training_period(req.user(), req.period_id())
-            .await
-        else {
-            return Err(DeleteTrainingPeriodError::PeriodDoesNotExist(
-                req.period_id().clone(),
-            ));
-        };
-
-        // Verify user owns the period
-        if period.user() != req.user() {
-            return Err(DeleteTrainingPeriodError::UserDoesNotOwnPeriod(
-                req.user().clone(),
-                req.period_id().clone(),
-            ));
-        }
-
-        // Delete the period
         self.training_repository
-            .delete_training_period(req.period_id())
+            .delete_training_period(req.user(), req.period_id())
             .await
-            .map_err(DeleteTrainingPeriodError::Unknown)?;
-
-        Ok(())
     }
 
     async fn update_training_period_name(
         &self,
         req: UpdateTrainingPeriodNameRequest,
     ) -> Result<(), UpdateTrainingPeriodNameError> {
-        // Get the period to verify it exists and check ownership
-        let Some(period) = self
-            .training_repository
-            .get_training_period(req.user(), req.period_id())
-            .await
-        else {
-            return Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(
-                req.period_id().clone(),
-            ));
-        };
-
-        // Verify user owns the period
-        if period.user() != req.user() {
-            return Err(UpdateTrainingPeriodNameError::UserDoesNotOwnPeriod(
-                req.user().clone(),
-                req.period_id().clone(),
-            ));
-        }
-
-        // Update the period name
         self.training_repository
-            .update_training_period_name(req.period_id(), req.name().to_string())
+            .update_training_period_name(req.user(), req.period_id(), req.name().to_string())
             .await
-            .map_err(UpdateTrainingPeriodNameError::Unknown)?;
-
-        Ok(())
     }
 
     async fn update_training_period_note(
         &self,
         req: UpdateTrainingPeriodNoteRequest,
     ) -> Result<(), UpdateTrainingPeriodNoteError> {
-        // Get the period to verify it exists and check ownership
-        let Some(period) = self
-            .training_repository
-            .get_training_period(req.user(), req.period_id())
-            .await
-        else {
-            return Err(UpdateTrainingPeriodNoteError::PeriodDoesNotExist(
-                req.period_id().clone(),
-            ));
-        };
-
-        // Verify user owns the period
-        if period.user() != req.user() {
-            return Err(UpdateTrainingPeriodNoteError::UserDoesNotOwnPeriod(
-                req.user().clone(),
-                req.period_id().clone(),
-            ));
-        }
-
-        // Update the period note
         self.training_repository
-            .update_training_period_note(req.period_id(), req.note().clone())
+            .update_training_period_note(req.user(), req.period_id(), req.note().clone())
             .await
-            .map_err(UpdateTrainingPeriodNoteError::Unknown)?;
-
-        Ok(())
     }
 
     async fn update_training_period_dates(
         &self,
         req: UpdateTrainingPeriodDatesRequest,
     ) -> Result<(), UpdateTrainingPeriodDatesError> {
-        // Get the period to verify it exists and check ownership
-        let Some(period) = self
-            .training_repository
-            .get_training_period(req.user(), req.period_id())
-            .await
-        else {
-            return Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(
-                req.period_id().clone(),
-            ));
-        };
-
-        // Verify user owns the period
-        if period.user() != req.user() {
-            return Err(UpdateTrainingPeriodDatesError::UserDoesNotOwnPeriod(
-                req.user().clone(),
-                req.period_id().clone(),
-            ));
-        }
-
         // Validate dates
         if let Some(end_date) = req.end()
             && req.start() > end_date
@@ -521,11 +381,8 @@ where
 
         // Update the period dates
         self.training_repository
-            .update_training_period_dates(req.period_id(), *req.start(), *req.end())
+            .update_training_period_dates(req.user(), req.period_id(), *req.start(), *req.end())
             .await
-            .map_err(UpdateTrainingPeriodDatesError::Unknown)?;
-
-        Ok(())
     }
 
     async fn create_training_note(
@@ -559,7 +416,10 @@ where
         user: &UserId,
         note_id: &TrainingNoteId,
     ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
-        let note = self.training_repository.get_training_note(note_id).await?;
+        let note = self
+            .training_repository
+            .get_training_note(user, note_id)
+            .await?;
 
         // Verify the note belongs to the user
         if let Some(ref n) = note
@@ -592,14 +452,14 @@ where
         // Verify the note exists and belongs to the user
         let note = self
             .training_repository
-            .get_training_note(note_id)
+            .get_training_note(user, note_id)
             .await
             .map_err(|err| UpdateTrainingNoteError::Unknown(err.into()))?;
 
         match note {
             Some(n) if n.user() == user => {
                 self.training_repository
-                    .update_training_note(note_id, title, content, date)
+                    .update_training_note(user, note_id, title, content, date)
                     .await?;
                 Ok(())
             }
@@ -617,14 +477,14 @@ where
         // Verify the note exists and belongs to the user
         let note = self
             .training_repository
-            .get_training_note(note_id)
+            .get_training_note(user, note_id)
             .await
             .map_err(|err| DeleteTrainingNoteError::Unknown(err.into()))?;
 
         match note {
             Some(n) if n.user() == user => {
                 self.training_repository
-                    .delete_training_note(note_id)
+                    .delete_training_note(user, note_id)
                     .await?;
                 Ok(())
             }
@@ -686,27 +546,13 @@ where
     ) -> Result<TrainingMetricsOrdering, GetTrainingMetricsOrderingError> {
         // If scope is TrainingPeriod, verify the period exists and belongs to user
         if let Some(period_id) = scope.period() {
-            let period = self
+            let _period = self
                 .training_repository
                 .get_training_period(user, &period_id)
-                .await;
-
-            match period {
-                None => {
-                    return Err(GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
-                        period_id,
-                    ));
-                }
-                Some(p) if p.user() != user => {
-                    return Err(
-                        GetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(
-                            user.clone(),
-                            period_id,
-                        ),
-                    );
-                }
-                _ => {}
-            }
+                .await
+                .ok_or(GetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                    period_id,
+                ))?;
         }
 
         self.training_repository
@@ -722,27 +568,13 @@ where
     ) -> Result<(), SetTrainingMetricsOrderingError> {
         // If scope is TrainingPeriod, verify the period exists and belongs to user
         if let Some(period_id) = scope.period() {
-            let period = self
+            let _period = self
                 .training_repository
                 .get_training_period(user, &period_id)
-                .await;
-
-            match period {
-                None => {
-                    return Err(SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
-                        period_id,
-                    ));
-                }
-                Some(p) if p.user() != user => {
-                    return Err(
-                        SetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(
-                            user.clone(),
-                            period_id,
-                        ),
-                    );
-                }
-                _ => {}
-            }
+                .await
+                .ok_or(SetTrainingMetricsOrderingError::TrainingPeriodDoesNotExist(
+                    period_id,
+                ))?;
         }
 
         self.training_repository
@@ -767,9 +599,9 @@ pub mod test_utils {
             TrainingPeriodWithActivities,
         },
         ports::training::{
-            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteMetricError,
-            DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-            GetDefinitionError, GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
+            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteTrainingNoteError,
+            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
+            GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
             GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
             SaveTrainingPeriodError, UpdateTrainingMetricScopeError,
             UpdateTrainingMetricScopeRepositoryError, UpdateTrainingMetricScopeRequest,
@@ -958,6 +790,7 @@ pub mod test_utils {
 
             async fn update_training_metric_scope(
                 &self,
+                user: &UserId,
                 metric: &TrainingMetricId,
                 scope: &TrainingMetricScope,
             ) -> Result<(), UpdateTrainingMetricScopeRepositoryError>;
@@ -975,19 +808,22 @@ pub mod test_utils {
 
             async fn get_definition(
                 &self,
+                user: &UserId,
                 metric: &TrainingMetricId,
             ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError>;
 
             async fn delete_definition(
                 &self,
+                user: &UserId,
                 metric: &TrainingMetricId,
-            ) -> Result<(), DeleteMetricError>;
+            ) -> Result<(), DeleteTrainingMetricError>;
 
             async fn update_training_metric_name(
                 &self,
+                user: &UserId,
                 metric_id: &TrainingMetricId,
                 name: TrainingMetricName,
-            ) -> Result<(), anyhow::Error>;
+            ) -> Result<(), UpdateTrainingMetricNameError>;
 
             async fn save_training_period(
                 &self,
@@ -1013,27 +849,31 @@ pub mod test_utils {
 
             async fn delete_training_period(
                 &self,
+                user: &UserId,
                 period_id: &TrainingPeriodId,
-            ) -> Result<(), anyhow::Error>;
+            ) -> Result<(), DeleteTrainingPeriodError>;
 
             async fn update_training_period_name(
                 &self,
+                user: &UserId,
                 period_id: &TrainingPeriodId,
                 name: String,
-            ) -> Result<(), anyhow::Error>;
+            ) -> Result<(), UpdateTrainingPeriodNameError>;
 
             async fn update_training_period_note(
                 &self,
+                user: &UserId,
                 period_id: &TrainingPeriodId,
                 note: Option<String>,
-            ) -> Result<(), anyhow::Error>;
+            ) -> Result<(), UpdateTrainingPeriodNoteError>;
 
             async fn update_training_period_dates(
                 &self,
+                user: &UserId,
                 period_id: &TrainingPeriodId,
                 start: NaiveDate,
                 end: Option<NaiveDate>,
-            ) -> Result<(), anyhow::Error>;
+            ) -> Result<(), UpdateTrainingPeriodDatesError>;
 
             async fn save_training_note(
                 &self,
@@ -1042,6 +882,7 @@ pub mod test_utils {
 
             async fn get_training_note(
                 &self,
+                user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
 
@@ -1053,6 +894,7 @@ pub mod test_utils {
 
             async fn update_training_note(
                 &self,
+                user: &UserId,
                 note_id: &TrainingNoteId,
                 title: Option<TrainingNoteTitle>,
                 content: TrainingNoteContent,
@@ -1061,6 +903,7 @@ pub mod test_utils {
 
             async fn delete_training_note(
                 &self,
+                user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<(), DeleteTrainingNoteError>;
 
@@ -1868,7 +1711,11 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_delete_metric_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| Ok(None));
+        repository.expect_delete_definition().returning(|_, _| {
+            Err(DeleteTrainingMetricError::MetricDoesNotExist(
+                TrainingMetricId::from("test"),
+            ))
+        });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -1887,40 +1734,9 @@ mod tests_training_metrics_service {
     }
 
     #[tokio::test]
-    async fn test_training_service_delete_metric_wrong_user() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "other_user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = DeleteTrainingMetricRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-        );
-
-        let res = service.delete_metric(req).await;
-
-        let Err(DeleteTrainingMetricError::UserDoesNotOwnTrainingMetric(user, metric)) = res else {
-            unreachable!("Should have returned an err")
-        };
-        assert_eq!(user, "user".to_string().into());
-        assert_eq!(metric, TrainingMetricId::from("test"));
-    }
-
-    #[tokio::test]
     async fn test_training_service_delete_metric() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
+        repository.expect_get_definition().returning(|_, _| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
@@ -1933,8 +1749,10 @@ mod tests_training_metrics_service {
         repository
             .expect_delete_definition()
             .times(1)
-            .withf(|id| id == &TrainingMetricId::from("test"))
-            .returning(|_| Ok(()));
+            .withf(|user, id| {
+                user == &UserId::from("user") && id == &TrainingMetricId::from("test")
+            })
+            .returning(|_, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -1952,7 +1770,13 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_update_metric_name_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| Ok(None));
+        repository
+            .expect_update_training_metric_name()
+            .returning(|_, _, _| {
+                Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
+                    TrainingMetricId::from("test"),
+                ))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -1972,42 +1796,9 @@ mod tests_training_metrics_service {
     }
 
     #[tokio::test]
-    async fn test_training_service_update_metric_name_wrong_user() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "other_user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = UpdateTrainingMetricNameRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricName::from("Updated Name"),
-        );
-
-        let res = service.update_training_metric_name(req).await;
-
-        let Err(UpdateTrainingMetricNameError::UserDoesNotOwnTrainingMetric(user, metric)) = res
-        else {
-            unreachable!("Should have returned an err")
-        };
-        assert_eq!(user, "user".to_string().into());
-        assert_eq!(metric, TrainingMetricId::from("test"));
-    }
-
-    #[tokio::test]
     async fn test_training_service_update_metric_name() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
+        repository.expect_get_definition().returning(|_, _| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
@@ -2020,11 +1811,12 @@ mod tests_training_metrics_service {
         repository
             .expect_update_training_metric_name()
             .times(1)
-            .withf(|id, name| {
-                id == &TrainingMetricId::from("test")
+            .withf(|user, id, name| {
+                user == &UserId::from("user")
+                    && id == &TrainingMetricId::from("test")
                     && name == &TrainingMetricName::from("Updated Name")
             })
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -2043,7 +1835,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_update_metric_scope_ok() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
+        repository.expect_get_definition().returning(|_, _| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
@@ -2056,10 +1848,12 @@ mod tests_training_metrics_service {
         repository
             .expect_update_training_metric_scope()
             .times(1)
-            .withf(|id, scope| {
-                id == &TrainingMetricId::from("test") && scope == &TrainingMetricScope::Global
+            .withf(|user, id, scope| {
+                user == &UserId::from("user")
+                    && id == &TrainingMetricId::from("test")
+                    && scope == &TrainingMetricScope::Global
             })
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -2077,7 +1871,9 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_update_metric_scope_metric_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| Ok(None));
+        repository
+            .expect_get_definition()
+            .returning(|_, _| Ok(None));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -2096,41 +1892,9 @@ mod tests_training_metrics_service {
     }
 
     #[tokio::test]
-    async fn test_update_metric_scope_user_does_not_own_metric() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "other_user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = UpdateTrainingMetricScopeRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricScope::Global,
-        );
-
-        let res = service.update_metric_scope(req).await;
-        let Err(UpdateTrainingMetricScopeError::UserDoesNotOwnTrainingMetric(user, metric)) = res
-        else {
-            unreachable!("Should have returned UserDoesNotOwnTrainingMetric error")
-        };
-        assert_eq!(user, "user".to_string().into());
-        assert_eq!(metric, TrainingMetricId::from("test"));
-    }
-
-    #[tokio::test]
     async fn test_update_metric_scope_training_period_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
+        repository.expect_get_definition().returning(|_, _| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
@@ -2166,7 +1930,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_update_metric_scope_with_valid_training_period() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_| {
+        repository.expect_get_definition().returning(|_, _| {
             Ok(Some(TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
@@ -2198,7 +1962,7 @@ mod tests_training_metrics_service {
         repository
             .expect_update_training_metric_scope()
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -2844,26 +2608,11 @@ mod test_training_service_period {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
         training_repository
             .expect_delete_training_period()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|_, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -2880,10 +2629,15 @@ mod test_training_service_period {
         let user_id = UserId::test_default();
 
         let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
         training_repository
-            .expect_get_training_period()
+            .expect_delete_training_period()
             .times(1)
-            .returning(|_, _| None);
+            .returning(move |_, _| {
+                Err(DeleteTrainingPeriodError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -2901,69 +2655,19 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_delete_training_period_user_does_not_own() {
-        let period_id = TrainingPeriodId::new();
-        let owner_user_id = UserId::from("owner");
-        let other_user_id = UserId::from("other");
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            owner_user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let req = DeleteTrainingPeriodRequest::new(other_user_id.clone(), period_id.clone());
-        let result = service.delete_training_period(req).await;
-
-        assert!(result.is_err());
-        match result {
-            Err(DeleteTrainingPeriodError::UserDoesNotOwnPeriod(user, period)) => {
-                assert_eq!(user, other_user_id);
-                assert_eq!(period, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnPeriod error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_delete_training_period_repository_error() {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
         training_repository
             .expect_delete_training_period()
             .times(1)
-            .returning(|_| Err(anyhow!("database error")));
+            .returning(|_, _| {
+                Err(DeleteTrainingPeriodError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -2984,29 +2688,17 @@ mod test_training_service_period {
         let user_id = UserId::test_default();
         let new_name = "Updated Period Name".to_string();
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Old Period Name".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
         let period_id_clone = period_id.clone();
         training_repository
             .expect_update_training_period_name()
             .times(1)
-            .withf(move |id, name| id == &period_id_clone && name == "Updated Period Name")
-            .returning(|_, _| Ok(()));
+            .withf(move |user, id, name| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && name == "Updated Period Name"
+            })
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3018,16 +2710,21 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_update_training_period_name_not_found() {
+    async fn test_update_training_period_name_period_not_found() {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
         let new_name = "Updated Period Name".to_string();
 
         let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
         training_repository
-            .expect_get_training_period()
+            .expect_update_training_period_name()
             .times(1)
-            .return_once(|_, _| None);
+            .return_once(move |_, _, _| {
+                Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3045,72 +2742,20 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_update_training_period_name_user_does_not_own() {
-        let period_id = TrainingPeriodId::new();
-        let user_id = UserId::test_default();
-        let other_user_id = UserId::from("other_user".to_string());
-        let new_name = "Updated Period Name".to_string();
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            other_user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let req =
-            UpdateTrainingPeriodNameRequest::new(user_id.clone(), period_id.clone(), new_name);
-        let result = service.update_training_period_name(req).await;
-
-        assert!(result.is_err());
-        match result {
-            Err(UpdateTrainingPeriodNameError::UserDoesNotOwnPeriod(uid, pid)) => {
-                assert_eq!(uid, user_id);
-                assert_eq!(pid, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnPeriod error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_update_training_period_name_repository_error() {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
         let new_name = "Updated Period Name".to_string();
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
         training_repository
             .expect_update_training_period_name()
             .times(1)
-            .returning(|_, _| Err(anyhow!("database error")));
+            .returning(|_, _, _| {
+                Err(UpdateTrainingPeriodNameError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3131,30 +2776,17 @@ mod test_training_service_period {
         let user_id = UserId::test_default();
         let new_note = Some("Updated note content".to_string());
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            Some("Old note".to_string()),
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
 
         let period_id_clone = period_id.clone();
         let new_note_clone = new_note.clone();
         training_repository
             .expect_update_training_period_note()
             .times(1)
-            .withf(move |id, note| id == &period_id_clone && note == &new_note_clone)
-            .returning(|_, _| Ok(()));
+            .withf(move |user, id, note| {
+                user == &UserId::test_default() && id == &period_id_clone && note == &new_note_clone
+            })
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3171,29 +2803,15 @@ mod test_training_service_period {
         let user_id = UserId::test_default();
         let new_note = None;
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            Some("Old note".to_string()),
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
         let period_id_clone = period_id.clone();
         training_repository
             .expect_update_training_period_note()
             .times(1)
-            .withf(move |id, note| id == &period_id_clone && note.is_none())
-            .returning(|_, _| Ok(()));
+            .withf(move |user, id, note| {
+                user == &UserId::test_default() && id == &period_id_clone && note.is_none()
+            })
+            .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3211,10 +2829,15 @@ mod test_training_service_period {
         let new_note = Some("Updated note".to_string());
 
         let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
         training_repository
-            .expect_get_training_period()
+            .expect_update_training_period_note()
             .times(1)
-            .return_once(|_, _| None);
+            .return_once(move |_, _, _| {
+                Err(UpdateTrainingPeriodNoteError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3232,72 +2855,20 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_update_training_period_note_user_does_not_own() {
-        let period_id = TrainingPeriodId::new();
-        let user_id = UserId::test_default();
-        let other_user_id = UserId::from("other_user".to_string());
-        let new_note = Some("Updated note".to_string());
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            other_user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let req =
-            UpdateTrainingPeriodNoteRequest::new(user_id.clone(), period_id.clone(), new_note);
-        let result = service.update_training_period_note(req).await;
-
-        assert!(result.is_err());
-        match result {
-            Err(UpdateTrainingPeriodNoteError::UserDoesNotOwnPeriod(uid, pid)) => {
-                assert_eq!(uid, user_id);
-                assert_eq!(pid, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnPeriod error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_update_training_period_note_repository_error() {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
         let new_note = Some("Updated note".to_string());
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
         training_repository
             .expect_update_training_period_note()
             .times(1)
-            .returning(|_, _| Err(anyhow!("database error")));
+            .returning(|_, _, _| {
+                Err(UpdateTrainingPeriodNoteError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3319,22 +2890,7 @@ mod test_training_service_period {
         let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
 
         let period_id_clone = period_id.clone();
         let new_start_clone = new_start;
@@ -3342,10 +2898,13 @@ mod test_training_service_period {
         training_repository
             .expect_update_training_period_dates()
             .times(1)
-            .withf(move |id, start, end| {
-                id == &period_id_clone && start == &new_start_clone && end == &new_end_clone
+            .withf(move |user, id, start, end| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && start == &new_start_clone
+                    && end == &new_end_clone
             })
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3363,32 +2922,20 @@ mod test_training_service_period {
         let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
         let new_end = None;
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
 
         let period_id_clone = period_id.clone();
         let new_start_clone = new_start;
         training_repository
             .expect_update_training_period_dates()
             .times(1)
-            .withf(move |id, start, end| {
-                id == &period_id_clone && start == &new_start_clone && end.is_none()
+            .withf(move |user, id, start, end| {
+                user == &UserId::test_default()
+                    && id == &period_id_clone
+                    && start == &new_start_clone
+                    && end.is_none()
             })
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3406,22 +2953,7 @@ mod test_training_service_period {
         let new_start = "2025-11-30".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-11-01".parse::<NaiveDate>().unwrap());
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
+        let training_repository = MockTrainingRepository::new();
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3444,10 +2976,15 @@ mod test_training_service_period {
         let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
 
         let mut training_repository = MockTrainingRepository::new();
+        let period = period_id.clone();
         training_repository
-            .expect_get_training_period()
+            .expect_update_training_period_dates()
             .times(1)
-            .return_once(|_, _| None);
+            .return_once(move |_, _, _, _| {
+                Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(
+                    period.clone(),
+                ))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3466,78 +3003,21 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_update_training_period_dates_user_does_not_own() {
-        let period_id = TrainingPeriodId::new();
-        let user_id = UserId::test_default();
-        let other_user_id = UserId::from("other_user".to_string());
-        let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
-        let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            other_user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let req = UpdateTrainingPeriodDatesRequest::new(
-            user_id.clone(),
-            period_id.clone(),
-            new_start,
-            new_end,
-        );
-        let result = service.update_training_period_dates(req).await;
-
-        assert!(result.is_err());
-        match result {
-            Err(UpdateTrainingPeriodDatesError::UserDoesNotOwnPeriod(uid, pid)) => {
-                assert_eq!(uid, user_id);
-                assert_eq!(pid, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnPeriod error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_update_training_period_dates_repository_error() {
         let period_id = TrainingPeriodId::new();
         let user_id = UserId::test_default();
         let new_start = "2025-11-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-11-30".parse::<NaiveDate>().unwrap());
 
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            user_id.clone(),
-            "2025-10-17".parse::<NaiveDate>().unwrap(),
-            Some("2025-10-21".parse::<NaiveDate>().unwrap()),
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
         let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .return_once(move |_, _| Some(period));
         training_repository
             .expect_update_training_period_dates()
             .times(1)
-            .returning(|_, _, _| Err(anyhow!("database error")));
+            .returning(|_, _, _, _| {
+                Err(UpdateTrainingPeriodDatesError::Unknown(anyhow!(
+                    "database error"
+                )))
+            });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -3798,7 +3278,7 @@ mod test_training_service_metric_values {
         training_repository
             .expect_get_definition()
             .times(1)
-            .return_once(move |_| Ok(None));
+            .return_once(move |_, _| Ok(None));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
@@ -4022,47 +3502,6 @@ mod test_training_service_metrics_ordering {
     }
 
     #[tokio::test]
-    async fn test_get_training_metrics_ordering_user_does_not_own_period() {
-        let user_id = UserId::from("user1");
-        let other_user_id = UserId::from("user2");
-        let period_id = TrainingPeriodId::from("period1");
-        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            other_user_id.clone(),
-            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-            None,
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .returning(move |_, _| Some(period.clone()));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let result = service
-            .get_training_metrics_ordering(&user_id, &scope)
-            .await;
-
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            GetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(u, p) => {
-                assert_eq!(u, user_id);
-                assert_eq!(p, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnTrainingPeriod error"),
-        }
-    }
-
-    #[tokio::test]
     async fn test_get_training_metrics_ordering_repository_error() {
         let user_id = UserId::from("user1");
         let scope = TrainingMetricScope::Global;
@@ -4183,49 +3622,6 @@ mod test_training_service_metrics_ordering {
                 assert_eq!(id, period_id);
             }
             _ => panic!("Expected TrainingPeriodDoesNotExist error"),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_set_training_metrics_ordering_user_does_not_own_period() {
-        let user_id = UserId::from("user1");
-        let other_user_id = UserId::from("user2");
-        let period_id = TrainingPeriodId::from("period1");
-        let scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
-        let ordering =
-            TrainingMetricsOrdering::try_from(vec![TrainingMetricId::from("metric1")]).unwrap();
-
-        let period = TrainingPeriod::new(
-            period_id.clone(),
-            other_user_id.clone(),
-            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-            None,
-            "Test Period".to_string(),
-            TrainingPeriodSports::new(None),
-            None,
-        )
-        .unwrap();
-
-        let mut training_repository = MockTrainingRepository::new();
-        training_repository
-            .expect_get_training_period()
-            .times(1)
-            .returning(move |_, _| Some(period.clone()));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
-
-        let result = service
-            .set_training_metrics_ordering(&user_id, &scope, ordering)
-            .await;
-
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            SetTrainingMetricsOrderingError::UserDoesNotOwnTrainingPeriod(u, p) => {
-                assert_eq!(u, user_id);
-                assert_eq!(p, period_id);
-            }
-            _ => panic!("Expected UserDoesNotOwnTrainingPeriod error"),
         }
     }
 

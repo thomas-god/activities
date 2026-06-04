@@ -109,7 +109,7 @@ pub async fn compute_training_metric_values<
 
     let req = GetTrainingMetricValuesRequest::ByDefinition {
         user: user.user().clone(),
-        metric: request.metric.clone(),
+        metric: request.metric,
         granularity: granularity.clone(),
         aggregate: aggregate.clone(),
         filters,

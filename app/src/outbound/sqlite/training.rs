@@ -19,11 +19,14 @@ use crate::domain::{
     ports::{
         DateRange,
         training::{
-            DeleteMetricError, DeleteTrainingNoteError, GetDefinitionError,
-            GetTrainingMetricsDefinitionsError, GetTrainingMetricsOrderingError,
-            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
-            SaveTrainingPeriodError, SetTrainingMetricsOrderingError, TrainingRepository,
+            DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
+            GetDefinitionError, GetTrainingMetricsDefinitionsError,
+            GetTrainingMetricsOrderingError, GetTrainingNoteError, SaveTrainingMetricError,
+            SaveTrainingNoteError, SaveTrainingPeriodError, SetTrainingMetricsOrderingError,
+            TrainingRepository, UpdateTrainingMetricNameError,
             UpdateTrainingMetricScopeRepositoryError, UpdateTrainingNoteError,
+            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodNameError,
+            UpdateTrainingPeriodNoteError,
         },
     },
 };
@@ -106,15 +109,17 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn update_training_metric_scope(
         &self,
+        user: &UserId,
         metric: &TrainingMetricId,
         scope: &TrainingMetricScope,
     ) -> Result<(), UpdateTrainingMetricScopeRepositoryError> {
         let period_id: Option<TrainingPeriodId> = scope.into();
         sqlx::query(
-            "UPDATE t_training_metrics_definitions SET training_period_id = ?1 WHERE id = ?2;",
+            "UPDATE t_training_metrics_definitions SET training_period_id = ?1 WHERE id = ?2 AND user_id = ?3;",
         )
         .bind(period_id)
         .bind(metric)
+        .bind(user)
         .execute(&self.pool)
         .await
         .map_err(|err| UpdateTrainingMetricScopeRepositoryError::Unknown(anyhow!(err)))
@@ -123,15 +128,17 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn get_definition(
         &self,
+        user: &UserId,
         metric: &TrainingMetricId,
     ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
         SELECT id, name, user_id, source, activity_metric, granularity, aggregate, filters, group_by, training_period_id
         FROM t_training_metrics_definitions
-        WHERE id = ?1 LIMIT 1;",
+        WHERE id = ?1 AND user_id = ?2 LIMIT 1;",
         )
         .bind(metric)
+        .bind(user)
         .fetch_one(&self.pool)
         .await
         {
@@ -229,12 +236,17 @@ impl TrainingRepository for SqliteTrainingRepository {
         })
     }
 
-    async fn delete_definition(&self, metric: &TrainingMetricId) -> Result<(), DeleteMetricError> {
+    async fn delete_definition(
+        &self,
+        user: &UserId,
+        metric: &TrainingMetricId,
+    ) -> Result<(), DeleteTrainingMetricError> {
         match sqlx::query(
             "DELETE FROM t_training_metrics_definitions
-        WHERE id = ?1;",
+        WHERE id = ?1 AND user_id = ?2;",
         )
         .bind(metric)
+        .bind(user)
         .execute(&self.pool)
         .await
         {
@@ -242,27 +254,36 @@ impl TrainingRepository for SqliteTrainingRepository {
                 if res.rows_affected() == 1 {
                     Ok(())
                 } else {
-                    Err(DeleteMetricError::TrainingMetricDoesNotExists(
+                    Err(DeleteTrainingMetricError::MetricDoesNotExist(
                         metric.clone(),
                     ))
                 }
             }
-            Err(err) => Err(DeleteMetricError::Unknown(anyhow!(err))),
+            Err(err) => Err(DeleteTrainingMetricError::Unknown(anyhow!(err))),
         }
     }
 
     async fn update_training_metric_name(
         &self,
+        user: &UserId,
         metric_id: &TrainingMetricId,
         name: TrainingMetricName,
-    ) -> Result<(), anyhow::Error> {
-        sqlx::query("UPDATE t_training_metrics_definitions SET name = ?1 WHERE id = ?2;")
-            .bind(name.to_string())
-            .bind(metric_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())
+    ) -> Result<(), UpdateTrainingMetricNameError> {
+        match sqlx::query(
+            "UPDATE t_training_metrics_definitions SET name = ?1 WHERE id = ?2 AND user_id = ?3;",
+        )
+        .bind(name.to_string())
+        .bind(metric_id)
+        .bind(user)
+        .execute(&self.pool)
+        .await
+        {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(_) => Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
+                metric_id.clone(),
+            )),
+            Err(err) => Err(UpdateTrainingMetricNameError::Unknown(anyhow!(err))),
+        }
     }
 
     async fn save_training_period(
@@ -357,58 +378,88 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn delete_training_period(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
-    ) -> Result<(), anyhow::Error> {
-        sqlx::query("DELETE FROM t_training_periods WHERE id = ?1;")
+    ) -> Result<(), DeleteTrainingPeriodError> {
+        match sqlx::query("DELETE FROM t_training_periods WHERE id = ?1 AND user_id = ?2;")
             .bind(period_id)
+            .bind(user)
             .execute(&self.pool)
             .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())
+        {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(_) => Err(DeleteTrainingPeriodError::PeriodDoesNotExist(
+                period_id.clone(),
+            )),
+            Err(err) => Err(DeleteTrainingPeriodError::Unknown(anyhow!(err))),
+        }
     }
 
     async fn update_training_period_name(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         name: String,
-    ) -> Result<(), anyhow::Error> {
-        sqlx::query("UPDATE t_training_periods SET name = ?1 WHERE id = ?2;")
+    ) -> Result<(), UpdateTrainingPeriodNameError> {
+        match sqlx::query("UPDATE t_training_periods SET name = ?1 WHERE id = ?2 AND user_id = ?3;")
             .bind(name)
             .bind(period_id)
+            .bind(user)
             .execute(&self.pool)
             .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())
+        {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(_) => Err(UpdateTrainingPeriodNameError::PeriodDoesNotExist(
+                period_id.clone(),
+            )),
+            Err(err) => Err(UpdateTrainingPeriodNameError::Unknown(anyhow!(err))),
+        }
     }
 
     async fn update_training_period_note(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         note: Option<String>,
-    ) -> Result<(), anyhow::Error> {
-        sqlx::query("UPDATE t_training_periods SET note = ?1 WHERE id = ?2;")
+    ) -> Result<(), UpdateTrainingPeriodNoteError> {
+        match sqlx::query("UPDATE t_training_periods SET note = ?1 WHERE id = ?2 AND user_id = ?3;")
             .bind(note)
             .bind(period_id)
+            .bind(user)
             .execute(&self.pool)
             .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())
+        {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(_) => Err(UpdateTrainingPeriodNoteError::PeriodDoesNotExist(
+                period_id.clone(),
+            )),
+            Err(err) => Err(UpdateTrainingPeriodNoteError::Unknown(anyhow!(err))),
+        }
     }
 
     async fn update_training_period_dates(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         start: NaiveDate,
         end: Option<NaiveDate>,
-    ) -> Result<(), anyhow::Error> {
-        sqlx::query("UPDATE t_training_periods SET start = ?1, end = ?2 WHERE id = ?3;")
-            .bind(start)
-            .bind(end)
-            .bind(period_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())
+    ) -> Result<(), UpdateTrainingPeriodDatesError> {
+        match sqlx::query(
+            "UPDATE t_training_periods SET start = ?1, end = ?2 WHERE id = ?3 AND user_id = ?4;",
+        )
+        .bind(start)
+        .bind(end)
+        .bind(period_id)
+        .bind(user)
+        .execute(&self.pool)
+        .await
+        {
+            Ok(res) if res.rows_affected() == 1 => Ok(()),
+            Ok(_) => Err(UpdateTrainingPeriodDatesError::PeriodDoesNotExist(
+                period_id.clone(),
+            )),
+            Err(err) => Err(UpdateTrainingPeriodDatesError::Unknown(anyhow!(err))),
+        }
     }
 
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
@@ -429,12 +480,14 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn get_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
     ) -> Result<Option<TrainingNote>, GetTrainingNoteError> {
         match sqlx::query_as::<_, TrainingNoteRow>(
-            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE id = ?1 LIMIT 1;",
+            "SELECT id, user_id, title, content, date, created_at FROM t_training_notes WHERE id = ?1 AND user_id = ?2 LIMIT 1;",
         )
         .bind(note_id.to_string())
+        .bind(user)
         .fetch_one(&self.pool)
         .await
         {
@@ -487,18 +540,20 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn update_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
         date: TrainingNoteDate,
     ) -> Result<(), UpdateTrainingNoteError> {
         sqlx::query(
-            "UPDATE t_training_notes SET title = ?1, content = ?2, date = ?3 WHERE id = ?4;",
+            "UPDATE t_training_notes SET title = ?1, content = ?2, date = ?3 WHERE id = ?4 AND user_id = ?5;",
         )
         .bind(title.as_ref().map(|t| t.to_string()))
         .bind(content.to_string())
         .bind(date.to_string())
         .bind(note_id.to_string())
+        .bind(user)
         .execute(&self.pool)
         .await
         .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
@@ -507,10 +562,12 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     async fn delete_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
     ) -> Result<(), DeleteTrainingNoteError> {
-        sqlx::query("DELETE FROM t_training_notes WHERE id = ?1;")
+        sqlx::query("DELETE FROM t_training_notes WHERE id = ?1 AND user_id = ?2;")
             .bind(note_id.to_string())
+            .bind(user)
             .execute(&self.pool)
             .await
             .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
@@ -620,7 +677,7 @@ fn parse_definition_row_metric(
     match (metric, source.map(ActivityMetricV2::try_from)) {
         (Some(metric), _) => Some(metric),
         (None, Some(Ok(metric))) => Some(metric),
-        _ => return None,
+        _ => None,
     }
 }
 
@@ -796,7 +853,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.id())
+            .get_definition(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
@@ -819,7 +876,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.id())
+            .get_definition(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
@@ -842,7 +899,7 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.id())
+            .get_definition(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
@@ -858,7 +915,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let res = repository
-            .get_definition(&TrainingMetricId::new())
+            .get_definition(&UserId::test_default(), &TrainingMetricId::new())
             .await
             .expect("Should have returned OK");
         assert!(res.is_none());
@@ -964,14 +1021,14 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric();
+        let metric = build_metric();
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_training_metric_definition(metric.clone())
             .await
             .expect("Should have return Ok");
 
         repository
-            .delete_definition(definition.id())
+            .delete_definition(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK");
     }
@@ -984,9 +1041,11 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let id = TrainingMetricId::new();
-        let err = repository.delete_definition(&id).await;
+        let err = repository
+            .delete_definition(&UserId::test_default(), &id)
+            .await;
 
-        let Err(DeleteMetricError::TrainingMetricDoesNotExists(err_id)) = err else {
+        let Err(DeleteTrainingMetricError::MetricDoesNotExist(err_id)) = err else {
             unreachable!("Should have been an err")
         };
         assert_eq!(err_id, id);
@@ -1009,12 +1068,14 @@ mod test_sqlite_training_repository {
         // Update the name
         let new_name = TrainingMetricName::from("Updated Metric Name");
         let result = repository
-            .update_training_metric_name(metric.id(), new_name.clone())
+            .update_training_metric_name(metric.definition().user(), metric.id(), new_name.clone())
             .await;
         assert!(result.is_ok());
 
         // Verify the name was updated
-        let fetched = repository.get_definition(metric.id()).await;
+        let fetched = repository
+            .get_definition(metric.definition().user(), metric.id())
+            .await;
         assert!(fetched.is_ok());
         let fetched_def = fetched.unwrap();
         assert!(fetched_def.is_some());
@@ -1037,11 +1098,18 @@ mod test_sqlite_training_repository {
         // Try to update a non-existent metric
         let metric_id = TrainingMetricId::new();
         let result = repository
-            .update_training_metric_name(&metric_id, TrainingMetricName::from("New Name"))
-            .await;
+            .update_training_metric_name(
+                &UserId::test_default(),
+                &metric_id,
+                TrainingMetricName::from("New Name"),
+            )
+            .await
+            .expect_err("Should fail");
 
-        // Should succeed (no rows affected, but no error)
-        assert!(result.is_ok());
+        let UpdateTrainingMetricNameError::MetricDoesNotExist(id) = result else {
+            unreachable!(" Should be UpdateTrainingMetricNameError::MetricDoesNotExist(id)")
+        };
+        assert_eq!(id, metric_id);
     }
 
     #[tokio::test]
@@ -1091,7 +1159,11 @@ mod test_sqlite_training_repository {
         // Update only metric1's name
         let new_name = TrainingMetricName::from("Updated First Metric");
         let result = repository
-            .update_training_metric_name(metric1.id(), new_name.clone())
+            .update_training_metric_name(
+                metric1.definition().user(),
+                metric1.id(),
+                new_name.clone(),
+            )
             .await;
         assert!(result.is_ok());
 
@@ -1179,7 +1251,11 @@ mod test_sqlite_training_repository {
 
         // Update scope to Global
         let result = repository
-            .update_training_metric_scope(metric.id(), &TrainingMetricScope::Global)
+            .update_training_metric_scope(
+                metric.definition().user(),
+                metric.id(),
+                &TrainingMetricScope::Global,
+            )
             .await;
         assert!(result.is_ok());
 
@@ -1211,7 +1287,7 @@ mod test_sqlite_training_repository {
         let period_id = TrainingPeriodId::new();
         let new_scope = TrainingMetricScope::TrainingPeriod(period_id.clone());
         let result = repository
-            .update_training_metric_scope(metric.id(), &new_scope)
+            .update_training_metric_scope(metric.definition().user(), metric.id(), &new_scope)
             .await;
         assert!(result.is_ok());
 
@@ -1257,7 +1333,7 @@ mod test_sqlite_training_repository {
         let period_id_2 = TrainingPeriodId::new();
         let new_scope = TrainingMetricScope::TrainingPeriod(period_id_2.clone());
         let result = repository
-            .update_training_metric_scope(metric.id(), &new_scope)
+            .update_training_metric_scope(metric.definition().user(), metric.id(), &new_scope)
             .await;
         assert!(result.is_ok());
 
@@ -1680,7 +1756,9 @@ mod test_sqlite_training_repository {
         assert!(fetched.is_some());
 
         // Delete the period
-        let result = repository.delete_training_period(period.id()).await;
+        let result = repository
+            .delete_training_period(period.user(), period.id())
+            .await;
         assert!(result.is_ok());
 
         // Verify period is deleted
@@ -1699,9 +1777,16 @@ mod test_sqlite_training_repository {
 
         let period_id = TrainingPeriodId::new();
 
-        // Delete non-existent period should succeed (DELETE is idempotent)
-        let result = repository.delete_training_period(&period_id).await;
-        assert!(result.is_ok());
+        // Delete non-existent period (DELETE is idempotent)
+        let result = repository
+            .delete_training_period(&UserId::test_default(), &period_id)
+            .await
+            .expect_err("Should fail");
+
+        let DeleteTrainingPeriodError::PeriodDoesNotExist(id) = result else {
+            unreachable!(" Should be DeleteTrainingPeriodError::PeriodDoesNotExist(id)")
+        };
+        assert_eq!(id, period_id);
     }
 
     #[tokio::test]
@@ -1734,7 +1819,9 @@ mod test_sqlite_training_repository {
             .expect("Should save period 2");
 
         // Delete only period1
-        let result = repository.delete_training_period(period1.id()).await;
+        let result = repository
+            .delete_training_period(period1.user(), period1.id())
+            .await;
         assert!(result.is_ok());
 
         // Verify period1 is deleted
@@ -1768,7 +1855,7 @@ mod test_sqlite_training_repository {
         // Update the name
         let new_name = "Updated Name".to_string();
         let result = repository
-            .update_training_period_name(period.id(), new_name.clone())
+            .update_training_period_name(period.user(), period.id(), new_name.clone())
             .await;
         assert!(result.is_ok());
 
@@ -1796,11 +1883,18 @@ mod test_sqlite_training_repository {
         // Try to update a non-existent period
         let period_id = TrainingPeriodId::new();
         let result = repository
-            .update_training_period_name(&period_id, "New Name".to_string())
-            .await;
+            .update_training_period_name(
+                &UserId::test_default(),
+                &period_id,
+                "New Name".to_string(),
+            )
+            .await
+            .expect_err("Should fail");
 
-        // Should succeed (no rows affected, but no error)
-        assert!(result.is_ok());
+        let UpdateTrainingPeriodNameError::PeriodDoesNotExist(id) = result else {
+            unreachable!("Should be UpdateTrainingPeriodNameError::PeriodDoesNotExist")
+        };
+        assert_eq!(id, period_id);
     }
 
     #[tokio::test]
@@ -1835,7 +1929,7 @@ mod test_sqlite_training_repository {
         // Update only period1's name
         let new_name = "Updated First Period".to_string();
         let result = repository
-            .update_training_period_name(period1.id(), new_name.clone())
+            .update_training_period_name(period1.user(), period1.id(), new_name.clone())
             .await;
         assert!(result.is_ok());
 
@@ -1871,7 +1965,7 @@ mod test_sqlite_training_repository {
         // Update the note
         let new_note = Some("This is an updated note content".to_string());
         let result = repository
-            .update_training_period_note(period.id(), new_note.clone())
+            .update_training_period_note(period.user(), period.id(), new_note.clone())
             .await;
         assert!(result.is_ok());
 
@@ -1917,7 +2011,7 @@ mod test_sqlite_training_repository {
 
         // Clear the note by setting it to None
         let result = repository
-            .update_training_period_note(period.id(), None)
+            .update_training_period_note(period.user(), period.id(), None)
             .await;
         assert!(result.is_ok());
 
@@ -1940,11 +2034,18 @@ mod test_sqlite_training_repository {
         // Try to update a non-existent period
         let period_id = TrainingPeriodId::new();
         let result = repository
-            .update_training_period_note(&period_id, Some("Note".to_string()))
+            .update_training_period_note(
+                &UserId::test_default(),
+                &period_id,
+                Some("Note".to_string()),
+            )
             .await;
 
-        // Should succeed (no rows affected, but no error)
-        assert!(result.is_ok());
+        let UpdateTrainingPeriodNoteError::PeriodDoesNotExist(id) = result.expect_err("Should err")
+        else {
+            unreachable!(" Should be UpdateTrainingPeriodNoteError::PeriodDoesNotExist(id)")
+        };
+        assert_eq!(id, period_id);
     }
 
     #[tokio::test]
@@ -1989,7 +2090,7 @@ mod test_sqlite_training_repository {
         // Update only period1's note
         let new_note = Some("Updated first note".to_string());
         let result = repository
-            .update_training_period_note(period1.id(), new_note.clone())
+            .update_training_period_note(period1.user(), period1.id(), new_note.clone())
             .await;
         assert!(result.is_ok());
 
@@ -2026,7 +2127,7 @@ mod test_sqlite_training_repository {
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
         let result = repository
-            .update_training_period_dates(period.id(), new_start, new_end)
+            .update_training_period_dates(period.user(), period.id(), new_start, new_end)
             .await;
         assert!(result.is_ok());
 
@@ -2062,7 +2163,7 @@ mod test_sqlite_training_repository {
         // Update dates and clear the end date
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let result = repository
-            .update_training_period_dates(period.id(), new_start, None)
+            .update_training_period_dates(period.user(), period.id(), new_start, None)
             .await;
         assert!(result.is_ok());
 
@@ -2097,7 +2198,7 @@ mod test_sqlite_training_repository {
         // Update only the start date, keeping the original end
         let new_start = "2025-10-15".parse::<NaiveDate>().unwrap();
         let result = repository
-            .update_training_period_dates(period.id(), new_start, *original_end)
+            .update_training_period_dates(period.user(), period.id(), new_start, *original_end)
             .await;
         assert!(result.is_ok());
 
@@ -2123,11 +2224,14 @@ mod test_sqlite_training_repository {
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
         let result = repository
-            .update_training_period_dates(&period_id, new_start, new_end)
-            .await;
+            .update_training_period_dates(&UserId::test_default(), &period_id, new_start, new_end)
+            .await
+            .expect_err("Should fail");
 
-        // Should succeed (no rows affected, but no error)
-        assert!(result.is_ok());
+        let UpdateTrainingPeriodDatesError::PeriodDoesNotExist(id) = result else {
+            unreachable!("Should be UpdateTrainingPeriodDatesError::PeriodDoesNotExist")
+        };
+        assert_eq!(id, period_id);
     }
 
     #[tokio::test]
@@ -2163,7 +2267,7 @@ mod test_sqlite_training_repository {
         let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
         let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
         let result = repository
-            .update_training_period_dates(period1.id(), new_start, new_end)
+            .update_training_period_dates(period1.user(), period1.id(), new_start, new_end)
             .await;
         assert!(result.is_ok());
 
@@ -2288,7 +2392,7 @@ mod test_sqlite_training_repository {
             .expect("Should save note");
 
         let retrieved = repository
-            .get_training_note(note.id())
+            .get_training_note(note.user(), note.id())
             .await
             .expect("Should retrieve note")
             .expect("Note should exist");
@@ -2306,7 +2410,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let result = repository
-            .get_training_note(&TrainingNoteId::new())
+            .get_training_note(&UserId::test_default(), &TrainingNoteId::new())
             .await
             .expect("Should not error");
 
@@ -2586,6 +2690,7 @@ mod test_sqlite_training_repository {
         let new_date = TrainingNoteDate::try_from("2025-01-15").unwrap();
         repository
             .update_training_note(
+                note.user(),
                 note.id(),
                 new_title.clone(),
                 new_content.clone(),
@@ -2596,7 +2701,7 @@ mod test_sqlite_training_repository {
 
         // Verify content, title, and date were updated
         let updated_note = repository
-            .get_training_note(note.id())
+            .get_training_note(note.user(), note.id())
             .await
             .expect("Should retrieve note")
             .expect("Note should exist");
@@ -2617,6 +2722,7 @@ mod test_sqlite_training_repository {
 
         let result = repository
             .update_training_note(
+                &UserId::test_default(),
                 &TrainingNoteId::new(),
                 None,
                 TrainingNoteContent::from("Content"),
@@ -2642,13 +2748,13 @@ mod test_sqlite_training_repository {
             .expect("Should save note");
 
         repository
-            .delete_training_note(note.id())
+            .delete_training_note(note.user(), note.id())
             .await
             .expect("Should delete note");
 
         // Verify note was deleted
         let result = repository
-            .get_training_note(note.id())
+            .get_training_note(note.user(), note.id())
             .await
             .expect("Should not error");
         assert!(result.is_none());
@@ -2662,7 +2768,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let result = repository
-            .delete_training_note(&TrainingNoteId::new())
+            .delete_training_note(&UserId::test_default(), &TrainingNoteId::new())
             .await;
 
         // Should not fail even if note doesn't exist
@@ -3329,5 +3435,321 @@ mod test_sqlite_training_repository {
         )));
         let result = parse_definition_row_metric(metric, source);
         assert_eq!(result, None);
+    }
+
+    // --- User isolation tests for methods accepting &UserId ---
+
+    #[tokio::test]
+    async fn test_get_training_note_returns_none_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        let result = repository
+            .get_training_note(&UserId::from("another_user".to_string()), note.id())
+            .await
+            .expect("Should not error");
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        repository
+            .update_training_note(
+                &UserId::from("another_user".to_string()),
+                note.id(),
+                Some(TrainingNoteTitle::from("Updated title")),
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await
+            .expect("Should not fail");
+
+        let retrieved = repository
+            .get_training_note(note.user(), note.id())
+            .await
+            .expect("Should not error")
+            .expect("Note should still exist");
+
+        assert_eq!(retrieved.content(), note.content());
+        assert_eq!(retrieved.title(), note.title());
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_does_not_delete_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let note = build_training_note();
+        repository
+            .save_training_note(note.clone())
+            .await
+            .expect("Should save note");
+
+        repository
+            .delete_training_note(&UserId::from("another_user".to_string()), note.id())
+            .await
+            .expect("Should not fail");
+
+        let retrieved = repository
+            .get_training_note(note.user(), note.id())
+            .await
+            .expect("Should not error");
+        assert!(retrieved.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_delete_definition_does_not_delete_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric = build_metric();
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        let err = repository
+            .delete_definition(&UserId::from("another_user".to_string()), metric.id())
+            .await;
+
+        let Err(DeleteTrainingMetricError::MetricDoesNotExist(_)) = err else {
+            unreachable!("Should have been a DeleteTrainingMetricError::MetricDoesNotExist error");
+        };
+
+        let fetched = repository
+            .get_definition(metric.definition().user(), metric.id())
+            .await
+            .expect("Should not error");
+        assert!(fetched.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_name_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Original Name")),
+            TrainingMetricScope::Global,
+            build_metric().definition().clone(),
+        );
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        let res = repository
+            .update_training_metric_name(
+                &UserId::from("another_user".to_string()),
+                metric.id(),
+                TrainingMetricName::from("Updated Name"),
+            )
+            .await
+            .expect_err("Should fail");
+
+        let UpdateTrainingMetricNameError::MetricDoesNotExist(id) = res else {
+            unreachable!("Should be UpdateTrainingMetricNameError::MetricDoesNotExist")
+        };
+        assert_eq!(&id, metric.id());
+
+        let metrics = repository
+            .get_global_metrics(metric.definition().user())
+            .await
+            .expect("Should retrieve metrics");
+        let fetched = metrics.iter().find(|m| m.id() == metric.id()).unwrap();
+        assert_eq!(fetched.name(), metric.name());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_scope_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric = build_metric();
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should save metric");
+
+        let period_id = TrainingPeriodId::new();
+        repository
+            .update_training_metric_scope(
+                &UserId::from("another_user".to_string()),
+                metric.id(),
+                &TrainingMetricScope::TrainingPeriod(period_id),
+            )
+            .await
+            .expect("Should not fail");
+
+        let metrics = repository
+            .get_global_metrics(metric.definition().user())
+            .await
+            .expect("Should retrieve metrics");
+        let fetched = metrics.iter().find(|m| m.id() == metric.id()).unwrap();
+        assert_eq!(fetched.scope(), &TrainingMetricScope::Global);
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_period_does_not_delete_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        let res = repository
+            .delete_training_period(&UserId::from("another_user".to_string()), period.id())
+            .await
+            .expect_err("Should fail");
+
+        let DeleteTrainingPeriodError::PeriodDoesNotExist(id) = res else {
+            unreachable!(" Should be DeleteTrainingPeriodError::PeriodDoesNotExist(id)")
+        };
+        assert_eq!(&id, period.id());
+
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await;
+        assert!(fetched.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_name_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        let res = repository
+            .update_training_period_name(
+                &UserId::from("another_user".to_string()),
+                period.id(),
+                "Updated Name".to_string(),
+            )
+            .await
+            .expect_err("Should fail");
+
+        let UpdateTrainingPeriodNameError::PeriodDoesNotExist(id) = res else {
+            unreachable!("Should be UpdateTrainingPeriodNameError::PeriodDoesNotExist")
+        };
+        assert_eq!(&id, period.id());
+
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await
+            .expect("Period should still exist");
+        assert_eq!(fetched.name(), period.name());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_note_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        let res = repository
+            .update_training_period_note(
+                &UserId::from("another_user".to_string()),
+                period.id(),
+                Some("Updated note".to_string()),
+            )
+            .await
+            .expect_err("Should fail");
+
+        let UpdateTrainingPeriodNoteError::PeriodDoesNotExist(id) = res else {
+            unreachable!("Should be UpdateTrainingPeriodNoteError::PeriodDoesNotExist")
+        };
+        assert_eq!(&id, period.id());
+
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await
+            .expect("Period should still exist");
+        assert_eq!(fetched.note(), period.note());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_period_dates_does_not_update_for_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should save period");
+
+        let new_start = "2025-12-01".parse::<NaiveDate>().unwrap();
+        let new_end = Some("2025-12-31".parse::<NaiveDate>().unwrap());
+        let res = repository
+            .update_training_period_dates(
+                &UserId::from("another_user".to_string()),
+                period.id(),
+                new_start,
+                new_end,
+            )
+            .await
+            .expect_err("Should fail");
+
+        let UpdateTrainingPeriodDatesError::PeriodDoesNotExist(id) = res else {
+            unreachable!("Should be UpdateTrainingPeriodDatesError::PeriodDoesNotExist")
+        };
+        assert_eq!(&id, period.id());
+
+        let fetched = repository
+            .get_training_period(period.user(), period.id())
+            .await
+            .expect("Period should still exist");
+        assert_eq!(fetched.start(), period.start());
+        assert_eq!(fetched.end(), period.end());
     }
 }

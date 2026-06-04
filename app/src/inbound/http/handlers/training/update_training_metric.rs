@@ -100,13 +100,6 @@ fn handle_update_name_error(error: UpdateTrainingMetricNameError) -> Response {
             }),
         )
             .into_response(),
-        UpdateTrainingMetricNameError::UserDoesNotOwnTrainingMetric(_, _) => (
-            StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse {
-                error: "You do not have permission to update this training metric".to_string(),
-            }),
-        )
-            .into_response(),
         UpdateTrainingMetricNameError::GetDefinitionError(e) => {
             eprintln!("Error getting training metric definition: {:?}", e);
             (
@@ -136,13 +129,6 @@ fn handle_update_scope_error(error: UpdateTrainingMetricScopeError) -> Response 
             StatusCode::NOT_FOUND,
             axum::Json(ErrorResponse {
                 error: "Training metric does not exist".to_string(),
-            }),
-        )
-            .into_response(),
-        UpdateTrainingMetricScopeError::UserDoesNotOwnTrainingMetric(_, _) => (
-            StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse {
-                error: "You do not have permission to update this training metric".to_string(),
             }),
         )
             .into_response(),

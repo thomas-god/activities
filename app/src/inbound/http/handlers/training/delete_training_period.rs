@@ -48,13 +48,6 @@ pub async fn delete_training_period<
             }),
         )
             .into_response(),
-        Err(DeleteTrainingPeriodError::UserDoesNotOwnPeriod(_, _)) => (
-            StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse {
-                error: "User does not own this training period".to_string(),
-            }),
-        )
-            .into_response(),
         Err(DeleteTrainingPeriodError::Unknown(_)) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             axum::Json(ErrorResponse {

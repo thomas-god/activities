@@ -152,12 +152,8 @@ impl DeleteTrainingMetricRequest {
 pub enum DeleteTrainingMetricError {
     #[error("Training metric with id {0} does not exists")]
     MetricDoesNotExist(TrainingMetricId),
-    #[error("User {0} does not own training metric {1}")]
-    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
     #[error("An infratstructure error occured when getting defintion")]
     GetDefinitionError(#[from] GetDefinitionError),
-    #[error("An infratstructure error occured when trying to delete defintion")]
-    DeleteMetricError(#[from] DeleteMetricError),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -187,8 +183,6 @@ impl UpdateTrainingMetricNameRequest {
 pub enum UpdateTrainingMetricNameError {
     #[error("Training metric {0} does not exist")]
     MetricDoesNotExist(TrainingMetricId),
-    #[error("User {0} does not own training metric {1}")]
-    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
     #[error("An infrastructure error occured when getting definition")]
     GetDefinitionError(#[from] GetDefinitionError),
     #[error(transparent)]
@@ -220,8 +214,6 @@ impl UpdateTrainingMetricScopeRequest {
 pub enum UpdateTrainingMetricScopeError {
     #[error("Training metric {0} does not exist")]
     MetricDoesNotExist(TrainingMetricId),
-    #[error("User {0} does not own training metric {1}")]
-    UserDoesNotOwnTrainingMetric(UserId, TrainingMetricId),
     #[error("Training period {0} does not exist")]
     TrainingPeriodDoesNotExist(TrainingPeriodId),
     #[error("An infrastructure error occured when getting definition")]
@@ -412,8 +404,6 @@ pub enum GetTrainingMetricValueError {
 pub enum GetTrainingMetricsOrderingError {
     #[error("Training period {0} does not exist")]
     TrainingPeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnTrainingPeriod(UserId, TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -422,16 +412,6 @@ pub enum GetTrainingMetricsOrderingError {
 pub enum SetTrainingMetricsOrderingError {
     #[error("Training period {0} does not exist")]
     TrainingPeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnTrainingPeriod(UserId, TrainingPeriodId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum DeleteMetricError {
-    #[error("Training metric {0:?} does not exist")]
-    TrainingMetricDoesNotExists(TrainingMetricId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -549,8 +529,6 @@ impl DeleteTrainingPeriodRequest {
 pub enum DeleteTrainingPeriodError {
     #[error("Training period {0} does not exist")]
     PeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -580,8 +558,6 @@ impl UpdateTrainingPeriodNameRequest {
 pub enum UpdateTrainingPeriodNameError {
     #[error("Training period {0} does not exist")]
     PeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -611,8 +587,6 @@ impl UpdateTrainingPeriodNoteRequest {
 pub enum UpdateTrainingPeriodNoteError {
     #[error("Training period {0} does not exist")]
     PeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -647,8 +621,6 @@ impl UpdateTrainingPeriodDatesRequest {
 pub enum UpdateTrainingPeriodDatesError {
     #[error("Training period {0} does not exist")]
     PeriodDoesNotExist(TrainingPeriodId),
-    #[error("User {0} does not own training period {1}")]
-    UserDoesNotOwnPeriod(UserId, TrainingPeriodId),
     #[error("End date must be None or after start date")]
     EndDateBeforeStartDate,
     #[error(transparent)]
@@ -727,25 +699,29 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 
     fn update_training_metric_scope(
         &self,
+        user: &UserId,
         metric: &TrainingMetricId,
         scope: &TrainingMetricScope,
     ) -> impl Future<Output = Result<(), UpdateTrainingMetricScopeRepositoryError>> + Send;
 
     fn get_definition(
         &self,
+        user: &UserId,
         metric: &TrainingMetricId,
     ) -> impl Future<Output = Result<Option<TrainingMetricDefinition>, GetDefinitionError>> + Send;
 
     fn delete_definition(
         &self,
+        user: &UserId,
         metric: &TrainingMetricId,
-    ) -> impl Future<Output = Result<(), DeleteMetricError>> + Send;
+    ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
 
     fn update_training_metric_name(
         &self,
+        user: &UserId,
         metric_id: &TrainingMetricId,
         name: TrainingMetricName,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<(), UpdateTrainingMetricNameError>> + Send;
 
     fn get_global_metrics(
         &self,
@@ -782,27 +758,31 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 
     fn delete_training_period(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<(), DeleteTrainingPeriodError>> + Send;
 
     fn update_training_period_name(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         name: String,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNameError>> + Send;
 
     fn update_training_period_note(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         note: Option<String>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<(), UpdateTrainingPeriodNoteError>> + Send;
 
     fn update_training_period_dates(
         &self,
+        user: &UserId,
         period_id: &TrainingPeriodId,
         start: NaiveDate,
         end: Option<NaiveDate>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<(), UpdateTrainingPeriodDatesError>> + Send;
 
     fn save_training_note(
         &self,
@@ -811,6 +791,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 
     fn get_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<Option<TrainingNote>, GetTrainingNoteError>> + Send;
 
@@ -822,6 +803,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 
     fn update_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
         title: Option<TrainingNoteTitle>,
         content: TrainingNoteContent,
@@ -830,6 +812,7 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
 
     fn delete_training_note(
         &self,
+        user: &UserId,
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<(), DeleteTrainingNoteError>> + Send;
 
