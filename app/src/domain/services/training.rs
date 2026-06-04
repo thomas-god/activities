@@ -60,7 +60,7 @@ where
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
         let activities = self
             .activity_service
-            .list_activities_with_metrics_v2(
+            .list_activities_with_metrics(
                 definition.user(),
                 &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
                 &[*definition.metric()],
@@ -1052,7 +1052,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
         // When no date range is specified, it should query the user's history
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
 
         let service = TrainingService::new(repository, activity_service);
@@ -1114,7 +1114,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
 
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| {
                 // Empty as no activity has this metric
                 Ok(vec![])
@@ -1180,7 +1180,7 @@ mod tests_training_metrics_service {
         let mut activity_service = MockActivityService::default();
         // Should list activities in the date range
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .withf(|_, filters, _| {
                 // The date range should be aligned to full days (Sep 24-26)
                 filters.date_range().is_some()
@@ -1237,7 +1237,7 @@ mod tests_training_metrics_service {
         // Input: Wed Sep 24 to Thu Sep 25, 2025
         // Should be aligned to: Mon Sep 22 to Mon Sep 29, 2025
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .withf(|_, filters, _| {
                 let Some(range) = filters.date_range() else {
                     return false;
@@ -1312,7 +1312,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
@@ -1384,7 +1384,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
         let service = TrainingService::new(repository, activity_service);
@@ -1586,7 +1586,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
@@ -1684,7 +1684,7 @@ mod tests_training_metrics_service {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
@@ -3314,7 +3314,7 @@ mod test_training_service_metric_values {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .times(1)
             .returning(|_, _, _| Ok(vec![]));
 
@@ -3361,7 +3361,7 @@ mod test_training_service_metric_values {
 
         let mut activity_service = MockActivityService::default();
         activity_service
-            .expect_list_activities_with_metrics_v2()
+            .expect_list_activities_with_metrics()
             .times(1)
             .returning(move |_, _, _| {
                 Ok(vec![(

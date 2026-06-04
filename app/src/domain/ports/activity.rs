@@ -10,10 +10,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricSource,
-            ActivityMetricV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
-            Sport, TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+            Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
+            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+            ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -37,14 +36,7 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithParsedData>, ListActivitiesError>> + Send;
 
-    fn list_activities_with_metric(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        source: &ActivityMetricSource,
-    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
-
-    fn list_activities_with_metrics_v2(
+    fn list_activities_with_metrics(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
@@ -537,45 +529,20 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Vec<RawActivity>, ListActivitiesError>> + Send;
 
-    fn list_activities_with_timeseries(
+    fn list_activities_with_parsed_data(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> impl Future<Output = Result<Vec<ActivityWithParsedData>, ListActivitiesError>> + Send;
 
-    fn get_activities_with_metric(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        metric: &TimeseriesMetric,
-        aggregate: &TimeseriesAggregate,
-    ) -> impl Future<Output = Result<Vec<(Activity, f64)>, ListActivitiesError>> + Send;
-
-    fn get_activities_to_process_for_metric(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        metric: &TimeseriesMetric,
-        aggregate: &TimeseriesAggregate,
-    ) -> impl Future<Output = Result<Vec<ActivityId>, ListActivitiesError>> + Send;
-
     fn update_activity_metric(
-        &self,
-        user: &UserId,
-        activity: &ActivityId,
-        metric: &TimeseriesMetric,
-        aggregate: &TimeseriesAggregate,
-        value: &Option<f64>,
-    ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
-
-    fn update_activity_metric_v2(
         &self,
         activity: &ActivityId,
         metric: &ActivityMetricV2,
         value: &Option<f64>,
     ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
 
-    fn get_activities_with_metrics_v2(
+    fn get_activities_with_metrics(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
@@ -592,7 +559,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<Activity>, anyhow::Error>> + Send;
 
-    fn get_activity_with_timeseries(
+    fn get_activity_with_parsed_data(
         &self,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, anyhow::Error>> + Send;
