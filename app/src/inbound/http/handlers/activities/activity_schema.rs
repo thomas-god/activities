@@ -4,8 +4,8 @@ use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 
 use crate::domain::models::activity::{
-    Activity, ActivityNutrition, ActivityTimeseries, ActivityWithParsedData, Lap, Timeseries,
-    TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+    Activity, ActivityMetricV2, ActivityMetricsV2, ActivityNutrition, ActivityTimeseries,
+    ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
 };
 
 // =============================================================================
@@ -167,11 +167,11 @@ pub struct PublicActivity {
     pub workout_type: Option<String>,
     pub feedback: Option<String>,
     pub nutrition: Option<PublicNutrition>,
-    pub statistics: HashMap<String, f64>,
+    pub metrics: HashMap<String, f64>,
 }
 
-impl From<&Activity> for PublicActivity {
-    fn from(activity: &Activity) -> Self {
+impl PublicActivity {
+    pub fn from(activity: &Activity, metrics: &ActivityMetricsV2) -> Self {
         Self {
             id: activity.id().to_string(),
             sport: activity.sport().to_string(),
@@ -182,7 +182,9 @@ impl From<&Activity> for PublicActivity {
             workout_type: activity.workout_type().as_ref().map(|wt| wt.to_string()),
             feedback: activity.feedback().as_ref().map(|f| f.to_string()),
             nutrition: activity.nutrition().as_ref().map(PublicNutrition::from),
-            statistics: activity.statistics().items(),
+            metrics: HashMap::from_iter(metrics.iter().filter_map(|(metric, value)| {
+                value.as_ref().map(|value| (metric.to_string(), *value))
+            })),
         }
     }
 }
@@ -202,10 +204,10 @@ pub struct PublicActivityWithTimeseries {
     pub timeseries: PublicActivityTimeseries,
 }
 
-impl From<&ActivityWithParsedData> for PublicActivityWithTimeseries {
-    fn from(activity: &ActivityWithParsedData) -> Self {
+impl PublicActivityWithTimeseries {
+    pub fn from(activity: &ActivityWithParsedData, metrics: &ActivityMetricsV2) -> Self {
         Self {
-            activity: PublicActivity::from(activity.activity()),
+            activity: PublicActivity::from(activity.activity(), metrics),
             timeseries: activity.timeseries().into(),
         }
     }

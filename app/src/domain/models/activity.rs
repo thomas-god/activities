@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, hash_map::Iter},
     fmt::{self},
     hash::Hash,
     ops::Div,
@@ -13,6 +13,13 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::models::UserId;
+
+pub const DEFAULT_METRICS: [ActivityMetricV2; 4] = [
+    ActivityMetricV2::Calories,
+    ActivityMetricV2::Duration,
+    ActivityMetricV2::Elevation,
+    ActivityMetricV2::Distance,
+];
 
 ///////////////////////////////////////////////////////////////////
 /// ACTIVITY
@@ -1027,6 +1034,31 @@ impl ActivityMetricV2 {
                 TimeseriesAggregate::Average,
             )),
         }
+    }
+}
+
+#[derive(Debug, Clone, Constructor, Default, PartialEq)]
+pub struct ActivityMetricsV2(HashMap<ActivityMetricV2, Option<f64>>);
+
+impl ActivityMetricsV2 {
+    pub fn contains_key(&self, metric: &ActivityMetricV2) -> bool {
+        self.0.contains_key(metric)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn insert(&mut self, metric: ActivityMetricV2, value: Option<f64>) {
+        let _ = self.0.insert(metric, value);
+    }
+
+    pub fn get(&self, metric: &ActivityMetricV2) -> Option<&Option<f64>> {
+        self.0.get(metric)
+    }
+
+    pub fn iter(&self) -> Iter<'_, ActivityMetricV2, Option<f64>> {
+        self.0.iter()
     }
 }
 

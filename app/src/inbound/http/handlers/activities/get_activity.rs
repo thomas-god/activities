@@ -6,7 +6,7 @@ use axum::{
 
 use crate::{
     domain::{
-        models::activity::ActivityId,
+        models::activity::{ActivityId, DEFAULT_METRICS},
         ports::{
             activity::IActivityService, preferences::IPreferencesService,
             training::ITrainingService,
@@ -34,15 +34,20 @@ pub async fn get_activity<
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
-    let Ok(res) = state
+    let Ok((activity, metrics)) = state
         .activity_service
-        .get_activity_with_parsed_data(&ActivityId::from(&activity_id))
+        .get_activity_with_metrics_and_parsed_data(
+            &ActivityId::from(&activity_id),
+            &DEFAULT_METRICS,
+        )
         .await
     else {
         return Err(StatusCode::NOT_FOUND);
     };
 
-    Ok(Json(PublicActivityWithTimeseries::from(&res)))
+    Ok(Json(PublicActivityWithTimeseries::from(
+        &activity, &metrics,
+    )))
 }
 
 #[cfg(test)]
@@ -58,10 +63,10 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
-                    ActivityStatistic, ActivityStatistics, ActivityTimeseries,
-                    ActivityWithParsedData, Sport, Timeseries, TimeseriesActiveTime,
-                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetricV2,
+                    ActivityMetricsV2, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+                    ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
+                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::activity::GetActivityError,
@@ -91,43 +96,52 @@ mod tests {
         let target_id = "target_id".to_string();
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_parsed_data()
-            .returning(|_| {
-                Ok(ActivityWithParsedData::new(
-                    Activity::new_empty(
-                        ActivityId::from("target_id"),
-                        UserId::test_default(),
-                        ActivityStartTime::new(
-                            "2025-09-03T00:00:00Z"
-                                .parse::<DateTime<FixedOffset>>()
-                                .unwrap(),
+            .expect_get_activity_with_metrics_and_parsed_data()
+            .returning(|_, _| {
+                Ok((
+                    ActivityWithParsedData::new(
+                        Activity::new_empty(
+                            ActivityId::from("target_id"),
+                            UserId::test_default(),
+                            ActivityStartTime::new(
+                                "2025-09-03T00:00:00Z"
+                                    .parse::<DateTime<FixedOffset>>()
+                                    .unwrap(),
+                            ),
+                            ActivityDuration::from(1200.),
+                            Sport::IndoorCycling,
+                            ActivityStatistics::new(HashMap::from([(
+                                ActivityStatistic::Duration,
+                                1200.,
+                            )])),
                         ),
-                        ActivityDuration::from(1200.),
-                        Sport::IndoorCycling,
+                        ActivityTimeseries::new(
+                            TimeseriesTime::new(vec![0, 1, 2]),
+                            TimeseriesActiveTime::new(vec![
+                                ActiveTime::Running(0),
+                                ActiveTime::Running(1),
+                                ActiveTime::Running(2),
+                            ]),
+                            vec![],
+                            vec![Timeseries::new(
+                                TimeseriesMetric::Power,
+                                vec![
+                                    Some(TimeseriesValue::Int(120)),
+                                    None,
+                                    Some(TimeseriesValue::Int(130)),
+                                ],
+                            )],
+                        )
+                        .unwrap(),
                         ActivityStatistics::new(HashMap::from([(
                             ActivityStatistic::Duration,
                             1200.,
                         )])),
                     ),
-                    ActivityTimeseries::new(
-                        TimeseriesTime::new(vec![0, 1, 2]),
-                        TimeseriesActiveTime::new(vec![
-                            ActiveTime::Running(0),
-                            ActiveTime::Running(1),
-                            ActiveTime::Running(2),
-                        ]),
-                        vec![],
-                        vec![Timeseries::new(
-                            TimeseriesMetric::Power,
-                            vec![
-                                Some(TimeseriesValue::Int(120)),
-                                None,
-                                Some(TimeseriesValue::Int(130)),
-                            ],
-                        )],
-                    )
-                    .unwrap(),
-                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
+                    ActivityMetricsV2::new(HashMap::from([(
+                        ActivityMetricV2::Duration,
+                        Some(1200.),
+                    )])),
                 ))
             });
         let file_parser = MockFileParser::test_default();
@@ -166,7 +180,7 @@ mod tests {
                     workout_type: None,
                     nutrition: None,
                     feedback: None,
-                    statistics: HashMap::from([("Duration".to_string(), 1200.)]),
+                    metrics: HashMap::from([("Duration".to_string(), 1200.)]),
                 },
                 timeseries: PublicActivityTimeseries {
                     time: vec![0, 1, 2],
@@ -192,9 +206,9 @@ mod tests {
     async fn test_get_activity_does_not_exist() {
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_parsed_data()
-            .with(eq(ActivityId::from("target_id")))
-            .returning(|_| {
+            .expect_get_activity_with_metrics_and_parsed_data()
+            .with(eq(ActivityId::from("target_id")), eq(DEFAULT_METRICS))
+            .returning(|_, _| {
                 Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
                     "target_id",
                 )))
@@ -224,3 +238,6 @@ mod tests {
         assert_eq!(response, StatusCode::NOT_FOUND);
     }
 }
+
+// left: PublicActivityWithTimeseries { activity: PublicActivity { id: "target_id", sport: "IndoorCycling", sport_category: Some("Cycling"), name: None, start_time: 2025-09-03T00:00:00+00:00, rpe: None, workout_type: None, feedback: None, nutrition: None, metrics: {} }, timeseries: PublicActivityTimeseries { time: [0, 1, 2], active_time: [Some(0), Some(1), Some(2)], metrics: {"Power": PublicTimeseries { unit: "W", values: [Some(Int(120)), None, Some(Int(130))] }}, laps: [] } }
+// right: PublicActivityWithTimeseries { activity: PublicActivity { id: "target_id", sport: "IndoorCycling", sport_category: Some("Cycling"), name: None, start_time: 2025-09-03T00:00:00+00:00, rpe: None, workout_type: None, feedback: None, nutrition: None, metrics: {"Duration": 1200.0} }, timeseries: PublicActivityTimeseries { time: [0, 1, 2], active_time: [Some(0), Some(1), Some(2)], metrics: {"Power": PublicTimeseries { unit: "W", values: [Some(Int(120)), None, Some(Int(130))] }}, laps: [] } }

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -11,8 +9,9 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
-            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-            ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport, WorkoutType,
+            ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
+            Sport, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -41,22 +40,27 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         user: &UserId,
         filters: &ListActivitiesFilters,
         metrics: &[ActivityMetricV2],
-    ) -> impl Future<
-        Output = Result<
-            Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>,
-            ListActivitiesError,
-        >,
-    > + Send;
+    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>> + Send;
 
-    fn get_activity(
+    fn list_activities_with_metrics_and_parsed_data(
         &self,
-        activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<Activity, GetActivityError>> + Send;
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metrics: &[ActivityMetricV2],
+    ) -> impl Future<
+        Output = Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError>,
+    > + Send;
 
     fn get_activity_with_parsed_data(
         &self,
         activity_id: &ActivityId,
     ) -> impl Future<Output = Result<ActivityWithParsedData, GetActivityError>> + Send;
+
+    fn get_activity_with_metrics_and_parsed_data(
+        &self,
+        activity_id: &ActivityId,
+        metrics: &[ActivityMetricV2],
+    ) -> impl Future<Output = Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>> + Send;
 
     fn modify_activity(
         &self,
@@ -546,22 +550,23 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         filters: &ListActivitiesFilters,
         metrics: &[ActivityMetricV2],
-    ) -> impl Future<
-        Output = Result<
-            Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>,
-            ListActivitiesError,
-        >,
-    > + Send;
+    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>> + Send;
 
     fn get_activity(
         &self,
         id: &ActivityId,
-    ) -> impl Future<Output = Result<Option<Activity>, anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
+
+    fn get_activity_with_metrics(
+        &self,
+        id: &ActivityId,
+        metrics: &[ActivityMetricV2],
+    ) -> impl Future<Output = Result<Option<(Activity, ActivityMetricsV2)>, GetActivityError>> + Send;
 
     fn get_activity_with_parsed_data(
         &self,
         id: &ActivityId,
-    ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, anyhow::Error>> + Send;
+    ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, GetActivityError>> + Send;
 
     fn modify_activity_name(
         &self,

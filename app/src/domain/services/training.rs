@@ -5,6 +5,7 @@ use derive_more::Constructor;
 use crate::domain::{
     models::{
         UserId,
+        activity::ActivityMetricV2,
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
             TrainingMetricValues, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
@@ -309,10 +310,11 @@ where
             .await
     }
 
-    async fn get_training_period_with_activities(
+    async fn get_training_period_with_activities_with_metrics(
         &self,
         user: &UserId,
         period_id: &TrainingPeriodId,
+        metrics: &[ActivityMetricV2],
     ) -> Option<crate::domain::models::training::TrainingPeriodWithActivities> {
         use crate::domain::models::training::TrainingPeriodWithActivities;
 
@@ -325,14 +327,18 @@ where
         let filters =
             ListActivitiesFilters::empty().set_date_range(Some(period.range_default_tomorrow()));
 
-        let Ok(activities) = self.activity_service.list_activities(user, &filters).await else {
+        let Ok(activities) = self
+            .activity_service
+            .list_activities_with_metrics(user, &filters, metrics)
+            .await
+        else {
             return None;
         };
 
         // Filter activities by the period's sport filters
         let matching_activities: Vec<_> = activities
             .into_iter()
-            .filter(|activity| period.matches(activity))
+            .filter(|(activity, _)| period.matches(activity))
             .collect();
 
         Some(TrainingPeriodWithActivities::new(
@@ -669,10 +675,11 @@ pub mod test_utils {
                 period: &TrainingPeriodId,
             ) -> Option<TrainingPeriod>;
 
-            async fn get_training_period_with_activities(
+            async fn get_training_period_with_activities_with_metrics(
                 &self,
                 user: &UserId,
                 period: &TrainingPeriodId,
+                metrics: &[ActivityMetricV2]
             ) -> Option<TrainingPeriodWithActivities>;
 
             async fn delete_training_period(
@@ -932,8 +939,8 @@ mod tests_training_metrics_service {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityStartTime,
-        ActivityStatistics, Sport,
+        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
+        ActivityStartTime, ActivityStatistics, Sport,
     };
 
     use crate::domain::ports::DateRange;
@@ -1264,7 +1271,7 @@ mod tests_training_metrics_service {
                         Sport::Running,
                         stats,
                     ),
-                    HashMap::from([(ActivityMetricV2::Distance, Some(0.))]),
+                    ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::Distance, Some(0.))])),
                 )])
             });
 
@@ -1985,7 +1992,7 @@ mod test_training_service_period {
 
     use crate::domain::{
         models::{
-            activity::ActivityDuration,
+            activity::{ActivityDuration, ActivityMetricsV2},
             training::{TrainingPeriod, TrainingPeriodSports},
         },
         ports::{
@@ -2048,7 +2055,7 @@ mod test_training_service_period {
     }
 
     #[tokio::test]
-    async fn test_get_training_period_with_activities_not_found() {
+    async fn test_get_training_period_with_activities_period_not_found() {
         let mut repository = MockTrainingRepository::new();
         repository
             .expect_get_training_period()
@@ -2058,7 +2065,11 @@ mod test_training_service_period {
         let service = TrainingService::new(repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_none());
@@ -2072,53 +2083,62 @@ mod test_training_service_period {
 
         // Create test activities with different sports and dates
         let activities = vec![
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-18T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-19T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-20T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Swimming,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Swimming,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
         ];
 
@@ -2142,14 +2162,18 @@ mod test_training_service_period {
         let mut activity_service = MockActivityService::new();
         let activities_clone = activities.clone();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(move |_, _| Ok(activities_clone.clone()));
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_some());
@@ -2166,53 +2190,62 @@ mod test_training_service_period {
 
         // Create test activities with different sports
         let activities = vec![
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-18T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-19T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-20T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Swimming,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Swimming,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
         ];
 
@@ -2237,14 +2270,18 @@ mod test_training_service_period {
         let mut activity_service = MockActivityService::new();
         let activities_clone = activities.clone();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(move |_, _| Ok(activities_clone.clone()));
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_some());
@@ -2252,7 +2289,7 @@ mod test_training_service_period {
         // Should only include Running activity
         assert_eq!(period_with_activities.activities().len(), 1);
         assert_eq!(
-            period_with_activities.activities()[0].sport(),
+            period_with_activities.activities()[0].0.sport(),
             &Sport::Running
         );
     }
@@ -2266,53 +2303,62 @@ mod test_training_service_period {
 
         // Create test activities with different sports in the Running category
         let activities = vec![
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-18T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-19T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::TrailRunning,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-19T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::TrailRunning,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-20T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-                ActivityStatistics::default(),
+            (
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-20T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
         ];
 
@@ -2339,14 +2385,18 @@ mod test_training_service_period {
         let mut activity_service = MockActivityService::new();
         let activities_clone = activities.clone();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(move |_, _| Ok(activities_clone.clone()));
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_some());
@@ -2357,13 +2407,13 @@ mod test_training_service_period {
             period_with_activities
                 .activities()
                 .iter()
-                .any(|a| a.sport() == &Sport::Running)
+                .any(|a| a.0.sport() == &Sport::Running)
         );
         assert!(
             period_with_activities
                 .activities()
                 .iter()
-                .any(|a| a.sport() == &Sport::TrailRunning)
+                .any(|a| a.0.sport() == &Sport::TrailRunning)
         );
     }
 
@@ -2375,56 +2425,65 @@ mod test_training_service_period {
 
         // Create activities with dates both inside and outside the period
         let activities = vec![
-            // Before period
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-16T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                // Before period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-16T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            // Inside period
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-18T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                // Inside period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-18T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            // After period
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    "2025-10-22T10:00:00Z"
-                        .parse::<chrono::DateTime<chrono::Utc>>()
-                        .unwrap()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                // After period
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        "2025-10-22T10:00:00Z"
+                            .parse::<chrono::DateTime<chrono::Utc>>()
+                            .unwrap()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
         ];
 
@@ -2448,14 +2507,18 @@ mod test_training_service_period {
         let mut activity_service = MockActivityService::new();
         let activities_clone = activities.clone();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(move |_, _| Ok(activities_clone.clone()));
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_some());
@@ -2478,41 +2541,47 @@ mod test_training_service_period {
         // Note: Tomorrow's activity wouldn't be returned by the repository
         // because the date range filter is exclusive of the end date
         let activities = vec![
-            // Yesterday - should be included
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    yesterday
-                        .and_hms_opt(10, 0, 0)
-                        .unwrap()
-                        .and_utc()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-                ActivityStatistics::default(),
+            (
+                // Yesterday - should be included
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        yesterday
+                            .and_hms_opt(10, 0, 0)
+                            .unwrap()
+                            .and_utc()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Running,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
-            // Today - should be included (this is the bug we're fixing)
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(
-                    today
-                        .and_hms_opt(14, 30, 0)
-                        .unwrap()
-                        .and_utc()
-                        .timestamp()
-                        .try_into()
-                        .unwrap(),
-                )
-                .unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-                ActivityStatistics::default(),
+            (
+                // Today - should be included (this is the bug we're fixing)
+                Activity::new_empty(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    ActivityStartTime::from_timestamp(
+                        today
+                            .and_hms_opt(14, 30, 0)
+                            .unwrap()
+                            .and_utc()
+                            .timestamp()
+                            .try_into()
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityStatistics::default(),
+                ),
+                ActivityMetricsV2::default(),
             ),
         ];
 
@@ -2537,14 +2606,18 @@ mod test_training_service_period {
         let mut activity_service = MockActivityService::new();
         let activities_clone = activities.clone();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(move |_, _| Ok(activities_clone.clone()));
+            .returning(move |_, _, _| Ok(activities_clone.clone()));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         assert!(result.is_some());
@@ -2562,7 +2635,7 @@ mod test_training_service_period {
         let activity_sports: Vec<_> = period_with_activities
             .activities()
             .iter()
-            .map(|a| a.sport())
+            .map(|a| a.0.sport())
             .collect();
         assert!(activity_sports.contains(&&Sport::Running)); // yesterday
         assert!(activity_sports.contains(&&Sport::Cycling)); // today
@@ -2589,14 +2662,18 @@ mod test_training_service_period {
 
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_list_activities()
+            .expect_list_activities_with_metrics()
             .times(1)
-            .returning(|_, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
+            .returning(|_, _, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
 
         let service = TrainingService::new(training_repository, activity_service);
 
         let result = service
-            .get_training_period_with_activities(&UserId::test_default(), &TrainingPeriodId::new())
+            .get_training_period_with_activities_with_metrics(
+                &UserId::test_default(),
+                &TrainingPeriodId::new(),
+                &[],
+            )
             .await;
 
         // Should return None when repository fails
@@ -3254,8 +3331,8 @@ mod test_training_service_metric_values {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityStartTime,
-        ActivityStatistic, ActivityStatistics, Sport,
+        Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
+        ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
     };
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
@@ -3366,7 +3443,7 @@ mod test_training_service_metric_values {
             .returning(move |_, _, _| {
                 Ok(vec![(
                     activity.clone(),
-                    HashMap::from([(ActivityMetricV2::Distance, Some(0.))]),
+                    ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::Distance, Some(0.))])),
                 )])
             });
 

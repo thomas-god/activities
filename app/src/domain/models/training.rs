@@ -14,8 +14,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetricV2, ActivityRpe, BonkStatus, Sport,
-            SportCategory, WorkoutType,
+            Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
+            Sport, SportCategory, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -841,11 +841,11 @@ impl TrainingPeriod {
 #[derive(Debug, Clone)]
 pub struct TrainingPeriodWithActivities {
     period: TrainingPeriod,
-    activities: Vec<Activity>,
+    activities: Vec<(Activity, ActivityMetricsV2)>,
 }
 
 impl TrainingPeriodWithActivities {
-    pub fn new(period: TrainingPeriod, activities: Vec<Activity>) -> Self {
+    pub fn new(period: TrainingPeriod, activities: Vec<(Activity, ActivityMetricsV2)>) -> Self {
         Self { period, activities }
     }
 
@@ -853,7 +853,7 @@ impl TrainingPeriodWithActivities {
         &self.period
     }
 
-    pub fn activities(&self) -> &[Activity] {
+    pub fn activities(&self) -> &[(Activity, ActivityMetricsV2)] {
         &self.activities
     }
 }

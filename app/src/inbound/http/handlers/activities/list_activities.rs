@@ -7,11 +7,14 @@ use chrono::NaiveDate;
 use serde::Deserialize;
 
 use crate::{
-    domain::ports::{
-        DateRange,
-        activity::{IActivityService, ListActivitiesFilters},
-        preferences::IPreferencesService,
-        training::ITrainingService,
+    domain::{
+        models::activity::DEFAULT_METRICS,
+        ports::{
+            DateRange,
+            activity::{IActivityService, ListActivitiesFilters},
+            preferences::IPreferencesService,
+            training::ITrainingService,
+        },
     },
     inbound::{
         http::{
@@ -54,13 +57,18 @@ pub async fn list_activities<
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Query(filters): Query<Filters>,
 ) -> Result<Json<Vec<PublicActivity>>, StatusCode> {
-    let Ok(res) = state
+    let Ok(activities) = state
         .activity_service
-        .list_activities(user.user(), &filters.into())
+        .list_activities_with_metrics(user.user(), &filters.into(), &DEFAULT_METRICS)
         .await
     else {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 
-    Ok(Json(res.iter().map(PublicActivity::from).collect()))
+    Ok(Json(
+        activities
+            .iter()
+            .map(|(activity, metrics)| PublicActivity::from(activity, metrics))
+            .collect(),
+    ))
 }

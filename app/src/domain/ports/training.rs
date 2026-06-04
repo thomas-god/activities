@@ -225,7 +225,6 @@ pub enum UpdateTrainingMetricScopeError {
 ///////////////////////////////////////////////////////////////////
 /// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
-
 pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn create_metric(
         &self,
@@ -282,10 +281,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         period: &TrainingPeriodId,
     ) -> impl Future<Output = Option<TrainingPeriod>> + Send;
 
-    fn get_training_period_with_activities(
+    fn get_training_period_with_activities_with_metrics(
         &self,
         user: &UserId,
         period: &TrainingPeriodId,
+        metrics: &[ActivityMetricV2],
     ) -> impl Future<Output = Option<TrainingPeriodWithActivities>> + Send;
 
     fn delete_training_period(
@@ -690,7 +690,6 @@ pub enum DeleteTrainingNoteError {
 ///////////////////////////////////////////////////////////////////
 /// TRAINING REPOSITORY
 ///////////////////////////////////////////////////////////////////
-
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
     fn save_training_metric_definition(
         &self,

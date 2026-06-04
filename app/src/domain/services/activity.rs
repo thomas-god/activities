@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-
 use anyhow::anyhow;
 
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
+        activity::{
+            Activity, ActivityId, ActivityMetricV2, ActivityMetricsV2, ActivityWithParsedData,
+        },
     },
     ports::activity::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
@@ -114,7 +114,7 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
         metrics: &[ActivityMetricV2],
-    ) -> Result<Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>, ListActivitiesError> {
+    ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError> {
         let mut activities = self
             .activity_repository
             .get_activities_with_metrics(user, filters, metrics)
@@ -133,7 +133,8 @@ where
             let Some(activity_with_parsed_data) = self
                 .activity_repository
                 .get_activity_with_parsed_data(activity.id())
-                .await?
+                .await
+                .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?
             else {
                 continue;
             };
@@ -152,12 +153,27 @@ where
         Ok(activities)
     }
 
-    async fn get_activity(&self, activity_id: &ActivityId) -> Result<Activity, GetActivityError> {
-        match self.activity_repository.get_activity(activity_id).await {
-            Ok(Some(activity)) => Ok(activity),
-            Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
-            Err(err) => Err(GetActivityError::Unknown(err)),
+    async fn list_activities_with_metrics_and_parsed_data(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+        metrics: &[ActivityMetricV2],
+    ) -> Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError> {
+        let activities = self
+            .list_activities_with_metrics(user, filters, metrics)
+            .await?;
+
+        let mut res = Vec::new();
+        for (activity, metrics) in activities {
+            let Ok(activity_with_parsed_data) =
+                self.get_activity_with_parsed_data(activity.id()).await
+            else {
+                continue;
+            };
+            res.push((activity_with_parsed_data, metrics));
         }
+
+        Ok(res)
     }
 
     async fn get_activity_with_parsed_data(
@@ -171,8 +187,36 @@ where
         {
             Ok(Some(activity)) => Ok(activity),
             Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
-            Err(err) => Err(GetActivityError::Unknown(err)),
+            Err(err) => Err(err),
         }
+    }
+
+    async fn get_activity_with_metrics_and_parsed_data(
+        &self,
+        activity_id: &ActivityId,
+        metrics: &[ActivityMetricV2],
+    ) -> Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError> {
+        let (activity, metrics) = match self
+            .activity_repository
+            .get_activity_with_metrics(activity_id, metrics)
+            .await
+        {
+            Ok(Some(res)) => res,
+            Ok(None) => return Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
+            Err(err) => return Err(err),
+        };
+
+        let activity = match self
+            .activity_repository
+            .get_activity_with_parsed_data(activity.id())
+            .await
+        {
+            Ok(Some(activity)) => activity,
+            Ok(None) => return Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
+            Err(err) => return Err(err),
+        };
+
+        Ok((activity, metrics))
     }
 
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
@@ -384,22 +428,30 @@ pub mod test_utils {
                 filters: &ListActivitiesFilters
             ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError>;
 
-            async fn get_activity(
+            async fn list_activities_with_metrics(
                 &self,
-                activity_id: &ActivityId,
-            ) -> Result<Activity, GetActivityError>;
+                user: &UserId,
+                filters: &ListActivitiesFilters,
+                metrics: &[ActivityMetricV2],
+            ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>;
+
+            async fn list_activities_with_metrics_and_parsed_data(
+                &self,
+                user: &UserId,
+                filters: &ListActivitiesFilters,
+                metrics: &[ActivityMetricV2],
+            ) -> Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError>;
 
             async fn get_activity_with_parsed_data(
                 &self,
                 activity_id: &ActivityId,
             ) -> Result<ActivityWithParsedData, GetActivityError>;
 
-            async fn list_activities_with_metrics(
+            async fn get_activity_with_metrics_and_parsed_data(
                 &self,
-                user: &UserId,
-                filters: &ListActivitiesFilters,
+                activity_id: &ActivityId,
                 metrics: &[ActivityMetricV2],
-            ) -> Result<Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>, ListActivitiesError>;
+            ) -> Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>;
 
             async fn modify_activity(
                 &self,
@@ -448,7 +500,6 @@ pub mod test_utils {
             let mut mock = Self::new();
             mock.default_create_activity();
             mock.default_list_activities();
-            mock.default_get_activity();
             mock.default_modify_activity();
             mock.default_update_activity_rpe();
             mock.default_delete_activity();
@@ -470,19 +521,6 @@ pub mod test_utils {
         }
         pub fn default_list_activities(&mut self) {
             self.expect_list_activities().returning(|_, _| Ok(vec![]));
-        }
-
-        pub fn default_get_activity(&mut self) {
-            self.expect_get_activity().returning(|_| {
-                Ok(Activity::new_empty(
-                    ActivityId::new(),
-                    UserId::test_default(),
-                    ActivityStartTime::from_timestamp(1000).unwrap(),
-                    ActivityDuration::default(),
-                    Sport::Running,
-                    ActivityStatistics::default(),
-                ))
-            });
         }
 
         pub fn default_modify_activity(&mut self) {
@@ -555,17 +593,23 @@ pub mod test_utils {
                 user: &UserId,
                 filters: &ListActivitiesFilters,
                 metrics: &[ActivityMetricV2],
-            ) -> Result<Vec<(Activity, HashMap<ActivityMetricV2, Option<f64>>)>, ListActivitiesError>;
+            ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>;
 
             async fn get_activity(
                 &self,
                 id: &ActivityId,
-            ) -> Result<Option<Activity>, anyhow::Error>;
+            ) -> Result<Option<Activity>, GetActivityError>;
+
+            async fn get_activity_with_metrics(
+                &self,
+                id: &ActivityId,
+                metrics: &[ActivityMetricV2],
+            ) -> Result<Option<(Activity, ActivityMetricsV2)>, GetActivityError>;
 
             async fn get_activity_with_parsed_data(
                 &self,
                 id: &ActivityId,
-            ) -> Result<Option<ActivityWithParsedData>, anyhow::Error>;
+            ) -> Result<Option<ActivityWithParsedData>, GetActivityError>;
 
             async fn modify_activity_name(
                 &self,
@@ -1426,10 +1470,10 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             (ActivityMetricV2::AvgHeartRate, Some(12.3)),
-                        ]),
+                        ])),
                     )])
                 });
             let raw_data_repository = MockRawDataRepository::default();
@@ -1462,10 +1506,10 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             (ActivityMetricV2::AvgHeartRate, None),
-                        ]),
+                        ])),
                     )])
                 });
             let raw_data_repository = MockRawDataRepository::default();
@@ -1495,10 +1539,10 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             // ActivityMetricV2::AvgHeartRate is missing and no HR values in timeseries
-                        ]),
+                        ])),
                     )])
                 });
             activity_repository
@@ -1542,10 +1586,10 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing with cadence values in timeseries
-                        ]),
+                        ])),
                     )])
                 });
             activity_repository
@@ -1592,10 +1636,10 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing and we can't find the activity's timeseries
-                        ]),
+                        ])),
                     )])
                 });
             activity_repository
@@ -1631,17 +1675,17 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        HashMap::from([
+                        ActivityMetricsV2::new(HashMap::from([
                             (ActivityMetricV2::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing
-                        ]),
+                        ])),
                     )])
                 });
             activity_repository
                 .expect_get_activity_with_parsed_data()
                 .times(1)
                 .with(eq(ActivityId::from("test_activity")))
-                .returning(|_| Err(anyhow!("error")));
+                .returning(|_| Err(GetActivityError::Unknown(anyhow!("error"))));
             activity_repository.expect_update_activity_metric().times(0);
             let raw_data_repository = MockRawDataRepository::default();
 

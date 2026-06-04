@@ -10,7 +10,10 @@ use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize, de};
 use serde_json::json;
 
-use crate::inbound::http::handlers::activities::activity_schema::PublicActivity;
+use crate::{
+    domain::models::activity::DEFAULT_METRICS,
+    inbound::http::handlers::activities::activity_schema::PublicActivity,
+};
 use crate::{
     domain::{
         models::{
@@ -87,7 +90,11 @@ pub async fn get_training_period<
 ) -> Result<impl IntoResponse, StatusCode> {
     let Some(period_with_activities) = state
         .training_metrics_service
-        .get_training_period_with_activities(user.user(), &TrainingPeriodId::from(&period_id))
+        .get_training_period_with_activities_with_metrics(
+            user.user(),
+            &TrainingPeriodId::from(&period_id),
+            &DEFAULT_METRICS,
+        )
         .await
     else {
         return Err(StatusCode::NOT_FOUND);
@@ -97,7 +104,7 @@ pub async fn get_training_period<
     let activities: Vec<PublicActivity> = period_with_activities
         .activities()
         .iter()
-        .map(PublicActivity::from)
+        .map(|(activity, metrics)| PublicActivity::from(activity, metrics))
         .collect();
 
     let body = ResponseBody {
