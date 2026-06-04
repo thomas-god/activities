@@ -16,42 +16,42 @@
 	let { callback, scope = { kind: 'global' } }: { callback: () => void; scope?: Scope } = $props();
 
 	// Define unified metric sources
-	type MetricSourceOption = {
+	type ActivityMetricOption = {
 		id: string;
-		source: { Statistic: string } | { Timeseries: [string, string] };
+		metric: string;
 	};
 
-	const metricSources: MetricSourceOption[] = [
+	const activityMetricOptions: ActivityMetricOption[] = [
 		// Activity statistics
-		{ id: 'calories', source: { Statistic: 'Calories' } },
-		{ id: 'elevation', source: { Statistic: 'Elevation' } },
-		{ id: 'distance', source: { Statistic: 'Distance' } },
-		{ id: 'duration', source: { Statistic: 'Duration' } },
-		{ id: 'normalized-power', source: { Statistic: 'NormalizedPower' } },
+		{ id: 'calories', metric: 'Calories' },
+		{ id: 'elevation', metric: 'Elevation' },
+		{ id: 'distance', metric: 'Distance' },
+		{ id: 'duration', metric: 'Duration' },
+		{ id: 'normalized-power', metric: 'NormalizedPower' },
 		// Heart rate timeseries
-		{ id: 'hr-max', source: { Timeseries: ['HeartRate', 'Max'] } },
-		{ id: 'hr-min', source: { Timeseries: ['HeartRate', 'Min'] } },
-		{ id: 'hr-avg', source: { Timeseries: ['HeartRate', 'Average'] } },
+		{ id: 'hr-max', metric: 'MaxHeartRate' },
+		{ id: 'hr-min', metric: 'MinHeartRate' },
+		{ id: 'hr-avg', metric: 'AvgHeartRate' },
 		// Power timeseries
-		{ id: 'power-max', source: { Timeseries: ['Power', 'Max'] } },
-		{ id: 'power-min', source: { Timeseries: ['Power', 'Min'] } },
-		{ id: 'power-avg', source: { Timeseries: ['Power', 'Average'] } },
+		{ id: 'power-max', metric: 'MaxPower' },
+		{ id: 'power-min', metric: 'MinPower' },
+		{ id: 'power-avg', metric: 'AvgPower' },
 		// Speed timeseries
-		{ id: 'speed-max', source: { Timeseries: ['Speed', 'Max'] } },
-		{ id: 'speed-min', source: { Timeseries: ['Speed', 'Min'] } },
-		{ id: 'speed-avg', source: { Timeseries: ['Speed', 'Average'] } },
+		{ id: 'speed-max', metric: 'MaxSpeed' },
+		{ id: 'speed-min', metric: 'MinSpeed' },
+		{ id: 'speed-avg', metric: 'AvgSpeed' },
 		// Pace timeseries
-		{ id: 'pace-max', source: { Timeseries: ['Pace', 'Max'] } },
-		{ id: 'pace-min', source: { Timeseries: ['Pace', 'Min'] } },
-		{ id: 'pace-avg', source: { Timeseries: ['Pace', 'Average'] } },
+		{ id: 'pace-max', metric: 'MaxPace' },
+		{ id: 'pace-min', metric: 'MinPace' },
+		{ id: 'pace-avg', metric: 'AvgPace' },
 		// Altitude timeseries
-		{ id: 'altitude-max', source: { Timeseries: ['Altitude', 'Max'] } },
-		{ id: 'altitude-min', source: { Timeseries: ['Altitude', 'Min'] } },
-		{ id: 'altitude-avg', source: { Timeseries: ['Altitude', 'Average'] } },
+		{ id: 'altitude-max', metric: 'MaxAltitude' },
+		{ id: 'altitude-min', metric: 'MinAltitude' },
+		{ id: 'altitude-avg', metric: 'AvgAltitude' },
 		// Cadence timeseries
-		{ id: 'cadence-max', source: { Timeseries: ['Cadence', 'Max'] } },
-		{ id: 'cadence-min', source: { Timeseries: ['Cadence', 'Min'] } },
-		{ id: 'cadence-avg', source: { Timeseries: ['Cadence', 'Average'] } }
+		{ id: 'cadence-max', metric: 'MaxCadence' },
+		{ id: 'cadence-min', metric: 'MinCadence' },
+		{ id: 'cadence-avg', metric: 'AvgCadence' }
 	];
 
 	const granularityValues = ['Daily', 'Weekly', 'Monthly'] as const;
@@ -82,9 +82,9 @@
 
 	let chartWidth: number = $state(0);
 
-	let statisticSource = $derived.by(() => {
-		const selectedSource = metricSources.find((s) => s.id === selectedMetricSourceId);
-		return selectedSource?.source || { Statistic: 'Duration' };
+	let selectedActivityMetric = $derived.by(() => {
+		const selectedMetric = activityMetricOptions.find((s) => s.id === selectedMetricSourceId);
+		return selectedMetric?.metric || 'Duration';
 	});
 
 	// Determine unit and format for preview display
@@ -92,26 +92,22 @@
 		if (aggregate === 'NumberOfActivities') return 'activities';
 
 		// Map metric sources to units
-		const source = metricSources.find((s) => s.id === selectedMetricSourceId);
+		const source = activityMetricOptions.find((s) => s.id === selectedMetricSourceId);
 		if (!source) return 's';
 
-		if ('Statistic' in source.source) {
-			const stat = source.source.Statistic;
-			if (stat === 'Calories') return 'kcal';
-			if (stat === 'Elevation') return 'm';
-			if (stat === 'Distance') return 'km';
-			if (stat === 'Duration') return 's';
-			if (stat === 'NormalizedPower') return 'W';
-		} else if ('Timeseries' in source.source) {
-			const [metric, _aggregate] = source.source.Timeseries;
-			if (metric === 'HeartRate') return 'bpm';
-			if (metric === 'Power') return 'W';
-			if (metric === 'Speed') return 'km/h';
-			if (metric === 'Altitude') return 'm';
-			if (metric === 'Cadence') return 'rpm';
-			if (metric === 'Distance') return 'km';
-			if (metric === 'Pace') return 's/km';
-		}
+		const metric = source.metric;
+		if (metric.includes('Calories')) return 'kcal';
+		if (metric.includes('Elevation')) return 'm';
+		if (metric.includes('Distance')) return 'km';
+		if (metric.includes('Duration')) return 's';
+		if (metric.includes('NormalizedPower')) return 'W';
+		if (metric.includes('HeartRate')) return 'bpm';
+		if (metric.includes('Power')) return 'W';
+		if (metric.includes('Speed')) return 'km/h';
+		if (metric.includes('Altitude')) return 'm';
+		if (metric.includes('Cadence')) return 'rpm';
+		if (metric.includes('Distance')) return 'km';
+		if (metric.includes('Pace')) return 's/km';
 
 		return 's';
 	});
@@ -163,14 +159,14 @@
 		const end = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
 
 		let payload: {
-			source: typeof statisticSource;
+			metric: string;
 			granularity: typeof granularity;
 			aggregate: typeof aggregate;
 			filters?: {};
 			group_by?: Exclude<typeof groupBy, 'None'>;
 			start: string;
 			end: string;
-		} = { source: statisticSource, granularity, aggregate, start, end };
+		} = { metric: selectedActivityMetric, granularity, aggregate, start, end };
 
 		if (Object.keys(activeFilters).length > 0) {
 			payload = { ...payload, filters: activeFilters };
@@ -196,14 +192,14 @@
 	let metricRequest = $derived.by(() => {
 		let basePayload: {
 			name: string;
-			source: typeof statisticSource;
+			metric: string;
 			granularity: typeof granularity;
 			aggregate: typeof aggregate;
 			filters: {};
 			group_by?: Exclude<typeof groupBy, 'None'>;
 		} = {
 			name: metricName.trim(),
-			source: statisticSource,
+			metric: selectedActivityMetric,
 			granularity,
 			aggregate,
 			filters: activeFilters
