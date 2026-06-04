@@ -1030,6 +1030,99 @@ impl ActivityMetricV2 {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ActivityMetricSource {
+    Statistic(ActivityStatistic),
+    Timeseries((TimeseriesMetric, TimeseriesAggregate)),
+}
+
+impl ToUnit for ActivityMetricSource {
+    fn unit(&self) -> Unit {
+        match self {
+            Self::Statistic(stat) => stat.unit(),
+            Self::Timeseries((metric, _)) => metric.unit(),
+        }
+    }
+}
+
+impl TryFrom<&ActivityMetricSource> for ActivityMetricV2 {
+    type Error = String;
+
+    fn try_from(value: &ActivityMetricSource) -> Result<Self, Self::Error> {
+        match value {
+            ActivityMetricSource::Statistic(statistic) => Ok(match statistic {
+                ActivityStatistic::Calories => ActivityMetricV2::Calories,
+                ActivityStatistic::Distance => ActivityMetricV2::Distance,
+                ActivityStatistic::Duration => ActivityMetricV2::Duration,
+                ActivityStatistic::NormalizedPower => ActivityMetricV2::NormalizedPower,
+                ActivityStatistic::Elevation => ActivityMetricV2::Elevation,
+            }),
+            ActivityMetricSource::Timeseries((metric, aggregate)) => match (metric, aggregate) {
+                (TimeseriesMetric::Speed, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgSpeed)
+                }
+                (TimeseriesMetric::Speed, TimeseriesAggregate::Min) => {
+                    Ok(ActivityMetricV2::MinSpeed)
+                }
+                (TimeseriesMetric::Speed, TimeseriesAggregate::Max) => {
+                    Ok(ActivityMetricV2::MaxSpeed)
+                }
+
+                (TimeseriesMetric::Power, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgPower)
+                }
+                (TimeseriesMetric::Power, TimeseriesAggregate::Min) => {
+                    Ok(ActivityMetricV2::MinPower)
+                }
+                (TimeseriesMetric::Power, TimeseriesAggregate::Max) => {
+                    Ok(ActivityMetricV2::MaxPower)
+                }
+
+                (TimeseriesMetric::HeartRate, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgHeartRate)
+                }
+                (TimeseriesMetric::HeartRate, TimeseriesAggregate::Min) => {
+                    Ok(ActivityMetricV2::MinHeartRate)
+                }
+                (TimeseriesMetric::HeartRate, TimeseriesAggregate::Max) => {
+                    Ok(ActivityMetricV2::MaxHeartRate)
+                }
+
+                (TimeseriesMetric::Cadence, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgCadence)
+                }
+                (TimeseriesMetric::Cadence, TimeseriesAggregate::Min) => {
+                    Ok(ActivityMetricV2::MinCadence)
+                }
+                (TimeseriesMetric::Cadence, TimeseriesAggregate::Max) => {
+                    Ok(ActivityMetricV2::MaxCadence)
+                }
+
+                (TimeseriesMetric::Altitude, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgAltitude)
+                }
+                (TimeseriesMetric::Altitude, TimeseriesAggregate::Min) => {
+                    Ok(ActivityMetricV2::MinAltitude)
+                }
+                (TimeseriesMetric::Altitude, TimeseriesAggregate::Max) => {
+                    Ok(ActivityMetricV2::MaxAltitude)
+                }
+
+                (TimeseriesMetric::Pace, TimeseriesAggregate::Average) => {
+                    Ok(ActivityMetricV2::AvgPace)
+                }
+                (TimeseriesMetric::Pace, TimeseriesAggregate::Min) => Ok(ActivityMetricV2::MinPace),
+                (TimeseriesMetric::Pace, TimeseriesAggregate::Max) => Ok(ActivityMetricV2::MaxPace),
+
+                (metric, aggregate) => Err(format!(
+                    "({},{}) cannot be parsed into an ActivityMetricV2",
+                    metric, aggregate
+                )),
+            },
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
@@ -1344,21 +1437,6 @@ impl ActivityMetric {
 
     pub fn activity_duration(&self) -> &ActivityDuration {
         &self.activity_duration
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ActivityMetricSource {
-    Statistic(ActivityStatistic),
-    Timeseries((TimeseriesMetric, TimeseriesAggregate)),
-}
-
-impl ToUnit for ActivityMetricSource {
-    fn unit(&self) -> Unit {
-        match self {
-            Self::Statistic(stat) => stat.unit(),
-            Self::Timeseries((metric, _)) => metric.unit(),
-        }
     }
 }
 
