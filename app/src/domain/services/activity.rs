@@ -60,11 +60,6 @@ where
             *req.sport(),
             req.statistics().clone(),
         );
-        let activity_with_parsed_data = ActivityWithParsedData::new(
-            activity.clone(),
-            req.timeseries().clone(),
-            req.statistics().clone(),
-        );
 
         if self
             .activity_repository
@@ -87,7 +82,7 @@ where
 
         // Persist activity
         self.activity_repository
-            .save_activity(&activity_with_parsed_data)
+            .save_activity(&activity)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
 
@@ -524,7 +519,7 @@ pub mod test_utils {
 
             async fn save_activity(
                 &self,
-                activity: &ActivityWithParsedData,
+                activity: &Activity,
             ) -> Result<(), SaveActivityError>;
 
             async fn list_activities(

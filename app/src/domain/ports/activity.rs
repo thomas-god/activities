@@ -508,8 +508,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn save_activity(
         &self,
-        // TODO: une Activity sans timeseries devrait suffire normalement
-        activity: &ActivityWithParsedData,
+        activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
     fn list_activities(

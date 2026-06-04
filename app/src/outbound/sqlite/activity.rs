@@ -609,10 +609,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
-    async fn save_activity(
-        &self,
-        activity: &ActivityWithParsedData,
-    ) -> Result<(), SaveActivityError> {
+    async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
         let mut tx = self
             .pool
             .begin()
@@ -783,62 +780,6 @@ mod test_sqlite_activity_repository {
         )
     }
 
-    fn build_activity_with_parsed_data() -> ActivityWithParsedData {
-        ActivityWithParsedData::new(
-            build_activity(),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2, 3]),
-                TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1),
-                    ActiveTime::Running(2),
-                    ActiveTime::Running(3),
-                ]),
-                vec![],
-                vec![Timeseries::new(
-                    TimeseriesMetric::Speed,
-                    vec![
-                        Some(TimeseriesValue::Float(1.3)),
-                        Some(TimeseriesValue::Float(1.45)),
-                        Some(TimeseriesValue::Float(1.15)),
-                        Some(TimeseriesValue::Float(2.45)),
-                    ],
-                )],
-            )
-            .unwrap(),
-            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-        )
-    }
-
-    fn build_activity_with_timeseries_starting_at(
-        start: &DateTime<FixedOffset>,
-    ) -> ActivityWithParsedData {
-        ActivityWithParsedData::new(
-            build_activity_starting_at(start),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2, 3]),
-                TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1),
-                    ActiveTime::Running(2),
-                    ActiveTime::Running(3),
-                ]),
-                vec![],
-                vec![Timeseries::new(
-                    TimeseriesMetric::Speed,
-                    vec![
-                        Some(TimeseriesValue::Float(1.3)),
-                        Some(TimeseriesValue::Float(1.45)),
-                        Some(TimeseriesValue::Float(1.15)),
-                        Some(TimeseriesValue::Float(2.45)),
-                    ],
-                )],
-            )
-            .unwrap(),
-            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-        )
-    }
-
     #[tokio::test]
     async fn test_save_activity() {
         let db_file = NamedTempFile::new().unwrap();
@@ -849,7 +790,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -875,7 +816,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -906,7 +847,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -945,7 +886,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .delete_activity(activity.id())
@@ -963,7 +904,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -1005,7 +946,7 @@ mod test_sqlite_activity_repository {
 
         // Create an activity with feedback
         let feedback_text = ActivityFeedback::from("Great workout! Felt strong throughout.");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         // Save activity without feedback first
         repository
@@ -1039,7 +980,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         let res = repository
             .get_activity(activity.id())
@@ -1059,13 +1000,13 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Insertion should have succeed");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1089,13 +1030,13 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Insertion should have succeed");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1122,7 +1063,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_timeseries_starting_at(
+        let activity = build_activity_starting_at(
             &"2025-09-29T12:34:00+02:00"
                 .parse::<DateTime<FixedOffset>>()
                 .unwrap(),
@@ -1132,7 +1073,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Insertion should have succeed");
 
-        let activity = build_activity_with_timeseries_starting_at(
+        let activity = build_activity_starting_at(
             &"2025-10-03T12:34:00+02:00"
                 .parse::<DateTime<FixedOffset>>()
                 .unwrap(),
@@ -1166,7 +1107,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_timeseries_starting_at(
+        let activity = build_activity_starting_at(
             &"2025-09-10T08:34:00-10:00"
                 .parse::<DateTime<FixedOffset>>()
                 .unwrap(),
@@ -1200,13 +1141,13 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Insertion should have succeed");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1235,14 +1176,14 @@ mod test_sqlite_activity_repository {
         .expect("repo should init");
 
         // Save activity without feedback
-        let activity1 = build_activity_with_parsed_data();
+        let activity1 = build_activity();
         repository
             .save_activity(&activity1)
             .await
             .expect("Insertion should have succeed");
 
         // Save activity and add feedback
-        let activity2 = build_activity_with_parsed_data();
+        let activity2 = build_activity();
         repository
             .save_activity(&activity2)
             .await
@@ -1281,7 +1222,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1326,7 +1267,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1389,7 +1330,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1469,7 +1410,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1554,7 +1495,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1636,7 +1577,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1661,7 +1602,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1727,7 +1668,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1771,7 +1712,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1805,7 +1746,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1839,12 +1780,12 @@ mod test_sqlite_activity_repository {
         .expect("repo should init");
 
         // Insert 2 activities
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Save should have succeeded");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1878,12 +1819,12 @@ mod test_sqlite_activity_repository {
         .expect("repo should init");
 
         // Insert 2 activities
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Save should have succeeded");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1926,12 +1867,12 @@ mod test_sqlite_activity_repository {
         .expect("repo should init");
 
         // Insert 2 activities
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Save should have succeeded");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -1976,13 +1917,13 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
             .expect("Insertion should have succeed");
 
-        let another_activity = build_activity_with_parsed_data();
+        let another_activity = build_activity();
         repository
             .save_activity(&another_activity)
             .await
@@ -2036,7 +1977,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -2066,7 +2007,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
         repository
             .save_activity(&activity)
             .await
@@ -2082,9 +2023,9 @@ mod test_sqlite_activity_repository {
     #[tokio::test]
     async fn test_list_all_raw_activities_skip_missing_raw_files() {
         let db_file = NamedTempFile::new().unwrap();
-        let activity_1 = build_activity_with_parsed_data();
+        let activity_1 = build_activity();
         let activity_1_id = activity_1.id().clone();
-        let activity_2 = build_activity_with_parsed_data();
+        let activity_2 = build_activity();
 
         let mut raw_data_repository = MockRawDataRepository::new();
         raw_data_repository
@@ -2144,7 +2085,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-            let activity = build_activity_with_parsed_data();
+            let activity = build_activity();
             repository
                 .save_activity(&activity)
                 .await
@@ -2192,7 +2133,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-            let activity = build_activity_with_parsed_data();
+            let activity = build_activity();
             repository
                 .save_activity(&activity)
                 .await
@@ -2223,7 +2164,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-            let activity = build_activity_with_parsed_data();
+            let activity = build_activity();
             repository
                 .save_activity(&activity)
                 .await
@@ -2252,7 +2193,7 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("repo should init");
-            let activity = build_activity_with_parsed_data();
+            let activity = build_activity();
             assert_eq!(
                 sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
                     .fetch_one(&repository.pool)
@@ -2384,7 +2325,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2422,7 +2363,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2460,7 +2401,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2498,7 +2439,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2536,7 +2477,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2574,7 +2515,7 @@ mod test_sqlite_activity_repository {
         )
         .await
         .expect("repo should init");
-        let activity = build_activity_with_parsed_data();
+        let activity = build_activity();
 
         repository
             .save_activity(&activity)
@@ -2608,7 +2549,7 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("repo should init");
-            let activity = build_activity_with_parsed_data();
+            let activity = build_activity();
 
             repo.save_activity(&activity)
                 .await
