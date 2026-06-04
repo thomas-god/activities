@@ -130,18 +130,16 @@ where
                 continue;
             }
 
-            let Some(activity_with_timeseries) = self
+            let Some(activity_with_parsed_data) = self
                 .activity_repository
                 .get_activity_with_parsed_data(activity.id())
                 .await?
             else {
-                // We can't find the timeseries so just return the existing metrics
-                // TODO: what about metrics that don't need a timeseries to be computed ?
                 continue;
             };
 
             for metric in missing_metrics {
-                let value = metric.compute_value(&activity_with_timeseries);
+                let value = metric.compute_value(&activity_with_parsed_data);
                 activity_metrics.insert(*metric, value);
 
                 self.activity_repository
@@ -1587,7 +1585,7 @@ mod tests_activity_service {
         }
 
         #[tokio::test]
-        async fn test_activity_with_timeseries_missing() {
+        async fn test_activity_with_parsed_data_missing() {
             let mut activity_repository = MockActivityRepository::new();
             activity_repository
                 .expect_get_activities_with_metrics()

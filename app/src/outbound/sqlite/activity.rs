@@ -219,12 +219,12 @@ where
             Err(err) => return Err(anyhow!(err)),
         };
 
-        let activity_with_timeseries = match self.load_timeseries(id, activity).await {
+        let activity_with_parsed_data = match self.load_timeseries(id, activity).await {
             Ok(value) => value,
             Err(err) => return Err(err),
         };
 
-        Ok(Some(activity_with_timeseries))
+        Ok(Some(activity_with_parsed_data))
     }
 
     async fn list_activities(
@@ -369,12 +369,12 @@ where
 
         let mut res = vec![];
         for activity in activities.into_iter() {
-            let Ok(activity_with_timeseries) =
+            let Ok(activity_with_parsed_data) =
                 self.load_timeseries(&activity.id().clone(), activity).await
             else {
                 continue;
             };
-            res.push(activity_with_timeseries);
+            res.push(activity_with_parsed_data);
         }
         Ok(res)
     }
@@ -1648,7 +1648,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_get_activity_with_timeseries_ok() {
+    async fn test_get_activity_with_parsed_data_ok() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
@@ -1695,7 +1695,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_get_activity_with_timeseries_get_raw_data_fails() {
+    async fn test_get_activity_with_parsed_data_get_raw_data_fails() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
@@ -1725,7 +1725,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_get_activity_with_timeseries_raw_data_parsing_fails() {
+    async fn test_get_activity_with_parsed_data_raw_data_parsing_fails() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
@@ -1759,7 +1759,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_list_activities_with_timeseries_ok() {
+    async fn test_list_activities_with_parsed_data_ok() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
@@ -1800,7 +1800,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_list_activities_with_timeseries_with_limit() {
+    async fn test_list_activities_with_parsed_data_with_limit() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
@@ -1842,7 +1842,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_list_activities_with_timeseries_ok_ignore_failed_activities() {
+    async fn test_list_activities_with_parsed_data_ok_ignore_failed_activities() {
         let mut raw_data_repo = MockRawDataRepository::new();
         raw_data_repo
             .expect_get_raw_data()
