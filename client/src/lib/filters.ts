@@ -171,9 +171,9 @@ export const filterActivities = (
 			}
 		}
 
-		if (!applyRangeFilter(activity.statistics['Duration'], filters.durationRange)) return false;
-		if (!applyRangeFilter(activity.statistics['Distance'], filters.distanceRange)) return false;
-		if (!applyRangeFilter(activity.statistics['Elevation'], filters.elevationRange)) return false;
+		if (!applyRangeFilter(activity.metrics['Duration'], filters.durationRange)) return false;
+		if (!applyRangeFilter(activity.metrics['Distance'], filters.distanceRange)) return false;
+		if (!applyRangeFilter(activity.metrics['Elevation'], filters.elevationRange)) return false;
 
 		return true;
 	});

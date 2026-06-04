@@ -78,7 +78,7 @@
 	// Compute per-field min/max from the activity list for placeholder hints
 	let activityDurationRange = $derived.by(() => {
 		const values = activities
-			.map((a) => a.statistics['Duration'])
+			.map((a) => a.metrics['Duration'])
 			.filter((v): v is number => v !== undefined);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values) / 60, max: Math.max(...values) / 60 };
@@ -86,7 +86,7 @@
 
 	let activityDistanceRange = $derived.by(() => {
 		const values = activities
-			.map((a) => a.statistics['Distance'])
+			.map((a) => a.metrics['Distance'])
 			.filter((v): v is number => v !== undefined);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values) / 1000, max: Math.max(...values) / 1000 };
@@ -94,7 +94,7 @@
 
 	let activityElevationRange = $derived.by(() => {
 		const values = activities
-			.map((a) => a.statistics['Elevation'])
+			.map((a) => a.metrics['Elevation'])
 			.filter((v): v is number => v !== undefined);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values), max: Math.max(...values) };

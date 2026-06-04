@@ -210,7 +210,7 @@
 								{activity.name || sportDisplay(activity.sport)}
 							</span>
 							<span class="text-xs opacity-60">
-								{formatDuration(activity.statistics['Duration'] ?? 0)}
+								{formatDuration(activity.metrics['Duration'] ?? 0)}
 							</span>
 						</button>
 					{/each}
@@ -257,7 +257,7 @@
 								</div>
 								<div class="text-xs opacity-60">
 									{dayjs(activity.start_time).format('HH:mm')} • {formatDuration(
-										activity.statistics['Duration'] ?? 0
+										activity.metrics['Duration'] ?? 0
 									)}
 								</div>
 							</div>

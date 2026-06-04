@@ -17,8 +17,6 @@ const NutritionSchema = z.object({
 
 /**
  * Canonical schema for an activity returned by the API.
- * All quantity fields (duration, distance, elevation, …) are surfaced through
- * `statistics` so that every endpoint returns an identical shape.
  */
 export const ActivitySchema = z.object({
 	id: z.string(),
@@ -30,7 +28,7 @@ export const ActivitySchema = z.object({
 	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
 	feedback: z.string().nullable(),
 	nutrition: NutritionSchema.nullable(),
-	statistics: z.record(z.string(), z.number())
+	metrics: z.record(z.string(), z.number())
 });
 
 const ActivityListSchema = z.array(ActivitySchema);

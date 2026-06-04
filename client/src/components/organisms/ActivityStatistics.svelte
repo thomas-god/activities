@@ -6,18 +6,18 @@
 
 	let { activity }: { activity: ActivityWithTimeseries } = $props();
 
-	let statistics = $derived(new Map(Object.entries(activity.statistics)));
+	let metrics = $derived(new Map(Object.entries(activity.metrics)));
 
-	let calories = $derived(statistics.get('Calories'));
+	let calories = $derived(metrics.get('Calories'));
 	let distance = $derived.by(() => {
-		const value = statistics.get('Distance');
+		const value = metrics.get('Distance');
 		if (value === undefined) {
 			return value;
 		}
 		return value / 1000;
 	});
 	let duration = $derived(activity.timeseries.active_time.at(-1) ?? undefined);
-	let elevation = $derived(statistics.get('Elevation'));
+	let elevation = $derived(metrics.get('Elevation'));
 	let avgHeartRate = $derived(timeseriesAvg(activity.timeseries.metrics, 'HeartRate'));
 	let maxHeartRate = $derived(timeseriesMaximum(activity.timeseries.metrics, 'HeartRate'));
 	let averageSpeed = $derived.by(() => {

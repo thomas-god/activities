@@ -17,7 +17,7 @@ const makeActivity = (overrides: Partial<Activity> = {}): Activity => ({
 	workout_type: null,
 	feedback: null,
 	nutrition: null,
-	statistics: {},
+	metrics: {},
 	...overrides
 });
 
@@ -182,7 +182,7 @@ describe('filterActivities', () => {
 
 	describe('duration range filter', () => {
 		it('includes an activity whose duration is within the range', () => {
-			const activity = makeActivity({ statistics: { Duration: 3600 } });
+			const activity = makeActivity({ metrics: { Duration: 3600 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -193,7 +193,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is below the minimum', () => {
-			const activity = makeActivity({ statistics: { Duration: 600 } });
+			const activity = makeActivity({ metrics: { Duration: 600 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -204,7 +204,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is above the maximum', () => {
-			const activity = makeActivity({ statistics: { Duration: 10000 } });
+			const activity = makeActivity({ metrics: { Duration: 10000 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -215,7 +215,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity with no Duration statistic when a duration range is set', () => {
-			const activity = makeActivity({ statistics: {} });
+			const activity = makeActivity({ metrics: {} });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -226,7 +226,7 @@ describe('filterActivities', () => {
 		});
 
 		it('includes an activity when only min is set and the value equals min', () => {
-			const activity = makeActivity({ statistics: { Duration: 1800 } });
+			const activity = makeActivity({ metrics: { Duration: 1800 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -239,7 +239,7 @@ describe('filterActivities', () => {
 
 	describe('distance range filter', () => {
 		it('includes an activity whose distance is within the range', () => {
-			const activity = makeActivity({ statistics: { Distance: 8000 } });
+			const activity = makeActivity({ metrics: { Distance: 8000 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -250,7 +250,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose distance is below the minimum', () => {
-			const activity = makeActivity({ statistics: { Distance: 2000 } });
+			const activity = makeActivity({ metrics: { Distance: 2000 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -261,7 +261,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose distance is above the maximum', () => {
-			const activity = makeActivity({ statistics: { Distance: 15000 } });
+			const activity = makeActivity({ metrics: { Distance: 15000 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -272,7 +272,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity with no Distance statistic when a distance range is set', () => {
-			const activity = makeActivity({ statistics: {} });
+			const activity = makeActivity({ metrics: {} });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -285,7 +285,7 @@ describe('filterActivities', () => {
 
 	describe('elevation range filter', () => {
 		it('includes an activity whose elevation is within the range', () => {
-			const activity = makeActivity({ statistics: { Elevation: 300 } });
+			const activity = makeActivity({ metrics: { Elevation: 300 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -296,7 +296,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose elevation is below the minimum', () => {
-			const activity = makeActivity({ statistics: { Elevation: 50 } });
+			const activity = makeActivity({ metrics: { Elevation: 50 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -307,7 +307,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose elevation is above the maximum', () => {
-			const activity = makeActivity({ statistics: { Elevation: 800 } });
+			const activity = makeActivity({ metrics: { Elevation: 800 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -318,7 +318,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity with no Elevation statistic when an elevation range is set', () => {
-			const activity = makeActivity({ statistics: {} });
+			const activity = makeActivity({ metrics: {} });
 
 			const result = filterActivities([activity], {
 				...noFilters,
