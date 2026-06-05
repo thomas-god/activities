@@ -14,11 +14,12 @@ use uuid::Uuid;
 
 use crate::domain::models::UserId;
 
-pub const DEFAULT_METRICS: [ActivityMetricV2; 4] = [
+pub const DEFAULT_METRICS: [ActivityMetricV2; 5] = [
     ActivityMetricV2::Calories,
     ActivityMetricV2::Duration,
     ActivityMetricV2::Elevation,
     ActivityMetricV2::Distance,
+    ActivityMetricV2::ActiveDuration,
 ];
 
 ///////////////////////////////////////////////////////////////////
@@ -902,6 +903,8 @@ pub enum ActivityMetricV2 {
     NormalizedPower,
 
     // Derived from timeseries
+    ActiveDuration,
+
     MaxSpeed,
     MinSpeed,
     AvgSpeed,
@@ -934,6 +937,11 @@ impl ActivityMetricV2 {
             ActivityMetricSource::Timeseries((metric, aggregate)) => {
                 aggregate.value_from_timeseries(&metric, activity)
             }
+            ActivityMetricSource::ActiveDuration => activity
+                .timeseries()
+                .active_time()
+                .duration()
+                .map(|duration| duration as f64),
         }
     }
 
@@ -949,6 +957,8 @@ impl ActivityMetricV2 {
             }
 
             // Derived from timeseries
+            Self::ActiveDuration => ActivityMetricSource::ActiveDuration,
+
             Self::MaxSpeed => ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Speed,
                 TimeseriesAggregate::Max,
@@ -1057,6 +1067,7 @@ impl ActivityMetricsV2 {
 pub enum ActivityMetricSource {
     Statistic(ActivityStatistic),
     Timeseries((TimeseriesMetric, TimeseriesAggregate)),
+    ActiveDuration,
 }
 
 impl ToUnit for ActivityMetricSource {
@@ -1064,6 +1075,7 @@ impl ToUnit for ActivityMetricSource {
         match self {
             Self::Statistic(stat) => stat.unit(),
             Self::Timeseries((metric, _)) => metric.unit(),
+            Self::ActiveDuration => Unit::Second,
         }
     }
 }
@@ -1142,6 +1154,7 @@ impl TryFrom<&ActivityMetricSource> for ActivityMetricV2 {
                     metric, aggregate
                 )),
             },
+            ActivityMetricSource::ActiveDuration => Ok(ActivityMetricV2::ActiveDuration),
         }
     }
 }

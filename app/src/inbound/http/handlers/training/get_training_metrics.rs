@@ -152,6 +152,7 @@ fn format_source(source: &ActivityMetricSource) -> String {
         ActivityMetricSource::Timeseries((metric, aggregate)) => {
             format!("Activity {aggregate:?} {metric:?}")
         }
+        ActivityMetricSource::ActiveDuration => "ActiveDuration".into(),
     }
 }
 

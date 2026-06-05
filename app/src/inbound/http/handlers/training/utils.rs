@@ -238,6 +238,9 @@ pub fn convert_metric_values(
             ),
             _ => (metric.unit(), values),
         },
+        ActivityMetricSource::ActiveDuration => {
+            (ActivityMetricSource::ActiveDuration.unit(), values)
+        }
     }
 }
 

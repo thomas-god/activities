@@ -796,6 +796,8 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricV2 {
             Self::Distance => "distance",
             Self::NormalizedPower => "normalized-power",
 
+            Self::ActiveDuration => "active-duration",
+
             Self::MaxSpeed => "max-speed",
             Self::MinSpeed => "min-speed",
             Self::AvgSpeed => "avg-speed",
@@ -834,6 +836,8 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricV2 {
             "elevation" => Ok(Self::Elevation),
             "distance" => Ok(Self::Distance),
             "normalized-power" => Ok(Self::NormalizedPower),
+
+            "active-duration" => Ok(Self::ActiveDuration),
 
             "max-speed" => Ok(Self::MaxSpeed),
             "min-speed" => Ok(Self::MinSpeed),
