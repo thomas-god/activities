@@ -26,7 +26,7 @@
 		{ id: 'calories', metric: 'Calories' },
 		{ id: 'elevation', metric: 'Elevation' },
 		{ id: 'distance', metric: 'Distance' },
-		{ id: 'duration', metric: 'Duration' },
+		{ id: 'active-duration', metric: 'ActiveDuration' },
 		{ id: 'normalized-power', metric: 'NormalizedPower' },
 		// Heart rate timeseries
 		{ id: 'hr-max', metric: 'MaxHeartRate' },
@@ -285,7 +285,7 @@
 					<option value="calories">Calories</option>
 					<option value="elevation">Elevation gain</option>
 					<option value="distance">Distance</option>
-					<option value="duration">Duration</option>
+					<option value="active-duration">Duration</option>
 					<option value="normalized-power">Normalized power</option>
 				</optgroup>
 				<optgroup label="Heart Rate">

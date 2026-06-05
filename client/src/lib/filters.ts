@@ -171,7 +171,7 @@ export const filterActivities = (
 			}
 		}
 
-		if (!applyRangeFilter(activity.metrics['Duration'], filters.durationRange)) return false;
+		if (!applyRangeFilter(activity.metrics['ActiveDuration'], filters.durationRange)) return false;
 		if (!applyRangeFilter(activity.metrics['Distance'], filters.distanceRange)) return false;
 		if (!applyRangeFilter(activity.metrics['Elevation'], filters.elevationRange)) return false;
 

@@ -74,7 +74,7 @@
 				</span>
 			{/if}
 			<span class="font-semibold sm:text-lg">
-				{formatDuration(activity.metrics['Duration'] ?? 0)}
+				{formatDuration(activity.metrics['ActiveDuration'] ?? 0)}
 			</span>
 		</div>
 	</div>

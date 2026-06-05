@@ -78,7 +78,7 @@
 	// Compute per-field min/max from the activity list for placeholder hints
 	let activityDurationRange = $derived.by(() => {
 		const values = activities
-			.map((a) => a.metrics['Duration'])
+			.map((a) => a.metrics['ActiveDuration'])
 			.filter((v): v is number => v !== undefined);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values) / 60, max: Math.max(...values) / 60 };
