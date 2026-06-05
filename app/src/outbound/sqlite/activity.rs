@@ -11,8 +11,7 @@ use crate::{
             activity::{
                 Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
                 ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition,
-                ActivityRpe, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                ActivityWithParsedData, Sport, WorkoutType,
+                ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
             },
         },
         ports::{
@@ -32,8 +31,8 @@ type ActivityRow = (
     UserId,
     Option<ActivityName>,
     ActivityStartTime,
+    Option<ActivityDuration>,
     Sport,
-    ActivityStatistics,
     Option<ActivityRpe>,
     Option<WorkoutType>,
     Option<ActivityNutrition>,
@@ -166,8 +165,8 @@ where
 
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
         match sqlx::query_as::<_, ActivityRow>(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback
-            FROM t_activities
+            "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
+            FROM t_activities_v2
             WHERE id = ?1
             LIMIT 1;",
         )
@@ -175,35 +174,24 @@ where
         .fetch_one(&self.pool)
         .await
         {
-            Ok((
-                id,
-                user_id,
-                name,
-                start_time,
-                sport,
-                statistics,
-                rpe,
-                workout_type,
-                nutrition,
-                feedback,
-            )) => {
-                let duration = statistics
-                    .get(&ActivityStatistic::Duration)
-                    .map_or_else(ActivityDuration::default, |d| ActivityDuration::from(*d));
+            Ok((id, user_id, name, start_time, duration , sport, rpe, workout_type, nutrition, feedback)) => {
 
                 Ok(Some(Activity::new(
-                id,
-                user_id,
-                name,
-                start_time,
-                duration,
-                sport,
-                rpe,
-                workout_type,
-                nutrition,
-                feedback,
-            )))},
-            Err(sqlx::Error::RowNotFound) => Err(GetActivityError::ActivityDoesNotExist(id.clone())),
+                    id,
+                    user_id,
+                    name,
+                    start_time,
+                    duration.unwrap_or_default(),
+                    sport,
+                    rpe,
+                    workout_type,
+                    nutrition,
+                    feedback,
+                )))
+            }
+            Err(sqlx::Error::RowNotFound) => {
+                Err(GetActivityError::ActivityDoesNotExist(id.clone()))
+            }
             Err(err) => Err(GetActivityError::Unknown(anyhow!(err))),
         }
     }
@@ -277,10 +265,10 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, sport, statistics, rpe, workout_type, nutrition, feedback
-            FROM t_activities ",
+            "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
+            FROM t_activities_v2",
         );
-        builder.push("WHERE user_id = ").push_bind(user);
+        builder.push(" WHERE user_id = ").push_bind(user);
 
         if let Some(date_range) = filters.date_range() {
             builder
@@ -311,24 +299,19 @@ where
                             user_id,
                             name,
                             start_time,
+                            duration,
                             sport,
-                            statistics,
                             rpe,
                             workout_type,
                             nutrition,
                             feedback,
                         )| {
-                            let duration = statistics
-                                .get(&ActivityStatistic::Duration)
-                                .map_or_else(ActivityDuration::default, |d| {
-                                    ActivityDuration::from(*d)
-                                });
                             Activity::new(
                                 id,
                                 user_id,
                                 name,
                                 start_time,
-                                duration,
+                                duration.unwrap_or_default(),
                                 sport,
                                 rpe,
                                 workout_type,
@@ -348,7 +331,7 @@ where
     ) -> Result<RawActivity, GetRawActivityError> {
         let Some(_) = sqlx::query_as::<_, (ActivityId,)>(
             "SELECT id
-            FROM t_activities
+            FROM t_activities_v2
             WHERE user_id = ?1 and id = ?2
             LIMIT 1;",
         )
@@ -379,7 +362,7 @@ where
     ) -> Result<Vec<RawActivity>, ListActivitiesError> {
         let activities: Vec<ActivityId> = sqlx::query_as::<_, (ActivityId,)>(
             "SELECT id
-            FROM t_activities
+            FROM t_activities_v2
             WHERE user_id = ?1;",
         )
         .bind(user)
@@ -723,7 +706,7 @@ where
         &self,
         natural_key: &ActivityNaturalKey,
     ) -> Result<bool, SimilarActivityError> {
-        match sqlx::query("SELECT natural_key FROM t_activities WHERE natural_key = ?1;")
+        match sqlx::query("SELECT natural_key FROM t_activities_v2 WHERE natural_key = ?1;")
             .bind(natural_key)
             .fetch_optional(&self.pool)
             .await
@@ -742,7 +725,7 @@ where
         match sqlx::query_as::<_, (Option<DateTime<FixedOffset>>, Option<DateTime<FixedOffset>>)>(
             "
         SELECT MIN(start_time), MAX(start_time)
-        FROM t_activities
+        FROM t_activities_v2
         WHERE user_id = ?1;",
         )
         .bind(user)
@@ -800,7 +783,7 @@ mod test_sqlite_activity_repository {
         .await
         .expect("repo should init");
 
-        sqlx::query("select count(*) from t_activities;")
+        sqlx::query("select count(*) from t_activities_v2;")
             .fetch_one(&repository.pool)
             .await
             .unwrap();
@@ -896,6 +879,14 @@ mod test_sqlite_activity_repository {
                 .unwrap(),
             1
         );
+
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            1
+        );
     }
 
     #[tokio::test]
@@ -927,6 +918,14 @@ mod test_sqlite_activity_repository {
                 .unwrap(),
             1
         );
+
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            1
+        );
     }
 
     #[tokio::test]
@@ -953,6 +952,13 @@ mod test_sqlite_activity_repository {
                 .unwrap(),
             1
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            1
+        );
 
         repository
             .delete_activity(activity.id())
@@ -961,6 +967,13 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(
             sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
+                .fetch_one(&repository.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
                 .fetch_one(&repository.pool)
                 .await
                 .unwrap(),
@@ -1332,6 +1345,15 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             0
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_activities_v2 where name = 'a new name';"
+            )
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            0
+        );
 
         repository
             .modify_activity_name(
@@ -1344,6 +1366,15 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityName>>(
                 "select name from t_activities where name = 'a new name';"
+            )
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(ActivityName::from("a new name"))
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityName>>(
+                "select name from t_activities_v2 where name = 'a new name';"
             )
             .fetch_one(&repository.pool)
             .await
@@ -1379,6 +1410,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             None
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                "select rpe from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
 
         // Update RPE to 5
         repository
@@ -1396,6 +1437,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             Some(ActivityRpe::Five)
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                r#"select rpe as "rpe?" from t_activities_v2 where id = ?1;"#
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(ActivityRpe::Five)
+        );
 
         // Update RPE to None (clear it)
         repository
@@ -1406,6 +1457,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityRpe>>(
                 "select rpe from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityRpe>>(
+                "select rpe from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1442,6 +1503,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             None
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
 
         // Update workout_type to Intervals
         repository
@@ -1452,6 +1523,17 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(WorkoutType::Intervals)
+        );
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1476,6 +1558,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             Some(WorkoutType::Tempo)
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(WorkoutType::Tempo)
+        );
 
         // Update workout_type to None (clear it)
         repository
@@ -1486,6 +1578,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<WorkoutType>>(
+                "select workout_type from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1522,6 +1624,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             None
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
 
         // Update nutrition to bonked with details
         let nutrition_bonked = ActivityNutrition::new(
@@ -1536,6 +1648,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(nutrition_bonked.clone())
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1559,6 +1681,17 @@ mod test_sqlite_activity_repository {
             .fetch_one(&repository.pool)
             .await
             .unwrap(),
+            Some(nutrition_none.clone())
+        );
+
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
             Some(nutrition_none)
         );
 
@@ -1571,6 +1704,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
+                "select nutrition from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1607,6 +1750,16 @@ mod test_sqlite_activity_repository {
             .unwrap(),
             None
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
 
         // Update feedback with some text
         let feedback_text = ActivityFeedback::from("Felt great today! Weather was perfect.");
@@ -1618,6 +1771,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            Some(feedback_text.clone())
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
@@ -1641,6 +1804,16 @@ mod test_sqlite_activity_repository {
             .fetch_one(&repository.pool)
             .await
             .unwrap(),
+            Some(feedback_updated.clone())
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities_v2 where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
             Some(feedback_updated)
         );
 
@@ -1653,6 +1826,16 @@ mod test_sqlite_activity_repository {
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities where id = ?1;"
+            )
+            .bind(activity.id())
+            .fetch_one(&repository.pool)
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
+                "select feedback from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
             .fetch_one(&repository.pool)
