@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ActivitiesSelect from '$components/molecules/ActivitiesSelect.svelte';
 	import CompareActivities from '$components/organisms/CompareActivities.svelte';
+	import CompareActivitiesSummary from '$components/organisms/CompareActivitiesSummary.svelte';
 	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
 	import type { PageProps } from './$types';
 
@@ -37,6 +38,9 @@
 {/await}
 
 {#if loadedActivities.length > 0}
+	<div class="mt-4 rounded-box bg-base-100 p-4 shadow-md">
+		<CompareActivitiesSummary activities={loadedActivities} />
+	</div>
 	<div class="mt-4 rounded-box bg-base-100 p-4 shadow-md">
 		<CompareActivities activities={loadedActivities} />
 	</div>

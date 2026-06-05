@@ -70,19 +70,18 @@
 					class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
 				>
 					<li>
+						<button onclick={() => goto(`/activities/compare?activities=${activity.id}`)}>
+							<img src="/icons/chart.svg" alt="Chart icon" class="h-6 w-6" /> Compare
+						</button>
+					</li>
+					<li>
 						<button onclick={onDownloadCallback}>
 							<img src="/icons/download.svg" alt="Download arrow icon" class="h-6 w-6" /> Download
 						</button>
 					</li>
 					<li>
 						<button onclick={onDeleteClickedCallback} class="text-error">
-							<img src="/icons/delete.svg" alt="Bin delete icon" class="h-6 w-6" /> Delete Activity
-						</button>
-					</li>
-
-					<li>
-						<button onclick={() => goto(`/activities/compare?activities=${activity.id}`)}>
-							<img src="/icons/chart.svg" alt="Chart icon" class="h-6 w-6" /> Compare to others
+							<img src="/icons/delete.svg" alt="Bin delete icon" class="h-6 w-6" /> Delete
 						</button>
 					</li>
 				</ul>
