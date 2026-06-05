@@ -19,6 +19,7 @@
 	import type { Nutrition } from '$lib/nutrition';
 	import { sportDisplay } from '$lib/sport';
 	import type { ActivityWithTimeseries } from '$lib/api/activities';
+	import { isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
 
 	interface Props {
 		activity: ActivityWithTimeseries;
@@ -69,7 +70,11 @@
 	);
 	let hasPowerData = $derived(powerValues !== null && powerValues.some((v) => v !== null));
 
-	let metricOptions: { option: Metric; display: string }[] = [
+	interface MetricOption {
+		option: Metric;
+		display: string;
+	}
+	let metricOptions: MetricOption[] = [
 		{ option: 'HeartRate', display: 'Heart rate' },
 		{ option: 'Speed', display: 'Speed' },
 		{ option: 'Power', display: 'Power' },
@@ -92,10 +97,15 @@
 
 	// We use $derived to recalculate when availableOptions changes
 	// svelte-ignore state_referenced_locally
-	let selectedOptions = $state([availableOptions[0]]);
+	let selectedOptions: Option<MetricOption[]> = $state(
+		availableOptions.length > 0 ? some([availableOptions[0]]) : none()
+	);
 
 	let selectedMetrics = $derived.by(() => {
-		return selectedOptions.map((option) => {
+		if (isNone(selectedOptions)) {
+			return;
+		}
+		return selectedOptions.value.map((option) => {
 			return {
 				values: active_metrics.metrics[option.option!].values,
 				name: option.option,
@@ -307,36 +317,47 @@
 		</div>
 	</details>
 
-	<details class={`collapse-arrow collapse ${sectionClass}`} open>
-		<summary class="collapse-title text-lg font-semibold">Metrics</summary>
-		<div class="collapse-content px-0">
-			<fieldset class="fieldset px-4">
-				<MetricsMultiSelect {availableOptions} maxSelected={3} bind:selectedOptions />
-			</fieldset>
-			{#if selectedMetrics}
-				<div class="px-2 pb-2">
-					<div class=" w-full overflow-hidden" bind:clientWidth={chartWidth}>
-						<TimeseriesChart
-							bind:this={chart}
-							time={active_metrics.time}
-							distance={active_distance}
-							metrics={selectedMetrics}
-							height={chartHeight}
-							width={chartWidth}
-							{selectedLap}
-						/>
+	{#if isSome(selectedOptions)}
+		<details class={`collapse-arrow collapse ${sectionClass}`} open>
+			<summary class="collapse-title text-lg font-semibold">Metrics</summary>
+			<div class="collapse-content px-0">
+				<fieldset class="fieldset px-4">
+					<MetricsMultiSelect
+						{availableOptions}
+						maxSelected={3}
+						bind:selectedOptions={
+							() => (selectedOptions as Some<MetricOption[]>).value,
+							(v) => (selectedOptions = some(v))
+						}
+					/>
+				</fieldset>
+				{#if selectedMetrics}
+					<div class="px-2 pb-2">
+						<div class=" w-full overflow-hidden" bind:clientWidth={chartWidth}>
+							<TimeseriesChart
+								bind:this={chart}
+								time={active_metrics.time}
+								distance={active_distance}
+								metrics={selectedMetrics}
+								height={chartHeight}
+								width={chartWidth}
+								{selectedLap}
+							/>
+						</div>
 					</div>
-				</div>
-			{/if}
-		</div>
-	</details>
+				{/if}
+			</div>
+		</details>
+	{/if}
 
-	<details class={`collapse-arrow collapse ${sectionClass}`} open>
-		<summary class="collapse-title text-lg font-semibold">Laps</summary>
-		<div class="collapse-content overflow-x-scroll">
-			<ActivityLaps {activity} bind:selectedLap {onLapSelectedCallback} />
-		</div>
-	</details>
+	{#if activity.timeseries.laps.length > 0}
+		<details class={`collapse-arrow collapse ${sectionClass}`} open>
+			<summary class="collapse-title text-lg font-semibold">Laps</summary>
+			<div class="collapse-content overflow-x-scroll">
+				<ActivityLaps {activity} bind:selectedLap {onLapSelectedCallback} />
+			</div>
+		</details>
+	{/if}
 
 	{#if hasGpsData}
 		<details class={`collapse-arrow collapse ${sectionClass}`} open>

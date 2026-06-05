@@ -240,3 +240,51 @@ export async function downloadAllActivities(): Promise<void> {
 	window.URL.revokeObjectURL(url);
 	document.body.removeChild(a);
 }
+
+export type StandaloneActivityPayload = {
+	start_time: string;
+	duration: number;
+	sport: (typeof sports)[number];
+	distance?: number;
+	elevation?: number;
+	calories?: number;
+};
+
+export type PostStandaloneActivityResponse =
+	| { type: 'success'; id: string }
+	| { type: 'duplicate' }
+	| { type: 'error' }
+	| { type: 'authentication-error' };
+
+const PostStandaloneActivityResponseSchema = z.object({ id: z.string() });
+
+export async function postStandaloneActivity(
+	payload: StandaloneActivityPayload
+): Promise<PostStandaloneActivityResponse> {
+	try {
+		const response = await fetch(`${PUBLIC_APP_URL}/api/activity/standalone`, {
+			method: 'POST',
+			credentials: 'include',
+			mode: 'cors',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+
+		if (response.ok) {
+			const data = PostStandaloneActivityResponseSchema.parse(await response.json());
+			return { type: 'success', id: data.id };
+		}
+
+		if (response.status === 401) {
+			return { type: 'authentication-error' };
+		}
+
+		if (response.status === 409) {
+			return { type: 'duplicate' };
+		}
+
+		return { type: 'error' };
+	} catch {
+		return { type: 'error' };
+	}
+}

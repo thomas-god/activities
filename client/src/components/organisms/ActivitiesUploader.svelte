@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { postActivities } from '$lib/api';
+	import CreateStandaloneActivity from './CreateStandaloneActivity.svelte';
 
 	let { activitiesUploadedCallback }: { activitiesUploadedCallback: () => void } = $props();
 
@@ -65,63 +66,69 @@
 	};
 </script>
 
-<fieldset class="fieldset rounded-box border-base-300 bg-base-100 p-2">
-	<legend class="fieldset-legend text-base">Upload new activities</legend>
-	<div class="join gap-3">
-		<input
-			type="file"
-			class="file-input"
-			accept=".fit,.fit.gz,.tcx,.tcx.gz"
-			multiple
-			bind:files
-			bind:value={file_upload_content}
-			id="activity_file"
-			name="activity file"
-		/>
-		<button
-			class="btn rounded-lg btn-primary"
-			disabled={!can_upload}
-			onclick={() => postActivitiesCallback()}
-		>
-			{#if formState === 'Pending'}
-				<span class="loading loading-spinner"></span>
-			{:else}
-				Upload
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+	<fieldset class="fieldset rounded-box border-base-300 bg-base-100 p-2">
+		<legend class="fieldset-legend text-base">Upload new activities</legend>
+		<div class="join gap-3">
+			<input
+				type="file"
+				class="file-input"
+				accept=".fit,.fit.gz,.tcx,.tcx.gz"
+				multiple
+				bind:files
+				bind:value={file_upload_content}
+				id="activity_file"
+				name="activity file"
+			/>
+			<button
+				class="btn rounded-lg btn-primary"
+				disabled={!can_upload}
+				onclick={() => postActivitiesCallback()}
+			>
+				{#if formState === 'Pending'}
+					<span class="loading loading-spinner"></span>
+				{:else}
+					Upload
+				{/if}
+			</button>
+		</div>
+		<p class="label">.fit and .tcx files are supported, max 1 GB</p>
+		{#if formState === 'Success'}
+			<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
+				Files successfully uploaded ! ({nbOfCreatedActivities} new activities)
+			</div>
+			{#if duplicatedFiles.length > 0}
+				<div class="mt-2 rounded-box bg-warning/20 p-3 text-warning-content">
+					Some files ({duplicatedFiles.length}) were already imported and have been skipped
+					<ul>
+						{#each duplicatedFiles as file}
+							<li>
+								{file}
+							</li>
+						{/each}
+					</ul>
+				</div>
 			{/if}
-		</button>
-	</div>
-	<p class="label">.fit and .tcx files are supported, max 1 GB</p>
-	{#if formState === 'Success'}
-		<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
-			Files successfully uploaded ! ({nbOfCreatedActivities} new activities)
-		</div>
-		{#if duplicatedFiles.length > 0}
-			<div class="mt-2 rounded-box bg-warning/20 p-3 text-warning-content">
-				Some files ({duplicatedFiles.length}) were already imported and have been skipped
-				<ul>
-					{#each duplicatedFiles as file}
-						<li>
-							{file}
-						</li>
-					{/each}
-				</ul>
-			</div>
-		{/if}
-		{#if invalidFiles.length > 0}
+			{#if invalidFiles.length > 0}
+				<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
+					Some files ({invalidFiles.length}) could not be processed
+					<ul>
+						{#each invalidFiles as file}
+							<li>
+								{file}
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+		{:else if formState === 'Error'}
 			<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
-				Some files ({invalidFiles.length}) could not be processed
-				<ul>
-					{#each invalidFiles as file}
-						<li>
-							{file}
-						</li>
-					{/each}
-				</ul>
+				An error occurred when trying to upload activities files, try again later.
 			</div>
 		{/if}
-	{:else if formState === 'Error'}
-		<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
-			An error occurred when trying to upload activities files, try again later.
-		</div>
-	{/if}
-</fieldset>
+	</fieldset>
+
+	<div class="divider my-0.5">or</div>
+
+	<CreateStandaloneActivity activityCreatedCallback={activitiesUploadedCallback} />
+</div>
