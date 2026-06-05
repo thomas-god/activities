@@ -9,6 +9,7 @@
 	let formState: 'NotSent' | 'Pending' | 'Success' | 'Error' = $state('NotSent');
 	let duplicatedFiles: string[] = $state([]);
 	let invalidFiles: string[] = $state([]);
+	let nbOfCreatedActivities = $state(0);
 
 	const checkCanUpload = (files: FileList | undefined): files is FileList => {
 		if (files) {
@@ -34,6 +35,8 @@
 		}
 
 		formState = 'Pending';
+		invalidFiles = [];
+		duplicatedFiles = [];
 		let res = await postActivities(formData);
 
 		if (res.type === 'error') {
@@ -49,6 +52,7 @@
 					invalidFiles.push(file);
 				}
 			}
+			nbOfCreatedActivities = res.nbOfProcessedFiles;
 		}
 
 		file_upload_content = '';
@@ -89,11 +93,11 @@
 	<p class="label">.fit and .tcx files are supported, max 1 GB</p>
 	{#if formState === 'Success'}
 		<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
-			Files successfully uploaded !
+			Files successfully uploaded ! ({nbOfCreatedActivities} new activities)
 		</div>
 		{#if duplicatedFiles.length > 0}
 			<div class="mt-2 rounded-box bg-warning/20 p-3 text-warning-content">
-				Some files were already imported and have been skipped
+				Some files ({duplicatedFiles.length}) were already imported and have been skipped
 				<ul>
 					{#each duplicatedFiles as file}
 						<li>
@@ -105,7 +109,7 @@
 		{/if}
 		{#if invalidFiles.length > 0}
 			<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
-				Some files could not be processed
+				Some files ({invalidFiles.length}) could not be processed
 				<ul>
 					{#each invalidFiles as file}
 						<li>

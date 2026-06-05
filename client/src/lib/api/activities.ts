@@ -166,6 +166,7 @@ export type PostActivitiesResponse =
 	| {
 			type: 'success';
 			unprocessed: { file: string; reason: 'duplicated' | 'invalid' }[];
+			nbOfProcessedFiles: number;
 	  }
 	| {
 			type: 'error';
@@ -189,7 +190,7 @@ export async function postActivities(body: FormData): Promise<PostActivitiesResp
 					return { file, reason: mappedReason };
 				});
 
-			return { type: 'success', unprocessed };
+			return { type: 'success', unprocessed, nbOfProcessedFiles: data.created_ids.length };
 		}
 
 		if (response.status === 401) {
