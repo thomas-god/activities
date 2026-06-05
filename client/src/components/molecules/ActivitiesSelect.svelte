@@ -79,7 +79,9 @@
 				}}>-</button
 			>
 			<div class="shrink-0">
-				{activity.name || activity.sport}
+				<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+					{activity.name || activity.sport}
+				</a>
 			</div>
 			<div class="shrink-0 text-sm tracking-wide italic opacity-70">
 				{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
@@ -89,52 +91,57 @@
 		<p class="italic">No activity selected</p>
 	{/each}
 </div>
-
-<div class="mt-3 mb-1 flex flex-row flex-wrap items-center gap-2">
-	<h2 class="text-lg">Available activities</h2>
-	<div class="flex flex-row gap-1">
-		<label class="input input-sm">
-			<svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-				<g
-					stroke-linejoin="round"
-					stroke-linecap="round"
-					stroke-width="2.5"
-					fill="none"
-					stroke="currentColor"
-				>
-					<circle cx="11" cy="11" r="8"></circle>
-					<path d="m21 21-4.3-4.3"></path>
-				</g>
-			</svg>
-			<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
-		</label>
-		<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
-	</div>
-</div>
-<div class="max-h-64 overflow-scroll">
-	{#each filteredActivities as activity (activity.id)}
-		{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
-			<div class="flex flex-row items-center gap-2 py-0.5">
-				<div class="shrink-0">
-					<img
-						src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-						class="h-6 w-6"
-						alt="Sport icon"
-					/>
-				</div>
-				<button
-					class="btn mr-1 shrink-0 btn-xs btn-primary"
-					onclick={() => {
-						selectActivity(activity);
-					}}>+</button
-				>
-				<div class="shrink-0">
-					{activity.name || activity.sport}
-				</div>
-				<div class="shrink-0 text-sm tracking-wide italic opacity-70">
-					{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
-				</div>
+<details class="collapse-arrow collapse p-0" open>
+	<summary class="collapse-title mb-1 px-0">
+		<div class="flex flex-row flex-wrap items-center gap-2">
+			<h2 class="text-lg">Available activities</h2>
+			<div class="flex flex-row gap-1">
+				<label class="input input-sm">
+					<svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+						<g
+							stroke-linejoin="round"
+							stroke-linecap="round"
+							stroke-width="2.5"
+							fill="none"
+							stroke="currentColor"
+						>
+							<circle cx="11" cy="11" r="8"></circle>
+							<path d="m21 21-4.3-4.3"></path>
+						</g>
+					</svg>
+					<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
+				</label>
+				<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
 			</div>
-		{/if}
-	{/each}
-</div>
+		</div>
+	</summary>
+	<div class="collapse-content max-h-64 overflow-scroll p-0">
+		{#each filteredActivities as activity (activity.id)}
+			{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
+				<div class="flex flex-row items-center gap-2 py-0.5">
+					<div class="shrink-0">
+						<img
+							src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+							class="h-6 w-6"
+							alt="Sport icon"
+						/>
+					</div>
+					<button
+						class="btn mr-1 shrink-0 btn-xs btn-primary"
+						onclick={() => {
+							selectActivity(activity);
+						}}>+</button
+					>
+					<div class="shrink-0">
+						<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+							{activity.name || activity.sport}
+						</a>
+					</div>
+					<div class="shrink-0 text-sm tracking-wide italic opacity-70">
+						{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
+					</div>
+				</div>
+			{/if}
+		{/each}
+	</div>
+</details>

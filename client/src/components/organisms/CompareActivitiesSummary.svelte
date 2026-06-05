@@ -134,7 +134,9 @@
 								class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full"
 								style="background-color: {d3.schemeTableau10[idx % d3.schemeTableau10.length]}"
 							></span>
-							{activity.name ?? activity.start_time.slice(0, 10)}
+							<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+								{activity.name ?? activity.start_time.slice(0, 10)}
+							</a>
 						</th>
 					{/each}
 				</tr>
