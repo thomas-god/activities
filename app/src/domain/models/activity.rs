@@ -14,12 +14,18 @@ use uuid::Uuid;
 
 use crate::domain::models::UserId;
 
-pub const DEFAULT_METRICS: [ActivityMetricV2; 5] = [
+pub const DEFAULT_METRICS: [ActivityMetricV2; 11] = [
     ActivityMetricV2::Calories,
     ActivityMetricV2::Duration,
     ActivityMetricV2::Elevation,
     ActivityMetricV2::Distance,
     ActivityMetricV2::ActiveDuration,
+    ActivityMetricV2::AvgSpeed,
+    ActivityMetricV2::AvgPace,
+    ActivityMetricV2::AvgHeartRate,
+    ActivityMetricV2::MaxHeartRate,
+    ActivityMetricV2::AvgPower,
+    ActivityMetricV2::NormalizedPower,
 ];
 
 ///////////////////////////////////////////////////////////////////

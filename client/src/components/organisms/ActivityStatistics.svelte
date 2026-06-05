@@ -1,8 +1,7 @@
 <script lang="ts">
 	import type { ActivityWithTimeseries } from '$lib/api';
 	import { formatDuration } from '$lib/duration';
-	import { paceToString, speedToPace } from '$lib/speed';
-	import { timeseriesAvg, timeseriesMaximum, timeseriesQuarticAvg } from '$lib/timeseries';
+	import { paceToString } from '$lib/speed';
 
 	let { activity }: { activity: ActivityWithTimeseries } = $props();
 
@@ -16,22 +15,14 @@
 		}
 		return value / 1000;
 	});
-	let duration = $derived(activity.timeseries.active_time.at(-1) ?? undefined);
+	let duration = $derived(metrics.get('ActiveDuration'));
 	let elevation = $derived(metrics.get('Elevation'));
-	let avgHeartRate = $derived(timeseriesAvg(activity.timeseries.metrics, 'HeartRate'));
-	let maxHeartRate = $derived(timeseriesMaximum(activity.timeseries.metrics, 'HeartRate'));
-	let averageSpeed = $derived.by(() => {
-		if (duration === undefined) {
-			return undefined;
-		}
-		if (distance === undefined) {
-			return undefined;
-		}
-		return distance / (duration / 3600);
-	});
-	let averagePace = $derived(averageSpeed === undefined ? undefined : speedToPace(averageSpeed));
-	let averagePower = $derived(timeseriesAvg(activity.timeseries.metrics, 'Power'));
-	let weightedAveragePower = $derived(timeseriesQuarticAvg(activity.timeseries.metrics, 'Power'));
+	let avgHeartRate = $derived(metrics.get('AvgHeartRate'));
+	let maxHeartRate = $derived(metrics.get('MaxHeartRate'));
+	let averageSpeed = $derived(metrics.get('AvgSpeed'));
+	let averagePace = $derived(metrics.get('AvgPace'));
+	let averagePower = $derived(metrics.get('AvgPower'));
+	let normalizedPower = $derived(metrics.get('NormalizedPower'));
 
 	type StatRow = {
 		icon: string;
@@ -68,7 +59,7 @@
 				rows.push({
 					icon: 'pace.svg',
 					label: 'Pace',
-					value: paceToString(averagePace!),
+					value: paceToString((averagePace! * 1000) / 60),
 					unit: '/km',
 					legend: 'avg'
 				});
@@ -76,7 +67,7 @@
 				rows.push({
 					icon: 'pace.svg',
 					label: 'Speed',
-					value: `${averageSpeed.toFixed(2)}`,
+					value: `${(averageSpeed * 3.6).toFixed(2)}`,
 					unit: 'km/h',
 					legend: 'avg'
 				});
@@ -111,13 +102,13 @@
 			});
 		}
 
-		if (averagePower !== undefined && weightedAveragePower !== undefined) {
+		if (averagePower !== undefined && normalizedPower !== undefined) {
 			rows.push({
 				icon: 'power.svg',
 				label: 'Power',
-				value: `${averagePower.toFixed(0)} / ${weightedAveragePower.toFixed(0)}`,
+				value: `${averagePower.toFixed(0)} / ${normalizedPower.toFixed(0)}`,
 				unit: 'W',
-				legend: 'avg / weighted'
+				legend: 'avg / normalized'
 			});
 		}
 
