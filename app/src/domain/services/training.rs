@@ -940,7 +940,7 @@ mod tests_training_metrics_service {
     use super::*;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
-        ActivityStartTime, ActivityStatistics, Sport,
+        ActivityStartTime, Sport,
     };
 
     use crate::domain::ports::DateRange;
@@ -1254,7 +1254,6 @@ mod tests_training_metrics_service {
                     && *range.end() == NaiveDate::from_ymd_opt(2025, 9, 29).unwrap()
             })
             .returning(|_, _, _| {
-                let stats = ActivityStatistics::default();
                 Ok(vec![(
                     Activity::new_empty(
                         ActivityId::from("test"),
@@ -1269,7 +1268,6 @@ mod tests_training_metrics_service {
                         ),
                         ActivityDuration::default(),
                         Sport::Running,
-                        stats,
                     ),
                     ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::Distance, Some(0.))])),
                 )])
@@ -2077,9 +2075,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_no_sport_filter() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
+        use crate::domain::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
 
         // Create test activities with different sports and dates
         let activities = vec![
@@ -2098,7 +2094,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2117,7 +2112,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Cycling,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2136,7 +2130,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Swimming,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2183,9 +2176,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_with_sport_filter() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
+        use crate::domain::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
         use crate::domain::models::training::SportFilter;
 
         // Create test activities with different sports
@@ -2205,7 +2196,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2224,7 +2214,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Cycling,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2243,7 +2232,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Swimming,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2297,7 +2285,7 @@ mod test_training_service_period {
     #[tokio::test]
     async fn test_get_training_period_with_activities_with_category_filter() {
         use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport, SportCategory,
+            Activity, ActivityId, ActivityStartTime, Sport, SportCategory,
         };
         use crate::domain::models::training::SportFilter;
 
@@ -2318,7 +2306,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2337,7 +2324,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::TrailRunning,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2356,7 +2342,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Cycling,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2419,9 +2404,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_date_filtering() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
+        use crate::domain::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
 
         // Create activities with dates both inside and outside the period
         let activities = vec![
@@ -2441,7 +2424,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2461,7 +2443,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2481,7 +2462,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2529,9 +2509,7 @@ mod test_training_service_period {
 
     #[tokio::test]
     async fn test_get_training_period_with_activities_open_ended_includes_today() {
-        use crate::domain::models::activity::{
-            Activity, ActivityId, ActivityStartTime, ActivityStatistics, Sport,
-        };
+        use crate::domain::models::activity::{Activity, ActivityId, ActivityStartTime, Sport};
         use chrono::{Days, Utc};
 
         let today = Utc::now().date_naive();
@@ -2558,7 +2536,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -2579,7 +2556,6 @@ mod test_training_service_period {
                     .unwrap(),
                     ActivityDuration::default(),
                     Sport::Cycling,
-                    ActivityStatistics::default(),
                 ),
                 ActivityMetricsV2::default(),
             ),
@@ -3332,7 +3308,7 @@ mod test_training_service_metric_values {
     use super::*;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
-        ActivityStartTime, ActivityStatistic, ActivityStatistics, Sport,
+        ActivityStartTime, Sport,
     };
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
@@ -3424,16 +3400,12 @@ mod test_training_service_metric_values {
         );
 
         // Create some test activities
-        let mut stats_map = HashMap::new();
-        stats_map.insert(ActivityStatistic::Distance, 10000.0);
-
         let activity = Activity::new_empty(
             ActivityId::new(),
             user_id.clone(),
             ActivityStartTime::from_timestamp(1705315200).unwrap(), // 2024-01-15T10:00:00Z
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::new(stats_map),
         );
 
         let mut activity_service = MockActivityService::default();
@@ -3443,7 +3415,10 @@ mod test_training_service_metric_values {
             .returning(move |_, _, _| {
                 Ok(vec![(
                     activity.clone(),
-                    ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::Distance, Some(0.))])),
+                    ActivityMetricsV2::new(HashMap::from([(
+                        ActivityMetricV2::Distance,
+                        Some(10000.0),
+                    )])),
                 )])
             });
 

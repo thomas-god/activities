@@ -58,6 +58,11 @@ where
             *req.start_time(),
             *req.duration(),
             *req.sport(),
+        );
+
+        let activity_with_parsed_data = ActivityWithParsedData::new(
+            activity.clone(),
+            req.timeseries().clone(),
             req.statistics().clone(),
         );
 
@@ -82,7 +87,7 @@ where
 
         // Persist activity
         self.activity_repository
-            .save_activity(&activity)
+            .save_activity(&activity_with_parsed_data)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
 
@@ -394,8 +399,7 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityDuration, ActivityName, ActivityNaturalKey, ActivityStartTime, ActivityStatistics,
-        Sport,
+        ActivityDuration, ActivityName, ActivityNaturalKey, ActivityStartTime, Sport,
     };
     use crate::domain::ports::activity::{
         DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
@@ -515,7 +519,6 @@ pub mod test_utils {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ))
             });
         }
@@ -555,7 +558,7 @@ pub mod test_utils {
 
             async fn save_activity(
                 &self,
-                activity: &Activity,
+                activity: &ActivityWithParsedData,
             ) -> Result<(), SaveActivityError>;
 
             async fn list_activities(
@@ -841,7 +844,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -870,7 +872,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -906,7 +907,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -965,7 +965,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -999,7 +998,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -1061,7 +1059,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -1095,7 +1092,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -1154,7 +1150,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -1188,7 +1183,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -1249,7 +1243,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -1303,7 +1296,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
 
@@ -1334,7 +1326,6 @@ mod tests_activity_service {
                 ActivityStartTime::from_timestamp(0).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::new()),
             )))
         });
         activity_repository
@@ -1416,7 +1407,6 @@ mod tests_activity_service {
                     ActivityStartTime::from_timestamp(0).unwrap(),
                     ActivityDuration::from(1200.),
                     Sport::Cycling,
-                    ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
                 ),
                 ActivityTimeseries::new(
                     TimeseriesTime::new(vec![0, 1, 2]),

@@ -110,10 +110,6 @@ mod tests {
                             ),
                             ActivityDuration::from(1200.),
                             Sport::IndoorCycling,
-                            ActivityStatistics::new(HashMap::from([(
-                                ActivityStatistic::Duration,
-                                1200.,
-                            )])),
                         ),
                         ActivityTimeseries::new(
                             TimeseriesTime::new(vec![0, 1, 2]),

@@ -198,7 +198,6 @@ where
                 start_time,
                 duration,
                 sport,
-                statistics,
                 rpe,
                 workout_type,
                 nutrition,
@@ -331,7 +330,6 @@ where
                                 start_time,
                                 duration,
                                 sport,
-                                statistics,
                                 rpe,
                                 workout_type,
                                 nutrition,
@@ -657,7 +655,10 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
-    async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
+    async fn save_activity(
+        &self,
+        activity: &ActivityWithParsedData,
+    ) -> Result<(), SaveActivityError> {
         let mut tx = self
             .pool
             .begin()
@@ -774,9 +775,8 @@ mod test_sqlite_activity_repository {
                 UserId,
                 activity::{
                     ActiveTime, ActivityDuration, ActivityNutrition, ActivityStartTime,
-                    ActivityStatistic, ActivityStatistics, ActivityTimeseries, BonkStatus, Sport,
-                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-                    TimeseriesValue,
+                    ActivityStatistics, ActivityTimeseries, BonkStatus, Sport, Timeseries,
+                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::{
@@ -806,25 +806,69 @@ mod test_sqlite_activity_repository {
             .unwrap();
     }
 
-    fn build_activity() -> Activity {
-        Activity::new_empty(
-            ActivityId::new(),
-            UserId::test_default(),
-            ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
-            ActivityDuration::default(),
-            Sport::Cycling,
-            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+    fn build_activity() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::new(),
+                UserId::test_default(),
+                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Speed,
+                    vec![
+                        Some(TimeseriesValue::Float(5.5)),
+                        Some(TimeseriesValue::Int(6)),
+                        Some(TimeseriesValue::Float(6.5)),
+                        Some(TimeseriesValue::Int(7)),
+                    ],
+                )],
+            )
+            .unwrap(),
+            ActivityStatistics::default(),
         )
     }
 
-    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> Activity {
-        Activity::new_empty(
-            ActivityId::new(),
-            UserId::test_default(),
-            ActivityStartTime::new(*start),
-            ActivityDuration::default(),
-            Sport::Cycling,
-            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::new(),
+                UserId::test_default(),
+                ActivityStartTime::new(*start),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2, 3]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                    ActiveTime::Running(3),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Speed,
+                    vec![
+                        Some(TimeseriesValue::Float(5.5)),
+                        Some(TimeseriesValue::Int(6)),
+                        Some(TimeseriesValue::Float(6.5)),
+                        Some(TimeseriesValue::Int(7)),
+                    ],
+                )],
+            )
+            .unwrap(),
+            ActivityStatistics::default(),
         )
     }
 
@@ -978,7 +1022,6 @@ mod test_sqlite_activity_repository {
         assert_eq!(res.name(), activity.name());
         assert_eq!(res.start_time(), activity.start_time());
         assert_eq!(res.sport(), activity.sport());
-        assert_eq!(res.statistics(), activity.statistics());
     }
 
     #[tokio::test]

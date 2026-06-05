@@ -33,7 +33,6 @@ pub struct Activity {
     start_time: ActivityStartTime,
     duration: ActivityDuration,
     sport: Sport,
-    statistics: ActivityStatistics,
     rpe: Option<ActivityRpe>,
     workout_type: Option<WorkoutType>,
     nutrition: Option<ActivityNutrition>,
@@ -50,7 +49,6 @@ impl Activity {
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
-        statistics: ActivityStatistics,
         rpe: Option<ActivityRpe>,
         workout_type: Option<WorkoutType>,
         nutrition: Option<ActivityNutrition>,
@@ -63,7 +61,6 @@ impl Activity {
             start_time,
             sport,
             duration,
-            statistics,
             rpe,
             workout_type,
             nutrition,
@@ -78,7 +75,6 @@ impl Activity {
         start_time: ActivityStartTime,
         duration: ActivityDuration,
         sport: Sport,
-        statistics: ActivityStatistics,
     ) -> Self {
         Self {
             id,
@@ -87,7 +83,6 @@ impl Activity {
             start_time,
             duration,
             sport,
-            statistics,
             rpe: ActivityRpe::empty(),
             workout_type: WorkoutType::empty(),
             nutrition: ActivityNutrition::empty(),
@@ -130,10 +125,6 @@ impl Activity {
 
     pub fn sport(&self) -> &Sport {
         &self.sport
-    }
-
-    pub fn statistics(&self) -> &ActivityStatistics {
-        &self.statistics
     }
 
     pub fn rpe(&self) -> &Option<ActivityRpe> {
@@ -1493,7 +1484,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Cycling,
-            ActivityStatistics::default(),
         );
         let second_activity = Activity::new_empty(
             ActivityId::new(),
@@ -1501,7 +1491,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -1515,7 +1504,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Cycling,
-            ActivityStatistics::default(),
         );
         let second_activity = Activity::new_empty(
             ActivityId::new(),
@@ -1523,7 +1511,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Cycling,
-            ActivityStatistics::default(),
         );
 
         assert_eq!(first_activity.natural_key(), second_activity.natural_key());
@@ -1537,7 +1524,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Cycling,
-            ActivityStatistics::default(),
         );
         let second_activity = Activity::new_empty(
             ActivityId::new(),
@@ -1545,7 +1531,6 @@ mod tests {
             ActivityStartTime::from_timestamp(0).unwrap(),
             ActivityDuration::default(),
             Sport::Cycling,
-            ActivityStatistics::default(),
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
@@ -1720,7 +1705,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -1769,7 +1753,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),
@@ -2028,10 +2011,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([
-                    (ActivityStatistic::Distance, 10000.0), // 10 km in meters
-                    (ActivityStatistic::Duration, 3600.0),  // 1 hour in seconds
-                ])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2078,7 +2057,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2120,7 +2098,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::from(0.0),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2162,7 +2139,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2205,10 +2181,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::default(),
                 Sport::Running,
-                ActivityStatistics::new(HashMap::from([
-                    (ActivityStatistic::Distance, 10000.0),
-                    (ActivityStatistic::Duration, 3600.0),
-                ])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1800, 3600]),
@@ -2318,7 +2290,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::from(9999.0),
                 Sport::Running,
-                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250, 500]),
@@ -2352,7 +2323,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::from(3600.0),
                 Sport::Running,
-                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 100, 250]),
@@ -2385,7 +2355,6 @@ mod test_timeseries {
                 ),
                 ActivityDuration::from(1800.0),
                 Sport::Running,
-                ActivityStatistics::default(),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![]),

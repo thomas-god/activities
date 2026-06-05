@@ -202,7 +202,6 @@ mod tests {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ))
             });
 
@@ -260,7 +259,6 @@ mod tests {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ))
             });
         service
@@ -274,7 +272,6 @@ mod tests {
                     ActivityStartTime::from_timestamp(2000).unwrap(),
                     ActivityDuration::default(),
                     Sport::Cycling,
-                    ActivityStatistics::default(),
                 ))
             });
 
@@ -341,7 +338,6 @@ mod tests {
                     ActivityStartTime::from_timestamp(1000).unwrap(),
                     ActivityDuration::default(),
                     Sport::Running,
-                    ActivityStatistics::default(),
                 ))
             });
         service

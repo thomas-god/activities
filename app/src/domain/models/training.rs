@@ -1123,7 +1123,6 @@ mod test_training_metrics {
                 ),
                 ActivityDuration::default(),
                 Sport::Cycling,
-                ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
             ),
             ActivityTimeseries::new(
                 TimeseriesTime::new(vec![0, 1, 2]),
@@ -1907,7 +1906,7 @@ mod test_granularity_bins {
 mod test_training_metric_filters {
     use crate::domain::models::activity::{
         ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
-        ActivityStartTime, ActivityStatistics,
+        ActivityStartTime,
     };
 
     use super::*;
@@ -1928,7 +1927,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             sport,
-            ActivityStatistics::default(),
         )
     }
 
@@ -1940,7 +1938,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::default(),
             ActivityRpe::empty(),
             Some(workout_type),
             ActivityNutrition::empty(),
@@ -1956,7 +1953,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::default(),
             ActivityRpe::empty(),
             WorkoutType::empty(),
             Some(ActivityNutrition::new(bonk_status, None)),
@@ -1972,7 +1968,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::default(),
             Some(rpe),
             WorkoutType::empty(),
             ActivityNutrition::empty(),
@@ -1992,7 +1987,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             sport,
-            ActivityStatistics::default(),
             Some(ActivityRpe::Eight),
             Some(workout_type),
             Some(ActivityNutrition::new(bonk_status, None)),
@@ -2007,7 +2001,6 @@ mod test_training_metric_filters {
             default_start_time(),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::default(),
         )
     }
 
@@ -2259,9 +2252,7 @@ mod test_training_metric_filters {
 #[cfg(test)]
 mod test_training_period {
 
-    use crate::domain::models::activity::{
-        ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistics,
-    };
+    use crate::domain::models::activity::{ActivityDuration, ActivityId, ActivityStartTime};
 
     use super::*;
 
@@ -2324,7 +2315,6 @@ mod test_training_period {
             ActivityStartTime::new(start.parse::<DateTime<FixedOffset>>().unwrap()),
             ActivityDuration::default(),
             Sport::Running,
-            ActivityStatistics::new(HashMap::new()),
         )
     }
 
@@ -2339,7 +2329,6 @@ mod test_training_period {
             ),
             ActivityDuration::default(),
             sport,
-            ActivityStatistics::new(HashMap::new()),
         )
     }
 
@@ -2543,7 +2532,7 @@ mod test_training_period {
 mod test_training_metric_group_by {
     use crate::domain::models::activity::{
         ActivityDuration, ActivityFeedback, ActivityId, ActivityName, ActivityNutrition,
-        ActivityRpe, ActivityStartTime, ActivityStatistics, BonkStatus, WorkoutType,
+        ActivityRpe, ActivityStartTime, BonkStatus, WorkoutType,
     };
 
     use super::*;
@@ -2561,7 +2550,6 @@ mod test_training_metric_group_by {
             ),
             ActivityDuration::default(),
             Sport::TrailRunning,
-            ActivityStatistics::new(HashMap::new()),
             Some(ActivityRpe::Six),
             Some(WorkoutType::Intervals),
             Some(ActivityNutrition::new(BonkStatus::Bonked, None)),
@@ -2606,7 +2594,6 @@ mod test_training_metric_group_by {
             ),
             ActivityDuration::default(),
             Sport::Golf,
-            ActivityStatistics::new(HashMap::new()),
         );
 
         assert_eq!(
