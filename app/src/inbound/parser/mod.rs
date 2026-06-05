@@ -11,10 +11,14 @@ use crate::{
         },
         ports::activity::{CreateActivityRequest, RawContent},
     },
-    inbound::parser::{fit::try_fit_bytes_into_domain, tcx::try_tcx_bytes_into_domain},
+    inbound::parser::{
+        fit::try_fit_bytes_into_domain, json::try_custom_json_bytes_into_domain,
+        tcx::try_tcx_bytes_into_domain,
+    },
 };
 
 pub mod fit;
+pub mod json;
 pub mod tcx;
 
 #[derive(Debug, Clone, Constructor)]
@@ -70,6 +74,7 @@ impl ParsedFileContent {
 pub enum SupportedExtension {
     FIT,
     TCX,
+    CustomJSON,
 }
 
 impl SupportedExtension {
@@ -77,6 +82,7 @@ impl SupportedExtension {
         match self {
             Self::FIT => "fit",
             Self::TCX => "tcx",
+            Self::CustomJSON => "json",
         }
     }
 }
@@ -87,6 +93,7 @@ impl TryFrom<&str> for SupportedExtension {
         match value {
             "fit" => Ok(Self::FIT),
             "tcx" => Ok(Self::TCX),
+            "json" => Ok(Self::CustomJSON),
             _ => Err(()),
         }
     }
@@ -129,6 +136,7 @@ impl ParseFile for Parser {
         match extension {
             SupportedExtension::FIT => try_fit_bytes_into_domain(bytes),
             SupportedExtension::TCX => try_tcx_bytes_into_domain(bytes),
+            SupportedExtension::CustomJSON => try_custom_json_bytes_into_domain(bytes),
         }
     }
 }

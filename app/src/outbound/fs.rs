@@ -57,7 +57,11 @@ impl RawDataRepository for FilesystemRawDataRepository {
     }
 
     async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<RawContent, GetRawDataError> {
-        for ext in [SupportedExtension::FIT, SupportedExtension::TCX] {
+        for ext in [
+            SupportedExtension::FIT,
+            SupportedExtension::TCX,
+            SupportedExtension::CustomJSON,
+        ] {
             let mut file = match tokio::fs::OpenOptions::new()
                 .read(true)
                 .write(false)

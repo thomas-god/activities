@@ -943,11 +943,7 @@ impl ActivityMetricV2 {
             ActivityMetricSource::Timeseries((metric, aggregate)) => {
                 aggregate.value_from_timeseries(&metric, activity)
             }
-            ActivityMetricSource::ActiveDuration => activity
-                .timeseries()
-                .active_time()
-                .duration()
-                .map(|duration| duration as f64),
+            ActivityMetricSource::ActiveDuration => Some(*activity.active_duration().as_f64()),
         }
     }
 
@@ -1214,6 +1210,15 @@ impl ActivityTimeseries {
             laps,
             metrics,
         })
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            time: TimeseriesTime(Vec::new()),
+            active_time: TimeseriesActiveTime(Vec::new()),
+            metrics: Vec::new(),
+            laps: Vec::new(),
+        }
     }
 
     pub fn time(&self) -> &TimeseriesTime {
@@ -2387,5 +2392,28 @@ mod test_timeseries {
 
         // Empty timeseries, should use statistics
         assert_eq!(activity.active_duration(), ActivityDuration::from(1800.0));
+    }
+
+    #[test]
+    fn test_active_duration_metric_empty_timeseries_falls_back_to_activity_duration() {
+        let activity = ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::default(),
+                UserId::test_default(),
+                ActivityStartTime::new(
+                    "2025-09-03T00:00:00Z"
+                        .parse::<DateTime<FixedOffset>>()
+                        .unwrap(),
+                ),
+                ActivityDuration::from(3600.0),
+                Sport::Running,
+            ),
+            ActivityTimeseries::empty(),
+            ActivityStatistics::default(),
+        );
+
+        let result = ActivityMetricV2::ActiveDuration.compute_value(&activity);
+
+        assert_eq!(result, Some(3600.0));
     }
 }
