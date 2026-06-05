@@ -195,7 +195,22 @@
 				</div>
 			{:then selectedActivity}
 				{#if selectedActivity}
-					<button onclick={() => handleActivitySelected(null)} class="absolute right-3">X</button>
+					<div class="absolute right-3 join">
+						<button
+							onclick={() => goto(`/activity/${selectedActivityId}`)}
+							class="btn join-item btn-sm"
+						>
+							<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button
+						>
+						<button
+							onclick={() => {
+								handleActivitySelected(null);
+							}}
+							class="btn join-item btn-sm"
+						>
+							<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
+						>
+					</div>
 					<ActivityDetails
 						activity={selectedActivity}
 						onActivityUpdated={handleActivityUpdated}
