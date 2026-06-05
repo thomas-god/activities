@@ -5,6 +5,7 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityId, ActivityMetricV2, ActivityMetricsV2, ActivityWithParsedData,
+            DEFAULT_METRICS,
         },
     },
     ports::activity::{
@@ -90,6 +91,15 @@ where
             .save_activity(&activity_with_parsed_data)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
+
+        // Pre-compute base metrics for the new activity
+        for ref metric in DEFAULT_METRICS {
+            let value = metric.compute_value(&activity_with_parsed_data);
+            let _ = self
+                .activity_repository
+                .update_activity_metric(activity.id(), metric, &value)
+                .await;
+        }
 
         Ok(activity)
     }
@@ -754,6 +764,10 @@ mod tests_activity_service {
             .expect_save_activity()
             .times(1)
             .returning(|_| Ok(()));
+        activity_repository
+            .expect_update_activity_metric()
+            .times(DEFAULT_METRICS.len())
+            .returning(|_, _, _| Ok(()));
         let mut raw_data_repository = MockRawDataRepository::new();
         raw_data_repository
             .expect_save_raw_data()
