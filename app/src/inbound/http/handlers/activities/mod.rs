@@ -1,4 +1,5 @@
 pub mod activity_schema;
+mod create_standalone_activity;
 mod delete_activity;
 mod get_activity;
 mod get_raw;
@@ -6,6 +7,7 @@ mod list_activities;
 mod patch_activity;
 mod upload_activity;
 
+pub use create_standalone_activity::create_standalone_activity;
 pub use delete_activity::delete_activity;
 pub use get_activity::get_activity;
 pub use get_raw::{get_all_raw_activities, get_raw_activity};

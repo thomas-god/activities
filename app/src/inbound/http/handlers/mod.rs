@@ -6,8 +6,8 @@ mod preferences;
 mod training;
 
 pub(super) use activities::{
-    delete_activity, get_activity, get_all_raw_activities, get_raw_activity, list_activities,
-    patch_activity, upload_activities,
+    create_standalone_activity, delete_activity, get_activity, get_all_raw_activities,
+    get_raw_activity, list_activities, patch_activity, upload_activities,
 };
 pub(super) use auth::{
     CookieUserExtractor, DefaultUserExtractor, cookie_auth_middleware, login_user, register_user,

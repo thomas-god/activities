@@ -19,9 +19,42 @@ pub struct StandaloneActivity {
     start_time: DateTime<FixedOffset>,
     duration: f64,
     sport: Sport,
+    #[serde(skip_serializing_if = "Option::is_none")]
     distance: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     elevation: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     calories: Option<f64>,
+}
+
+impl TryFrom<StandaloneActivity> for ParsedFileContent {
+    type Error = ParseBytesError;
+
+    fn try_from(activity: StandaloneActivity) -> Result<Self, Self::Error> {
+        let mut statistics = HashMap::from([(ActivityStatistic::Duration, activity.duration)]);
+        if let Some(calories) = activity.calories {
+            statistics.insert(ActivityStatistic::Calories, calories);
+        }
+        if let Some(elevation) = activity.elevation {
+            statistics.insert(ActivityStatistic::Elevation, elevation);
+        }
+        if let Some(distance) = activity.distance {
+            statistics.insert(ActivityStatistic::Distance, distance);
+        }
+
+        let raw_content =
+            serde_json::to_vec(&activity).map_err(|_err| ParseBytesError::InvalidContent)?;
+
+        Ok(ParsedFileContent {
+            sport: activity.sport,
+            start_time: ActivityStartTime::from(activity.start_time),
+            duration: ActivityDuration::from(activity.duration),
+            statistics: ActivityStatistics::new(statistics),
+            timeseries: ActivityTimeseries::empty(),
+            extension: SupportedExtension::CustomJSON.suffix().to_string(),
+            raw_content,
+        })
+    }
 }
 
 pub fn try_custom_json_bytes_into_domain(
@@ -29,27 +62,7 @@ pub fn try_custom_json_bytes_into_domain(
 ) -> Result<ParsedFileContent, ParseBytesError> {
     let activity = serde_json::from_slice::<StandaloneActivity>(&bytes)
         .map_err(|_err| ParseBytesError::InvalidContent)?;
-
-    let mut statistics = HashMap::from([(ActivityStatistic::Duration, activity.duration)]);
-    if let Some(calories) = activity.calories {
-        statistics.insert(ActivityStatistic::Calories, calories);
-    }
-    if let Some(elevation) = activity.elevation {
-        statistics.insert(ActivityStatistic::Elevation, elevation);
-    }
-    if let Some(distance) = activity.distance {
-        statistics.insert(ActivityStatistic::Distance, distance);
-    }
-
-    Ok(ParsedFileContent {
-        sport: activity.sport,
-        start_time: ActivityStartTime::from(activity.start_time),
-        duration: ActivityDuration::from(activity.duration),
-        statistics: ActivityStatistics::new(statistics),
-        timeseries: ActivityTimeseries::empty(),
-        extension: SupportedExtension::CustomJSON.suffix().to_string(),
-        raw_content: bytes,
-    })
+    activity.try_into()
 }
 
 #[cfg(test)]
@@ -151,11 +164,13 @@ mod tests {
     }
 
     #[test]
-    fn test_raw_content_preserved() {
+    fn test_raw_content_can_be_reparsed() {
         let json =
             r#"{"start_time":"2024-03-15T08:30:00+01:00","duration":1800.0,"sport":"Walking"}"#;
-        let bytes = make_bytes(json);
-        let content = try_custom_json_bytes_into_domain(bytes.clone()).unwrap();
-        assert_eq!(content.raw_content(), bytes.as_slice());
+        let content = try_custom_json_bytes_into_domain(make_bytes(json)).unwrap();
+        let reparsed = try_custom_json_bytes_into_domain(content.raw_content().to_vec()).unwrap();
+        assert_eq!(reparsed.sport(), content.sport());
+        assert_eq!(reparsed.start_time().date(), content.start_time().date());
+        assert_eq!(reparsed.duration().as_f64(), content.duration().as_f64());
     }
 }
