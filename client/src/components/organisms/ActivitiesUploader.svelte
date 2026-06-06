@@ -66,9 +66,9 @@
 	};
 </script>
 
-<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-	<fieldset class="fieldset rounded-box border-base-300 bg-base-100 p-2">
-		<legend class="fieldset-legend text-base">Upload new activities</legend>
+<div class="grid grid-cols-1 gap-4">
+	<fieldset class="fieldset rounded-box border-base-300 bg-base-100">
+		<legend class="fieldset-legend text-base">Upload activity files</legend>
 		<div class="join gap-3">
 			<input
 				type="file"

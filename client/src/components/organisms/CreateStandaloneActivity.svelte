@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { postStandaloneActivity } from '$lib/api';
-	import { sports } from '$lib/sport';
+	import {
+		sportCategoryDisplay,
+		sports,
+		sportsPerCategory,
+		type SportCategory,
+		sportDisplay
+	} from '$lib/sport';
 	import { dayjs } from '$lib/duration';
 
 	let { activityCreatedCallback }: { activityCreatedCallback: () => void } = $props();
@@ -62,8 +68,11 @@
 		<div>
 			<label class="label" for="sa-sport">Sport</label>
 			<select class="select w-full select-sm" id="sa-sport" bind:value={sport}>
-				{#each sports as s}
-					<option value={s}>{s}</option>
+				{#each Object.entries(sportsPerCategory) as [category, sports]}
+					<optgroup label={sportCategoryDisplay(category as SportCategory)}></optgroup>
+					{#each sports as s}
+						<option value={s}>{sportDisplay(s)}</option>
+					{/each}
 				{/each}
 			</select>
 		</div>
@@ -75,26 +84,23 @@
 
 		<div>
 			<label class="label" for="sa-duration-h">Duration</label>
-			<div class="join">
+			<div class="join gap-1">
 				<input
 					type="number"
-					class="input input-sm join-item w-16"
+					class="input input-sm join-item"
 					id="sa-duration-h"
 					min="0"
-					max="99"
-					placeholder="h"
 					bind:value={durationHours}
 				/>
-				<span class="join-item flex items-center bg-base-200 px-1">h</span>
+				<label class="join-item flex items-center bg-base-200 px-1" for="sa-duration-h">h</label>
 				<input
 					type="number"
-					class="input input-sm join-item w-16"
+					class="input input-sm join-item"
+					id="sa-duration-m"
 					min="0"
-					max="59"
-					placeholder="min"
 					bind:value={durationMinutes}
 				/>
-				<span class="join-item flex items-center bg-base-200 px-1">min</span>
+				<label class="join-item flex items-center bg-base-200 px-1" for="sa-duration-m">min</label>
 			</div>
 		</div>
 
