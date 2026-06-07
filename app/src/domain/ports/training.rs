@@ -64,6 +64,39 @@ impl CreateTrainingMetricRequest {
     }
 }
 
+/// Copy a training metric definition (global or not) to a training period.
+#[derive(Debug, Clone, Constructor)]
+pub struct CopyTrainingMetricRequest {
+    user: UserId,
+    source_metric: TrainingMetricId,
+    target_period: TrainingPeriodId,
+}
+
+impl CopyTrainingMetricRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn source_metric(&self) -> &TrainingMetricId {
+        &self.source_metric
+    }
+    pub fn target_period(&self) -> &TrainingPeriodId {
+        &self.target_period
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum CopyTrainingMetricError {
+    #[error("Training metric does not exist")]
+    MetricDoesNotExist(TrainingMetricId),
+    #[error("Training period does not exist")]
+    PeriodDoesNotExist(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+    #[error("Error when saving training metric definition")]
+    SaveMetricError(#[from] SaveTrainingMetricError),
+}
+
 pub enum GetTrainingMetricValuesRequest {
     ByTrainingMetricId(UserId, TrainingMetricId),
     ByDefinition {
@@ -202,6 +235,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
+
+    fn copy_training_metric(
+        &self,
+        req: CopyTrainingMetricRequest,
+    ) -> impl Future<Output = Result<(), CopyTrainingMetricError>> + Send;
 
     fn get_training_metrics_values(
         &self,

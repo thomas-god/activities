@@ -1,4 +1,5 @@
 mod compute_training_metric_values;
+mod copy_training_metric;
 mod create_training_metric;
 mod create_training_note;
 mod create_training_period;
@@ -21,6 +22,7 @@ mod update_training_period;
 mod utils;
 
 pub use compute_training_metric_values::compute_training_metric_values;
+pub use copy_training_metric::copy_training_metric;
 pub use create_training_metric::create_training_metric;
 pub use create_training_note::create_training_note;
 pub use create_training_period::create_training_period;

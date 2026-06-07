@@ -20,7 +20,8 @@ use crate::domain::ports::{
 use crate::inbound::http::handlers::{DefaultUserExtractor, cookie_auth_middleware};
 use crate::inbound::parser::ParseFile;
 use handlers::{
-    compute_training_metric_values, create_standalone_activity, create_training_metric,
+    compute_training_metric_values, copy_training_metric, create_standalone_activity,
+    create_training_metric,
     create_training_note, create_training_period, delete_activity, delete_preference,
     delete_training_metric, delete_training_note, delete_training_period,
     get_active_training_periods, get_activity, get_all_preferences, get_all_raw_activities,
@@ -228,6 +229,10 @@ fn core_routes<
             "/training/metric/{metric_id}",
             delete(delete_training_metric::<AS, PF, TS, US, PS>)
                 .patch(update_training_metric::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/metric/{metric_id}/copy",
+            post(copy_training_metric::<AS, PF, TS, US, PS>),
         )
         .route(
             "/training/metric/{metric_id}/values",

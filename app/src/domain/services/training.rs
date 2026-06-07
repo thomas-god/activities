@@ -16,11 +16,11 @@ use crate::domain::{
         DateRange,
         activity::{IActivityService, ListActivitiesFilters},
         training::{
-            ComputeTrainingMetricValuesError, CreateTrainingMetricError,
-            CreateTrainingMetricRequest, CreateTrainingNoteError, CreateTrainingNoteRequest,
-            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteTrainingMetricError,
-            DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-            DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
+            ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
+            CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
+            CreateTrainingNoteRequest, CreateTrainingPeriodError, CreateTrainingPeriodRequest,
+            DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
+            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
             ITrainingService, SetTrainingMetricsOrderingError, TrainingRepository,
             UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
@@ -110,6 +110,41 @@ where
             .await?;
 
         Ok(id)
+    }
+
+    async fn copy_training_metric(
+        &self,
+        req: CopyTrainingMetricRequest,
+    ) -> Result<(), CopyTrainingMetricError> {
+        let source_definition = self
+            .training_repository
+            .get_definition(req.user(), req.source_metric())
+            .await
+            .map_err(|err| CopyTrainingMetricError::Unknown(anyhow!(err)))?
+            .ok_or_else(|| {
+                CopyTrainingMetricError::MetricDoesNotExist(req.source_metric().clone())
+            })?;
+
+        let _target_period = self
+            .training_repository
+            .get_training_period(req.user(), req.target_period())
+            .await
+            .ok_or_else(|| {
+                CopyTrainingMetricError::PeriodDoesNotExist(req.source_metric().clone())
+            })?;
+
+        let new_metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            None,
+            TrainingMetricScope::TrainingPeriod(req.target_period().clone()),
+            source_definition,
+        );
+
+        self.training_repository
+            .save_training_metric_definition(new_metric)
+            .await?;
+
+        Ok(())
     }
 
     async fn get_training_metrics_values(
@@ -547,11 +582,11 @@ pub mod test_utils {
             TrainingPeriodWithActivities,
         },
         ports::training::{
-            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteTrainingNoteError,
-            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
-            GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
-            GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
-            SaveTrainingPeriodError, UpdateTrainingNoteError,
+            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
+            CreateTrainingPeriodRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
+            DeleteTrainingPeriodRequest, GetDefinitionError, GetTrainingMetricValuesRequest,
+            GetTrainingMetricsDefinitionsError, GetTrainingNoteError, SaveTrainingMetricError,
+            SaveTrainingNoteError, SaveTrainingPeriodError, UpdateTrainingNoteError,
         },
     };
 
@@ -577,6 +612,11 @@ pub mod test_utils {
                 date_range: &DateRange,
                 scope: &TrainingMetricScope,
             ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
+
+            async fn copy_training_metric(
+                &self,
+                req: CopyTrainingMetricRequest,
+            ) -> Result<(), CopyTrainingMetricError>;
 
             async fn delete_metric(
                 &self,
@@ -3393,6 +3433,211 @@ mod test_training_service_metrics_ordering {
         match result.unwrap_err() {
             SetTrainingMetricsOrderingError::Unknown(_) => {}
             _ => panic!("Expected Unknown error"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_copy_metric {
+    use super::*;
+    use crate::domain::models::activity::ActivityMetricV2;
+    use crate::domain::models::training::{
+        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricGroupBy,
+    };
+    use crate::domain::ports::training::{GetDefinitionError, SaveTrainingMetricError};
+    use crate::domain::services::activity::test_utils::MockActivityService;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use anyhow::anyhow;
+
+    fn make_definition() -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricV2::Distance,
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricFilters::empty(),
+            TrainingMetricGroupBy::none(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_ok() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let definition = make_definition();
+
+        let mut repository = MockTrainingRepository::new();
+
+        let def_clone = definition.clone();
+        repository
+            .expect_get_definition()
+            .times(1)
+            .returning(move |_, _| Ok(Some(def_clone.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Some(
+                    crate::domain::models::training::TrainingPeriod::new(
+                        TrainingPeriodId::new(),
+                        UserId::test_default(),
+                        "2025-01-01".parse().unwrap(),
+                        None,
+                        "Test".to_string(),
+                        crate::domain::models::training::TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        let period_id_clone = period_id.clone();
+        let def_for_assert = definition.clone();
+        repository
+            .expect_save_training_metric_definition()
+            .times(1)
+            .withf(move |metric| {
+                metric.scope() == &TrainingMetricScope::TrainingPeriod(period_id_clone.clone())
+                    && metric.definition() == &def_for_assert
+                    && metric.name().is_none()
+            })
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_source_metric_not_found() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_definition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id.clone(), period_id);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::MetricDoesNotExist(id) => assert_eq!(id, source_id),
+            _ => panic!("Expected MetricDoesNotExist"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_get_definition_error() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_definition()
+            .times(1)
+            .returning(|_, _| Err(GetDefinitionError::Unknown(anyhow!("db error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::Unknown(_) => {}
+            _ => panic!("Expected Unknown error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_target_period_not_found() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let definition = make_definition();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_definition()
+            .times(1)
+            .returning(move |_, _| Ok(Some(definition.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| None);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::PeriodDoesNotExist(_) => {}
+            _ => panic!("Expected PeriodDoesNotExist"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_copy_training_metric_save_error() {
+        let source_id = TrainingMetricId::from("source");
+        let period_id = TrainingPeriodId::new();
+        let definition = make_definition();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_definition()
+            .times(1)
+            .returning(move |_, _| Ok(Some(definition.clone())));
+
+        repository
+            .expect_get_training_period()
+            .times(1)
+            .returning(|_, _| {
+                Some(
+                    crate::domain::models::training::TrainingPeriod::new(
+                        TrainingPeriodId::new(),
+                        UserId::test_default(),
+                        "2025-01-01".parse().unwrap(),
+                        None,
+                        "Test".to_string(),
+                        crate::domain::models::training::TrainingPeriodSports::new(None),
+                        None,
+                    )
+                    .unwrap(),
+                )
+            });
+
+        repository
+            .expect_save_training_metric_definition()
+            .times(1)
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+
+        let result = service.copy_training_metric(req).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CopyTrainingMetricError::SaveMetricError(_) => {}
+            _ => panic!("Expected SaveMetricError"),
         }
     }
 }
