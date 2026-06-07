@@ -112,37 +112,18 @@ where
         Ok(id)
     }
 
-    /// Get training metric values for all registered training metrics for a given user and scope.
     async fn get_training_metrics_values(
         &self,
         user: &UserId,
         date_range: &DateRange,
         scope: &TrainingMetricScope,
     ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
-        // Get metrics based on scope
         let metrics = match scope {
-            TrainingMetricScope::Global => {
-                // Only global metrics
-                self.training_repository.get_global_metrics(user).await
-            }
+            TrainingMetricScope::Global => self.training_repository.get_global_metrics(user).await,
             TrainingMetricScope::TrainingPeriod(period) => {
-                // Global metrics + period-specific metrics
-                // Both queries must succeed for the operation to succeed
-                let Ok(global_result) = self.training_repository.get_global_metrics(user).await
-                else {
-                    return vec![];
-                };
-                let Ok(period_result) = self
-                    .training_repository
+                self.training_repository
                     .get_period_metrics(user, period)
                     .await
-                else {
-                    return vec![];
-                };
-
-                let mut merged = global_result;
-                merged.extend(period_result);
-                Ok(merged)
             }
         };
 
@@ -1287,31 +1268,14 @@ mod tests_training_metrics_service {
     }
 
     #[tokio::test]
-    async fn test_get_training_metrics_values_with_training_period_scope_merges_metrics() {
+    async fn test_get_training_metrics_values_with_training_period_scope() {
         let period_id = TrainingPeriodId::new();
         let mut repository = MockTrainingRepository::new();
 
-        // Expect call to get global metrics
-        repository.expect_get_global_metrics().returning(|_| {
-            Ok(vec![TrainingMetric::new(
-                TrainingMetricId::from("global-metric"),
-                Some(TrainingMetricName::from("Global Metric")),
-                TrainingMetricScope::Global,
-                TrainingMetricDefinition::new(
-                    UserId::test_default(),
-                    ActivityMetricV2::Distance,
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
-                ),
-            )])
-        });
         repository
             .expect_get_training_metrics_ordering()
             .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
-        // Expect call to get period metrics
         let test_period_id = period_id.clone();
         repository
             .expect_get_period_metrics()
@@ -1351,48 +1315,12 @@ mod tests_training_metrics_service {
             .await;
 
         // Should have both global and period metrics merged
-        assert_eq!(res.len(), 2);
-
-        let global_metric = res
-            .iter()
-            .find(|(m, _)| m.id() == &TrainingMetricId::from("global-metric"));
-        assert!(global_metric.is_some());
+        assert_eq!(res.len(), 1);
 
         let period_metric = res
             .iter()
             .find(|(m, _)| m.id() == &TrainingMetricId::from("period-metric"));
         assert!(period_metric.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_get_training_metrics_values_with_training_period_handles_global_error() {
-        let period_id = TrainingPeriodId::new();
-        let mut repository = MockTrainingRepository::new();
-
-        // Global metrics returns error
-        repository.expect_get_global_metrics().returning(|_| {
-            Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
-                "error"
-            )))
-        });
-
-        // Period metrics won't be called since global fails first
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let res = service
-            .get_training_metrics_values(
-                &UserId::test_default(),
-                &DateRange::new(
-                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
-                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
-                ),
-                &TrainingMetricScope::TrainingPeriod(period_id),
-            )
-            .await;
-
-        // Should return empty when global metrics fail
-        assert!(res.is_empty());
     }
 
     #[tokio::test]
@@ -1443,46 +1371,6 @@ mod tests_training_metrics_service {
             .await;
 
         // Should return empty when period metrics fail
-        assert!(res.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_training_metrics_values_with_training_period_both_errors_returns_empty() {
-        let period_id = TrainingPeriodId::new();
-        let mut repository = MockTrainingRepository::new();
-
-        // Both return errors
-        repository.expect_get_global_metrics().returning(|_| {
-            Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
-                "global error"
-            )))
-        });
-
-        let test_period_id = period_id.clone();
-        repository
-            .expect_get_period_metrics()
-            .withf(move |_, period| period == &test_period_id)
-            .returning(|_, _| {
-                Err(GetTrainingMetricsDefinitionsError::Unknown(anyhow!(
-                    "period error"
-                )))
-            });
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let res = service
-            .get_training_metrics_values(
-                &UserId::test_default(),
-                &DateRange::new(
-                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
-                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
-                ),
-                &TrainingMetricScope::TrainingPeriod(period_id),
-            )
-            .await;
-
-        // Should return empty when both fail
         assert!(res.is_empty());
     }
 
