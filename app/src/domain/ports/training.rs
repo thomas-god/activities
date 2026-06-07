@@ -189,39 +189,6 @@ pub enum UpdateTrainingMetricNameError {
     Unknown(#[from] anyhow::Error),
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct UpdateTrainingMetricScopeRequest {
-    user: UserId,
-    metric_id: TrainingMetricId,
-    scope: TrainingMetricScope,
-}
-
-impl UpdateTrainingMetricScopeRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn metric_id(&self) -> &TrainingMetricId {
-        &self.metric_id
-    }
-
-    pub fn scope(&self) -> &TrainingMetricScope {
-        &self.scope
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateTrainingMetricScopeError {
-    #[error("Training metric {0} does not exist")]
-    MetricDoesNotExist(TrainingMetricId),
-    #[error("Training period {0} does not exist")]
-    TrainingPeriodDoesNotExist(TrainingPeriodId),
-    #[error("An infrastructure error occured when getting definition")]
-    GetDefinitionError(#[from] GetDefinitionError),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
 ///////////////////////////////////////////////////////////////////
 /// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
@@ -235,11 +202,6 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteTrainingMetricRequest,
     ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
-
-    fn update_metric_scope(
-        &self,
-        req: UpdateTrainingMetricScopeRequest,
-    ) -> impl Future<Output = Result<(), UpdateTrainingMetricScopeError>> + Send;
 
     fn get_training_metrics_values(
         &self,
@@ -368,12 +330,6 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
 
 #[derive(Debug, Error)]
 pub enum SaveTrainingMetricError {
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateTrainingMetricScopeRepositoryError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -695,13 +651,6 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         &self,
         metric: TrainingMetric,
     ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
-
-    fn update_training_metric_scope(
-        &self,
-        user: &UserId,
-        metric: &TrainingMetricId,
-        scope: &TrainingMetricScope,
-    ) -> impl Future<Output = Result<(), UpdateTrainingMetricScopeRepositoryError>> + Send;
 
     fn get_definition(
         &self,

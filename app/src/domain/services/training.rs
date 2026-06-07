@@ -24,7 +24,6 @@ use crate::domain::{
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
             ITrainingService, SetTrainingMetricsOrderingError, TrainingRepository,
             UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
-            UpdateTrainingMetricScopeError, UpdateTrainingMetricScopeRequest,
             UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
             UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
             UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
@@ -111,44 +110,6 @@ where
             .await?;
 
         Ok(id)
-    }
-
-    async fn update_metric_scope(
-        &self,
-        req: UpdateTrainingMetricScopeRequest,
-    ) -> Result<(), UpdateTrainingMetricScopeError> {
-        // Get the metric to verify it exists and check ownership
-        let Some(_definition) = self
-            .training_repository
-            .get_definition(req.user(), req.metric_id())
-            .await?
-        else {
-            return Err(UpdateTrainingMetricScopeError::MetricDoesNotExist(
-                req.metric_id().clone(),
-            ));
-        };
-
-        // If scope is TrainingPeriod, verify the period exists and belongs to user
-        if let Some(period_id) = req.scope().period() {
-            let period = self
-                .training_repository
-                .get_training_period(req.user(), &period_id)
-                .await;
-
-            if period.is_none() {
-                return Err(UpdateTrainingMetricScopeError::TrainingPeriodDoesNotExist(
-                    period_id,
-                ));
-            }
-        }
-
-        // Update the metric scope
-        self.training_repository
-            .update_training_metric_scope(req.user(), req.metric_id(), req.scope())
-            .await
-            .map_err(|err| UpdateTrainingMetricScopeError::Unknown(err.into()))?;
-
-        Ok(())
     }
 
     /// Get training metric values for all registered training metrics for a given user and scope.
@@ -609,9 +570,7 @@ pub mod test_utils {
             DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetDefinitionError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
             GetTrainingNoteError, SaveTrainingMetricError, SaveTrainingNoteError,
-            SaveTrainingPeriodError, UpdateTrainingMetricScopeError,
-            UpdateTrainingMetricScopeRepositoryError, UpdateTrainingMetricScopeRequest,
-            UpdateTrainingNoteError,
+            SaveTrainingPeriodError, UpdateTrainingNoteError,
         },
     };
 
@@ -642,11 +601,6 @@ pub mod test_utils {
                 &self,
                 req: DeleteTrainingMetricRequest,
             ) -> Result<(), DeleteTrainingMetricError>;
-
-            async fn update_metric_scope(
-                &self,
-                req: UpdateTrainingMetricScopeRequest,
-            ) -> Result<(), UpdateTrainingMetricScopeError>;
 
             async fn update_training_metric_name(
                 &self,
@@ -793,14 +747,6 @@ pub mod test_utils {
                 &self,
                 metric: TrainingMetric,
             ) -> Result<(), SaveTrainingMetricError>;
-
-
-            async fn update_training_metric_scope(
-                &self,
-                user: &UserId,
-                metric: &TrainingMetricId,
-                scope: &TrainingMetricScope,
-            ) -> Result<(), UpdateTrainingMetricScopeRepositoryError>;
 
             async fn get_global_metrics(
                 &self,
@@ -949,7 +895,6 @@ mod tests_training_metrics_service {
         models::training::{
             TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
             TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
-            TrainingPeriod, TrainingPeriodSports,
         },
         ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
         services::training::test_utils::MockTrainingRepository,
@@ -1834,151 +1779,6 @@ mod tests_training_metrics_service {
 
         let res = service.update_training_metric_name(req).await;
 
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metric_scope_ok() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_, _| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-        repository
-            .expect_update_training_metric_scope()
-            .times(1)
-            .withf(|user, id, scope| {
-                user == &UserId::from("user")
-                    && id == &TrainingMetricId::from("test")
-                    && scope == &TrainingMetricScope::Global
-            })
-            .returning(|_, _, _| Ok(()));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = UpdateTrainingMetricScopeRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricScope::Global,
-        );
-
-        let res = service.update_metric_scope(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_update_metric_scope_metric_does_not_exist() {
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_definition()
-            .returning(|_, _| Ok(None));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = UpdateTrainingMetricScopeRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricScope::Global,
-        );
-
-        let res = service.update_metric_scope(req).await;
-        let Err(UpdateTrainingMetricScopeError::MetricDoesNotExist(metric)) = res else {
-            unreachable!("Should have returned MetricDoesNotExist error")
-        };
-        assert_eq!(metric, TrainingMetricId::from("test"));
-    }
-
-    #[tokio::test]
-    async fn test_update_metric_scope_training_period_does_not_exist() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_, _| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-        repository
-            .expect_get_training_period()
-            .returning(|_, _| None);
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let period_id = TrainingPeriodId::new();
-        let req = UpdateTrainingMetricScopeRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricScope::TrainingPeriod(period_id.clone()),
-        );
-
-        let res = service.update_metric_scope(req).await;
-        let Err(UpdateTrainingMetricScopeError::TrainingPeriodDoesNotExist(returned_period_id)) =
-            res
-        else {
-            unreachable!("Should have returned TrainingPeriodDoesNotExist error")
-        };
-        assert_eq!(returned_period_id, period_id);
-    }
-
-    #[tokio::test]
-    async fn test_update_metric_scope_with_valid_training_period() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_, _| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "user".to_string().into(),
-                ActivityMetricV2::Calories,
-                TrainingMetricGranularity::Daily,
-                TrainingMetricAggregate::Average,
-                TrainingMetricFilters::empty(),
-                TrainingMetricGroupBy::none(),
-            )))
-        });
-
-        let period_id = TrainingPeriodId::new();
-        let period_id_clone = period_id.clone();
-        repository
-            .expect_get_training_period()
-            .returning(move |_, _| {
-                Some(
-                    TrainingPeriod::new(
-                        period_id_clone.clone(),
-                        "user".to_string().into(),
-                        "2025-10-01".parse::<NaiveDate>().unwrap(),
-                        None,
-                        "Test Period".to_string(),
-                        TrainingPeriodSports::new(None),
-                        None,
-                    )
-                    .unwrap(),
-                )
-            });
-        repository
-            .expect_update_training_metric_scope()
-            .times(1)
-            .returning(|_, _, _| Ok(()));
-
-        let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
-
-        let req = UpdateTrainingMetricScopeRequest::new(
-            "user".to_string().into(),
-            TrainingMetricId::from("test"),
-            TrainingMetricScope::TrainingPeriod(period_id.clone()),
-        );
-
-        let res = service.update_metric_scope(req).await;
         assert!(res.is_ok());
     }
 }

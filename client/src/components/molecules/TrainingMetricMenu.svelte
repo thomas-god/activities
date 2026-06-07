@@ -23,7 +23,6 @@
 	let isUpdating = $state(false);
 	let editedName = $state(name || '');
 	let editNameDialog: HTMLDialogElement;
-	let makeMetricGlobalDialog: HTMLDialogElement;
 
 	const deleteMetricCallback = async (): Promise<void> => {
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
@@ -71,24 +70,6 @@
 			isUpdating = false;
 		}
 	}
-
-	const makeMetricGlobal = async (): Promise<void> => {
-		const body = JSON.stringify({ scope: { type: 'global' } });
-		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
-			method: 'PATCH',
-			credentials: 'include',
-			mode: 'cors',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body
-		});
-
-		if (res.status === 401) {
-			goto('/login');
-		}
-		makeMetricGlobalDialog.close();
-	};
 </script>
 
 <div class="dropdown dropdown-end">
@@ -103,14 +84,6 @@
 		<li>
 			<EditButton callback={() => editNameDialog.show()} text="Edit name" size="normal" />
 		</li>
-		{#if scope === 'local'}
-			<li>
-				<button onclick={() => makeMetricGlobalDialog.show()} class="btn btn-ghost">
-					<img src="/icons/globe.svg" class="h-4 w-4" alt="Globe icon" />
-					<span>Make metric global</span>
-				</button>
-			</li>
-		{/if}
 		<li>
 			<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
 		</li>
@@ -142,34 +115,6 @@
 				onclick={handleUpdateName}
 				disabled={isUpdating || !editedName.trim()}
 			>
-				{#if isUpdating}
-					<span class="loading loading-sm loading-spinner"></span>
-					Updating...
-				{:else}
-					Update
-				{/if}
-			</button>
-		</div>
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<!-- Make metric global modal -->
-<dialog class="modal" bind:this={makeMetricGlobalDialog}>
-	<div class="modal-box">
-		<h3 class="text-lg font-bold">Make training metric global</h3>
-		<div class="py-4">
-			<span> This will make the metric </span>
-			<span class="italic">{name}</span>
-			<span>available to all other training periods outside this one</span>
-		</div>
-		<div class="modal-action">
-			<button class="btn" onclick={() => makeMetricGlobalDialog.close()} disabled={isUpdating}>
-				Cancel
-			</button>
-			<button class="btn btn-primary" onclick={makeMetricGlobal} disabled={isUpdating}>
 				{#if isUpdating}
 					<span class="loading loading-sm loading-spinner"></span>
 					Updating...
