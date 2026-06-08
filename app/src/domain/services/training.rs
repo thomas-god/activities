@@ -149,7 +149,7 @@ where
 
         let new_metric = TrainingMetric::new(
             TrainingMetricId::new(),
-            None,
+            req.new_name().clone(),
             TrainingMetricScope::TrainingPeriod(req.target_period().clone()),
             source_definition,
         );
@@ -3699,7 +3699,7 @@ mod test_training_service_copy_metric {
     use crate::domain::models::activity::ActivityMetricV2;
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy,
+        TrainingMetricGroupBy, TrainingMetricName,
     };
     use crate::domain::ports::training::{GetDefinitionError, SaveTrainingMetricError};
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -3757,14 +3757,19 @@ mod test_training_service_copy_metric {
             .withf(move |metric| {
                 metric.scope() == &TrainingMetricScope::TrainingPeriod(period_id_clone.clone())
                     && metric.definition() == &def_for_assert
-                    && metric.name().is_none()
+                    && metric.name() == &Some(TrainingMetricName::from("new-name"))
             })
             .returning(|_| Ok(()));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+        let req = CopyTrainingMetricRequest::new(
+            UserId::test_default(),
+            source_id,
+            period_id,
+            Some(TrainingMetricName::from("new-name")),
+        );
 
         let result = service.copy_training_metric(req).await;
         assert!(result.is_ok());
@@ -3784,8 +3789,12 @@ mod test_training_service_copy_metric {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let req =
-            CopyTrainingMetricRequest::new(UserId::test_default(), source_id.clone(), period_id);
+        let req = CopyTrainingMetricRequest::new(
+            UserId::test_default(),
+            source_id.clone(),
+            period_id,
+            None,
+        );
 
         let result = service.copy_training_metric(req).await;
         assert!(result.is_err());
@@ -3809,7 +3818,8 @@ mod test_training_service_copy_metric {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
 
         let result = service.copy_training_metric(req).await;
         assert!(result.is_err());
@@ -3839,7 +3849,8 @@ mod test_training_service_copy_metric {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
 
         let result = service.copy_training_metric(req).await;
         assert!(result.is_err());
@@ -3887,7 +3898,8 @@ mod test_training_service_copy_metric {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let req = CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id);
+        let req =
+            CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
 
         let result = service.copy_training_metric(req).await;
         assert!(result.is_err());

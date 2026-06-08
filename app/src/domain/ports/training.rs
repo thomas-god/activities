@@ -70,18 +70,21 @@ pub struct CopyTrainingMetricRequest {
     user: UserId,
     source_metric: TrainingMetricId,
     target_period: TrainingPeriodId,
+    new_name: Option<TrainingMetricName>,
 }
 
 impl CopyTrainingMetricRequest {
     pub fn user(&self) -> &UserId {
         &self.user
     }
-
     pub fn source_metric(&self) -> &TrainingMetricId {
         &self.source_metric
     }
     pub fn target_period(&self) -> &TrainingPeriodId {
         &self.target_period
+    }
+    pub fn new_name(&self) -> &Option<TrainingMetricName> {
+        &self.new_name
     }
 }
 
