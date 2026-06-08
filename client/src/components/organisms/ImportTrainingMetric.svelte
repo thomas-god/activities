@@ -10,7 +10,12 @@
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 
-	let { metrics, period_id }: { metrics: MetricsListGrouped; period_id: string } = $props();
+	let {
+		metrics,
+		period_id,
+		metricCopiedCallback
+	}: { metrics: MetricsListGrouped; period_id: string; metricCopiedCallback: () => void } =
+		$props();
 
 	let chartWidth: number = $state(300);
 
@@ -116,8 +121,9 @@
 							<img src="/icons/loop.svg" alt="Magnifying glass icon" class="inline h-5 w-5" />
 						</button>
 						<CopyUploadButton
-							callback={() =>
+							onClickCallback={() =>
 								copyTrainingMetricIntoPeriod(fetch, metric.id, period_id, metric.name)}
+							onSuccessCallback={metricCopiedCallback}
 						/>
 					</div>
 				</div>

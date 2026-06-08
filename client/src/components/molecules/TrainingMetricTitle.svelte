@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import { metricScope, type MetricsListItemGrouped } from '$lib/api';
 	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/metric';
 	import TrainingMetricMenu from './TrainingMetricMenu.svelte';
 
-	let { metric }: { metric: MetricsListItemGrouped } = $props();
+	let { metric, onUpdate }: { metric: MetricsListItemGrouped; onUpdate: () => void } = $props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
@@ -80,8 +79,8 @@
 				name={metric.name}
 				id={metric.id}
 				scope={metricScope(metric)}
-				onUpdate={() => invalidate('app:training-metrics')}
-				onDelete={() => invalidate('app:training-metrics')}
+				{onUpdate}
+				onDelete={onUpdate}
 			/>
 		</div>
 	</div>

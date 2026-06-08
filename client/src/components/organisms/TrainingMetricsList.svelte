@@ -6,7 +6,8 @@
 
 	let {
 		metrics,
-		height
+		height,
+		onUpdate
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
@@ -47,7 +48,7 @@
 <div class="flex flex-col items-center gap-0">
 	{#each metricProps as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-			<TrainingMetricTitle metric={metric.initialMetric} />
+			<TrainingMetricTitle metric={metric.initialMetric} {onUpdate} />
 
 			{#if metric.values.length > 0}
 				<TrainingMetricsChartStacked

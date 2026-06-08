@@ -81,10 +81,10 @@
 		tabindex="0"
 		class="dropdown-content menu z-[1] flex w-52 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 	>
-		<li>
+		<li class="w-full">
 			<EditButton callback={() => editNameDialog.show()} text="Edit name" size="normal" />
 		</li>
-		<li>
+		<li class="w-full">
 			<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
 		</li>
 	</ul>

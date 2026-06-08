@@ -1,16 +1,17 @@
 <script lang="ts">
 	import { isNone, none, some, type Option } from '$lib/Options';
 
-	let { callback }: { callback: () => Promise<void> } = $props();
+	let {
+		onClickCallback,
+		onSuccessCallback
+	}: { onClickCallback: () => Promise<void>; onSuccessCallback: () => void } = $props();
+
+	const setPromise = () => (promise = some(onClickCallback().then(onSuccessCallback)));
 	let promise: Option<Promise<void>> = $state(none());
 </script>
 
 {#if isNone(promise)}
-	<button
-		title="Copy"
-		class="btn join-item btn-ghost btn-xs"
-		onclick={() => (promise = some(callback()))}
-	>
+	<button title="Copy" class="btn join-item btn-ghost btn-xs" onclick={setPromise}>
 		<img src="/icons/copy.svg" alt="Copy icon" class="inline h-5 w-5" />
 	</button>
 {:else}
