@@ -167,6 +167,20 @@ where
         date_range: &DateRange,
         scope: &TrainingMetricScope,
     ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError> {
+        let extra_sports = match scope {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(period) => self
+                .training_repository
+                .get_training_period(user, period)
+                .await
+                .ok_or(GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(
+                    period.clone(),
+                ))?
+                .sports()
+                .items()
+                .cloned(),
+        };
+
         let metrics = match scope {
             TrainingMetricScope::Global => self.training_repository.get_global_metrics(user).await,
             TrainingMetricScope::TrainingPeriod(period) => {
@@ -187,10 +201,11 @@ where
 
         let mut res = vec![];
         for metric in metrics {
+            let definition = metric.definition().clone().merge_sports(&extra_sports);
             let aligned_date_range = date_range.align_to(metric.definition().granularity());
 
             let values = self
-                .compute_training_metric_values(metric.definition(), &aligned_date_range)
+                .compute_training_metric_values(&definition, &aligned_date_range)
                 .await
                 .unwrap_or_default();
 
@@ -1410,22 +1425,34 @@ mod tests_training_metrics_service {
 
     #[tokio::test]
     async fn test_get_training_metrics_values_with_training_period_scope() {
-        let period_id = TrainingPeriodId::new();
         let mut repository = MockTrainingRepository::new();
 
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("test-period"),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
         repository
             .expect_get_training_metrics_ordering()
             .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
-        let test_period_id = period_id.clone();
         repository
             .expect_get_period_metrics()
-            .withf(move |_, period| period == &test_period_id)
+            .withf(move |_, period| period == &TrainingPeriodId::from("test-period"))
             .returning(|_, _| {
                 Ok(vec![TrainingMetric::new(
                     TrainingMetricId::from("period-metric"),
                     Some(TrainingMetricName::from("Period Metric")),
-                    TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new()),
+                    TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("test-period")),
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
                         ActivityMetricV2::Duration,
@@ -1451,7 +1478,7 @@ mod tests_training_metrics_service {
                     NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
                     NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
                 ),
-                &TrainingMetricScope::TrainingPeriod(period_id),
+                &TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("test-period")),
             )
             .await
             .unwrap();
@@ -1470,21 +1497,19 @@ mod tests_training_metrics_service {
         let period_id = TrainingPeriodId::new();
         let mut repository = MockTrainingRepository::new();
 
-        // Global metrics returns successfully
-        repository.expect_get_global_metrics().returning(|_| {
-            Ok(vec![TrainingMetric::new(
-                TrainingMetricId::from("global-metric"),
-                Some(TrainingMetricName::from("Global Metric")),
-                TrainingMetricScope::Global,
-                TrainingMetricDefinition::new(
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("metric-1"),
                     UserId::test_default(),
-                    ActivityMetricV2::Distance,
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Sum,
-                    TrainingMetricFilters::empty(),
-                    TrainingMetricGroupBy::none(),
-                ),
-            )])
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                    None,
+                )
+                .unwrap(),
+            )
         });
 
         // Period metrics returns error
@@ -1690,6 +1715,126 @@ mod tests_training_metrics_service {
         assert_eq!(res[0].0.id(), &TrainingMetricId::from("metric-3"));
         assert_eq!(res[1].0.id(), &TrainingMetricId::from("metric-1"));
         assert_eq!(res[2].0.id(), &TrainingMetricId::from("metric-2"));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_metrics_values_applies_training_period_sports_to_metrics_filters() {
+        let mut repository = MockTrainingRepository::new();
+
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::from("metric-1"),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+
+        repository
+            .expect_get_period_metrics()
+            .returning(move |_, _| {
+                Ok(vec![
+                    TrainingMetric::new(
+                        TrainingMetricId::from("metric-1"),
+                        Some(TrainingMetricName::from("Metric 1")),
+                        TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+                        TrainingMetricDefinition::new(
+                            UserId::test_default(),
+                            ActivityMetricV2::Distance,
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                            TrainingMetricFilters::empty()
+                                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                            TrainingMetricGroupBy::none(),
+                        ),
+                    ),
+                    TrainingMetric::new(
+                        TrainingMetricId::from("metric-2"),
+                        Some(TrainingMetricName::from("Metric 2")),
+                        TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+                        TrainingMetricDefinition::new(
+                            UserId::test_default(),
+                            ActivityMetricV2::Distance,
+                            TrainingMetricGranularity::Daily,
+                            TrainingMetricAggregate::Sum,
+                            TrainingMetricFilters::empty(),
+                            TrainingMetricGroupBy::none(),
+                        ),
+                    ),
+                ])
+            });
+
+        repository
+            .expect_get_training_metrics_ordering()
+            .returning(move |_, _| {
+                Ok(TrainingMetricsOrdering::try_from(vec![
+                    TrainingMetricId::from("metric-1"),
+                    TrainingMetricId::from("metric-2"),
+                ])
+                .unwrap())
+            });
+
+        let mut activity_service = MockActivityService::default();
+        activity_service
+            .expect_list_activities_with_metrics()
+            .returning(|_, _, _| {
+                Ok(vec![(
+                    Activity::new_empty(
+                        ActivityId::from("test"),
+                        UserId::test_default(),
+                        ActivityStartTime::new(
+                            NaiveDateTime::new(
+                                NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                                NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+                            )
+                            .and_utc()
+                            .fixed_offset(),
+                        ),
+                        ActivityDuration::default(),
+                        Sport::Running,
+                    ),
+                    ActivityMetricsV2::new(HashMap::from([(
+                        ActivityMetricV2::Distance,
+                        Some(10.),
+                    )])),
+                )])
+            });
+
+        let activity_service = activity_service;
+        let service = TrainingService::new(repository, activity_service);
+
+        let res = service
+            .get_training_metrics_values(
+                &UserId::test_default(),
+                &DateRange::new(
+                    NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
+                    NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
+                ),
+                &TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            res.get(0)
+                .unwrap()
+                .1
+                .get(&TrainingMetricBin::from_granule("2025-09-24")),
+            None // None as activity should be excluded from the metric computation
+        );
+        assert_eq!(
+            res.get(1)
+                .unwrap()
+                .1
+                .get(&TrainingMetricBin::from_granule("2025-09-24")),
+            None // None as activity should be excluded from the metric computation
+        )
     }
 
     #[tokio::test]
@@ -3073,7 +3218,7 @@ mod test_training_service_training_note {
         let period_id_clone = period_id.clone();
         training_repository
             .expect_get_training_period()
-            .times(1)
+            .times(2)
             .returning(move |_, _| {
                 use crate::domain::models::training::{TrainingPeriod, TrainingPeriodSports};
                 Some(
