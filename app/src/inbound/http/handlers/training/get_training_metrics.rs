@@ -174,7 +174,7 @@ pub async fn get_training_metrics<
             &DateRange::from(query.date_range()),
             &query.scope(),
         )
-        .await;
+        .await?;
 
     let body = ResponseBody(
         res.into_iter()
@@ -231,7 +231,7 @@ pub async fn get_training_period_metrics<
     let res = state
         .training_metrics_service
         .get_training_period_metrics_values(user.user(), &period_id)
-        .await;
+        .await?;
 
     let body = ResponseBody(
         res.into_iter()

@@ -56,7 +56,8 @@ pub struct ResponseBody {
 impl From<GetTrainingMetricValuesError> for StatusCode {
     fn from(value: GetTrainingMetricValuesError) -> Self {
         match value {
-            GetTrainingMetricValuesError::TrainingMetricDoesNotExists(_) => Self::NOT_FOUND,
+            GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_) => Self::NOT_FOUND,
+            GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(_) => Self::NOT_FOUND,
             GetTrainingMetricValuesError::Unknown(_) => Self::INTERNAL_SERVER_ERROR,
         }
     }

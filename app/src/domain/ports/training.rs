@@ -111,6 +111,8 @@ pub enum GetTrainingMetricValuesRequest {
 
 #[derive(Debug, Error)]
 pub enum CreateTrainingMetricError {
+    #[error("Training period {0} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
     #[error("Error when saving training metric definition")]
@@ -246,7 +248,9 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         user: &UserId,
         date_range: &DateRange,
         scope: &TrainingMetricScope,
-    ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
+    ) -> impl Future<
+        Output = Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>,
+    > + Send;
 
     fn get_training_metric_values(
         &self,
@@ -350,7 +354,9 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         period_id: &TrainingPeriodId,
-    ) -> impl Future<Output = Vec<(TrainingMetric, TrainingMetricValues)>> + Send;
+    ) -> impl Future<
+        Output = Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>,
+    > + Send;
 
     fn get_training_metrics_ordering(
         &self,
@@ -418,8 +424,10 @@ pub enum GetDefinitionError {
 
 #[derive(Debug, Error)]
 pub enum GetTrainingMetricValuesError {
+    #[error("Training period {0:?} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
     #[error("Training metric {0:?} does not exist")]
-    TrainingMetricDoesNotExists(TrainingMetricId),
+    TrainingMetricDoesNotExist(TrainingMetricId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }

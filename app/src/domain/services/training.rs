@@ -152,7 +152,7 @@ where
         user: &UserId,
         date_range: &DateRange,
         scope: &TrainingMetricScope,
-    ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
+    ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError> {
         let metrics = match scope {
             TrainingMetricScope::Global => self.training_repository.get_global_metrics(user).await,
             TrainingMetricScope::TrainingPeriod(period) => {
@@ -160,11 +160,8 @@ where
                     .get_period_metrics(user, period)
                     .await
             }
-        };
-
-        let Ok(metrics) = metrics else {
-            return vec![];
-        };
+        }
+        .map_err(|err| GetTrainingMetricValuesError::Unknown(anyhow!(err)))?;
 
         let ordering = self
             .training_repository
@@ -186,7 +183,7 @@ where
             res.push((metric.clone(), values))
         }
 
-        res
+        Ok(res)
     }
 
     async fn get_training_metric_values(
@@ -215,9 +212,7 @@ where
                 .get_definition(&user, &id)
                 .await
                 .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?
-                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(
-                    id,
-                ))?,
+                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(id))?,
         };
 
         self.compute_training_metric_values(&definition, date_range)
@@ -504,15 +499,15 @@ where
         &self,
         user: &UserId,
         period_id: &TrainingPeriodId,
-    ) -> Vec<(TrainingMetric, TrainingMetricValues)> {
+    ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError> {
         // Get the training period to verify it exists and belongs to the user
-        let Some(period) = self
+        let period = self
             .training_repository
             .get_training_period(user, period_id)
             .await
-        else {
-            return vec![];
-        };
+            .ok_or(GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(
+                period_id.clone(),
+            ))?;
 
         let date_range = period.range_default_tomorrow();
 
@@ -611,7 +606,7 @@ pub mod test_utils {
                 user: &UserId,
                 date_range: &DateRange,
                 scope: &TrainingMetricScope,
-            ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
+            ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>;
 
             async fn copy_training_metric(
                 &self,
@@ -719,7 +714,7 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 period_id: &TrainingPeriodId,
-            ) -> Vec<(TrainingMetric, TrainingMetricValues)>;
+            ) -> Result<Vec<(TrainingMetric, TrainingMetricValues)>, GetTrainingMetricValuesError>;
 
             async fn get_training_metrics_ordering(
                 &self,
@@ -749,7 +744,7 @@ pub mod test_utils {
             mock.expect_create_metric()
                 .returning(|_| Ok(TrainingMetricId::default()));
             mock.expect_get_training_metrics_values()
-                .returning(|_, _, _| vec![]);
+                .returning(|_, _, _| Ok(vec![]));
             mock.expect_delete_metric().returning(|_| Ok(()));
 
             mock
@@ -987,7 +982,7 @@ mod tests_training_metrics_service {
         let activity_service = MockActivityService::new();
         let service = TrainingService::new(repository, activity_service);
 
-        let res = service
+        let err = service
             .get_training_metrics_values(
                 &UserId::test_default(),
                 &DateRange::new(
@@ -996,8 +991,12 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
-        assert!(res.is_empty());
+            .await
+            .unwrap_err();
+
+        let GetTrainingMetricValuesError::Unknown(_err) = err else {
+            unreachable!("Should have err")
+        };
     }
 
     #[tokio::test]
@@ -1039,7 +1038,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -1104,7 +1104,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(res.len(), 1);
         let (def, value) = res.first().unwrap();
@@ -1178,7 +1179,8 @@ mod tests_training_metrics_service {
                 &date_range,
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(res.len(), 1);
     }
@@ -1254,7 +1256,8 @@ mod tests_training_metrics_service {
                 &date_range,
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(res.len(), 1);
     }
@@ -1297,7 +1300,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].0.id(), &TrainingMetricId::from("global-metric"));
@@ -1352,7 +1356,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::TrainingPeriod(period_id),
             )
-            .await;
+            .await
+            .unwrap();
 
         // Should have both global and period metrics merged
         assert_eq!(res.len(), 1);
@@ -1399,19 +1404,21 @@ mod tests_training_metrics_service {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
 
-        let res = service
+        let err = service
             .get_training_metrics_values(
                 &UserId::test_default(),
                 &DateRange::new(
                     NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
                     NaiveDate::from_ymd_opt(2025, 9, 25).unwrap(),
                 ),
-                &TrainingMetricScope::TrainingPeriod(period_id),
+                &TrainingMetricScope::TrainingPeriod(period_id.clone()),
             )
-            .await;
+            .await
+            .unwrap_err();
 
-        // Should return empty when period metrics fail
-        assert!(res.is_empty());
+        let GetTrainingMetricValuesError::Unknown(_err) = err else {
+            unreachable!("Should have err")
+        };
     }
 
     #[tokio::test]
@@ -1479,7 +1486,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         // Metrics should still be returned even when ordering fails
         assert_eq!(res.len(), 2);
@@ -1577,7 +1585,8 @@ mod tests_training_metrics_service {
                 ),
                 &TrainingMetricScope::Global,
             )
-            .await;
+            .await
+            .unwrap();
 
         // Metrics should be returned in the order specified by ordering: 3, 1, 2
         assert_eq!(res.len(), 3);
@@ -3000,7 +3009,8 @@ mod test_training_service_training_note {
 
         let result = service
             .get_training_period_metrics_values(&user_id, &period_id)
-            .await;
+            .await
+            .unwrap();
 
         assert!(result.is_empty()); // Empty because we mocked no metrics
     }
@@ -3021,11 +3031,15 @@ mod test_training_service_training_note {
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(training_repository, activity_service);
 
-        let result = service
+        let err = service
             .get_training_period_metrics_values(&user_id, &period_id)
-            .await;
+            .await
+            .unwrap_err();
 
-        assert!(result.is_empty()); // Returns empty when period not found
+        let GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(id) = err else {
+            unreachable!("Should have err")
+        };
+        assert_eq!(id, period_id);
     }
 }
 
@@ -3071,7 +3085,7 @@ mod test_training_service_metric_values {
 
         assert!(result.is_err());
         match result {
-            Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExists(_)) => {}
+            Err(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_)) => {}
             _ => panic!("Expected TrainingMetricDoesNotExists error"),
         }
     }
