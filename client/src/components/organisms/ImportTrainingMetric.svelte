@@ -127,18 +127,24 @@
 
 	{#if isSome(selectedMetric)}
 		{@const metric = selectedMetric.value}
-		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-			<TrainingMetricsChartStacked
-				height={300}
-				width={chartWidth}
-				values={metric.values}
-				unit={metric.unit}
-				granularity={metric.granularity}
-				format={metricValuesDisplayFormat(metric)}
-				showGroup={metric.showGroup}
-				groupBy={metric.groupBy}
-				stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-			/>
-		</div>
+		{#if metric.values.length > 0}
+			<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
+				<TrainingMetricsChartStacked
+					height={300}
+					width={chartWidth}
+					values={metric.values}
+					unit={metric.unit}
+					granularity={metric.granularity}
+					format={metricValuesDisplayFormat(metric)}
+					showGroup={metric.showGroup}
+					groupBy={metric.groupBy}
+					stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+				/>
+			</div>
+		{:else}
+			<div class="alert rounded-box alert-info">
+				<span>No data available for the selected period and filters.</span>
+			</div>
+		{/if}
 	{/if}
 </div>
