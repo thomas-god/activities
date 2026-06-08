@@ -29,7 +29,8 @@
 	} from '$lib/filters';
 	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
-	import type { TrainingPeriodDetails } from '$lib/api';
+	import { fetchTrainingMetrics, type TrainingPeriodDetails } from '$lib/api';
+	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -40,6 +41,8 @@
 
 	// svelte-ignore non_reactive_update
 	let newTrainingMetricDialog: HTMLDialogElement;
+	// svelte-ignore non_reactive_update
+	let importTrainingMetricDialog: HTMLDialogElement;
 	// svelte-ignore non_reactive_update
 	let metricsOrderingDialog: MetricsOrderingDialog;
 
@@ -247,6 +250,19 @@
 	const openMetricsOrderingDialog = () => {
 		metricsOrderingDialog.open();
 	};
+
+	let getGlobalMetricsPromise = $derived.by(async () => {
+		const period = await data.periodDetails;
+		if (period === null) {
+			return Promise.resolve([]);
+		}
+		return fetchTrainingMetrics(
+			fetch,
+			period.start,
+			period.end === null ? undefined : period.end,
+			'global'
+		);
+	});
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -368,12 +384,20 @@
 										onclick={() => newTrainingMetricDialog.show()}
 										class="btn join-item btn-sm"
 									>
-										<img src="/icons/plus.svg" class="h-4 w-4" alt="Plus sign icon" />
+										<img src="/icons/plus.svg" class="inline h-5 w-5" alt="Plus sign icon" />
+									</button>
+								</div>
+								<div class="tooltip tooltip-bottom" data-tip="Import metric">
+									<button
+										onclick={() => importTrainingMetricDialog.show()}
+										class="btn join-item btn-sm"
+									>
+										<img src="/icons/import.svg" class="inline h-5 w-5" alt="Import sign icon" />
 									</button>
 								</div>
 								<div class="tooltip tooltip-bottom" data-tip="Order metrics">
 									<button onclick={openMetricsOrderingDialog} class="btn join-item btn-sm">
-										<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
+										<img src="/icons/order.svg" class="inline h-5 w-5" alt="List order icon" />
 									</button>
 								</div>
 							</div>
@@ -522,6 +546,19 @@
 					}}
 					scope={{ kind: 'period', periodId: periodDetails.id }}
 				/>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+
+		<dialog class="modal" id="import-training-metric-dialog" bind:this={importTrainingMetricDialog}>
+			<div class="modal-box max-w-3xl">
+				{#await getGlobalMetricsPromise}
+					<div class="loading"></div>
+				{:then globalMetrics}
+					<ImportTrainingMetric metrics={globalMetrics} period_id={periodDetails.id} />
+				{/await}
 			</div>
 			<form method="dialog" class="modal-backdrop">
 				<button>close</button>

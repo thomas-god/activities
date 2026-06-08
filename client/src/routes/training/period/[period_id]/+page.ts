@@ -1,10 +1,6 @@
 import type { PageLoad } from './$types';
-import { fetchTrainingPeriodDetails, type TrainingPeriodDetails, type Activity } from '$lib/api';
-import {
-	fetchTrainingPeriodNotes,
-	fetchTrainingPeriodMetrics,
-	type TrainingNote
-} from '$lib/api/training';
+import { fetchTrainingPeriodDetails } from '$lib/api';
+import { fetchTrainingPeriodNotes, fetchTrainingPeriodMetrics } from '$lib/api/training';
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
 	depends(`app:training-period:${params.period_id}`);

@@ -231,6 +231,45 @@ export async function fetchTrainingMetrics(
 	return [];
 }
 
+/**
+ * Fetch training metrics
+ * @param sourceMetric - ID of the metric to copy
+ * @param targetPeriod - ID of the training period to copy the metric into
+ * @param newName - Name of the new metric
+ */
+export async function copyTrainingMetricIntoPeriod(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+	sourceMetric: string,
+	targetPeriod: string,
+	newName: string | null
+): Promise<void> {
+	let body: Record<string, string> = { targetPeriod };
+	if (newName !== null) {
+		body = { newName, ...body };
+	}
+
+	const url = `${PUBLIC_APP_URL}/api/training/metric/${sourceMetric}/copy`;
+
+	const res = await fetch(url, {
+		method: 'POST',
+		mode: 'cors',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+		return;
+	}
+
+	if (res.status === 201) {
+		return;
+	}
+
+	return;
+}
+
 export const groupMetricValues = (metric: MetricsListItemGrouped) => {
 	let values = [];
 	for (const [group, time_values] of Object.entries(metric.values)) {
