@@ -57,7 +57,7 @@
 	const granularityValues = ['Daily', 'Weekly', 'Monthly'] as const;
 	type Granularity = (typeof granularityValues)[number];
 
-	let selectedMetricSourceId = $state('duration');
+	let selectedMetricSourceId = $state('active-duration');
 	let granularity: Granularity = $state('Weekly');
 	let aggregate: 'Min' | 'Max' | 'Average' | 'Sum' | 'NumberOfActivities' = $state('Average');
 	let groupBy: 'None' | 'Sport' | 'SportCategory' | 'WorkoutType' | 'RpeRange' | 'Bonked' =
@@ -84,7 +84,7 @@
 
 	let selectedActivityMetric = $derived.by(() => {
 		const selectedMetric = activityMetricOptions.find((s) => s.id === selectedMetricSourceId);
-		return selectedMetric?.metric || 'Duration';
+		return selectedMetric?.metric || 'ActiveDuration';
 	});
 
 	// Determine unit and format for preview display
@@ -236,6 +236,7 @@
 		callback();
 	};
 
+	// TODO: do not run this at component init ?
 	const fetchPreview = async (
 		request: typeof previewRequest
 	): Promise<{ time: string; group: string; value: number }[]> => {
@@ -274,7 +275,7 @@
 	};
 </script>
 
-<div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+<div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2" id="test-debug">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
 		<legend class="fieldset-legend text-base">New training metric</legend>
 

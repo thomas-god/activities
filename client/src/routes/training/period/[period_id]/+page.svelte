@@ -221,7 +221,6 @@
 	};
 
 	const selectActivityCallback = (activityId: string) => {
-		// On mobile, navigate to activity page
 		if (screenWidth < 700) {
 			goto(`/activity/${activityId}`);
 			return;
@@ -360,38 +359,26 @@
 				<div
 					class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 				>
-					{#if metrics.length > 0}
-						<div bind:clientWidth={chartWidth}>
-							<div class="flex flex-row gap-2 pt-4">
-								<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
-								<div class="dropdown dropdown-end">
-									<div
-										tabindex="0"
-										role="button"
-										class="btn btn-square opacity-100 btn-ghost btn-xs"
+					<div bind:clientWidth={chartWidth}>
+						<div class="flex flex-row items-center gap-2 pt-4">
+							<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
+							<div class="join">
+								<div class="tooltip tooltip-bottom" data-tip="New metric">
+									<button
+										onclick={() => newTrainingMetricDialog.show()}
+										class="btn join-item btn-sm"
 									>
-										<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
-									</div>
-									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-									<ul
-										tabindex="0"
-										class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
-									>
-										<li>
-											<button onclick={() => newTrainingMetricDialog.show()}>
-												<img src="/icons/plus.svg" class="h-4 w-4" alt="Plus sign icon" />
-												<span>New metric</span>
-											</button>
-										</li>
-										<li>
-											<button onclick={openMetricsOrderingDialog}>
-												<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
-												<span>Reorder</span>
-											</button>
-										</li>
-									</ul>
+										<img src="/icons/plus.svg" class="h-4 w-4" alt="Plus sign icon" />
+									</button>
+								</div>
+								<div class="tooltip tooltip-bottom" data-tip="Order metrics">
+									<button onclick={openMetricsOrderingDialog} class="btn join-item btn-sm">
+										<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
+									</button>
 								</div>
 							</div>
+						</div>
+						{#if metrics.length > 0}
 							{#if screenWidth < 700}
 								<TrainingMetricsCarousel {metrics} height={chartHeight} />
 							{:else}
@@ -402,12 +389,12 @@
 									onDelete={() => invalidate(`app:training-period:${periodDetails.id}`)}
 								/>
 							{/if}
-						</div>
-					{:else}
-						<div class="text-center text-sm tracking-wide italic opacity-60">
-							No training metrics
-						</div>
-					{/if}
+						{:else}
+							<div class="mt-4 text-center text-sm tracking-wide italic opacity-60">
+								No training metrics
+							</div>
+						{/if}
+					</div>
 				</div>
 
 				<MetricsOrderingDialog
