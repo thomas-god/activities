@@ -79,6 +79,31 @@ impl TrainingMetricFilters {
         }
     }
 
+    pub fn merge_sports(self, other_sports: &Option<Vec<SportFilter>>) -> Self {
+        let Some(other_sports) = other_sports else {
+            return self;
+        };
+
+        let new_sports = match self.sports {
+            Some(mut sports) => {
+                for sport in other_sports {
+                    if !sports.contains(sport) {
+                        sports.push(sport.clone());
+                    }
+                }
+                Some(sports)
+            }
+            None => Some(other_sports.iter().cloned().collect()),
+        };
+
+        Self {
+            sports: new_sports,
+            workout_types: self.workout_types,
+            bonked: self.bonked,
+            rpes: self.rpes,
+        }
+    }
+
     pub fn sports(&self) -> &Option<Vec<SportFilter>> {
         &self.sports
     }
@@ -295,6 +320,17 @@ impl TrainingMetricDefinition {
 
     pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
         &self.group_by
+    }
+
+    pub fn merge_sports(self, other_sports: &Option<Vec<SportFilter>>) -> Self {
+        Self {
+            user: self.user,
+            metric: self.metric,
+            granularity: self.granularity,
+            granularity_aggregate: self.granularity_aggregate,
+            filters: self.filters.merge_sports(other_sports),
+            group_by: self.group_by,
+        }
     }
 }
 
@@ -651,7 +687,7 @@ impl TrainingMetricBin {
     }
 }
 
-#[derive(Debug, Clone, Constructor, Default)]
+#[derive(Debug, Clone, Constructor, Default, PartialEq)]
 pub struct TrainingMetricValues(HashMap<TrainingMetricBin, TrainingMetricValue>);
 
 impl TrainingMetricValues {
@@ -2246,6 +2282,100 @@ mod test_training_metric_filters {
         assert!(empty_filter.matches(&activity_bonked));
         assert!(empty_filter.matches(&activity_rpe_eight));
         assert!(empty_filter.matches(&activity_minimal));
+    }
+
+    #[test]
+    fn test_append_sports_to_training_filters_with_empty_sports() {
+        let filter = TrainingMetricFilters::empty();
+        let new_sports = Some(vec![SportFilter::Sport(Sport::Badminton)]);
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![SportFilter::Sport(Sport::Badminton)])
+        );
+    }
+
+    #[test]
+    fn test_append_sports_to_training_filters_with_existing_sports() {
+        let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
+        let new_sports = Some(vec![SportFilter::Sport(Sport::Badminton)]);
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![
+                SportFilter::Sport(Sport::AlpineSki),
+                SportFilter::Sport(Sport::Badminton)
+            ])
+        );
+    }
+
+    #[test]
+    fn test_append_sports_to_training_filters_with_duplicated_sports() {
+        let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
+        let new_sports = Some(vec![
+            SportFilter::Sport(Sport::Badminton),
+            SportFilter::Sport(Sport::AlpineSki),
+        ]);
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![
+                SportFilter::Sport(Sport::AlpineSki),
+                SportFilter::Sport(Sport::Badminton)
+            ])
+        );
+    }
+
+    #[test]
+    fn test_append_none_sports_to_training_filters_with_existing_sports() {
+        let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
+        let new_sports = None;
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![SportFilter::Sport(Sport::AlpineSki),])
+        );
+    }
+
+    #[test]
+    fn test_append_none_sports_to_training_filters_without_existing_sports() {
+        let filter = TrainingMetricFilters::empty();
+        let new_sports = None;
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert!(new_filter.sports().is_none(),);
+    }
+
+    #[test]
+    fn test_append_sports_to_training_filters_preserves_other_filters() {
+        let workout_types = Some(vec![WorkoutType::Easy]);
+        let bonked = Some(BonkStatus::None);
+        let rpes = Some(vec![ActivityRpe::Five]);
+        let filter = TrainingMetricFilters::new(
+            Some(vec![SportFilter::Sport(Sport::AlpineSki)]),
+            workout_types.clone(),
+            bonked.clone(),
+            rpes.clone(),
+        );
+        let new_sports = Some(vec![
+            SportFilter::Sport(Sport::Badminton),
+            SportFilter::Sport(Sport::AlpineSki),
+        ]);
+
+        let new_filter = filter.merge_sports(&new_sports);
+
+        assert_eq!(new_filter.workout_types(), &workout_types);
+        assert_eq!(new_filter.rpes(), &rpes);
+        assert_eq!(new_filter.bonked(), &bonked);
     }
 }
 

@@ -90,13 +90,27 @@ where
         &self,
         req: CreateTrainingMetricRequest,
     ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
+        let extra_sports = match req.scope() {
+            TrainingMetricScope::Global => None,
+            TrainingMetricScope::TrainingPeriod(period) => self
+                .training_repository
+                .get_training_period(req.user(), period)
+                .await
+                .ok_or(CreateTrainingMetricError::TrainingPeriodDoesNotExist(
+                    period.clone(),
+                ))?
+                .sports()
+                .items()
+                .cloned(),
+        };
+
         let id = TrainingMetricId::new();
         let definition = TrainingMetricDefinition::new(
             req.user().clone(),
             *req.metric(),
             req.granularity().clone(),
             req.aggregate().clone(),
-            req.filters().clone(),
+            req.filters().clone().merge_sports(&extra_sports),
             req.group_by().clone(),
         );
         let training_metric = TrainingMetric::new(
@@ -905,6 +919,9 @@ mod tests_training_metrics_service {
         ActivityStartTime, Sport,
     };
 
+    use crate::domain::models::training::{
+        SportFilter, TrainingMetricBin, TrainingPeriod, TrainingPeriodSports,
+    };
     use crate::domain::ports::DateRange;
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::{
@@ -942,6 +959,86 @@ mod tests_training_metrics_service {
             .create_metric(req)
             .await
             .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_add_period_sports_to_metric_filters() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_training_period().returning(|_, _| {
+            Some(
+                TrainingPeriod::new(
+                    TrainingPeriodId::new(),
+                    UserId::test_default(),
+                    "2025-10-17".parse::<NaiveDate>().unwrap(),
+                    Some("2025-10-21".parse::<NaiveDate>().unwrap()),
+                    "Test Period".to_string(),
+                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                    None,
+                )
+                .unwrap(),
+            )
+        });
+        repository
+            .expect_save_training_metric_definition()
+            .withf(|metric| {
+                metric.definition().filters().sports()
+                    == &Some(vec![
+                        SportFilter::Sport(Sport::AlpineSki),
+                        SportFilter::Sport(Sport::Running),
+                    ])
+            })
+            .returning(|_| Ok(()));
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(repository, activities);
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            ActivityMetricV2::Calories,
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            TrainingMetricFilters::empty()
+                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            TrainingMetricGroupBy::none(),
+            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_fails_if_training_period_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_training_period()
+            .returning(|_, _| None);
+        repository.expect_save_training_metric_definition().times(0);
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(repository, activities);
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            ActivityMetricV2::Calories,
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            TrainingMetricFilters::empty()
+                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            TrainingMetricGroupBy::none(),
+            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+        );
+
+        let Err(CreateTrainingMetricError::TrainingPeriodDoesNotExist(period)) =
+            service.create_metric(req).await
+        else {
+            unreachable!("Should have err")
+        };
+        assert_eq!(period, TrainingPeriodId::from("period-id"))
     }
 
     #[tokio::test]
