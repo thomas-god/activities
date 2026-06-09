@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as d3 from 'd3';
 	import { type ActivityWithTimeseries } from '$lib/api';
-	import { formatDuration } from '$lib/duration';
+	import { formatDateTime, formatDuration } from '$lib/duration';
 	import { paceToString } from '$lib/speed';
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
@@ -16,6 +16,12 @@
 	let tableRows = $derived.by<TableRow[]>(() => {
 		const rows: TableRow[] = [];
 		const hasMetric = (key: string) => activities.some((a) => a.metrics[key] !== undefined);
+
+		rows.push({
+			label: 'Date',
+			unit: '',
+			values: activities.map((a) => formatDateTime(a.start_time))
+		});
 
 		if (hasMetric('ActiveDuration')) {
 			rows.push({
