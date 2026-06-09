@@ -102,7 +102,15 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(metric.scope().period())
         .execute(&self.pool)
         .await
-        .map_err(|err| SaveTrainingMetricError::Unknown(anyhow!(err)))
+        .map_err(|err| match err {
+            sqlx::Error::Database(err) => {
+                if err.is_foreign_key_violation() && metric.scope().period().is_some() {
+                    SaveTrainingMetricError::TrainingPeriodDoesNotExist(metric.scope().period().unwrap())
+                } else {
+                    SaveTrainingMetricError::Unknown(anyhow!(err))
+                }
+            }
+            err =>   SaveTrainingMetricError::Unknown(anyhow!(err))})
         .map(|_| ())
     }
 
@@ -701,11 +709,27 @@ mod test_sqlite_training_repository {
             .unwrap();
     }
 
-    fn build_metric() -> TrainingMetric {
+    fn build_global_metric() -> TrainingMetric {
         TrainingMetric::new(
             TrainingMetricId::new(),
             None,
             TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricV2::MaxAltitude,
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Max,
+                TrainingMetricFilters::empty(),
+                TrainingMetricGroupBy::none(),
+            ),
+        )
+    }
+
+    fn build_metric_scoped_to_period(period: &TrainingPeriodId) -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            None,
+            TrainingMetricScope::TrainingPeriod(period.clone()),
             TrainingMetricDefinition::new(
                 UserId::test_default(),
                 ActivityMetricV2::MaxAltitude,
@@ -760,18 +784,58 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_save_training_metrics() {
+    async fn test_save_training_metric_definition_scope_global() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
-        let definition = build_metric();
+        let definition = build_global_metric();
 
         repository
             .save_training_metric_definition(definition)
             .await
             .expect("Should have return Ok");
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metric_definition_scope_period() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let period = build_training_period();
+        let definition = build_metric_scoped_to_period(period.id());
+
+        repository
+            .save_training_period(period)
+            .await
+            .expect("Should have created the period");
+
+        repository
+            .save_training_metric_definition(definition)
+            .await
+            .expect("Should have return Ok");
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metric_definition_scope_period_fails_if_period_does_not_exist() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let definition =
+            build_metric_scoped_to_period(&TrainingPeriodId::from("non-existing-period"));
+
+        let Err(SaveTrainingMetricError::TrainingPeriodDoesNotExist(id)) =
+            repository.save_training_metric_definition(definition).await
+        else {
+            unreachable!("Should have returned err")
+        };
+
+        assert_eq!(id, TrainingPeriodId::from("non-existing-period"))
     }
 
     #[tokio::test]
@@ -806,7 +870,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric();
+        let definition = build_global_metric();
 
         repository
             .save_training_metric_definition(definition.clone())
@@ -825,7 +889,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let metric = build_metric();
+        let metric = build_global_metric();
 
         repository
             .save_training_metric_definition(metric.clone())
@@ -908,7 +972,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric();
+        let definition = build_global_metric();
         repository
             .save_training_metric_definition(definition.clone())
             .await
@@ -936,7 +1000,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let definition = build_metric();
+        let definition = build_global_metric();
         repository
             .save_training_metric_definition(definition.clone())
             .await
@@ -1001,7 +1065,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let metric = build_metric();
+        let metric = build_global_metric();
         repository
             .save_training_metric_definition(metric.clone())
             .await
@@ -1039,7 +1103,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         // Create a metric
-        let metric = build_metric();
+        let metric = build_global_metric();
         repository
             .save_training_metric_definition(metric.clone())
             .await
@@ -2636,7 +2700,7 @@ mod test_sqlite_training_repository {
             TrainingMetricId::new(),
             Some(TrainingMetricName::new("My Custom Metric")),
             TrainingMetricScope::Global,
-            build_metric().definition().clone(),
+            build_global_metric().definition().clone(),
         );
 
         repository
@@ -2664,7 +2728,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let metric_without_name = build_metric(); // None for name
+        let metric_without_name = build_global_metric(); // None for name
 
         repository
             .save_training_metric_definition(metric_without_name.clone())
@@ -2687,7 +2751,6 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
         let user_id = UserId::test_default();
-        let period_id = TrainingPeriodId::new();
 
         // Create a global metric
         let global_metric = TrainingMetric::new(
@@ -2705,10 +2768,11 @@ mod test_sqlite_training_repository {
         );
 
         // Create a period-scoped metric
+        let period = build_training_period();
         let period_metric = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Period Metric")),
-            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricScope::TrainingPeriod(period.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
                 ActivityMetricV2::Distance,
@@ -2724,6 +2788,10 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should save global metric");
 
+        repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should have created the period");
         repository
             .save_training_metric_definition(period_metric.clone())
             .await
@@ -2750,7 +2818,6 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
         let user_id = UserId::test_default();
-        let period_id = TrainingPeriodId::new();
 
         // Create a global metric
         let global_metric = TrainingMetric::new(
@@ -2768,10 +2835,11 @@ mod test_sqlite_training_repository {
         );
 
         // Create a period-scoped metric for our period
+        let period_1 = build_training_period();
         let period_metric = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Period Metric")),
-            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricScope::TrainingPeriod(period_1.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
                 ActivityMetricV2::Distance,
@@ -2783,10 +2851,11 @@ mod test_sqlite_training_repository {
         );
 
         // Create a period-scoped metric for a different period
+        let period_2 = build_training_period();
         let other_period_metric = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Other Period Metric")),
-            TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new()),
+            TrainingMetricScope::TrainingPeriod(period_2.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
                 ActivityMetricV2::Distance,
@@ -2803,10 +2872,18 @@ mod test_sqlite_training_repository {
             .expect("Should save global metric");
 
         repository
+            .save_training_period(period_1.clone())
+            .await
+            .expect("Should have created period 1");
+        repository
             .save_training_metric_definition(period_metric.clone())
             .await
             .expect("Should save period metric");
 
+        repository
+            .save_training_period(period_2.clone())
+            .await
+            .expect("Should have created period 2");
         repository
             .save_training_metric_definition(other_period_metric.clone())
             .await
@@ -2819,7 +2896,7 @@ mod test_sqlite_training_repository {
             .expect("Should retrieve global metrics");
 
         let mut period_metrics = repository
-            .get_period_metrics(&user_id, &period_id)
+            .get_period_metrics(&user_id, period_1.id())
             .await
             .expect("Should retrieve period metrics");
 
@@ -2857,7 +2934,6 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
         let user_id = UserId::test_default();
-        let period_id = TrainingPeriodId::new();
 
         // Create a global metric
         let global_metric = TrainingMetric::new(
@@ -2875,10 +2951,11 @@ mod test_sqlite_training_repository {
         );
 
         // Create a period-scoped metric
+        let period = build_training_period();
         let period_metric = TrainingMetric::new(
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Period Metric")),
-            TrainingMetricScope::TrainingPeriod(period_id.clone()),
+            TrainingMetricScope::TrainingPeriod(period.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
                 ActivityMetricV2::Distance,
@@ -2895,6 +2972,10 @@ mod test_sqlite_training_repository {
             .expect("Should save global metric");
 
         repository
+            .save_training_period(period.clone())
+            .await
+            .expect("Should have created the period");
+        repository
             .save_training_metric_definition(period_metric.clone())
             .await
             .expect("Should save period metric");
@@ -2906,7 +2987,7 @@ mod test_sqlite_training_repository {
             .expect("Should retrieve global metrics");
 
         let period_metrics = repository
-            .get_period_metrics(&user_id, &period_id)
+            .get_period_metrics(&user_id, period.id())
             .await
             .expect("Should retrieve period metrics");
 
@@ -3376,7 +3457,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("repo should init");
 
-        let metric = build_metric();
+        let metric = build_global_metric();
         repository
             .save_training_metric_definition(metric.clone())
             .await
@@ -3408,7 +3489,7 @@ mod test_sqlite_training_repository {
             TrainingMetricId::new(),
             Some(TrainingMetricName::from("Original Name")),
             TrainingMetricScope::Global,
-            build_metric().definition().clone(),
+            build_global_metric().definition().clone(),
         );
         repository
             .save_training_metric_definition(metric.clone())

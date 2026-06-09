@@ -377,6 +377,8 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
 
 #[derive(Debug, Error)]
 pub enum SaveTrainingMetricError {
+    #[error("Training period {0} does not exist")]
+    TrainingPeriodDoesNotExist(TrainingPeriodId),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
