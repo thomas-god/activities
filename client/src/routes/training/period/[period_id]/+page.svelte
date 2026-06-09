@@ -404,7 +404,7 @@
 						</div>
 					{:then metrics}
 						<div
-							class={`item metrics flex-col rounded-box bg-base-100 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
+							class={`item metrics flex-col rounded-box bg-base-100 pb-3 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 						>
 							<div bind:clientWidth={chartWidth}>
 								<div class="flex flex-row items-center gap-2 pt-4">
@@ -649,14 +649,11 @@
 		.period_container {
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
-			grid-template-rows: 100dvh;
 			align-items: start;
-			overflow: hidden;
 		}
 
 		.metrics {
 			display: flex;
-			height: 100%;
 			overflow-y: auto;
 			grid-row: 1;
 			grid-column: 2;
@@ -667,7 +664,6 @@
 		.activities {
 			grid-row: 1;
 			grid-column: 1;
-			height: 100%;
 			overflow-y: auto;
 		}
 
