@@ -40,6 +40,9 @@
 
 				// Merge: server order first, then metrics not in ordering
 				metricsOrder = [...serverOrder, ...metricsNotInOrder];
+
+				// Remove unknows metrics ids
+				metricsOrder = metricsOrder.filter((id) => allMetricIds.includes(id));
 			} else {
 				// If fetch fails, use all metrics in current order
 				metricsOrder = metrics.map((m) => m.id);
