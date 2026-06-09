@@ -7,9 +7,13 @@
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
-	import { groupMetricValues } from '$lib/api';
-
-	let { data }: PageProps = $props();
+	import {
+		fetchTrainingMetrics,
+		fetchTrainingPeriods,
+		groupMetricValues,
+		type MetricsListGrouped
+	} from '$lib/api';
+	import { isSome, some, type Option } from '$lib/Options';
 
 	let chartWidth: number = $state(0);
 
@@ -17,6 +21,13 @@
 		start: page.url.searchParams.get('start') as string,
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
+
+	const generateMetricsPromise = () =>
+		some(fetchTrainingMetrics(fetch, dates.start, dates.end, 'global'));
+	const setMetricsPromise = () => (metricsPromise = generateMetricsPromise());
+	let metricsPromise: Option<Promise<MetricsListGrouped>> = $derived(generateMetricsPromise());
+
+	let periodsPromise = $state(some(fetchTrainingPeriods(fetch)));
 
 	$effect(() => {
 		// Redirect if no start parameter
@@ -40,41 +51,42 @@
 </script>
 
 <div class="mx-auto flex flex-col gap-4 pt-5">
-	{#await data.metrics}
-		<div class="flex w-full flex-col items-center p-4 pt-6">
-			<div class="loading loading-bars"></div>
-		</div>
-	{:then metrics}
-		<TrainingMetricsOptions
-			{dates}
-			{datesUpdateCallback}
-			periods={data.periods}
-			metricsOrderingScope={{ type: 'global' }}
-			{metrics}
-			onMetricsReordered={() => invalidate('app:training-metrics')}
-		/>
-
-		{#each metrics as metric (metric.id)}
-			<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
-				<div class="relative p-4 text-center">
-					<TrainingMetricTitle {metric} />
-				</div>
-				{#if groupMetricValues(metric).length > 0}
-					<TrainingMetricsChartStacked
-						height={250}
-						width={chartWidth}
-						values={groupMetricValues(metric)}
-						unit={metric.unit}
-						granularity={metric.granularity}
-						format={metricValuesDisplayFormat(metric)}
-						showGroup={metric.group_by !== null}
-						groupBy={metric.group_by}
-						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-					/>
-				{:else}
-					<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
-				{/if}
+	<TrainingMetricsOptions
+		{dates}
+		{datesUpdateCallback}
+		{periodsPromise}
+		metricsOrderingScope={{ type: 'global' }}
+		{metricsPromise}
+		onMetricsReordered={setMetricsPromise}
+	/>
+	{#if isSome(metricsPromise)}
+		{#await metricsPromise.value}
+			<div class="flex w-full flex-col items-center p-4 pt-6">
+				<div class="loading loading-bars"></div>
 			</div>
-		{/each}
-	{/await}
+		{:then metrics}
+			{#each metrics as metric (metric.id)}
+				<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
+					<div class="relative p-4 text-center">
+						<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
+					</div>
+					{#if groupMetricValues(metric).length > 0}
+						<TrainingMetricsChartStacked
+							height={250}
+							width={chartWidth}
+							values={groupMetricValues(metric)}
+							unit={metric.unit}
+							granularity={metric.granularity}
+							format={metricValuesDisplayFormat(metric)}
+							showGroup={metric.group_by !== null}
+							groupBy={metric.group_by}
+							stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+						/>
+					{:else}
+						<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
+					{/if}
+				</div>
+			{/each}
+		{/await}
+	{/if}
 </div>

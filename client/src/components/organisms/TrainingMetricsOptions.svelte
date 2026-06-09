@@ -2,30 +2,25 @@
 	import DateRange from '../molecules/DateRange.svelte';
 	import MetricsOrderingDialog from './MetricsOrderingDialog.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
-	import type { TrainingPeriodList } from '$lib/api';
+	import type { MetricsListGrouped, TrainingPeriodList } from '$lib/api';
 	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
+	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 
 	interface Props {
 		dates: { start: string; end: string };
 		datesUpdateCallback: (newDates: { start: string; end: string }) => void;
-		periods?: TrainingPeriodList;
+		periodsPromise?: Option<Promise<TrainingPeriodList>>;
 		metricsOrderingScope: MetricsOrderingScope;
-		metrics: Array<{
-			id: string;
-			name: string | null;
-			granularity: string;
-			aggregate: any;
-			metric: string;
-		}>;
+		metricsPromise: Option<Promise<MetricsListGrouped>>;
 		onMetricsReordered: () => void;
 	}
 
 	let {
 		dates,
 		datesUpdateCallback,
-		periods = [],
+		periodsPromise = none(),
 		metricsOrderingScope,
-		metrics,
+		metricsPromise,
 		onMetricsReordered
 	}: Props = $props();
 
@@ -77,7 +72,12 @@
 		});
 	};
 
-	let sortedPeriods = $derived(periods.toSorted((a, b) => (a.start < b.start ? 1 : -1)));
+	let sortedPeriods: Promise<TrainingPeriodList> = $derived.by(async () => {
+		if (isNone(periodsPromise)) {
+			return [];
+		}
+		return (await periodsPromise.value).toSorted((a, b) => (a.start < b.start ? 1 : -1));
+	});
 </script>
 
 <div class="rounded-box border-base-300 bg-base-100 p-2 pt-4 shadow-md sm:p-4">
@@ -102,40 +102,45 @@
 			class:btn-active={selectedQuickRange === 'year'}
 			onclick={thisYear}>This year</button
 		>
-		<select
-			class="select select-sm"
-			value={selectedPeriodId ?? ''}
-			onchange={(e) => {
-				const periodId = e.currentTarget.value;
-				if (periodId) {
-					const period = periods.find((p) => p.id === periodId);
-					if (period) {
-						selectPeriod(period.id, period.start, period.end);
+		{#await sortedPeriods then periods}
+			<select
+				class="select select-sm"
+				value={selectedPeriodId ?? ''}
+				onchange={(e) => {
+					const periodId = e.currentTarget.value;
+					if (periodId) {
+						const period = periods.find((p) => p.id === periodId);
+						if (period) {
+							selectPeriod(period.id, period.start, period.end);
+						}
 					}
-				}
-			}}
-		>
-			<option value="" disabled selected>Training period</option>
-			{#each sortedPeriods as period}
-				<option value={period.id}
-					>{period.name} ({localiseDate(period.start)} - {period.end === null
-						? 'Ongoing'
-						: localiseDate(period.end)})</option
-				>
-			{:else}
-				<option disabled class="italic">No training periods</option>
-			{/each}
-		</select>
+				}}
+			>
+				<option value="" disabled selected>Training period</option>
+				{#each periods as period}
+					<option value={period.id}
+						>{period.name} ({localiseDate(period.start)} - {period.end === null
+							? 'Ongoing'
+							: localiseDate(period.end)})</option
+					>
+				{:else}
+					<option disabled class="italic">No training periods</option>
+				{/each}
+			</select>
+		{/await}
 	</div>
 	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-ghost btn-sm">
 		<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
 		Metrics order
 	</button>
 </div>
-
-<MetricsOrderingDialog
-	bind:this={metricsOrderingDialog}
-	scope={metricsOrderingScope}
-	{metrics}
-	onSaved={onMetricsReordered}
-/>
+{#if isSome(metricsPromise)}
+	{#await metricsPromise.value then metrics}
+		<MetricsOrderingDialog
+			bind:this={metricsOrderingDialog}
+			scope={metricsOrderingScope}
+			{metrics}
+			onSaved={onMetricsReordered}
+		/>
+	{/await}
+{/if}
