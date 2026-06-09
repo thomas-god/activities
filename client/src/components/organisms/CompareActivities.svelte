@@ -67,15 +67,17 @@
 </script>
 
 {#if activities.length > 0}
-	<h2 class="pb-1 text-lg">
-		Metrics
-		{#if zoomDomain !== null}
-			<button class="btn btn-ghost btn-xs" onclick={() => (zoomDomain = null)}>Reset zoom</button>
-		{/if}
-		<button class="btn btn-ghost btn-sm" onclick={() => offsetsDialogElement.show()}>
-			<img src="/icons/power.svg" alt="Cog icon" class="h-6 w-6" />
-		</button>
-	</h2>
+	<div class="my-2 flex flex-row items-center gap-2">
+		<h2 class="pb-1 text-lg">Metrics</h2>
+		<div class="join">
+			<button class="btn join-item btn-sm" onclick={() => offsetsDialogElement.show()}>
+				<img src="/icons/power.svg" alt="Cog icon" class="h-7 w-7" />
+			</button>
+			{#if zoomDomain !== null}
+				<button class="btn join-item btn-sm" onclick={() => (zoomDomain = null)}>Reset zoom</button>
+			{/if}
+		</div>
+	</div>
 	<MetricsMultiSelect
 		availableOptions={possibleMetricOptions}
 		bind:selectedOptions={selectedMetricOptions}

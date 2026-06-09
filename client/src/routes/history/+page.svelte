@@ -132,26 +132,28 @@
 						<span class="ml-1 hidden sm:inline">Calendar</span>
 					</button>
 				</div>
-				{#await data.activities then _}
-					<ActivitiesFiltersComponent
-						{activities}
-						bind:filteredActivities
-						bind:filters={
-							() => filters,
-							(f) => {
-								handleFilterChange(f);
+				<div class="join">
+					{#await data.activities then _}
+						<ActivitiesFiltersComponent
+							{activities}
+							bind:filteredActivities
+							bind:filters={
+								() => filters,
+								(f) => {
+									handleFilterChange(f);
+								}
 							}
-						}
-					/>
-				{/await}
-				<button
-					class="btn btn-ghost btn-sm"
-					onclick={handleDownloadClick}
-					title="Download all activities as ZIP"
-				>
-					<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
-					<span class="ml-1 hidden sm:inline">Download</span>
-				</button>
+						/>
+					{/await}
+					<button
+						class="btn join-item btn-sm"
+						onclick={handleDownloadClick}
+						title="Download all activities as ZIP"
+					>
+						<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
+						<span class="ml-1 hidden sm:inline">Download</span>
+					</button>
+				</div>
 			</div>
 		</div>
 

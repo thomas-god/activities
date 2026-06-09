@@ -125,7 +125,7 @@
 
 <button
 	onclick={() => dialogElement.showModal()}
-	class={`btn ${hasActiveFilters ? 'btn-warning' : 'btn-ghost'} btn-sm`}
+	class={`btn ${hasActiveFilters ? 'btn-soft btn-info' : 'btn'} join-item btn-sm`}
 	><img src="/icons/filter.svg" alt="Filter icon" class="h-5 w-5" />
 	{#if showLabel}
 		<span class="ml-1 hidden sm:inline">Filters</span>
