@@ -1,6 +1,6 @@
-use axum::{Extension, Json, extract::State, http::StatusCode};
+use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::NaiveDate;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
@@ -33,6 +33,11 @@ pub struct CreateTrainingPeriodBody {
     note: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CreateTrainingPeriodResponse {
+    id: String,
+}
+
 fn build_request(body: CreateTrainingPeriodBody, user: &UserId) -> CreateTrainingPeriodRequest {
     CreateTrainingPeriodRequest::new(
         user.clone(),
@@ -60,14 +65,19 @@ pub async fn create_training_period<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, UR, PS>>,
     Json(payload): Json<CreateTrainingPeriodBody>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<(StatusCode, Json<CreateTrainingPeriodResponse>), StatusCode> {
     let req = build_request(payload, user.user());
 
     state
         .training_metrics_service
         .create_training_period(req)
         .await
-        .map(|_| StatusCode::CREATED)
+        .map(|id| {
+            (
+                StatusCode::CREATED,
+                Json(CreateTrainingPeriodResponse { id: id.to_string() }),
+            )
+        })
         .map_err(StatusCode::from)
 }
 
