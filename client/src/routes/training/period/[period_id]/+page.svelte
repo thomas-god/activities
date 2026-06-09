@@ -20,7 +20,6 @@
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
 	import Timeline from '$components/pages/Timeline.svelte';
 	import EditButton from '$components/atoms/EditButton.svelte';
-	import DeleteButton from '$components/atoms/DeleteButton.svelte';
 	import {
 		applyFiltersToSearchParams,
 		filtersFromSearchParams,
@@ -335,24 +334,29 @@
 							{/if}
 							<!-- Action menu dropdown (always inline) -->
 							<div class="dropdown dropdown-end">
-								<div tabindex="0" role="button" class="btn btn-square opacity-100 btn-ghost btn-xs">
-									<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
-								</div>
+								<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Options">
+									<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+								</button>
 								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 								<ul
 									tabindex="0"
 									class="dropdown-content menu z-[1] flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 								>
 									<li class="w-full">
-										<EditButton callback={openEditModal} text="Edit name" size="normal" />
+										<button onclick={openEditModal}>
+											<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" />Edit name
+										</button>
 									</li>
 									<li class="w-full">
-										<button class="btn btn-ghost" onclick={openEditDatesModal}
-											><img src="/icons/calendar.svg" class="h-4 w-4" alt="Edit icon" />Edit dates</button
-										>
+										<button onclick={openEditDatesModal}>
+											<img src="/icons/calendar.svg" alt="Calendar icon" class="h-6 w-6" />Edit
+											dates
+										</button>
 									</li>
 									<li class="w-full">
-										<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
+										<button onclick={() => (showDeleteModal = true)} class="text-error">
+											<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" />Delete
+										</button>
 									</li>
 								</ul>
 							</div>

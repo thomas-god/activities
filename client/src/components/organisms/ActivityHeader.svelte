@@ -60,14 +60,14 @@
 			·
 			{sportDisplay(activity.sport)}
 
-			<div class="dropdown dropdown-end ml-0">
-				<button tabindex="0" class="btn btn-ghost btn-xs" aria-label="More options">
-					<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
+			<div class="dropdown dropdown-end ml-0.5">
+				<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="More options">
+					<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
 				</button>
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<ul
 					tabindex="0"
-					class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
+					class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
 				>
 					<li>
 						<button onclick={() => goto(`/activities/compare?activities=${activity.id}`)}>

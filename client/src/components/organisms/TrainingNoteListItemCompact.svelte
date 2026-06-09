@@ -66,23 +66,23 @@
 					)}
 				</div>
 				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">
-						<img src="/icons/menu.svg" class="h-4 w-4" alt="Menu icon" />
-					</div>
+					<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="More options">
+						<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+					</button>
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 					<ul
 						tabindex="0"
-						class="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow"
+						class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow"
 					>
 						<li>
 							<button onclick={startEdit}>
-								<img src="/icons/edit.svg" class="h-4 w-4" alt="Edit icon" />
+								<img src="/icons/edit.svg" class="h-6 w-6" alt="Edit icon" />
 								<span>Edit</span>
 							</button>
 						</li>
 						<li>
 							<button onclick={confirmDelete} class="text-error">
-								<img src="/icons/delete.svg" class="h-4 w-4" alt="Delet icon" />
+								<img src="/icons/delete.svg" class="h-6 w-6" alt="Delete icon" />
 								<span>Delete</span>
 							</button>
 						</li>

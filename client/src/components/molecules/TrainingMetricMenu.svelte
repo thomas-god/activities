@@ -2,8 +2,6 @@
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
-	import EditButton from '$components/atoms/EditButton.svelte';
-	import DeleteButton from '$components/atoms/DeleteButton.svelte';
 
 	let {
 		name,
@@ -73,19 +71,20 @@
 </script>
 
 <div class="dropdown dropdown-end">
-	<div tabindex="0" role="button" class="btn btn-square btn-ghost btn-xs">
-		<img src="/icons/menu.svg" alt="Menu icon" class="h-5 w-5" />
-	</div>
+	<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Metric options">
+		<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-	<ul
-		tabindex="0"
-		class="dropdown-content menu z-[1] flex w-52 flex-col items-start rounded-box bg-base-100 p-2 shadow"
-	>
-		<li class="w-full">
-			<EditButton callback={() => editNameDialog.show()} text="Edit name" size="normal" />
+	<ul tabindex="0" class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
+		<li>
+			<button onclick={() => editNameDialog.show()}>
+				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit name
+			</button>
 		</li>
-		<li class="w-full">
-			<DeleteButton callback={() => (showDeleteModal = true)} text="Delete" />
+		<li>
+			<button onclick={() => (showDeleteModal = true)} class="text-error">
+				<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" /> Delete
+			</button>
 		</li>
 	</ul>
 </div>
