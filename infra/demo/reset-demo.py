@@ -90,8 +90,8 @@ def delete_all_notes() -> None:
             print(f"Failed to delete note {note_id}: {del_response.status_code}")
 
 
-def delete_all_metrics() -> None:
-    """Delete all existing training metrics."""
+def delete_all_global_metrics() -> None:
+    """Delete all existing global training metrics (i.e. those not linked to a training period)."""
     print("Deleting all existing training metrics...")
     try:
         response = requests.get(
@@ -336,7 +336,9 @@ def generate_activity(
     return activity_id
 
 
-def create_training_period(name: str, start: str, end: str, description: str):
+def create_training_period(
+    name: str, start: str, end: str, description: str
+) -> str | None:
     """Create a training period."""
     payload = {
         "name": name,
@@ -351,18 +353,19 @@ def create_training_period(name: str, start: str, end: str, description: str):
         headers={"Content-Type": "application/json"},
     )
     print(f"Period ({name}): {response.status_code}")
+    print(response.json)
     if response.status_code == 201:
-        data = response.text
+        data = response.json()
         print(data)
-        return data
+        return data["id"]
     else:
         print(response.text)
     return None
 
 
-def create_training_metric(
+def create_global_training_metric(
     name: str,
-    source: dict[str, str],
+    metric: str,
     granularity: str,
     aggregate: str,
     group_by: str | None = None,
@@ -370,11 +373,45 @@ def create_training_metric(
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
-        "source": source,
+        "metric": metric,
         "granularity": granularity,
         "aggregate": aggregate,
         "filters": {},
         "scope": {"type": "global"},
+    }
+    if group_by:
+        payload["group_by"] = group_by
+
+    response = requests.post(
+        f"{API_URL}/training/metric",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    if response.status_code == 201:
+        data = response.text
+        print(f"Creating metric... 201 - {data}")
+        return data
+    else:
+        print(f"Creating metric... {response.status_code} - {response.text}")
+    return None
+
+
+def create_scoped_training_metric(
+    name: str,
+    metric: str,
+    granularity: str,
+    aggregate: str,
+    period_id: str,
+    group_by: str | None = None,
+) -> dict[str, Any] | None:
+    """Create a training metric."""
+    payload: dict[str, Any] = {
+        "name": name,
+        "metric": metric,
+        "granularity": granularity,
+        "aggregate": aggregate,
+        "filters": {},
+        "scope": {"type": "trainingPeriod", "trainingPeriodId": period_id},
     }
     if group_by:
         payload["group_by"] = group_by
@@ -515,35 +552,43 @@ def generate_demo_data() -> int:
 
     period1_start = (today - timedelta(days=84)).strftime("%Y-%m-%d")
     period1_end = today_str
-    create_training_period(
+    period_1_id = create_training_period(
         "This is a training period",
         period1_start,
         period1_end,
-        "Training periods help you keep track of specific training blocks, e.g. base training, race specific preparation, etc.",
+        "Training periods help you keep track of specific training blocks, e.g. base training, race specific preparation, etc.\nYou can define dedicated training metrics for this period, or import some from your globally defined ones.",
     )
 
     # Create training metrics
     print("\nCreating training metrics...")
     metric_start = (today - timedelta(days=120)).strftime("%Y-%m-%d")
 
-    create_training_metric(
+    create_scoped_training_metric(
+        "Average heart rate (only for this training period)",
+        "AvgHeartRate",
+        "Daily",
+        "Average",
+        period_id=period_1_id,
+    )
+
+    create_global_training_metric(
         "Weekly calories",
-        {"Statistic": "Calories"},
+        "Calories",
         "Weekly",
         "Sum",
     )
 
-    create_training_metric(
+    create_global_training_metric(
         "Weekly distance",
-        {"Statistic": "Distance"},
+        "Distance",
         "Weekly",
         "Sum",
         group_by="SportCategory",
     )
 
-    create_training_metric(
+    create_global_training_metric(
         "Weekly duration",
-        {"Statistic": "Duration"},
+        "ActiveDuration",
         "Weekly",
         "Sum",
         group_by="WorkoutType",
@@ -594,7 +639,7 @@ def main() -> int:
     delete_all_activities()
     delete_all_periods()
     delete_all_notes()
-    delete_all_metrics()
+    delete_all_global_metrics()
 
     generate_demo_data()
 
