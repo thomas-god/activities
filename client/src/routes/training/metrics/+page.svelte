@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import TrainingMetricsOptions from '$components/organisms/TrainingMetricsOptions.svelte';
 	import { dayjs } from '$lib/duration';
-	import type { PageProps } from './$types';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import { metricValuesDisplayFormat } from '$lib/metric';
@@ -18,7 +17,7 @@
 	let chartWidth: number = $state(0);
 
 	let dates = $derived({
-		start: page.url.searchParams.get('start') as string,
+		start: page.url.searchParams.get('start') || dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
 		end: page.url.searchParams.get('end') || dayjs().format('YYYY-MM-DD')
 	});
 
@@ -28,16 +27,6 @@
 	let metricsPromise: Option<Promise<MetricsListGrouped>> = $derived(generateMetricsPromise());
 
 	let periodsPromise = $state(some(fetchTrainingPeriods(fetch)));
-
-	$effect(() => {
-		// Redirect if no start parameter
-		const startDate = page.url.searchParams.get('start');
-		if (startDate === null) {
-			const now = dayjs();
-			const start = encodeURIComponent(now.subtract(1, 'month').format('YYYY-MM-DD'));
-			goto(`${page.url.toString()}?start=${start}`);
-		}
-	});
 
 	const datesUpdateCallback = (newDates: { start: string; end: string }) => {
 		let url = page.url.pathname.toString();
