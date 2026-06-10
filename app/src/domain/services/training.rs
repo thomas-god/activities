@@ -90,7 +90,7 @@ where
         &self,
         req: CreateTrainingMetricRequest,
     ) -> Result<TrainingMetricId, CreateTrainingMetricError> {
-        let extra_sports = match req.scope() {
+        let default_sports = match req.scope() {
             TrainingMetricScope::Global => None,
             TrainingMetricScope::TrainingPeriod(period) => self
                 .training_repository
@@ -110,7 +110,7 @@ where
             *req.metric(),
             req.granularity().clone(),
             req.aggregate().clone(),
-            req.filters().clone().merge_sports(&extra_sports),
+            req.filters().clone().merge_default_sports(&default_sports),
             req.group_by().clone(),
         );
         let training_metric = TrainingMetric::new(
@@ -139,7 +139,7 @@ where
                 CopyTrainingMetricError::MetricDoesNotExist(req.source_metric().clone())
             })?;
 
-        let _target_period = self
+        let target_period = self
             .training_repository
             .get_training_period(req.user(), req.target_period())
             .await
@@ -147,11 +147,13 @@ where
                 CopyTrainingMetricError::PeriodDoesNotExist(req.source_metric().clone())
             })?;
 
+        let new_definition = source_definition.merge_default_sports(target_period.sport_items());
+
         let new_metric = TrainingMetric::new(
             TrainingMetricId::new(),
             req.new_name().clone(),
             TrainingMetricScope::TrainingPeriod(req.target_period().clone()),
-            source_definition,
+            new_definition,
         );
 
         self.training_repository
@@ -201,7 +203,10 @@ where
 
         let mut res = vec![];
         for metric in metrics {
-            let definition = metric.definition().clone().merge_sports(&extra_sports);
+            let definition = metric
+                .definition()
+                .clone()
+                .merge_default_sports(&extra_sports);
             let aligned_date_range = date_range.align_to(metric.definition().granularity());
 
             let values = self
@@ -987,7 +992,10 @@ mod tests_training_metrics_service {
                     "2025-10-17".parse::<NaiveDate>().unwrap(),
                     Some("2025-10-21".parse::<NaiveDate>().unwrap()),
                     "Test Period".to_string(),
-                    TrainingPeriodSports::new(Some(vec![SportFilter::Sport(Sport::Running)])),
+                    TrainingPeriodSports::new(Some(vec![
+                        SportFilter::Sport(Sport::Running),
+                        SportFilter::Sport(Sport::AlpineSki),
+                    ])),
                     None,
                 )
                 .unwrap(),
@@ -997,10 +1005,7 @@ mod tests_training_metrics_service {
             .expect_save_training_metric_definition()
             .withf(|metric| {
                 metric.definition().filters().sports()
-                    == &Some(vec![
-                        SportFilter::Sport(Sport::AlpineSki),
-                        SportFilter::Sport(Sport::Running),
-                    ])
+                    == &Some(vec![SportFilter::Sport(Sport::AlpineSki)])
             })
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
@@ -1014,7 +1019,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty()
-                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricGroupBy::none(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
         );
@@ -1043,7 +1048,7 @@ mod tests_training_metrics_service {
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
             TrainingMetricFilters::empty()
-                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricGroupBy::none(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
         );
@@ -1749,8 +1754,9 @@ mod tests_training_metrics_service {
                             ActivityMetricV2::Distance,
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
-                            TrainingMetricFilters::empty()
-                                .merge_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+                            TrainingMetricFilters::empty().merge_default_sports(&Some(vec![
+                                SportFilter::Sport(Sport::AlpineSki),
+                            ])),
                             TrainingMetricGroupBy::none(),
                         ),
                     ),

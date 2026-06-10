@@ -59,6 +59,47 @@ impl SportFilter {
             Self::SportCategory(category) => activity.sport().category() == Some(*category),
         }
     }
+
+    /// Returns [`Some`] containing the smallest [`SportFilter`] compatible with `other`,
+    /// [`None`] if they're not compatible.
+    ///
+    /// When comparing a [`SportFilter::Sport`] with a [`SportFilter::SportCategory`], if the sport
+    /// is included in the category, then the sport is returned, else [`None`].
+    pub fn smallest_compatible(&self, other: &SportFilter) -> Option<SportFilter> {
+        match (self, other) {
+            // Comparing sport to sport
+            (Self::Sport(sport), Self::Sport(other_sport)) if sport == other_sport => {
+                Some(Self::Sport(*sport))
+            }
+            (Self::Sport(_sport), Self::Sport(_other_sport)) => None,
+
+            // Comparing category to category
+            (Self::SportCategory(category), Self::SportCategory(other_category))
+                if category == other_category =>
+            {
+                Some(Self::SportCategory(*category))
+            }
+            (Self::SportCategory(_category), Self::SportCategory(_other_category)) => None,
+
+            // Comparing sport to category
+            (Self::Sport(sport), Self::SportCategory(other_category)) => {
+                if let Some(category) = sport.category()
+                    && category == *other_category
+                {
+                    return Some(Self::Sport(*sport));
+                }
+                None
+            }
+            (Self::SportCategory(category), Self::Sport(other_sport)) => {
+                if let Some(other_category) = other_sport.category()
+                    && *category == other_category
+                {
+                    return Some(Self::Sport(*other_sport));
+                }
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
@@ -79,25 +120,28 @@ impl TrainingMetricFilters {
         }
     }
 
-    pub fn merge_sports(self, other_sports: &Option<Vec<SportFilter>>) -> Self {
-        let Some(other_sports) = other_sports else {
+    /// Merge `default_sports` into the current sport filters.
+    /// - if current sport filters is empty, then use `default_sports` instead,
+    /// - if current sport fitlers is not empty, filter it by the elements of `default_sports`
+    pub fn merge_default_sports(self, default_sports: &Option<Vec<SportFilter>>) -> Self {
+        let Some(default_sports) = default_sports else {
             return self;
         };
 
         let new_sports = match self.sports {
-            Some(mut sports) => {
-                for sport in other_sports {
-                    if !sports.contains(sport) {
-                        sports.push(sport.clone());
-                    }
-                }
-                Some(sports)
-            }
-            None => Some(other_sports.iter().cloned().collect()),
+            Some(sports) => sports
+                .iter()
+                .flat_map(|sport| {
+                    default_sports
+                        .iter()
+                        .filter_map(|other| sport.smallest_compatible(other))
+                })
+                .collect::<Vec<_>>(),
+            None => default_sports.to_vec(),
         };
 
         Self {
-            sports: new_sports,
+            sports: Some(new_sports),
             workout_types: self.workout_types,
             bonked: self.bonked,
             rpes: self.rpes,
@@ -322,13 +366,13 @@ impl TrainingMetricDefinition {
         &self.group_by
     }
 
-    pub fn merge_sports(self, other_sports: &Option<Vec<SportFilter>>) -> Self {
+    pub fn merge_default_sports(self, default_sports: &Option<Vec<SportFilter>>) -> Self {
         Self {
             user: self.user,
             metric: self.metric,
             granularity: self.granularity,
             granularity_aggregate: self.granularity_aggregate,
-            filters: self.filters.merge_sports(other_sports),
+            filters: self.filters.merge_default_sports(default_sports),
             group_by: self.group_by,
         }
     }
@@ -867,6 +911,10 @@ impl TrainingPeriod {
 
     pub fn sports(&self) -> &TrainingPeriodSports {
         &self.sports
+    }
+
+    pub fn sport_items(&self) -> &Option<Vec<SportFilter>> {
+        &self.sports.0
     }
 
     pub fn note(&self) -> &Option<String> {
@@ -2068,6 +2116,65 @@ mod test_training_metric_filters {
     }
 
     #[test]
+    fn test_sport_filter_smallest_compatible() {
+        // Same category
+        assert_eq!(
+            SportFilter::SportCategory(SportCategory::Running)
+                .smallest_compatible(&SportFilter::SportCategory(SportCategory::Running)),
+            Some(SportFilter::SportCategory(SportCategory::Running))
+        );
+
+        // Category with one of its child sport
+        assert_eq!(
+            SportFilter::SportCategory(SportCategory::Running)
+                .smallest_compatible(&SportFilter::Sport(Sport::TrailRunning)),
+            Some(SportFilter::Sport(Sport::TrailRunning))
+        );
+
+        // Category with a sport from another category
+        assert_eq!(
+            SportFilter::SportCategory(SportCategory::Running)
+                .smallest_compatible(&SportFilter::Sport(Sport::AlpineSki)),
+            None
+        );
+
+        // Sport with itself
+        assert_eq!(
+            SportFilter::Sport(Sport::TrailRunning)
+                .smallest_compatible(&SportFilter::Sport(Sport::TrailRunning)),
+            Some(SportFilter::Sport(Sport::TrailRunning))
+        );
+
+        // Sport with another sport
+        assert_eq!(
+            SportFilter::Sport(Sport::TrailRunning)
+                .smallest_compatible(&SportFilter::Sport(Sport::Rowing)),
+            None
+        );
+
+        // Sport with another sport fromt he same category
+        assert_eq!(
+            SportFilter::Sport(Sport::TrailRunning)
+                .smallest_compatible(&SportFilter::Sport(Sport::TrackRunning)),
+            None
+        );
+
+        // Sport with its parent category
+        assert_eq!(
+            SportFilter::Sport(Sport::TrailRunning)
+                .smallest_compatible(&SportFilter::SportCategory(SportCategory::Running)),
+            Some(SportFilter::Sport(Sport::TrailRunning))
+        );
+
+        // Sport with another category
+        assert_eq!(
+            SportFilter::Sport(Sport::TrailRunning)
+                .smallest_compatible(&SportFilter::SportCategory(SportCategory::Cycling)),
+            None
+        );
+    }
+
+    #[test]
     fn test_filter_by_sport() {
         let activity = create_activity_with_sport(Sport::Cycling);
 
@@ -2285,97 +2392,119 @@ mod test_training_metric_filters {
     }
 
     #[test]
-    fn test_append_sports_to_training_filters_with_empty_sports() {
+    fn test_merge_none_default_sports_to_none_sport_filter() {
         let filter = TrainingMetricFilters::empty();
-        let new_sports = Some(vec![SportFilter::Sport(Sport::Badminton)]);
+        let default_sports = None;
 
-        let new_filter = filter.merge_sports(&new_sports);
+        let new_filter = filter.merge_default_sports(&default_sports);
 
-        assert_eq!(
-            new_filter.sports(),
-            &Some(vec![SportFilter::Sport(Sport::Badminton)])
-        );
+        assert!(new_filter.sports().is_none(),)
     }
 
     #[test]
-    fn test_append_sports_to_training_filters_with_existing_sports() {
+    fn test_merge_none_default_sports_to_sport_filter() {
         let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
-        let new_sports = Some(vec![SportFilter::Sport(Sport::Badminton)]);
+        let default_sports = None;
 
-        let new_filter = filter.merge_sports(&new_sports);
+        let new_filter = filter.merge_default_sports(&default_sports);
 
         assert_eq!(
             new_filter.sports(),
-            &Some(vec![
-                SportFilter::Sport(Sport::AlpineSki),
-                SportFilter::Sport(Sport::Badminton)
-            ])
-        );
+            &Some(vec![SportFilter::Sport(Sport::AlpineSki)])
+        )
     }
 
     #[test]
-    fn test_append_sports_to_training_filters_with_duplicated_sports() {
-        let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
-        let new_sports = Some(vec![
-            SportFilter::Sport(Sport::Badminton),
+    fn test_merge_default_sports_to_none_sport_filter() {
+        let filter = TrainingMetricFilters::empty();
+        let default_sports = Some(vec![
             SportFilter::Sport(Sport::AlpineSki),
+            SportFilter::Sport(Sport::Running),
         ]);
 
-        let new_filter = filter.merge_sports(&new_sports);
+        let new_filter = filter.merge_default_sports(&default_sports);
 
         assert_eq!(
             new_filter.sports(),
             &Some(vec![
                 SportFilter::Sport(Sport::AlpineSki),
-                SportFilter::Sport(Sport::Badminton)
+                SportFilter::Sport(Sport::Running)
             ])
-        );
+        )
     }
 
     #[test]
-    fn test_append_none_sports_to_training_filters_with_existing_sports() {
+    fn test_merge_default_sports_to_sport_filter_included_in_default() {
         let filter = create_filter_with_sports(vec![SportFilter::Sport(Sport::AlpineSki)]);
-        let new_sports = None;
+        let default_sports = Some(vec![
+            SportFilter::Sport(Sport::AlpineSki),
+            SportFilter::Sport(Sport::Running),
+        ]);
 
-        let new_filter = filter.merge_sports(&new_sports);
+        let new_filter = filter.merge_default_sports(&default_sports);
 
         assert_eq!(
             new_filter.sports(),
             &Some(vec![SportFilter::Sport(Sport::AlpineSki),])
-        );
+        )
     }
 
     #[test]
-    fn test_append_none_sports_to_training_filters_without_existing_sports() {
-        let filter = TrainingMetricFilters::empty();
-        let new_sports = None;
-
-        let new_filter = filter.merge_sports(&new_sports);
-
-        assert!(new_filter.sports().is_none(),);
-    }
-
-    #[test]
-    fn test_append_sports_to_training_filters_preserves_other_filters() {
-        let workout_types = Some(vec![WorkoutType::Easy]);
-        let bonked = Some(BonkStatus::None);
-        let rpes = Some(vec![ActivityRpe::Five]);
-        let filter = TrainingMetricFilters::new(
-            Some(vec![SportFilter::Sport(Sport::AlpineSki)]),
-            workout_types.clone(),
-            bonked.clone(),
-            rpes.clone(),
-        );
-        let new_sports = Some(vec![
-            SportFilter::Sport(Sport::Badminton),
+    fn test_merge_default_sports_to_sport_filter_not_included_in_default() {
+        let filter = create_filter_with_sports(vec![
             SportFilter::Sport(Sport::AlpineSki),
+            SportFilter::Sport(Sport::Rugby),
+        ]);
+        let default_sports = Some(vec![
+            SportFilter::Sport(Sport::AlpineSki),
+            SportFilter::Sport(Sport::Running),
         ]);
 
-        let new_filter = filter.merge_sports(&new_sports);
+        let new_filter = filter.merge_default_sports(&default_sports);
 
-        assert_eq!(new_filter.workout_types(), &workout_types);
-        assert_eq!(new_filter.rpes(), &rpes);
-        assert_eq!(new_filter.bonked(), &bonked);
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![SportFilter::Sport(Sport::AlpineSki),])
+        )
+    }
+
+    #[test]
+    fn test_merge_default_sports_to_sport_filter_with_category() {
+        let filter =
+            create_filter_with_sports(vec![SportFilter::SportCategory(SportCategory::Running)]);
+        let default_sports = Some(vec![
+            SportFilter::Sport(Sport::TrackRunning),
+            SportFilter::Sport(Sport::TrailRunning),
+        ]);
+
+        let new_filter = filter.merge_default_sports(&default_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![
+                SportFilter::Sport(Sport::TrackRunning),
+                SportFilter::Sport(Sport::TrailRunning),
+            ])
+        )
+    }
+
+    #[test]
+    fn test_merge_category_default_sports_to_sport_filter() {
+        let filter = create_filter_with_sports(vec![
+            SportFilter::Sport(Sport::TrackRunning),
+            SportFilter::Sport(Sport::TrailRunning),
+        ]);
+        let default_sports = Some(vec![SportFilter::SportCategory(SportCategory::Running)]);
+
+        let new_filter = filter.merge_default_sports(&default_sports);
+
+        assert_eq!(
+            new_filter.sports(),
+            &Some(vec![
+                SportFilter::Sport(Sport::TrackRunning),
+                SportFilter::Sport(Sport::TrailRunning),
+            ])
+        )
     }
 }
 
