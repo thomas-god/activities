@@ -565,7 +565,7 @@ impl TrainingMetricGranularity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum TrainingMetricAggregate {
     Min,
     Max,

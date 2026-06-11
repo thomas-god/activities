@@ -1038,6 +1038,10 @@ impl ActivityMetricV2 {
             )),
         }
     }
+
+    pub fn unit(&self) -> Unit {
+        self.source().unit()
+    }
 }
 
 #[derive(Debug, Clone, Constructor, Default, PartialEq)]

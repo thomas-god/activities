@@ -17,13 +17,14 @@ use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 
-use crate::inbound::http::handlers::{DefaultUserExtractor, cookie_auth_middleware};
+use crate::inbound::http::handlers::{
+    DefaultUserExtractor, cookie_auth_middleware, get_training_metric_templates,
+};
 use crate::inbound::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
-    create_training_metric,
-    create_training_note, create_training_period, delete_activity, delete_preference,
-    delete_training_metric, delete_training_note, delete_training_period,
+    create_training_metric, create_training_note, create_training_period, delete_activity,
+    delete_preference, delete_training_metric, delete_training_note, delete_training_period,
     get_active_training_periods, get_activity, get_all_preferences, get_all_raw_activities,
     get_preference, get_raw_activity, get_training_metric_values, get_training_metrics,
     get_training_metrics_ordering, get_training_note, get_training_notes, get_training_period,
@@ -220,6 +221,10 @@ fn core_routes<
             "/training/metrics/ordering",
             get(get_training_metrics_ordering::<AS, PF, TS, US, PS>)
                 .post(set_training_metrics_ordering::<AS, PF, TS, US, PS>),
+        )
+        .route(
+            "/training/metrics/templates",
+            get(get_training_metric_templates),
         )
         .route(
             "/training/metric",
