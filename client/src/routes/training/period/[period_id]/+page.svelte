@@ -13,7 +13,6 @@
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
-	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
@@ -38,6 +37,7 @@
 	} from '$lib/api';
 	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
+	import CreateTrainingMetricFromCollection from '$components/organisms/CreateTrainingMetricFromCollection.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -584,7 +584,7 @@
 
 			<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
 				<div class="modal-box max-w-3xl">
-					<CreateTrainingMetric
+					<CreateTrainingMetricFromCollection
 						callback={() => {
 							newTrainingMetricDialog.close();
 							updateMetricsPromise();

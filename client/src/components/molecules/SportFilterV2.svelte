@@ -98,7 +98,7 @@
 </script>
 
 {#if isSome(sports) && isSome(categories)}
-	<div class="flex flex-col gap-1 rounded border border-primary/40 p-1.5 shadow">
+	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
 			<div class="flex-1 text-wrap break-words">
 				Sports: {display}
@@ -120,9 +120,9 @@
 		</div>
 		{#if editing}
 			<div class="divider my-0.5 px-2"></div>
-			<div class="flex flex-col gap-2 px-1">
+			<div class="flex max-h-64 flex-col gap-2 overflow-scroll px-1">
 				{#each SportCategories as category}
-					<div class="flex flex-col gap-1 border border-black/30 p-0.5">
+					<div class="flex flex-col gap-1 p-1">
 						<div
 							class="flex flex-row items-center gap-1.5 border-b-1 border-b-black/45 pb-0.5 pl-0.5"
 						>

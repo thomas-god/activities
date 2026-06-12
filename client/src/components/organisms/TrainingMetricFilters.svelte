@@ -18,6 +18,7 @@
 	}
 
 	let { filters = $bindable() }: { filters: TrainingMetricFiltersType } = $props();
+	const uid = $props.id();
 
 	let allFiltersSet = $derived(
 		isSome(filters.sports) &&
@@ -29,16 +30,20 @@
 </script>
 
 <label class="label" for="metric-name"
-	>Add filters
+	>Filter activities by
 
 	{#if !allFiltersSet}
-		<button class="btn btn-circle btn-xs" popovertarget="popover-1" style="anchor-name:--anchor-1">
+		<button
+			class="btn btn-circle btn-xs"
+			popovertarget={`${uid}-filters-popover`}
+			style="anchor-name:--anchor-1"
+		>
 			<img src="/icons/plus.svg" alt="Plus sign" class="inline h-5 w-5" />
 		</button>
 		<ul
 			class="menu dropdown z-1 w-52 rounded-box bg-base-100 p-2 shadow-sm"
 			popover
-			id="popover-1"
+			id={`${uid}-filters-popover`}
 			style="position-anchor:--anchor-1"
 		>
 			{#if isNone(filters.sports) && isNone(filters.sportCategories)}

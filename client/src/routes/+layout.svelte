@@ -4,8 +4,8 @@
 	import '../app.css';
 	import ActivitiesUploader from '$components/organisms/ActivitiesUploader.svelte';
 	import CreateTrainingNote from '$components/organisms/CreateTrainingNote.svelte';
-	import CreateTrainingMetric from '$components/organisms/CreateTrainingMetric.svelte';
 	import CreateTrainingPeriod from '$components/organisms/CreateTrainingPeriod.svelte';
+	import CreateTrainingMetricFromCollection from '$components/organisms/CreateTrainingMetricFromCollection.svelte';
 
 	let { children } = $props();
 
@@ -108,7 +108,7 @@
 
 	<dialog class="modal" id="create-training-metric-modal" bind:this={createTrainingMetricDialog}>
 		<div class="modal-box max-w-3xl">
-			<CreateTrainingMetric callback={createTrainingMetricCallback} />
+			<CreateTrainingMetricFromCollection callback={createTrainingMetricCallback} />
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button>close</button>

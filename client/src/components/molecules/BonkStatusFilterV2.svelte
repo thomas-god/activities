@@ -11,7 +11,7 @@
 </script>
 
 {#if isSome(bonkStatus)}
-	<div class="flex flex-col gap-1 rounded border border-primary/40 p-1.5 shadow">
+	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
 			<div class="flex-1 text-wrap break-words">
 				Bonk status: {bonkStatus.value === 'none' ? 'No bonk' : 'Bonked'}
