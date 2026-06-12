@@ -57,6 +57,7 @@ pub enum TrainingMetricTemplateCategory {
     Cadence,
     Altitude,
     Pace,
+    Other,
 }
 
 impl From<&TrainingMetricTemplate> for TrainingMetricTemplateBody {
@@ -171,6 +172,16 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         });
     }
 
+    // Number of activities
+    let metric = ActivityMetricV2::NumberOfActivity;
+    let aggregate = TrainingMetricAggregate::Sum;
+    templates.push(TrainingMetricTemplate {
+        display_name: format!("{}", format_metric(&metric)),
+        metric,
+        aggregate,
+        category: metric_category(&metric),
+    });
+
     templates
 });
 
@@ -212,6 +223,7 @@ fn metric_category(metric: &ActivityMetricV2) -> TrainingMetricTemplateCategory 
         | ActivityMetricV2::MinPower
         | ActivityMetricV2::AvgPower
         | ActivityMetricV2::NormalizedPower => TrainingMetricTemplateCategory::Power,
+        ActivityMetricV2::NumberOfActivity => TrainingMetricTemplateCategory::Other,
     }
 }
 
@@ -248,6 +260,8 @@ fn format_metric(metric: &ActivityMetricV2) -> String {
         ActivityMetricV2::MaxPace => "Maximum pace",
         ActivityMetricV2::MinPace => "Minimum pace",
         ActivityMetricV2::AvgPace => "Average pace",
+
+        ActivityMetricV2::NumberOfActivity => "Number of activities",
     }
     .to_string()
 }

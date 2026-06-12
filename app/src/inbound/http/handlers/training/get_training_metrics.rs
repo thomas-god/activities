@@ -164,6 +164,7 @@ fn format_source(source: &ActivityMetricSource) -> String {
             format!("Activity {aggregate:?} {metric:?}")
         }
         ActivityMetricSource::ActiveDuration => "ActiveDuration".into(),
+        ActivityMetricSource::NumberOfActivities => "Number of activities".into(),
     }
 }
 

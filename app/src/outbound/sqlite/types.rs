@@ -821,6 +821,8 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricV2 {
             Self::MaxPace => "max-pace",
             Self::MinPace => "min-pace",
             Self::AvgPace => "avg-pace",
+
+            Self::NumberOfActivity => "number-of-activities",
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
@@ -862,6 +864,8 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricV2 {
             "max-pace" => Ok(Self::MaxPace),
             "min-pace" => Ok(Self::MinPace),
             "avg-pace" => Ok(Self::AvgPace),
+
+            "number-of-activities" => Ok(Self::NumberOfActivity),
 
             _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }

@@ -934,6 +934,9 @@ pub enum ActivityMetricV2 {
     MaxPace,
     MinPace,
     AvgPace,
+
+    // Other
+    NumberOfActivity,
 }
 
 impl ActivityMetricV2 {
@@ -944,6 +947,7 @@ impl ActivityMetricV2 {
                 aggregate.value_from_timeseries(&metric, activity)
             }
             ActivityMetricSource::ActiveDuration => Some(*activity.active_duration().as_f64()),
+            ActivityMetricSource::NumberOfActivities => Some(1.),
         }
     }
 
@@ -1036,6 +1040,9 @@ impl ActivityMetricV2 {
                 TimeseriesMetric::Pace,
                 TimeseriesAggregate::Average,
             )),
+
+            // Other
+            Self::NumberOfActivity => ActivityMetricSource::NumberOfActivities,
         }
     }
 
@@ -1074,6 +1081,7 @@ pub enum ActivityMetricSource {
     Statistic(ActivityStatistic),
     Timeseries((TimeseriesMetric, TimeseriesAggregate)),
     ActiveDuration,
+    NumberOfActivities,
 }
 
 impl ToUnit for ActivityMetricSource {
@@ -1082,6 +1090,7 @@ impl ToUnit for ActivityMetricSource {
             Self::Statistic(stat) => stat.unit(),
             Self::Timeseries((metric, _)) => metric.unit(),
             Self::ActiveDuration => Unit::Second,
+            Self::NumberOfActivities => Unit::NumberOfActivities,
         }
     }
 }
@@ -1161,6 +1170,7 @@ impl TryFrom<&ActivityMetricSource> for ActivityMetricV2 {
                 )),
             },
             ActivityMetricSource::ActiveDuration => Ok(ActivityMetricV2::ActiveDuration),
+            ActivityMetricSource::NumberOfActivities => Ok(ActivityMetricV2::NumberOfActivity),
         }
     }
 }
