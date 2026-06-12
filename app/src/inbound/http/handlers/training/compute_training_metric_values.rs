@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Serialize};
@@ -31,7 +33,7 @@ use crate::{
                     APITrainingMetricSource,
                 },
                 utils::{
-                    GroupedMetricValues, MetricsDateRange, convert_metric_values,
+                    GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
                     fill_metric_values,
                 },
             },
@@ -67,7 +69,17 @@ impl From<&ComputeMetricValuesRequest> for DateRange {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody {
-    values: GroupedMetricValues,
+    values: HashMap<String, GranuleValues>,
+    unit: String,
+}
+
+impl From<GroupedMetricValues> for ResponseBody {
+    fn from(value: GroupedMetricValues) -> Self {
+        ResponseBody {
+            unit: value.unit().to_string(),
+            values: value.values(),
+        }
+    }
 }
 
 impl From<ComputeTrainingMetricValuesError> for StatusCode {
@@ -122,10 +134,9 @@ pub async fn compute_training_metric_values<
         .await
         .map_err(StatusCode::from)?;
 
-    let values = fill_metric_values(&granularity, values, &range);
-    let (_, values) = convert_metric_values(values, &request.metric.source(), &aggregate);
+    let values = convert_metric_values(fill_metric_values(&granularity, values, &range));
 
-    Ok(Json(ResponseBody { values }))
+    Ok(Json(ResponseBody::from(values)))
 }
 
 #[cfg(test)]

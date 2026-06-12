@@ -212,7 +212,9 @@ where
             let values = self
                 .compute_training_metric_values(&definition, &aligned_date_range)
                 .await
-                .unwrap_or_default();
+                .unwrap_or_else(|_| {
+                    TrainingMetricValues::empty(metric.definition().metric().unit())
+                });
 
             res.push((metric.clone(), values))
         }

@@ -21,8 +21,10 @@ use crate::{
             },
         },
         ports::{
-            DateRange, activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
+            DateRange,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{GetTrainingMetricValuesError, ITrainingService},
         },
     },
     inbound::{
@@ -32,7 +34,7 @@ use crate::{
             handlers::training::{
                 types::ScopePayload,
                 utils::{
-                    GroupedMetricValues, MetricsDateRange, convert_metric_values,
+                    GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
                     fill_metric_values,
                 },
             },
@@ -80,6 +82,16 @@ impl MetricsQuery {
     }
 }
 
+impl From<GetTrainingMetricValuesError> for StatusCode {
+    fn from(value: GetTrainingMetricValuesError) -> Self {
+        match value {
+            GetTrainingMetricValuesError::TrainingMetricDoesNotExist(_) => Self::NOT_FOUND,
+            GetTrainingMetricValuesError::TrainingPeriodDoesNotExist(_) => Self::NOT_FOUND,
+            GetTrainingMetricValuesError::Unknown(_) => Self::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBodyItem {
     id: String,
@@ -92,7 +104,7 @@ pub struct ResponseBodyItem {
     workout_types: Vec<String>,
     bonked: Option<String>,
     rpes: Vec<String>,
-    values: GroupedMetricValues,
+    values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
     scope: ScopePayload,
 }
@@ -103,18 +115,17 @@ fn to_response_body_item(
 ) -> ResponseBodyItem {
     let (metric, metric_values) = metric;
     let definition = metric.definition();
-    let values = fill_metric_values(definition.granularity(), metric_values, range);
-    let (unit, values) = convert_metric_values(
-        values,
-        &definition.metric().source(),
-        definition.aggregate(),
-    );
+    let values = convert_metric_values(fill_metric_values(
+        definition.granularity(),
+        metric_values,
+        range,
+    ));
 
     ResponseBodyItem {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
         metric: format_source(&definition.metric().source()),
-        unit: unit.to_string(),
+        unit: values.unit().to_string(),
         granularity: definition.granularity().to_string(),
         aggregate: definition.aggregate().to_string(),
         sports: definition
@@ -140,7 +151,7 @@ fn to_response_body_item(
             .as_ref()
             .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect())
             .unwrap_or_default(),
-        values,
+        values: values.values(),
         group_by: definition.group_by().as_ref().map(|g| format!("{:?}", g)),
         scope: metric.scope().into(),
     }

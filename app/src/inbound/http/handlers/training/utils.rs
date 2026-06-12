@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset, Local};
-use serde::Deserialize;
+use derive_more::Constructor;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     models::{
@@ -51,7 +52,29 @@ pub type GranuleValues = HashMap<String, f64>;
 ///   }
 /// }
 /// ```
-pub type GroupedMetricValues = HashMap<String, GranuleValues>;
+#[derive(Debug, Clone, Constructor)]
+pub struct GroupedMetricValues {
+    values: HashMap<String, GranuleValues>,
+    unit: Unit,
+}
+
+impl GroupedMetricValues {
+    pub fn insert(&mut self, group: String, value: GranuleValues) {
+        self.values.insert(group, value);
+    }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, HashMap<String, f64>> {
+        self.values.iter()
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.unit
+    }
+
+    pub fn values(self) -> HashMap<String, GranuleValues> {
+        self.values
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct MetricsDateRange {
@@ -115,7 +138,7 @@ pub fn fill_metric_values(
         .collect();
 
     // 3. For each group, create a map of granule -> value
-    let mut result: GroupedMetricValues = HashMap::new();
+    let mut result = GroupedMetricValues::new(HashMap::new(), values.unit());
 
     for group in groups {
         let mut granule_values: GranuleValues = HashMap::new();
@@ -162,86 +185,55 @@ pub fn fill_metric_values(
 /// # Returns
 ///
 /// A tuple of (Unit, GroupedMetricValues) with converted values and the appropriate unit
-pub fn convert_metric_values(
-    values: GroupedMetricValues,
-    source: &ActivityMetricSource,
-    aggregate: &TrainingMetricAggregate,
-) -> (Unit, GroupedMetricValues) {
-    if matches!(aggregate, TrainingMetricAggregate::NumberOfActivities) {
-        return (Unit::NumberOfActivities, values);
-    }
-
-    match source {
-        ActivityMetricSource::Statistic(stat) => match stat {
-            ActivityStatistic::Distance => (
-                Unit::Kilometer,
-                values
-                    .iter()
-                    .map(|(group, group_values)| {
-                        (
-                            group.clone(),
-                            group_values
-                                .iter()
-                                .map(|(k, val)| (k.clone(), *val / 1000.))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            _ => (stat.unit(), values),
-        },
-        ActivityMetricSource::Timeseries((metric, _)) => match metric {
-            TimeseriesMetric::Distance => (
-                Unit::Kilometer,
-                values
-                    .iter()
-                    .map(|(group, group_values)| {
-                        (
-                            group.clone(),
-                            group_values
-                                .iter()
-                                .map(|(k, val)| (k.clone(), *val / 1000.))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            TimeseriesMetric::Speed => (
-                Unit::KilometerPerHour,
-                values
-                    .iter()
-                    .map(|(group, group_values)| {
-                        (
-                            group.clone(),
-                            group_values
-                                .iter()
-                                .map(|(k, val)| (k.clone(), *val * 3.6))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            TimeseriesMetric::Pace => (
-                Unit::SecondPerKilometer,
-                values
-                    .iter()
-                    .map(|(group, group_values)| {
-                        (
-                            group.clone(),
-                            group_values
-                                .iter()
-                                .map(|(k, val)| (k.clone(), *val * 1000.))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            _ => (metric.unit(), values),
-        },
-        ActivityMetricSource::ActiveDuration => {
-            (ActivityMetricSource::ActiveDuration.unit(), values)
+pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues {
+    return match values.unit {
+        Unit::Meter => {
+            let converted = values
+                .iter()
+                .map(|(group, group_values)| {
+                    (
+                        group.clone(),
+                        group_values
+                            .iter()
+                            .map(|(k, val)| (k.clone(), *val / 1000.))
+                            .collect::<GranuleValues>(),
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            GroupedMetricValues::new(converted, Unit::Kilometer)
         }
-    }
+        Unit::MeterPerSecond => {
+            let converted = values
+                .iter()
+                .map(|(group, group_values)| {
+                    (
+                        group.clone(),
+                        group_values
+                            .iter()
+                            .map(|(k, val)| (k.clone(), *val * 3.6))
+                            .collect(),
+                    )
+                })
+                .collect();
+            GroupedMetricValues::new(converted, Unit::KilometerPerHour)
+        }
+        Unit::SecondPerMeter => {
+            let converted = values
+                .iter()
+                .map(|(group, group_values)| {
+                    (
+                        group.clone(),
+                        group_values
+                            .iter()
+                            .map(|(k, val)| (k.clone(), *val * 1000.))
+                            .collect(),
+                    )
+                })
+                .collect();
+            GroupedMetricValues::new(converted, Unit::SecondPerKilometer)
+        }
+        _ => values,
+    };
 }
 
 #[cfg(test)]
@@ -266,24 +258,28 @@ mod tests {
             end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
         };
 
-        let values = TrainingMetricValues::new(HashMap::from([
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), None),
-                TrainingMetricValue::Max(10.0),
-            ),
-            (
-                TrainingMetricBin::new("2025-09-25".to_string(), None),
-                TrainingMetricValue::Max(15.0),
-            ),
-        ]));
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
 
         let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
 
         // Should have one group (the "no group" case, represented by NO_GROUP constant)
-        assert_eq!(result.len(), 1);
+        assert_eq!(result.values.len(), 1);
 
         // The group key for "no group" should be NO_GROUP constant
         let group_values = result
+            .values
             .get(NO_GROUP)
             .expect("Should have NO_GROUP key for no group");
 
@@ -302,23 +298,29 @@ mod tests {
             end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
         };
 
-        let values = TrainingMetricValues::new(HashMap::from([
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(10.0),
-            ),
-            (
-                TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(15.0),
-            ),
-        ]));
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(15.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
 
         let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
 
         // Should have one group: "Cycling"
-        assert_eq!(result.len(), 1);
+        assert_eq!(result.values.len(), 1);
 
-        let cycling_values = result.get("Cycling").expect("Should have Cycling group");
+        let cycling_values = result
+            .values
+            .get("Cycling")
+            .expect("Should have Cycling group");
 
         // Should have 3 days
         assert_eq!(cycling_values.len(), 3);
@@ -335,41 +337,50 @@ mod tests {
             end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
         };
 
-        let values = TrainingMetricValues::new(HashMap::from([
-            // Cycling values
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(10.0),
-            ),
-            (
-                TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(15.0),
-            ),
-            // Running values
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
-                TrainingMetricValue::Max(5.0),
-            ),
-            (
-                TrainingMetricBin::new("2025-09-26".to_string(), Some("Running".to_string())),
-                TrainingMetricValue::Max(8.0),
-            ),
-        ]));
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                // Cycling values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                // Running values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(5.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-26".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(8.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
 
         let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
 
         // Should have two groups: "Cycling" and "Running"
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.values.len(), 2);
 
         // Check Cycling group
-        let cycling_values = result.get("Cycling").expect("Should have Cycling group");
+        let cycling_values = result
+            .values
+            .get("Cycling")
+            .expect("Should have Cycling group");
         assert_eq!(cycling_values.len(), 3);
         assert_eq!(cycling_values.get("2025-09-24"), Some(&10.0));
         assert_eq!(cycling_values.get("2025-09-25"), Some(&15.0));
         assert_eq!(cycling_values.get("2025-09-26"), Some(&0.0)); // Missing for cycling
 
         // Check Running group
-        let running_values = result.get("Running").expect("Should have Running group");
+        let running_values = result
+            .values
+            .get("Running")
+            .expect("Should have Running group");
         assert_eq!(running_values.len(), 3);
         assert_eq!(running_values.get("2025-09-24"), Some(&5.0));
         assert_eq!(running_values.get("2025-09-25"), Some(&0.0)); // Missing for running
@@ -384,30 +395,34 @@ mod tests {
             end: Some(DateTime::parse_from_rfc3339("2025-09-25T00:00:00Z").unwrap()),
         };
 
-        let values = TrainingMetricValues::new(HashMap::from([
-            // No group
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), None),
-                TrainingMetricValue::Max(20.0),
-            ),
-            // Cycling group
-            (
-                TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(10.0),
-            ),
-            (
-                TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(15.0),
-            ),
-        ]));
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                // No group
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(20.0),
+                ),
+                // Cycling group
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(15.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
 
         let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
 
         // Should have two groups: NO_GROUP for None and "Cycling"
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.values.len(), 2);
 
         // Check no-group (NO_GROUP constant)
         let no_group_values = result
+            .values
             .get(NO_GROUP)
             .expect("Should have NO_GROUP key for no group");
         assert_eq!(no_group_values.len(), 2);
@@ -415,7 +430,10 @@ mod tests {
         assert_eq!(no_group_values.get("2025-09-25"), Some(&0.0)); // Missing value
 
         // Check Cycling group
-        let cycling_values = result.get("Cycling").expect("Should have Cycling group");
+        let cycling_values = result
+            .values
+            .get("Cycling")
+            .expect("Should have Cycling group");
         assert_eq!(cycling_values.len(), 2);
         assert_eq!(cycling_values.get("2025-09-24"), Some(&10.0));
         assert_eq!(cycling_values.get("2025-09-25"), Some(&15.0));
@@ -429,12 +447,12 @@ mod tests {
             end: Some(DateTime::parse_from_rfc3339("2025-09-25T00:00:00Z").unwrap()),
         };
 
-        let values = TrainingMetricValues::new(HashMap::new());
+        let values = TrainingMetricValues::new(HashMap::new(), Unit::Kilometer);
 
         let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
 
         // With no values, there are no groups, so result should be empty
-        assert_eq!(result.len(), 0);
+        assert_eq!(result.values.len(), 0);
     }
 
     #[test]
@@ -446,17 +464,23 @@ mod tests {
         };
 
         // Weekly granularity uses the Monday date as the key, not "2025-W39" format
-        let values = TrainingMetricValues::new(HashMap::from([(
-            TrainingMetricBin::new("2025-09-22".to_string(), Some("Cycling".to_string())),
-            TrainingMetricValue::Max(100.0),
-        )]));
+        let values = TrainingMetricValues::new(
+            HashMap::from([(
+                TrainingMetricBin::new("2025-09-22".to_string(), Some("Cycling".to_string())),
+                TrainingMetricValue::Max(100.0),
+            )]),
+            Unit::Kilometer,
+        );
 
         let result = fill_metric_values(&TrainingMetricGranularity::Weekly, values, &range);
 
         // Should have one group: "Cycling"
-        assert_eq!(result.len(), 1);
+        assert_eq!(result.values.len(), 1);
 
-        let cycling_values = result.get("Cycling").expect("Should have Cycling group");
+        let cycling_values = result
+            .values
+            .get("Cycling")
+            .expect("Should have Cycling group");
 
         // Should have at least 2 weeks
         assert!(cycling_values.len() >= 2);
@@ -466,76 +490,38 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_metric_values_number_of_activities_returns_activity_unit() {
-        // When aggregate is NumberOfActivities, unit should always be Activity
-        let values = HashMap::from([(
-            "Other".to_string(),
-            HashMap::from([
-                ("2025-09-24".to_string(), 5.0),
-                ("2025-09-25".to_string(), 3.0),
-            ]),
-        )]);
-
-        use crate::domain::models::training::TrainingMetricAggregate;
-
-        // Test with Distance source (which normally converts to Kilometer)
-        let (unit, converted_values) = convert_metric_values(
-            values.clone(),
-            &ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            &TrainingMetricAggregate::NumberOfActivities,
-        );
-
-        assert_eq!(unit, Unit::NumberOfActivities);
-        // Values should not be converted (no division by 1000)
-        assert_eq!(
-            converted_values.get("Other").unwrap().get("2025-09-24"),
-            Some(&5.0)
-        );
-        assert_eq!(
-            converted_values.get("Other").unwrap().get("2025-09-25"),
-            Some(&3.0)
-        );
-
-        // Test with Duration source
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Statistic(ActivityStatistic::Duration),
-            &TrainingMetricAggregate::NumberOfActivities,
-        );
-
-        assert_eq!(unit, Unit::NumberOfActivities);
-        assert_eq!(
-            converted_values.get("Other").unwrap().get("2025-09-24"),
-            Some(&5.0)
-        );
-    }
-
-    #[test]
     fn test_convert_metric_values_distance_statistic_converts_to_kilometers() {
         use crate::domain::models::training::TrainingMetricAggregate;
 
         // Distance statistic should be converted from meters to kilometers
-        let values = HashMap::from([(
-            "Cycling".to_string(),
-            HashMap::from([
-                ("2025-09-24".to_string(), 10000.0), // 10km in meters
-                ("2025-09-25".to_string(), 25000.0), // 25km in meters
-            ]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            &TrainingMetricAggregate::Sum,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 10000.0), // 10km in meters
+                    ("2025-09-25".to_string(), 25000.0), // 25km in meters
+                ]),
+            )]),
+            Unit::Meter,
         );
 
-        assert_eq!(unit, Unit::Kilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&10.0)
         );
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-25"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-25"),
             Some(&25.0)
         );
     }
@@ -543,23 +529,23 @@ mod tests {
     #[test]
     fn test_convert_metric_values_distance_timeseries_converts_to_kilometers() {
         // Distance timeseries should also be converted to kilometers
-        let values = HashMap::from([(
-            "Running".to_string(),
-            HashMap::from([("2025-09-24".to_string(), 5000.0)]), // 5km in meters
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Distance,
-                TimeseriesAggregate::Max,
-            )),
-            &TrainingMetricAggregate::Max,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Running".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 5000.0)]), // 5km in meters
+            )]),
+            Unit::Meter,
         );
 
-        assert_eq!(unit, Unit::Kilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&5.0)
         );
     }
@@ -567,30 +553,31 @@ mod tests {
     #[test]
     fn test_convert_metric_values_speed_timeseries_converts_to_kmh() {
         // Speed should be converted from m/s to km/h
-        let values = HashMap::from([(
-            "Cycling".to_string(),
-            HashMap::from([
-                ("2025-09-24".to_string(), 10.0), // 10 m/s = 36 km/h
-                ("2025-09-25".to_string(), 5.55), // 5.55 m/s ≈ 20 km/h
-            ]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Speed,
-                TimeseriesAggregate::Average,
-            )),
-            &TrainingMetricAggregate::Average,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 10.0), // 10 m/s = 36 km/h
+                    ("2025-09-25".to_string(), 5.55), // 5.55 m/s ≈ 20 km/h
+                ]),
+            )]),
+            Unit::MeterPerSecond,
         );
 
-        assert_eq!(unit, Unit::KilometerPerHour);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::KilometerPerHour);
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&36.0)
         );
         assert!(
             (converted_values
+                .values
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-25")
@@ -606,27 +593,34 @@ mod tests {
         use crate::domain::models::training::TrainingMetricAggregate;
 
         // Duration should keep its unit (seconds) and values unchanged
-        let values = HashMap::from([(
-            "Other".to_string(),
-            HashMap::from([
-                ("2025-09-24".to_string(), 3600.0), // 1 hour in seconds
-                ("2025-09-25".to_string(), 7200.0), // 2 hours in seconds
-            ]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values.clone(),
-            &ActivityMetricSource::Statistic(ActivityStatistic::Duration),
-            &TrainingMetricAggregate::Sum,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Other".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 3600.0), // 1 hour in seconds
+                    ("2025-09-25".to_string(), 7200.0), // 2 hours in seconds
+                ]),
+            )]),
+            Unit::Second,
         );
 
-        assert_eq!(unit, Unit::Second);
+        let converted_values = convert_metric_values(values.clone());
+
+        assert_eq!(converted_values.unit(), Unit::Second);
         assert_eq!(
-            converted_values.get("Other").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Other")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&3600.0)
         );
         assert_eq!(
-            converted_values.get("Other").unwrap().get("2025-09-25"),
+            converted_values
+                .values
+                .get("Other")
+                .unwrap()
+                .get("2025-09-25"),
             Some(&7200.0)
         );
     }
@@ -634,23 +628,23 @@ mod tests {
     #[test]
     fn test_convert_metric_values_power_timeseries_no_conversion() {
         // Power should keep its unit (watts) and values unchanged
-        let values = HashMap::from([(
-            "Cycling".to_string(),
-            HashMap::from([("2025-09-24".to_string(), 250.0)]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Power,
-                TimeseriesAggregate::Average,
-            )),
-            &TrainingMetricAggregate::Average,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 250.0)]),
+            )]),
+            Unit::Watt,
         );
 
-        assert_eq!(unit, Unit::Watt);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::Watt);
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&250.0)
         );
     }
@@ -660,30 +654,37 @@ mod tests {
         use crate::domain::models::training::TrainingMetricAggregate;
 
         // Test that conversion works correctly with multiple groups
-        let values = HashMap::from([
-            (
-                "Cycling".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 20000.0)]),
-            ),
-            (
-                "Running".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 10000.0)]),
-            ),
-        ]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Statistic(ActivityStatistic::Distance),
-            &TrainingMetricAggregate::Sum,
+        let values = GroupedMetricValues::new(
+            HashMap::from([
+                (
+                    "Cycling".to_string(),
+                    HashMap::from([("2025-09-24".to_string(), 20000.0)]),
+                ),
+                (
+                    "Running".to_string(),
+                    HashMap::from([("2025-09-24".to_string(), 10000.0)]),
+                ),
+            ]),
+            Unit::Meter,
         );
 
-        assert_eq!(unit, Unit::Kilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&20.0)
         );
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&10.0)
         );
     }
@@ -691,30 +692,34 @@ mod tests {
     #[test]
     fn test_convert_metric_values_pace_timeseries_converts_to_s_per_km() {
         // Pace should be converted from s:m to s:km (multiply by 1000)
-        let values = HashMap::from([(
-            "Running".to_string(),
-            HashMap::from([
-                ("2025-09-24".to_string(), 0.2),  // 0.2 s:m = 200 s/km = 3:20 min/km
-                ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
-            ]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Pace,
-                TimeseriesAggregate::Average,
-            )),
-            &TrainingMetricAggregate::Average,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Running".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 0.2),  // 0.2 s:m = 200 s/km = 3:20 min/km
+                    ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
+                ]),
+            )]),
+            Unit::SecondPerMeter,
         );
 
-        assert_eq!(unit, Unit::SecondPerKilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&200.0)
         );
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-25"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-25"),
             Some(&250.0)
         );
     }
@@ -724,33 +729,37 @@ mod tests {
         use crate::domain::models::training::TrainingMetricAggregate;
 
         // Test pace conversion with multiple sports
-        let values = HashMap::from([
-            (
-                "Running".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 0.2)]), // 200 s/km
-            ),
-            (
-                "Cycling".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
-            ),
-        ]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Pace,
-                TimeseriesAggregate::Average,
-            )),
-            &TrainingMetricAggregate::Average,
+        let values = GroupedMetricValues::new(
+            HashMap::from([
+                (
+                    "Running".to_string(),
+                    HashMap::from([("2025-09-24".to_string(), 0.2)]), // 200 s/km
+                ),
+                (
+                    "Cycling".to_string(),
+                    HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
+                ),
+            ]),
+            Unit::SecondPerMeter,
         );
 
-        assert_eq!(unit, Unit::SecondPerKilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&200.0)
         );
         assert_eq!(
-            converted_values.get("Cycling").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Cycling")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&100.0)
         );
     }
@@ -758,23 +767,23 @@ mod tests {
     #[test]
     fn test_convert_metric_values_pace_zero_value() {
         // Test that zero pace values are handled correctly (0 * 1000 = 0)
-        let values = HashMap::from([(
-            "Running".to_string(),
-            HashMap::from([("2025-09-24".to_string(), 0.0)]),
-        )]);
-
-        let (unit, converted_values) = convert_metric_values(
-            values,
-            &ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Pace,
-                TimeseriesAggregate::Average,
-            )),
-            &TrainingMetricAggregate::Average,
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Running".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 0.0)]),
+            )]),
+            Unit::SecondPerMeter,
         );
 
-        assert_eq!(unit, Unit::SecondPerKilometer);
+        let converted_values = convert_metric_values(values);
+
+        assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
-            converted_values.get("Running").unwrap().get("2025-09-24"),
+            converted_values
+                .values
+                .get("Running")
+                .unwrap()
+                .get("2025-09-24"),
             Some(&0.0)
         );
     }

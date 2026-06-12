@@ -105,8 +105,8 @@ impl From<&Lap> for PublicLap {
 
 fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, PublicTimeseries> {
     HashMap::from_iter(metrics.iter().map(|metric| {
-        let (unit, values) = match metric.metric() {
-            TimeseriesMetric::Speed => (
+        let (unit, values) = match metric.metric().unit() {
+            Unit::MeterPerSecond => (
                 Unit::KilometerPerHour,
                 metric
                     .values()
@@ -118,7 +118,7 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Public
                     })
                     .collect(),
             ),
-            TimeseriesMetric::Distance => (
+            Unit::Meter => (
                 Unit::Kilometer,
                 metric
                     .values()

@@ -15,7 +15,7 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
-            Sport, SportCategory, WorkoutType,
+            Sport, SportCategory, Unit, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -366,6 +366,13 @@ impl TrainingMetricDefinition {
         &self.group_by
     }
 
+    pub fn unit(&self) -> Unit {
+        match self.granularity_aggregate {
+            TrainingMetricAggregate::NumberOfActivities => Unit::NumberOfActivities,
+            _ => self.metric.unit(),
+        }
+    }
+
     pub fn merge_default_sports(self, default_sports: &Option<Vec<SportFilter>>) -> Self {
         Self {
             user: self.user,
@@ -407,10 +414,10 @@ impl TrainingMetricDefinition {
         activity_metrics: Vec<(Option<String>, ActivityMetric)>,
     ) -> TrainingMetricValues {
         let grouped_metrics = group_metrics_by_bin(&self.granularity, activity_metrics);
-        TrainingMetricValues::new(aggregate_metrics(
-            &self.granularity_aggregate,
-            grouped_metrics,
-        ))
+        TrainingMetricValues::new(
+            aggregate_metrics(&self.granularity_aggregate, grouped_metrics),
+            self.unit(),
+        )
     }
 }
 
@@ -731,24 +738,34 @@ impl TrainingMetricBin {
     }
 }
 
-#[derive(Debug, Clone, Constructor, Default, PartialEq)]
-pub struct TrainingMetricValues(HashMap<TrainingMetricBin, TrainingMetricValue>);
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct TrainingMetricValues {
+    values: HashMap<TrainingMetricBin, TrainingMetricValue>,
+    unit: Unit,
+}
 
 impl TrainingMetricValues {
+    pub fn empty(unit: Unit) -> Self {
+        Self {
+            values: HashMap::new(),
+            unit,
+        }
+    }
+
     pub fn insert(
         &mut self,
         key: TrainingMetricBin,
         value: TrainingMetricValue,
     ) -> Option<TrainingMetricValue> {
-        self.0.insert(key, value)
+        self.values.insert(key, value)
     }
 
     pub fn get(&self, key: &TrainingMetricBin) -> Option<&TrainingMetricValue> {
-        self.0.get(key)
+        self.values.get(key)
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.values.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -756,13 +773,17 @@ impl TrainingMetricValues {
     }
 
     pub fn iter(&self) -> Iter<'_, TrainingMetricBin, TrainingMetricValue> {
-        self.0.iter()
+        self.values.iter()
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.unit
     }
 }
 
 impl TrainingMetricValues {
     pub fn as_hash_map(self) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
-        self.0
+        self.values
     }
 }
 
@@ -771,7 +792,7 @@ impl std::iter::IntoIterator for TrainingMetricValues {
     type IntoIter = std::collections::hash_map::IntoIter<TrainingMetricBin, TrainingMetricValue>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.values.into_iter()
     }
 }
 

@@ -856,7 +856,7 @@ pub trait ToUnit {
     fn unit(&self) -> Unit;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Unit {
     KiloCalorie,
     Meter,
