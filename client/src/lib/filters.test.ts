@@ -182,7 +182,7 @@ describe('filterActivities', () => {
 
 	describe('duration range filter', () => {
 		it('includes an activity whose duration is within the range', () => {
-			const activity = makeActivity({ metrics: { Duration: 3600 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: 3600 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -193,7 +193,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is below the minimum', () => {
-			const activity = makeActivity({ metrics: { Duration: 600 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: 600 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -204,7 +204,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is above the maximum', () => {
-			const activity = makeActivity({ metrics: { Duration: 10000 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: 10000 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -214,7 +214,7 @@ describe('filterActivities', () => {
 			expect(result).toEqual([]);
 		});
 
-		it('excludes an activity with no Duration statistic when a duration range is set', () => {
+		it('excludes an activity with no ActiveDuration statistic when a duration range is set', () => {
 			const activity = makeActivity({ metrics: {} });
 
 			const result = filterActivities([activity], {
@@ -226,7 +226,7 @@ describe('filterActivities', () => {
 		});
 
 		it('includes an activity when only min is set and the value equals min', () => {
-			const activity = makeActivity({ metrics: { Duration: 1800 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: 1800 } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
