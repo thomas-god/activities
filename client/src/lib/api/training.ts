@@ -4,7 +4,6 @@ import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
 import { groupByClauses, metricAggregateFunctions } from '$lib/metric';
 import { dayjs } from '$lib/duration';
-import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 import { type Activity, ActivitySchema } from './activities';
 
 // =============================================================================

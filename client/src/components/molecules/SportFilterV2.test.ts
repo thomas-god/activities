@@ -46,7 +46,7 @@ describe('SportFilterV2', () => {
 
 		await user.click(runningCheckbox);
 
-		expect(getSummaryText(container)).toBe('Sports:');
+		expect(getSummaryText(container)).toBe('Sports: All sports');
 		expect(screen.getByLabelText('Running')).not.toBeChecked();
 	});
 
@@ -80,6 +80,33 @@ describe('SportFilterV2', () => {
 		expect(screen.getByLabelText('Yoga')).toBeChecked();
 		expect(screen.getByLabelText('HIIT')).toBeChecked();
 		expect(categoryCheckbox).toBeChecked();
+	});
+
+	it('only shows categories and sports allowed by existingSportsConstraints', async () => {
+		const user = userEvent.setup();
+
+		const { container } = render(SportFilterV2, {
+			props: {
+				sports: some<Sport[]>(['Running']) as Option<Sport[]>,
+				categories: some<SportCategory[]>(['Cardio']) as Option<SportCategory[]>,
+				existingSportsConstraints: some({
+					sports: ['Running'],
+					categories: ['Cardio']
+				}) as Option<{ sports: Sport[]; categories: SportCategory[] }>
+			}
+		});
+
+		expect(getSummaryText(container)).toBe('Sports: Running, Gym & Fitness');
+
+		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+
+		expect(screen.getByText('Gym & Fitness sports')).toBeInTheDocument();
+		expect(screen.getByText('Running sports')).toBeInTheDocument();
+		expect(screen.queryByText('Cycling sports')).toBeNull();
+		expect(screen.getByLabelText('HIIT')).toBeChecked();
+		expect(screen.getByLabelText('Running')).toBeChecked();
+		expect(screen.queryByLabelText('TrailRunning')).toBeNull();
+		expect(screen.queryByLabelText('Cycling')).toBeNull();
 	});
 
 	it('turns a category off and selects the other sports when one sport is toggled from that category', async () => {

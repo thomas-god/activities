@@ -12,10 +12,12 @@
 	let {
 		sports = $bindable(),
 		categories = $bindable(),
+		existingSportsConstraints = none(),
 		allowDelete = true
 	}: {
 		sports: Option<Sport[]>;
 		categories: Option<SportCategory[]>;
+		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 		allowDelete?: boolean;
 	} = $props();
 	let editing = $state(false);
@@ -88,6 +90,36 @@
 		}
 	};
 
+	const shouldDisplayCategory = (category: SportCategory): boolean => {
+		if (isNone(existingSportsConstraints)) {
+			return true;
+		}
+
+		// Category is explicitely set
+		if (existingSportsConstraints.value.categories.includes(category)) {
+			return true;
+		}
+
+		// At least one of its sport is set
+		return existingSportsConstraints.value.sports.some((sport) =>
+			sportsPerCategory[category].includes(sport)
+		);
+	};
+
+	const shouldDisplaySport = (sport: Sport, category: SportCategory): boolean => {
+		if (isNone(existingSportsConstraints)) {
+			return true;
+		}
+
+		// Parent category is explicitely set
+		if (existingSportsConstraints.value.categories.includes(category)) {
+			return true;
+		}
+
+		// Sport is explicitely set
+		return existingSportsConstraints.value.sports.includes(sport);
+	};
+
 	let display = $derived.by(() => {
 		let values: string[] = [];
 
@@ -129,36 +161,40 @@
 			<div class="divider my-0.5 px-2"></div>
 			<div class="flex max-h-64 flex-col gap-2 overflow-scroll px-1">
 				{#each SportCategories as category}
-					<div class="flex flex-col gap-1 p-1">
-						<div
-							class="flex flex-row items-center gap-1.5 border-b-1 border-b-black/45 pb-0.5 pl-0.5"
-						>
-							<span class="font-semibold">
-								{#if ['WaterSports', 'TeamSports'].includes(category)}
-									{sportCategoryDisplay(category)}
-								{:else}
-									{sportCategoryDisplay(category)} sports
-								{/if}
-							</span>
-							<input
-								type="checkbox"
-								class="checkbox rounded-sm checkbox-xs checkbox-primary"
-								checked={categoryIsSelected(category)}
-								onclick={() => toggleCategory(category)}
-							/>
-						</div>
-						<div class="flex flex-row flex-wrap gap-1">
-							{#each sportsPerCategory[category].toSorted() as sport}
+					{#if shouldDisplayCategory(category)}
+						<div class="flex flex-col gap-1 p-1">
+							<div
+								class="flex flex-row items-center gap-1.5 border-b-1 border-b-black/45 pb-0.5 pl-0.5"
+							>
+								<span class="font-semibold">
+									{#if ['WaterSports', 'TeamSports'].includes(category)}
+										{sportCategoryDisplay(category)}
+									{:else}
+										{sportCategoryDisplay(category)} sports
+									{/if}
+								</span>
 								<input
 									type="checkbox"
-									class="btn btn-soft btn-xs"
-									aria-label={sportDisplay(sport)}
-									checked={sportIsSelected(sport) || categoryIsSelected(category)}
-									onclick={() => toggleSport(sport, category)}
+									class="checkbox rounded-sm checkbox-xs checkbox-primary"
+									checked={categoryIsSelected(category)}
+									onclick={() => toggleCategory(category)}
 								/>
-							{/each}
+							</div>
+							<div class="flex flex-row flex-wrap gap-1">
+								{#each sportsPerCategory[category].toSorted() as sport}
+									{#if shouldDisplaySport(sport, category)}
+										<input
+											type="checkbox"
+											class="btn btn-soft btn-xs"
+											aria-label={sportDisplay(sport)}
+											checked={sportIsSelected(sport) || categoryIsSelected(category)}
+											onclick={() => toggleSport(sport, category)}
+										/>
+									{/if}
+								{/each}
+							</div>
 						</div>
-					</div>
+					{/if}
 				{/each}
 			</div>
 		{/if}

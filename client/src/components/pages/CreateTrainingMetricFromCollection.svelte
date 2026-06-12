@@ -14,7 +14,15 @@
 
 	export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 
-	let { callback, scope = { kind: 'global' } }: { callback: () => void; scope?: Scope } = $props();
+	let {
+		callback,
+		scope = { kind: 'global' },
+		existingSportsConstraints = none()
+	}: {
+		callback: () => void;
+		scope?: Scope;
+		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
+	} = $props();
 
 	const MetricTemplatesSchema = z.array(
 		z.object({
@@ -308,7 +316,7 @@
 			<option value="Bonked">Bonked</option>
 		</select>
 
-		<TrainingMetricFilters bind:filters />
+		<TrainingMetricFilters bind:filters {existingSportsConstraints} />
 
 		<label class="label" for="metric-name">Metric name</label>
 		<input

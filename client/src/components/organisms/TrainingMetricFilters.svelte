@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Sport, SportCategory } from '$lib/sport';
-	import { isNone, isSome, type Option, some } from '$lib/Options';
+	import { isNone, isSome, none, type Option, some } from '$lib/Options';
 	import type { RPEValue } from '$lib/rpe';
 	import type { BonkStatus } from '$lib/nutrition';
 	import RpeFilterV2 from '$components/molecules/RpeFilterV2.svelte';
@@ -17,7 +17,13 @@
 		bonked: Option<BonkStatus>;
 	}
 
-	let { filters = $bindable() }: { filters: TrainingMetricFiltersType } = $props();
+	let {
+		filters = $bindable(),
+		existingSportsConstraints = none()
+	}: {
+		filters: TrainingMetricFiltersType;
+		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
+	} = $props();
 	const uid = $props.id();
 
 	let allFiltersSet = $derived(
@@ -81,6 +87,7 @@
 	<SportFilterV2
 		bind:sports={() => filters.sports, (v) => (filters.sports = v)}
 		bind:categories={() => filters.sportCategories, (v) => (filters.sportCategories = v)}
+		{existingSportsConstraints}
 	/>
 
 	<RpeFilterV2 bind:rpes={() => filters.rpes, (v) => (filters.rpes = v)} />
