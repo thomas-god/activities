@@ -6,7 +6,10 @@ use crate::{
         models::{
             UserId,
             activity::ActivityMetricV2,
-            training::{TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName},
+            training::{
+                TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName,
+                TrainingMetricWindow,
+            },
         },
         ports::{
             activity::IActivityService,
@@ -19,8 +22,9 @@ use crate::{
             AppState,
             auth::{AuthenticatedUser, IUserService},
             handlers::training::types::{
-                APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
-                APITrainingMetricGroupBy, APITrainingMetricSource, ScopePayload,
+                APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
+                APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricSource,
+                ScopePayload,
             },
         },
         parser::ParseFile,
@@ -31,10 +35,8 @@ use crate::{
 pub struct CreateTrainingMetricBody {
     name: String,
     metric: ActivityMetricV2,
-    granularity: APITrainingMetricGranularity,
-    aggregate: APITrainingMetricAggregate,
+    window: Option<APITimeseriesWindow>,
     filters: APITrainingMetricFilters,
-    group_by: Option<APITrainingMetricGroupBy>,
     scope: ScopePayload,
 }
 
@@ -50,10 +52,8 @@ fn build_request(
         user.clone(),
         TrainingMetricName::from(body.name),
         body.metric,
-        body.granularity.into(),
-        body.aggregate.into(),
+        body.window.map(TrainingMetricWindow::from),
         body.filters.try_into()?,
-        body.group_by.map(TrainingMetricGroupBy::from),
         body.scope.into(),
     ))
 }

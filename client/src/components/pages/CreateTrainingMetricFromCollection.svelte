@@ -132,16 +132,20 @@
 
 		let payload: {
 			metric: string;
-			granularity: string;
-			aggregate: string;
+			window: {
+				granularity: string;
+				aggregate: string;
+				group_by?: Exclude<typeof groupBy, 'None'>;
+			};
 			filters?: {};
-			group_by?: Exclude<typeof groupBy, 'None'>;
 			start: string;
 			end: string;
 		} = {
 			metric: selectedTemplate.value.metric,
-			granularity: granularity,
-			aggregate: selectedTemplate.value.aggregate,
+			window: {
+				granularity: granularity,
+				aggregate: selectedTemplate.value.aggregate
+			},
 			start,
 			end
 		};
@@ -151,7 +155,7 @@
 		}
 
 		if (groupBy !== 'None') {
-			payload = { ...payload, group_by: groupBy };
+			payload.window = { ...payload.window, group_by: groupBy };
 		}
 
 		return some(payload);
@@ -177,20 +181,24 @@
 		let basePayload: {
 			name: string;
 			metric: string;
-			granularity: string;
-			aggregate: string;
+			window: {
+				granularity: string;
+				aggregate: string;
+				group_by?: Exclude<typeof groupBy, 'None'>;
+			};
 			filters: {};
-			group_by?: Exclude<typeof groupBy, 'None'>;
 		} = {
 			name: metricName.trim(),
 			metric: selectedTemplate.value.metric,
-			granularity,
-			aggregate: selectedTemplate.value.aggregate,
+			window: {
+				granularity,
+				aggregate: selectedTemplate.value.aggregate
+			},
 			filters: activeFilters
 		};
 
 		if (groupBy !== 'None') {
-			basePayload = { ...basePayload, group_by: groupBy };
+			basePayload.window = { ...basePayload.window, group_by: groupBy };
 		}
 
 		return some(basePayload);
@@ -250,6 +258,7 @@
 		}
 
 		const data = await res.json();
+		// TODO: get unit from data.unit
 		// Transform the GroupedMetricValues response to the format expected by the chart
 		// Response format: { group_name: { granule: value } }
 		const values: { time: string; group: string; value: number }[] = [];

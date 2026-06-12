@@ -8,7 +8,7 @@ use axum::{
 };
 use chrono::{DateTime, FixedOffset, Local};
 use derive_more::Constructor;
-use serde::{Deserialize, Serialize, de};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
                 types::ScopePayload,
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
-                    fill_metric_values,
+                    fill_missing_granules, group_metric_values,
                 },
             },
         },
@@ -98,8 +98,8 @@ pub struct ResponseBodyItem {
     name: Option<String>,
     metric: String,
     unit: String,
-    granularity: String,
-    aggregate: String,
+    granularity: Option<String>,
+    aggregate: Option<String>,
     sports: Vec<String>,
     workout_types: Vec<String>,
     bonked: Option<String>,
@@ -115,19 +115,25 @@ fn to_response_body_item(
 ) -> ResponseBodyItem {
     let (metric, metric_values) = metric;
     let definition = metric.definition();
-    let values = convert_metric_values(fill_metric_values(
-        definition.granularity(),
-        metric_values,
-        range,
-    ));
+    let values = convert_metric_values(group_metric_values(metric_values));
+    let values = match metric.definition().window() {
+        Some(window) => fill_missing_granules(values, window, range),
+        None => values,
+    };
 
     ResponseBodyItem {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
         metric: format_source(&definition.metric().source()),
         unit: values.unit().to_string(),
-        granularity: definition.granularity().to_string(),
-        aggregate: definition.aggregate().to_string(),
+        granularity: definition
+            .window()
+            .as_ref()
+            .map(|w| w.granularity().to_string()),
+        aggregate: definition
+            .window()
+            .as_ref()
+            .map(|w| w.aggregate().to_string()),
         sports: definition
             .filters()
             .sports()
@@ -152,7 +158,10 @@ fn to_response_body_item(
             .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect())
             .unwrap_or_default(),
         values: values.values(),
-        group_by: definition.group_by().as_ref().map(|g| format!("{:?}", g)),
+        group_by: definition
+            .window()
+            .as_ref()
+            .and_then(|w| w.group_by().as_ref().map(|g| format!("{:?}", g))),
         scope: metric.scope().into(),
     }
 }
@@ -256,6 +265,8 @@ pub async fn get_training_period_metrics<
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use crate::domain::models::activity::{
         ActivityStatistic, TimeseriesAggregate, TimeseriesMetric,
     };
@@ -308,5 +319,59 @@ mod tests {
             }
             TrainingMetricScope::Global => panic!("Expected TrainingPeriod scope"),
         }
+    }
+
+    #[test]
+    fn test_response_body_shape() {
+        let body = ResponseBody(vec![ResponseBodyItem {
+            id: "metric-id-1".to_string(),
+            name: Some("My Metric".to_string()),
+            metric: "Calories".to_string(),
+            unit: "kcal".to_string(),
+            granularity: Some("Daily".to_string()),
+            aggregate: Some("Average".to_string()),
+            sports: vec!["Running".to_string()],
+            workout_types: vec!["tempo".to_string()],
+            bonked: Some("bonked".to_string()),
+            rpes: vec!["eight".to_string()],
+            values: HashMap::from([(
+                "Running".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 10.5)]),
+            )]),
+            group_by: Some("Sport".to_string()),
+            scope: ScopePayload::TrainingPeriod {
+                training_period_id: "period-1".to_string(),
+            },
+        }]);
+
+        let serialized = serde_json::to_value(body).unwrap();
+
+        assert_eq!(
+            serialized,
+            json!([
+                {
+                    "id": "metric-id-1",
+                    "name": "My Metric",
+                    "metric": "Calories",
+                    "unit": "kcal",
+                    "granularity": "Daily",
+                    "aggregate": "Average",
+                    "sports": ["Running"],
+                    "workout_types": ["tempo"],
+                    "bonked": "bonked",
+                    "rpes": ["eight"],
+                    "values": {
+                        "Running": {
+                            "2025-09-24": 10.5
+                        }
+                    },
+                    "group_by": "Sport",
+                    "scope": {
+                        "type": "trainingPeriod",
+                        "trainingPeriodId": "period-1"
+                    }
+                }
+            ])
+        );
     }
 }

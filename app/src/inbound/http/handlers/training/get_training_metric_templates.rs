@@ -64,10 +64,10 @@ impl From<&TrainingMetricTemplate> for TrainingMetricTemplateBody {
     fn from(value: &TrainingMetricTemplate) -> Self {
         Self {
             display_name: value.display_name.to_string(),
-            metric: value.metric.clone(),
+            metric: value.metric,
             unit: value.metric.source().unit().to_string(),
-            aggregate: value.aggregate.clone(),
-            category: value.category.clone(),
+            aggregate: value.aggregate,
+            category: value.category,
         }
     }
 }
@@ -110,7 +110,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         ActivityMetricV2::MinPace,
     ] {
         templates.push(TrainingMetricTemplate {
-            display_name: format!("{}", format_metric(&metric)),
+            display_name: format_metric(&metric),
             metric,
             aggregate,
             category: metric_category(&metric),
@@ -128,7 +128,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         ActivityMetricV2::MaxPace,
     ] {
         templates.push(TrainingMetricTemplate {
-            display_name: format!("{}", format_metric(&metric)),
+            display_name: format_metric(&metric),
             metric,
             aggregate,
             category: metric_category(&metric),
@@ -146,7 +146,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         ActivityMetricV2::AvgPace,
     ] {
         templates.push(TrainingMetricTemplate {
-            display_name: format!("{}", format_metric(&metric)),
+            display_name: format_metric(&metric),
             metric,
             aggregate,
             category: metric_category(&metric),
@@ -176,7 +176,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     let metric = ActivityMetricV2::NumberOfActivity;
     let aggregate = TrainingMetricAggregate::Sum;
     templates.push(TrainingMetricTemplate {
-        display_name: format!("{}", format_metric(&metric)),
+        display_name: format_metric(&metric),
         metric,
         aggregate,
         category: metric_category(&metric),

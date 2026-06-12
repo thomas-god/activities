@@ -1,3 +1,4 @@
+use derive_more::Constructor;
 /// Mappings between domain types and types part of the HTTP API
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +9,8 @@ use crate::domain::models::{
     },
     training::{
         SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricScope, TrainingPeriodId, TrainingPeriodSports,
+        TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricWindow, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 
@@ -77,6 +79,23 @@ impl From<APITrainingMetricSource> for ActivityMetricSource {
                 ))
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, Constructor, PartialEq, Deserialize)]
+pub struct APITimeseriesWindow {
+    granularity: APITrainingMetricGranularity,
+    aggregate: APITrainingMetricAggregate,
+    group_by: Option<APITrainingMetricGroupBy>,
+}
+
+impl From<APITimeseriesWindow> for TrainingMetricWindow {
+    fn from(value: APITimeseriesWindow) -> Self {
+        Self::new(
+            value.granularity.into(),
+            value.aggregate.into(),
+            value.group_by.map(TrainingMetricGroupBy::from),
+        )
     }
 }
 

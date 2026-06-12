@@ -335,10 +335,29 @@ impl TrainingMetricScope {
 pub struct TrainingMetricDefinition {
     user: UserId,
     metric: ActivityMetricV2,
-    granularity: TrainingMetricGranularity,
-    granularity_aggregate: TrainingMetricAggregate,
+    window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricWindow {
+    granularity: TrainingMetricGranularity,
+    aggregate: TrainingMetricAggregate,
     group_by: Option<TrainingMetricGroupBy>,
+}
+
+impl TrainingMetricWindow {
+    pub fn granularity(&self) -> &TrainingMetricGranularity {
+        &self.granularity
+    }
+
+    pub fn aggregate(&self) -> &TrainingMetricAggregate {
+        &self.aggregate
+    }
+
+    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
+        &self.group_by
+    }
 }
 
 impl TrainingMetricDefinition {
@@ -350,25 +369,17 @@ impl TrainingMetricDefinition {
         &self.metric
     }
 
-    pub fn granularity(&self) -> &TrainingMetricGranularity {
-        &self.granularity
-    }
-
-    pub fn aggregate(&self) -> &TrainingMetricAggregate {
-        &self.granularity_aggregate
+    pub fn window(&self) -> &Option<TrainingMetricWindow> {
+        &self.window
     }
 
     pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
     }
 
-    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
-        &self.group_by
-    }
-
     pub fn unit(&self) -> Unit {
-        match self.granularity_aggregate {
-            TrainingMetricAggregate::NumberOfActivities => Unit::NumberOfActivities,
+        match self.window.as_ref().map(|w| w.aggregate) {
+            Some(TrainingMetricAggregate::NumberOfActivities) => Unit::NumberOfActivities,
             _ => self.metric.unit(),
         }
     }
@@ -377,54 +388,60 @@ impl TrainingMetricDefinition {
         Self {
             user: self.user,
             metric: self.metric,
-            granularity: self.granularity,
-            granularity_aggregate: self.granularity_aggregate,
+            window: self.window,
             filters: self.filters.merge_default_sports(default_sports),
-            group_by: self.group_by,
         }
     }
 }
 
 impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
-        let activity_metrics = activities
-            .iter()
-            .filter_map(|(activity, metric_value)| {
-                if self.filters.matches(activity) {
-                    Some((
-                        self.group_by
-                            .as_ref()
-                            .and_then(|group_by| group_by.extract_group(activity)),
-                        ActivityMetric::new(
-                            *metric_value,
-                            *activity.start_time(),
-                            *activity.duration(),
-                        ),
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        self.aggregate_metrics(activity_metrics)
-    }
-
-    fn aggregate_metrics(
-        &self,
-        activity_metrics: Vec<(Option<String>, ActivityMetric)>,
-    ) -> TrainingMetricValues {
-        let grouped_metrics = group_metrics_by_bin(&self.granularity, activity_metrics);
-        TrainingMetricValues::new(
-            aggregate_metrics(&self.granularity_aggregate, grouped_metrics),
-            self.unit(),
-        )
+        match self.window.as_ref() {
+            None => TrainingMetricValues::new(
+                HashMap::from_iter(activities.iter().map(|(activity, value)| {
+                    (
+                        TrainingMetricBin::new(activity.start_time().date().to_string(), None),
+                        TrainingMetricValue::SingleValue(*value),
+                    )
+                })),
+                self.unit(),
+            ),
+            Some(window) => {
+                group_and_aggregate_metrics(activities, self.filters(), window, self.unit())
+            }
+        }
     }
 }
 
-#[derive(Debug, Clone, Constructor, PartialEq)]
-pub struct DateGranule {
-    start: NaiveDate,
-    end: NaiveDate,
+fn group_and_aggregate_metrics(
+    activities: &[(Activity, f64)],
+    filters: &TrainingMetricFilters,
+    window: &TrainingMetricWindow,
+    unit: Unit,
+) -> TrainingMetricValues {
+    let metrics = activities
+        .iter()
+        .filter_map(|(activity, metric_value)| {
+            if filters.matches(activity) {
+                Some((
+                    window
+                        .group_by()
+                        .as_ref()
+                        .and_then(|group_by| group_by.extract_group(activity)),
+                    ActivityMetric::new(
+                        *metric_value,
+                        *activity.start_time(),
+                        *activity.duration(),
+                    ),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let grouped_metrics = group_metrics_by_bin(window.granularity(), metrics);
+    TrainingMetricValues::new(aggregate_metrics(window.aggregate(), grouped_metrics), unit)
 }
 
 fn group_metrics_by_bin(
@@ -685,6 +702,7 @@ impl TrainingMetricAggregate {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricValue {
+    SingleValue(f64),
     Min(f64),
     Max(f64),
     Sum(f64),
@@ -699,6 +717,7 @@ pub enum TrainingMetricValue {
 impl TrainingMetricValue {
     pub fn value(&self) -> f64 {
         match self {
+            Self::SingleValue(value) => *value,
             Self::Max(max) => *max,
             Self::Min(min) => *min,
             Self::Sum(sum) => *sum,
@@ -1447,15 +1466,17 @@ mod test_training_metrics {
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
             ActivityMetricV2::Calories,
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Max,
+                TrainingMetricGroupBy::none(),
+            )),
             TrainingMetricFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 None,
                 None,
                 None,
             ),
-            TrainingMetricGroupBy::none(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1472,10 +1493,12 @@ mod test_training_metrics {
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
             ActivityMetricV2::Calories,
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Max,
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Max,
+                Some(TrainingMetricGroupBy::Sport),
+            )),
             TrainingMetricFilters::empty(),
-            Some(TrainingMetricGroupBy::Sport),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1487,6 +1510,51 @@ mod test_training_metrics {
                     Some("Cycling".to_string())
                 ))
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn test_compute_training_metrics_without_window() {
+        let activity_1 = default_activity().activity().clone();
+        let activity_2 = Activity::new_empty(
+            ActivityId::default(),
+            UserId::test_default(),
+            ActivityStartTime::new(
+                "2025-09-04T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            ActivityDuration::default(),
+            Sport::Cycling,
+        );
+
+        let date_key_1 = activity_1.start_time().date().to_string();
+        let date_key_2 = activity_2.start_time().date().to_string();
+        let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
+
+        let metric_definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Running)]),
+                None,
+                None,
+                None,
+            ),
+        );
+
+        let metrics = metric_definition.compute_values(&activities);
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics.unit(), Unit::KiloCalorie);
+        assert_eq!(
+            metrics.get(&TrainingMetricBin::new(date_key_1, None)),
+            Some(&TrainingMetricValue::SingleValue(42.0))
+        );
+        assert_eq!(
+            metrics.get(&TrainingMetricBin::new(date_key_2, None)),
+            Some(&TrainingMetricValue::SingleValue(84.0))
         );
     }
 
@@ -2946,10 +3014,12 @@ mod test_training_metrics_ordering {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
             ActivityMetricV2::Distance,
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Sum,
+                None,
+            )),
             TrainingMetricFilters::empty(),
-            None,
         );
 
         let ids = ["a", "c", "b", "d"];

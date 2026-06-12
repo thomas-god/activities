@@ -10,7 +10,7 @@ use crate::{
             activity::{ActivityMetricSource, ActivityMetricV2},
             training::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
-                TrainingMetricGranularity,
+                TrainingMetricGranularity, TrainingMetricWindow,
             },
         },
         ports::{
@@ -28,13 +28,13 @@ use crate::{
             auth::{AuthenticatedUser, IUserService},
             handlers::training::{
                 types::{
-                    APITrainingMetricAggregate, APITrainingMetricFilters,
+                    APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                     APITrainingMetricGranularity, APITrainingMetricGroupBy,
                     APITrainingMetricSource,
                 },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
-                    fill_metric_values,
+                    fill_missing_granules, group_metric_values,
                 },
             },
         },
@@ -46,12 +46,9 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct ComputeMetricValuesRequest {
     metric: ActivityMetricV2,
-    granularity: APITrainingMetricGranularity,
-    aggregate: APITrainingMetricAggregate,
+    window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
-    #[serde(default)]
-    group_by: Option<APITrainingMetricGroupBy>,
     start: DateTime<FixedOffset>,
     end: Option<DateTime<FixedOffset>>,
 }
@@ -110,10 +107,7 @@ pub async fn compute_training_metric_values<
         .map_err(|_| StatusCode::BAD_REQUEST)?
         .unwrap_or_else(TrainingMetricFilters::empty);
 
-    let group_by = request.group_by.map(|gb| gb.into());
-
-    let granularity: TrainingMetricGranularity = request.granularity.into();
-    let aggregate: TrainingMetricAggregate = request.aggregate.into();
+    let window: Option<TrainingMetricWindow> = request.window.map(|w| w.into());
     let range = MetricsDateRange {
         start: request.start,
         end: request.end,
@@ -122,10 +116,8 @@ pub async fn compute_training_metric_values<
     let req = GetTrainingMetricValuesRequest::ByDefinition {
         user: user.user().clone(),
         metric: request.metric,
-        granularity: granularity.clone(),
-        aggregate: aggregate.clone(),
+        window: window.clone(),
         filters,
-        group_by,
     };
 
     let values = state
@@ -134,7 +126,11 @@ pub async fn compute_training_metric_values<
         .await
         .map_err(StatusCode::from)?;
 
-    let values = convert_metric_values(fill_metric_values(&granularity, values, &range));
+    let values = convert_metric_values(group_metric_values(values));
+    let values = match window.as_ref() {
+        Some(window) => fill_missing_granules(values, window, &range),
+        None => values,
+    };
 
     Ok(Json(ResponseBody::from(values)))
 }
@@ -150,8 +146,10 @@ mod tests {
         // Demonstrates basic JSON format for the request
         let json = r#"{
             "metric": "Calories",
-            "granularity": "Daily",
-            "aggregate": "Sum",
+            "window": {
+                "granularity": "Daily",
+                "aggregate": "Sum"
+            },
             "start": "2024-01-01T00:00:00+00:00"
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
@@ -159,7 +157,14 @@ mod tests {
         assert!(result.is_ok());
         let request = result.unwrap();
         assert!(request.filters.is_none());
-        assert!(request.group_by.is_none());
+        assert_eq!(
+            request.window.unwrap(),
+            APITimeseriesWindow::new(
+                APITrainingMetricGranularity::Daily,
+                APITrainingMetricAggregate::Sum,
+                None
+            )
+        );
         assert!(request.end.is_none());
     }
 
@@ -173,11 +178,13 @@ mod tests {
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
             "metric": "AvgSpeed",
-            "granularity": "Daily",
-            "aggregate": "Sum",
+            "window": {
+                "granularity": "Daily",
+                "aggregate": "Sum",
+                "group_by": "Sport"
+            },
             "start": "2024-01-01T00:00:00+00:00",
             "end": "2024-12-31T23:59:59+00:00",
-            "group_by": "Sport",
             "filters": {"sports": [{"Sport": "Running"}]}
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
@@ -185,7 +192,14 @@ mod tests {
         assert!(result.is_ok());
         let request = result.unwrap();
         assert!(request.filters.is_some());
-        assert!(request.group_by.is_some());
+        assert_eq!(
+            request.window.unwrap(),
+            APITimeseriesWindow::new(
+                APITrainingMetricGranularity::Daily,
+                APITrainingMetricAggregate::Sum,
+                Some(APITrainingMetricGroupBy::Sport)
+            )
+        );
         assert!(request.end.is_some());
     }
 }

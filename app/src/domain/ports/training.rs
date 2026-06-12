@@ -7,9 +7,8 @@ use crate::domain::{
         UserId,
         activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
         training::{
-            TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
-            TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricValues,
+            TrainingMetric, TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricId,
+            TrainingMetricName, TrainingMetricScope, TrainingMetricValues, TrainingMetricWindow,
             TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
             TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
             TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
@@ -23,10 +22,8 @@ pub struct CreateTrainingMetricRequest {
     user: UserId,
     name: TrainingMetricName,
     metric: ActivityMetricV2,
-    granularity: TrainingMetricGranularity,
-    aggregate: TrainingMetricAggregate,
+    window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
-    group_by: Option<TrainingMetricGroupBy>,
     scope: TrainingMetricScope,
 }
 
@@ -43,20 +40,12 @@ impl CreateTrainingMetricRequest {
         &self.metric
     }
 
-    pub fn granularity(&self) -> &TrainingMetricGranularity {
-        &self.granularity
-    }
-
-    pub fn aggregate(&self) -> &TrainingMetricAggregate {
-        &self.aggregate
+    pub fn window(&self) -> &Option<TrainingMetricWindow> {
+        &self.window
     }
 
     pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
-    }
-
-    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
-        &self.group_by
     }
 
     pub fn scope(&self) -> &TrainingMetricScope {
@@ -105,10 +94,8 @@ pub enum GetTrainingMetricValuesRequest {
     ByDefinition {
         user: UserId,
         metric: ActivityMetricV2,
-        granularity: TrainingMetricGranularity,
-        aggregate: TrainingMetricAggregate,
+        window: Option<TrainingMetricWindow>,
         filters: TrainingMetricFilters,
-        group_by: Option<TrainingMetricGroupBy>,
     },
 }
 

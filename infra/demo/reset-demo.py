@@ -374,13 +374,15 @@ def create_global_training_metric(
     payload: dict[str, Any] = {
         "name": name,
         "metric": metric,
-        "granularity": granularity,
-        "aggregate": aggregate,
+        "window": {
+            "granularity": granularity,
+            "aggregate": aggregate,
+        },
         "filters": {},
         "scope": {"type": "global"},
     }
     if group_by:
-        payload["group_by"] = group_by
+        payload["window"]["group_by"] = group_by
 
     response = requests.post(
         f"{API_URL}/training/metric",
@@ -408,13 +410,15 @@ def create_scoped_training_metric(
     payload: dict[str, Any] = {
         "name": name,
         "metric": metric,
-        "granularity": granularity,
-        "aggregate": aggregate,
+        "window": {
+            "granularity": granularity,
+            "aggregate": aggregate,
+        },
         "filters": {},
         "scope": {"type": "trainingPeriod", "trainingPeriodId": period_id},
     }
     if group_by:
-        payload["group_by"] = group_by
+        payload["window"]["group_by"] = group_by
 
     response = requests.post(
         f"{API_URL}/training/metric",

@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use chrono::{DateTime, FixedOffset, Local};
 use derive_more::Constructor;
@@ -9,7 +12,7 @@ use crate::domain::{
         activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
         training::{
             TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
-            TrainingMetricValues,
+            TrainingMetricValues, TrainingMetricWindow,
         },
     },
     ports::DateRange,
@@ -52,19 +55,21 @@ pub type GranuleValues = HashMap<String, f64>;
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Constructor)]
+#[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct GroupedMetricValues {
     values: HashMap<String, GranuleValues>,
     unit: Unit,
 }
 
 impl GroupedMetricValues {
-    pub fn insert(&mut self, group: String, value: GranuleValues) {
-        self.values.insert(group, value);
-    }
-
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, HashMap<String, f64>> {
         self.values.iter()
+    }
+
+    pub fn iter_mut(
+        &mut self,
+    ) -> std::collections::hash_map::IterMut<'_, String, HashMap<String, f64>> {
+        self.values.iter_mut()
     }
 
     pub fn unit(&self) -> Unit {
@@ -93,36 +98,25 @@ impl From<&MetricsDateRange> for DateRange {
     }
 }
 
-/// Fills metric values with zeros for all expected granules in the date range.
-///
-/// This function takes sparse metric values (which may only contain data for some dates/weeks/months)
-/// and produces a complete dataset with zero values for any missing granules. This is useful for
-/// creating consistent time series data for visualization.
-///
-/// # Arguments
-///
-/// * `granularity` - The time granularity (Daily, Weekly, or Monthly)
-/// * `values` - The sparse training metric values to fill
-/// * `range` - The date range to fill values for
-///
-/// # Returns
-///
-/// A HashMap organized by group, where each group contains a complete set of granule -> value mappings.
-/// Missing values are filled with 0.0.
-///
-/// # Example
-///
-/// ```ignore
-/// // Input: values for 2025-09-24 and 2025-09-25, range covers 2025-09-24 to 2025-09-26
-/// // Output: values for all three days, with 2025-09-26 filled as 0.0
-/// ```
-pub fn fill_metric_values(
-    granularity: &TrainingMetricGranularity,
-    values: TrainingMetricValues,
+pub fn group_metric_values(values: TrainingMetricValues) -> GroupedMetricValues {
+    let mut grouped_values: HashMap<String, GranuleValues> = HashMap::new();
+    for (bin, value) in values.iter() {
+        grouped_values
+            .entry(bin.group().clone().unwrap_or_else(|| NO_GROUP.to_string()))
+            .or_default()
+            .insert(bin.granule().to_string(), value.value());
+    }
+
+    GroupedMetricValues::new(grouped_values, values.unit())
+}
+
+pub fn fill_missing_granules(
+    mut values: GroupedMetricValues,
+    window: &TrainingMetricWindow,
     range: &MetricsDateRange,
 ) -> GroupedMetricValues {
-    // 1. Get all expected granules (bins) from the date range
-    let expected_granules: Vec<String> = granularity
+    let expected_granules: Vec<String> = window
+        .granularity()
         .bins_keys(
             &range.start,
             &range.end.unwrap_or(Local::now().fixed_offset()),
@@ -131,38 +125,13 @@ pub fn fill_metric_values(
         .map(|granule| granule.to_string())
         .collect();
 
-    // 2. Extract unique groups from the values
-    let groups: HashSet<String> = values
-        .iter()
-        .map(|(bin, _)| bin.group().clone().unwrap_or_else(|| NO_GROUP.to_string()))
-        .collect();
-
-    // 3. For each group, create a map of granule -> value
-    let mut result = GroupedMetricValues::new(HashMap::new(), values.unit());
-
-    for group in groups {
-        let mut granule_values: GranuleValues = HashMap::new();
-
-        for granule in &expected_granules {
-            // Try to find a value for this granule and group combination
-            let bin = if group == NO_GROUP {
-                TrainingMetricBin::new(granule.clone(), None)
-            } else {
-                TrainingMetricBin::new(granule.clone(), Some(group.clone()))
-            };
-
-            let value = values
-                .get(&bin)
-                .map(|metric_value| metric_value.value())
-                .unwrap_or(0.0);
-
-            granule_values.insert(granule.clone(), value);
+    for (_group, values) in values.iter_mut() {
+        for granule in expected_granules.iter() {
+            values.entry(granule.to_owned()).or_insert(0.);
         }
-
-        result.insert(group, granule_values);
     }
 
-    result
+    values
 }
 
 /// Converts metric values from their raw units to display units.
@@ -186,7 +155,7 @@ pub fn fill_metric_values(
 ///
 /// A tuple of (Unit, GroupedMetricValues) with converted values and the appropriate unit
 pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues {
-    return match values.unit {
+    match values.unit {
         Unit::Meter => {
             let converted = values
                 .iter()
@@ -233,7 +202,7 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
             GroupedMetricValues::new(converted, Unit::SecondPerKilometer)
         }
         _ => values,
-    };
+    }
 }
 
 #[cfg(test)]
@@ -249,245 +218,6 @@ mod tests {
     };
 
     use super::*;
-
-    #[test]
-    fn test_fill_metric_values_without_groups() {
-        // Test with values that have no group (group = None)
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
-        };
-
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), None),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), None),
-                    TrainingMetricValue::Max(15.0),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
-
-        // Should have one group (the "no group" case, represented by NO_GROUP constant)
-        assert_eq!(result.values.len(), 1);
-
-        // The group key for "no group" should be NO_GROUP constant
-        let group_values = result
-            .values
-            .get(NO_GROUP)
-            .expect("Should have NO_GROUP key for no group");
-
-        // Should have 3 days: 2025-09-24, 2025-09-25, 2025-09-26
-        assert_eq!(group_values.len(), 3);
-        assert_eq!(group_values.get("2025-09-24"), Some(&10.0));
-        assert_eq!(group_values.get("2025-09-25"), Some(&15.0));
-        assert_eq!(group_values.get("2025-09-26"), Some(&0.0)); // Missing value, filled to be 0
-    }
-
-    #[test]
-    fn test_fill_metric_values_with_single_group() {
-        // Test with values that all belong to the same group
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
-        };
-
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(15.0),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
-
-        // Should have one group: "Cycling"
-        assert_eq!(result.values.len(), 1);
-
-        let cycling_values = result
-            .values
-            .get("Cycling")
-            .expect("Should have Cycling group");
-
-        // Should have 3 days
-        assert_eq!(cycling_values.len(), 3);
-        assert_eq!(cycling_values.get("2025-09-24"), Some(&10.0));
-        assert_eq!(cycling_values.get("2025-09-25"), Some(&15.0));
-        assert_eq!(cycling_values.get("2025-09-26"), Some(&0.0)); // Missing value, filled to be 0
-    }
-
-    #[test]
-    fn test_fill_metric_values_with_multiple_groups() {
-        // Test with values from multiple groups
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
-        };
-
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                // Cycling values
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(15.0),
-                ),
-                // Running values
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
-                    TrainingMetricValue::Max(5.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-26".to_string(), Some("Running".to_string())),
-                    TrainingMetricValue::Max(8.0),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
-
-        // Should have two groups: "Cycling" and "Running"
-        assert_eq!(result.values.len(), 2);
-
-        // Check Cycling group
-        let cycling_values = result
-            .values
-            .get("Cycling")
-            .expect("Should have Cycling group");
-        assert_eq!(cycling_values.len(), 3);
-        assert_eq!(cycling_values.get("2025-09-24"), Some(&10.0));
-        assert_eq!(cycling_values.get("2025-09-25"), Some(&15.0));
-        assert_eq!(cycling_values.get("2025-09-26"), Some(&0.0)); // Missing for cycling
-
-        // Check Running group
-        let running_values = result
-            .values
-            .get("Running")
-            .expect("Should have Running group");
-        assert_eq!(running_values.len(), 3);
-        assert_eq!(running_values.get("2025-09-24"), Some(&5.0));
-        assert_eq!(running_values.get("2025-09-25"), Some(&0.0)); // Missing for running
-        assert_eq!(running_values.get("2025-09-26"), Some(&8.0));
-    }
-
-    #[test]
-    fn test_fill_metric_values_with_mixed_groups() {
-        // Test with some values having groups and some without
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-25T00:00:00Z").unwrap()),
-        };
-
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                // No group
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), None),
-                    TrainingMetricValue::Max(20.0),
-                ),
-                // Cycling group
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
-                    TrainingMetricValue::Max(15.0),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
-
-        // Should have two groups: NO_GROUP for None and "Cycling"
-        assert_eq!(result.values.len(), 2);
-
-        // Check no-group (NO_GROUP constant)
-        let no_group_values = result
-            .values
-            .get(NO_GROUP)
-            .expect("Should have NO_GROUP key for no group");
-        assert_eq!(no_group_values.len(), 2);
-        assert_eq!(no_group_values.get("2025-09-24"), Some(&20.0));
-        assert_eq!(no_group_values.get("2025-09-25"), Some(&0.0)); // Missing value
-
-        // Check Cycling group
-        let cycling_values = result
-            .values
-            .get("Cycling")
-            .expect("Should have Cycling group");
-        assert_eq!(cycling_values.len(), 2);
-        assert_eq!(cycling_values.get("2025-09-24"), Some(&10.0));
-        assert_eq!(cycling_values.get("2025-09-25"), Some(&15.0));
-    }
-
-    #[test]
-    fn test_fill_metric_values_empty_values() {
-        // Test with no values - should return empty result
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-25T00:00:00Z").unwrap()),
-        };
-
-        let values = TrainingMetricValues::new(HashMap::new(), Unit::Kilometer);
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Daily, values, &range);
-
-        // With no values, there are no groups, so result should be empty
-        assert_eq!(result.values.len(), 0);
-    }
-
-    #[test]
-    fn test_fill_metric_values_weekly_granularity() {
-        // Test with weekly granularity to ensure granularity handling works
-        let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-22T00:00:00Z").unwrap(), // Week starting Sep 22
-            end: Some(DateTime::parse_from_rfc3339("2025-10-05T00:00:00Z").unwrap()), // Week starting Oct 5
-        };
-
-        // Weekly granularity uses the Monday date as the key, not "2025-W39" format
-        let values = TrainingMetricValues::new(
-            HashMap::from([(
-                TrainingMetricBin::new("2025-09-22".to_string(), Some("Cycling".to_string())),
-                TrainingMetricValue::Max(100.0),
-            )]),
-            Unit::Kilometer,
-        );
-
-        let result = fill_metric_values(&TrainingMetricGranularity::Weekly, values, &range);
-
-        // Should have one group: "Cycling"
-        assert_eq!(result.values.len(), 1);
-
-        let cycling_values = result
-            .values
-            .get("Cycling")
-            .expect("Should have Cycling group");
-
-        // Should have at least 2 weeks
-        assert!(cycling_values.len() >= 2);
-        assert_eq!(cycling_values.get("2025-09-22"), Some(&100.0));
-        // Other weeks should have 0
-        assert!(cycling_values.contains_key("2025-09-29"));
-    }
 
     #[test]
     fn test_convert_metric_values_distance_statistic_converts_to_kilometers() {
@@ -785,6 +515,322 @@ mod tests {
                 .unwrap()
                 .get("2025-09-24"),
             Some(&0.0)
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_grouping_metric_values {
+    use crate::domain::models::training::TrainingMetricValue;
+
+    use super::*;
+
+    #[test]
+    fn test_no_group_multiple_values() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let grouped_values = group_metric_values(values);
+
+        assert_eq!(
+            grouped_values,
+            GroupedMetricValues::new(
+                HashMap::from([(
+                    NO_GROUP.to_string(),
+                    HashMap::from([
+                        ("2025-09-24".to_string(), 10.0,),
+                        ("2025-09-25".to_string(), 15.0),
+                    ])
+                )]),
+                Unit::Kilometer
+            )
+        );
+    }
+
+    #[test]
+    fn test_no_group_and_one_group_with_multiple_values() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                // No group values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                // Running values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(5.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-26".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(8.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let grouped_values = group_metric_values(values);
+
+        assert_eq!(
+            grouped_values,
+            GroupedMetricValues::new(
+                HashMap::from([
+                    (
+                        NO_GROUP.to_string(),
+                        HashMap::from([
+                            ("2025-09-24".to_string(), 10.0,),
+                            ("2025-09-25".to_string(), 15.0),
+                        ])
+                    ),
+                    (
+                        "Running".to_string(),
+                        HashMap::from([
+                            ("2025-09-24".to_string(), 5.0,),
+                            ("2025-09-26".to_string(), 8.0),
+                        ])
+                    )
+                ]),
+                Unit::Kilometer
+            )
+        );
+    }
+
+    #[test]
+    fn test_two_groups_with_multiple_values() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                // Cycling values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), Some("Cycling".to_string())),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                // Running values
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(5.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-26".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(8.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let grouped_values = group_metric_values(values);
+
+        assert_eq!(
+            grouped_values,
+            GroupedMetricValues::new(
+                HashMap::from([
+                    (
+                        "Cycling".to_string(),
+                        HashMap::from([
+                            ("2025-09-24".to_string(), 10.0,),
+                            ("2025-09-25".to_string(), 15.0),
+                        ])
+                    ),
+                    (
+                        "Running".to_string(),
+                        HashMap::from([
+                            ("2025-09-24".to_string(), 5.0,),
+                            ("2025-09-26".to_string(), 8.0),
+                        ])
+                    )
+                ]),
+                Unit::Kilometer
+            )
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_fill_grouped_metric_values {
+    use chrono::NaiveDate;
+
+    use crate::domain::models::training::TrainingMetricGroupBy;
+
+    use super::*;
+
+    #[test]
+    fn test_fill_window_daily_no_gaps() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            TrainingMetricGroupBy::none(),
+        );
+        let range = MetricsDateRange {
+            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
+            end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
+        };
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 10.0),
+                    ("2025-09-25".to_string(), 15.0),
+                    ("2025-09-26".to_string(), 12.0),
+                ]),
+            )]),
+            Unit::Kilometer,
+        );
+
+        let filled_values = fill_missing_granules(values, &window, &range);
+
+        assert_eq!(
+            filled_values,
+            GroupedMetricValues::new(
+                HashMap::from([(
+                    "Cycling".to_string(),
+                    HashMap::from([
+                        ("2025-09-24".to_string(), 10.0),
+                        ("2025-09-25".to_string(), 15.0),
+                        ("2025-09-26".to_string(), 12.0),
+                    ]),
+                )]),
+                Unit::Kilometer,
+            )
+        );
+    }
+
+    #[test]
+    fn test_fill_window_daily_with_gaps() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            TrainingMetricGroupBy::none(),
+        );
+        let range = MetricsDateRange {
+            start: DateTime::parse_from_rfc3339("2025-09-23T00:00:00Z").unwrap(),
+            end: Some(DateTime::parse_from_rfc3339("2025-09-27T00:00:00Z").unwrap()),
+        };
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-24".to_string(), 10.0),
+                    ("2025-09-26".to_string(), 12.0),
+                ]),
+            )]),
+            Unit::Kilometer,
+        );
+
+        let filled_values = fill_missing_granules(values, &window, &range);
+
+        assert_eq!(
+            filled_values,
+            GroupedMetricValues::new(
+                HashMap::from([(
+                    "Cycling".to_string(),
+                    HashMap::from([
+                        ("2025-09-23".to_string(), 0.),
+                        ("2025-09-24".to_string(), 10.0),
+                        ("2025-09-25".to_string(), 0.),
+                        ("2025-09-26".to_string(), 12.0),
+                        ("2025-09-27".to_string(), 0.),
+                    ]),
+                )]),
+                Unit::Kilometer,
+            )
+        );
+    }
+
+    #[test]
+    fn test_fill_window_weekly_with_gaps() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Average,
+            TrainingMetricGroupBy::none(),
+        );
+        let range = MetricsDateRange {
+            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
+            end: Some(DateTime::parse_from_rfc3339("2025-10-08T00:00:00Z").unwrap()),
+        };
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-29".to_string(), 10.0),
+                    ("2025-10-06".to_string(), 12.0),
+                ]),
+            )]),
+            Unit::Kilometer,
+        );
+
+        let filled_values = fill_missing_granules(values, &window, &range);
+
+        assert_eq!(
+            filled_values,
+            GroupedMetricValues::new(
+                HashMap::from([(
+                    "Cycling".to_string(),
+                    HashMap::from([
+                        ("2025-09-22".to_string(), 0.),
+                        ("2025-09-29".to_string(), 10.0),
+                        ("2025-10-06".to_string(), 12.0),
+                    ]),
+                )]),
+                Unit::Kilometer,
+            )
+        );
+    }
+
+    #[test]
+    fn test_fill_window_monthly_with_gaps() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Average,
+            TrainingMetricGroupBy::none(),
+        );
+        let range = MetricsDateRange {
+            start: DateTime::parse_from_rfc3339("2025-09-14T00:00:00Z").unwrap(),
+            end: Some(DateTime::parse_from_rfc3339("2025-11-02T00:00:00Z").unwrap()),
+        };
+        let values = GroupedMetricValues::new(
+            HashMap::from([(
+                "Cycling".to_string(),
+                HashMap::from([
+                    ("2025-09-01".to_string(), 20.0),
+                    ("2025-11-01".to_string(), 30.0),
+                ]),
+            )]),
+            Unit::Kilometer,
+        );
+
+        let filled_values = fill_missing_granules(values, &window, &range);
+
+        assert_eq!(
+            filled_values,
+            GroupedMetricValues::new(
+                HashMap::from([(
+                    "Cycling".to_string(),
+                    HashMap::from([
+                        ("2025-09-01".to_string(), 20.0),
+                        ("2025-10-01".to_string(), 0.),
+                        ("2025-11-01".to_string(), 30.0),
+                    ]),
+                )]),
+                Unit::Kilometer,
+            )
         );
     }
 }
