@@ -37,7 +37,7 @@
 	} from '$lib/api';
 	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import CreateTrainingMetricFromCollection from '$components/organisms/CreateTrainingMetricFromCollection.svelte';
+	import CreateTrainingMetricFromCollection from '$components/pages/CreateTrainingMetricFromCollection.svelte';
 
 	let period_id = $state(page.params.period_id);
 

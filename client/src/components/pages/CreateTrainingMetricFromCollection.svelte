@@ -5,12 +5,12 @@
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import { workoutTypeToAPI } from '$lib/workout-type';
 	import { bonkStatusToAPI } from '$lib/nutrition';
-	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
+	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
 	import z from 'zod';
 	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
 	import TrainingMetricFilters, {
 		type TrainingMetricFiltersType
-	} from './TrainingMetricFilters.svelte';
+	} from '../organisms/TrainingMetricFilters.svelte';
 
 	export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 

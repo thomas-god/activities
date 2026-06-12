@@ -5,7 +5,7 @@
 	import ActivitiesUploader from '$components/organisms/ActivitiesUploader.svelte';
 	import CreateTrainingNote from '$components/organisms/CreateTrainingNote.svelte';
 	import CreateTrainingPeriod from '$components/organisms/CreateTrainingPeriod.svelte';
-	import CreateTrainingMetricFromCollection from '$components/organisms/CreateTrainingMetricFromCollection.svelte';
+	import CreateTrainingMetricFromCollection from '$components/pages/CreateTrainingMetricFromCollection.svelte';
 
 	let { children } = $props();
 
