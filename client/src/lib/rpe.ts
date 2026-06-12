@@ -13,6 +13,7 @@
  * All valid RPE values (1-10)
  */
 export const RPE_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+export type RPEValue = (typeof RPE_VALUES)[number];
 
 /**
  * Get the display label for an RPE value as a scale out of 10

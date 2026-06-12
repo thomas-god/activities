@@ -30,6 +30,13 @@ export function none<T>(): Option<T> {
 	};
 }
 
+export function map<T, U>(value: Option<T>, closure: (v: T) => U): Option<U> {
+	if (value._kind === 'None') {
+		return none();
+	}
+	return some(closure(value.value));
+}
+
 export function unwrapOr<T>(value: Option<T>, defaultValue: T): T {
 	return isSome(value) ? value.value : defaultValue;
 }
