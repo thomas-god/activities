@@ -11,10 +11,12 @@
 
 	let {
 		sports = $bindable(),
-		categories = $bindable()
+		categories = $bindable(),
+		allowDelete = true
 	}: {
 		sports: Option<Sport[]>;
 		categories: Option<SportCategory[]>;
+		allowDelete?: boolean;
 	} = $props();
 	let editing = $state(false);
 
@@ -88,12 +90,15 @@
 
 	let display = $derived.by(() => {
 		let values: string[] = [];
+
 		if (isSome(sports)) {
 			values = values.concat(sports.value.map((s) => sportDisplay(s)).toSorted());
 		}
+
 		if (isSome(categories))
 			values = values.concat(categories.value.map((c) => sportCategoryDisplay(c)).toSorted());
-		return values.join(', ');
+
+		return values.length > 0 ? values.join(', ') : 'All sports';
 	});
 </script>
 
@@ -107,15 +112,17 @@
 				<button class="btn join-item btn-xs" onclick={() => (editing = !editing)}>
 					<img src="/icons/edit.svg" alt="Pen editing icon" class="inline h-5 w-5" />
 				</button>
-				<button
-					class="btn join-item btn-xs"
-					onclick={() => {
-						sports = none();
-						categories = none();
-					}}
-				>
-					<img src="/icons/delete.svg" alt="Bin delete icon" class="inline h-5 w-5" />
-				</button>
+				{#if allowDelete}
+					<button
+						class="btn join-item btn-xs"
+						onclick={() => {
+							sports = none();
+							categories = none();
+						}}
+					>
+						<img src="/icons/delete.svg" alt="Bin delete icon" class="inline h-5 w-5" />
+					</button>
+				{/if}
 			</div>
 		</div>
 		{#if editing}

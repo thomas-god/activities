@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
+	import SportFilterV2 from '$components/molecules/SportFilterV2.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import DateRange from '../molecules/DateRange.svelte';
-	import SportsSelect from '../molecules/SportsSelect.svelte';
+	import { unwrapOr, some } from '$lib/Options';
 
 	let { callback }: { callback: () => void } = $props();
 
@@ -14,7 +15,6 @@
 
 	let selectedSports: Sport[] = $state([]);
 	let selectedSportCategories: SportCategory[] = $state([]);
-	let sportFilterSelected = $state(false);
 
 	let requestPending = $state(false);
 
@@ -29,18 +29,18 @@
 			note: note.trim() === '' ? null : note.trim()
 		};
 
-		if (sportFilterSelected) {
-			const sportFilter = selectedSports.map((sport) => ({
-				Sport: sport
-			}));
-			const sportCategoriesFilter = selectedSportCategories.map((category) => ({
-				SportCategory: category
-			}));
-			const filters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
-				...sportFilter,
-				...sportCategoriesFilter
-			];
-			basePayload = { ...basePayload, sports: filters };
+		const sportFilter = selectedSports.map((sport) => ({
+			Sport: sport
+		}));
+		const sportCategoriesFilter = selectedSportCategories.map((category) => ({
+			SportCategory: category
+		}));
+		const sportFilters: ({ Sport: Sport } | { SportCategory: SportCategory })[] = [
+			...sportFilter,
+			...sportCategoriesFilter
+		];
+		if (sportFilters.length > 0) {
+			basePayload = { ...basePayload, sports: sportFilters };
 		}
 
 		return basePayload;
@@ -84,11 +84,14 @@
 
 		<div class="my-2 font-semibold">
 			<span class="pr-2"> Filter by sports </span>
-			<input type="checkbox" bind:checked={sportFilterSelected} class="toggle toggle-sm" />
 		</div>
-		{#if sportFilterSelected}
-			<SportsSelect bind:selectedSports bind:selectedSportCategories />
-		{/if}
+		<SportFilterV2
+			bind:sports={() => some(selectedSports), (v) => (selectedSports = unwrapOr(v, []))}
+			bind:categories={
+				() => some(selectedSportCategories), (v) => (selectedSportCategories = unwrapOr(v, []))
+			}
+			allowDelete={false}
+		/>
 
 		<button
 			class="btn mt-4 btn-neutral"
