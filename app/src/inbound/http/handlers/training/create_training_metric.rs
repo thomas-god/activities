@@ -36,7 +36,8 @@ pub struct CreateTrainingMetricBody {
     name: String,
     metric: ActivityMetricV2,
     window: Option<APITimeseriesWindow>,
-    filters: APITrainingMetricFilters,
+    #[serde(default)]
+    filters: Option<APITrainingMetricFilters>,
     scope: ScopePayload,
 }
 
@@ -47,13 +48,19 @@ fn build_request(
     if body.name.trim().is_empty() {
         return Err("Metric name cannot be empty".to_string());
     }
+    let filters = body
+        .filters
+        .map(TrainingMetricFilters::try_from)
+        .transpose()
+        .map_err(|_| "Invalid fitlers".to_string())?
+        .unwrap_or_else(TrainingMetricFilters::empty);
 
     Ok(CreateTrainingMetricRequest::new(
         user.clone(),
         TrainingMetricName::from(body.name),
         body.metric,
         body.window.map(TrainingMetricWindow::from),
-        body.filters.try_into()?,
+        filters,
         body.scope.into(),
     ))
 }
