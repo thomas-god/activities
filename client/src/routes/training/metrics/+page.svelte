@@ -13,6 +13,7 @@
 		type MetricsListGrouped
 	} from '$lib/api';
 	import { isSome, some, type Option } from '$lib/Options';
+	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
 
 	let chartWidth: number = $state(0);
 
@@ -71,6 +72,14 @@
 								showGroup={metric.group_by !== null}
 								groupBy={metric.group_by}
 								stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+							/>
+						{:else}
+							<TrainingMetricsChartLine
+								height={300}
+								width={chartWidth}
+								values={groupMetricValues(metric)}
+								unit={metric.unit}
+								format={metricValuesDisplayFormat(metric)}
 							/>
 						{/if}
 					{:else}

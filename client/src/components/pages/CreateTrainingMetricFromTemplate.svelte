@@ -7,10 +7,11 @@
 	import { bonkStatusToAPI } from '$lib/nutrition';
 	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
 	import z from 'zod';
-	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
+	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricFilters, {
 		type TrainingMetricFiltersType
 	} from '../organisms/TrainingMetricFilters.svelte';
+	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
 
 	export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 
@@ -368,6 +369,14 @@
 									: selectedTemplate.value.aggregate === 'Sum'
 										? true
 										: false}
+							/>
+						{:else}
+							<TrainingMetricsChartLine
+								height={300}
+								width={chartWidth}
+								values={values.values}
+								unit={values.unit}
+								format={previewFormat(values.unit)}
 							/>
 						{/if}
 					</div>

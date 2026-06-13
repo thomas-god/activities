@@ -8,6 +8,7 @@
 		metricValuesDisplayFormat
 	} from '$lib/metric';
 	import { isSome, none, some, type Option } from '$lib/Options';
+	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 
 	let {
@@ -150,6 +151,14 @@
 						showGroup={metric.showGroup}
 						groupBy={metric.groupBy}
 						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+					/>
+				{:else}
+					<TrainingMetricsChartLine
+						height={300}
+						width={chartWidth}
+						values={metric.values}
+						unit={metric.unit}
+						format={metricValuesDisplayFormat(metric)}
 					/>
 				{/if}
 			</div>

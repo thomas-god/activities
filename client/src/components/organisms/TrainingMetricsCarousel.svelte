@@ -3,6 +3,7 @@
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { MetricsListItemGrouped } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/metric';
+	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 
 	let {
 		metrics,
@@ -92,6 +93,14 @@
 					groupBy={currentMetric.groupBy}
 					stacked={currentMetric.aggregate === 'Sum' ||
 						currentMetric.aggregate === 'NumberOfActivities'}
+				/>
+			{:else}
+				<TrainingMetricsChartLine
+					height={300}
+					width={chartWidth}
+					values={currentMetric.values}
+					unit={currentMetric.unit}
+					format={metricValuesDisplayFormat(currentMetric)}
 				/>
 			{/if}
 		</div>
