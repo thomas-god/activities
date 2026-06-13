@@ -78,18 +78,20 @@
 
 	{#if currentMetric.values.length > 0}
 		<div bind:clientWidth={chartWidth}>
-			<TrainingMetricsChartStacked
-				{height}
-				width={chartWidth}
-				values={currentMetric.values}
-				unit={currentMetric.unit}
-				granularity={currentMetric.granularity}
-				format={metricValuesDisplayFormat(currentMetric)}
-				showGroup={currentMetric.showGroup}
-				groupBy={currentMetric.groupBy}
-				stacked={currentMetric.aggregate === 'Sum' ||
-					currentMetric.aggregate === 'NumberOfActivities'}
-			/>
+			{#if currentMetric.granularity !== null}
+				<TrainingMetricsChartStacked
+					{height}
+					width={chartWidth}
+					values={currentMetric.values}
+					unit={currentMetric.unit}
+					granularity={currentMetric.granularity}
+					format={metricValuesDisplayFormat(currentMetric)}
+					showGroup={currentMetric.showGroup}
+					groupBy={currentMetric.groupBy}
+					stacked={currentMetric.aggregate === 'Sum' ||
+						currentMetric.aggregate === 'NumberOfActivities'}
+				/>
+			{/if}
 		</div>
 	{:else}
 		<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>

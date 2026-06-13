@@ -51,17 +51,19 @@
 			<TrainingMetricTitle metric={metric.initialMetric} {onUpdate} />
 
 			{#if metric.values.length > 0}
-				<TrainingMetricsChartStacked
-					{height}
-					width={chartWidth}
-					values={metric.values}
-					unit={metric.unit}
-					granularity={metric.granularity}
-					format={metricValuesDisplayFormat(metric)}
-					showGroup={metric.showGroup}
-					groupBy={metric.groupBy}
-					stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-				/>
+				{#if metric.granularity !== null}
+					<TrainingMetricsChartStacked
+						{height}
+						width={chartWidth}
+						values={metric.values}
+						unit={metric.unit}
+						granularity={metric.granularity}
+						format={metricValuesDisplayFormat(metric)}
+						showGroup={metric.showGroup}
+						groupBy={metric.groupBy}
+						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+					/>
+				{/if}
 			{:else}
 				<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
 			{/if}

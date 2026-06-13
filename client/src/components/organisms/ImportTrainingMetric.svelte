@@ -55,10 +55,14 @@
 		lines.push({ label: 'Source', value: metric.metric.toLocaleLowerCase() });
 
 		// Granularity
-		lines.push({ label: 'Granularity', value: metric.granularity.toLowerCase() });
+		if (metric.granularity !== null) {
+			lines.push({ label: 'Granularity', value: metric.granularity.toLowerCase() });
+		}
 
 		// Aggregate function
-		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
+		if (metric.aggregate !== null) {
+			lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
+		}
 
 		// Group by if present
 		if (metric.groupBy) {
@@ -135,17 +139,19 @@
 		{@const metric = selectedMetric.value}
 		{#if metric.values.length > 0}
 			<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-				<TrainingMetricsChartStacked
-					height={300}
-					width={chartWidth}
-					values={metric.values}
-					unit={metric.unit}
-					granularity={metric.granularity}
-					format={metricValuesDisplayFormat(metric)}
-					showGroup={metric.showGroup}
-					groupBy={metric.groupBy}
-					stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-				/>
+				{#if metric.granularity !== null}
+					<TrainingMetricsChartStacked
+						height={300}
+						width={chartWidth}
+						values={metric.values}
+						unit={metric.unit}
+						granularity={metric.granularity}
+						format={metricValuesDisplayFormat(metric)}
+						showGroup={metric.showGroup}
+						groupBy={metric.groupBy}
+						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+					/>
+				{/if}
 			</div>
 		{:else}
 			<div class="alert rounded-box alert-info">

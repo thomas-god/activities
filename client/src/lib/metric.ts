@@ -94,7 +94,7 @@ export const displayGroupName = (group: string, groupBy: GroupByClause | null): 
 };
 
 export const metricValuesDisplayFormat = (metric: {
-	aggregate: string;
+	aggregate: string | null;
 	unit: string;
 }): 'number' | 'duration' | 'pace' => {
 	if (metric.aggregate === 'NumberOfActivities') return 'number';

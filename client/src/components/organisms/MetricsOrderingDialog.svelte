@@ -11,8 +11,8 @@
 		metrics: Array<{
 			id: string;
 			name: string | null;
-			granularity: string;
-			aggregate: MetricAggregateFunction;
+			granularity: string | null;
+			aggregate: MetricAggregateFunction | null;
 			metric: string;
 		}>;
 		onSaved?: () => void;
@@ -126,10 +126,13 @@
 		}
 
 		// Generate default title from metric properties
-		const parts = [
-			capitalize(metric.granularity.toLowerCase()),
-			aggregateFunctionDisplay[metric.aggregate]
-		];
+		const parts = [];
+		if (metric.granularity !== null) {
+			parts.push(metric.granularity.toLowerCase());
+		}
+		if (metric.aggregate !== null) {
+			parts.push(aggregateFunctionDisplay[metric.aggregate]);
+		}
 
 		if (metric.aggregate !== 'NumberOfActivities') {
 			parts.push(metric.metric.toLowerCase());

@@ -353,21 +353,23 @@
 			{:then values}
 				{#if values.values.length > 0}
 					<div bind:clientWidth={chartWidth}>
-						<TrainingMetricsChartStacked
-							height={300}
-							width={chartWidth}
-							values={values.values}
-							unit={values.unit}
-							{granularity}
-							format={previewFormat(values.unit)}
-							showGroup={groupBy !== 'None'}
-							groupBy={groupBy !== 'None' ? groupBy : null}
-							stacked={isNone(selectedTemplate)
-								? false
-								: selectedTemplate.value.aggregate === 'Sum'
-									? true
-									: false}
-						/>
+						{#if granularity !== 'None'}
+							<TrainingMetricsChartStacked
+								height={300}
+								width={chartWidth}
+								values={values.values}
+								unit={values.unit}
+								{granularity}
+								format={previewFormat(values.unit)}
+								showGroup={groupBy !== 'None'}
+								groupBy={groupBy !== 'None' ? groupBy : null}
+								stacked={isNone(selectedTemplate)
+									? false
+									: selectedTemplate.value.aggregate === 'Sum'
+										? true
+										: false}
+							/>
+						{/if}
 					</div>
 				{:else}
 					<div class="alert rounded-box alert-info">

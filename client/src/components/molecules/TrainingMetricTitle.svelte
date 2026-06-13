@@ -14,10 +14,14 @@
 		lines.push({ label: 'Source', value: metric.metric.toLocaleLowerCase() });
 
 		// Granularity
-		lines.push({ label: 'Granularity', value: metric.granularity.toLowerCase() });
+		if (metric.granularity !== null) {
+			lines.push({ label: 'Granularity', value: metric.granularity.toLowerCase() });
+		}
 
 		// Aggregate function
-		lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
+		if (metric.aggregate !== null) {
+			lines.push({ label: 'Aggregate', value: aggregateFunctionDisplay[metric.aggregate] });
+		}
 
 		// Group by if present
 		if (metric.group_by) {
@@ -44,8 +48,12 @@
 			{#if metric.name}
 				{metric.name}
 			{:else}
-				{capitalize(metric.granularity.toLowerCase())}
-				{aggregateFunctionDisplay[metric.aggregate]}
+				{#if metric.granularity !== null}
+					{capitalize(metric.granularity.toLowerCase())}
+				{/if}
+				{#if metric.aggregate !== null}
+					{aggregateFunctionDisplay[metric.aggregate]}
+				{/if}
 				{#if metric.aggregate !== 'NumberOfActivities'}
 					{metric.metric.toLowerCase()}
 				{/if}

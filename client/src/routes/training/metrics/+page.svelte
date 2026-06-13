@@ -60,17 +60,19 @@
 						<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
 					</div>
 					{#if groupMetricValues(metric).length > 0}
-						<TrainingMetricsChartStacked
-							height={250}
-							width={chartWidth}
-							values={groupMetricValues(metric)}
-							unit={metric.unit}
-							granularity={metric.granularity}
-							format={metricValuesDisplayFormat(metric)}
-							showGroup={metric.group_by !== null}
-							groupBy={metric.group_by}
-							stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-						/>
+						{#if metric.granularity !== null}
+							<TrainingMetricsChartStacked
+								height={250}
+								width={chartWidth}
+								values={groupMetricValues(metric)}
+								unit={metric.unit}
+								granularity={metric.granularity}
+								format={metricValuesDisplayFormat(metric)}
+								showGroup={metric.group_by !== null}
+								groupBy={metric.group_by}
+								stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+							/>
+						{/if}
 					{:else}
 						<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
 					{/if}
