@@ -398,11 +398,15 @@ impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
         match self.window.as_ref() {
             None => TrainingMetricValues::new(
-                HashMap::from_iter(activities.iter().map(|(activity, value)| {
-                    (
-                        TrainingMetricBin::new(activity.start_time().date().to_string(), None),
-                        TrainingMetricValue::SingleValue(*value),
-                    )
+                HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
+                    if self.filters().matches(activity) {
+                        Some((
+                            TrainingMetricBin::new(activity.start_time().date().to_string(), None),
+                            TrainingMetricValue::SingleValue(*value),
+                        ))
+                    } else {
+                        None
+                    }
                 })),
                 self.unit(),
             ),
@@ -1532,16 +1536,12 @@ mod test_training_metrics {
         let date_key_2 = activity_2.start_time().date().to_string();
         let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
 
+        let window = None;
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
             ActivityMetricV2::Calories,
-            None,
-            TrainingMetricFilters::new(
-                Some(vec![SportFilter::Sport(Sport::Running)]),
-                None,
-                None,
-                None,
-            ),
+            window,
+            TrainingMetricFilters::empty(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1555,6 +1555,47 @@ mod test_training_metrics {
         assert_eq!(
             metrics.get(&TrainingMetricBin::new(date_key_2, None)),
             Some(&TrainingMetricValue::SingleValue(84.0))
+        );
+    }
+
+    #[test]
+    fn test_compute_training_metrics_without_window_with_filters() {
+        let activity_1 = default_activity().activity().clone();
+        let activity_2 = Activity::new_empty(
+            ActivityId::default(),
+            UserId::test_default(),
+            ActivityStartTime::new(
+                "2025-09-04T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            ActivityDuration::default(),
+            Sport::Running,
+        );
+
+        let date_key_1 = activity_1.start_time().date().to_string();
+        let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
+
+        let window = None;
+        let metric_definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricV2::Calories,
+            window,
+            TrainingMetricFilters::new(
+                Some(vec![SportFilter::Sport(Sport::Cycling)]),
+                None,
+                None,
+                None,
+            ),
+        );
+
+        let metrics = metric_definition.compute_values(&activities);
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics.unit(), Unit::KiloCalorie);
+        assert_eq!(
+            metrics.get(&TrainingMetricBin::new(date_key_1, None)),
+            Some(&TrainingMetricValue::SingleValue(42.0))
         );
     }
 
