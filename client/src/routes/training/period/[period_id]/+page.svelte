@@ -439,7 +439,11 @@
 								</div>
 								{#if metrics.length > 0}
 									{#if screenWidth < 700}
-										<TrainingMetricsCarousel {metrics} height={chartHeight} />
+										<TrainingMetricsCarousel
+											{metrics}
+											height={chartHeight}
+											onMetricUpdate={updateMetricsPromise}
+										/>
 									{:else}
 										<TrainingMetricsList
 											{metrics}

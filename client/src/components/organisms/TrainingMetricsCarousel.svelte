@@ -7,10 +7,12 @@
 	let {
 		metrics,
 		height,
+		onMetricUpdate,
 		initialIndex = 0
 	}: {
 		metrics: MetricsListItemGrouped[];
 		height: number;
+		onMetricUpdate: () => void;
 		initialIndex?: number;
 	} = $props();
 
@@ -69,7 +71,7 @@
 			←
 		</button>
 		<div class="flex flex-1 flex-row justify-center text-center">
-			<TrainingMetricTitle metric={currentMetric.initialMetric} />
+			<TrainingMetricTitle metric={currentMetric.initialMetric} onUpdate={onMetricUpdate} />
 		</div>
 		<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
 			→
