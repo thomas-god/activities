@@ -16,7 +16,7 @@
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
-	let marginLeft = 50;
+	let marginLeft = 55;
 
 	let gx: SVGGElement;
 	let gy: SVGGElement;
@@ -45,7 +45,7 @@
 			};
 		}
 
-		return (value: d3.NumberValue, _idx: number) => value.toString();
+		return (value: d3.NumberValue, _idx: number) => `${value.toString()} ${unit}`;
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
@@ -78,11 +78,23 @@
 		}
 		return yAxisDefaultTickValues();
 	};
+	let minTime = $derived(
+		dayjs
+			.unix(d3.min(valuesAsTime, (v) => v.time) ?? 0)
+			.startOf('day')
+			.unix()
+	);
+	let maxTime = $derived(
+		dayjs
+			.unix(d3.max(valuesAsTime, (v) => v.time) ?? 0)
+			.endOf('day')
+			.unix()
+	);
 
 	let x = $derived(
 		d3
 			.scaleLinear()
-			.domain([d3.min(valuesAsTime, (v) => v.time) ?? 0, d3.max(valuesAsTime, (v) => v.time) ?? 0])
+			.domain([minTime, maxTime])
 			.range([marginLeft, width - marginRight])
 	);
 
@@ -210,8 +222,9 @@
 				})
 		);
 
+		let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(x).tickFormat(timeAxisTickFormater).ticks(4));
+			sel.call(d3.axisBottom(x).tickFormat(timeAxisTickFormater).ticks(maxTimeTicks));
 		});
 
 		d3.select(gy).call((sel) =>

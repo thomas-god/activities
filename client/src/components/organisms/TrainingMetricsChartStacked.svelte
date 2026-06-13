@@ -31,7 +31,7 @@
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
-	let marginLeft = 50;
+	let marginLeft = 55;
 
 	let gx: SVGGElement;
 	let gy: SVGGElement;
@@ -81,7 +81,7 @@
 			};
 		}
 
-		return (date: string, _idx: number) => date;
+		return (date: string, _idx: number) => dayjs(date).format('MMM D');
 	});
 
 	let yAxisTickFormater = $derived.by(() => {
@@ -96,7 +96,7 @@
 			};
 		}
 
-		return (value: d3.NumberValue, _idx: number) => value.toString();
+		return (value: d3.NumberValue, _idx: number) => `${value.toString()} ${unit}`;
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
