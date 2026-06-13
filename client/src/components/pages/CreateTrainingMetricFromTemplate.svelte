@@ -72,19 +72,12 @@
 
 	let chartWidth: number = $state(0);
 
-	let previewUnit = $derived(
-		unwrapOr(
-			map(selectedTemplate, (template) => template.unit),
-			''
-		)
-	);
-
-	let previewFormat: 'number' | 'duration' | 'pace' = $derived.by(() => {
-		// if (aggregate === 'NumberOfActivities') return 'number';
-		if (previewUnit === 's') return 'duration';
-		if (previewUnit === 's/km') return 'pace';
+	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
+		if (unit === 'activities') return 'number';
+		if (unit === 's') return 'duration';
+		if (unit === 's/km') return 'pace';
 		return 'number';
-	});
+	};
 
 	let requestPending = $state(false);
 
@@ -224,9 +217,9 @@
 	// TODO: do not run this at component init ?
 	const fetchPreview = async (
 		request: typeof previewRequest
-	): Promise<{ time: string; group: string; value: number }[]> => {
+	): Promise<{ values: { time: string; group: string; value: number }[]; unit: string }> => {
 		if (isNone(request)) {
-			return [];
+			return { values: [], unit: '' };
 		}
 
 		const body = JSON.stringify(request.value);
@@ -248,7 +241,6 @@
 		}
 
 		const data = await res.json();
-		// TODO: get unit from data.unit
 		// Transform the GroupedMetricValues response to the format expected by the chart
 		// Response format: { group_name: { granule: value } }
 		const values: { time: string; group: string; value: number }[] = [];
@@ -257,7 +249,7 @@
 				values.push({ time, group, value });
 			}
 		}
-		return values;
+		return { values, unit: data.unit };
 	};
 </script>
 
@@ -359,18 +351,22 @@
 					<span class="loading loading-lg loading-spinner"></span>
 				</div>
 			{:then values}
-				{#if values.length > 0}
+				{#if values.values.length > 0}
 					<div bind:clientWidth={chartWidth}>
 						<TrainingMetricsChartStacked
 							height={300}
 							width={chartWidth}
-							{values}
-							unit={previewUnit}
+							values={values.values}
+							unit={values.unit}
 							{granularity}
-							format={previewFormat}
+							format={previewFormat(values.unit)}
 							showGroup={groupBy !== 'None'}
 							groupBy={groupBy !== 'None' ? groupBy : null}
-							stacked={false}
+							stacked={isNone(selectedTemplate)
+								? false
+								: selectedTemplate.value.aggregate === 'Sum'
+									? true
+									: false}
 						/>
 					</div>
 				{:else}
