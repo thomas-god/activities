@@ -55,7 +55,7 @@
 	};
 
 	let selectedTemplate: Option<MetricTemplate> = $state(none());
-	const granularityValues = ['Daily', 'Weekly', 'Monthly'] as const;
+	const granularityValues = ['None', 'Daily', 'Weekly', 'Monthly'] as const;
 	type Granularity = (typeof granularityValues)[number];
 
 	let granularity: Granularity = $state('Weekly');
@@ -89,8 +89,8 @@
 	let requestPending = $state(false);
 
 	// Build filters object based on selected filter values
-	let activeFilters = $derived.by(() => {
-		let activeFilters: any = {};
+	let activeFilters: Object = $derived.by(() => {
+		let activeFilters: Object = {};
 
 		if (isSome(filters.sports) && isSome(filters.sportCategories)) {
 			const sportFilter = filters.sports.value.map((sport) => ({
@@ -104,61 +104,73 @@
 				...sportCategoriesFilter
 			];
 			if (sportFilters.length > 0) {
-				activeFilters.sports = sportFilters;
+				activeFilters = { ...activeFilters, sports: sportFilters };
 			}
 		}
 
 		if (isSome(filters.workoutTypes) && filters.workoutTypes.value.length > 0) {
-			activeFilters.workout_types = filters.workoutTypes.value.map(workoutTypeToAPI);
+			activeFilters = {
+				...activeFilters,
+				workout_types: filters.workoutTypes.value.map(workoutTypeToAPI)
+			};
 		}
 
 		if (isSome(filters.bonked)) {
-			activeFilters.bonked = bonkStatusToAPI(filters.bonked.value);
+			activeFilters = {
+				...activeFilters,
+				bonked: bonkStatusToAPI(filters.bonked.value)
+			};
 		}
 
 		if (isSome(filters.rpes) && filters.rpes.value.length > 0) {
-			activeFilters.rpes = filters.rpes.value;
+			activeFilters = { ...activeFilters, rpes: filters.rpes.value };
 		}
 
 		return activeFilters;
 	});
 
-	let previewRequest = $derived.by(() => {
+	let metricDefinitionPayload: Option<Object> = $derived.by(() => {
 		if (isNone(selectedTemplate)) {
+			return none();
+		}
+		let payload: Object = {
+			metric: selectedTemplate.value.metric
+		};
+
+		// Optional window
+		if (granularity !== 'None') {
+			let window: {
+				granularity: string;
+				aggregate: string;
+				group_by?: Exclude<typeof groupBy, 'None'>;
+			} = {
+				granularity,
+				aggregate: selectedTemplate.value.aggregate
+			};
+
+			if (groupBy !== 'None') {
+				window = { ...window, group_by: groupBy };
+			}
+
+			payload = { window, ...payload };
+		}
+
+		// Optional filters
+		if (Object.keys(activeFilters).length > 0) {
+			payload = { ...payload, filters: activeFilters };
+		}
+
+		return some(payload);
+	});
+
+	let previewRequest = $derived.by(() => {
+		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
 		const start = dayjs().subtract(3, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ');
 		const end = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
 
-		let payload: {
-			metric: string;
-			window: {
-				granularity: string;
-				aggregate: string;
-				group_by?: Exclude<typeof groupBy, 'None'>;
-			};
-			filters?: {};
-			start: string;
-			end: string;
-		} = {
-			metric: selectedTemplate.value.metric,
-			window: {
-				granularity: granularity,
-				aggregate: selectedTemplate.value.aggregate
-			},
-			start,
-			end
-		};
-
-		if (Object.keys(activeFilters).length > 0) {
-			payload = { ...payload, filters: activeFilters };
-		}
-
-		if (groupBy !== 'None') {
-			payload.window = { ...payload.window, group_by: groupBy };
-		}
-
-		return some(payload);
+		return some({ start, end, ...metricDefinitionPayload.value });
 	});
 
 	// Automatically fetch preview when form values change
@@ -172,36 +184,14 @@
 	let previewKey = $derived(JSON.stringify(previewRequest));
 
 	let createMetricRequest: Option<Object> = $derived.by(() => {
-		if (isNone(selectedTemplate)) {
+		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
 		if (metricName.trim() === '') {
 			return none();
 		}
-		let basePayload: {
-			name: string;
-			metric: string;
-			window: {
-				granularity: string;
-				aggregate: string;
-				group_by?: Exclude<typeof groupBy, 'None'>;
-			};
-			filters: {};
-		} = {
-			name: metricName.trim(),
-			metric: selectedTemplate.value.metric,
-			window: {
-				granularity,
-				aggregate: selectedTemplate.value.aggregate
-			},
-			filters: activeFilters
-		};
 
-		if (groupBy !== 'None') {
-			basePayload.window = { ...basePayload.window, group_by: groupBy };
-		}
-
-		return some(basePayload);
+		return some({ name: metricName.trim(), ...metricDefinitionPayload.value });
 	});
 
 	const createMetricCallback = async (payload: Option<Object>): Promise<void> => {
@@ -310,20 +300,23 @@
 
 		<label class="label" for="metric-granularity">Group activities by</label>
 		<select class="select w-full" bind:value={granularity} id="metric-granularity">
+			<option value="None">None</option>
 			<option value="Daily">Day</option>
 			<option value="Weekly">Week</option>
 			<option value="Monthly">Month</option>
 		</select>
 
-		<label class="label" for="metric-group-by">Additionally group activities by</label>
-		<select class="select w-full" bind:value={groupBy} id="metric-group-by">
-			<option value="None">No grouping</option>
-			<option value="Sport">Sport</option>
-			<option value="SportCategory">Sport Category</option>
-			<option value="WorkoutType">Workout Type</option>
-			<option value="RpeRange">RPE Range</option>
-			<option value="Bonked">Bonked</option>
-		</select>
+		{#if granularity !== 'None'}
+			<label class="label" for="metric-group-by">Additionally group activities by</label>
+			<select class="select w-full" bind:value={groupBy} id="metric-group-by">
+				<option value="None">No grouping</option>
+				<option value="Sport">Sport</option>
+				<option value="SportCategory">Sport Category</option>
+				<option value="WorkoutType">Workout Type</option>
+				<option value="RpeRange">RPE Range</option>
+				<option value="Bonked">Bonked</option>
+			</select>
+		{/if}
 
 		<TrainingMetricFilters bind:filters {existingSportsConstraints} />
 

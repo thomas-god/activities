@@ -37,7 +37,7 @@
 	} from '$lib/api';
 	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import CreateTrainingMetricFromCollection from '$components/pages/CreateTrainingMetricFromCollection.svelte';
+	import CreateTrainingMetricFromTemplate from '$components/pages/CreateTrainingMetricFromTemplate.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -584,7 +584,7 @@
 
 			<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
 				<div class="modal-box max-w-3xl">
-					<CreateTrainingMetricFromCollection
+					<CreateTrainingMetricFromTemplate
 						callback={() => {
 							newTrainingMetricDialog.close();
 							updateMetricsPromise();
