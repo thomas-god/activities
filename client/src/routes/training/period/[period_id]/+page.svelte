@@ -590,7 +590,10 @@
 							updateMetricsPromise();
 						}}
 						scope={{ kind: 'period', periodId: periodDetails.id }}
-						existingSportsConstraints={some(periodDetails.sports)}
+						existingSportsConstraints={periodDetails.sports.sports.length === 0 &&
+						periodDetails.sports.categories.length === 0
+							? none() // All sports/categories, i.e. no constraints
+							: some(periodDetails.sports)}
 					/>
 				</div>
 				<form method="dialog" class="modal-backdrop">
