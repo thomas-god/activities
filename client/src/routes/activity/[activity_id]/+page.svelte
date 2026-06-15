@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import Navbar from '$components/organisms/navigation/Navbar.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
+
+<Navbar />
 
 <div class="mx-auto pt-5 sm:px-4">
 	{#await data.activity}

@@ -14,6 +14,7 @@
 	} from '$lib/api';
 	import { isSome, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
+	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
 
 	let chartWidth: number = $state(0);
 
@@ -39,6 +40,8 @@
 		goto(url);
 	};
 </script>
+
+<NavbarMetrics invalidateTrainingMetrics={setMetricsPromise} />
 
 <div class="mx-auto flex flex-col gap-4 pt-5">
 	<TrainingMetricsOptions

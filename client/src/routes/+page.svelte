@@ -12,6 +12,7 @@
 	} from '$lib/api/activities';
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -47,6 +48,11 @@
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
+
+<NavbarActivities
+	invalidateActivities={() => invalidate('app:activities')}
+	invalidateTrainingNotes={() => invalidate('app:training-notes')}
+/>
 
 <div class="homepage_container">
 	{#await data.trainingPeriods}

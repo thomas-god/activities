@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import Navbar from '$components/organisms/navigation/Navbar.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import z from 'zod';
 
@@ -35,6 +36,8 @@
 		await promise;
 	};
 </script>
+
+<Navbar />
 
 {#if promise === undefined}
 	<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">

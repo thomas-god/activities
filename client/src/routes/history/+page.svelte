@@ -3,7 +3,7 @@
 	import DownloadActivitiesModal from '$components/molecules/DownloadActivitiesModal.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
 	import { fetchActivityDetails } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
@@ -12,6 +12,7 @@
 	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
+	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -109,6 +110,11 @@
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
+
+<NavbarActivities
+	invalidateActivities={() => invalidate('app:activities')}
+	invalidateTrainingNotes={() => invalidate('app:training-notes')}
+/>
 
 <div class="flex flex-row gap-2">
 	<div class="@container mt-5 grow rounded-box bg-base-100 p-4 shadow-md">

@@ -2,6 +2,7 @@
 	import ActivitiesSelect from '$components/molecules/ActivitiesSelect.svelte';
 	import CompareActivities from '$components/organisms/CompareActivities.svelte';
 	import CompareActivitiesSummary from '$components/organisms/CompareActivitiesSummary.svelte';
+	import Navbar from '$components/organisms/navigation/Navbar.svelte';
 	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
 	import type { PageProps } from './$types';
 
@@ -17,6 +18,8 @@
 		activitiesDetails.filter((a): a is ActivityWithTimeseries => a !== null)
 	);
 </script>
+
+<Navbar />
 
 {#await data.activities}
 	<div class="loading-dots"></div>

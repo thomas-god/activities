@@ -1,11 +1,15 @@
 <script lang="ts">
+	import { invalidate } from '$app/navigation';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
+	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	let periods = $derived(data.periods.toSorted((a, b) => (a.start < b.start ? 1 : -1)));
 </script>
+
+<NavbarPeriods invalidateTrainingPeriods={() => invalidate('app:training-periods')} />
 
 <div class="mx-auto flex flex-col gap-4 pt-5">
 	<div class="rounded-box bg-base-100 shadow-md">

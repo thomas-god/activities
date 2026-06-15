@@ -38,6 +38,7 @@
 	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import CreateTrainingMetricFromTemplate from '$components/pages/CreateTrainingMetricFromTemplate.svelte';
+	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -290,6 +291,8 @@
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
+
+<NavbarPeriods invalidateTrainingPeriods={() => invalidate('app:training-periods')} />
 
 {#if isSome(pageDetailsPromise)}
 	{#await pageDetailsPromise.value}
