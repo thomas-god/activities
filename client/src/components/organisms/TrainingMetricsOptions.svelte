@@ -88,19 +88,17 @@
 	</div>
 	<div class="flex flex-row flex-wrap items-center gap-2 py-2">
 		<button
-			class="btn btn-sm sm:btn-md"
+			class="btn btn-sm"
 			class:btn-active={selectedQuickRange === '4weeks'}
 			onclick={() => pastXWeeks(4)}>Last 4 weeks</button
 		>
 		<button
-			class="btn btn-sm sm:btn-md"
+			class="btn btn-sm"
 			class:btn-active={selectedQuickRange === '12weeks'}
 			onclick={() => pastXWeeks(12)}>Last 12 weeks</button
 		>
-		<button
-			class="btn btn-sm sm:btn-md"
-			class:btn-active={selectedQuickRange === 'year'}
-			onclick={thisYear}>This year</button
+		<button class="btn btn-sm" class:btn-active={selectedQuickRange === 'year'} onclick={thisYear}
+			>This year</button
 		>
 		{#await sortedPeriods then periods}
 			<select
@@ -129,7 +127,7 @@
 			</select>
 		{/await}
 	</div>
-	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-ghost btn-sm">
+	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-sm">
 		<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
 		Metrics order
 	</button>

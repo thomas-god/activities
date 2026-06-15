@@ -12,22 +12,10 @@
 <div class="flex flex-row flex-wrap justify-start gap-2">
 	<label class="label">
 		From
-		<input
-			type="date"
-			class="input input-sm sm:input-md"
-			bind:value={start}
-			max={end}
-			oninput={callback}
-		/>
+		<input type="date" class="input input-sm" bind:value={start} max={end} oninput={callback} />
 	</label>
 	<label class="label">
 		to
-		<input
-			type="date"
-			class="input input-sm sm:input-md"
-			bind:value={end}
-			min={start}
-			oninput={callback}
-		/>
+		<input type="date" class="input input-sm" bind:value={end} min={start} oninput={callback} />
 	</label>
 </div>
