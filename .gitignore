@@ -231,3 +231,4 @@ todo
 instructions/
 copilot-instructions.md
 CLAUDE.md
+config.toml

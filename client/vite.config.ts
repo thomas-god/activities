@@ -5,6 +5,10 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit(), svelteTesting()],
+	  server: {
+    host: true,
+    port: 5173,
+  },
 	test: {
 		include: ['**/*.test.ts'],
 		globals: true,
