@@ -401,7 +401,10 @@ impl TrainingMetricDefinition {
                 HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
                     if self.filters().matches(activity) {
                         Some((
-                            TrainingMetricBin::new(activity.start_time().date().to_string(), None),
+                            TrainingMetricBin::new(
+                                activity.start_time().datetime().to_rfc3339(),
+                                None,
+                            ),
                             TrainingMetricValue::SingleValue(*value),
                         ))
                     } else {
@@ -455,7 +458,7 @@ fn group_metrics_by_bin(
     let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetric>> = HashMap::new();
     for (group, value) in metrics {
         let bin = TrainingMetricBin::new(
-            granularity.datetime_key(value.activity_start_time().date()),
+            granularity.datetime_key(value.activity_start_time().datetime()),
             group,
         );
         grouped_values.entry(bin).or_default().push(value);
@@ -935,7 +938,7 @@ impl TrainingPeriod {
     }
 
     pub fn matches(&self, activity: &Activity) -> bool {
-        let activity_start_date = activity.start_time().date().date_naive();
+        let activity_start_date = activity.start_time().datetime().date_naive();
         if activity_start_date < self.start {
             return false;
         }
@@ -1532,8 +1535,8 @@ mod test_training_metrics {
             Sport::Cycling,
         );
 
-        let date_key_1 = activity_1.start_time().date().to_string();
-        let date_key_2 = activity_2.start_time().date().to_string();
+        let date_key_1 = activity_1.start_time().datetime().to_rfc3339();
+        let date_key_2 = activity_2.start_time().datetime().to_rfc3339();
         let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
 
         let window = None;
@@ -1573,7 +1576,7 @@ mod test_training_metrics {
             Sport::Running,
         );
 
-        let date_key_1 = activity_1.start_time().date().to_string();
+        let date_key_1 = activity_1.start_time().datetime().to_rfc3339();
         let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
 
         let window = None;

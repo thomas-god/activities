@@ -656,7 +656,7 @@ where
         .bind(activity.id())
         .bind(activity.user())
         .bind(activity.name())
-        .bind(activity.start_time().date())
+        .bind(activity.start_time().datetime())
         .bind(activity.sport())
         .bind(activity.statistics())
         .bind(activity.natural_key())
@@ -682,7 +682,7 @@ where
         .bind(activity.id())
         .bind(activity.user())
         .bind(activity.name())
-        .bind(activity.start_time().date())
+        .bind(activity.start_time().datetime())
         .bind(activity.duration())
         .bind(activity.sport())
         .bind(activity.natural_key())
@@ -2214,12 +2214,12 @@ mod test_sqlite_activity_repository {
             .expect("Should be Some");
         let expected_start = activity
             .start_time()
-            .date()
-            .min(another_activity.start_time().date());
+            .datetime()
+            .min(another_activity.start_time().datetime());
         let expected_end = activity
             .start_time()
-            .date()
-            .max(another_activity.start_time().date());
+            .datetime()
+            .max(another_activity.start_time().datetime());
 
         assert_eq!(date_range.start(), expected_start);
         assert_eq!(date_range.end().expect("End should be some"), *expected_end);

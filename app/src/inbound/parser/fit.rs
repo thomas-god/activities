@@ -691,11 +691,11 @@ mod tests_fit_parser {
         let expected_time = "2025-10-11T11:43:33+02:00"
             .parse::<DateTime<FixedOffset>>()
             .unwrap();
-        assert_eq!(*res.start_time().date(), expected_time);
+        assert_eq!(*res.start_time().datetime(), expected_time);
 
         // Check for correct offset to UTC
         assert_eq!(
-            (*res.start_time().date()).to_rfc3339(),
+            (*res.start_time().datetime()).to_rfc3339(),
             "2025-10-11T11:43:33+02:00".to_string()
         );
     }

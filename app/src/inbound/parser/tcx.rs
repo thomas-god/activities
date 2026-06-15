@@ -26,7 +26,7 @@ pub fn try_tcx_bytes_into_domain(
     let duration = find_activity_duration(&doc);
     let sport = find_sport(&doc);
     let statistics = find_activity_statistics(&doc);
-    let timeseries = parse_timeseries(&doc, start_time.date())?;
+    let timeseries = parse_timeseries(&doc, start_time.datetime())?;
 
     Ok(ParsedFileContent::new(
         sport,
@@ -595,7 +595,7 @@ mod test_tcx_parser {
         let doc = roxmltree::Document::parse(&content).unwrap();
         let start_time = find_activity_start_time(&doc).expect("Should have a start time");
 
-        let timeseries = parse_timeseries(&doc, start_time.date()).unwrap();
+        let timeseries = parse_timeseries(&doc, start_time.datetime()).unwrap();
 
         assert_eq!(timeseries.time().len(), 3);
 
@@ -725,7 +725,7 @@ mod test_tcx_parser {
         let doc = roxmltree::Document::parse(&content).unwrap();
         let start_time = find_activity_start_time(&doc).expect("Should have a start time");
 
-        let timeseries = parse_timeseries(&doc, start_time.date()).unwrap();
+        let timeseries = parse_timeseries(&doc, start_time.datetime()).unwrap();
 
         assert_eq!(timeseries.laps(), &vec![Lap::new(0, 10), Lap::new(60, 72)])
     }

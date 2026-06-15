@@ -177,7 +177,7 @@ impl PublicActivity {
             sport: activity.sport().to_string(),
             sport_category: activity.sport().category().map(|cat| cat.to_string()),
             name: activity.name().map(|name| name.to_string()),
-            start_time: *activity.start_time().date(),
+            start_time: *activity.start_time().datetime(),
             rpe: activity.rpe().as_ref().map(|r| r.value()),
             workout_type: activity.workout_type().as_ref().map(|wt| wt.to_string()),
             feedback: activity.feedback().as_ref().map(|f| f.to_string()),

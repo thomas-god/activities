@@ -91,7 +91,7 @@ mod tests {
         let expected_time = "2024-03-15T08:30:00+01:00"
             .parse::<DateTime<FixedOffset>>()
             .unwrap();
-        assert_eq!(*content.start_time().date(), expected_time);
+        assert_eq!(*content.start_time().datetime(), expected_time);
         assert_eq!(*content.duration().as_f64(), 3600.0);
         assert_eq!(content.sport(), &Sport::Running);
         assert_eq!(
@@ -170,7 +170,10 @@ mod tests {
         let content = try_custom_json_bytes_into_domain(make_bytes(json)).unwrap();
         let reparsed = try_custom_json_bytes_into_domain(content.raw_content().to_vec()).unwrap();
         assert_eq!(reparsed.sport(), content.sport());
-        assert_eq!(reparsed.start_time().date(), content.start_time().date());
+        assert_eq!(
+            reparsed.start_time().datetime(),
+            content.start_time().datetime()
+        );
         assert_eq!(reparsed.duration().as_f64(), content.duration().as_f64());
     }
 }

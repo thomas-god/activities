@@ -525,7 +525,7 @@ impl ActivityStartTime {
         DateTime::from_timestamp(timestamp as i64, 0).map(|dt| Self(dt.fixed_offset()))
     }
 
-    pub fn date(&self) -> &DateTime<FixedOffset> {
+    pub fn datetime(&self) -> &DateTime<FixedOffset> {
         &self.0
     }
 }
