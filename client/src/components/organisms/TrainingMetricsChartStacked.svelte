@@ -96,7 +96,8 @@
 			};
 		}
 
-		return (value: d3.NumberValue, _idx: number) => `${value.toString()} ${unit}`;
+		return (value: d3.NumberValue, _idx: number) =>
+			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
