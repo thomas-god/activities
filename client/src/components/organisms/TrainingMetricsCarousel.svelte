@@ -64,19 +64,23 @@
 
 {#if currentMetric && metrics.length > 0}
 	<div class="flex items-center justify-between">
-		<button
-			class="btn btn-circle btn-ghost btn-sm"
-			onclick={goToPrevious}
-			aria-label="Previous metric"
-		>
-			←
-		</button>
+		{#if metrics.length > 1}
+			<button
+				class="btn btn-circle btn-ghost btn-sm"
+				onclick={goToPrevious}
+				aria-label="Previous metric"
+			>
+				←
+			</button>
+		{/if}
 		<div class="flex flex-1 flex-row justify-center text-center">
 			<TrainingMetricTitle metric={currentMetric.initialMetric} onUpdate={onMetricUpdate} />
 		</div>
-		<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
-			→
-		</button>
+		{#if metrics.length > 1}
+			<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
+				→
+			</button>
+		{/if}
 	</div>
 
 	{#if currentMetric.values.length > 0}
