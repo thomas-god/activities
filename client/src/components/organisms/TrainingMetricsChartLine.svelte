@@ -10,9 +10,17 @@
 		height: number;
 		unit: string;
 		format: 'number' | 'duration' | 'pace';
+		showAverageLine?: boolean;
 	}
 
-	let { values, height, width, unit, format }: TimeseriesChartProps = $props();
+	let {
+		values,
+		height,
+		width,
+		unit,
+		format,
+		showAverageLine = true
+	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -106,6 +114,13 @@
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
+	let averageValue = $derived(d3.mean(valuesAsTime, (v) => v.value) ?? 0);
+	let shouldShowAverageLine = $derived(showAverageLine && valuesAsTime.length > 0);
+	let averageLineY = $derived(y(averageValue));
+	let averageLegendY = $derived(
+		Math.max(marginTop + 12, Math.min(height - marginBottom - 4, averageLineY - 6))
+	);
+
 	// Tooltip state
 	let tooltip = $state<{
 		visible: boolean;
@@ -136,6 +151,8 @@
 		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
+
+	let averageLegend = $derived(`Average = ${formatTooltipValue(averageValue)}`);
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -262,6 +279,26 @@
 			stroke="currentColor"
 			opacity="0.3"
 		/>
+
+		{#if shouldShowAverageLine}
+			<line
+				x1={marginLeft}
+				x2={width - marginRight}
+				y1={averageLineY}
+				y2={averageLineY}
+				stroke="currentColor"
+				stroke-width="1.5"
+				opacity="0.6"
+			/>
+			<text
+				x={marginLeft + 4}
+				y={averageLegendY}
+				class="fill-current text-xs"
+				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+			>
+				{averageLegend}
+			</text>
+		{/if}
 
 		<g bind:this={gDots} />
 

@@ -15,6 +15,7 @@
 		showGroup?: boolean;
 		groupBy: GroupByClause | null;
 		stacked?: boolean;
+		showAverageLine?: boolean;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		format,
 		groupBy,
 		showGroup = true,
-		stacked = true
+		stacked = true,
+		showAverageLine = true
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -199,6 +201,23 @@
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
+	let averageValue = $derived.by(() => {
+		const totals: number[] = [];
+		for (const serie of series) {
+			let idx = 0;
+			for (const values of serie) {
+				totals[idx] = (totals.at(idx) ?? 0) + Number(values[1] - values[0]);
+				idx += 1;
+			}
+		}
+		return totals.reduce((sum, curr) => sum + curr, 0) / totals.length;
+	});
+	let shouldShowAverageLine = $derived(showAverageLine && averageValue !== 0);
+	let averageLineY = $derived(y(averageValue));
+	let averageLegendY = $derived(
+		Math.max(marginTop + 12, Math.min(height - marginBottom - 4, averageLineY - 6))
+	);
+
 	const colors = $derived.by(() => {
 		const scale = d3.scaleOrdinal(d3.schemeObservable10);
 		const customScale = (groupName: string) => {
@@ -251,6 +270,7 @@
 		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
+	let averageLegend = $derived(`Average = ${formatTooltipValue(averageValue)}`);
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -421,6 +441,26 @@
 		/>
 
 		<g bind:this={gBars} />
+
+		{#if shouldShowAverageLine}
+			<line
+				x1={marginLeft}
+				x2={width - marginRight}
+				y1={averageLineY}
+				y2={averageLineY}
+				stroke="currentColor"
+				stroke-width="1.5"
+				opacity="0.6"
+			/>
+			<text
+				x={marginLeft + 4}
+				y={averageLegendY}
+				class="fill-current text-xs"
+				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+			>
+				{averageLegend}
+			</text>
+		{/if}
 
 		<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 		<g bind:this={gy} transform="translate({marginLeft} 0)" />
