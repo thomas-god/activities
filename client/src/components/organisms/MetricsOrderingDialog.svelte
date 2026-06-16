@@ -144,6 +144,9 @@
 
 <dialog class="modal" bind:this={dialog}>
 	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<h3 class="mb-4 text-lg font-bold">Reorder Training Metrics</h3>
 
 		{#if isLoadingOrder}

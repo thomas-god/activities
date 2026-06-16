@@ -25,6 +25,9 @@
 
 <dialog class="modal" bind:this={createTrainingMetricDialog}>
 	<div class="modal-box max-w-3xl">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<CreateTrainingMetricFromTemplate callback={createTrainingMetricCallback} />
 	</div>
 	<form method="dialog" class="modal-backdrop">

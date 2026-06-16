@@ -92,6 +92,9 @@
 <!-- Edit name modal -->
 <dialog class="modal" bind:this={editNameDialog}>
 	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<h3 class="text-lg font-bold">Edit Training Metric Name</h3>
 		<div class="py-4">
 			<label class="input">

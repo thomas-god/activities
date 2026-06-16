@@ -37,6 +37,14 @@
 {#if isOpen}
 	<dialog class="modal-open modal">
 		<div class="modal-box">
+			<form method="dialog">
+				<button
+					class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm"
+					onclick={() => (isOpen = false)}
+				>
+					✕
+				</button>
+			</form>
 			<h3 class="text-lg font-bold">{title}</h3>
 			<p class="py-4">
 				{#if description}

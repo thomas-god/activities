@@ -103,6 +103,9 @@
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<h3 class="text-lg font-bold">Timeseries alignment</h3>
 		<p class="opacity-75">You can align timeseries by adding a time offset for each activity.</p>
 		<select class="select" bind:value={offsetsDialogMetric}>

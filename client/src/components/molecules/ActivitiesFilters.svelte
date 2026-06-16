@@ -134,6 +134,9 @@
 
 <dialog class="modal" bind:this={dialogElement}>
 	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<summary class="collapse-title flex items-center justify-between">
 			<div class="flex items-center gap-2">
 				<h2 class="text-lg font-semibold">

@@ -34,6 +34,12 @@
 {#if isOpen}
 	<dialog class="modal-open modal">
 		<div class="modal-box">
+			<form method="dialog">
+				<button
+					class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm"
+					onclick={() => (isOpen = false)}>✕</button
+				>
+			</form>
 			<h3 class="text-lg font-bold">Edit Training Period Name</h3>
 			<div class="py-4">
 				<label class="input">

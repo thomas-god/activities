@@ -591,6 +591,9 @@
 
 			<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
 				<div class="modal-box max-w-3xl">
+					<form method="dialog">
+						<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+					</form>
 					<CreateTrainingMetricFromTemplate
 						callback={() => {
 							newTrainingMetricDialog.close();
@@ -614,6 +617,9 @@
 				bind:this={importTrainingMetricDialog}
 			>
 				<div class="modal-box max-w-3xl">
+					<form method="dialog">
+						<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+					</form>
 					{#await getGlobalMetricsPromise}
 						<div class="loading"></div>
 					{:then globalMetrics}

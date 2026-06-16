@@ -38,6 +38,9 @@
 
 <dialog class="modal" bind:this={activitiesUploadDialog}>
 	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<ActivitiesUploader {activitiesUploadedCallback} />
 	</div>
 	<form method="dialog" class="modal-backdrop">
@@ -47,6 +50,9 @@
 
 <dialog class="modal" bind:this={newTrainingNoteDialog}>
 	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
 		<CreateTrainingNote callback={newTrainingNoteCallback} />
 	</div>
 	<form method="dialog" class="modal-backdrop">
