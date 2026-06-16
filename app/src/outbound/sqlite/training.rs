@@ -42,6 +42,7 @@ type DefinitionRow = (
     TrainingMetricFilters,
     Option<TrainingMetricGroupBy>,
     Option<TrainingPeriodId>,
+    Option<TrainingMetricSummary>,
 );
 type TrainingPeriodRow = (
     TrainingPeriodId,
@@ -89,8 +90,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         let definition = metric.definition();
         sqlx::query(
             "INSERT INTO t_training_metrics_definitions
-                (id, user_id, activity_metric, granularity, aggregate, filters, group_by, name, training_period_id)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9);",
+                (id, user_id, activity_metric, granularity, aggregate, filters, group_by, name, training_period_id, summary)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);",
         )
         .bind(metric.id())
         .bind(definition.user())
@@ -101,6 +102,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(definition.window().as_ref().map(|w| w.group_by()))
         .bind(metric.name())
         .bind(metric.scope().period())
+        .bind(definition.summary())
         .execute(&self.pool)
         .await
         .map_err(|err| match err {
@@ -122,7 +124,18 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
-        SELECT id, name, user_id, source, activity_metric, granularity, aggregate, filters, group_by, training_period_id
+        SELECT 
+            id, 
+            name, 
+            user_id, 
+            source, 
+            activity_metric, 
+            granularity, 
+            aggregate, 
+            filters, 
+            group_by, 
+            training_period_id,
+            summary
         FROM t_training_metrics_definitions
         WHERE id = ?1 AND user_id = ?2 LIMIT 1;",
         )
@@ -131,20 +144,34 @@ impl TrainingRepository for SqliteTrainingRepository {
         .fetch_one(&self.pool)
         .await
         {
-            Ok((_id, _name, user_id, source, metric, granularity, aggregate, filters, group_by, _training_period_id)) => {
+            Ok((
+                _id,
+                _name,
+                user_id,
+                source,
+                metric,
+                granularity,
+                aggregate,
+                filters,
+                group_by,
+                _training_period_id,
+                summary,
+            )) => {
                 let Some(metric) = parse_definition_row_metric(metric, source) else {
-                    return Ok(None)
+                    return Ok(None);
                 };
                 let window = match (granularity, aggregate) {
-                    (Some(granularity), Some(aggregate)) => Some(TrainingMetricWindow::new(granularity, aggregate, group_by)),
-                    _ => None
+                    (Some(granularity), Some(aggregate)) => {
+                        Some(TrainingMetricWindow::new(granularity, aggregate, group_by))
+                    }
+                    _ => None,
                 };
                 Ok(Some(TrainingMetricDefinition::new(
                     user_id,
                     metric,
                     window,
                     filters,
-                    TrainingMetricSummary::empty(),
+                    summary.unwrap_or_else(TrainingMetricSummary::empty),
                 )))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -157,7 +184,18 @@ impl TrainingRepository for SqliteTrainingRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT id, name, user_id, source, activity_metric, granularity, aggregate, filters, group_by, training_period_id
+            "SELECT 
+                id, 
+                name, 
+                user_id, 
+                source, 
+                activity_metric, 
+                granularity, 
+                aggregate, 
+                filters, 
+                group_by, 
+                training_period_id,
+                summary
             FROM t_training_metrics_definitions
             WHERE user_id = ?1 AND training_period_id IS NULL;",
         )
@@ -168,11 +206,25 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|rows| {
             rows.into_iter()
                 .filter_map(
-                    |(id, name, user_id, source, metric, granularity, aggregate, filters, group_by, training_period_id)| {
+                    |(
+                        id,
+                        name,
+                        user_id,
+                        source,
+                        metric,
+                        granularity,
+                        aggregate,
+                        filters,
+                        group_by,
+                        training_period_id,
+                        summary,
+                    )| {
                         let metric = parse_definition_row_metric(metric, source)?;
                         let window = match (granularity, aggregate) {
-                            (Some(granularity), Some(aggregate)) => Some(TrainingMetricWindow::new(granularity, aggregate, group_by)),
-                            _ => None
+                            (Some(granularity), Some(aggregate)) => {
+                                Some(TrainingMetricWindow::new(granularity, aggregate, group_by))
+                            }
+                            _ => None,
                         };
                         Some(TrainingMetric::new(
                             id,
@@ -183,7 +235,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 metric,
                                 window,
                                 filters,
-                                TrainingMetricSummary::empty(),
+                                summary.unwrap_or_else(TrainingMetricSummary::empty),
                             ),
                         ))
                     },
@@ -198,7 +250,18 @@ impl TrainingRepository for SqliteTrainingRepository {
         period: &TrainingPeriodId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT id, name, user_id, source, activity_metric, granularity, aggregate, filters, group_by, training_period_id
+            "SELECT 
+                id, 
+                name, 
+                user_id, 
+                source, 
+                activity_metric, 
+                granularity, 
+                aggregate, 
+                filters, 
+                group_by, 
+                training_period_id,
+                summary
             FROM t_training_metrics_definitions
             WHERE user_id = ?1 AND training_period_id = ?2;",
         )
@@ -210,11 +273,25 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|rows| {
             rows.into_iter()
                 .filter_map(
-                    |(id, name, user_id, source, metric, granularity, aggregate, filters, group_by, training_period_id)| {
+                    |(
+                        id,
+                        name,
+                        user_id,
+                        source,
+                        metric,
+                        granularity,
+                        aggregate,
+                        filters,
+                        group_by,
+                        training_period_id,
+                        summary,
+                    )| {
                         let metric = parse_definition_row_metric(metric, source)?;
                         let window = match (granularity, aggregate) {
-                            (Some(granularity), Some(aggregate)) => Some(TrainingMetricWindow::new(granularity, aggregate, group_by)),
-                            _ => None
+                            (Some(granularity), Some(aggregate)) => {
+                                Some(TrainingMetricWindow::new(granularity, aggregate, group_by))
+                            }
+                            _ => None,
                         };
                         Some(TrainingMetric::new(
                             id,
@@ -225,7 +302,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 metric,
                                 window,
                                 filters,
-                                TrainingMetricSummary::empty(),
+                                summary.unwrap_or_else(TrainingMetricSummary::empty),
                             ),
                         ))
                     },
@@ -689,8 +766,8 @@ mod test_sqlite_training_repository {
         activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric},
         training::{
             SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-            TrainingPeriodId, TrainingPeriodSports,
+            TrainingMetricSummaryAverage, TrainingNote, TrainingNoteContent, TrainingNoteId,
+            TrainingNoteTitle, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     };
 
@@ -801,6 +878,29 @@ mod test_sqlite_training_repository {
                     None,
                 ),
                 TrainingMetricSummary::empty(),
+            ),
+        )
+    }
+    fn build_metric_definition_with_summary() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            None,
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricV2::MaxAltitude,
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Max,
+                    Some(TrainingMetricGroupBy::Sport),
+                )),
+                TrainingMetricFilters::new(
+                    Some(vec![SportFilter::Sport(Sport::Running)]),
+                    None,
+                    None,
+                    None,
+                ),
+                TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
             ),
         )
     }
@@ -922,6 +1022,29 @@ mod test_sqlite_training_repository {
             .unwrap(),
             Some(TrainingMetricGroupBy::Sport)
         );
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metric_definition_summary() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric = build_metric_definition_with_summary();
+
+        repository
+            .save_training_metric_definition(metric.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let saved_metric = repository
+            .get_definition(metric.definition().user(), metric.id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(metric.definition(), &saved_metric);
     }
 
     #[tokio::test]

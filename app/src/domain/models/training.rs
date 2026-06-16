@@ -331,12 +331,12 @@ impl TrainingMetricScope {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
 pub struct TrainingMetricSummary {
     average: Option<TrainingMetricSummaryAverage>,
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
 pub struct TrainingMetricSummaryAverage {
     include_zeros: bool,
 }
@@ -432,6 +432,10 @@ impl TrainingMetricDefinition {
 
     pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
+    }
+
+    pub fn summary(&self) -> &TrainingMetricSummary {
+        &self.summary
     }
 
     pub fn unit(&self) -> Unit {
