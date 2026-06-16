@@ -342,7 +342,7 @@ pub struct TrainingMetricSummaryAverage {
 }
 
 impl TrainingMetricSummaryAverage {
-    pub fn compute(&self, values: &TrainingMetricValues) -> Option<f64> {
+    pub fn compute(&self, values: &HashMap<TrainingMetricBin, TrainingMetricValue>) -> Option<f64> {
         let mut values_by_bin: HashMap<&str, f64> = HashMap::new();
         for (bin, value) in values.iter() {
             values_by_bin
@@ -375,16 +375,31 @@ impl TrainingMetricSummary {
         Self { average: None }
     }
 
-    pub fn compute(&self, values: &TrainingMetricValues) -> TrainingMetricSummaryValues {
+    pub fn compute(
+        &self,
+        values: &HashMap<TrainingMetricBin, TrainingMetricValue>,
+    ) -> TrainingMetricSummaryValues {
         TrainingMetricSummaryValues {
             average: self.average.as_ref().and_then(|a| a.compute(values)),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq, Constructor, Default)]
 pub struct TrainingMetricSummaryValues {
     average: Option<f64>,
+}
+
+impl TrainingMetricSummaryValues {
+    pub fn as_hash_map(&self) -> HashMap<String, f64> {
+        let mut map = HashMap::new();
+
+        if let Some(average) = self.average {
+            map.insert("average".to_string(), average);
+        }
+
+        map
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -458,27 +473,23 @@ impl TrainingMetricDefinition {
 
 impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
-        match self.window.as_ref() {
-            None => TrainingMetricValues::new(
-                HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
-                    if self.filters().matches(activity) {
-                        Some((
-                            TrainingMetricBin::new(
-                                activity.start_time().datetime().to_rfc3339(),
-                                None,
-                            ),
-                            TrainingMetricValue::SingleValue(*value),
-                        ))
-                    } else {
-                        None
-                    }
-                })),
-                self.unit(),
-            ),
-            Some(window) => {
-                group_and_aggregate_metrics(activities, self.filters(), window, self.unit())
-            }
-        }
+        let values = match self.window.as_ref() {
+            None => HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
+                if self.filters().matches(activity) {
+                    Some((
+                        TrainingMetricBin::new(activity.start_time().datetime().to_rfc3339(), None),
+                        TrainingMetricValue::SingleValue(*value),
+                    ))
+                } else {
+                    None
+                }
+            })),
+
+            Some(window) => group_and_aggregate_metrics(activities, self.filters(), window),
+        };
+        let summary = self.summary.compute(&values);
+
+        TrainingMetricValues::new(values, summary, self.unit())
     }
 }
 
@@ -486,8 +497,7 @@ fn group_and_aggregate_metrics(
     activities: &[(Activity, f64)],
     filters: &TrainingMetricFilters,
     window: &TrainingMetricWindow,
-    unit: Unit,
-) -> TrainingMetricValues {
+) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
     let metrics = activities
         .iter()
         .filter_map(|(activity, metric_value)| {
@@ -509,8 +519,10 @@ fn group_and_aggregate_metrics(
         })
         .collect();
 
-    let grouped_metrics = group_metrics_by_bin(window.granularity(), metrics);
-    TrainingMetricValues::new(aggregate_metrics(window.aggregate(), grouped_metrics), unit)
+    aggregate_metrics(
+        window.aggregate(),
+        group_metrics_by_bin(window.granularity(), metrics),
+    )
 }
 
 fn group_metrics_by_bin(
@@ -829,6 +841,7 @@ impl TrainingMetricBin {
 #[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct TrainingMetricValues {
     values: HashMap<TrainingMetricBin, TrainingMetricValue>,
+    summary_values: TrainingMetricSummaryValues,
     unit: Unit,
 }
 
@@ -836,6 +849,7 @@ impl TrainingMetricValues {
     pub fn empty(unit: Unit) -> Self {
         Self {
             values: HashMap::new(),
+            summary_values: TrainingMetricSummaryValues::default(),
             unit,
         }
     }
@@ -862,6 +876,10 @@ impl TrainingMetricValues {
 
     pub fn iter(&self) -> Iter<'_, TrainingMetricBin, TrainingMetricValue> {
         self.values.iter()
+    }
+
+    pub fn summary_values(&self) -> &TrainingMetricSummaryValues {
+        &self.summary_values
     }
 
     pub fn unit(&self) -> Unit {
@@ -3288,7 +3306,7 @@ mod test_training_metric_summary {
 
     #[test]
     fn test_compute_average_empty_values() {
-        let values = TrainingMetricValues::new(HashMap::new(), Unit::Kilometer);
+        let values = HashMap::new();
 
         let include_zeros = true;
         let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
@@ -3298,27 +3316,24 @@ mod test_training_metric_summary {
 
     #[test]
     fn test_compute_average_include_zeros() {
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), None),
-                    TrainingMetricValue::Max(15.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), None),
-                    TrainingMetricValue::Max(15.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-26".to_string(), None),
-                    TrainingMetricValue::Max(0.),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
+        let values = HashMap::from([
+            (
+                TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                TrainingMetricValue::Max(10.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-24".to_string(), None),
+                TrainingMetricValue::Max(15.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-25".to_string(), None),
+                TrainingMetricValue::Max(15.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-26".to_string(), None),
+                TrainingMetricValue::Max(0.),
+            ),
+        ]);
 
         let include_zeros = true;
         let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
@@ -3328,27 +3343,24 @@ mod test_training_metric_summary {
 
     #[test]
     fn test_compute_average_exclude_zeros() {
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), None),
-                    TrainingMetricValue::Max(15.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), None),
-                    TrainingMetricValue::Max(15.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-26".to_string(), None),
-                    TrainingMetricValue::Max(0.),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
+        let values = HashMap::from([
+            (
+                TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                TrainingMetricValue::Max(10.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-24".to_string(), None),
+                TrainingMetricValue::Max(15.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-25".to_string(), None),
+                TrainingMetricValue::Max(15.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-26".to_string(), None),
+                TrainingMetricValue::Max(0.),
+            ),
+        ]);
 
         let include_zeros = false;
         let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
@@ -3358,19 +3370,16 @@ mod test_training_metric_summary {
 
     #[test]
     fn test_compute_summary_average() {
-        let values = TrainingMetricValues::new(
-            HashMap::from([
-                (
-                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
-                    TrainingMetricValue::Max(10.0),
-                ),
-                (
-                    TrainingMetricBin::new("2025-09-25".to_string(), None),
-                    TrainingMetricValue::Max(20.0),
-                ),
-            ]),
-            Unit::Kilometer,
-        );
+        let values = HashMap::from([
+            (
+                TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                TrainingMetricValue::Max(10.0),
+            ),
+            (
+                TrainingMetricBin::new("2025-09-25".to_string(), None),
+                TrainingMetricValue::Max(20.0),
+            ),
+        ]);
 
         let summary = TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true)));
 

@@ -107,6 +107,7 @@ pub struct ResponseBodyItem {
     values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
     scope: ScopePayload,
+    summary: HashMap<String, f64>,
 }
 
 fn to_response_body_item(
@@ -120,12 +121,14 @@ fn to_response_body_item(
         Some(window) => fill_missing_granules(values, window, range),
         None => values,
     };
+    let unit = values.unit();
+    let (values, summary) = values.values_and_summary();
 
     ResponseBodyItem {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
         metric: format_source(&definition.metric().source()),
-        unit: values.unit().to_string(),
+        unit: unit.to_string(),
         granularity: definition
             .window()
             .as_ref()
@@ -157,12 +160,13 @@ fn to_response_body_item(
             .as_ref()
             .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect())
             .unwrap_or_default(),
-        values: values.values(),
+        values: values,
         group_by: definition
             .window()
             .as_ref()
             .and_then(|w| w.group_by().as_ref().map(|g| format!("{:?}", g))),
         scope: metric.scope().into(),
+        summary,
     }
 }
 
@@ -342,6 +346,7 @@ mod tests {
             scope: ScopePayload::TrainingPeriod {
                 training_period_id: "period-1".to_string(),
             },
+            summary: HashMap::new(),
         }]);
 
         let serialized = serde_json::to_value(body).unwrap();
@@ -369,7 +374,8 @@ mod tests {
                     "scope": {
                         "type": "trainingPeriod",
                         "trainingPeriodId": "period-1"
-                    }
+                    },
+                    "summary": {}
                 }
             ])
         );

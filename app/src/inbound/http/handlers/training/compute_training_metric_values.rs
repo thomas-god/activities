@@ -69,14 +69,18 @@ impl From<&ComputeMetricValuesRequest> for DateRange {
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody {
     values: HashMap<String, GranuleValues>,
+    summary: HashMap<String, f64>,
     unit: String,
 }
 
 impl From<GroupedMetricValues> for ResponseBody {
     fn from(value: GroupedMetricValues) -> Self {
+        let unit = value.unit();
+        let (values, summary) = value.values_and_summary();
         ResponseBody {
-            unit: value.unit().to_string(),
-            values: value.values(),
+            unit: unit.to_string(),
+            values: values,
+            summary: summary,
         }
     }
 }

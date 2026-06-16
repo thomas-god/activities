@@ -58,6 +58,7 @@ pub type GranuleValues = HashMap<String, f64>;
 #[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct GroupedMetricValues {
     values: HashMap<String, GranuleValues>,
+    summary_values: HashMap<String, f64>,
     unit: Unit,
 }
 
@@ -76,8 +77,8 @@ impl GroupedMetricValues {
         self.unit
     }
 
-    pub fn values(self) -> HashMap<String, GranuleValues> {
-        self.values
+    pub fn values_and_summary(self) -> (HashMap<String, GranuleValues>, HashMap<String, f64>) {
+        (self.values, self.summary_values)
     }
 }
 
@@ -107,7 +108,11 @@ pub fn group_metric_values(values: TrainingMetricValues) -> GroupedMetricValues 
             .insert(bin.granule().to_string(), value.value());
     }
 
-    GroupedMetricValues::new(grouped_values, values.unit())
+    GroupedMetricValues::new(
+        grouped_values,
+        values.summary_values().as_hash_map(),
+        values.unit(),
+    )
 }
 
 pub fn fill_missing_granules(
@@ -169,7 +174,7 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect::<HashMap<_, _>>();
-            GroupedMetricValues::new(converted, Unit::Kilometer)
+            GroupedMetricValues::new(converted, values.summary_values, Unit::Kilometer)
         }
         Unit::MeterPerSecond => {
             let converted = values
@@ -184,7 +189,7 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect();
-            GroupedMetricValues::new(converted, Unit::KilometerPerHour)
+            GroupedMetricValues::new(converted, values.summary_values, Unit::KilometerPerHour)
         }
         Unit::SecondPerMeter => {
             let converted = values
@@ -199,7 +204,7 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect();
-            GroupedMetricValues::new(converted, Unit::SecondPerKilometer)
+            GroupedMetricValues::new(converted, values.summary_values, Unit::SecondPerKilometer)
         }
         _ => values,
     }
@@ -232,6 +237,7 @@ mod tests {
                     ("2025-09-25".to_string(), 25000.0), // 25km in meters
                 ]),
             )]),
+            HashMap::new(),
             Unit::Meter,
         );
 
@@ -264,6 +270,7 @@ mod tests {
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 5000.0)]), // 5km in meters
             )]),
+            HashMap::new(),
             Unit::Meter,
         );
 
@@ -291,6 +298,7 @@ mod tests {
                     ("2025-09-25".to_string(), 5.55), // 5.55 m/s ≈ 20 km/h
                 ]),
             )]),
+            HashMap::new(),
             Unit::MeterPerSecond,
         );
 
@@ -331,6 +339,7 @@ mod tests {
                     ("2025-09-25".to_string(), 7200.0), // 2 hours in seconds
                 ]),
             )]),
+            HashMap::new(),
             Unit::Second,
         );
 
@@ -363,6 +372,7 @@ mod tests {
                 "Cycling".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 250.0)]),
             )]),
+            HashMap::new(),
             Unit::Watt,
         );
 
@@ -395,6 +405,7 @@ mod tests {
                     HashMap::from([("2025-09-24".to_string(), 10000.0)]),
                 ),
             ]),
+            HashMap::new(),
             Unit::Meter,
         );
 
@@ -430,6 +441,7 @@ mod tests {
                     ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
                 ]),
             )]),
+            HashMap::new(),
             Unit::SecondPerMeter,
         );
 
@@ -470,6 +482,7 @@ mod tests {
                     HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
                 ),
             ]),
+            HashMap::new(),
             Unit::SecondPerMeter,
         );
 
@@ -502,6 +515,7 @@ mod tests {
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 0.0)]),
             )]),
+            HashMap::new(),
             Unit::SecondPerMeter,
         );
 
@@ -521,7 +535,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_grouping_metric_values {
-    use crate::domain::models::training::TrainingMetricValue;
+    use crate::domain::models::training::{TrainingMetricSummaryValues, TrainingMetricValue};
 
     use super::*;
 
@@ -538,6 +552,7 @@ mod test_grouping_metric_values {
                     TrainingMetricValue::Max(15.0),
                 ),
             ]),
+            TrainingMetricSummaryValues::default(),
             Unit::Kilometer,
         );
 
@@ -553,6 +568,7 @@ mod test_grouping_metric_values {
                         ("2025-09-25".to_string(), 15.0),
                     ])
                 )]),
+                HashMap::new(),
                 Unit::Kilometer
             )
         );
@@ -581,6 +597,7 @@ mod test_grouping_metric_values {
                     TrainingMetricValue::Max(8.0),
                 ),
             ]),
+            TrainingMetricSummaryValues::default(),
             Unit::Kilometer,
         );
 
@@ -605,6 +622,7 @@ mod test_grouping_metric_values {
                         ])
                     )
                 ]),
+                HashMap::new(),
                 Unit::Kilometer
             )
         );
@@ -633,6 +651,7 @@ mod test_grouping_metric_values {
                     TrainingMetricValue::Max(8.0),
                 ),
             ]),
+            TrainingMetricSummaryValues::default(),
             Unit::Kilometer,
         );
 
@@ -657,6 +676,7 @@ mod test_grouping_metric_values {
                         ])
                     )
                 ]),
+                HashMap::new(),
                 Unit::Kilometer
             )
         );
@@ -691,6 +711,7 @@ mod test_fill_grouped_metric_values {
                     ("2025-09-26".to_string(), 12.0),
                 ]),
             )]),
+            HashMap::new(),
             Unit::Kilometer,
         );
 
@@ -707,6 +728,7 @@ mod test_fill_grouped_metric_values {
                         ("2025-09-26".to_string(), 12.0),
                     ]),
                 )]),
+                HashMap::new(),
                 Unit::Kilometer,
             )
         );
@@ -731,6 +753,7 @@ mod test_fill_grouped_metric_values {
                     ("2025-09-26".to_string(), 12.0),
                 ]),
             )]),
+            HashMap::new(),
             Unit::Kilometer,
         );
 
@@ -749,6 +772,7 @@ mod test_fill_grouped_metric_values {
                         ("2025-09-27".to_string(), 0.),
                     ]),
                 )]),
+                HashMap::new(),
                 Unit::Kilometer,
             )
         );
@@ -773,6 +797,7 @@ mod test_fill_grouped_metric_values {
                     ("2025-10-06".to_string(), 12.0),
                 ]),
             )]),
+            HashMap::new(),
             Unit::Kilometer,
         );
 
@@ -789,6 +814,7 @@ mod test_fill_grouped_metric_values {
                         ("2025-10-06".to_string(), 12.0),
                     ]),
                 )]),
+                HashMap::new(),
                 Unit::Kilometer,
             )
         );
@@ -813,6 +839,7 @@ mod test_fill_grouped_metric_values {
                     ("2025-11-01".to_string(), 30.0),
                 ]),
             )]),
+            HashMap::new(),
             Unit::Kilometer,
         );
 
@@ -829,6 +856,7 @@ mod test_fill_grouped_metric_values {
                         ("2025-11-01".to_string(), 30.0),
                     ]),
                 )]),
+                HashMap::new(),
                 Unit::Kilometer,
             )
         );
