@@ -4,6 +4,7 @@
 	import type { MetricsListItemGrouped } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/metric';
 	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
+	import { none, some } from '$lib/Options';
 
 	let {
 		metrics,
@@ -45,7 +46,8 @@
 			unit: metric.unit,
 			showGroup: metric.group_by !== null,
 			scope,
-			initialMetric: metric
+			initialMetric: metric,
+			summary: metric.summary
 		};
 	});
 
@@ -97,6 +99,9 @@
 					groupBy={currentMetric.groupBy}
 					stacked={currentMetric.aggregate === 'Sum' ||
 						currentMetric.aggregate === 'NumberOfActivities'}
+					average={'average' in currentMetric.summary
+						? some(currentMetric.summary.average)
+						: none()}
 				/>
 			{:else}
 				<TrainingMetricsChartLine
@@ -105,6 +110,9 @@
 					values={currentMetric.values}
 					unit={currentMetric.unit}
 					format={metricValuesDisplayFormat(currentMetric)}
+					average={'average' in currentMetric.summary
+						? some(currentMetric.summary.average)
+						: none()}
 				/>
 			{/if}
 		</div>

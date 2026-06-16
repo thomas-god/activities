@@ -224,9 +224,13 @@
 	// TODO: do not run this at component init ?
 	const fetchPreview = async (
 		request: typeof previewRequest
-	): Promise<{ values: { time: string; group: string; value: number }[]; unit: string }> => {
+	): Promise<{
+		values: { time: string; group: string; value: number }[];
+		unit: string;
+		summary: Record<string, number>;
+	}> => {
 		if (isNone(request)) {
-			return { values: [], unit: '' };
+			return { values: [], unit: '', summary: {} };
 		}
 
 		const body = JSON.stringify(request.value);
@@ -256,7 +260,7 @@
 				values.push({ time, group, value });
 			}
 		}
-		return { values, unit: data.unit };
+		return { values, unit: data.unit, summary: data.summary };
 	};
 </script>
 
@@ -385,6 +389,7 @@
 									: selectedTemplate.value.aggregate === 'Sum'
 										? true
 										: false}
+								average={'average' in values.summary ? some(values.summary.average) : none()}
 							/>
 						{:else}
 							<TrainingMetricsChartLine
@@ -393,6 +398,7 @@
 								values={values.values}
 								unit={values.unit}
 								format={previewFormat(values.unit)}
+								average={'average' in values.summary ? some(values.summary.average) : none()}
 							/>
 						{/if}
 					</div>

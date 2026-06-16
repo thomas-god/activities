@@ -3,6 +3,7 @@
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
+	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
 
 	export interface TimeseriesChartProps {
 		values: { time: string; value: number }[];
@@ -10,17 +11,10 @@
 		height: number;
 		unit: string;
 		format: 'number' | 'duration' | 'pace';
-		showAverageLine?: boolean;
+		average: Option<number>;
 	}
 
-	let {
-		values,
-		height,
-		width,
-		unit,
-		format,
-		showAverageLine = true
-	}: TimeseriesChartProps = $props();
+	let { values, height, width, unit, format, average }: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -114,12 +108,13 @@
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
-	let averageValue = $derived(d3.mean(valuesAsTime, (v) => v.value) ?? 0);
-	let shouldShowAverageLine = $derived(showAverageLine && valuesAsTime.length > 0);
-	let averageLineY = $derived(y(averageValue));
+	let averageLineY = $derived(map(average, (avg) => y(avg)));
 	let averageLegendY = $derived(
-		Math.max(marginTop + 12, Math.min(height - marginBottom - 4, averageLineY - 6))
+		map(averageLineY, (avg) =>
+			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
+		)
 	);
+	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -151,8 +146,6 @@
 		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
-
-	let averageLegend = $derived(`Average = ${formatTooltipValue(averageValue)}`);
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -280,23 +273,23 @@
 			opacity="0.3"
 		/>
 
-		{#if shouldShowAverageLine}
+		{#if isSome(average)}
 			<line
 				x1={marginLeft}
 				x2={width - marginRight}
-				y1={averageLineY}
-				y2={averageLineY}
+				y1={unwrapOr(averageLineY, 0)}
+				y2={unwrapOr(averageLineY, 0)}
 				stroke="currentColor"
 				stroke-width="1.5"
 				opacity="0.6"
 			/>
 			<text
 				x={marginLeft + 4}
-				y={averageLegendY}
+				y={unwrapOr(averageLegendY, 0)}
 				class="fill-current text-xs"
 				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
 			>
-				{averageLegend}
+				{unwrapOr(averageLegend, '')}
 			</text>
 		{/if}
 

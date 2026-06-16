@@ -12,7 +12,7 @@
 		groupMetricValues,
 		type MetricsListGrouped
 	} from '$lib/api';
-	import { isSome, some, type Option } from '$lib/Options';
+	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
 	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
 
@@ -75,6 +75,7 @@
 								showGroup={metric.group_by !== null}
 								groupBy={metric.group_by}
 								stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+								average={'average' in metric.summary ? some(metric.summary.average) : none()}
 							/>
 						{:else}
 							<TrainingMetricsChartLine
@@ -83,6 +84,7 @@
 								values={groupMetricValues(metric)}
 								unit={metric.unit}
 								format={metricValuesDisplayFormat(metric)}
+								average={'average' in metric.summary ? some(metric.summary.average) : none()}
 							/>
 						{/if}
 					{:else}

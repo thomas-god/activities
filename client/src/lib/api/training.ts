@@ -50,6 +50,7 @@ const MetricsListItemSchemaGrouped = z.object({
 	bonked: z.string().nullable().optional(),
 	rpes: z.array(z.string()).optional(),
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
+	summary: z.record(z.string(), z.number()),
 	group_by: z.enum(groupByClauses).nullable(),
 	scope: z.discriminatedUnion('type', [
 		z.object({ type: z.literal('global') }),

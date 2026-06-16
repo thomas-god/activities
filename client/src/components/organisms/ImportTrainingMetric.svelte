@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { invalidate } from '$app/navigation';
 	import CopyUploadButton from '$components/atoms/CopyUploadButton.svelte';
 	import { copyTrainingMetricIntoPeriod, type MetricsListGrouped } from '$lib/api';
 	import {
@@ -44,7 +43,8 @@
 				unit: metric.unit,
 				showGroup: metric.group_by !== null,
 				scope,
-				initialMetric: metric
+				initialMetric: metric,
+				summary: metric.summary
 			};
 		})
 	);
@@ -151,6 +151,7 @@
 						showGroup={metric.showGroup}
 						groupBy={metric.groupBy}
 						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
+						average={'average' in metric.summary ? some(metric.summary.average) : none()}
 					/>
 				{:else}
 					<TrainingMetricsChartLine
@@ -159,6 +160,7 @@
 						values={metric.values}
 						unit={metric.unit}
 						format={metricValuesDisplayFormat(metric)}
+						average={'average' in metric.summary ? some(metric.summary.average) : none()}
 					/>
 				{/if}
 			</div>

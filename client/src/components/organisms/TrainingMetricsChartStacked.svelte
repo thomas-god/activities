@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
 	import { displayGroupName, type GroupByClause } from '$lib/metric';
+	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
@@ -15,7 +16,7 @@
 		showGroup?: boolean;
 		groupBy: GroupByClause | null;
 		stacked?: boolean;
-		showAverageLine?: boolean;
+		average: Option<number>;
 	}
 
 	let {
@@ -26,9 +27,9 @@
 		granularity,
 		format,
 		groupBy,
+		average,
 		showGroup = true,
-		stacked = true,
-		showAverageLine = true
+		stacked = true
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -201,22 +202,13 @@
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
-	let averageValue = $derived.by(() => {
-		const totals: number[] = [];
-		for (const serie of series) {
-			let idx = 0;
-			for (const values of serie) {
-				totals[idx] = (totals.at(idx) ?? 0) + Number(values[1] - values[0]);
-				idx += 1;
-			}
-		}
-		return totals.reduce((sum, curr) => sum + curr, 0) / totals.length;
-	});
-	let shouldShowAverageLine = $derived(showAverageLine && averageValue !== 0);
-	let averageLineY = $derived(y(averageValue));
+	let averageLineY = $derived(map(average, (avg) => y(avg)));
 	let averageLegendY = $derived(
-		Math.max(marginTop + 12, Math.min(height - marginBottom - 4, averageLineY - 6))
+		map(averageLineY, (avg) =>
+			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
+		)
 	);
+	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
 
 	const colors = $derived.by(() => {
 		const scale = d3.scaleOrdinal(d3.schemeObservable10);
@@ -270,7 +262,6 @@
 		}
 		return `${value.toFixed(1)} ${unit}`;
 	};
-	let averageLegend = $derived(`Average = ${formatTooltipValue(averageValue)}`);
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -442,23 +433,23 @@
 
 		<g bind:this={gBars} />
 
-		{#if shouldShowAverageLine}
+		{#if isSome(average)}
 			<line
 				x1={marginLeft}
 				x2={width - marginRight}
-				y1={averageLineY}
-				y2={averageLineY}
+				y1={unwrapOr(averageLineY, 0)}
+				y2={unwrapOr(averageLineY, 0)}
 				stroke="currentColor"
 				stroke-width="1.5"
 				opacity="0.6"
 			/>
 			<text
 				x={marginLeft + 4}
-				y={averageLegendY}
+				y={unwrapOr(averageLegendY, 0)}
 				class="fill-current text-xs"
 				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
 			>
-				{averageLegend}
+				{unwrapOr(averageLegend, '')}
 			</text>
 		{/if}
 
