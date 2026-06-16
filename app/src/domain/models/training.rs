@@ -332,11 +332,68 @@ impl TrainingMetricScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricSummary {
+    average: Option<TrainingMetricSummaryAverage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricSummaryAverage {
+    include_zeros: bool,
+}
+
+impl TrainingMetricSummaryAverage {
+    pub fn compute(&self, values: &TrainingMetricValues) -> Option<f64> {
+        let mut values_by_bin: HashMap<&str, f64> = HashMap::new();
+        for (bin, value) in values.iter() {
+            values_by_bin
+                .entry(bin.granule())
+                .and_modify(|v| *v += value.value())
+                .or_insert(value.value());
+        }
+
+        let number_of_valid_bins = values_by_bin.iter().fold(0, |acc, (_, value)| {
+            if !self.include_zeros && *value == 0. {
+                acc
+            } else {
+                acc + 1
+            }
+        });
+
+        if number_of_valid_bins == 0 {
+            return None;
+        }
+
+        Some(
+            values_by_bin.iter().fold(0., |acc, (_, curr)| acc + curr)
+                / (number_of_valid_bins as f64),
+        )
+    }
+}
+
+impl TrainingMetricSummary {
+    pub fn empty() -> Self {
+        Self { average: None }
+    }
+
+    pub fn compute(&self, values: &TrainingMetricValues) -> TrainingMetricSummaryValues {
+        TrainingMetricSummaryValues {
+            average: self.average.as_ref().and_then(|a| a.compute(values)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricSummaryValues {
+    average: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     user: UserId,
     metric: ActivityMetricV2,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
+    summary: TrainingMetricSummary,
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -389,6 +446,7 @@ impl TrainingMetricDefinition {
             user: self.user,
             metric: self.metric,
             window: self.window,
+            summary: self.summary,
             filters: self.filters.merge_default_sports(default_sports),
         }
     }
@@ -1484,6 +1542,7 @@ mod test_training_metrics {
                 None,
                 None,
             ),
+            TrainingMetricSummary::empty(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1506,6 +1565,7 @@ mod test_training_metrics {
                 Some(TrainingMetricGroupBy::Sport),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1545,6 +1605,7 @@ mod test_training_metrics {
             ActivityMetricV2::Calories,
             window,
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1590,6 +1651,7 @@ mod test_training_metrics {
                 None,
                 None,
             ),
+            TrainingMetricSummary::empty(),
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -3064,6 +3126,7 @@ mod test_training_metrics_ordering {
                 None,
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         );
 
         let ids = ["a", "c", "b", "d"];
@@ -3212,5 +3275,101 @@ mod test_training_metrics_ordering {
         let new_ordering = ordering.remove_metric(&TrainingMetricId::from("b"));
 
         assert_eq!(new_ordering, ordering_from_vec(vec!["a", "c"]))
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_summary {
+    use super::*;
+
+    #[test]
+    fn test_compute_average_empty_values() {
+        let values = TrainingMetricValues::new(HashMap::new(), Unit::Kilometer);
+
+        let include_zeros = true;
+        let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
+
+        assert!(average.is_none())
+    }
+
+    #[test]
+    fn test_compute_average_include_zeros() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-26".to_string(), None),
+                    TrainingMetricValue::Max(0.),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let include_zeros = true;
+        let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
+
+        assert_eq!(average, Some(((10. + 15.) + 15. + 0.) / 3.))
+    }
+
+    #[test]
+    fn test_compute_average_exclude_zeros() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(15.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-26".to_string(), None),
+                    TrainingMetricValue::Max(0.),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let include_zeros = false;
+        let average = TrainingMetricSummaryAverage::new(include_zeros).compute(&values);
+
+        assert_eq!(average, Some(((10. + 15.) + 15.) / 2.))
+    }
+
+    #[test]
+    fn test_compute_summary_average() {
+        let values = TrainingMetricValues::new(
+            HashMap::from([
+                (
+                    TrainingMetricBin::new("2025-09-24".to_string(), Some("Running".to_string())),
+                    TrainingMetricValue::Max(10.0),
+                ),
+                (
+                    TrainingMetricBin::new("2025-09-25".to_string(), None),
+                    TrainingMetricValue::Max(20.0),
+                ),
+            ]),
+            Unit::Kilometer,
+        );
+
+        let summary = TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true)));
+
+        assert_eq!(summary.compute(&values).average, Some(15.0));
     }
 }

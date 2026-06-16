@@ -8,8 +8,9 @@ use crate::domain::{
         activity::ActivityMetricV2,
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
-            TrainingMetricValues, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            TrainingMetricSummary, TrainingMetricValues, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriodId,
         },
     },
     ports::{
@@ -111,6 +112,7 @@ where
             *req.metric(),
             req.window().clone(),
             req.filters().clone().merge_default_sports(&default_sports),
+            TrainingMetricSummary::empty(),
         );
         let training_metric = TrainingMetric::new(
             id.clone(),
@@ -240,7 +242,13 @@ where
                 metric,
                 window: winddow,
                 filters,
-            } => TrainingMetricDefinition::new(user, metric, winddow, filters),
+            } => TrainingMetricDefinition::new(
+                user,
+                metric,
+                winddow,
+                filters,
+                TrainingMetricSummary::empty(),
+            ),
             GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
                 .training_repository
                 .get_definition(&user, &id)
@@ -1141,6 +1149,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )])
         });
@@ -1185,6 +1194,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )
         );
@@ -1208,6 +1218,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )])
         });
@@ -1255,6 +1266,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )
         );
@@ -1279,6 +1291,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )])
         });
@@ -1337,6 +1350,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )])
         });
@@ -1416,6 +1430,7 @@ mod tests_training_metrics_service {
                         TrainingMetricGroupBy::none(),
                     )),
                     TrainingMetricFilters::empty(),
+                    TrainingMetricSummary::empty(),
                 ),
             )])
         });
@@ -1489,6 +1504,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 )])
             });
@@ -1595,6 +1611,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 ),
                 TrainingMetric::new(
@@ -1610,6 +1627,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 ),
             ])
@@ -1682,6 +1700,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 ),
                 TrainingMetric::new(
@@ -1697,6 +1716,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 ),
                 TrainingMetric::new(
@@ -1712,6 +1732,7 @@ mod tests_training_metrics_service {
                             TrainingMetricGroupBy::none(),
                         )),
                         TrainingMetricFilters::empty(),
+                        TrainingMetricSummary::empty(),
                     ),
                 ),
             ])
@@ -1794,6 +1815,7 @@ mod tests_training_metrics_service {
                             TrainingMetricFilters::empty().merge_default_sports(&Some(vec![
                                 SportFilter::Sport(Sport::AlpineSki),
                             ])),
+                            TrainingMetricSummary::empty(),
                         ),
                     ),
                     TrainingMetric::new(
@@ -1809,6 +1831,7 @@ mod tests_training_metrics_service {
                                 TrainingMetricGroupBy::none(),
                             )),
                             TrainingMetricFilters::empty(),
+                            TrainingMetricSummary::empty(),
                         ),
                     ),
                 ])
@@ -1919,6 +1942,7 @@ mod tests_training_metrics_service {
                     TrainingMetricGroupBy::none(),
                 )),
                 TrainingMetricFilters::empty(),
+                TrainingMetricSummary::empty(),
             )))
         });
         repository
@@ -1983,6 +2007,7 @@ mod tests_training_metrics_service {
                     TrainingMetricGroupBy::none(),
                 )),
                 TrainingMetricFilters::empty(),
+                TrainingMetricSummary::empty(),
             )))
         });
         repository
@@ -3398,6 +3423,7 @@ mod test_training_service_metric_values {
                 TrainingMetricGroupBy::none(),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         );
 
         let mut activity_service = MockActivityService::default();
@@ -3434,6 +3460,7 @@ mod test_training_service_metric_values {
                 TrainingMetricGroupBy::none(),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         );
 
         // Create some test activities
@@ -3769,6 +3796,7 @@ mod test_training_service_copy_metric {
                 TrainingMetricGroupBy::none(),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
         )
     }
 
