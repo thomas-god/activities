@@ -8,10 +8,11 @@ use crate::domain::{
         activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricId,
-            TrainingMetricName, TrainingMetricScope, TrainingMetricValues, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+            TrainingMetricName, TrainingMetricScope, TrainingMetricSummary, TrainingMetricValues,
+            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
+            TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+            TrainingPeriodWithActivities,
         },
     },
     ports::DateRange,
@@ -24,6 +25,7 @@ pub struct CreateTrainingMetricRequest {
     metric: ActivityMetricV2,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
+    summary: TrainingMetricSummary,
     scope: TrainingMetricScope,
 }
 
@@ -46,6 +48,10 @@ impl CreateTrainingMetricRequest {
 
     pub fn filters(&self) -> &TrainingMetricFilters {
         &self.filters
+    }
+
+    pub fn summary(&self) -> &TrainingMetricSummary {
+        &self.summary
     }
 
     pub fn scope(&self) -> &TrainingMetricScope {
@@ -96,6 +102,7 @@ pub enum GetTrainingMetricValuesRequest {
         metric: ActivityMetricV2,
         window: Option<TrainingMetricWindow>,
         filters: TrainingMetricFilters,
+        summary: TrainingMetricSummary,
     },
 }
 

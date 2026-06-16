@@ -9,8 +9,8 @@ use crate::domain::models::{
     },
     training::{
         SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricWindow, TrainingPeriodId,
-        TrainingPeriodSports,
+        TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSummary,
+        TrainingMetricSummaryAverage, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
     },
 };
 
@@ -79,6 +79,28 @@ impl From<APITrainingMetricSource> for ActivityMetricSource {
                 ))
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor, Deserialize, Default)]
+pub struct APITrainingMetricSummary {
+    average: Option<APITrainingMetricSummaryAverage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor, Deserialize)]
+pub struct APITrainingMetricSummaryAverage {
+    include_zeros: bool,
+}
+
+impl From<APITrainingMetricSummaryAverage> for TrainingMetricSummaryAverage {
+    fn from(value: APITrainingMetricSummaryAverage) -> Self {
+        Self::new(value.include_zeros)
+    }
+}
+
+impl From<APITrainingMetricSummary> for TrainingMetricSummary {
+    fn from(value: APITrainingMetricSummary) -> Self {
+        Self::new(value.average.map(TrainingMetricSummaryAverage::from))
     }
 }
 

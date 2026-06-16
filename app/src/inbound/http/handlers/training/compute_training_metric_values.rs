@@ -30,7 +30,7 @@ use crate::{
                 types::{
                     APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                     APITrainingMetricGranularity, APITrainingMetricGroupBy,
-                    APITrainingMetricSource,
+                    APITrainingMetricSource, APITrainingMetricSummary,
                 },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
@@ -49,6 +49,8 @@ pub struct ComputeMetricValuesRequest {
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
+    #[serde(default)]
+    summary: APITrainingMetricSummary,
     start: DateTime<FixedOffset>,
     end: Option<DateTime<FixedOffset>>,
 }
@@ -118,6 +120,7 @@ pub async fn compute_training_metric_values<
         metric: request.metric,
         window: window.clone(),
         filters,
+        summary: request.summary.into(),
     };
 
     let values = state

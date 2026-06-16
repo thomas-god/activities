@@ -24,7 +24,7 @@ use crate::{
             handlers::training::types::{
                 APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                 APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricSource,
-                ScopePayload,
+                APITrainingMetricSummary, ScopePayload,
             },
         },
         parser::ParseFile,
@@ -38,6 +38,8 @@ pub struct CreateTrainingMetricBody {
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
+    #[serde(default)]
+    summary: APITrainingMetricSummary,
     scope: ScopePayload,
 }
 
@@ -61,6 +63,7 @@ fn build_request(
         body.metric,
         body.window.map(TrainingMetricWindow::from),
         filters,
+        body.summary.into(),
         body.scope.into(),
     ))
 }

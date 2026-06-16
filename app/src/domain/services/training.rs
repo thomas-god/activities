@@ -8,9 +8,8 @@ use crate::domain::{
         activity::ActivityMetricV2,
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
-            TrainingMetricSummary, TrainingMetricValues, TrainingMetricsOrdering, TrainingNote,
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-            TrainingPeriodId,
+            TrainingMetricValues, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -112,7 +111,7 @@ where
             *req.metric(),
             req.window().clone(),
             req.filters().clone().merge_default_sports(&default_sports),
-            TrainingMetricSummary::empty(),
+            req.summary().clone(),
         );
         let training_metric = TrainingMetric::new(
             id.clone(),
@@ -240,15 +239,10 @@ where
             GetTrainingMetricValuesRequest::ByDefinition {
                 user,
                 metric,
-                window: winddow,
+                window,
                 filters,
-            } => TrainingMetricDefinition::new(
-                user,
-                metric,
-                winddow,
-                filters,
-                TrainingMetricSummary::empty(),
-            ),
+                summary,
+            } => TrainingMetricDefinition::new(user, metric, window, filters, summary),
             GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
                 .training_repository
                 .get_definition(&user, &id)
@@ -948,7 +942,8 @@ mod tests_training_metrics_service {
     };
 
     use crate::domain::models::training::{
-        SportFilter, TrainingMetricBin, TrainingMetricWindow, TrainingPeriod, TrainingPeriodSports,
+        SportFilter, TrainingMetricBin, TrainingMetricSummary, TrainingMetricWindow,
+        TrainingPeriod, TrainingPeriodSports,
     };
     use crate::domain::ports::DateRange;
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -982,6 +977,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGroupBy::none(),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
         );
 
@@ -1033,6 +1029,7 @@ mod tests_training_metrics_service {
             )),
             TrainingMetricFilters::empty()
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
         );
 
@@ -1064,6 +1061,7 @@ mod tests_training_metrics_service {
             )),
             TrainingMetricFilters::empty()
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
+            TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
         );
 
@@ -1094,6 +1092,7 @@ mod tests_training_metrics_service {
                 TrainingMetricGroupBy::none(),
             )),
             TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
         );
 
@@ -3369,7 +3368,7 @@ mod test_training_service_metric_values {
     };
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricWindow,
+        TrainingMetricGroupBy, TrainingMetricSummary, TrainingMetricWindow,
     };
     use crate::domain::ports::training::GetTrainingMetricValuesError;
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -3779,7 +3778,7 @@ mod test_training_service_copy_metric {
     use crate::domain::models::activity::ActivityMetricV2;
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricName, TrainingMetricWindow,
+        TrainingMetricGroupBy, TrainingMetricName, TrainingMetricSummary, TrainingMetricWindow,
     };
     use crate::domain::ports::training::{GetDefinitionError, SaveTrainingMetricError};
     use crate::domain::services::activity::test_utils::MockActivityService;
