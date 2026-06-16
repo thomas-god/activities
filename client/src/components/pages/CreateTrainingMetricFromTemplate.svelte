@@ -69,6 +69,7 @@
 		bonked: none(),
 		workoutTypes: none()
 	});
+	let showAverage = $state(false);
 	let metricName = $state('');
 
 	let chartWidth: number = $state(0);
@@ -152,6 +153,11 @@
 		// Optional filters
 		if (Object.keys(activeFilters).length > 0) {
 			payload = { ...payload, filters: activeFilters };
+		}
+
+		// Optional summary
+		if (showAverage) {
+			payload = { ...payload, summary: { average: { include_zeros: false } } };
 		}
 
 		return some(payload);
@@ -312,6 +318,16 @@
 		{/if}
 
 		<TrainingMetricFilters bind:filters {existingSportsConstraints} />
+
+		<label class="label" for="show-metric-average">
+			Display metric average
+			<input
+				type="checkbox"
+				class="checkbox checkbox-sm"
+				id="show-metric-average"
+				bind:checked={showAverage}
+			/>
+		</label>
 
 		<label class="label" for="metric-name">Metric name</label>
 		<input
