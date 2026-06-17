@@ -515,6 +515,20 @@ export const createTrainingMetric = async (payload: Object) => {
 	}
 };
 
+export const updateTrainingMetric = async (metric: string, payload: Object) => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
+		body: JSON.stringify(payload),
+		method: 'PATCH',
+		credentials: 'include',
+		mode: 'cors',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+	}
+};
+
 export const getTrainingMetricPreview = async (
 	payload: Object
 ): Promise<

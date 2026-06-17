@@ -1,4 +1,4 @@
-import type { MetricTemplate } from '$lib/api/training';
+import type {  MetricsListItemGrouped, MetricTemplate } from '$lib/api/training';
 import { bonkStatusToAPI } from '$lib/nutrition';
 import { isNone, isSome, none, some, type Option } from '$lib/Options';
 import type { Sport, SportCategory } from '$lib/sport';
@@ -103,4 +103,32 @@ export const fieldsAsPayload = (fields: TrainingMetricFields): Option<Object> =>
 	}
 
 	return some(payload);
+};
+
+export const matchMetricToFormFields = (
+	metric: MetricsListItemGrouped,
+	templates: MetricTemplate[]
+): TrainingMetricFields => {
+	const selectedTemplate = templates.find((template) =>
+		metric.metric === template.metric && metric.aggregate === null
+			? true
+			: metric.aggregate === template.aggregate
+	);
+
+	const filters = {
+		sports: metric.sports === null ? none() : some(metric.sports?.sports),
+		sportCategories: metric.sports === null ? none() : some(metric.sports?.categories),
+		bonked: metric.bonked === null ? none() : some(metric.bonked),
+		rpes: metric.rpes === null ? none() : some(metric.rpes),
+		workoutTypes: metric.workout_types === null ? none() : some(metric.workout_types)
+	} as TrainingMetricFiltersType;
+
+	return {
+		name: metric.name || '',
+		selectedTemplate: selectedTemplate === undefined ? none() : some(selectedTemplate),
+		granularity: metric.granularity === null ? 'None' : (metric.granularity as Granularity),
+		groupBy: metric.group_by === null ? 'None' : metric.group_by,
+		showAverage: metric.show_average !== null,
+		filters
+	};
 };

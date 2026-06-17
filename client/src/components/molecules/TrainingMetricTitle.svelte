@@ -85,6 +85,7 @@
 				</div>
 			</div>
 			<TrainingMetricMenu
+				{metric}
 				name={metric.name}
 				id={metric.id}
 				scope={metricScope(metric)}

@@ -2,14 +2,19 @@
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
+	import UpdateTrainingMetricFrom from '$components/pages/UpdateTrainingMetricFrom.svelte';
+	import type { MetricsListItemGrouped } from '$lib/api';
+	import { none } from '$lib/Options';
 
 	let {
+		metric,
 		name,
 		id,
 		scope,
 		onUpdate,
 		onDelete
 	}: {
+		metric: MetricsListItemGrouped;
 		id: string;
 		name: string | null;
 		scope: 'global' | 'local';
@@ -18,9 +23,7 @@
 	} = $props();
 
 	let showDeleteModal = $state(false);
-	let isUpdating = $state(false);
-	let editedName = $state(name || '');
-	let editNameDialog: HTMLDialogElement;
+	let editMetricDialog: HTMLDialogElement;
 
 	const deleteMetricCallback = async (): Promise<void> => {
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
@@ -35,39 +38,6 @@
 		showDeleteModal = false;
 		onDelete();
 	};
-
-	async function handleUpdateName() {
-		if (!editedName.trim()) {
-			alert('Name cannot be empty');
-			return;
-		}
-
-		isUpdating = true;
-		try {
-			const response = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
-				method: 'PATCH',
-				credentials: 'include',
-				mode: 'cors',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ name: editedName.trim() })
-			});
-
-			if (response.ok) {
-				editNameDialog.close();
-				onUpdate();
-			} else {
-				const error = await response.json();
-				alert(error.error || 'Failed to update training metric name');
-			}
-		} catch (error) {
-			alert('Error updating training metric name');
-			console.error(error);
-		} finally {
-			isUpdating = false;
-		}
-	}
 </script>
 
 <div class="dropdown dropdown-end">
@@ -76,12 +46,11 @@
 	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
-		<!-- TODO: replace edit name -> edit metric -->
-		<!-- <li>
-			<button onclick={() => editNameDialog.show()}>
-				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit name
+		<li>
+			<button onclick={() => editMetricDialog.show()}>
+				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit metric
 			</button>
-		</li> -->
+		</li>
 		<li>
 			<button onclick={() => (showDeleteModal = true)} class="text-error">
 				<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" /> Delete
@@ -91,41 +60,16 @@
 </div>
 
 <!-- Edit name modal -->
-<dialog class="modal" bind:this={editNameDialog}>
-	<div class="modal-box">
+<dialog class="modal" bind:this={editMetricDialog}>
+	<div class="modal-box max-w-2xl text-start">
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<h3 class="text-lg font-bold">Edit Training Metric Name</h3>
-		<div class="py-4">
-			<label class="input">
-				<span class="label">Name</span>
-				<input
-					type="text"
-					bind:value={editedName}
-					placeholder="Enter metric name"
-					class="w-full"
-					disabled={isUpdating}
-				/>
-			</label>
-		</div>
-		<div class="modal-action">
-			<button class="btn" onclick={() => editNameDialog.close()} disabled={isUpdating}>
-				Cancel
-			</button>
-			<button
-				class="btn btn-primary"
-				onclick={handleUpdateName}
-				disabled={isUpdating || !editedName.trim()}
-			>
-				{#if isUpdating}
-					<span class="loading loading-sm loading-spinner"></span>
-					Updating...
-				{:else}
-					Update
-				{/if}
-			</button>
-		</div>
+		<UpdateTrainingMetricFrom
+			initialMetric={metric}
+			callback={onUpdate}
+			existingSportsConstraints={none()}
+		/>
 	</div>
 	<form method="dialog" class="modal-backdrop">
 		<button>close</button>
