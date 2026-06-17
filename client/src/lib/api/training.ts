@@ -5,6 +5,7 @@ import { SportCategories, sports } from '$lib/sport';
 import { groupByClauses, metricAggregateFunctions } from '$lib/metric';
 import { dayjs } from '$lib/duration';
 import { type Activity, ActivitySchema } from './activities';
+import { none, type Option, some } from '$lib/Options';
 
 // =============================================================================
 // Schemas
@@ -70,6 +71,16 @@ const TrainingNoteSchema = z.object({
 
 const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 
+const MetricTemplatesSchema = z.array(
+	z.object({
+		display_name: z.string(),
+		metric: z.string(),
+		aggregate: z.string(),
+		unit: z.string(),
+		category: z.string()
+	})
+);
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -83,6 +94,7 @@ export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped
 export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
+export type MetricTemplate = z.infer<typeof MetricTemplatesSchema>[number];
 
 // =============================================================================
 // API Functions
@@ -472,3 +484,65 @@ export async function deleteTrainingNote(noteId: string): Promise<boolean> {
 
 	return res.status === 204;
 }
+
+export const fetchTrainingMetricTemplates = async () => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metrics/templates`, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	return MetricTemplatesSchema.parse(await res.json());
+};
+
+export const createTrainingMetric = async (payload: Object) => {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
+		body: JSON.stringify(payload),
+		method: 'POST',
+		credentials: 'include',
+		mode: 'cors',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+	}
+};
+
+export const getTrainingMetricPreview = async (
+	payload: Object
+): Promise<
+	Option<{
+		values: { time: string; group: string; value: number }[];
+		unit: string;
+		summary: Record<string, number>;
+	}>
+> => {
+	const body = JSON.stringify(payload);
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
+		body,
+		method: 'POST',
+		credentials: 'include',
+		mode: 'cors',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (res.status === 401) {
+		goto('/login');
+	}
+
+	if (res.status !== 200) {
+		return none();
+	}
+
+	const data = await res.json();
+	// Transform the GroupedMetricValues response to the format expected by the chart
+	// Response format: { group_name: { granule: value } }
+	const values: { time: string; group: string; value: number }[] = [];
+	for (const [group, granuleValues] of Object.entries(data.values)) {
+		for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
+			values.push({ time, group, value });
+		}
+	}
+	return some({ values, unit: data.unit, summary: data.summary });
+};
