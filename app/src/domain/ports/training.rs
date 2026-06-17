@@ -7,11 +7,12 @@ use crate::domain::{
         UserId,
         activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
         training::{
-            TrainingMetric, TrainingMetricFilters, TrainingMetricId, TrainingMetricName,
-            TrainingMetricScope, TrainingMetricSummary, TrainingMetricValues, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+            TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricFilters, TrainingMetricId,
+            TrainingMetricName, TrainingMetricPatch, TrainingMetricScope, TrainingMetricSummary,
+            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+            TrainingPeriodWithActivities,
         },
     },
     ports::DateRange,
@@ -80,6 +81,47 @@ impl CopyTrainingMetricRequest {
     pub fn new_name(&self) -> &Option<TrainingMetricName> {
         &self.new_name
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct UpdateTrainingMetricRequest {
+    user: UserId,
+    id: TrainingMetricId,
+    name: TrainingMetricName,
+    metric: ActivityMetricV2,
+    window: Option<TrainingMetricWindow>,
+    filters: TrainingMetricFilters,
+    summary: TrainingMetricSummary,
+}
+
+impl UpdateTrainingMetricRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn id(&self) -> &TrainingMetricId {
+        &self.id
+    }
+    pub fn patch(self) -> TrainingMetricPatch {
+        TrainingMetricPatch::new(
+            self.name,
+            TrainingMetricDefinitionPatch::new(
+                self.metric,
+                self.window,
+                self.filters,
+                self.summary,
+            ),
+        )
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTrainingMetricError {
+    #[error("Training metric {0} does not exist")]
+    MetricDoesNotExist(TrainingMetricId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+    #[error("Error when saving training metric definition")]
+    SaveMetricError(#[from] SaveTrainingMetricError),
 }
 
 #[derive(Debug, Error)]
@@ -253,6 +295,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: GetTrainingMetricValuesRequest,
         date_range: &DateRange,
     ) -> impl Future<Output = Result<TrainingMetricValues, GetTrainingMetricValuesError>> + Send;
+
+    fn update_training_metric(
+        &self,
+        req: UpdateTrainingMetricRequest,
+    ) -> impl Future<Output = Result<(), UpdateTrainingMetricError>> + Send;
 
     fn update_training_metric_name(
         &self,

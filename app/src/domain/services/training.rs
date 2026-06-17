@@ -23,11 +23,11 @@ use crate::domain::{
             DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
             ITrainingService, SetTrainingMetricsOrderingError, TrainingRepository,
-            UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
-            UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
-            UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
-            UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
-            UpdateTrainingPeriodNoteRequest,
+            UpdateTrainingMetricError, UpdateTrainingMetricNameError,
+            UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
+            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
+            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
+            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
         },
     },
 };
@@ -124,6 +124,25 @@ where
             .await?;
 
         Ok(id)
+    }
+
+    async fn update_training_metric(
+        &self,
+        req: UpdateTrainingMetricRequest,
+    ) -> Result<(), UpdateTrainingMetricError> {
+        let metric = self
+            .training_repository
+            .get_metric(req.user(), req.id())
+            .await
+            .map_err(|err| UpdateTrainingMetricError::Unknown(anyhow!(err)))?
+            .ok_or_else(|| UpdateTrainingMetricError::MetricDoesNotExist(req.id().clone()))?;
+
+        let patched_metric = metric.apply_patch(req.patch());
+
+        self.training_repository
+            .save_metric(patched_metric)
+            .await
+            .map_err(UpdateTrainingMetricError::SaveMetricError)
     }
 
     async fn copy_training_metric(
@@ -617,9 +636,10 @@ pub mod test_utils {
         ports::training::{
             CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
             CreateTrainingPeriodRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-            DeleteTrainingPeriodRequest, GetDefinitionError, GetTrainingMetricValuesRequest,
+            DeleteTrainingPeriodRequest, GetTrainingMetricError, GetTrainingMetricValuesRequest,
             GetTrainingMetricsDefinitionsError, GetTrainingNoteError, SaveTrainingMetricError,
-            SaveTrainingNoteError, SaveTrainingPeriodError, UpdateTrainingNoteError,
+            SaveTrainingNoteError, SaveTrainingPeriodError, UpdateTrainingMetricError,
+            UpdateTrainingMetricRequest, UpdateTrainingNoteError,
         },
     };
 
@@ -655,6 +675,11 @@ pub mod test_utils {
                 &self,
                 req: DeleteTrainingMetricRequest,
             ) -> Result<(), DeleteTrainingMetricError>;
+
+            async fn update_training_metric(
+                &self,
+                req: UpdateTrainingMetricRequest,
+            ) -> Result<(), UpdateTrainingMetricError>;
 
             async fn update_training_metric_name(
                 &self,
@@ -2028,6 +2053,134 @@ mod tests_training_metrics_service {
         let res = service.update_training_metric_name(req).await;
 
         assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_ok() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_save_metric()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            ActivityMetricV2::Distance,
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Weekly,
+                TrainingMetricAggregate::Sum,
+                TrainingMetricGroupBy::none(),
+            )),
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_does_not_exist() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository.expect_save_metric().times(0);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::MetricDoesNotExist(id)) = res else {
+            unreachable!("Should have returned MetricDoesNotExist")
+        };
+        assert_eq!(id, TrainingMetricId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_metric()
+            .times(1)
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_save_metric()
+            .times(1)
+            .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::SaveMetricError(_)) = res else {
+            unreachable!("Should have returned SaveMetricError")
+        };
+    }
+
+    #[tokio::test]
+    async fn test_update_training_metric_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_metric().times(1).returning(|_, _| {
+            Err(
+                crate::domain::ports::training::GetTrainingMetricError::Unknown(anyhow!(
+                    "db error"
+                )),
+            )
+        });
+        repository.expect_save_metric().times(0);
+
+        let activity_service = MockActivityService::default();
+        let service = TrainingService::new(repository, activity_service);
+
+        let req = UpdateTrainingMetricRequest::new(
+            "user".to_string().into(),
+            TrainingMetricId::from("test"),
+            TrainingMetricName::from("Updated Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+        );
+
+        let res = service.update_training_metric(req).await;
+
+        let Err(UpdateTrainingMetricError::Unknown(_)) = res else {
+            unreachable!("Should have returned Unknown")
+        };
     }
 }
 

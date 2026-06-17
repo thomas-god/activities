@@ -21,7 +21,7 @@ use crate::domain::{
         DateRange,
         training::{
             DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-            GetDefinitionError, GetTrainingMetricsDefinitionsError,
+            GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
             GetTrainingMetricsOrderingError, GetTrainingNoteError, SaveTrainingMetricError,
             SaveTrainingNoteError, SaveTrainingPeriodError, SetTrainingMetricsOrderingError,
             TrainingRepository, UpdateTrainingMetricNameError, UpdateTrainingNoteError,
@@ -88,7 +88,18 @@ impl TrainingRepository for SqliteTrainingRepository {
         sqlx::query(
             "INSERT INTO t_training_metrics_definitions
                 (id, user_id, activity_metric, granularity, aggregate, filters, group_by, name, training_period_id, summary)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);",
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                ON CONFLICT (id) DO UPDATE SET
+                    user_id=excluded.user_id,
+                    activity_metric=excluded.activity_metric,
+                    granularity=excluded.granularity,
+                    aggregate=excluded.aggregate,
+                    filters=excluded.filters,
+                    group_by=excluded.group_by,
+                    name=excluded.name,
+                    training_period_id=excluded.training_period_id,
+                    summary=excluded.summary;",
+
         )
         .bind(metric.id())
         .bind(definition.user())
@@ -767,7 +778,8 @@ mod test_sqlite_training_repository {
     use crate::domain::models::{
         activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric},
         training::{
-            SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+            SportFilter, TrainingMetricAggregate, TrainingMetricDefinitionPatch,
+            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricPatch,
             TrainingMetricSummaryAverage, TrainingNote, TrainingNoteContent, TrainingNoteId,
             TrainingNoteTitle, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
@@ -1050,22 +1062,41 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_save_training_metrics_fails_if_duplicate() {
+    async fn test_save_existing_metric() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
-        let definition = build_global_metric();
+        let metric = build_global_metric();
 
         repository
-            .save_metric(definition.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
+
+        let new_metric = metric.apply_patch(TrainingMetricPatch::new(
+            TrainingMetricName::from("another-name"),
+            TrainingMetricDefinitionPatch::new(
+                ActivityMetricV2::AvgPace,
+                None,
+                TrainingMetricFilters::empty(),
+                TrainingMetricSummary::empty(),
+            ),
+        ));
+
         repository
-            .save_metric(definition)
+            .save_metric(new_metric.clone())
             .await
-            .expect_err("Should have return Err");
+            .expect("Should have return Ok");
+
+        let saved_metric = repository
+            .get_metric(new_metric.definition().user(), new_metric.id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(saved_metric, new_metric);
     }
 
     #[tokio::test]

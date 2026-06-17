@@ -299,6 +299,33 @@ impl TrainingMetric {
     pub fn definition(&self) -> &TrainingMetricDefinition {
         &self.definition
     }
+
+    pub fn apply_patch(self, patch: TrainingMetricPatch) -> TrainingMetric {
+        TrainingMetric {
+            id: self.id,
+            scope: self.scope,
+            name: Some(patch.name),
+            definition: self.definition.apply_patch(patch.definition),
+        }
+    }
+}
+
+/// Patch that can be applied to a [`TrainingMetric`], i.e. its fields that are allowed to be
+/// updated.
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricPatch {
+    name: TrainingMetricName,
+    definition: TrainingMetricDefinitionPatch,
+}
+
+impl TrainingMetricPatch {
+    pub fn name(&self) -> &TrainingMetricName {
+        &self.name
+    }
+
+    pub fn definition(&self) -> &TrainingMetricDefinitionPatch {
+        &self.definition
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -432,6 +459,32 @@ impl TrainingMetricWindow {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Constructor)]
+pub struct TrainingMetricDefinitionPatch {
+    metric: ActivityMetricV2,
+    window: Option<TrainingMetricWindow>,
+    filters: TrainingMetricFilters,
+    summary: TrainingMetricSummary,
+}
+
+impl TrainingMetricDefinitionPatch {
+    pub fn metric(&self) -> &ActivityMetricV2 {
+        &self.metric
+    }
+
+    pub fn window(&self) -> &Option<TrainingMetricWindow> {
+        &self.window
+    }
+
+    pub fn filters(&self) -> &TrainingMetricFilters {
+        &self.filters
+    }
+
+    pub fn summary(&self) -> &TrainingMetricSummary {
+        &self.summary
+    }
+}
+
 impl TrainingMetricDefinition {
     pub fn user(&self) -> &UserId {
         &self.user
@@ -460,6 +513,16 @@ impl TrainingMetricDefinition {
         }
     }
 
+    pub fn apply_patch(self, patch: TrainingMetricDefinitionPatch) -> Self {
+        Self {
+            user: self.user,
+            metric: patch.metric,
+            window: patch.window,
+            filters: patch.filters,
+            summary: patch.summary,
+        }
+    }
+
     pub fn merge_default_sports(self, default_sports: &Option<Vec<SportFilter>>) -> Self {
         Self {
             user: self.user,
@@ -469,9 +532,7 @@ impl TrainingMetricDefinition {
             filters: self.filters.merge_default_sports(default_sports),
         }
     }
-}
 
-impl TrainingMetricDefinition {
     pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
         let values = match self.window.as_ref() {
             None => HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
