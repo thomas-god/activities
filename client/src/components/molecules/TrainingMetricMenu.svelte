@@ -76,11 +76,12 @@
 	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
-		<li>
+		<!-- TODO: replace edit name -> edit metric -->
+		<!-- <li>
 			<button onclick={() => editNameDialog.show()}>
 				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit name
 			</button>
-		</li>
+		</li> -->
 		<li>
 			<button onclick={() => (showDeleteModal = true)} class="text-error">
 				<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" /> Delete

@@ -1,13 +1,17 @@
-use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::domain::models::UserId;
+use crate::domain::models::activity::ActivityMetricV2;
 use crate::domain::models::training::{
-    TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingPeriodId,
+    TrainingMetricFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
+    TrainingMetricWindow, TrainingPeriodId,
 };
+use crate::domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
 use crate::domain::ports::{
     activity::IActivityService,
     preferences::IPreferencesService,
@@ -15,18 +19,20 @@ use crate::domain::ports::{
 };
 use crate::inbound::http::AppState;
 use crate::inbound::http::auth::{AuthenticatedUser, IUserService};
-use crate::inbound::http::handlers::training::types::ScopePayload;
+use crate::inbound::http::handlers::training::types::{
+    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, ScopePayload,
+};
 use crate::inbound::parser::ParseFile;
 
-#[derive(Serialize)]
-struct ErrorResponse {
-    error: String,
-}
-
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UpdateTrainingMetricBody {
     name: String,
+    metric: ActivityMetricV2,
+    window: Option<APITimeseriesWindow>,
+    #[serde(default)]
+    filters: Option<APITrainingMetricFilters>,
+    #[serde(default)]
+    summary: APITrainingMetricSummary,
 }
 
 pub async fn update_training_metric<
@@ -40,54 +46,46 @@ pub async fn update_training_metric<
     State(state): State<AppState<AS, PF, TS, US, PS>>,
     Path(metric_id): Path<Uuid>,
     axum::Json(body): axum::Json<UpdateTrainingMetricBody>,
-) -> Response {
+) -> StatusCode {
     let metric_id = TrainingMetricId::from(&metric_id.to_string());
 
-    let name = TrainingMetricName::from(body.name);
-    let request =
-        UpdateTrainingMetricNameRequest::new(user.user().clone(), metric_id.clone(), name);
+    let Ok(request) = build_request(user.user().clone(), metric_id, body) else {
+        return StatusCode::BAD_REQUEST;
+    };
 
-    if let Err(e) = state
+    match state
         .training_metrics_service
-        .update_training_metric_name(request)
+        .update_training_metric(request)
         .await
     {
-        return handle_update_name_error(e);
+        Err(UpdateTrainingMetricError::MetricDoesNotExist(_)) => StatusCode::NOT_FOUND,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        Ok(_) => StatusCode::CREATED,
     }
-
-    StatusCode::OK.into_response()
 }
 
-fn handle_update_name_error(error: UpdateTrainingMetricNameError) -> Response {
-    match error {
-        UpdateTrainingMetricNameError::MetricDoesNotExist(_) => (
-            StatusCode::NOT_FOUND,
-            axum::Json(ErrorResponse {
-                error: "Training metric does not exist".to_string(),
-            }),
-        )
-            .into_response(),
-        UpdateTrainingMetricNameError::GetMetricError(e) => {
-            eprintln!("Error getting training metric definition: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(ErrorResponse {
-                    error: "Internal server error".to_string(),
-                }),
-            )
-                .into_response()
-        }
-        UpdateTrainingMetricNameError::Unknown(e) => {
-            eprintln!("Error updating training metric name: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(ErrorResponse {
-                    error: "Internal server error".to_string(),
-                }),
-            )
-                .into_response()
-        }
-    }
+fn build_request(
+    user: UserId,
+    metric: TrainingMetricId,
+    body: UpdateTrainingMetricBody,
+) -> Result<UpdateTrainingMetricRequest, String> {
+    let name = TrainingMetricName::from(body.name);
+    let filters = body
+        .filters
+        .map(TrainingMetricFilters::try_from)
+        .transpose()
+        .map_err(|_| "Invalid fitlers".to_string())?
+        .unwrap_or_else(TrainingMetricFilters::empty);
+
+    Ok(UpdateTrainingMetricRequest::new(
+        user,
+        metric,
+        name,
+        body.metric,
+        body.window.map(TrainingMetricWindow::from),
+        filters,
+        body.summary.into(),
+    ))
 }
 
 #[cfg(test)]
@@ -95,10 +93,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_deserialize_update_name_only() {
-        let json = r#"{"name": "New Metric Name"}"#;
+    fn test_deserialize_required_fields_only() {
+        let json = r#"{"name": "New Metric Name", "metric": "Calories"}"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
         assert_eq!(body.name, "New Metric Name".to_string());
+        assert_eq!(body.metric, ActivityMetricV2::Calories);
+        assert!(body.window.is_none());
+        assert!(body.filters.is_none());
+    }
+
+    #[test]
+    fn test_deserialize_missing_required_metric_fails() {
+        let json = r#"{"name": "New Metric Name"}"#;
+        let result: Result<UpdateTrainingMetricBody, _> = serde_json::from_str(json);
+        assert!(result.is_err());
     }
 
     #[test]
