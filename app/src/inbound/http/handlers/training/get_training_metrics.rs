@@ -16,8 +16,9 @@ use crate::{
         models::{
             activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric},
             training::{
-                TrainingMetric, TrainingMetricDefinition, TrainingMetricScope,
-                TrainingMetricValues, TrainingPeriodId,
+                SportFilter, TrainingMetric, TrainingMetricDefinition, TrainingMetricScope,
+                TrainingMetricSummaryAverage, TrainingMetricValues, TrainingPeriodId,
+                TrainingPeriodSports,
             },
         },
         ports::{
@@ -93,6 +94,35 @@ impl From<GetTrainingMetricValuesError> for StatusCode {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ResponseSports {
+    categories: Vec<String>,
+    sports: Vec<String>,
+}
+
+impl From<&Option<Vec<SportFilter>>> for ResponseSports {
+    fn from(value: &Option<Vec<SportFilter>>) -> Self {
+        let Some(items) = value else {
+            return Self {
+                categories: vec![],
+                sports: vec![],
+            };
+        };
+
+        let mut sports = Vec::new();
+        let mut categories = Vec::new();
+
+        for sport in items {
+            match sport {
+                SportFilter::Sport(sport) => sports.push(sport.to_string()),
+                SportFilter::SportCategory(category) => categories.push(category.to_string()),
+            }
+        }
+
+        Self { categories, sports }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ResponseBodyItem {
     id: String,
     name: Option<String>,
@@ -100,10 +130,11 @@ pub struct ResponseBodyItem {
     unit: String,
     granularity: Option<String>,
     aggregate: Option<String>,
-    sports: Vec<String>,
-    workout_types: Vec<String>,
+    sports: ResponseSports,
+    workout_types: Option<Vec<String>>,
     bonked: Option<String>,
-    rpes: Vec<String>,
+    rpes: Option<Vec<String>>,
+    show_average: Option<TrainingMetricSummaryAverage>,
     values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
     scope: ScopePayload,
@@ -137,18 +168,12 @@ fn to_response_body_item(
             .window()
             .as_ref()
             .map(|w| w.aggregate().to_string()),
-        sports: definition
-            .filters()
-            .sports()
-            .as_ref()
-            .map(|sports| sports.iter().map(|sport| sport.to_string()).collect())
-            .unwrap_or_default(),
+        sports: ResponseSports::from(definition.filters().sports()),
         workout_types: definition
             .filters()
             .workout_types()
             .as_ref()
-            .map(|types| types.iter().map(|wt| wt.to_string()).collect())
-            .unwrap_or_default(),
+            .map(|types| types.iter().map(|wt| wt.to_string()).collect()),
         bonked: definition
             .filters()
             .bonked()
@@ -158,8 +183,8 @@ fn to_response_body_item(
             .filters()
             .rpes()
             .as_ref()
-            .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect())
-            .unwrap_or_default(),
+            .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect()),
+        show_average: definition.summary().average().clone(),
         values: values,
         group_by: definition
             .window()
@@ -334,10 +359,14 @@ mod tests {
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),
             aggregate: Some("Average".to_string()),
-            sports: vec!["Running".to_string()],
-            workout_types: vec!["tempo".to_string()],
+            sports: ResponseSports {
+                sports: vec!["TrailRunning".to_string()],
+                categories: vec!["Cycling".to_string()],
+            },
+            workout_types: Some(vec!["tempo".to_string()]),
             bonked: Some("bonked".to_string()),
-            rpes: vec!["eight".to_string()],
+            rpes: Some(vec!["eight".to_string()]),
+            show_average: Some(TrainingMetricSummaryAverage::new(false)),
             values: HashMap::from([(
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 10.5)]),
@@ -361,10 +390,14 @@ mod tests {
                     "unit": "kcal",
                     "granularity": "Daily",
                     "aggregate": "Average",
-                    "sports": ["Running"],
+                    "sports": {
+                        "sports": ["TrailRunning"],
+                        "categories": ["Cycling"]
+                    },
                     "workout_types": ["tempo"],
                     "bonked": "bonked",
                     "rpes": ["eight"],
+                    "show_average": {"include_zeros": false},
                     "values": {
                         "Running": {
                             "2025-09-24": 10.5

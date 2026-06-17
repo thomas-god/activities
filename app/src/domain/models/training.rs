@@ -402,6 +402,10 @@ impl TrainingMetricSummary {
         Self { average: None }
     }
 
+    pub fn average(&self) -> &Option<TrainingMetricSummaryAverage> {
+        &self.average
+    }
+
     pub fn compute(
         &self,
         values: &HashMap<TrainingMetricBin, TrainingMetricValue>,

@@ -71,10 +71,11 @@
 		}
 
 		// Sports filter
-		if (metric.sports && metric.sports.length > 0) {
+		if (metric.sports && metric.sports.sports.length + metric.sports.categories.length > 0) {
+			const sports = metric.sports.sports.concat(metric.sports.categories);
 			lines.push({
 				label: 'Filters',
-				value: metric.sports.map((s) => s.toLocaleLowerCase()).join(', ')
+				value: sports.map((s) => s.toLocaleLowerCase()).join(', ')
 			});
 		} else {
 			lines.push({ label: 'Filters', value: 'all sports' });
