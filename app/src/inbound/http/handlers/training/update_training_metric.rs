@@ -67,7 +67,7 @@ fn handle_update_name_error(error: UpdateTrainingMetricNameError) -> Response {
             }),
         )
             .into_response(),
-        UpdateTrainingMetricNameError::GetDefinitionError(e) => {
+        UpdateTrainingMetricNameError::GetMetricError(e) => {
             eprintln!("Error getting training metric definition: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,

@@ -120,7 +120,7 @@ where
             definition,
         );
         self.training_repository
-            .save_training_metric_definition(training_metric.clone())
+            .save_metric(training_metric.clone())
             .await?;
 
         Ok(id)
@@ -132,12 +132,14 @@ where
     ) -> Result<(), CopyTrainingMetricError> {
         let source_definition = self
             .training_repository
-            .get_definition(req.user(), req.source_metric())
+            .get_metric(req.user(), req.source_metric())
             .await
             .map_err(|err| CopyTrainingMetricError::Unknown(anyhow!(err)))?
             .ok_or_else(|| {
                 CopyTrainingMetricError::MetricDoesNotExist(req.source_metric().clone())
-            })?;
+            })?
+            .definition()
+            .clone();
 
         let target_period = self
             .training_repository
@@ -156,9 +158,7 @@ where
             new_definition,
         );
 
-        self.training_repository
-            .save_training_metric_definition(new_metric)
-            .await?;
+        self.training_repository.save_metric(new_metric).await?;
 
         Ok(())
     }
@@ -245,10 +245,12 @@ where
             } => TrainingMetricDefinition::new(user, metric, window, filters, summary),
             GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
                 .training_repository
-                .get_definition(&user, &id)
+                .get_metric(&user, &id)
                 .await
                 .map_err(|err| GetTrainingMetricValuesError::Unknown(err.into()))?
-                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(id))?,
+                .ok_or(GetTrainingMetricValuesError::TrainingMetricDoesNotExist(id))?
+                .definition()
+                .clone(),
         };
 
         self.compute_training_metric_values(&definition, date_range)
@@ -261,7 +263,7 @@ where
         req: DeleteTrainingMetricRequest,
     ) -> Result<(), DeleteTrainingMetricError> {
         self.training_repository
-            .delete_definition(req.user(), req.metric())
+            .delete_metric(req.user(), req.metric())
             .await
     }
 
@@ -270,7 +272,7 @@ where
         req: UpdateTrainingMetricNameRequest,
     ) -> Result<(), UpdateTrainingMetricNameError> {
         self.training_repository
-            .update_training_metric_name(req.user(), req.metric_id(), req.name().clone())
+            .update_metric_name(req.user(), req.metric_id(), req.name().clone())
             .await
     }
 
@@ -795,7 +797,7 @@ pub mod test_utils {
         }
 
         impl TrainingRepository for TrainingRepository {
-            async fn save_training_metric_definition(
+            async fn save_metric(
                 &self,
                 metric: TrainingMetric,
             ) -> Result<(), SaveTrainingMetricError>;
@@ -811,19 +813,19 @@ pub mod test_utils {
                 period: &TrainingPeriodId,
             ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError>;
 
-            async fn get_definition(
+            async fn get_metric(
                 &self,
                 user: &UserId,
                 metric: &TrainingMetricId,
-            ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError>;
+            ) -> Result<Option<TrainingMetric>, GetTrainingMetricError>;
 
-            async fn delete_definition(
+            async fn delete_metric(
                 &self,
                 user: &UserId,
                 metric: &TrainingMetricId,
             ) -> Result<(), DeleteTrainingMetricError>;
 
-            async fn update_training_metric_name(
+            async fn update_metric_name(
                 &self,
                 user: &UserId,
                 metric_id: &TrainingMetricId,
@@ -960,9 +962,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_create_metric_ok() {
         let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_save_training_metric_definition()
-            .returning(|_| Ok(()));
+        repository.expect_save_metric().returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
         let service = TrainingService::new(repository, activities);
@@ -1008,7 +1008,7 @@ mod tests_training_metrics_service {
             )
         });
         repository
-            .expect_save_training_metric_definition()
+            .expect_save_metric()
             .withf(|metric| {
                 metric.definition().filters().sports()
                     == &Some(vec![SportFilter::Sport(Sport::AlpineSki)])
@@ -1045,7 +1045,7 @@ mod tests_training_metrics_service {
         repository
             .expect_get_training_period()
             .returning(|_, _| None);
-        repository.expect_save_training_metric_definition().times(0);
+        repository.expect_save_metric().times(0);
         let activities = MockActivityService::new();
 
         let service = TrainingService::new(repository, activities);
@@ -1077,7 +1077,7 @@ mod tests_training_metrics_service {
     async fn test_create_metric_fails_to_save_definition() {
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_save_training_metric_definition()
+            .expect_save_metric()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         let activities = MockActivityService::new();
         let service = TrainingService::new(repository, activities);
@@ -1906,7 +1906,7 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_delete_metric_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_delete_definition().returning(|_, _| {
+        repository.expect_delete_metric().returning(|_, _| {
             Err(DeleteTrainingMetricError::MetricDoesNotExist(
                 TrainingMetricId::from("test"),
             ))
@@ -1928,11 +1928,12 @@ mod tests_training_metrics_service {
         assert_eq!(metric, TrainingMetricId::from("test"));
     }
 
-    #[tokio::test]
-    async fn test_training_service_delete_metric() {
-        let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_, _| {
-            Ok(Some(TrainingMetricDefinition::new(
+    fn build_metric() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
                 "user".to_string().into(),
                 ActivityMetricV2::Calories,
                 Some(TrainingMetricWindow::new(
@@ -1942,10 +1943,18 @@ mod tests_training_metrics_service {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
-            )))
-        });
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_training_service_delete_metric() {
+        let mut repository = MockTrainingRepository::new();
         repository
-            .expect_delete_definition()
+            .expect_get_metric()
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_delete_metric()
             .times(1)
             .withf(|user, id| {
                 user == &UserId::from("user") && id == &TrainingMetricId::from("test")
@@ -1968,13 +1977,11 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_update_metric_name_does_not_exist() {
         let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_update_training_metric_name()
-            .returning(|_, _, _| {
-                Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
-                    TrainingMetricId::from("test"),
-                ))
-            });
+        repository.expect_update_metric_name().returning(|_, _, _| {
+            Err(UpdateTrainingMetricNameError::MetricDoesNotExist(
+                TrainingMetricId::from("test"),
+            ))
+        });
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -1996,21 +2003,11 @@ mod tests_training_metrics_service {
     #[tokio::test]
     async fn test_training_service_update_metric_name() {
         let mut repository = MockTrainingRepository::new();
-        repository.expect_get_definition().returning(|_, _| {
-            Ok(Some(TrainingMetricDefinition::new(
-                "user".to_string().into(),
-                ActivityMetricV2::Calories,
-                Some(TrainingMetricWindow::new(
-                    TrainingMetricGranularity::Daily,
-                    TrainingMetricAggregate::Average,
-                    TrainingMetricGroupBy::none(),
-                )),
-                TrainingMetricFilters::empty(),
-                TrainingMetricSummary::empty(),
-            )))
-        });
         repository
-            .expect_update_training_metric_name()
+            .expect_get_metric()
+            .returning(|_, _| Ok(Some(build_metric())));
+        repository
+            .expect_update_metric_name()
             .times(1)
             .withf(|user, id, name| {
                 user == &UserId::from("user")
@@ -3386,7 +3383,7 @@ mod test_training_service_metric_values {
 
         let mut training_repository = MockTrainingRepository::new();
         training_repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
             .return_once(move |_, _| Ok(None));
 
@@ -3779,23 +3776,29 @@ mod test_training_service_copy_metric {
     use crate::domain::models::training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricName, TrainingMetricSummary, TrainingMetricWindow,
+        TrainingPeriod, TrainingPeriodSports,
     };
-    use crate::domain::ports::training::{GetDefinitionError, SaveTrainingMetricError};
+    use crate::domain::ports::training::{GetTrainingMetricError, SaveTrainingMetricError};
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use anyhow::anyhow;
 
-    fn make_definition() -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
-            UserId::test_default(),
-            ActivityMetricV2::Distance,
-            Some(TrainingMetricWindow::new(
-                TrainingMetricGranularity::Weekly,
-                TrainingMetricAggregate::Sum,
-                TrainingMetricGroupBy::none(),
-            )),
-            TrainingMetricFilters::empty(),
-            TrainingMetricSummary::empty(),
+    fn make_metric() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricV2::Distance,
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Weekly,
+                    TrainingMetricAggregate::Sum,
+                    TrainingMetricGroupBy::none(),
+                )),
+                TrainingMetricFilters::empty(),
+                TrainingMetricSummary::empty(),
+            ),
         )
     }
 
@@ -3803,28 +3806,28 @@ mod test_training_service_copy_metric {
     async fn test_copy_training_metric_ok() {
         let source_id = TrainingMetricId::from("source");
         let period_id = TrainingPeriodId::new();
-        let definition = make_definition();
+        let metric = make_metric();
 
         let mut repository = MockTrainingRepository::new();
 
-        let def_clone = definition.clone();
+        let metric_clone = metric.clone();
         repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
-            .returning(move |_, _| Ok(Some(def_clone.clone())));
+            .returning(move |_, _| Ok(Some(metric_clone.clone())));
 
         repository
             .expect_get_training_period()
             .times(1)
             .returning(|_, _| {
                 Some(
-                    crate::domain::models::training::TrainingPeriod::new(
+                    TrainingPeriod::new(
                         TrainingPeriodId::new(),
                         UserId::test_default(),
                         "2025-01-01".parse().unwrap(),
                         None,
                         "Test".to_string(),
-                        crate::domain::models::training::TrainingPeriodSports::new(None),
+                        TrainingPeriodSports::new(None),
                         None,
                     )
                     .unwrap(),
@@ -3832,13 +3835,13 @@ mod test_training_service_copy_metric {
             });
 
         let period_id_clone = period_id.clone();
-        let def_for_assert = definition.clone();
+        let metric_for_assert = metric.clone();
         repository
-            .expect_save_training_metric_definition()
+            .expect_save_metric()
             .times(1)
             .withf(move |metric| {
                 metric.scope() == &TrainingMetricScope::TrainingPeriod(period_id_clone.clone())
-                    && metric.definition() == &def_for_assert
+                    && metric.definition() == metric_for_assert.definition()
                     && metric.name() == &Some(TrainingMetricName::from("new-name"))
             })
             .returning(|_| Ok(()));
@@ -3864,7 +3867,7 @@ mod test_training_service_copy_metric {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
             .returning(|_, _| Ok(None));
 
@@ -3893,9 +3896,9 @@ mod test_training_service_copy_metric {
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
-            .returning(|_, _| Err(GetDefinitionError::Unknown(anyhow!("db error"))));
+            .returning(|_, _| Err(GetTrainingMetricError::Unknown(anyhow!("db error"))));
 
         let activity_service = MockActivityService::default();
         let service = TrainingService::new(repository, activity_service);
@@ -3915,13 +3918,13 @@ mod test_training_service_copy_metric {
     async fn test_copy_training_metric_target_period_not_found() {
         let source_id = TrainingMetricId::from("source");
         let period_id = TrainingPeriodId::new();
-        let definition = make_definition();
+        let metric = make_metric();
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
-            .returning(move |_, _| Ok(Some(definition.clone())));
+            .returning(move |_, _| Ok(Some(metric.clone())));
 
         repository
             .expect_get_training_period()
@@ -3946,13 +3949,13 @@ mod test_training_service_copy_metric {
     async fn test_copy_training_metric_save_error() {
         let source_id = TrainingMetricId::from("source");
         let period_id = TrainingPeriodId::new();
-        let definition = make_definition();
+        let metric = make_metric();
 
         let mut repository = MockTrainingRepository::new();
         repository
-            .expect_get_definition()
+            .expect_get_metric()
             .times(1)
-            .returning(move |_, _| Ok(Some(definition.clone())));
+            .returning(move |_, _| Ok(Some(metric.clone())));
 
         repository
             .expect_get_training_period()
@@ -3973,7 +3976,7 @@ mod test_training_service_copy_metric {
             });
 
         repository
-            .expect_save_training_metric_definition()
+            .expect_save_metric()
             .times(1)
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
 

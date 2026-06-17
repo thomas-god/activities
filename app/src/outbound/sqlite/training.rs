@@ -83,10 +83,7 @@ impl SqliteTrainingRepository {
 }
 
 impl TrainingRepository for SqliteTrainingRepository {
-    async fn save_training_metric_definition(
-        &self,
-        metric: TrainingMetric,
-    ) -> Result<(), SaveTrainingMetricError> {
+    async fn save_metric(&self, metric: TrainingMetric) -> Result<(), SaveTrainingMetricError> {
         let definition = metric.definition();
         sqlx::query(
             "INSERT INTO t_training_metrics_definitions
@@ -117,11 +114,11 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|_| ())
     }
 
-    async fn get_definition(
+    async fn get_metric(
         &self,
         user: &UserId,
         metric: &TrainingMetricId,
-    ) -> Result<Option<TrainingMetricDefinition>, GetDefinitionError> {
+    ) -> Result<Option<TrainingMetric>, GetTrainingMetricError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
         SELECT 
@@ -145,8 +142,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         .await
         {
             Ok((
-                _id,
-                _name,
+                id,
+                name,
                 user_id,
                 source,
                 metric,
@@ -154,7 +151,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                 aggregate,
                 filters,
                 group_by,
-                _training_period_id,
+                training_period_id,
                 summary,
             )) => {
                 let Some(metric) = parse_definition_row_metric(metric, source) else {
@@ -166,16 +163,21 @@ impl TrainingRepository for SqliteTrainingRepository {
                     }
                     _ => None,
                 };
-                Ok(Some(TrainingMetricDefinition::new(
+                let scope = match training_period_id {
+                    None => TrainingMetricScope::Global,
+                    Some(period) => TrainingMetricScope::TrainingPeriod(period),
+                };
+                let definition = TrainingMetricDefinition::new(
                     user_id,
                     metric,
                     window,
                     filters,
                     summary.unwrap_or_else(TrainingMetricSummary::empty),
-                )))
+                );
+                Ok(Some(TrainingMetric::new(id, name, scope, definition)))
             }
             Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(err) => Err(GetDefinitionError::Unknown(anyhow!(err))),
+            Err(err) => Err(GetTrainingMetricError::Unknown(anyhow!(err))),
         }
     }
 
@@ -311,7 +313,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         })
     }
 
-    async fn delete_definition(
+    async fn delete_metric(
         &self,
         user: &UserId,
         metric: &TrainingMetricId,
@@ -338,7 +340,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
-    async fn update_training_metric_name(
+    async fn update_metric_name(
         &self,
         user: &UserId,
         metric_id: &TrainingMetricId,
@@ -915,7 +917,7 @@ mod test_sqlite_training_repository {
         let definition = build_global_metric();
 
         repository
-            .save_training_metric_definition(definition)
+            .save_metric(definition)
             .await
             .expect("Should have return Ok");
     }
@@ -941,16 +943,16 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
-        let saved_definition = repository
-            .get_definition(metric.definition().user(), metric.id())
+        let saved_metric = repository
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
-        assert_eq!(saved_definition, *metric.definition());
+        assert_eq!(saved_metric.definition(), metric.definition());
 
         let saved_metrics = repository
             .get_global_metrics(metric.definition().user())
@@ -975,7 +977,7 @@ mod test_sqlite_training_repository {
             .expect("Should have created the period");
 
         repository
-            .save_training_metric_definition(definition)
+            .save_metric(definition)
             .await
             .expect("Should have return Ok");
     }
@@ -991,7 +993,7 @@ mod test_sqlite_training_repository {
             build_metric_scoped_to_period(&TrainingPeriodId::from("non-existing-period"));
 
         let Err(SaveTrainingMetricError::TrainingPeriodDoesNotExist(id)) =
-            repository.save_training_metric_definition(definition).await
+            repository.save_metric(definition).await
         else {
             unreachable!("Should have returned err")
         };
@@ -1009,7 +1011,7 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_group_by();
 
         repository
-            .save_training_metric_definition(definition)
+            .save_metric(definition)
             .await
             .expect("Should have return Ok");
 
@@ -1034,17 +1036,17 @@ mod test_sqlite_training_repository {
         let metric = build_metric_definition_with_summary();
 
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let saved_metric = repository
-            .get_definition(metric.definition().user(), metric.id())
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .unwrap()
             .unwrap();
 
-        assert_eq!(metric.definition(), &saved_metric);
+        assert_eq!(metric, saved_metric);
     }
 
     #[tokio::test]
@@ -1057,17 +1059,17 @@ mod test_sqlite_training_repository {
         let definition = build_global_metric();
 
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_metric(definition.clone())
             .await
             .expect("Should have return Ok");
         repository
-            .save_training_metric_definition(definition)
+            .save_metric(definition)
             .await
             .expect_err("Should have return Err");
     }
 
     #[tokio::test]
-    async fn test_get_definition() {
+    async fn test_get_metric() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1076,21 +1078,21 @@ mod test_sqlite_training_repository {
         let metric = build_global_metric();
 
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.definition().user(), metric.id())
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, *metric.definition());
+        assert_eq!(res, metric);
     }
 
     #[tokio::test]
-    async fn test_get_definition_with_filters() {
+    async fn test_get_metric_with_filters() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1099,21 +1101,21 @@ mod test_sqlite_training_repository {
         let metric = build_metric_definition_with_filters();
 
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.definition().user(), metric.id())
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, *metric.definition());
+        assert_eq!(res, metric);
     }
 
     #[tokio::test]
-    async fn test_get_definition_with_group_by() {
+    async fn test_get_metric_with_group_by() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1122,35 +1124,35 @@ mod test_sqlite_training_repository {
         let metric = build_metric_definition_with_group_by();
 
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
         let res = repository
-            .get_definition(metric.definition().user(), metric.id())
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK")
             .expect("Should have returned Some");
 
-        assert_eq!(res, *metric.definition());
+        assert_eq!(res, metric);
     }
 
     #[tokio::test]
-    async fn test_get_definition_not_found() {
+    async fn test_get_metric_not_found() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
         let res = repository
-            .get_definition(&UserId::test_default(), &TrainingMetricId::new())
+            .get_metric(&UserId::test_default(), &TrainingMetricId::new())
             .await
             .expect("Should have returned OK");
         assert!(res.is_none());
     }
 
     #[tokio::test]
-    async fn test_get_definitions_for_user() {
+    async fn test_get_metrics_for_user() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1158,12 +1160,12 @@ mod test_sqlite_training_repository {
 
         let definition = build_global_metric();
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_metric(definition.clone())
             .await
             .expect("Should have return Ok");
         let definition_with_filters = build_metric_definition_with_filters();
         repository
-            .save_training_metric_definition(definition_with_filters.clone())
+            .save_metric(definition_with_filters.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1178,7 +1180,7 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_get_definitions_for_user_only() {
+    async fn test_get_metrics_for_user_only() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1186,7 +1188,7 @@ mod test_sqlite_training_repository {
 
         let definition = build_global_metric();
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_metric(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1199,7 +1201,7 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_get_definitions_with_filters() {
+    async fn test_get_metrics_with_filters() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1208,7 +1210,7 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_filters();
 
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_metric(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1221,7 +1223,7 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_get_definitions_with_group_by() {
+    async fn test_get_metrics_with_group_by() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
             .await
@@ -1230,7 +1232,7 @@ mod test_sqlite_training_repository {
         let definition = build_metric_definition_with_group_by();
 
         repository
-            .save_training_metric_definition(definition.clone())
+            .save_metric(definition.clone())
             .await
             .expect("Should have return Ok");
 
@@ -1251,12 +1253,12 @@ mod test_sqlite_training_repository {
 
         let metric = build_global_metric();
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
 
         repository
-            .delete_definition(metric.definition().user(), metric.id())
+            .delete_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should have returned OK");
     }
@@ -1269,9 +1271,7 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         let id = TrainingMetricId::new();
-        let err = repository
-            .delete_definition(&UserId::test_default(), &id)
-            .await;
+        let err = repository.delete_metric(&UserId::test_default(), &id).await;
 
         let Err(DeleteTrainingMetricError::MetricDoesNotExist(err_id)) = err else {
             unreachable!("Should have been an err")
@@ -1289,35 +1289,37 @@ mod test_sqlite_training_repository {
         // Create a metric
         let metric = build_global_metric();
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should save metric");
 
         // Update the name
         let new_name = TrainingMetricName::from("Updated Metric Name");
         let result = repository
-            .update_training_metric_name(metric.definition().user(), metric.id(), new_name.clone())
+            .update_metric_name(metric.definition().user(), metric.id(), new_name.clone())
             .await;
         assert!(result.is_ok());
 
         // Verify the name was updated
-        let fetched = repository
-            .get_definition(metric.definition().user(), metric.id())
-            .await;
-        assert!(fetched.is_ok());
-        let fetched_def = fetched.unwrap();
-        assert!(fetched_def.is_some());
-        let definition = fetched_def.unwrap();
+        let metric = repository
+            .get_metric(metric.definition().user(), metric.id())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            metric.name(),
+            &Some(TrainingMetricName::from("Updated Metric Name"))
+        );
 
         // Verify other fields unchanged
-        assert_eq!(definition.user(), metric.definition().user());
-        assert_eq!(definition.metric(), metric.definition().metric());
+        assert_eq!(metric.definition().user(), metric.definition().user());
+        assert_eq!(metric.definition().metric(), metric.definition().metric());
         assert_eq!(
-            definition.window().as_ref().unwrap().granularity(),
+            metric.definition().window().as_ref().unwrap().granularity(),
             metric.definition().window().as_ref().unwrap().granularity()
         );
         assert_eq!(
-            definition.window().as_ref().unwrap().aggregate(),
+            metric.definition().window().as_ref().unwrap().aggregate(),
             metric.definition().window().as_ref().unwrap().aggregate()
         );
     }
@@ -1332,7 +1334,7 @@ mod test_sqlite_training_repository {
         // Try to update a non-existent metric
         let metric_id = TrainingMetricId::new();
         let result = repository
-            .update_training_metric_name(
+            .update_metric_name(
                 &UserId::test_default(),
                 &metric_id,
                 TrainingMetricName::from("New Name"),
@@ -1388,22 +1390,18 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(metric1.clone())
+            .save_metric(metric1.clone())
             .await
             .expect("Should save metric 1");
         repository
-            .save_training_metric_definition(metric2.clone())
+            .save_metric(metric2.clone())
             .await
             .expect("Should save metric 2");
 
         // Update only metric1's name
         let new_name = TrainingMetricName::from("Updated First Metric");
         let result = repository
-            .update_training_metric_name(
-                metric1.definition().user(),
-                metric1.id(),
-                new_name.clone(),
-            )
+            .update_metric_name(metric1.definition().user(), metric1.id(), new_name.clone())
             .await;
         assert!(result.is_ok());
 
@@ -2900,7 +2898,7 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(metric_with_name.clone())
+            .save_metric(metric_with_name.clone())
             .await
             .expect("Should save metric with name");
 
@@ -2927,7 +2925,7 @@ mod test_sqlite_training_repository {
         let metric_without_name = build_global_metric(); // None for name
 
         repository
-            .save_training_metric_definition(metric_without_name.clone())
+            .save_metric(metric_without_name.clone())
             .await
             .expect("Should save metric without name");
 
@@ -2986,7 +2984,7 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(global_metric.clone())
+            .save_metric(global_metric.clone())
             .await
             .expect("Should save global metric");
 
@@ -2995,7 +2993,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have created the period");
         repository
-            .save_training_metric_definition(period_metric.clone())
+            .save_metric(period_metric.clone())
             .await
             .expect("Should save period metric");
 
@@ -3078,7 +3076,7 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(global_metric.clone())
+            .save_metric(global_metric.clone())
             .await
             .expect("Should save global metric");
 
@@ -3087,7 +3085,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have created period 1");
         repository
-            .save_training_metric_definition(period_metric.clone())
+            .save_metric(period_metric.clone())
             .await
             .expect("Should save period metric");
 
@@ -3096,7 +3094,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have created period 2");
         repository
-            .save_training_metric_definition(other_period_metric.clone())
+            .save_metric(other_period_metric.clone())
             .await
             .expect("Should save other period metric");
 
@@ -3184,7 +3182,7 @@ mod test_sqlite_training_repository {
         );
 
         repository
-            .save_training_metric_definition(global_metric.clone())
+            .save_metric(global_metric.clone())
             .await
             .expect("Should save global metric");
 
@@ -3193,7 +3191,7 @@ mod test_sqlite_training_repository {
             .await
             .expect("Should have created the period");
         repository
-            .save_training_metric_definition(period_metric.clone())
+            .save_metric(period_metric.clone())
             .await
             .expect("Should save period metric");
 
@@ -3676,12 +3674,12 @@ mod test_sqlite_training_repository {
 
         let metric = build_global_metric();
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should save metric");
 
         let err = repository
-            .delete_definition(&UserId::from("another_user".to_string()), metric.id())
+            .delete_metric(&UserId::from("another_user".to_string()), metric.id())
             .await;
 
         let Err(DeleteTrainingMetricError::MetricDoesNotExist(_)) = err else {
@@ -3689,7 +3687,7 @@ mod test_sqlite_training_repository {
         };
 
         let fetched = repository
-            .get_definition(metric.definition().user(), metric.id())
+            .get_metric(metric.definition().user(), metric.id())
             .await
             .expect("Should not error");
         assert!(fetched.is_some());
@@ -3709,12 +3707,12 @@ mod test_sqlite_training_repository {
             build_global_metric().definition().clone(),
         );
         repository
-            .save_training_metric_definition(metric.clone())
+            .save_metric(metric.clone())
             .await
             .expect("Should save metric");
 
         let res = repository
-            .update_training_metric_name(
+            .update_metric_name(
                 &UserId::from("another_user".to_string()),
                 metric.id(),
                 TrainingMetricName::from("Updated Name"),

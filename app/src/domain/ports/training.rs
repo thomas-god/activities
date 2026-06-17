@@ -7,12 +7,11 @@ use crate::domain::{
         UserId,
         activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
         training::{
-            TrainingMetric, TrainingMetricDefinition, TrainingMetricFilters, TrainingMetricId,
-            TrainingMetricName, TrainingMetricScope, TrainingMetricSummary, TrainingMetricValues,
-            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-            TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-            TrainingPeriodWithActivities,
+            TrainingMetric, TrainingMetricFilters, TrainingMetricId, TrainingMetricName,
+            TrainingMetricScope, TrainingMetricSummary, TrainingMetricValues, TrainingMetricWindow,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
         },
     },
     ports::DateRange,
@@ -182,10 +181,10 @@ impl DeleteTrainingMetricRequest {
 
 #[derive(Debug, Error)]
 pub enum DeleteTrainingMetricError {
-    #[error("Training metric with id {0} does not exists")]
+    #[error("Training metric with id {0} does not exist")]
     MetricDoesNotExist(TrainingMetricId),
-    #[error("An infratstructure error occured when getting defintion")]
-    GetDefinitionError(#[from] GetDefinitionError),
+    #[error("An infratstructure error occured when getting the metric")]
+    GetMetricError(#[from] GetTrainingMetricError),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -215,8 +214,8 @@ impl UpdateTrainingMetricNameRequest {
 pub enum UpdateTrainingMetricNameError {
     #[error("Training metric {0} does not exist")]
     MetricDoesNotExist(TrainingMetricId),
-    #[error("An infrastructure error occured when getting definition")]
-    GetDefinitionError(#[from] GetDefinitionError),
+    #[error("An infrastructure error occured when getting the metric")]
+    GetMetricError(#[from] GetTrainingMetricError),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -416,7 +415,7 @@ pub enum SetTrainingMetricsOrderingError {
 }
 
 #[derive(Debug, Error)]
-pub enum GetDefinitionError {
+pub enum GetTrainingMetricError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -692,24 +691,24 @@ pub enum DeleteTrainingNoteError {
 /// TRAINING REPOSITORY
 ///////////////////////////////////////////////////////////////////
 pub trait TrainingRepository: Clone + Send + Sync + 'static {
-    fn save_training_metric_definition(
+    fn save_metric(
         &self,
         metric: TrainingMetric,
     ) -> impl Future<Output = Result<(), SaveTrainingMetricError>> + Send;
 
-    fn get_definition(
+    fn get_metric(
         &self,
         user: &UserId,
         metric: &TrainingMetricId,
-    ) -> impl Future<Output = Result<Option<TrainingMetricDefinition>, GetDefinitionError>> + Send;
+    ) -> impl Future<Output = Result<Option<TrainingMetric>, GetTrainingMetricError>> + Send;
 
-    fn delete_definition(
+    fn delete_metric(
         &self,
         user: &UserId,
         metric: &TrainingMetricId,
     ) -> impl Future<Output = Result<(), DeleteTrainingMetricError>> + Send;
 
-    fn update_training_metric_name(
+    fn update_metric_name(
         &self,
         user: &UserId,
         metric_id: &TrainingMetricId,
