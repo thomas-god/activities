@@ -127,6 +127,7 @@ pub struct ResponseBodyItem {
     id: String,
     name: Option<String>,
     metric: String,
+    metric_formated: String,
     unit: String,
     granularity: Option<String>,
     aggregate: Option<String>,
@@ -158,7 +159,8 @@ fn to_response_body_item(
     ResponseBodyItem {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
-        metric: format_source(&definition.metric().source()),
+        metric: metric.definition().metric().to_string(),
+        metric_formated: format_source_metric(&definition.metric().source()),
         unit: unit.to_string(),
         granularity: definition
             .window()
@@ -195,7 +197,7 @@ fn to_response_body_item(
     }
 }
 
-fn format_source(source: &ActivityMetricSource) -> String {
+fn format_source_metric(source: &ActivityMetricSource) -> String {
     match source {
         ActivityMetricSource::Statistic(stat) => stat.to_string(),
         ActivityMetricSource::Timeseries((metric, aggregate)) => {
@@ -305,13 +307,13 @@ mod tests {
     #[test]
     fn test_format_definition_source() {
         assert_eq!(
-            format_source(&ActivityMetricSource::Statistic(
+            format_source_metric(&ActivityMetricSource::Statistic(
                 ActivityStatistic::Calories
             )),
             "Calories".to_string()
         );
         assert_eq!(
-            format_source(&ActivityMetricSource::Timeseries((
+            format_source_metric(&ActivityMetricSource::Timeseries((
                 TimeseriesMetric::Distance,
                 TimeseriesAggregate::Max
             ))),
@@ -356,6 +358,7 @@ mod tests {
             id: "metric-id-1".to_string(),
             name: Some("My Metric".to_string()),
             metric: "Calories".to_string(),
+            metric_formated: "Activity average calories".to_string(),
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),
             aggregate: Some("Average".to_string()),
@@ -387,6 +390,7 @@ mod tests {
                     "id": "metric-id-1",
                     "name": "My Metric",
                     "metric": "Calories",
+                    "metric_formated": "Activity average calories",
                     "unit": "kcal",
                     "granularity": "Daily",
                     "aggregate": "Average",
