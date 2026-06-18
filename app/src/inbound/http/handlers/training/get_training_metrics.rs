@@ -35,8 +35,8 @@ use crate::{
             handlers::training::{
                 types::ScopePayload,
                 utils::{
-                    GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
-                    fill_missing_granules, group_metric_values,
+                    GranuleValues, GroupedMetricValues, MetricsDateRange,
+                    convert_metric_values_unit, fill_missing_granules, group_metric_values,
                 },
             },
         },
@@ -148,7 +148,7 @@ fn to_response_body_item(
 ) -> ResponseBodyItem {
     let (metric, metric_values) = metric;
     let definition = metric.definition();
-    let values = convert_metric_values(group_metric_values(metric_values));
+    let values = convert_metric_values_unit(group_metric_values(metric_values));
     let values = match metric.definition().window() {
         Some(window) => fill_missing_granules(values, window, range),
         None => values,

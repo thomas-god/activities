@@ -159,10 +159,10 @@ pub fn fill_missing_granules(
 /// # Returns
 ///
 /// A tuple of (Unit, GroupedMetricValues) with converted values and the appropriate unit
-pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues {
+pub fn convert_metric_values_unit(values: GroupedMetricValues) -> GroupedMetricValues {
     match values.unit {
         Unit::Meter => {
-            let converted = values
+            let converted_values = values
                 .iter()
                 .map(|(group, group_values)| {
                     (
@@ -174,7 +174,12 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect::<HashMap<_, _>>();
-            GroupedMetricValues::new(converted, values.summary_values, Unit::Kilometer)
+            let converted_summary = values
+                .summary_values
+                .iter()
+                .map(|(name, value)| (name.clone(), *value / 1000.))
+                .collect::<HashMap<_, _>>();
+            GroupedMetricValues::new(converted_values, converted_summary, Unit::Kilometer)
         }
         Unit::MeterPerSecond => {
             let converted = values
@@ -189,7 +194,12 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect();
-            GroupedMetricValues::new(converted, values.summary_values, Unit::KilometerPerHour)
+            let converted_summary = values
+                .summary_values
+                .iter()
+                .map(|(name, value)| (name.clone(), *value * 3.6))
+                .collect::<HashMap<_, _>>();
+            GroupedMetricValues::new(converted, converted_summary, Unit::KilometerPerHour)
         }
         Unit::SecondPerMeter => {
             let converted = values
@@ -204,7 +214,12 @@ pub fn convert_metric_values(values: GroupedMetricValues) -> GroupedMetricValues
                     )
                 })
                 .collect();
-            GroupedMetricValues::new(converted, values.summary_values, Unit::SecondPerKilometer)
+            let converted_summary = values
+                .summary_values
+                .iter()
+                .map(|(name, value)| (name.clone(), *value * 1000.))
+                .collect::<HashMap<_, _>>();
+            GroupedMetricValues::new(converted, converted_summary, Unit::SecondPerKilometer)
         }
         _ => values,
     }
@@ -237,11 +252,11 @@ mod tests {
                     ("2025-09-25".to_string(), 25000.0), // 25km in meters
                 ]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 12000.)]),
             Unit::Meter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
@@ -260,6 +275,10 @@ mod tests {
                 .get("2025-09-25"),
             Some(&25.0)
         );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            12.
+        );
     }
 
     #[test]
@@ -270,11 +289,11 @@ mod tests {
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 5000.0)]), // 5km in meters
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 12000.)]),
             Unit::Meter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
@@ -284,6 +303,10 @@ mod tests {
                 .unwrap()
                 .get("2025-09-24"),
             Some(&5.0)
+        );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            12.
         );
     }
 
@@ -298,11 +321,11 @@ mod tests {
                     ("2025-09-25".to_string(), 5.55), // 5.55 m/s ≈ 20 km/h
                 ]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 10.)]),
             Unit::MeterPerSecond,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::KilometerPerHour);
         assert_eq!(
@@ -324,6 +347,10 @@ mod tests {
                 .abs()
                 < 0.01
         );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            36.
+        );
     }
 
     #[test]
@@ -339,11 +366,11 @@ mod tests {
                     ("2025-09-25".to_string(), 7200.0), // 2 hours in seconds
                 ]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 1000.)]),
             Unit::Second,
         );
 
-        let converted_values = convert_metric_values(values.clone());
+        let converted_values = convert_metric_values_unit(values.clone());
 
         assert_eq!(converted_values.unit(), Unit::Second);
         assert_eq!(
@@ -362,6 +389,10 @@ mod tests {
                 .get("2025-09-25"),
             Some(&7200.0)
         );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            1000.
+        );
     }
 
     #[test]
@@ -372,11 +403,11 @@ mod tests {
                 "Cycling".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 250.0)]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 100.)]),
             Unit::Watt,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::Watt);
         assert_eq!(
@@ -386,6 +417,10 @@ mod tests {
                 .unwrap()
                 .get("2025-09-24"),
             Some(&250.0)
+        );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            100.
         );
     }
 
@@ -405,11 +440,11 @@ mod tests {
                     HashMap::from([("2025-09-24".to_string(), 10000.0)]),
                 ),
             ]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 1000.)]),
             Unit::Meter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::Kilometer);
         assert_eq!(
@@ -428,6 +463,7 @@ mod tests {
                 .get("2025-09-24"),
             Some(&10.0)
         );
+        assert_eq!(*converted_values.summary_values.get("average").unwrap(), 1.);
     }
 
     #[test]
@@ -441,11 +477,11 @@ mod tests {
                     ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
                 ]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 0.2)]),
             Unit::SecondPerMeter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
@@ -463,6 +499,10 @@ mod tests {
                 .unwrap()
                 .get("2025-09-25"),
             Some(&250.0)
+        );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            200.
         );
     }
 
@@ -482,11 +522,11 @@ mod tests {
                     HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
                 ),
             ]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 0.2)]),
             Unit::SecondPerMeter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
@@ -505,6 +545,10 @@ mod tests {
                 .get("2025-09-24"),
             Some(&100.0)
         );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            200.
+        );
     }
 
     #[test]
@@ -515,11 +559,11 @@ mod tests {
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 0.0)]),
             )]),
-            HashMap::new(),
+            HashMap::from([("average".to_string(), 0.0)]),
             Unit::SecondPerMeter,
         );
 
-        let converted_values = convert_metric_values(values);
+        let converted_values = convert_metric_values_unit(values);
 
         assert_eq!(converted_values.unit(), Unit::SecondPerKilometer);
         assert_eq!(
@@ -529,6 +573,10 @@ mod tests {
                 .unwrap()
                 .get("2025-09-24"),
             Some(&0.0)
+        );
+        assert_eq!(
+            *converted_values.summary_values.get("average").unwrap(),
+            0.0
         );
     }
 }

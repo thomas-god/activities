@@ -33,8 +33,8 @@ use crate::{
                     APITrainingMetricSource, APITrainingMetricSummary,
                 },
                 utils::{
-                    GranuleValues, GroupedMetricValues, MetricsDateRange, convert_metric_values,
-                    fill_missing_granules, group_metric_values,
+                    GranuleValues, GroupedMetricValues, MetricsDateRange,
+                    convert_metric_values_unit, fill_missing_granules, group_metric_values,
                 },
             },
         },
@@ -133,7 +133,7 @@ pub async fn compute_training_metric_values<
         .await
         .map_err(StatusCode::from)?;
 
-    let values = convert_metric_values(group_metric_values(values));
+    let values = convert_metric_values_unit(group_metric_values(values));
     let values = match window.as_ref() {
         Some(window) => fill_missing_granules(values, window, &range),
         None => values,
