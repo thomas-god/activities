@@ -134,7 +134,7 @@ pub struct ResponseBodyItem {
     sports: ResponseSports,
     workout_types: Option<Vec<String>>,
     bonked: Option<String>,
-    rpes: Option<Vec<String>>,
+    rpes: Option<Vec<u8>>,
     show_average: Option<TrainingMetricSummaryAverage>,
     values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
@@ -185,7 +185,7 @@ fn to_response_body_item(
             .filters()
             .rpes()
             .as_ref()
-            .map(|rpes| rpes.iter().map(|rpe| rpe.to_string()).collect()),
+            .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
         show_average: definition.summary().average().clone(),
         values: values,
         group_by: definition
@@ -368,7 +368,7 @@ mod tests {
             },
             workout_types: Some(vec!["tempo".to_string()]),
             bonked: Some("bonked".to_string()),
-            rpes: Some(vec!["eight".to_string()]),
+            rpes: Some(vec![1, 2]),
             show_average: Some(TrainingMetricSummaryAverage::new(false)),
             values: HashMap::from([(
                 "Running".to_string(),
@@ -400,7 +400,7 @@ mod tests {
                     },
                     "workout_types": ["tempo"],
                     "bonked": "bonked",
-                    "rpes": ["eight"],
+                    "rpes": [1, 2],
                     "show_average": {"include_zeros": false},
                     "values": {
                         "Running": {
