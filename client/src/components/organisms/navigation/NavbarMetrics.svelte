@@ -10,13 +10,19 @@
 		createTrainingMetricDialog.close();
 		invalidateTrainingMetrics();
 	};
+
+	// To prevent the form from loading when the dialog is initialized but hidden
+	let showForm = $state(false);
 </script>
 
 {#snippet cta()}
 	<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 		<button
 			class="btn w-46 rounded-lg btn-sm btn-primary sm:btn-md"
-			onclick={() => createTrainingMetricDialog.showModal()}>+ New training metric</button
+			onclick={() => {
+				showForm = true;
+				createTrainingMetricDialog.showModal();
+			}}>+ New training metric</button
 		>
 	</div>
 {/snippet}
@@ -28,7 +34,9 @@
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<CreateTrainingMetricFromTemplate callback={createTrainingMetricCallback} />
+		{#if showForm}
+			<CreateTrainingMetricFromTemplate callback={createTrainingMetricCallback} />
+		{/if}
 	</div>
 	<form method="dialog" class="modal-backdrop">
 		<button>close</button>

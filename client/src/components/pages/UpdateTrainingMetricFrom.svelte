@@ -94,7 +94,6 @@
 		callback();
 	};
 
-	// TODO: do not run this at component init ?
 	const fetchPreview = async (request: typeof previewRequest) => {
 		if (isNone(request)) {
 			return { values: [], unit: '', summary: {} };

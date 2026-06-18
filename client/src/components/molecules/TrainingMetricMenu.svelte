@@ -25,6 +25,9 @@
 	let showDeleteModal = $state(false);
 	let editMetricDialog: HTMLDialogElement;
 
+	// To prevent the form from loading when the dialog is initialized but hidden
+	let showEditForm = $state(false);
+
 	const deleteMetricCallback = async (): Promise<void> => {
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
 			method: 'DELETE',
@@ -47,7 +50,12 @@
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
 		<li>
-			<button onclick={() => editMetricDialog.show()}>
+			<button
+				onclick={() => {
+					showEditForm = true;
+					editMetricDialog.show();
+				}}
+			>
 				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit metric
 			</button>
 		</li>
@@ -65,11 +73,13 @@
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<UpdateTrainingMetricFrom
-			initialMetric={metric}
-			callback={onUpdate}
-			existingSportsConstraints={none()}
-		/>
+		{#if showEditForm}
+			<UpdateTrainingMetricFrom
+				initialMetric={metric}
+				callback={onUpdate}
+				existingSportsConstraints={none()}
+			/>
+		{/if}
 	</div>
 	<form method="dialog" class="modal-backdrop">
 		<button>close</button>
