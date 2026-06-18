@@ -33,6 +33,7 @@
 			isSome(filters.workoutTypes) &&
 			isSome(filters.bonked)
 	);
+	$inspect(filters);
 </script>
 
 <label class="label" for="metric-name"

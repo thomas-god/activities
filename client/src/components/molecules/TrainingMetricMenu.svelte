@@ -3,7 +3,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
 	import UpdateTrainingMetricFrom from '$components/pages/UpdateTrainingMetricFrom.svelte';
-	import type { MetricsListItemGrouped } from '$lib/api';
+	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
 
 	let {
@@ -14,7 +14,7 @@
 		onUpdate,
 		onDelete
 	}: {
-		metric: MetricsListItemGrouped;
+		metric: TrainingMetric;
 		id: string;
 		name: string | null;
 		scope: 'global' | 'local';

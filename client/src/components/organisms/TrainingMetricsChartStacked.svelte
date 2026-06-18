@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
-	import { displayGroupName, type GroupByClause } from '$lib/metric';
+	import { displayGroupName, type TrainingMetricGroupByClause } from '$lib/trainingMetric';
 	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
@@ -14,7 +14,7 @@
 		granularity: string;
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
-		groupBy: GroupByClause | null;
+		groupBy: TrainingMetricGroupByClause | null;
 		stacked?: boolean;
 		average: Option<number>;
 	}
@@ -43,7 +43,10 @@
 	let svgElement: SVGElement;
 
 	// Get color for a group based on the groupBy category
-	const getGroupColor = (groupName: string, groupBy: GroupByClause | null): string | null => {
+	const getGroupColor = (
+		groupName: string,
+		groupBy: TrainingMetricGroupByClause | null
+	): string | null => {
 		if (!groupBy) return null;
 
 		switch (groupBy) {

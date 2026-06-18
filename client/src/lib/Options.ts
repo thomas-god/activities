@@ -47,3 +47,7 @@ export function unwrap<T>(value: Option<T>): T {
 	}
 	return value.value;
 }
+
+export function asOption<T>(value: T | null): Option<T> {
+	return value === null ? none() : some(value);
+}

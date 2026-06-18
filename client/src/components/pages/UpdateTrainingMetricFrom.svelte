@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import TrainingMetricsChartStacked from '../organisms/TrainingMetricsChartStacked.svelte';
 	import { isNone, none, some, type Option } from '$lib/Options';
-	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
 	import TrainingMetricForm from '$components/organisms/training_metric/TrainingMetricForm.svelte';
 	import {
 		fieldsAsPayload,
@@ -14,15 +12,16 @@
 		fetchTrainingMetricTemplates,
 		getTrainingMetricPreview,
 		updateTrainingMetric,
-		type MetricsListItemGrouped
+		type TrainingMetric
 	} from '$lib/api';
+	import PreviewChart from '$components/organisms/training_metric/PreviewChart.svelte';
 
 	let {
 		initialMetric,
 		callback,
 		existingSportsConstraints = none()
 	}: {
-		initialMetric: MetricsListItemGrouped;
+		initialMetric: TrainingMetric;
 		callback: () => void;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
@@ -37,8 +36,8 @@
 	let fields: TrainingMetricFields = $state({
 		name: '',
 		selectedTemplate: none(),
-		granularity: 'None',
-		groupBy: 'None',
+		granularity: none(),
+		groupBy: none(),
 		filters: {
 			sports: none(),
 			sportCategories: none(),
@@ -50,13 +49,6 @@
 	});
 
 	let chartWidth: number = $state(0);
-
-	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
-		if (unit === 'activities') return 'number';
-		if (unit === 's') return 'duration';
-		if (unit === 's/km') return 'pace';
-		return 'number';
-	};
 
 	let requestPending = $state(false);
 
@@ -152,33 +144,7 @@
 			{:then values}
 				{#if values.values.length > 0}
 					<div bind:clientWidth={chartWidth}>
-						{#if fields.granularity !== 'None'}
-							<TrainingMetricsChartStacked
-								height={300}
-								width={chartWidth}
-								values={values.values}
-								unit={values.unit}
-								granularity={fields.granularity}
-								format={previewFormat(values.unit)}
-								showGroup={fields.groupBy !== 'None'}
-								groupBy={fields.groupBy !== 'None' ? fields.groupBy : null}
-								stacked={isNone(fields.selectedTemplate)
-									? false
-									: fields.selectedTemplate.value.aggregate === 'Sum'
-										? true
-										: false}
-								average={'average' in values.summary ? some(values.summary.average) : none()}
-							/>
-						{:else}
-							<TrainingMetricsChartLine
-								height={300}
-								width={chartWidth}
-								values={values.values}
-								unit={values.unit}
-								format={previewFormat(values.unit)}
-								average={'average' in values.summary ? some(values.summary.average) : none()}
-							/>
-						{/if}
+						<PreviewChart width={chartWidth} {values} {fields} />
 					</div>
 				{:else}
 					<div class="alert rounded-box alert-info">

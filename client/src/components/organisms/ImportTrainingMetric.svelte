@@ -1,11 +1,11 @@
 <script lang="ts">
 	import CopyUploadButton from '$components/atoms/CopyUploadButton.svelte';
-	import { copyTrainingMetricIntoPeriod, type MetricsListGrouped } from '$lib/api';
+	import { copyTrainingMetricIntoPeriod, type TrainingMetricList } from '$lib/api';
 	import {
 		aggregateFunctionDisplay,
 		groupByClauseDisplay,
 		metricValuesDisplayFormat
-	} from '$lib/metric';
+	} from '$lib/trainingMetric';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
@@ -14,7 +14,7 @@
 		metrics,
 		period_id,
 		metricCopiedCallback
-	}: { metrics: MetricsListGrouped; period_id: string; metricCopiedCallback: () => void } =
+	}: { metrics: TrainingMetricList; period_id: string; metricCopiedCallback: () => void } =
 		$props();
 
 	let chartWidth: number = $state(300);
@@ -72,7 +72,7 @@
 
 		// Sports filter
 		if (metric.sports && metric.sports.sports.length + metric.sports.categories.length > 0) {
-			const sports = metric.sports.sports.concat(metric.sports.categories);
+			const sports = (metric.sports.sports as string[]).concat(metric.sports.categories);
 			lines.push({
 				label: 'Filters',
 				value: sports.map((s) => s.toLocaleLowerCase()).join(', ')

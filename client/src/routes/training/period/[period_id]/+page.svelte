@@ -31,7 +31,7 @@
 		fetchTrainingPeriodDetails,
 		fetchTrainingPeriodMetrics,
 		fetchTrainingPeriodNotes,
-		type MetricsListGrouped,
+		type TrainingMetricList,
 		type TrainingNotesList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
@@ -45,10 +45,10 @@
 	let pageDetailsPromise: Option<Promise<TrainingPeriodDetails | null>> = $derived(
 		period_id === undefined ? none() : some(fetchTrainingPeriodDetails(fetch, period_id))
 	);
-	const generateMetricsPromise = (): Option<Promise<MetricsListGrouped>> =>
+	const generateMetricsPromise = (): Option<Promise<TrainingMetricList>> =>
 		period_id === undefined ? none() : some(fetchTrainingPeriodMetrics(fetch, period_id));
 	const updateMetricsPromise = () => (metricsPromise = generateMetricsPromise());
-	let metricsPromise: Option<Promise<MetricsListGrouped>> = $derived(generateMetricsPromise());
+	let metricsPromise: Option<Promise<TrainingMetricList>> = $derived(generateMetricsPromise());
 	let trainingNotesPromise: Option<Promise<TrainingNotesList>> = $derived(
 		period_id === undefined ? none() : some(fetchTrainingPeriodNotes(fetch, period_id))
 	);

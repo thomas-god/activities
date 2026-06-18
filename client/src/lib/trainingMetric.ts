@@ -2,25 +2,43 @@ import { getBonkStatusLabel, type BonkStatus } from './nutrition';
 import { sportCategoryDisplay, sportDisplay, type Sport, type SportCategory } from './sport';
 import { workoutTypeDisplay, type WorkoutType } from './workout-type';
 
-export const activityStatistics = [
+export const trainingMetricGranularities = ['Daily', 'Weekly', 'Monthly'] as const;
+export type TrainingMetricGranularity = (typeof trainingMetricGranularities)[number];
+
+export const trainingMetricTemplateCategories = [
+	'Duration',
 	'Calories',
 	'Elevation',
 	'Distance',
-	'Duration',
-	'NormalizedPower'
+	'Speed',
+	'Power',
+	'HeartRate',
+	'Cadence',
+	'Altitude',
+	'Pace',
+	'Other'
 ] as const;
-export type ActivityStatistic = (typeof activityStatistics)[number];
+export type TrainingMetricTemplateCategory = (typeof trainingMetricTemplateCategories)[number];
 
-export const metricAggregateFunctions = [
+export const trainingMetricAggregateFunctions = [
 	'Min',
 	'Max',
 	'Average',
 	'Sum',
 	'NumberOfActivities'
 ] as const;
-export type MetricAggregateFunction = (typeof metricAggregateFunctions)[number];
+export type TrainingMetricAggregateFunction = (typeof trainingMetricAggregateFunctions)[number];
 
-export const aggregateFunctionDisplay: Record<MetricAggregateFunction, string> = {
+export const trainingMetricGroupByClauses = [
+	'Sport',
+	'SportCategory',
+	'WorkoutType',
+	'RpeRange',
+	'Bonked'
+] as const;
+export type TrainingMetricGroupByClause = (typeof trainingMetricGroupByClauses)[number];
+
+export const aggregateFunctionDisplay: Record<TrainingMetricAggregateFunction, string> = {
 	Average: 'average',
 	Max: 'maximum',
 	Min: 'minimum',
@@ -28,16 +46,7 @@ export const aggregateFunctionDisplay: Record<MetricAggregateFunction, string> =
 	NumberOfActivities: 'number of activities'
 };
 
-export const groupByClauses = [
-	'Sport',
-	'SportCategory',
-	'WorkoutType',
-	'RpeRange',
-	'Bonked'
-] as const;
-export type GroupByClause = (typeof groupByClauses)[number];
-
-export const groupByClauseDisplay = (clause: GroupByClause): string => {
+export const groupByClauseDisplay = (clause: TrainingMetricGroupByClause): string => {
 	switch (clause) {
 		case 'Sport':
 			return 'sport';
@@ -70,7 +79,10 @@ export const rpeRangeDisplay = (range: RpeRange): string => {
 	}
 };
 
-export const displayGroupName = (group: string, groupBy: GroupByClause | null): string => {
+export const displayGroupName = (
+	group: string,
+	groupBy: TrainingMetricGroupByClause | null
+): string => {
 	if (group === 'Other') {
 		return 'Other';
 	}

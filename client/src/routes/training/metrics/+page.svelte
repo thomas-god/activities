@@ -5,12 +5,12 @@
 	import { dayjs } from '$lib/duration';
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
-	import { metricValuesDisplayFormat } from '$lib/metric';
+	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import {
 		fetchTrainingMetrics,
 		fetchTrainingPeriods,
 		groupMetricValues,
-		type MetricsListGrouped
+		type TrainingMetricList
 	} from '$lib/api';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
@@ -26,7 +26,7 @@
 	const generateMetricsPromise = () =>
 		some(fetchTrainingMetrics(fetch, dates.start, dates.end, 'global'));
 	const setMetricsPromise = () => (metricsPromise = generateMetricsPromise());
-	let metricsPromise: Option<Promise<MetricsListGrouped>> = $derived(generateMetricsPromise());
+	let metricsPromise: Option<Promise<TrainingMetricList>> = $derived(generateMetricsPromise());
 
 	let periodsPromise = $state(some(fetchTrainingPeriods(fetch)));
 

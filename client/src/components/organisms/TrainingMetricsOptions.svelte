@@ -2,7 +2,7 @@
 	import DateRange from '../molecules/DateRange.svelte';
 	import MetricsOrderingDialog from './MetricsOrderingDialog.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
-	import type { MetricsListGrouped, TrainingPeriodList } from '$lib/api';
+	import type { TrainingMetricList, TrainingPeriodList } from '$lib/api';
 	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 
@@ -11,7 +11,7 @@
 		datesUpdateCallback: (newDates: { start: string; end: string }) => void;
 		periodsPromise?: Option<Promise<TrainingPeriodList>>;
 		metricsOrderingScope: MetricsOrderingScope;
-		metricsPromise: Option<Promise<MetricsListGrouped>>;
+		metricsPromise: Option<Promise<TrainingMetricList>>;
 		onMetricsReordered: () => void;
 	}
 

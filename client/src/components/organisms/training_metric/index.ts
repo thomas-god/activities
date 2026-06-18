@@ -1,28 +1,16 @@
-import type {  MetricsListItemGrouped, MetricTemplate } from '$lib/api/training';
+import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
 import { bonkStatusToAPI } from '$lib/nutrition';
-import { isNone, isSome, none, some, type Option } from '$lib/Options';
+import { asOption, isNone, isSome, none, some, type Option } from '$lib/Options';
 import type { Sport, SportCategory } from '$lib/sport';
+import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
 import { workoutTypeToAPI } from '$lib/workout-type';
 import type { TrainingMetricFiltersType } from '../TrainingMetricFilters.svelte';
 
-export const granularityValues = ['None', 'Daily', 'Weekly', 'Monthly'] as const;
-export type Granularity = (typeof granularityValues)[number];
-
-export const gropuByValues = [
-	'None',
-	'Sport',
-	'SportCategory',
-	'WorkoutType',
-	'RpeRange',
-	'Bonked'
-] as const;
-export type GroupBy = (typeof gropuByValues)[number];
-
 export interface TrainingMetricFields {
 	name: string;
-	selectedTemplate: Option<MetricTemplate>;
-	granularity: Granularity;
-	groupBy: GroupBy;
+	selectedTemplate: Option<TrainingMetricTemplate>;
+	granularity: Option<TrainingMetricGranularity>;
+	groupBy: Option<TrainingMetricGroupByClause>;
 	filters: TrainingMetricFiltersType;
 	showAverage: boolean;
 }
@@ -78,14 +66,14 @@ export const fieldsAsPayload = (fields: TrainingMetricFields): Option<Object> =>
 	};
 
 	// Optional window
-	if (fields.granularity !== 'None') {
+	if (isSome(fields.granularity)) {
 		let window: {} = {
-			granularity: fields.granularity,
+			granularity: fields.granularity.value,
 			aggregate: fields.selectedTemplate.value.aggregate
 		};
 
-		if (fields.groupBy !== 'None') {
-			window = { ...window, group_by: fields.groupBy };
+		if (isSome(fields.groupBy)) {
+			window = { ...window, group_by: fields.groupBy.value };
 		}
 
 		payload = { window, ...payload };
@@ -106,8 +94,8 @@ export const fieldsAsPayload = (fields: TrainingMetricFields): Option<Object> =>
 };
 
 export const matchMetricToFormFields = (
-	metric: MetricsListItemGrouped,
-	templates: MetricTemplate[]
+	metric: TrainingMetric,
+	templates: TrainingMetricTemplate[]
 ): TrainingMetricFields => {
 	const selectedTemplate = templates.find((template) =>
 		metric.metric === template.metric && metric.aggregate === null
@@ -116,18 +104,18 @@ export const matchMetricToFormFields = (
 	);
 
 	const filters = {
-		sports: metric.sports === null ? none() : some(metric.sports?.sports),
-		sportCategories: metric.sports === null ? none() : some(metric.sports?.categories),
-		bonked: metric.bonked === null ? none() : some(metric.bonked),
-		rpes: metric.rpes === null ? none() : some(metric.rpes),
-		workoutTypes: metric.workout_types === null ? none() : some(metric.workout_types)
+		sports: metric.sports === null ? none() : some(metric.sports.sports),
+		sportCategories: metric.sports === null ? none() : some(metric.sports.categories),
+		bonked: asOption(metric.bonked),
+		rpes: asOption(metric.rpes),
+		workoutTypes: asOption(metric.workout_types)
 	} as TrainingMetricFiltersType;
 
 	return {
 		name: metric.name || '',
 		selectedTemplate: selectedTemplate === undefined ? none() : some(selectedTemplate),
-		granularity: metric.granularity === null ? 'None' : (metric.granularity as Granularity),
-		groupBy: metric.group_by === null ? 'None' : metric.group_by,
+		granularity: asOption(metric.granularity),
+		groupBy: asOption(metric.group_by),
 		showAverage: metric.show_average !== null,
 		filters
 	};

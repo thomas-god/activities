@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { metricScope, type MetricsListItemGrouped } from '$lib/api';
-	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/metric';
+	import { metricScope, type TrainingMetric } from '$lib/api';
+	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/trainingMetric';
 	import TrainingMetricMenu from './TrainingMetricMenu.svelte';
 
-	let { metric, onUpdate }: { metric: MetricsListItemGrouped; onUpdate: () => void } = $props();
+	let { metric, onUpdate }: { metric: TrainingMetric; onUpdate: () => void } = $props();
 
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 
@@ -30,7 +30,7 @@
 
 		// Sports filter
 		if (metric.sports && metric.sports.sports.length + metric.sports.categories.length > 0) {
-			const sports = metric.sports.sports.concat(metric.sports.categories);
+			const sports = (metric.sports.sports as string[]).concat(metric.sports.categories);
 			lines.push({
 				label: 'Filters',
 				value: sports.join(', ')

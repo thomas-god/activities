@@ -2,10 +2,17 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { SportCategories, sports } from '$lib/sport';
-import { groupByClauses, metricAggregateFunctions } from '$lib/metric';
+import {
+	trainingMetricGroupByClauses,
+	trainingMetricAggregateFunctions,
+	trainingMetricGranularities,
+	trainingMetricTemplateCategories
+} from '$lib/trainingMetric';
 import { dayjs } from '$lib/duration';
-import { type Activity, ActivitySchema } from './activities';
+import { ActivitySchema } from './activities';
 import { none, type Option, some } from '$lib/Options';
+import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
+import { BONK_STATUS_VALUES } from '$lib/nutrition';
 
 // =============================================================================
 // Schemas
@@ -39,33 +46,33 @@ const TrainingPeriodDetailsSchema = z.object({
 });
 
 // Schema for the new API response with grouped values
-const MetricsListItemSchemaGrouped = z.object({
+const TrainingMetricSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	metric: z.string(),
 	unit: z.string(),
-	granularity: z.string().nullable(),
-	aggregate: z.enum(metricAggregateFunctions).nullable(),
-	sports: z
-		.object({
-			sports: z.array(z.string()),
-			categories: z.array(z.string())
-		})
-		.nullable(),
-	workout_types: z.array(z.string()).nullable(),
-	bonked: z.string().nullable().nullable(),
-	rpes: z.array(z.string()).nullable(),
-	show_average: z.object({ include_zeros: z.boolean() }).nullable(),
-	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
-	summary: z.record(z.string(), z.number()),
-	group_by: z.enum(groupByClauses).nullable(),
 	scope: z.discriminatedUnion('type', [
 		z.object({ type: z.literal('global') }),
 		z.object({ type: z.literal('trainingPeriod'), trainingPeriodId: z.string() })
-	])
+	]),
+	granularity: z.enum(trainingMetricGranularities).nullable(),
+	aggregate: z.enum(trainingMetricAggregateFunctions).nullable(),
+	group_by: z.enum(trainingMetricGroupByClauses).nullable(),
+	sports: z
+		.object({
+			sports: z.array(z.enum(sports)),
+			categories: z.array(z.enum(SportCategories))
+		})
+		.nullable(),
+	workout_types: z.array(z.enum(WORKOUT_TYPE_VALUES)).nullable(),
+	bonked: z.enum(BONK_STATUS_VALUES).nullable().nullable(),
+	rpes: z.array(z.number()).nullable(),
+	show_average: z.object({ include_zeros: z.boolean() }).nullable(),
+	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
+	summary: z.record(z.string(), z.number())
 });
 
-const MetricsListSchemaGrouped = z.array(MetricsListItemSchemaGrouped);
+const TrainingMetricListSchema = z.array(TrainingMetricSchema);
 
 const TrainingNoteSchema = z.object({
 	id: z.string(),
@@ -77,13 +84,13 @@ const TrainingNoteSchema = z.object({
 
 const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 
-const MetricTemplatesSchema = z.array(
+const TrainingMetricTemplatesSchema = z.array(
 	z.object({
 		display_name: z.string(),
 		metric: z.string(),
-		aggregate: z.string(),
+		aggregate: z.enum(trainingMetricAggregateFunctions),
 		unit: z.string(),
-		category: z.string()
+		category: z.enum(trainingMetricTemplateCategories)
 	})
 );
 
@@ -93,14 +100,12 @@ const MetricTemplatesSchema = z.array(
 
 export type TrainingPeriodListItem = z.infer<typeof TrainingPeriodListItemSchema>;
 export type TrainingPeriodList = z.infer<typeof TrainingPeriodListSchema>;
-/** @deprecated Use `Activity` from `$lib/api` instead */
-export type TrainingPeriodActivityItem = Activity;
 export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
-export type MetricsListItemGrouped = z.infer<typeof MetricsListItemSchemaGrouped>;
-export type MetricsListGrouped = z.infer<typeof MetricsListSchemaGrouped>;
+export type TrainingMetric = z.infer<typeof TrainingMetricSchema>;
+export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
-export type MetricTemplate = z.infer<typeof MetricTemplatesSchema>[number];
+export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchema>[number];
 
 // =============================================================================
 // API Functions
@@ -204,7 +209,7 @@ export async function fetchTrainingMetrics(
 	start: Date | string,
 	end?: Date | string,
 	scope?: 'global' | { period: string }
-): Promise<MetricsListGrouped> {
+): Promise<TrainingMetricList> {
 	const params = new URLSearchParams();
 
 	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
@@ -241,7 +246,7 @@ export async function fetchTrainingMetrics(
 
 	if (res.status === 200) {
 		// Parse the new grouped response from the API
-		const groupedMetrics = MetricsListSchemaGrouped.parse(await res.json());
+		const groupedMetrics = TrainingMetricListSchema.parse(await res.json());
 
 		return groupedMetrics;
 	}
@@ -288,7 +293,7 @@ export async function copyTrainingMetricIntoPeriod(
 	return;
 }
 
-export const groupMetricValues = (metric: MetricsListItemGrouped) => {
+export const groupMetricValues = (metric: TrainingMetric) => {
 	let values = [];
 	for (const [group, time_values] of Object.entries(metric.values)) {
 		for (const [dt, value] of Object.entries(time_values)) {
@@ -298,7 +303,7 @@ export const groupMetricValues = (metric: MetricsListItemGrouped) => {
 	return values;
 };
 
-export const metricScope = (metric: MetricsListItemGrouped) =>
+export const metricScope = (metric: TrainingMetric) =>
 	metric.scope.type === 'global' ? 'global' : 'local';
 
 /**
@@ -388,7 +393,7 @@ export async function fetchTrainingPeriodNotes(
 export async function fetchTrainingPeriodMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	periodId: string
-): Promise<MetricsListGrouped> {
+): Promise<TrainingMetricList> {
 	const url = `${PUBLIC_APP_URL}/api/training/period/${periodId}/metrics`;
 
 	const res = await fetch(url, {
@@ -403,7 +408,7 @@ export async function fetchTrainingPeriodMetrics(
 	}
 
 	if (res.status === 200) {
-		return MetricsListSchemaGrouped.parse(await res.json());
+		return TrainingMetricListSchema.parse(await res.json());
 	}
 
 	return [];
@@ -498,7 +503,7 @@ export const fetchTrainingMetricTemplates = async () => {
 		credentials: 'include'
 	});
 
-	return MetricTemplatesSchema.parse(await res.json());
+	return TrainingMetricTemplatesSchema.parse(await res.json());
 };
 
 export const createTrainingMetric = async (payload: Object) => {
@@ -529,15 +534,14 @@ export const updateTrainingMetric = async (metric: string, payload: Object) => {
 	}
 };
 
+export interface TrainingMetricPreviewValues {
+	values: { time: string; group: string; value: number }[];
+	unit: string;
+	summary: Record<string, number>;
+}
 export const getTrainingMetricPreview = async (
 	payload: Object
-): Promise<
-	Option<{
-		values: { time: string; group: string; value: number }[];
-		unit: string;
-		summary: Record<string, number>;
-	}>
-> => {
+): Promise<Option<TrainingMetricPreviewValues>> => {
 	const body = JSON.stringify(payload);
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
 		body,

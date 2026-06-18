@@ -4,7 +4,10 @@
 		setMetricsOrdering,
 		type MetricsOrderingScope
 	} from '$lib/api/training-metrics-ordering';
-	import { aggregateFunctionDisplay, type MetricAggregateFunction } from '$lib/metric';
+	import {
+		aggregateFunctionDisplay,
+		type TrainingMetricAggregateFunction
+	} from '$lib/trainingMetric';
 
 	interface Props {
 		scope: MetricsOrderingScope;
@@ -12,7 +15,7 @@
 			id: string;
 			name: string | null;
 			granularity: string | null;
-			aggregate: MetricAggregateFunction | null;
+			aggregate: TrainingMetricAggregateFunction | null;
 			metric: string;
 		}>;
 		onSaved?: () => void;

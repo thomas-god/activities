@@ -1,8 +1,8 @@
 <script lang="ts">
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
-	import type { MetricsListItemGrouped } from '$lib/api/training';
-	import { metricValuesDisplayFormat } from '$lib/metric';
+	import type { TrainingMetric } from '$lib/api/training';
+	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 	import { none, some } from '$lib/Options';
 
@@ -11,7 +11,7 @@
 		height,
 		onUpdate
 	}: {
-		metrics: MetricsListItemGrouped[];
+		metrics: TrainingMetric[];
 		height: number;
 		onUpdate: () => void;
 		onDelete: () => void;

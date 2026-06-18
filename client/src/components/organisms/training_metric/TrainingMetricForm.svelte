@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, none, some, type Option } from '$lib/Options';
-	import type { MetricTemplate } from '$lib/api';
+	import { isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
+	import type { TrainingMetricTemplate } from '$lib/api';
 	import TrainingMetricFilters from '../TrainingMetricFilters.svelte';
 	import type { TrainingMetricFields } from '.';
 
@@ -10,13 +10,13 @@
 		fields = $bindable(),
 		existingSportsConstraints = none()
 	}: {
-		templates: MetricTemplate[];
+		templates: TrainingMetricTemplate[];
 		fields: TrainingMetricFields;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
 
 	let templatesByCategory = $derived.by(() => {
-		const groupedMetrics: Map<string, MetricTemplate[]> = new Map();
+		const groupedMetrics: Map<string, TrainingMetricTemplate[]> = new Map();
 		for (const template of templates) {
 			groupedMetrics.getOrInsert(template.category, []).push(template);
 		}
@@ -57,7 +57,10 @@
 <label class="label" for="metric-granularity">Group activities by</label>
 <select
 	class="select w-full"
-	bind:value={() => fields.granularity, (g) => (fields = { ...fields, granularity: g })}
+	bind:value={
+		() => unwrapOr(fields.granularity, 'None'),
+		(g) => (fields = { ...fields, granularity: g === 'None' ? none() : some(g) })
+	}
 	id="metric-granularity"
 >
 	<option value="None">None</option>
@@ -66,7 +69,7 @@
 	<option value="Monthly">Month</option>
 </select>
 
-{#if fields.granularity !== 'None'}
+{#if isSome(fields.granularity)}
 	<label class="label" for="metric-group-by">Additionally group activities by</label>
 	<select
 		class="select w-full"
