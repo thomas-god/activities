@@ -73,7 +73,10 @@
 	<label class="label" for="metric-group-by">Additionally group activities by</label>
 	<select
 		class="select w-full"
-		bind:value={() => fields.groupBy, (g) => (fields = { ...fields, groupBy: g })}
+		bind:value={
+			() => unwrapOr(fields.groupBy, 'None'),
+			(g) => (fields = { ...fields, groupBy: g === 'None' ? none() : some(g) })
+		}
 		id="metric-group-by"
 	>
 		<option value="None">No grouping</option>
