@@ -1,4 +1,8 @@
-import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
+import type {
+	TrainingMetric,
+	TrainingMetricTemplate,
+	TrainingMetricBasePayload
+} from '$lib/api/training';
 import { bonkStatusToAPI } from '$lib/nutrition';
 import { asOption, isNone, isSome, none, some, type Option } from '$lib/Options';
 import type { Sport, SportCategory } from '$lib/sport';
@@ -57,17 +61,19 @@ const fieldsActiveFilters = (fields: TrainingMetricFields) => {
 	return activeFilters;
 };
 
-export const fieldsAsPayload = (fields: TrainingMetricFields): Option<Object> => {
+export const fieldsAsPayload = (
+	fields: TrainingMetricFields
+): Option<TrainingMetricBasePayload> => {
 	if (isNone(fields.selectedTemplate)) {
 		return none();
 	}
-	let payload: Object = {
+	let payload: Omit<TrainingMetricBasePayload, 'name'> = {
 		metric: fields.selectedTemplate.value.metric
 	};
 
 	// Optional window
 	if (isSome(fields.granularity)) {
-		let window: {} = {
+		let window: TrainingMetricBasePayload['window'] = {
 			granularity: fields.granularity.value,
 			aggregate: fields.selectedTemplate.value.aggregate
 		};
@@ -76,7 +82,7 @@ export const fieldsAsPayload = (fields: TrainingMetricFields): Option<Object> =>
 			window = { ...window, group_by: fields.groupBy.value };
 		}
 
-		payload = { window, ...payload };
+		payload = { ...payload, window };
 	}
 
 	// Optional filters

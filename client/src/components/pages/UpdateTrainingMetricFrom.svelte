@@ -12,7 +12,9 @@
 		fetchTrainingMetricTemplates,
 		getTrainingMetricPreview,
 		updateTrainingMetric,
-		type TrainingMetric
+		type PreviewTrainingMetricPayload,
+		type TrainingMetric,
+		type UpdateTrainingMetricPayload
 	} from '$lib/api';
 	import PreviewChart from '$components/organisms/training_metric/PreviewChart.svelte';
 
@@ -54,7 +56,7 @@
 
 	let metricDefinitionPayload = $derived(fieldsAsPayload(fields));
 
-	let previewRequest: Option<Object> = $derived.by(() => {
+	let previewRequest: Option<PreviewTrainingMetricPayload> = $derived.by(() => {
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
@@ -74,7 +76,7 @@
 	// Create a unique key for the preview request to force re-rendering
 	let previewKey = $derived(JSON.stringify(previewRequest));
 
-	let createMetricRequest: Option<Object> = $derived.by(() => {
+	let updateMetricRequest: Option<UpdateTrainingMetricPayload> = $derived.by(() => {
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
@@ -85,7 +87,9 @@
 		return some({ name: fields.name.trim(), ...metricDefinitionPayload.value });
 	});
 
-	const updateMetricCallback = async (payload: Option<Object>): Promise<void> => {
+	const updateMetricCallback = async (
+		payload: Option<UpdateTrainingMetricPayload>
+	): Promise<void> => {
 		if (isNone(payload)) {
 			return;
 		}
@@ -121,10 +125,10 @@
 					class="btn w-full btn-neutral"
 					onclick={async () => {
 						requestPending = true;
-						await updateMetricCallback(createMetricRequest);
+						await updateMetricCallback(updateMetricRequest);
 						requestPending = false;
 					}}
-					disabled={requestPending || isNone(createMetricRequest)}
+					disabled={requestPending || isNone(updateMetricRequest)}
 					>Update metric
 					{#if requestPending}
 						<span class="loading loading-spinner"></span>

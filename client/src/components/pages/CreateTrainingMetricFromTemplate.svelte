@@ -11,7 +11,9 @@
 	import {
 		createTrainingMetric,
 		fetchTrainingMetricTemplates,
-		getTrainingMetricPreview
+		getTrainingMetricPreview,
+		type CreateTrainingMetricPayload,
+		type PreviewTrainingMetricPayload
 	} from '$lib/api';
 	import PreviewChart from '$components/organisms/training_metric/PreviewChart.svelte';
 
@@ -48,7 +50,7 @@
 
 	let metricDefinitionPayload = $derived(fieldsAsPayload(fields));
 
-	let previewRequest: Option<Object> = $derived.by(() => {
+	let previewRequest: Option<PreviewTrainingMetricPayload> = $derived.by(() => {
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
@@ -68,7 +70,7 @@
 	// Create a unique key for the preview request to force re-rendering
 	let previewKey = $derived(JSON.stringify(previewRequest));
 
-	let createMetricRequest: Option<Object> = $derived.by(() => {
+	let createMetricRequest: Option<CreateTrainingMetricPayload> = $derived.by(() => {
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
@@ -76,21 +78,23 @@
 			return none();
 		}
 
-		return some({ name: fields.name.trim(), ...metricDefinitionPayload.value });
+		return some({
+			...metricDefinitionPayload.value,
+			name: fields.name.trim(),
+			scope:
+				scope.kind === 'global'
+					? { type: 'global' }
+					: { type: 'trainingPeriod', trainingPeriodId: scope.periodId }
+		});
 	});
 
-	const createMetricCallback = async (payload: Option<Object>): Promise<void> => {
+	const createMetricCallback = async (
+		payload: Option<CreateTrainingMetricPayload>
+	): Promise<void> => {
 		if (isNone(payload)) {
 			return;
 		}
-		const _scope =
-			scope.kind === 'global'
-				? { type: 'global' }
-				: { type: 'trainingPeriod', trainingPeriodId: scope.periodId };
-		await createTrainingMetric({
-			scope: _scope,
-			...payload.value
-		});
+		await createTrainingMetric(payload.value);
 		callback();
 	};
 

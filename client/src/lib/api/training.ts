@@ -1,18 +1,22 @@
 import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
-import { SportCategories, sports } from '$lib/sport';
+import { SportCategories, sports, type Sport, type SportCategory } from '$lib/sport';
 import {
 	trainingMetricGroupByClauses,
 	trainingMetricAggregateFunctions,
 	trainingMetricGranularities,
-	trainingMetricTemplateCategories
+	trainingMetricTemplateCategories,
+	type TrainingMetricGranularity,
+	type TrainingMetricAggregateFunction,
+	type TrainingMetricGroupByClause
 } from '$lib/trainingMetric';
 import { dayjs } from '$lib/duration';
 import { ActivitySchema } from './activities';
 import { none, type Option, some } from '$lib/Options';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
-import { BONK_STATUS_VALUES } from '$lib/nutrition';
+import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
+import type { RPEValue } from '$lib/rpe';
 
 // =============================================================================
 // Schemas
@@ -506,7 +510,46 @@ export const fetchTrainingMetricTemplates = async () => {
 	return TrainingMetricTemplatesSchema.parse(await res.json());
 };
 
-export const createTrainingMetric = async (payload: Object) => {
+export interface TrainingMetricBasePayload {
+	metric: string;
+	window?: {
+		granularity: TrainingMetricGranularity;
+		aggregate: TrainingMetricAggregateFunction;
+		group_by?: TrainingMetricGroupByClause;
+	};
+	filters?: {
+		sports?: (
+			| {
+					Sport: Sport;
+			  }
+			| { SportCategory: SportCategory }
+		)[];
+		workout_types?: WorkerType[];
+		rpes?: RPEValue[];
+		bonked?: BonkStatus;
+	};
+	summary?: {
+		average: {
+			include_zeros: boolean;
+		};
+	};
+}
+
+export interface PreviewTrainingMetricPayload extends TrainingMetricBasePayload {
+	start: string;
+	end: string;
+}
+
+export interface UpdateTrainingMetricPayload extends TrainingMetricBasePayload {
+	name: string;
+}
+
+export interface CreateTrainingMetricPayload extends TrainingMetricBasePayload {
+	name: string;
+	scope: { type: 'global' } | { type: 'trainingPeriod'; trainingPeriodId: string };
+}
+
+export const createTrainingMetric = async (payload: CreateTrainingMetricPayload) => {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
 		body: JSON.stringify(payload),
 		method: 'POST',
@@ -520,7 +563,10 @@ export const createTrainingMetric = async (payload: Object) => {
 	}
 };
 
-export const updateTrainingMetric = async (metric: string, payload: Object) => {
+export const updateTrainingMetric = async (
+	metric: string,
+	payload: UpdateTrainingMetricPayload
+) => {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
 		body: JSON.stringify(payload),
 		method: 'PATCH',
@@ -540,7 +586,7 @@ export interface TrainingMetricPreviewValues {
 	summary: Record<string, number>;
 }
 export const getTrainingMetricPreview = async (
-	payload: Object
+	payload: PreviewTrainingMetricPayload
 ): Promise<Option<TrainingMetricPreviewValues>> => {
 	const body = JSON.stringify(payload);
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
