@@ -103,10 +103,10 @@ export const matchMetricToFormFields = (
 	metric: TrainingMetric,
 	templates: TrainingMetricTemplate[]
 ): TrainingMetricFields => {
-	const selectedTemplate = templates.find((template) =>
-		metric.metric === template.metric && metric.aggregate === null
-			? true
-			: metric.aggregate === template.aggregate
+	const selectedTemplate = templates.find(
+		(template) =>
+			metric.metric === template.metric &&
+			(metric.aggregate === null ? true : metric.aggregate === template.aggregate)
 	);
 
 	const filters = {
