@@ -284,7 +284,7 @@
 		return fetchTrainingMetrics(
 			fetch,
 			period.start,
-			period.end === null ? undefined : period.end,
+			period.end === null ? dayjs().toDate() : period.end,
 			'global'
 		);
 	});

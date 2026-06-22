@@ -12,7 +12,7 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 	return {
 		activities: fetchActivities(fetch, undefined, startDate, endDate),
 		notes: fetchTrainingNotes(fetch, depends, startDate, endDate),
-		metrics: fetchTrainingMetrics(fetch, startDate, dayjs().endOf("day").toDate(), 'global'),
+		metrics: fetchTrainingMetrics(fetch, startDate, dayjs().endOf('day').toDate(), 'global'),
 		trainingPeriods: fetchActiveTrainingPeriods(fetch, new Date())
 	};
 };

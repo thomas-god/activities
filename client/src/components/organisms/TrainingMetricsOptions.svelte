@@ -4,7 +4,7 @@
 	import { dayjs, localiseDate } from '$lib/duration';
 	import type { TrainingMetricList, TrainingPeriodList } from '$lib/api';
 	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
+	import { isNone, some, none, unwrapOr, type Option, isSomeAnd } from '$lib/Options';
 
 	interface Props {
 		dates: { start: string; end: string };
@@ -26,46 +26,28 @@
 
 	let metricsOrderingDialog: MetricsOrderingDialog;
 
-	// Local state for DateRange component binding
-	let localDates = $state({ start: dates.start, end: dates.end });
-
-	// Update local dates when prop dates change
-	$effect(() => {
-		localDates = { start: dates.start, end: dates.end };
-	});
-
-	// Handle date changes from DateRange component
-	$effect(() => {
-		if (localDates.start !== dates.start || localDates.end !== dates.end) {
-			selectedPeriodId = null; // Reset selected period when dates manually changed
-			selectedQuickRange = null; // Reset quick range selection
-			datesUpdateCallback(localDates);
-		}
-	});
-
-	// Track selected training period
-	let selectedPeriodId = $state<string | null>(null);
-	let selectedQuickRange = $state<'4weeks' | '12weeks' | 'year' | null>(null);
+	let selectedPeriodId: Option<string> = $state(none());
+	let selectedQuickRange: Option<'4weeks' | '12weeks' | 'year'> = $state(none());
 
 	const pastXWeeks = (numberOfWeek: number) => {
-		selectedPeriodId = null; // Reset selected period
-		selectedQuickRange = numberOfWeek === 4 ? '4weeks' : '12weeks';
+		selectedPeriodId = none();
+		selectedQuickRange = some(numberOfWeek === 4 ? '4weeks' : '12weeks');
 		const now = dayjs().startOf('day');
 		const start = now.subtract(numberOfWeek, 'week');
 		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
 	};
 
 	const thisYear = () => {
-		selectedPeriodId = null; // Reset selected period
-		selectedQuickRange = 'year';
+		selectedPeriodId = none();
+		selectedQuickRange = some('year');
 		const now = dayjs().startOf('day');
 		const start = now.startOf('year');
 		datesUpdateCallback({ start: start.toISOString(), end: now.toISOString() });
 	};
 
 	const selectPeriod = (periodId: string, periodStart: string, periodEnd: string | null) => {
-		selectedPeriodId = periodId;
-		selectedQuickRange = null; // Reset quick range selection
+		selectedPeriodId = some(periodId);
+		selectedQuickRange = none();
 		datesUpdateCallback({
 			start: periodStart,
 			end: periodEnd === null ? dayjs().toISOString() : periodEnd
@@ -83,27 +65,38 @@
 <div class="rounded-box border-base-300 bg-base-100 p-2 pt-4 shadow-md sm:p-4">
 	<div class="flex items-center justify-between gap-2">
 		<div class="pl-4">
-			<DateRange bind:dates={localDates} />
+			<DateRange
+				bind:dates={
+					() => dates,
+					(d) => {
+						selectedPeriodId = none();
+						selectedQuickRange = none();
+						datesUpdateCallback(d);
+					}
+				}
+			/>
 		</div>
 	</div>
 	<div class="flex flex-row flex-wrap items-center gap-2 py-2">
 		<button
 			class="btn btn-sm"
-			class:btn-active={selectedQuickRange === '4weeks'}
+			class:btn-active={isSomeAnd(selectedQuickRange, (v) => v === '4weeks')}
 			onclick={() => pastXWeeks(4)}>Last 4 weeks</button
 		>
 		<button
 			class="btn btn-sm"
-			class:btn-active={selectedQuickRange === '12weeks'}
+			class:btn-active={isSomeAnd(selectedQuickRange, (v) => v === '12weeks')}
 			onclick={() => pastXWeeks(12)}>Last 12 weeks</button
 		>
-		<button class="btn btn-sm" class:btn-active={selectedQuickRange === 'year'} onclick={thisYear}
-			>This year</button
+		<button
+			class="btn btn-sm"
+			class:btn-active={isSomeAnd(selectedQuickRange, (v) => v === 'year')}
+			onclick={thisYear}>This year</button
 		>
 		{#await sortedPeriods then periods}
 			<select
 				class="select select-sm"
-				value={selectedPeriodId ?? ''}
+				value={unwrapOr(selectedPeriodId, '')}
 				onchange={(e) => {
 					const periodId = e.currentTarget.value;
 					if (periodId) {
@@ -132,13 +125,10 @@
 		Metrics order
 	</button>
 </div>
-{#if isSome(metricsPromise)}
-	{#await metricsPromise.value then metrics}
-		<MetricsOrderingDialog
-			bind:this={metricsOrderingDialog}
-			scope={metricsOrderingScope}
-			{metrics}
-			onSaved={onMetricsReordered}
-		/>
-	{/await}
-{/if}
+
+<MetricsOrderingDialog
+	bind:this={metricsOrderingDialog}
+	scope={metricsOrderingScope}
+	metrics={await unwrapOr(metricsPromise, Promise.resolve([]))}
+	onSaved={onMetricsReordered}
+/>

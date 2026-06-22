@@ -18,7 +18,7 @@
 		editCallback: (newNutrition: Nutrition | null) => Promise<void>;
 	} = $props();
 
-	let nutrition = $state(initialNutrition);
+	let nutrition = $derived(initialNutrition);
 	let editMode = $state(false);
 
 	const handleSave = () => {

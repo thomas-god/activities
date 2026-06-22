@@ -17,7 +17,7 @@
 		editCallback: (newWorkoutType: WorkoutType | null) => Promise<void>;
 	} = $props();
 
-	let workoutType = $state(initialWorkoutType);
+	let workoutType = $derived(initialWorkoutType);
 	let editMode = $state(false);
 
 	const handleSave = () => {

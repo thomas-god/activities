@@ -13,6 +13,13 @@ export function isSome<T>(value: Option<T>): value is Some<T> {
 	return value._kind === 'Some';
 }
 
+export function isSomeAnd<T>(value: Option<T>, predicate: (other: T) => boolean): value is Some<T> {
+	if (value._kind === 'None') {
+		return false;
+	}
+	return predicate(value.value);
+}
+
 export function isNone<T>(value: Option<T>): value is None {
 	return value._kind === 'None';
 }

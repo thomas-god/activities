@@ -10,7 +10,7 @@
 		editCallback: (newFeedback: string | null) => Promise<void>;
 	} = $props();
 
-	let feedback = $state(initialFeedback);
+	let feedback = $derived(initialFeedback);
 	let editMode = $state(false);
 
 	const handleSave = () => {

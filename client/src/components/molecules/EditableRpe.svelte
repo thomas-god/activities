@@ -8,7 +8,7 @@
 		editCallback
 	}: { rpe: number | null; editCallback: (newRpe: number | null) => Promise<void> } = $props();
 
-	let rpe = $state(initialRpe);
+	let rpe = $derived(initialRpe);
 	let editMode = $state(false);
 
 	const handleSave = () => {

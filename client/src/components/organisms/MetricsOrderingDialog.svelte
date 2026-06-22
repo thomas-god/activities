@@ -118,8 +118,6 @@
 		metricsOrder = newOrder;
 	};
 
-	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
-
 	const getMetricName = (metricId: string): string => {
 		const metric = metrics.find((m) => m.id === metricId);
 		if (!metric) return metricId;

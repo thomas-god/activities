@@ -21,7 +21,7 @@
 	} = $props();
 
 	let chartWidth: number = $state(300);
-	let currentIndex = $state(initialIndex);
+	let currentIndex = $derived(initialIndex);
 
 	let currentMetric = $derived.by(() => {
 		const metric = metrics[currentIndex];
