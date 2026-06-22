@@ -6,11 +6,9 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    groups:
-      all:
-        patterns:
-          - "*"
+    directories:
+      - "/app"
+      - "/fit-parser"
     schedule:
       interval: "weekly"
       day: "monday"
