@@ -54,7 +54,7 @@
 				bind:value={email}
 			/>
 
-			<div class="mx-auto join-horizontal mt-4 join gap-4">
+			<div class="join mx-auto join-horizontal mt-4 gap-4">
 				<button
 					class="btn join-item rounded-xs btn-primary"
 					disabled={!isValid}

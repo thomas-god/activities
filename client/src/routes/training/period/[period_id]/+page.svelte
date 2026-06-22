@@ -131,9 +131,11 @@
 		}
 	}
 
-	async function handleUpdateDates(periodId: string, start: string, end?: string) {
+	async function handleUpdateDates(periodId: string, start: string, end: string | undefined) {
 		const body: { start: string; end?: string } = { start };
-		if (end) body.end = end;
+		if (end) {
+			body.end = end;
+		}
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/period/${periodId}`, {
 			method: 'PATCH',
 			credentials: 'include',
