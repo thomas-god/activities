@@ -6,9 +6,11 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directories:
-      - "/app"
-      - "/fit-parser"
+    directory: "/"
+    groups:
+      all:
+        patterns:
+          - "*"
     schedule:
       interval: "weekly"
       day: "monday"
