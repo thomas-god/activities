@@ -353,10 +353,8 @@ def create_training_period(
         headers={"Content-Type": "application/json"},
     )
     print(f"Period ({name}): {response.status_code}")
-    print(response.json)
     if response.status_code == 201:
         data = response.json()
-        print(data)
         return data["id"]
     else:
         print(response.text)
@@ -366,23 +364,28 @@ def create_training_period(
 def create_global_training_metric(
     name: str,
     metric: str,
-    granularity: str,
-    aggregate: str,
+    granularity: str | None,
+    aggregate: str | None,
     group_by: str | None = None,
+    average: bool = False,
 ) -> dict[str, Any] | None:
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
         "metric": metric,
-        "window": {
-            "granularity": granularity,
-            "aggregate": aggregate,
-        },
         "filters": {},
         "scope": {"type": "global"},
     }
-    if group_by:
-        payload["window"]["group_by"] = group_by
+    if aggregate:
+        payload["window"] = {
+            "granularity": granularity,
+            "aggregate": aggregate,
+        }
+        if group_by:
+            payload["window"]["group_by"] = group_by
+
+    if average:
+        payload["summary"] = {"average": {"include_zeros": False}}
 
     response = requests.post(
         f"{API_URL}/training/metric",
@@ -401,24 +404,30 @@ def create_global_training_metric(
 def create_scoped_training_metric(
     name: str,
     metric: str,
-    granularity: str,
-    aggregate: str,
+    granularity: str | None,
+    aggregate: str | None,
     period_id: str,
     group_by: str | None = None,
+    average: bool = False,
 ) -> dict[str, Any] | None:
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
         "metric": metric,
-        "window": {
-            "granularity": granularity,
-            "aggregate": aggregate,
-        },
         "filters": {},
         "scope": {"type": "trainingPeriod", "trainingPeriodId": period_id},
     }
-    if group_by:
-        payload["window"]["group_by"] = group_by
+
+    if aggregate:
+        payload["window"] = {
+            "granularity": granularity,
+            "aggregate": aggregate,
+        }
+        if group_by:
+            payload["window"]["group_by"] = group_by
+
+    if average:
+        payload["summary"] = {"average": {"include_zeros": False}}
 
     response = requests.post(
         f"{API_URL}/training/metric",
@@ -570,16 +579,14 @@ def generate_demo_data() -> int:
     create_scoped_training_metric(
         "Average heart rate (only for this training period)",
         "AvgHeartRate",
-        "Daily",
-        "Average",
+        aggregate=None,
+        granularity=None,
         period_id=period_1_id,
+        average=True,
     )
 
     create_global_training_metric(
-        "Weekly calories",
-        "Calories",
-        "Weekly",
-        "Sum",
+        "Weekly calories", "Calories", "Weekly", "Sum", average=True
     )
 
     create_global_training_metric(
