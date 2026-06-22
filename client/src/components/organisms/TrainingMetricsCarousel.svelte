@@ -1,10 +1,10 @@
 <script lang="ts">
 	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
-	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import type { TrainingMetric } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 	import { none, some, type Option } from '$lib/Options';
+	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
 
 	let {
 		metrics,
@@ -67,24 +67,38 @@
 </script>
 
 {#if currentMetric && metrics.length > 0}
-	<div class="flex items-center justify-between">
+	<div class="flex items-start justify-between pt-2 gap-1 px-1">
 		{#if metrics.length > 1}
 			<button
-				class="btn btn-circle btn-ghost btn-sm"
+				class="btn btn-circle btn-ghost btn-sm self-start"
 				onclick={goToPrevious}
 				aria-label="Previous metric"
 			>
 				←
 			</button>
 		{/if}
-		<div class="flex flex-1 flex-row justify-center text-center">
-			<TrainingMetricTitle metric={currentMetric.initialMetric} onUpdate={onMetricUpdate} />
+		<div class="flex flex-1 flex-row justify-center text-center h-full">
+			{#if currentMetric.name}
+				{currentMetric.name}
+			{:else}
+				{currentMetric.metric.toLowerCase()}
+			{/if}
 		</div>
-		{#if metrics.length > 1}
-			<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
-				→
-			</button>
-		{/if}
+
+		<div class="self-start flex flex-row items-center gap-1">
+			<div>
+				<TrainingMetricMenu
+					metric={currentMetric.initialMetric}
+					onUpdate={onMetricUpdate}
+					onDelete={onMetricUpdate}
+				/>
+			</div>
+			{#if metrics.length > 1}
+				<button class="btn btn-circle btn-ghost btn-sm" onclick={goToNext} aria-label="Next metric">
+					→
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	{#if currentMetric.values.length > 0}

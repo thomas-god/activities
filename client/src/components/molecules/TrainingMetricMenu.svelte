@@ -8,16 +8,10 @@
 
 	let {
 		metric,
-		name,
-		id,
-		scope,
 		onUpdate,
 		onDelete
 	}: {
 		metric: TrainingMetric;
-		id: string;
-		name: string | null;
-		scope: 'global' | 'local';
 		onUpdate: () => void;
 		onDelete: () => void;
 	} = $props();
@@ -29,7 +23,7 @@
 	let showEditForm = $state(false);
 
 	const deleteMetricCallback = async (): Promise<void> => {
-		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${id}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric.id}`, {
 			method: 'DELETE',
 			credentials: 'include',
 			mode: 'cors'
@@ -91,8 +85,8 @@
 	bind:isOpen={showDeleteModal}
 	title="Delete Training Metric"
 	description="Are you sure you want to delete this training metric?"
-	itemPreview={name || 'Unnamed metric'}
-	warning={scope === 'global'
+	itemPreview={metric.name || 'Unnamed metric'}
+	warning={metric.scope.type === 'global'
 		? 'This metric is defined globally, deleting it will remove it from other training metrics.'
 		: undefined}
 	onConfirm={deleteMetricCallback}

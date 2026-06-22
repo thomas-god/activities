@@ -53,7 +53,9 @@
 <div class="flex flex-col items-center gap-0">
 	{#each metricProps as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-			<TrainingMetricTitle metric={metric.initialMetric} {onUpdate} />
+			<div class="px-4 pt-4">
+				<TrainingMetricTitle metric={metric.initialMetric} {onUpdate} />
+			</div>
 
 			{#if metric.values.length > 0}
 				{#if metric.granularity !== null}
