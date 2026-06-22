@@ -7,7 +7,7 @@ use base64::{Engine, engine::general_purpose};
 use chrono::{DateTime, Utc};
 use derive_more::{Constructor, Display};
 use email_address::EmailAddress as EmailAddressValidator;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::domain::models::UserId;
 
