@@ -1,4 +1,6 @@
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use std::ops::Add;
+
+use chrono::{DateTime, Days, FixedOffset, NaiveDate};
 use derive_more::Constructor;
 use serde::Deserialize;
 
@@ -49,6 +51,10 @@ impl DateRange {
         } else {
             self.clone()
         }
+    }
+
+    pub fn extend_end(&self, days_to_add: Days) -> DateRange {
+        DateRange::new(self.start, self.end.add(days_to_add))
     }
 }
 

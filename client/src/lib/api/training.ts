@@ -204,14 +204,14 @@ export async function fetchTrainingPeriodDetails(
  * Fetch training metrics
  * @param fetch - The fetch function from SvelteKit
  * @param start - Start date for metrics
- * @param end - Optional end date for metrics
+ * @param end - End date for metrics
  * @param scope - Optional scope filter: 'global' for global metrics only, or { period: periodId } for period + global metrics
  * @returns Array of metrics with flat values (extracted from "no_group") or empty array on error
  */
 export async function fetchTrainingMetrics(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	start: Date | string,
-	end?: Date | string,
+	end: Date | string,
 	scope?: 'global' | { period: string }
 ): Promise<TrainingMetricList> {
 	const params = new URLSearchParams();
@@ -219,10 +219,8 @@ export async function fetchTrainingMetrics(
 	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
 	params.set('start', startDate);
 
-	if (end) {
-		const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
-		params.set('end', endDate);
-	}
+	const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
+	params.set('end', endDate);
 
 	// Add scope parameters
 	if (scope === 'global') {

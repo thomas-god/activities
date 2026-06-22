@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use chrono::NaiveDate;
+use chrono::{Days, NaiveDate};
 use derive_more::Constructor;
 
 use crate::domain::{
@@ -8,8 +8,9 @@ use crate::domain::{
         activity::ActivityMetricV2,
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
-            TrainingMetricValues, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriodId,
         },
     },
     ports::{
@@ -227,14 +228,8 @@ where
                 .clone()
                 .merge_default_sports(&extra_sports);
 
-            let aligned_date_range = match (scope, metric.definition().window()) {
-                (TrainingMetricScope::Global, Some(window)) => {
-                    date_range.align_to(window.granularity())
-                }
-                (TrainingMetricScope::Global, None) => date_range.clone(),
-                // Implicetely assumes that date_range == training_period.range
-                (TrainingMetricScope::TrainingPeriod(_), _) => date_range.clone(),
-            };
+            let aligned_date_range =
+                align_date_range(date_range, scope, metric.definition().window());
 
             let values = self
                 .compute_training_metric_values(&definition, &aligned_date_range)
@@ -615,6 +610,21 @@ where
         self.training_repository
             .set_training_metrics_ordering(user, scope, ordering)
             .await
+    }
+}
+
+/// Make sure the input [`DateRange`] is compatible with the scope and window, potentially extending
+/// it to match. Also make sure the range's end is included by extending it of one day.
+fn align_date_range(
+    date_range: &DateRange,
+    scope: &TrainingMetricScope,
+    window: &Option<TrainingMetricWindow>,
+) -> DateRange {
+    match (scope, window) {
+        (TrainingMetricScope::Global, Some(window)) => date_range.align_to(window.granularity()),
+        (TrainingMetricScope::Global, None) => date_range.extend_end(Days::new(1)),
+        // Implicetely assumes that date_range == training_period.range
+        (TrainingMetricScope::TrainingPeriod(_), _) => date_range.extend_end(Days::new(1)),
     }
 }
 
@@ -4145,5 +4155,124 @@ mod test_training_service_copy_metric {
             CopyTrainingMetricError::SaveMetricError(_) => {}
             _ => panic!("Expected SaveMetricError"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_align_date_range {
+    use crate::domain::models::training::{TrainingMetricAggregate, TrainingMetricGranularity};
+
+    use super::*;
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_daily() {
+        let date_range = DateRange::new(
+            "2026-06-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            None,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-06-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_weekly() {
+        let date_range = DateRange::new(
+            "2026-06-16".parse::<NaiveDate>().unwrap(),
+            "2026-06-23".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            None,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-06-15".parse::<NaiveDate>().unwrap(), // Start of the first week
+                "2026-06-29".parse::<NaiveDate>().unwrap(), // Next monday to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_granularity_monthly() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Sum,
+            None,
+        ));
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-01".parse::<NaiveDate>().unwrap(), // Start of the first month
+                "2026-07-01".parse::<NaiveDate>().unwrap(), // Start of next month to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_global_and_window_none() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::Global;
+        let window = None;
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
+    }
+
+    #[test]
+    fn test_align_date_range_when_scope_is_metric() {
+        let date_range = DateRange::new(
+            "2026-05-23".parse::<NaiveDate>().unwrap(),
+            "2026-06-25".parse::<NaiveDate>().unwrap(),
+        );
+        let scope = TrainingMetricScope::TrainingPeriod(TrainingPeriodId::new());
+        let window = None;
+
+        let aligned_date_range = align_date_range(&date_range, &scope, &window);
+
+        assert_eq!(
+            aligned_date_range,
+            DateRange::new(
+                "2026-05-23".parse::<NaiveDate>().unwrap(), // Unchanged
+                "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
+            )
+        )
     }
 }
