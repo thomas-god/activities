@@ -13,9 +13,14 @@
 	let {
 		metrics,
 		period_id,
-		metricCopiedCallback
-	}: { metrics: TrainingMetricList; period_id: string; metricCopiedCallback: () => void } =
-		$props();
+		metricCopiedCallback,
+		timeDomain = none()
+	}: {
+		metrics: TrainingMetricList;
+		period_id: string;
+		metricCopiedCallback: () => void;
+		timeDomain?: Option<{ start: string; end: string | null }>;
+	} = $props();
 
 	let chartWidth: number = $state(300);
 
@@ -162,6 +167,7 @@
 						unit={metric.unit}
 						format={metricValuesDisplayFormat(metric)}
 						average={'average' in metric.summary ? some(metric.summary.average) : none()}
+						{timeDomain}
 					/>
 				{/if}
 			</div>

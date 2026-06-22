@@ -56,14 +56,16 @@
 
 	let metricDefinitionPayload = $derived(fieldsAsPayload(fields));
 
+	let dates = {
+		start: dayjs().subtract(4, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ'),
+		end: dayjs().add(1, 'day').format('YYYY-MM-DDTHH:mm:ssZ')
+	};
 	let previewRequest: Option<PreviewTrainingMetricPayload> = $derived.by(() => {
 		if (isNone(metricDefinitionPayload)) {
 			return none();
 		}
-		const start = dayjs().subtract(3, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ');
-		const end = dayjs().format('YYYY-MM-DDTHH:mm:ssZ');
 
-		return some({ start, end, ...metricDefinitionPayload.value });
+		return some({ ...dates, ...metricDefinitionPayload.value });
 	});
 
 	// Automatically fetch preview when form values change
@@ -147,7 +149,7 @@
 			{:then values}
 				{#if values.values.length > 0}
 					<div bind:clientWidth={chartWidth}>
-						<PreviewChart width={chartWidth} {values} {fields} />
+						<PreviewChart width={chartWidth} {values} {fields} timeDomain={some(dates)} />
 					</div>
 				{:else}
 					<div class="alert rounded-box alert-info">

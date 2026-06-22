@@ -3,7 +3,7 @@
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
-	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
+	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 
 	export interface TimeseriesChartProps {
 		values: { time: string; value: number }[];
@@ -12,9 +12,18 @@
 		unit: string;
 		format: 'number' | 'duration' | 'pace';
 		average: Option<number>;
+		timeDomain?: Option<{ start: string; end: string | null }>;
 	}
 
-	let { values, height, width, unit, format, average }: TimeseriesChartProps = $props();
+	let {
+		values,
+		height,
+		width,
+		unit,
+		format,
+		average,
+		timeDomain = none()
+	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -81,18 +90,33 @@
 		}
 		return yAxisDefaultTickValues();
 	};
-	let minTime = $derived(
-		dayjs
-			.unix(d3.min(valuesAsTime, (v) => v.time) ?? 0)
-			.startOf('day')
-			.unix()
-	);
-	let maxTime = $derived(
-		dayjs
-			.unix(d3.max(valuesAsTime, (v) => v.time) ?? 0)
-			.endOf('day')
-			.unix()
-	);
+	let minTime = $derived.by(() => {
+		const values = [
+			dayjs
+				.unix(d3.min(valuesAsTime, (v) => v.time) ?? 0)
+				.startOf('day')
+				.unix()
+		];
+		if (isSome(timeDomain)) {
+			values.push(dayjs(timeDomain.value.start).unix());
+		}
+
+		return Math.min(...values);
+	});
+	let maxTime = $derived.by(() => {
+		const values = [
+			dayjs
+				.unix(d3.max(valuesAsTime, (v) => v.time) ?? 0)
+				.endOf('day')
+				.unix()
+		];
+
+		if (isSome(timeDomain) && timeDomain.value.end !== null) {
+			values.push(dayjs(timeDomain.value.end).unix());
+		}
+
+		return Math.max(...values);
+	});
 
 	let x = $derived(
 		d3

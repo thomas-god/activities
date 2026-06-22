@@ -4,18 +4,20 @@
 	import type { TrainingMetric } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
-	import { none, some } from '$lib/Options';
+	import { none, some, type Option } from '$lib/Options';
 
 	let {
 		metrics,
 		height,
 		onMetricUpdate,
-		initialIndex = 0
+		initialIndex = 0,
+		timeDomain = none()
 	}: {
 		metrics: TrainingMetric[];
 		height: number;
 		onMetricUpdate: () => void;
 		initialIndex?: number;
+		timeDomain?: Option<{ start: string; end: string | null }>;
 	} = $props();
 
 	let chartWidth: number = $state(300);
@@ -113,6 +115,7 @@
 					average={'average' in currentMetric.summary
 						? some(currentMetric.summary.average)
 						: none()}
+					{timeDomain}
 				/>
 			{/if}
 		</div>

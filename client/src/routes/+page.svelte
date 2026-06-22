@@ -13,6 +13,8 @@
 	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
+	import { dayjs } from '$lib/duration';
+	import { some } from '$lib/Options';
 
 	let { data }: PageProps = $props();
 
@@ -21,6 +23,9 @@
 	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
+
+	const startDate = dayjs().startOf('isoWeek').subtract(3, 'weeks').toISOString();
+	const endDate = dayjs().add(1, 'day').endOf('day').toISOString();
 
 	const moreActivitiesCallback = () => {
 		goto('/history');
@@ -93,6 +98,7 @@
 					{metrics}
 					height={chartHeight}
 					onMetricUpdate={() => invalidate(`app:activities`)}
+					timeDomain={some({ start: startDate, end: endDate })}
 				/>
 			{:else}
 				<TrainingMetricsList
@@ -100,6 +106,7 @@
 					height={chartHeight}
 					onUpdate={() => invalidate(`app:activities`)}
 					onDelete={() => invalidate(`app:activities`)}
+					timeDomain={some({ start: startDate, end: endDate })}
 				/>
 			{/if}
 		{/await}

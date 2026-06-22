@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TrainingMetricPreviewValues } from '$lib/api';
-	import { isNone, isSome, none, some } from '$lib/Options';
+	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import type { TrainingMetricFields } from '.';
 	import TrainingMetricsChartLine from '../TrainingMetricsChartLine.svelte';
 	import TrainingMetricsChartStacked from '../TrainingMetricsChartStacked.svelte';
@@ -8,9 +8,14 @@
 	let {
 		fields,
 		values,
-		width
-	}: { fields: TrainingMetricFields; values: TrainingMetricPreviewValues; width: number } =
-		$props();
+		width,
+		timeDomain = none()
+	}: {
+		fields: TrainingMetricFields;
+		values: TrainingMetricPreviewValues;
+		width: number;
+		timeDomain?: Option<{ start: string; end: string | null }>;
+	} = $props();
 
 	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
 		if (unit === 'activities') return 'number';
@@ -45,5 +50,6 @@
 		unit={values.unit}
 		format={previewFormat(values.unit)}
 		average={'average' in values.summary ? some(values.summary.average) : none()}
+		{timeDomain}
 	/>
 {/if}

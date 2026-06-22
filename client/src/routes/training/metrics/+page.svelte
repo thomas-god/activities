@@ -85,6 +85,7 @@
 								unit={metric.unit}
 								format={metricValuesDisplayFormat(metric)}
 								average={'average' in metric.summary ? some(metric.summary.average) : none()}
+								timeDomain={some(dates)}
 							/>
 						{/if}
 					{:else}

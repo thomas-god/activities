@@ -446,6 +446,7 @@
 											{metrics}
 											height={chartHeight}
 											onMetricUpdate={updateMetricsPromise}
+											timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
 										/>
 									{:else}
 										<TrainingMetricsList
@@ -453,6 +454,7 @@
 											height={chartHeight}
 											onUpdate={updateMetricsPromise}
 											onDelete={updateMetricsPromise}
+											timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
 										/>
 									{/if}
 								{:else}
@@ -627,6 +629,7 @@
 							metrics={globalMetrics}
 							period_id={periodDetails.id}
 							metricCopiedCallback={updateMetricsPromise}
+							timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
 						/>
 					{/await}
 				</div>
