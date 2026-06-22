@@ -20,7 +20,7 @@ ENV PUBLIC_APP_URL=
 RUN npm run build
 
 # Build stage for Rust backend
-FROM rust:1.89-alpine AS backend-builder
+FROM rust:1.96-alpine AS backend-builder
 
 ARG APP_FEATURE
 
