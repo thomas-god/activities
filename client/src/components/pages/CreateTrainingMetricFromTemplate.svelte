@@ -27,7 +27,14 @@
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
 
-	let metricTemplatesPromise = $state(fetchTrainingMetricTemplates());
+	const buildPromise = async () => {
+		const templates = await fetchTrainingMetricTemplates();
+		if (templates.length > 0) {
+			fields = { ...fields, selectedTemplate: some(templates[0]) };
+		}
+		return templates;
+	};
+	let metricTemplatesPromise = $state(buildPromise());
 
 	let fields: TrainingMetricFields = $state({
 		name: '',
