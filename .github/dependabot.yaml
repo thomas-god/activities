@@ -6,7 +6,7 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/app" # Location of package manifests
+    directory: "/" # Location of package manifests
     groups:
       all:
         patterns:
