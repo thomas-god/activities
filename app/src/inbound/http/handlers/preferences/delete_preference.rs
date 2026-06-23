@@ -4,13 +4,13 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
-};
 use crate::inbound::parser::ParseFile;
+use crate::{domain::models::preferences::PreferenceKey, inbound::http::AppState};
 use crate::{
-    domain::models::preferences::PreferenceKey,
-    inbound::http::{AppState, auth::AuthenticatedUser},
+    domain::ports::{
+        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    },
+    inbound::auth::AuthenticatedUser,
 };
 
 pub async fn delete_preference<

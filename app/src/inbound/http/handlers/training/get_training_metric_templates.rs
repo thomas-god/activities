@@ -20,7 +20,8 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, IUserService, auth::AuthenticatedUser},
+        auth::{AuthenticatedUser, email_based::IUserService},
+        http::AppState,
         parser::ParseFile,
     },
 };

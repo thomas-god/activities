@@ -10,8 +10,8 @@ use crate::domain::ports::{
     preferences::IPreferencesService,
     training::{CopyTrainingMetricError, CopyTrainingMetricRequest, ITrainingService},
 };
+use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::AuthenticatedUser;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]

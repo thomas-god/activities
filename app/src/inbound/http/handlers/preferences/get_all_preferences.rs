@@ -3,8 +3,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
-use crate::inbound::http::{AppState, auth::AuthenticatedUser};
-use crate::inbound::parser::ParseFile;
+use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
 
 use super::types::PreferenceResponse;
 

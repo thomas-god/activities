@@ -1,9 +1,6 @@
 use axum::{
-    extract::FromRequestParts,
+    extract::{FromRef, FromRequestParts, Request, State},
     http::{StatusCode, request::Parts},
-};
-use axum::{
-    extract::{FromRef, Request, State},
     middleware::Next,
 };
 use axum::{
@@ -14,59 +11,13 @@ use axum_extra::extract::CookieJar;
 use cookie::{Cookie, time::OffsetDateTime};
 use std::{marker::PhantomData, sync::Arc};
 
-use crate::{
-    domain::{
-        models::UserId,
-        ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
-        },
+use crate::inbound::{
+    auth::{
+        AuthenticatedUser,
+        email_based::{GenerateSessionTokenResult, IUserService, infra::handlers::AuthAppState},
     },
-    inbound::{
-        http::{
-            AppState, AuthAppState, CookieConfig, IUserService,
-            auth::email_based::GenerateSessionTokenResult,
-        },
-        parser::ParseFile,
-    },
+    http::CookieConfig,
 };
-
-use crate::inbound::http::auth::AuthenticatedUser;
-
-mod login_user;
-mod register_user;
-mod validate_login;
-
-pub use login_user::login_user;
-pub use register_user::register_user;
-pub use validate_login::validate_login;
-
-/// Dummy extractor that always returns the default [UserId], regardless of the request.
-pub struct DefaultUserExtractor;
-
-impl<S> FromRequestParts<S> for DefaultUserExtractor
-where
-    S: Send + Sync,
-{
-    type Rejection = StatusCode;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let user = AuthenticatedUser::new(UserId::default());
-
-        parts.extensions.insert(user);
-
-        Ok(Self)
-    }
-}
-
-impl<US> FromRef<AuthAppState<US>> for Arc<US>
-where
-    US: IUserService,
-{
-    fn from_ref(input: &AuthAppState<US>) -> Self {
-        input.user_service.clone()
-    }
-}
 
 /// Extractor that tries to extract user information from the request's session cookie.
 #[allow(unused)]
@@ -162,7 +113,7 @@ mod test {
     use axum::{
         Extension, Router,
         http::header::SET_COOKIE,
-        middleware::{from_extractor, from_extractor_with_state, from_fn_with_state},
+        middleware::{from_extractor_with_state, from_fn_with_state},
         routing::get,
     };
     use axum_extra::extract::cookie::Cookie;
@@ -170,42 +121,18 @@ mod test {
     use chrono::{TimeDelta, Utc};
 
     use crate::{
-        domain::services::{
-            activity::test_utils::MockActivityService,
-            preferences::tests_utils::MockPreferencesService,
-            training::test_utils::MockTrainingService,
-        },
+        domain::models::UserId,
         inbound::{
-            http::{
-                CookieConfig,
-                auth::email_based::{
-                    CheckSessionResult, GenerateSessionTokenResult, SessionToken,
-                    test_utils::MockUserService,
-                },
+            auth::email_based::{
+                CheckSessionResult, GenerateSessionTokenResult, SessionToken,
+                infra::handlers::extractor::{CookieUserExtractor, cookie_auth_middleware},
+                test_utils::MockUserService,
             },
-            parser::test_utils::MockFileParser,
+            http::CookieConfig,
         },
     };
 
     use super::*;
-
-    #[tokio::test]
-    async fn test_default_user_extractor() {
-        async fn test_route(
-            Extension(user): Extension<AuthenticatedUser>,
-        ) -> impl axum::response::IntoResponse {
-            user.user().to_string()
-        }
-
-        let app = Router::new()
-            .route("/", get(test_route))
-            .route_layer(from_extractor::<DefaultUserExtractor>());
-        let server = TestServer::new(app).expect("unable to create test server");
-
-        let response = server.get("/").await;
-        response.assert_status(StatusCode::OK);
-        assert_eq!(response.text(), UserId::default().to_string());
-    }
 
     fn build_test_server(session_service: MockUserService) -> TestServer {
         let state = AuthAppState {

@@ -14,7 +14,8 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser, handlers::training::types::ScopePayload},
+        auth::AuthenticatedUser,
+        http::{AppState, handlers::training::types::ScopePayload},
         parser::ParseFile,
     },
 };

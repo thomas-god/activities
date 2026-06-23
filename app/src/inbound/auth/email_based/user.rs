@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::email_based::{
+    inbound::auth::email_based::{
         AuthLinkValidationResult, AuthToken, CheckSessionResult, EmailAddress,
         GenerateAuthLinkRequest, GenerateAuthLinkResult, IAuthLinkService, ISessionService,
         IUserService, SessionToken, UserLoginResult, UserRegistrationResult,
@@ -155,7 +155,7 @@ mod test_utils {
 mod test_user_service_register_new_user {
     use crate::{
         domain::models::UserId,
-        inbound::http::auth::email_based::{
+        inbound::auth::email_based::{
             EmailAddress, GenerateAuthLinkResult, UserRegistrationResult,
             test_utils::{MockAuthLinkService, MockSessionService},
             user::test_utils::MockUserRepository,
@@ -289,7 +289,7 @@ mod test_user_service_register_new_user {
 
 #[cfg(test)]
 mod test_user_service_login_user {
-    use crate::inbound::http::auth::email_based::{
+    use crate::inbound::auth::email_based::{
         test_utils::{MockAuthLinkService, MockSessionService},
         user::test_utils::MockUserRepository,
     };
@@ -393,7 +393,10 @@ impl IUserService for DisabledUserService {
         panic!("User service is disabled")
     }
 
-    async fn login_user(&self, _email: EmailAddress) -> crate::inbound::http::UserLoginResult {
+    async fn login_user(
+        &self,
+        _email: EmailAddress,
+    ) -> crate::inbound::auth::email_based::UserLoginResult {
         panic!("User service is disabled")
     }
 
@@ -404,7 +407,7 @@ impl IUserService for DisabledUserService {
     async fn validate_auth_link(
         &self,
         _token: AuthToken,
-    ) -> Result<crate::inbound::http::AuthLinkValidationResult, ()> {
+    ) -> Result<crate::inbound::auth::email_based::AuthLinkValidationResult, ()> {
         panic!("User service is disabled")
     }
 }
@@ -413,7 +416,7 @@ impl IUserService for DisabledUserService {
 mod test_user_service_validate_auth_link {
     use chrono::{TimeDelta, Utc};
 
-    use crate::inbound::http::auth::email_based::{
+    use crate::inbound::auth::email_based::{
         AuthLinkValidationResult, AuthToken, GenerateSessionTokenResult, SessionToken,
         test_utils::{MockAuthLinkService, MockSessionService},
         user::test_utils::MockUserRepository,
@@ -542,7 +545,7 @@ mod test_user_service_validate_auth_link {
 
 #[cfg(test)]
 mod test_user_service_check_session_token {
-    use crate::inbound::http::auth::email_based::{
+    use crate::inbound::auth::email_based::{
         SessionToken,
         test_utils::{MockAuthLinkService, MockSessionService},
         user::test_utils::MockUserRepository,

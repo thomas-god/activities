@@ -3,13 +3,10 @@ use axum::{
     http::{StatusCode, header::SET_COOKIE},
     response::{AppendHeaders, IntoResponse},
 };
-use axum_extra::extract::cookie::Cookie;
-use cookie::time::OffsetDateTime;
 
-use crate::inbound::http::{
-    AppState, AuthAppState, AuthLinkValidationResult,
-    auth::email_based::{AuthToken, IUserService},
-    handlers::auth::build_session_cookie,
+use crate::inbound::auth::email_based::{
+    AuthLinkValidationResult, AuthToken, IUserService,
+    infra::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
 pub async fn validate_login<UR: IUserService>(

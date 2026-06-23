@@ -11,7 +11,7 @@ use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::AuthenticatedUser;
+use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]

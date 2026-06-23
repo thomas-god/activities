@@ -21,10 +21,7 @@ use crate::{
         ports::preferences::IPreferencesService,
         ports::training::ITrainingService,
     },
-    inbound::{
-        http::{AppState, auth::AuthenticatedUser},
-        parser::ParseFile,
-    },
+    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };
 
 impl From<ModifyActivityError> for StatusCode {

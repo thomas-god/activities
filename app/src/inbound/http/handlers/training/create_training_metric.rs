@@ -18,9 +18,9 @@ use crate::{
         },
     },
     inbound::{
+        auth::AuthenticatedUser,
         http::{
             AppState,
-            auth::AuthenticatedUser,
             handlers::training::types::{
                 APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                 APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricSource,

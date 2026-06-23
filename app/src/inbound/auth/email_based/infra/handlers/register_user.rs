@@ -4,9 +4,8 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::inbound::http::{
-    AppState, AuthAppState, UserLoginResult,
-    auth::email_based::{EmailAddress, IUserService, UserRegistrationResult},
+use crate::inbound::auth::email_based::{
+    EmailAddress, IUserService, UserRegistrationResult, infra::handlers::AuthAppState,
 };
 
 #[derive(Debug, Deserialize)]

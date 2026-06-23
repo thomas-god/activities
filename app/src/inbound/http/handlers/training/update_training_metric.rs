@@ -17,8 +17,8 @@ use crate::domain::ports::{
     preferences::IPreferencesService,
     training::{ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest},
 };
+use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::AuthenticatedUser;
 use crate::inbound::http::handlers::training::types::{
     APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, ScopePayload,
 };

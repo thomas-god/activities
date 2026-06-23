@@ -17,10 +17,11 @@ use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 
-use crate::inbound::http::auth::AuthStrategy;
-use crate::inbound::http::handlers::{
-    DefaultUserExtractor, cookie_auth_middleware, get_training_metric_templates,
-};
+use crate::inbound::auth::AuthStrategy;
+use crate::inbound::auth::email_based::IUserService;
+use crate::inbound::auth::email_based::infra::handlers::email_based_login_routes;
+use crate::inbound::auth::no_auth::no_auth_login_routes;
+use crate::inbound::http::handlers::get_training_metric_templates;
 use crate::inbound::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
@@ -35,9 +36,9 @@ use handlers::{
 };
 
 #[cfg(feature = "multi-user")]
-pub use self::auth::infra::mailer::smtp::SMTPEmailProvider;
+pub use crate::inbound::auth::infra::mailer::smtp::SMTPEmailProvider;
 
-pub use self::auth::email_based::{
+pub use crate::inbound::auth::email_based::{
     AuthLinkService, DisabledUserService, SessionService, UserService,
     infra::{
         mailer::DoNothingMailProvider,
@@ -47,9 +48,7 @@ pub use self::auth::email_based::{
         },
     },
 };
-pub use self::auth::email_based::{AuthLinkValidationResult, IUserService, UserLoginResult};
 
-mod auth;
 mod handlers;
 
 #[derive(Debug, Clone)]
@@ -320,52 +319,4 @@ where
         AuthStrategy::NoAuth => no_auth_login_routes(base_router),
         AuthStrategy::EmailBased => email_based_login_routes(base_router, user_service),
     }
-}
-
-fn no_auth_login_routes<S>(base_router: Router<S>) -> Router<S>
-where
-    S: Clone + Send + Sync + 'static,
-{
-    base_router.route_layer(axum::middleware::from_extractor::<DefaultUserExtractor>())
-}
-
-#[derive(Debug, Clone)]
-pub struct AuthAppState<UR: IUserService> {
-    user_service: Arc<UR>,
-    cookie_config: Arc<CookieConfig>,
-}
-
-fn email_based_login_routes<US: IUserService, S>(
-    mut base_router: Router<S>,
-    user_service: US,
-) -> Router<S>
-where
-    S: Clone + Send + Sync + 'static,
-{
-    let auth_state = AuthAppState {
-        cookie_config: Arc::new(CookieConfig::default()),
-        user_service: Arc::new(user_service),
-    };
-
-    base_router = base_router.route_layer(axum::middleware::from_fn_with_state(
-        auth_state.clone(),
-        cookie_auth_middleware::<US>,
-    ));
-
-    let router = Router::new()
-        .route(
-            "/register",
-            post(crate::inbound::http::handlers::register_user::<US>),
-        )
-        .route(
-            "/login",
-            post(crate::inbound::http::handlers::login_user::<US>),
-        )
-        .route(
-            "/login/validate/{auth_token}",
-            post(crate::inbound::http::handlers::validate_login::<US>),
-        );
-    let router = router.with_state(auth_state);
-
-    base_router.nest("/api", router)
 }

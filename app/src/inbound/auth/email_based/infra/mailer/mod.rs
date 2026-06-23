@@ -1,6 +1,6 @@
 use derive_more::Constructor;
 
-use crate::inbound::http::auth::email_based::{AuthLink, EmailAddress, auth_link::MailProvider};
+use crate::inbound::auth::email_based::{AuthLink, EmailAddress, auth_link::MailProvider};
 
 #[cfg(feature = "multi-user")]
 pub mod smtp;

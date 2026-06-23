@@ -2,10 +2,11 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::ports::{preferences::IPreferencesService, training::ITrainingService};
+use crate::inbound::auth::AuthenticatedUser;
 use crate::{
     domain::ports::activity::IActivityService,
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        http::AppState,
         parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
     },
 };
@@ -64,7 +65,7 @@ mod tests {
                 training::test_utils::MockTrainingService,
             },
         },
-        inbound::{http::handlers::auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
+        inbound::{auth::no_auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
     };
 
     use super::*;

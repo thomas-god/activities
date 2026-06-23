@@ -17,7 +17,8 @@ use crate::{
         training::ITrainingService,
     },
     inbound::{
-        http::{AppState, auth::AuthenticatedUser},
+        auth::AuthenticatedUser,
+        http::AppState,
         parser::{ParseBytesError, ParseFile, SupportedExtension},
     },
 };
@@ -172,7 +173,7 @@ mod tests {
                 training::test_utils::MockTrainingService,
             },
         },
-        inbound::{http::handlers::auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
+        inbound::{auth::no_auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
     };
 
     use super::*;

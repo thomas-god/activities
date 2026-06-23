@@ -16,7 +16,7 @@ use crate::domain::ports::training::{
     UpdateTrainingPeriodNoteRequest,
 };
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::AuthenticatedUser;
+use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]

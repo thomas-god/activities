@@ -9,7 +9,7 @@ use crate::{
         models::{UserId, training::TrainingNoteContent},
         ports::training::{CreateTrainingNoteError, CreateTrainingNoteRequest, ITrainingService},
     },
-    inbound::http::{AppState, auth::AuthenticatedUser},
+    inbound::{auth::AuthenticatedUser, http::AppState},
 };
 
 #[derive(Debug, Deserialize)]

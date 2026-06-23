@@ -16,10 +16,7 @@ use crate::{
             training::ITrainingService,
         },
     },
-    inbound::{
-        http::{AppState, auth::AuthenticatedUser},
-        parser::ParseFile,
-    },
+    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };
 
 use super::activity_schema::PublicActivity;

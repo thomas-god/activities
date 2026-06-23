@@ -12,9 +12,9 @@ use crate::{
         },
     },
     inbound::{
+        auth::AuthenticatedUser,
         http::{
             AppState,
-            auth::AuthenticatedUser,
             handlers::training::types::{
                 APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
                 APITrainingMetricSource, APITrainingPeriodSports,

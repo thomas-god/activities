@@ -5,7 +5,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::email_based::{EmailAddress, user::UserRepository},
+    inbound::auth::email_based::{EmailAddress, user::UserRepository},
 };
 
 #[derive(Debug, Clone)]

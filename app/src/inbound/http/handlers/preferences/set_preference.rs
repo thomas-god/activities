@@ -6,7 +6,7 @@ use crate::domain::ports::{
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::models::preferences::Preference,
-    inbound::http::{AppState, auth::AuthenticatedUser},
+    inbound::{auth::AuthenticatedUser, http::AppState},
 };
 
 use super::types::SetPreferenceRequest;

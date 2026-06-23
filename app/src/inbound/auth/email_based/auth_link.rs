@@ -5,7 +5,7 @@ use derive_more::Constructor;
 use thiserror::Error;
 use tokio::sync::Mutex;
 
-use crate::inbound::http::auth::email_based::{
+use crate::inbound::auth::email_based::{
     AuthLink, AuthToken, EmailAddress, GenerateAuthLinkRequest, GenerateAuthLinkResult,
     HashedAuthLink, HashedAuthToken, IAuthLinkService,
 };
@@ -162,7 +162,7 @@ mod test_auth_link_service_generate_auth_link {
 
     use crate::{
         domain::models::UserId,
-        inbound::http::auth::email_based::{
+        inbound::auth::email_based::{
             GenerateAuthLinkRequest,
             auth_link::test_utils::{MockMailProvider, MockSessionRepository},
         },
@@ -259,7 +259,7 @@ mod test_auth_link_service_generate_auth_link {
 mod test_auth_link_service_validate_auth_link {
     use crate::{
         domain::models::UserId,
-        inbound::http::auth::email_based::auth_link::test_utils::{
+        inbound::auth::email_based::auth_link::test_utils::{
             MockMailProvider, MockSessionRepository,
         },
     };
