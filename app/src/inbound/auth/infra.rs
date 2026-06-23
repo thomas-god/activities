@@ -1,4 +1,4 @@
-use axum::Router;
+use axum::{Router, extract::State, response::IntoResponse, routing::get};
 
 use crate::{
     config::{SINGLE_USER_PASSWORD, load_optional_env},
@@ -29,9 +29,18 @@ pub fn add_auth_router<S, US: IUserService>(
 where
     S: Clone + Send + Sync + 'static,
 {
-    match strategy {
+    let router = match &strategy {
         AuthStrategy::NoAuth => no_auth_login_routes(base_router),
         AuthStrategy::SinglePassword(pwd) => single_password_login_routes(base_router, pwd),
         AuthStrategy::EmailBased => email_based_login_routes(base_router, user_service),
-    }
+    };
+
+    let info_router = Router::new()
+        .route("/auth_info", get(auth_info))
+        .with_state(format!("{strategy:?}"));
+    router.nest("/api", info_router)
+}
+
+pub async fn auth_info(State(state): State<String>) -> impl IntoResponse {
+    state.clone().into_response()
 }

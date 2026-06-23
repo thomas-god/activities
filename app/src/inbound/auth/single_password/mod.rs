@@ -64,7 +64,6 @@ fn build_cookie<'a>(
         .map_err(|_| format!("Cannot build datetime offset form expiry {expiry:?}"))?;
     let mut builder = Cookie::build(("token", const_hex::encode(results)))
         .expires(expire_at)
-        .secure(cookie_config.secure)
         .http_only(cookie_config.http_only)
         .same_site(cookie_config.same_site)
         .path("/");
@@ -84,13 +83,13 @@ fn verify_cookie(cookie: &Cookie<'_>, pwd: &SinglePassword) -> Option<()> {
 
 pub fn single_password_login_routes<S>(
     mut base_router: Router<S>,
-    password: SinglePassword,
+    password: &SinglePassword,
 ) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
     let state = SinglePasswordAuthState {
-        password,
+        password: password.clone(),
         cookie_config: CookieConfig::default(),
     };
 
@@ -142,7 +141,7 @@ mod tests {
 
     fn build_test_server(password: SinglePassword) -> TestServer {
         let app =
-            single_password_login_routes(Router::new().route("/", get(protected_route)), password);
+            single_password_login_routes(Router::new().route("/", get(protected_route)), &password);
 
         TestServer::new(app).expect("unable to create test server")
     }
@@ -169,7 +168,6 @@ mod tests {
         assert!(set_cookie.contains("token="));
         assert!(set_cookie.contains("Path=/"));
         assert!(set_cookie.contains("HttpOnly"));
-        assert!(set_cookie.contains("Secure"));
         assert!(set_cookie.contains("SameSite=Strict"));
 
         let cookie_pair = set_cookie
