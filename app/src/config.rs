@@ -4,7 +4,7 @@ use anyhow::Context;
 
 const SERVER_PORT_KEY: &str = "SERVER_PORT";
 const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
-pub const SINGLE_USER_PASSWORD: &str = "SINGLE_USER_PASSWORD";
+pub const SINGLE_USER_PASSWORD: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {

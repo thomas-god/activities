@@ -18,9 +18,8 @@ give access to your instance:
   sending emails containing auth link to users.
 - _single-user_: allows a single user to use the instance without an
   authentication step, and thus does not require an external email server to
-  work. Note that there is **NO authentication process** for this version, so be
-  careful where you plan to host it, as your activities will be accessible to
-  anyone that can reach your instance.
+  work. You can set an optional password through an environment variable if you
+  want to limit the access else your instance will be accessible to all.
 
 Beside the authentication process, both versions offer the same set of features.
 
@@ -82,18 +81,19 @@ from a file
 
 #### All versions
 
-| Variable name        | Required | Purpose                            | Example   |
-| -------------------- | -------- | ---------------------------------- | --------- |
-| ACTIVITIES_DATA_PATH | yes      | Location to store application data | /app/data |
+| Variable name                   | Required | Purpose                                                                                               | Example   |
+| ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- | --------- |
+| ACTIVITIES_DATA_PATH            | yes      | Location to store application data                                                                    | /app/data |
+| ACTIVITIES_SINGLE_USER_PASSWORD | no       | Add a required password to access the instance. If not set, there will be no authentication in place. | my-secret |
 
 #### Multi-user version
 
-| Variable name              | Required | Purpose                                                                                                                                         | Example                 |
-| -------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM     | yes      |                                                                                                                                                 | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME | yes      | SMTP username                                                                                                                                   |                         |
-| ACTIVITIES_MAILER_PASSWORD | yes      | SMTP password                                                                                                                                   |                         |
-| ACTIVITIES_MAILER_RELAY    | yes      | SMTP server                                                                                                                                     |                         |
+| Variable name              | Required | Purpose                                                                                                                                        | Example                 |
+| -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM     | yes      |                                                                                                                                                | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME | yes      | SMTP username                                                                                                                                  |                         |
+| ACTIVITIES_MAILER_PASSWORD | yes      | SMTP password                                                                                                                                  |                         |
+| ACTIVITIES_MAILER_RELAY    | yes      | SMTP server                                                                                                                                    |                         |
 | ACTIVITIES_MAILER_DOMAIN   | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server. | https://app.your.domain |
 
 ## Upload your training history
