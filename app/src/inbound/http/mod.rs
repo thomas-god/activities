@@ -34,7 +34,7 @@ use handlers::{
 };
 
 #[cfg(feature = "multi-user")]
-pub use crate::inbound::auth::infra::mailer::smtp::SMTPEmailProvider;
+pub use crate::inbound::auth::email_based::infra::mailer::smtp::SMTPEmailProvider;
 
 pub use crate::inbound::auth::email_based::{
     AuthLinkService, DisabledUserService, SessionService, UserService,
