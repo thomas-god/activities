@@ -17,6 +17,7 @@ use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 
+use crate::inbound::http::auth::AuthStrategy;
 use crate::inbound::http::handlers::{
     DefaultUserExtractor, cookie_auth_middleware, get_training_metric_templates,
 };
@@ -123,16 +124,14 @@ impl<
             .parse::<HeaderValue>()
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
-        let mut router = axum::Router::new().nest("/api", core_routes(state.clone()));
+        let router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
-        if cfg!(feature = "multi-user") {
-            let auth_state = AuthAppState {
-                cookie_config: Arc::new(CookieConfig::default()),
-                user_service: Arc::new(user_service),
-            };
-            let auth_router = login_routes(auth_state);
-            router = router.nest("/api", auth_router)
-        }
+        let auth_strategy = select_auth_strategy();
+        tracing::info!(
+            "App starting with authentication strategy: {:?}",
+            &auth_strategy
+        );
+        let mut router = add_auth_router(auth_strategy, router, user_service);
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()
@@ -179,7 +178,7 @@ fn core_routes<
 where
     S: Clone + Send + Sync + 'static,
 {
-    let mut router = Router::new()
+    let router = Router::new()
         .route(
             "/activity",
             post(upload_activities::<AS, PF, TS, PS>)
@@ -297,11 +296,35 @@ where
             delete(delete_preference::<AS, PF, TS, PS>),
         );
 
-    if cfg!(feature = "single-user") {
-        router = router.route_layer(axum::middleware::from_extractor::<DefaultUserExtractor>());
-    }
-
     router.with_state(state)
+}
+
+fn select_auth_strategy() -> AuthStrategy {
+    if cfg!(feature = "multi-user") {
+        return AuthStrategy::EmailBased;
+    }
+    AuthStrategy::NoAuth
+}
+
+fn add_auth_router<S, US: IUserService>(
+    strategy: AuthStrategy,
+    base_router: Router<S>,
+    user_service: US,
+) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    match strategy {
+        AuthStrategy::NoAuth => no_auth_login_routes(base_router),
+        AuthStrategy::EmailBased => email_based_login_routes(base_router, user_service),
+    }
+}
+
+fn no_auth_login_routes<S>(base_router: Router<S>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    base_router.route_layer(axum::middleware::from_extractor::<DefaultUserExtractor>())
 }
 
 #[derive(Debug, Clone)]
@@ -310,11 +333,24 @@ pub struct AuthAppState<UR: IUserService> {
     cookie_config: Arc<CookieConfig>,
 }
 
-fn login_routes<US: IUserService, S>(state: AuthAppState<US>) -> Router<S>
+fn email_based_login_routes<US: IUserService, S>(
+    mut base_router: Router<S>,
+    user_service: US,
+) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    let mut router = Router::new()
+    let auth_state = AuthAppState {
+        cookie_config: Arc::new(CookieConfig::default()),
+        user_service: Arc::new(user_service),
+    };
+
+    base_router = base_router.route_layer(axum::middleware::from_fn_with_state(
+        auth_state.clone(),
+        cookie_auth_middleware::<US>,
+    ));
+
+    let router = Router::new()
         .route(
             "/register",
             post(crate::inbound::http::handlers::register_user::<US>),
@@ -327,9 +363,7 @@ where
             "/login/validate/{auth_token}",
             post(crate::inbound::http::handlers::validate_login::<US>),
         );
-    router = router.route_layer(axum::middleware::from_fn_with_state(
-        state.clone(),
-        cookie_auth_middleware::<US>,
-    ));
-    router.with_state(state)
+    let router = router.with_state(auth_state);
+
+    base_router.nest("/api", router)
 }

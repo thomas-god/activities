@@ -14,6 +14,12 @@ use crate::domain::models::UserId;
 pub mod infra;
 pub mod services;
 
+#[derive(Debug, Clone)]
+pub enum AuthStrategy {
+    NoAuth,
+    EmailBased,
+}
+
 #[derive(Debug, Clone, Constructor)]
 pub struct AuthenticatedUser(UserId);
 
