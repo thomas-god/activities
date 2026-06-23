@@ -17,10 +17,7 @@ use crate::{
         },
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::ParseFile,
     },
 };
@@ -50,11 +47,10 @@ pub async fn list_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Query(filters): Query<Filters>,
 ) -> Result<Json<Vec<PublicActivity>>, StatusCode> {
     let Ok(activities) = state

@@ -10,18 +10,17 @@ use crate::domain::ports::{
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::models::preferences::PreferenceKey,
-    inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
+    inbound::http::{AppState, auth::AuthenticatedUser},
 };
 
 pub async fn delete_preference<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(key): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     let preference_key = key

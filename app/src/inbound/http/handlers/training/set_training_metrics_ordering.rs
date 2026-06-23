@@ -10,11 +10,7 @@ use crate::{
         },
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-            handlers::training::types::ScopePayload,
-        },
+        http::{AppState, auth::AuthenticatedUser, handlers::training::types::ScopePayload},
         parser::ParseFile,
     },
 };
@@ -30,11 +26,10 @@ pub async fn set_training_metrics_ordering<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(payload): Json<SetTrainingMetricsOrderingBody>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     let scope = payload.scope.into();

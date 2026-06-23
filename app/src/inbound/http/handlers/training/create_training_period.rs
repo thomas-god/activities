@@ -14,7 +14,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, IUserService},
+            auth::AuthenticatedUser,
             handlers::training::types::{
                 APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
                 APITrainingMetricSource, APITrainingPeriodSports,
@@ -59,11 +59,10 @@ pub async fn create_training_period<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(payload): Json<CreateTrainingPeriodBody>,
 ) -> Result<(StatusCode, Json<CreateTrainingPeriodResponse>), StatusCode> {
     let req = build_request(payload, user.user());

@@ -31,7 +31,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, IUserService},
+            auth::AuthenticatedUser,
             handlers::training::{
                 types::ScopePayload,
                 utils::{
@@ -212,11 +212,10 @@ pub async fn get_training_metrics<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let res = state
@@ -245,11 +244,10 @@ pub async fn get_training_period_metrics<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(period_id): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let period_id = TrainingPeriodId::from(&period_id);

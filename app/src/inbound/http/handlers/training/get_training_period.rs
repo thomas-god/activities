@@ -29,10 +29,7 @@ use crate::{
         },
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::ParseFile,
     },
 };
@@ -81,11 +78,10 @@ pub async fn get_training_period<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(period_id): Path<String>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let Some(period_with_activities) = state

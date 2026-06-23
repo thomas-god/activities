@@ -4,17 +4,9 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{
-    domain::ports::{
-        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
-    },
-    inbound::{
-        http::{
-            AppState, UserLoginResult,
-            auth::{EmailAddress, IUserService},
-        },
-        parser::ParseFile,
-    },
+use crate::inbound::http::{
+    AppState, AuthAppState, UserLoginResult,
+    auth::{EmailAddress, IUserService},
 };
 
 #[derive(Debug, Deserialize)]
@@ -22,14 +14,8 @@ pub struct LoginUserQuery {
     email: String,
 }
 
-pub async fn login_user<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
-    UR: IUserService,
-    PS: IPreferencesService,
->(
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+pub async fn login_user<UR: IUserService>(
+    State(state): State<AuthAppState<UR>>,
     Query(query): Query<LoginUserQuery>,
 ) -> StatusCode {
     let Ok(email) = EmailAddress::try_from(query.email) else {

@@ -25,7 +25,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, IUserService},
+            auth::AuthenticatedUser,
             handlers::training::{
                 types::{
                     APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
@@ -97,11 +97,10 @@ pub async fn compute_training_metric_values<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(request): Json<ComputeMetricValuesRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let date_range = DateRange::from(&request);

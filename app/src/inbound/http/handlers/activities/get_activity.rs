@@ -13,10 +13,7 @@ use crate::{
         },
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::ParseFile,
     },
 };
@@ -27,11 +24,10 @@ pub async fn get_activity<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(_user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
     let Ok((activity, metrics)) = state
@@ -147,9 +143,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         });
         let path = Path("target_id".to_string());
 
@@ -217,9 +211,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         });
         let path = Path("target_id".to_string());
 

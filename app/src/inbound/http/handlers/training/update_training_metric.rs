@@ -18,7 +18,7 @@ use crate::domain::ports::{
     training::{ITrainingService, UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest},
 };
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::{AuthenticatedUser, IUserService};
+use crate::inbound::http::auth::AuthenticatedUser;
 use crate::inbound::http::handlers::training::types::{
     APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, ScopePayload,
 };
@@ -39,11 +39,10 @@ pub async fn update_training_metric<
     AS: IActivityService,
     PF: ParseFile,
     TS: ITrainingService,
-    US: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TS, US, PS>>,
+    State(state): State<AppState<AS, PF, TS, PS>>,
     Path(metric_id): Path<Uuid>,
     axum::Json(body): axum::Json<UpdateTrainingMetricBody>,
 ) -> StatusCode {

@@ -6,28 +6,14 @@ use axum::{
 use axum_extra::extract::cookie::Cookie;
 use cookie::time::OffsetDateTime;
 
-use crate::{
-    domain::ports::{
-        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
-    },
-    inbound::{
-        http::{
-            AppState, AuthLinkValidationResult,
-            auth::{AuthToken, IUserService},
-            handlers::auth::build_session_cookie,
-        },
-        parser::ParseFile,
-    },
+use crate::inbound::http::{
+    AppState, AuthAppState, AuthLinkValidationResult,
+    auth::{AuthToken, IUserService},
+    handlers::auth::build_session_cookie,
 };
 
-pub async fn validate_login<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
-    UR: IUserService,
-    PS: IPreferencesService,
->(
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+pub async fn validate_login<UR: IUserService>(
+    State(state): State<AuthAppState<UR>>,
     Path(auth_token): Path<String>,
 ) -> impl IntoResponse {
     let token = AuthToken::from(auth_token);

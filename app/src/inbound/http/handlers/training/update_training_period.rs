@@ -16,7 +16,7 @@ use crate::domain::ports::training::{
     UpdateTrainingPeriodNoteRequest,
 };
 use crate::inbound::http::AppState;
-use crate::inbound::http::auth::{AuthenticatedUser, IUserService};
+use crate::inbound::http::auth::AuthenticatedUser;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]
@@ -36,11 +36,10 @@ pub async fn update_training_period<
     AS: IActivityService,
     PF: ParseFile,
     TS: ITrainingService,
-    US: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TS, US, PS>>,
+    State(state): State<AppState<AS, PF, TS, PS>>,
     Path(period_id): Path<Uuid>,
     axum::Json(body): axum::Json<UpdateTrainingPeriodBody>,
 ) -> Response {

@@ -69,11 +69,10 @@ pub async fn get_training_notes<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Query(query): Query<TrainingNotesQuery>,
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
     let date_range = Option::<DateRange>::from(&query);
@@ -94,11 +93,10 @@ pub async fn get_training_period_notes<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(period_id): Path<String>,
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
     let period_id = TrainingPeriodId::from(&period_id);

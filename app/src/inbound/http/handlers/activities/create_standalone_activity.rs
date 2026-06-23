@@ -5,10 +5,7 @@ use crate::domain::ports::{preferences::IPreferencesService, training::ITraining
 use crate::{
     domain::ports::activity::IActivityService,
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::{ParseBytesError, ParseFile, ParsedFileContent, json::StandaloneActivity},
     },
 };
@@ -22,11 +19,10 @@ pub async fn create_standalone_activity<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(activity): Json<StandaloneActivity>,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
     let parsed_content: ParsedFileContent = activity
@@ -152,9 +148,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(MockTrainingService::test_default()),
             file_parser: Arc::new(MockFileParser::test_default()),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -165,7 +159,6 @@ mod tests {
                         MockActivityService,
                         MockFileParser,
                         MockTrainingService,
-                        MockUserService,
                         MockPreferencesService,
                     >,
                 ),
@@ -195,9 +188,7 @@ mod tests {
             activity_service: Arc::new(MockActivityService::test_default()),
             training_metrics_service: Arc::new(MockTrainingService::test_default()),
             file_parser: Arc::new(MockFileParser::test_default()),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -208,7 +199,6 @@ mod tests {
                         MockActivityService,
                         MockFileParser,
                         MockTrainingService,
-                        MockUserService,
                         MockPreferencesService,
                     >,
                 ),

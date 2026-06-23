@@ -18,10 +18,7 @@ use crate::{
         training::ITrainingService,
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::ParseFile,
     },
 };
@@ -30,11 +27,10 @@ pub async fn get_all_raw_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
 ) -> Result<Response, StatusCode> {
     let request = GetAllActivitiesRequest::new(user.user().clone());
 
@@ -78,11 +74,10 @@ pub async fn get_raw_activity<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity): Path<String>,
 ) -> Result<Response, StatusCode> {
     let request = GetRawActivityRequest::new(ActivityId::from(&activity), user.user().clone());
@@ -147,9 +142,7 @@ mod tests {
             activity_service: Arc::new(activity_service),
             file_parser: Arc::new(MockFileParser::new()),
             training_metrics_service: Arc::new(MockTrainingService::new()),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
         let response = get_all_raw_activities(Extension(authenticated_user), State(state))
@@ -186,9 +179,7 @@ mod tests {
             activity_service: Arc::new(activity_service),
             file_parser: Arc::new(MockFileParser::new()),
             training_metrics_service: Arc::new(MockTrainingService::new()),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
         let result = get_all_raw_activities(Extension(authenticated_user), State(state)).await;
@@ -211,9 +202,7 @@ mod tests {
             activity_service: Arc::new(activity_service),
             file_parser: Arc::new(MockFileParser::new()),
             training_metrics_service: Arc::new(MockTrainingService::new()),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(crate::inbound::http::CookieConfig::default()),
         };
 
         let response = get_all_raw_activities(Extension(authenticated_user), State(state))

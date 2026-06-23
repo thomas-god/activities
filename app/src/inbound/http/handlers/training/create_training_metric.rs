@@ -20,7 +20,7 @@ use crate::{
     inbound::{
         http::{
             AppState,
-            auth::{AuthenticatedUser, IUserService},
+            auth::AuthenticatedUser,
             handlers::training::types::{
                 APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                 APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricSource,
@@ -78,11 +78,10 @@ pub async fn create_training_metric<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(payload): Json<CreateTrainingMetricBody>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     let req = build_request(payload, user.user()).map_err(|e| {

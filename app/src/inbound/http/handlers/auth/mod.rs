@@ -23,7 +23,9 @@ use crate::{
         },
     },
     inbound::{
-        http::{AppState, CookieConfig, IUserService, auth::GenerateSessionTokenResult},
+        http::{
+            AppState, AuthAppState, CookieConfig, IUserService, auth::GenerateSessionTokenResult,
+        },
         parser::ParseFile,
     },
 };
@@ -56,15 +58,11 @@ where
     }
 }
 
-impl<AS, PF, TMS, US, PS> FromRef<AppState<AS, PF, TMS, US, PS>> for Arc<US>
+impl<US> FromRef<AuthAppState<US>> for Arc<US>
 where
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
     US: IUserService,
-    PS: IPreferencesService,
 {
-    fn from_ref(input: &AppState<AS, PF, TMS, US, PS>) -> Self {
+    fn from_ref(input: &AuthAppState<US>) -> Self {
         input.user_service.clone()
     }
 }
@@ -104,17 +102,13 @@ where
     }
 }
 
-pub async fn cookie_auth_middleware<US, AS, PF, TMS, PS>(
-    State(state): State<AppState<AS, PF, TMS, US, PS>>,
+pub async fn cookie_auth_middleware<US>(
+    State(state): State<AuthAppState<US>>,
     mut request: Request,
     next: Next,
 ) -> Response
 where
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
     US: IUserService,
-    PS: IPreferencesService,
 {
     let jar = CookieJar::from_headers(request.headers());
     let Some(cookie) = jar.get("session_token") else {
@@ -213,12 +207,8 @@ mod test {
     }
 
     fn build_test_server(session_service: MockUserService) -> TestServer {
-        let state = AppState {
-            activity_service: Arc::new(MockActivityService::new()),
-            training_metrics_service: Arc::new(MockTrainingService::new()),
-            file_parser: Arc::new(MockFileParser::new()),
+        let state = AuthAppState {
             user_service: Arc::new(session_service),
-            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -233,13 +223,7 @@ mod test {
                 .route("/", get(test_route))
                 .route_layer(from_extractor_with_state::<
                     CookieUserExtractor<MockUserService>,
-                    AppState<
-                        MockActivityService,
-                        MockFileParser,
-                        MockTrainingService,
-                        MockUserService,
-                        MockPreferencesService,
-                    >,
+                    AuthAppState<MockUserService>,
                 >(state));
         TestServer::new(app).expect("unable to create test server")
     }
@@ -284,12 +268,8 @@ mod test {
     }
 
     fn build_middleware_test_server(session_service: MockUserService) -> TestServer {
-        let state = AppState {
-            activity_service: Arc::new(MockActivityService::new()),
-            training_metrics_service: Arc::new(MockTrainingService::new()),
-            file_parser: Arc::new(MockFileParser::new()),
+        let state = AuthAppState {
             user_service: Arc::new(session_service),
-            preferences_service: Arc::new(MockPreferencesService::new()),
             cookie_config: Arc::new(CookieConfig::default()),
         };
 
@@ -303,13 +283,7 @@ mod test {
             .route("/", get(test_route))
             .route_layer(from_fn_with_state(
                 state.clone(),
-                cookie_auth_middleware::<
-                    MockUserService,
-                    MockActivityService,
-                    MockFileParser,
-                    MockTrainingService,
-                    MockPreferencesService,
-                >,
+                cookie_auth_middleware::<MockUserService>,
             ))
             .with_state(state);
         TestServer::new(app).expect("unable to create test server")

@@ -34,11 +34,10 @@ pub async fn update_training_note<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(note_id): Path<String>,
     Json(payload): Json<UpdateTrainingNoteBody>,
 ) -> Result<StatusCode, StatusCode> {

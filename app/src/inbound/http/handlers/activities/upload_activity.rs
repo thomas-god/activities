@@ -17,10 +17,7 @@ use crate::{
         training::ITrainingService,
     },
     inbound::{
-        http::{
-            AppState,
-            auth::{AuthenticatedUser, IUserService},
-        },
+        http::{AppState, auth::AuthenticatedUser},
         parser::{ParseBytesError, ParseFile, SupportedExtension},
     },
 };
@@ -60,11 +57,10 @@ pub async fn upload_activities<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     mut multipart: Multipart,
 ) -> Result<impl axum::response::IntoResponse, StatusCode> {
     let mut created_ids = Vec::new();
@@ -211,9 +207,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -281,9 +275,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -352,9 +344,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()
@@ -402,9 +392,7 @@ mod tests {
             activity_service: Arc::new(service),
             training_metrics_service: Arc::new(metrics),
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(MockUserService::new()),
             preferences_service: Arc::new(MockPreferencesService::new()),
-            cookie_config: Arc::new(CookieConfig::default()),
         };
 
         let app = Router::new()

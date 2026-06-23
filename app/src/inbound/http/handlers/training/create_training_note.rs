@@ -48,11 +48,10 @@ pub async fn create_training_note<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
-    UR: IUserService,
     PS: IPreferencesService,
 >(
     Extension(user): Extension<AuthenticatedUser>,
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+    State(state): State<AppState<AS, PF, TMS, PS>>,
     Json(payload): Json<CreateTrainingNoteBody>,
 ) -> Result<Json<CreateTrainingNoteResponse>, StatusCode> {
     let req = build_request(payload, user.user())?;

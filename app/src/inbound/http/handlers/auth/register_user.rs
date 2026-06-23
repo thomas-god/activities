@@ -4,17 +4,9 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{
-    domain::ports::{
-        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
-    },
-    inbound::{
-        http::{
-            AppState, UserLoginResult,
-            auth::{EmailAddress, IUserService, UserRegistrationResult},
-        },
-        parser::ParseFile,
-    },
+use crate::inbound::http::{
+    AppState, AuthAppState, UserLoginResult,
+    auth::{EmailAddress, IUserService, UserRegistrationResult},
 };
 
 #[derive(Debug, Deserialize)]
@@ -22,14 +14,8 @@ pub struct RegisterUserQuery {
     email: String,
 }
 
-pub async fn register_user<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
-    UR: IUserService,
-    PS: IPreferencesService,
->(
-    State(state): State<AppState<AS, PF, TMS, UR, PS>>,
+pub async fn register_user<UR: IUserService>(
+    State(state): State<AuthAppState<UR>>,
     Query(query): Query<RegisterUserQuery>,
 ) -> StatusCode {
     let Ok(email) = EmailAddress::try_from(query.email) else {

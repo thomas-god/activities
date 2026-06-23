@@ -69,20 +69,13 @@ impl Default for CookieConfig {
 }
 
 #[derive(Debug, Clone)]
-struct AppState<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
-    UR: IUserService,
-    PS: IPreferencesService,
-> {
+struct AppState<AS: IActivityService, PF: ParseFile, TMS: ITrainingService, PS: IPreferencesService>
+{
     activity_service: Arc<AS>,
     file_parser: Arc<PF>,
     training_metrics_service: Arc<TMS>,
-    user_service: Arc<UR>,
     #[allow(dead_code)]
     preferences_service: Arc<PS>,
-    cookie_config: Arc<CookieConfig>,
 }
 
 pub struct HttpServer<AS, PF, TMS, UR, PS> {
@@ -107,7 +100,7 @@ impl<
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
-        session_repository: US,
+        user_service: US,
         preferences_service: PS,
         config: Config,
     ) -> anyhow::Result<Self> {
@@ -122,8 +115,6 @@ impl<
             activity_service: Arc::new(activity_service),
             training_metrics_service: training_metric_service,
             file_parser: Arc::new(file_parser),
-            user_service: Arc::new(session_repository),
-            cookie_config: Arc::new(CookieConfig::default()),
             preferences_service: Arc::new(preferences_service),
         };
 
@@ -135,7 +126,12 @@ impl<
         let mut router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
         if cfg!(feature = "multi-user") {
-            router = router.nest("/api", login_routes());
+            let auth_state = AuthAppState {
+                cookie_config: Arc::new(CookieConfig::default()),
+                user_service: Arc::new(user_service),
+            };
+            let auth_router = login_routes(auth_state);
+            router = router.nest("/api", auth_router)
         }
 
         router = router.layer(trace_layer).layer(
@@ -146,8 +142,6 @@ impl<
                 .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PATCH])
                 .allow_credentials(true),
         );
-
-        let router = router.with_state(state);
 
         let listener = net::TcpListener::bind(format!("0.0.0.0:{}", config.server_port))
             .await
@@ -177,50 +171,53 @@ fn core_routes<
     AS: IActivityService,
     PF: ParseFile,
     TS: ITrainingService,
-    US: IUserService,
     PS: IPreferencesService,
+    S,
 >(
-    state: AppState<AS, PF, TS, US, PS>,
-) -> Router<AppState<AS, PF, TS, US, PS>> {
+    state: AppState<AS, PF, TS, PS>,
+) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     let mut router = Router::new()
         .route(
             "/activity",
-            post(upload_activities::<AS, PF, TS, US, PS>)
+            post(upload_activities::<AS, PF, TS, PS>)
                 .route_layer(DefaultBodyLimit::max(1024 * 1024 * 1024)),
         )
         .route(
             "/activity/standalone",
-            post(create_standalone_activity::<AS, PF, TS, US, PS>),
+            post(create_standalone_activity::<AS, PF, TS, PS>),
         )
-        .route("/activities", get(list_activities::<AS, PF, TS, US, PS>))
+        .route("/activities", get(list_activities::<AS, PF, TS, PS>))
         .route(
             "/activities/download",
-            get(get_all_raw_activities::<AS, PF, TS, US, PS>),
+            get(get_all_raw_activities::<AS, PF, TS, PS>),
         )
         .route(
             "/activity/{activity_id}/download",
-            get(get_raw_activity::<AS, PF, TS, US, PS>),
+            get(get_raw_activity::<AS, PF, TS, PS>),
         )
         .route(
             "/activity/{activity_id}",
-            get(get_activity::<AS, PF, TS, US, PS>),
+            get(get_activity::<AS, PF, TS, PS>),
         )
         .route(
             "/activity/{activity_id}",
-            patch(patch_activity::<AS, PF, TS, US, PS>),
+            patch(patch_activity::<AS, PF, TS, PS>),
         )
         .route(
             "/activity/{activity_id}",
-            delete(delete_activity::<AS, PF, TS, US, PS>),
+            delete(delete_activity::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metrics",
-            get(get_training_metrics::<AS, PF, TS, US, PS>),
+            get(get_training_metrics::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metrics/ordering",
-            get(get_training_metrics_ordering::<AS, PF, TS, US, PS>)
-                .post(set_training_metrics_ordering::<AS, PF, TS, US, PS>),
+            get(get_training_metrics_ordering::<AS, PF, TS, PS>)
+                .post(set_training_metrics_ordering::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metrics/templates",
@@ -228,117 +225,111 @@ fn core_routes<
         )
         .route(
             "/training/metric",
-            post(create_training_metric::<AS, PF, TS, US, PS>),
+            post(create_training_metric::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metric/{metric_id}",
-            delete(delete_training_metric::<AS, PF, TS, US, PS>)
-                .patch(update_training_metric::<AS, PF, TS, US, PS>),
+            delete(delete_training_metric::<AS, PF, TS, PS>)
+                .patch(update_training_metric::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metric/{metric_id}/copy",
-            post(copy_training_metric::<AS, PF, TS, US, PS>),
+            post(copy_training_metric::<AS, PF, TS, PS>),
         )
         .route(
             "/training/metric/values",
-            post(compute_training_metric_values::<AS, PF, TS, US, PS>),
+            post(compute_training_metric_values::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period",
-            post(create_training_period::<AS, PF, TS, US, PS>),
+            post(create_training_period::<AS, PF, TS, PS>),
         )
         .route(
             "/training/note",
-            post(create_training_note::<AS, PF, TS, US, PS>),
+            post(create_training_note::<AS, PF, TS, PS>),
         )
+        .route("/training/notes", get(get_training_notes::<AS, PF, TS, PS>))
         .route(
-            "/training/notes",
-            get(get_training_notes::<AS, PF, TS, US, PS>),
+            "/training/note/{note_id}",
+            get(get_training_note::<AS, PF, TS, PS>),
         )
         .route(
             "/training/note/{note_id}",
-            get(get_training_note::<AS, PF, TS, US, PS>),
+            patch(update_training_note::<AS, PF, TS, PS>),
         )
         .route(
             "/training/note/{note_id}",
-            patch(update_training_note::<AS, PF, TS, US, PS>),
-        )
-        .route(
-            "/training/note/{note_id}",
-            delete(delete_training_note::<AS, PF, TS, US, PS>),
+            delete(delete_training_note::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            get(get_training_period::<AS, PF, TS, US, PS>),
+            get(get_training_period::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            delete(delete_training_period::<AS, PF, TS, US, PS>),
+            delete(delete_training_period::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period/{period_id}",
-            patch(update_training_period::<AS, PF, TS, US, PS>),
+            patch(update_training_period::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period/{period_id}/notes",
-            get(get_training_period_notes::<AS, PF, TS, US, PS>),
+            get(get_training_period_notes::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period/{period_id}/metrics",
-            get(get_training_period_metrics::<AS, PF, TS, US, PS>),
+            get(get_training_period_metrics::<AS, PF, TS, PS>),
         )
         .route(
             "/training/periods",
-            get(get_training_periods::<AS, PF, TS, US, PS>),
+            get(get_training_periods::<AS, PF, TS, PS>),
         )
         .route(
             "/training/periods/active",
-            get(get_active_training_periods::<AS, PF, TS, US, PS>),
+            get(get_active_training_periods::<AS, PF, TS, PS>),
         )
-        .route(
-            "/preferences",
-            get(get_all_preferences::<AS, PF, TS, US, PS>),
-        )
-        .route("/preferences", post(set_preference::<AS, PF, TS, US, PS>))
+        .route("/preferences", get(get_all_preferences::<AS, PF, TS, PS>))
+        .route("/preferences", post(set_preference::<AS, PF, TS, PS>))
+        .route("/preferences/{key}", get(get_preference::<AS, PF, TS, PS>))
         .route(
             "/preferences/{key}",
-            get(get_preference::<AS, PF, TS, US, PS>),
-        )
-        .route(
-            "/preferences/{key}",
-            delete(delete_preference::<AS, PF, TS, US, PS>),
+            delete(delete_preference::<AS, PF, TS, PS>),
         );
 
     if cfg!(feature = "single-user") {
         router = router.route_layer(axum::middleware::from_extractor::<DefaultUserExtractor>());
-    } else {
-        router = router.route_layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            cookie_auth_middleware::<US, AS, PF, TS, PS>,
-        ));
     }
 
-    router
+    router.with_state(state)
 }
 
-fn login_routes<
-    AS: IActivityService,
-    PF: ParseFile,
-    TMS: ITrainingService,
-    US: IUserService,
-    PS: IPreferencesService,
->() -> Router<AppState<AS, PF, TMS, US, PS>> {
-    Router::new()
+#[derive(Debug, Clone)]
+pub struct AuthAppState<UR: IUserService> {
+    user_service: Arc<UR>,
+    cookie_config: Arc<CookieConfig>,
+}
+
+fn login_routes<US: IUserService, S>(state: AuthAppState<US>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    let mut router = Router::new()
         .route(
             "/register",
-            post(crate::inbound::http::handlers::register_user::<AS, PF, TMS, US, PS>),
+            post(crate::inbound::http::handlers::register_user::<US>),
         )
         .route(
             "/login",
-            post(crate::inbound::http::handlers::login_user::<AS, PF, TMS, US, PS>),
+            post(crate::inbound::http::handlers::login_user::<US>),
         )
         .route(
             "/login/validate/{auth_token}",
-            post(crate::inbound::http::handlers::validate_login::<AS, PF, TMS, US, PS>),
-        )
+            post(crate::inbound::http::handlers::validate_login::<US>),
+        );
+    router = router.route_layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        cookie_auth_middleware::<US>,
+    ));
+    router.with_state(state)
 }
