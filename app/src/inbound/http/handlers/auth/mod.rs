@@ -24,7 +24,8 @@ use crate::{
     },
     inbound::{
         http::{
-            AppState, AuthAppState, CookieConfig, IUserService, auth::GenerateSessionTokenResult,
+            AppState, AuthAppState, CookieConfig, IUserService,
+            auth::email_based::GenerateSessionTokenResult,
         },
         parser::ParseFile,
     },
@@ -177,7 +178,7 @@ mod test {
         inbound::{
             http::{
                 CookieConfig,
-                auth::{
+                auth::email_based::{
                     CheckSessionResult, GenerateSessionTokenResult, SessionToken,
                     test_utils::MockUserService,
                 },

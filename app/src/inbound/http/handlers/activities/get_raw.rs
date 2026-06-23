@@ -119,7 +119,6 @@ mod tests {
         services::preferences::tests_utils::MockPreferencesService,
         services::training::test_utils::MockTrainingService,
     };
-    use crate::inbound::http::auth::test_utils::MockUserService;
     use crate::inbound::parser::test_utils::MockFileParser;
     use std::sync::Arc;
 

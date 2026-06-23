@@ -16,7 +16,7 @@ use crate::{
             training::ITrainingService,
         },
     },
-    inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
+    inbound::http::{AppState, auth::AuthenticatedUser},
 };
 
 #[derive(Debug, Deserialize)]

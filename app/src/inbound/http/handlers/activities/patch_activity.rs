@@ -393,10 +393,7 @@ mod tests {
                 training::test_utils::MockTrainingService,
             },
         },
-        inbound::{
-            http::{CookieConfig, auth::test_utils::MockUserService},
-            parser::test_utils::MockFileParser,
-        },
+        inbound::parser::test_utils::MockFileParser,
     };
     use mockall::predicate::*;
 

@@ -37,15 +37,17 @@ use handlers::{
 #[cfg(feature = "multi-user")]
 pub use self::auth::infra::mailer::smtp::SMTPEmailProvider;
 
-pub use self::auth::infra::{
-    mailer::DoNothingMailProvider,
-    sqlite::{
-        auth_link::SqliteAuthLinkRepository, session::SqliteSessionRepository,
-        user::SqliteUserRepository,
+pub use self::auth::email_based::{
+    AuthLinkService, DisabledUserService, SessionService, UserService,
+    infra::{
+        mailer::DoNothingMailProvider,
+        sqlite::{
+            auth_link::SqliteAuthLinkRepository, session::SqliteSessionRepository,
+            user::SqliteUserRepository,
+        },
     },
 };
-pub use self::auth::services::{AuthLinkService, DisabledUserService, SessionService, UserService};
-pub use self::auth::{AuthLinkValidationResult, IUserService, UserLoginResult};
+pub use self::auth::email_based::{AuthLinkValidationResult, IUserService, UserLoginResult};
 
 mod auth;
 mod handlers;

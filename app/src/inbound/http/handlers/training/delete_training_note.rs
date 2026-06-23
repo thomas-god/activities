@@ -13,7 +13,7 @@ use crate::{
             training::ITrainingService,
         },
     },
-    inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
+    inbound::http::{AppState, auth::AuthenticatedUser},
 };
 
 impl From<DeleteTrainingNoteError> for StatusCode {

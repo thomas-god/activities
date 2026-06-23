@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     domain::models::UserId,
-    inbound::http::auth::{
+    inbound::http::auth::email_based::{
         CheckSessionResult, GenerateSessionTokenResult, HashedSession, HashedSessionToken,
         ISessionService, Session, SessionToken,
     },
@@ -125,7 +125,7 @@ mod test_utils {
 
 #[cfg(test)]
 mod test_session_service_generate_session_token {
-    use crate::inbound::http::auth::services::session::test_utils::MockSessionRepository;
+    use crate::inbound::http::auth::email_based::session::test_utils::MockSessionRepository;
 
     use super::*;
 
@@ -165,7 +165,7 @@ mod test_session_service_generate_session_token {
 #[cfg(test)]
 mod test_session_service_check_session_token {
 
-    use crate::inbound::http::auth::services::session::test_utils::MockSessionRepository;
+    use crate::inbound::http::auth::email_based::session::test_utils::MockSessionRepository;
 
     use super::*;
 

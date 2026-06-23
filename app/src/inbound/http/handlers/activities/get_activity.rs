@@ -73,13 +73,8 @@ mod tests {
             },
         },
         inbound::{
-            http::{
-                CookieConfig,
-                auth::test_utils::MockUserService,
-                handlers::activities::activity_schema::{
-                    PublicActivity, PublicActivityTimeseries, PublicTimeseries,
-                    PublicTimeseriesValue,
-                },
+            http::handlers::activities::activity_schema::{
+                PublicActivity, PublicActivityTimeseries, PublicTimeseries, PublicTimeseriesValue,
             },
             parser::test_utils::MockFileParser,
         },

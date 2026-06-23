@@ -10,7 +10,7 @@ use crate::domain::ports::{
 use crate::inbound::parser::ParseFile;
 use crate::{
     domain::models::training::TrainingNoteId,
-    inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
+    inbound::http::{AppState, auth::AuthenticatedUser},
 };
 
 use super::get_training_notes::TrainingNoteResponse;

@@ -14,7 +14,7 @@ use crate::{
         },
         ports::training::{ITrainingService, UpdateTrainingNoteError},
     },
-    inbound::http::{AppState, auth::AuthenticatedUser, auth::IUserService},
+    inbound::http::{AppState, auth::AuthenticatedUser},
 };
 
 #[derive(Debug, Deserialize)]

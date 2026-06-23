@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::inbound::http::{
     AppState, AuthAppState, UserLoginResult,
-    auth::{EmailAddress, IUserService},
+    auth::email_based::{EmailAddress, IUserService},
 };
 
 #[derive(Debug, Deserialize)]

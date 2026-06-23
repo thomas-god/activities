@@ -8,7 +8,7 @@ use cookie::time::OffsetDateTime;
 
 use crate::inbound::http::{
     AppState, AuthAppState, AuthLinkValidationResult,
-    auth::{AuthToken, IUserService},
+    auth::email_based::{AuthToken, IUserService},
     handlers::auth::build_session_cookie,
 };
 

@@ -172,13 +172,7 @@ mod tests {
                 training::test_utils::MockTrainingService,
             },
         },
-        inbound::{
-            http::{
-                CookieConfig, auth::test_utils::MockUserService,
-                handlers::auth::DefaultUserExtractor,
-            },
-            parser::test_utils::MockFileParser,
-        },
+        inbound::{http::handlers::auth::DefaultUserExtractor, parser::test_utils::MockFileParser},
     };
 
     use super::*;
