@@ -22,36 +22,7 @@
 
 	let chartWidth: number = $state(300);
 	let currentIndex = $derived(initialIndex);
-
-	let currentMetric = $derived.by(() => {
-		const metric = metrics[currentIndex];
-		if (!metric) return undefined;
-
-		let values = [];
-		for (const [group, time_values] of Object.entries(metric.values)) {
-			for (const [dt, value] of Object.entries(time_values)) {
-				values.push({ time: dt, group, value });
-			}
-		}
-
-		let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
-
-		return {
-			id: metric.id,
-			name: metric.name,
-			values: values,
-			metric: metric.metric,
-			granularity: metric.granularity,
-			aggregate: metric.aggregate,
-			sports: metric.sports,
-			groupBy: metric.group_by,
-			unit: metric.unit,
-			showGroup: metric.group_by !== null,
-			scope,
-			initialMetric: metric,
-			summary: metric.summary
-		};
-	});
+	let currentMetric = $derived(metrics[currentIndex]);
 
 	const goToPrevious = () => {
 		currentIndex = currentIndex > 0 ? currentIndex - 1 : metrics.length - 1;
@@ -88,7 +59,7 @@
 		<div class="self-start flex flex-row items-center gap-1">
 			<div>
 				<TrainingMetricMenu
-					metric={currentMetric.initialMetric}
+					metric={currentMetric}
 					onUpdate={onMetricUpdate}
 					onDelete={onMetricUpdate}
 				/>
@@ -101,7 +72,7 @@
 		</div>
 	</div>
 
-	{#if currentMetric.values.length > 0}
+	{#if Object.entries(currentMetric.values).length > 0}
 		<div bind:clientWidth={chartWidth}>
 			{#if currentMetric.granularity !== null}
 				<TrainingMetricsChartStacked
@@ -111,8 +82,8 @@
 					unit={currentMetric.unit}
 					granularity={currentMetric.granularity}
 					format={metricValuesDisplayFormat(currentMetric)}
-					showGroup={currentMetric.showGroup}
-					groupBy={currentMetric.groupBy}
+					showGroup={currentMetric.group_by !== null}
+					groupBy={currentMetric.group_by}
 					stacked={currentMetric.aggregate === 'Sum' ||
 						currentMetric.aggregate === 'NumberOfActivities'}
 					average={'average' in currentMetric.summary

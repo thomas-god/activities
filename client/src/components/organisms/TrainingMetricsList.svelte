@@ -51,13 +51,13 @@
 </script>
 
 <div class="flex flex-col items-center gap-0">
-	{#each metricProps as metric, idx (metric.id)}
+	{#each metrics as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 			<div class="px-4 pt-4">
-				<TrainingMetricTitle metric={metric.initialMetric} {onUpdate} />
+				<TrainingMetricTitle {metric} {onUpdate} />
 			</div>
 
-			{#if metric.values.length > 0}
+			{#if Object.entries(metric.values).length > 0}
 				{#if metric.granularity !== null}
 					<TrainingMetricsChartStacked
 						{height}
@@ -66,8 +66,8 @@
 						unit={metric.unit}
 						granularity={metric.granularity}
 						format={metricValuesDisplayFormat(metric)}
-						showGroup={metric.showGroup}
-						groupBy={metric.groupBy}
+						showGroup={metric.group_by !== null}
+						groupBy={metric.group_by}
 						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
 						average={'average' in metric.summary ? some(metric.summary.average) : none()}
 					/>

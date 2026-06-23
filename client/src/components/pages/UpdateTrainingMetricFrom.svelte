@@ -102,13 +102,13 @@
 
 	const fetchPreview = async (request: typeof previewRequest) => {
 		if (isNone(request)) {
-			return { values: [], unit: '', summary: {} };
+			return { values: {}, unit: '', summary: {} };
 		}
 
 		const values = await getTrainingMetricPreview(request.value);
 
 		if (isNone(values)) {
-			return { values: [], unit: '', summary: {} };
+			return { values: {}, unit: '', summary: {} };
 		}
 
 		return values.value;
@@ -147,7 +147,7 @@
 					<span class="loading loading-lg loading-spinner"></span>
 				</div>
 			{:then values}
-				{#if values.values.length > 0}
+				{#if Object.entries(values.values).length > 0}
 					<div bind:clientWidth={chartWidth}>
 						<PreviewChart width={chartWidth} {values} {fields} timeDomain={some(dates)} />
 					</div>

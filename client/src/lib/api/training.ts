@@ -98,6 +98,12 @@ const TrainingMetricTemplatesSchema = z.array(
 	})
 );
 
+const TrainingMetricValuesPreviewSchema = z.object({
+	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
+	summary: z.record(z.string(), z.number()),
+	unit: z.string()
+});
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -110,6 +116,7 @@ export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
 export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchema>[number];
+export type TrainingMetricValuesPreview = z.infer<typeof TrainingMetricValuesPreviewSchema>;
 
 // =============================================================================
 // API Functions
@@ -578,14 +585,9 @@ export const updateTrainingMetric = async (
 	}
 };
 
-export interface TrainingMetricPreviewValues {
-	values: { time: string; group: string; value: number }[];
-	unit: string;
-	summary: Record<string, number>;
-}
 export const getTrainingMetricPreview = async (
 	payload: PreviewTrainingMetricPayload
-): Promise<Option<TrainingMetricPreviewValues>> => {
+): Promise<Option<TrainingMetricValuesPreview>> => {
 	const body = JSON.stringify(payload);
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
 		body,
@@ -603,14 +605,5 @@ export const getTrainingMetricPreview = async (
 		return none();
 	}
 
-	const data = await res.json();
-	// Transform the GroupedMetricValues response to the format expected by the chart
-	// Response format: { group_name: { granule: value } }
-	const values: { time: string; group: string; value: number }[] = [];
-	for (const [group, granuleValues] of Object.entries(data.values)) {
-		for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
-			values.push({ time, group, value });
-		}
-	}
-	return some({ values, unit: data.unit, summary: data.summary });
+	return some(TrainingMetricValuesPreviewSchema.parse(await res.json()));
 };

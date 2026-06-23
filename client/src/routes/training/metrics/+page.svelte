@@ -6,12 +6,7 @@
 	import TrainingMetricsChartStacked from '$components/organisms/TrainingMetricsChartStacked.svelte';
 	import TrainingMetricTitle from '$components/molecules/TrainingMetricTitle.svelte';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
-	import {
-		fetchTrainingMetrics,
-		fetchTrainingPeriods,
-		groupMetricValues,
-		type TrainingMetricList
-	} from '$lib/api';
+	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricsChartLine from '$components/organisms/TrainingMetricsChartLine.svelte';
 	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
@@ -63,12 +58,12 @@
 					<div class="relative p-4 text-center">
 						<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
 					</div>
-					{#if groupMetricValues(metric).length > 0}
+					{#if Object.entries(metric.values).length > 0}
 						{#if metric.granularity !== null}
 							<TrainingMetricsChartStacked
 								height={250}
 								width={chartWidth}
-								values={groupMetricValues(metric)}
+								values={metric.values}
 								unit={metric.unit}
 								granularity={metric.granularity}
 								format={metricValuesDisplayFormat(metric)}
@@ -81,7 +76,7 @@
 							<TrainingMetricsChartLine
 								height={300}
 								width={chartWidth}
-								values={groupMetricValues(metric)}
+								values={metric.values}
 								unit={metric.unit}
 								format={metricValuesDisplayFormat(metric)}
 								average={'average' in metric.summary ? some(metric.summary.average) : none()}

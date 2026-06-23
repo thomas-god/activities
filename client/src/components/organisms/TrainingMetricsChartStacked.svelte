@@ -7,7 +7,7 @@
 	import dayjs from 'dayjs';
 
 	export interface TimeseriesChartProps {
-		values: { time: string; group: string; value: number }[];
+		values: Record<string, Record<string, number>>;
 		width: number;
 		height: number;
 		unit: string;
@@ -41,6 +41,16 @@
 	let gyGrid: SVGGElement;
 	let gBars: SVGGElement;
 	let svgElement: SVGElement;
+
+	let formatedValues = $derived.by(() => {
+		const _values: { time: string; group: string; value: number }[] = [];
+		for (const [group, granuleValues] of Object.entries(values)) {
+			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
+				_values.push({ time, group, value });
+			}
+		}
+		return _values;
+	});
 
 	// Get color for a group based on the groupBy category
 	const getGroupColor = (
@@ -107,11 +117,11 @@
 	});
 
 	let yAxisDefaultTickValues = (): number[] => {
-		if (values.length === 0) {
+		if (formatedValues.length === 0) {
 			return [];
 		}
 		const maxGroupValue = stacked
-			? values
+			? formatedValues
 					.reduce<Map<string, number>>((groupValues, value) => {
 						if (groupValues.has(value.time)) {
 							groupValues.set(value.time, groupValues.get(value.time)! + value.value);
@@ -123,18 +133,18 @@
 					}, new Map<string, number>())
 					.entries()
 					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-			: (d3.max(values, (v) => v.value) ?? 0);
+			: (d3.max(formatedValues, (v) => v.value) ?? 0);
 		return d3.ticks(0, maxGroupValue, 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
-		if (values.length === 0) {
+		if (formatedValues.length === 0) {
 			return [];
 		}
 		if (format === 'duration') {
 			const dt = 600;
 			const maxDuration = stacked
-				? values
+				? formatedValues
 						.reduce<Map<string, number>>((times, value) => {
 							if (times.has(value.time)) {
 								times.set(value.time, times.get(value.time)! + value.value);
@@ -146,7 +156,7 @@
 						}, new Map<string, number>())
 						.entries()
 						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-				: (d3.max(values, (v) => v.value) ?? 0);
+				: (d3.max(formatedValues, (v) => v.value) ?? 0);
 			const roundedUpMaxDuration = Math.ceil(maxDuration / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
 			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
@@ -169,10 +179,10 @@
 	let series = $derived(
 		d3
 			.stack()
-			.keys(d3.union(values.map((v) => displayGroupName(v.group, groupBy))))
+			.keys(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy))))
 			.value(([_time, groupMap]: any, groupKey) => groupMap.get(groupKey).value)(
 			d3.index(
-				values as any,
+				formatedValues as any,
 				(value: any) => value.time,
 				(value: any) => displayGroupName(value.group, groupBy)
 			) as any
@@ -184,7 +194,7 @@
 			.scaleBand()
 			.domain(
 				d3.groupSort(
-					values,
+					formatedValues,
 					(a, b) => (a.at(0)!.time < b.at(0)!.time ? -1 : 1),
 					(value) => value.time
 				)
@@ -224,7 +234,7 @@
 
 	// Extract unique group names for the legend
 	let groups = $derived(
-		Array.from(d3.union(values.map((v) => displayGroupName(v.group, groupBy)))).sort()
+		Array.from(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy)))).sort()
 	);
 
 	let xGroup = $derived(d3.scaleBand().domain(groups).range([0, x.bandwidth()]).padding(0.1));
@@ -321,7 +331,9 @@
 					const time = stackedDataPoint.data[0];
 
 					// Calculate total for this time across all groups
-					const total = values.filter((v) => v.time === time).reduce((sum, v) => sum + v.value, 0);
+					const total = formatedValues
+						.filter((v) => v.time === time)
+						.reduce((sum, v) => sum + v.value, 0);
 
 					// Use SVG coordinates directly
 					const xPos = stacked

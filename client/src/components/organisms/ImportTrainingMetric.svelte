@@ -1,6 +1,10 @@
 <script lang="ts">
 	import CopyUploadButton from '$components/atoms/CopyUploadButton.svelte';
-	import { copyTrainingMetricIntoPeriod, type TrainingMetricList } from '$lib/api';
+	import {
+		copyTrainingMetricIntoPeriod,
+		type TrainingMetric,
+		type TrainingMetricList
+	} from '$lib/api';
 	import {
 		aggregateFunctionDisplay,
 		groupByClauseDisplay,
@@ -24,37 +28,7 @@
 
 	let chartWidth: number = $state(300);
 
-	type FormatedMetric = (typeof formatedMetrics)[number];
-
-	let formatedMetrics = $derived(
-		metrics.map((metric) => {
-			let values = [];
-			for (const [group, time_values] of Object.entries(metric.values)) {
-				for (const [dt, value] of Object.entries(time_values)) {
-					values.push({ time: dt, group, value });
-				}
-			}
-			let scope: 'global' | 'local' = metric.scope.type === 'global' ? 'global' : 'local';
-
-			return {
-				id: metric.id,
-				name: metric.name,
-				values: values,
-				metric: metric.metric,
-				granularity: metric.granularity,
-				aggregate: metric.aggregate,
-				sports: metric.sports,
-				groupBy: metric.group_by,
-				unit: metric.unit,
-				showGroup: metric.group_by !== null,
-				scope,
-				initialMetric: metric,
-				summary: metric.summary
-			};
-		})
-	);
-
-	let tooltipLines = (metric: FormatedMetric) => {
+	let tooltipLines = (metric: TrainingMetric) => {
 		const lines = [];
 
 		// Source metric
@@ -71,8 +45,8 @@
 		}
 
 		// Group by if present
-		if (metric.groupBy) {
-			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(metric.groupBy) });
+		if (metric.group_by) {
+			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(metric.group_by) });
 		}
 
 		// Sports filter
@@ -89,13 +63,13 @@
 		return lines;
 	};
 
-	let selectedMetric: Option<FormatedMetric> = $state(none());
+	let selectedMetric: Option<TrainingMetric> = $state(none());
 </script>
 
 <h2 class="fieldset-legend mb-2 text-base">Copy a global metric to this period</h2>
 <div class="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-[360px]">
 	<div class="flex w-full flex-col gap-3 overflow-scroll">
-		{#each formatedMetrics as metric (metric.id)}
+		{#each metrics as metric (metric.id)}
 			<div
 				class="flex w-full flex-row items-center justify-between gap-3 rounded-box bg-base-200 p-3"
 			>
@@ -144,7 +118,7 @@
 
 	{#if isSome(selectedMetric)}
 		{@const metric = selectedMetric.value}
-		{#if metric.values.length > 0}
+		{#if Object.entries(metric.values).length > 0}
 			<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 				{#if metric.granularity !== null}
 					<TrainingMetricsChartStacked
@@ -154,8 +128,8 @@
 						unit={metric.unit}
 						granularity={metric.granularity}
 						format={metricValuesDisplayFormat(metric)}
-						showGroup={metric.showGroup}
-						groupBy={metric.groupBy}
+						showGroup={metric.group_by !== null}
+						groupBy={metric.group_by}
 						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
 						average={'average' in metric.summary ? some(metric.summary.average) : none()}
 					/>

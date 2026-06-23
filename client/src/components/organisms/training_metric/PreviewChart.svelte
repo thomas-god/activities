@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TrainingMetricPreviewValues } from '$lib/api';
+	import type { TrainingMetricValuesPreview } from '$lib/api';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import type { TrainingMetricFields } from '.';
 	import TrainingMetricsChartLine from '../TrainingMetricsChartLine.svelte';
@@ -12,7 +12,7 @@
 		timeDomain = none()
 	}: {
 		fields: TrainingMetricFields;
-		values: TrainingMetricPreviewValues;
+		values: TrainingMetricValuesPreview;
 		width: number;
 		timeDomain?: Option<{ start: string; end: string | null }>;
 	} = $props();

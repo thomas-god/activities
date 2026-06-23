@@ -6,7 +6,7 @@
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 
 	export interface TimeseriesChartProps {
-		values: { time: string; value: number }[];
+		values: Record<string, Record<string, number>>;
 		width: number;
 		height: number;
 		unit: string;
@@ -35,8 +35,18 @@
 	let gDots: SVGGElement;
 	let svgElement: SVGElement;
 
+	let formatedValues = $derived.by(() => {
+		const _values: { time: string; group: string; value: number }[] = [];
+		for (const [group, granuleValues] of Object.entries(values)) {
+			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
+				_values.push({ time, group, value });
+			}
+		}
+		return _values;
+	});
+
 	let valuesAsTime = $derived(
-		values.map(({ time, value }) => ({ time: dayjs(time).unix(), value: value }))
+		formatedValues.map(({ time, value }) => ({ time: dayjs(time).unix(), value: value }))
 	);
 
 	let timeAxisTickFormater = $derived.by(() => {
