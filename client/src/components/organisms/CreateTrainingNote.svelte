@@ -44,8 +44,7 @@
 			class="textarea-bordered textarea"
 			placeholder="Write your training note here..."
 			rows="8"
-			bind:value={content}
-		></textarea>
+			bind:value={content}></textarea>
 
 		{#if errorMessage}
 			<p class="label text-error">{errorMessage}</p>

@@ -73,8 +73,7 @@
 					class="textarea-bordered textarea textarea-sm"
 					placeholder="e.g., Forgot to eat breakfast, only had water..."
 					bind:value={nutrition.details}
-					rows="2"
-				></textarea>
+					rows="2"></textarea>
 			</div>
 		{/if}
 		<div class="flex gap-2">

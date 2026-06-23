@@ -79,8 +79,7 @@
 			class="textarea-bordered textarea"
 			placeholder="Add notes about this training period..."
 			rows="3"
-			bind:value={note}
-		></textarea>
+			bind:value={note}></textarea>
 
 		<div class="my-2 font-semibold">
 			<span class="pr-2"> Filter by sports </span>

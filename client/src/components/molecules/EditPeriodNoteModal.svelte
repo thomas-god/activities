@@ -46,8 +46,7 @@
 						placeholder="Add a description of this training period..."
 						class="textarea w-full"
 						rows="6"
-						disabled={isUpdating}
-					></textarea>
+						disabled={isUpdating}></textarea>
 					<span>Description</span>
 				</label>
 			</div>

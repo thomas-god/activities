@@ -36,8 +36,7 @@
 				class="textarea-bordered textarea"
 				placeholder="e.g., Great run! Felt strong throughout. Weather was perfect and pacing was on point..."
 				bind:value={feedback}
-				rows="4"
-			></textarea>
+				rows="4"></textarea>
 		</div>
 		<div class="flex gap-2">
 			<SaveButton callback={handleSave} text="Save" />

@@ -125,8 +125,7 @@
 					rows="8"
 					placeholder="Content"
 					bind:value={editContent}
-					disabled={isSaving}
-				></textarea>
+					disabled={isSaving}></textarea>
 			</div>
 			<div class="modal-action">
 				<button class="btn" onclick={cancelEdit} disabled={isSaving}> Cancel </button>
