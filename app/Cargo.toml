@@ -10,6 +10,7 @@ axum = { version = "0.8.4", features = ["macros", "multipart"] }
 axum-extra = { version = "0.12.6", features = ["cookie"] }
 base64 = "0.22.1"
 chrono = { version = "0.4.41", features = ["serde"] }
+const-hex = "1.19.1"
 cookie = "0.18.1"
 derive_more = { version = "2.0.1", features = ["full"] }
 email_address = "0.2.9"
@@ -17,6 +18,7 @@ fit-parser = { path = "../fit-parser", features = [] }
 flate2 = "1.1.2"
 getrandom = { version = "0.4.3", features = ["sys_rng"] }
 handlebars = "6.3.2"
+hmac = "0.13.0"
 itertools = "0.15"
 lettre = { version = "0.11.22", features = [
     "builder",
@@ -29,6 +31,7 @@ rand = "0.10.1"
 roxmltree = "0.21.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
+sha2 = "0.11.0"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "chrono"] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }

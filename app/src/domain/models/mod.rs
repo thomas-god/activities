@@ -25,6 +25,10 @@ impl UserId {
         Self(uuid::Uuid::new_v4().to_string())
     }
 
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
     #[cfg(test)]
     pub fn test_default() -> Self {
         Self("test_user".to_string())

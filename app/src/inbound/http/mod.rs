@@ -17,10 +17,8 @@ use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 
-use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::email_based::IUserService;
-use crate::inbound::auth::email_based::infra::handlers::email_based_login_routes;
-use crate::inbound::auth::no_auth::no_auth_login_routes;
+use crate::inbound::auth::infra::{add_auth_router, select_auth_strategy};
 use crate::inbound::http::handlers::get_training_metric_templates;
 use crate::inbound::parser::ParseFile;
 use handlers::{
@@ -127,7 +125,10 @@ impl<
 
         let router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
-        let auth_strategy = select_auth_strategy();
+        let Ok(auth_strategy) = select_auth_strategy() else {
+            tracing::error!("Unable to load a valid authentication strategy");
+            panic!();
+        };
         tracing::info!(
             "App starting with authentication strategy: {:?}",
             &auth_strategy
@@ -298,25 +299,4 @@ where
         );
 
     router.with_state(state)
-}
-
-fn select_auth_strategy() -> AuthStrategy {
-    if cfg!(feature = "multi-user") {
-        return AuthStrategy::EmailBased;
-    }
-    AuthStrategy::NoAuth
-}
-
-fn add_auth_router<S, US: IUserService>(
-    strategy: AuthStrategy,
-    base_router: Router<S>,
-    user_service: US,
-) -> Router<S>
-where
-    S: Clone + Send + Sync + 'static,
-{
-    match strategy {
-        AuthStrategy::NoAuth => no_auth_login_routes(base_router),
-        AuthStrategy::EmailBased => email_based_login_routes(base_router, user_service),
-    }
 }

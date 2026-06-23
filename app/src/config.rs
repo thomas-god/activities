@@ -3,8 +3,8 @@ use std::{env, fs, path::Path};
 use anyhow::Context;
 
 const SERVER_PORT_KEY: &str = "SERVER_PORT";
-
 const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
+pub const SINGLE_USER_PASSWORD: &str = "SINGLE_USER_PASSWORD";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -21,6 +21,28 @@ impl Config {
             server_port,
             allow_origin,
         })
+    }
+}
+
+/// Optionnaly load a value from environnemnt variable. See [load_env] for more details.
+pub fn load_optional_env(key: &str) -> Result<Option<String>, String> {
+    // First check the env as a path to a file containing the env value
+    if let Ok(path) = env::var(format!("{key}_FILE")) {
+        let path = Path::new(&path);
+
+        if let Ok(content) = fs::read(path) {
+            return match String::from_utf8(content) {
+                Ok(value) => Ok(Some(value)),
+                _ => Err(format!("File content of {key}_FILE is invalid")),
+            };
+        };
+    };
+
+    // Else try to load the content directly from the env
+    match env::var(key) {
+        Ok(value) => Ok(Some(value)),
+        Err(env::VarError::NotPresent) => Ok(None),
+        _err => Err(format!("failed to load environment variable {}", key)),
     }
 }
 
