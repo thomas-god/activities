@@ -187,7 +187,7 @@ fn to_response_body_item(
             .as_ref()
             .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
         show_average: definition.summary().average().clone(),
-        values: values,
+        values,
         group_by: definition
             .window()
             .as_ref()

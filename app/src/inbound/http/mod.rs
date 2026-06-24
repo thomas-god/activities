@@ -13,7 +13,7 @@ use cookie::SameSite;
 use tokio::net;
 use tower_http::cors::CorsLayer;
 
-use crate::config::{AppMode, Config};
+use crate::config::{AppMode, BaseConfig};
 use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
@@ -105,7 +105,7 @@ impl<
         training_metric_service: Arc<TMS>,
         user_service: US,
         preferences_service: PS,
-        config: Config,
+        config: BaseConfig,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
             |request: &axum::extract::Request<_>| {

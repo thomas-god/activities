@@ -79,8 +79,8 @@ impl From<GroupedMetricValues> for ResponseBody {
         let (values, summary) = value.values_and_summary();
         ResponseBody {
             unit: unit.to_string(),
-            values: values,
-            summary: summary,
+            values,
+            summary,
         }
     }
 }

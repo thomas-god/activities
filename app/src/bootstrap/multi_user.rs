@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::Ok;
+use anyhow::{Ok, anyhow};
 use tokio::sync::Mutex;
 
 use crate::{
-    config::{AppMode, Config, MultiUserConfig, load_env},
+    config::{AppMode, BaseConfig, MultiUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
     },
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-pub async fn bootsrap_multi_user(
+pub async fn bootstrap_multi_user(
     mode_config: MultiUserConfig,
     mode: AppMode,
 ) -> anyhow::Result<
@@ -63,13 +63,14 @@ pub async fn bootsrap_multi_user(
         tracing::error!("Error while setting up tracing subscriber: {err:?}");
     };
 
-    let config = Config::from_env()?;
+    let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
 
-    let (activity_service, parser, training_metrics_service) = build_activity_service().await?;
+    let (activity_service, parser, training_metrics_service) =
+        build_activity_service(&config).await?;
 
-    let user_service = build_user_service(&mode_config).await?;
+    let user_service = build_user_service(&config, &mode_config).await?;
 
-    let preferences_service = build_preferences_service().await?;
+    let preferences_service = build_preferences_service(&config).await?;
 
     let http_server = HttpServer::new(
         &mode,
@@ -96,7 +97,9 @@ fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
     Ok(mailer)
 }
 
-async fn build_activity_service() -> anyhow::Result<(
+async fn build_activity_service(
+    config: &BaseConfig,
+) -> anyhow::Result<(
     ActivityService<
         SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
         FilesystemRawDataRepository,
@@ -112,7 +115,7 @@ async fn build_activity_service() -> anyhow::Result<(
         >,
     >,
 )> {
-    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
         tokio::fs::create_dir_all(&db_dir).await?;
@@ -150,6 +153,7 @@ async fn build_activity_service() -> anyhow::Result<(
 }
 
 async fn build_user_service(
+    config: &BaseConfig,
     mode_config: &MultiUserConfig,
 ) -> anyhow::Result<
     UserService<
@@ -158,7 +162,7 @@ async fn build_user_service(
         SessionService<SqliteSessionRepository>,
     >,
 > {
-    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
         tokio::fs::create_dir_all(&db_dir).await?;
@@ -189,9 +193,10 @@ async fn build_user_service(
     Ok(user_service)
 }
 
-async fn build_preferences_service()
--> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
-    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+async fn build_preferences_service(
+    config: &BaseConfig,
+) -> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
+    let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
         tokio::fs::create_dir_all(&db_dir).await?;

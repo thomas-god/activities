@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 use tower::{Layer, Service};
 
 /// Rate limit store using a simple [HashMap] for storing, mainly intended for low traffic routes.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct RateLimitStore {
     inner: Arc<Mutex<HashMap<IpAddr, (u32, Instant)>>>,
 }
@@ -28,7 +28,6 @@ impl RateLimitStore {
 
     pub async fn is_allowed(&self, ip: IpAddr, limit: u32, window: Duration) -> bool {
         let mut map = self.inner.lock().await;
-        dbg!(&map);
         let now = Instant::now();
 
         let entry = map.entry(ip).or_insert((0, now));

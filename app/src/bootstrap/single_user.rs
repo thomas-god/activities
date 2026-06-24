@@ -1,7 +1,9 @@
 use std::{path::PathBuf, sync::Arc};
 
+use anyhow::anyhow;
+
 use crate::{
-    config::{AppMode, Config, SingleUserConfig, load_env},
+    config::{AppMode, BaseConfig, SingleUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
     },
@@ -18,7 +20,7 @@ use crate::{
     },
 };
 
-pub async fn bootsrap_single_user(
+pub async fn bootstrap_single_user(
     _mode_config: SingleUserConfig,
     mode: AppMode,
 ) -> anyhow::Result<
@@ -53,8 +55,8 @@ pub async fn bootsrap_single_user(
         tracing::error!("Error while setting up tracing subscriber: {err:?}");
     };
 
-    let config = Config::from_env()?;
-    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+    let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
+    let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
         tokio::fs::create_dir_all(&db_dir).await?;
@@ -88,7 +90,7 @@ pub async fn bootsrap_single_user(
     ));
 
     let user_service = DisabledUserService {};
-    let preferences_service = build_preferences_service().await?;
+    let preferences_service = build_preferences_service(&config).await?;
 
     let http_server = HttpServer::new(
         &mode,
@@ -104,9 +106,10 @@ pub async fn bootsrap_single_user(
     Ok(http_server)
 }
 
-async fn build_preferences_service()
--> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
-    let root_path = PathBuf::from(load_env("ACTIVITIES_DATA_PATH")?);
+async fn build_preferences_service(
+    config: &BaseConfig,
+) -> anyhow::Result<PreferencesService<SqlitePreferencesRepository>> {
+    let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
         tokio::fs::create_dir_all(&db_dir).await?;
