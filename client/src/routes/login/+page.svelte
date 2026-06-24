@@ -154,6 +154,8 @@
 							>
 							{#if res.status === 401}
 								<span class="text-error">Invalid password</span>
+							{:else if res.status === 429}
+								<span class="text-error">Too many attempts, retry later</span>
 							{/if}
 						</div>
 					{/await}

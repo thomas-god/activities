@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     Json, Router,
     extract::{Request, State},
@@ -15,7 +17,13 @@ use sha2::Sha256;
 
 use crate::{
     domain::models::UserId,
-    inbound::{auth::SinglePassword, http::CookieConfig},
+    inbound::{
+        auth::SinglePassword,
+        http::{
+            CookieConfig,
+            middlewares::rate_limit::{IpRateLimitLayer, RateLimitStore},
+        },
+    },
 };
 
 use crate::inbound::auth::AuthenticatedUser;
@@ -98,10 +106,16 @@ where
         cookie_auth_middleware,
     ));
 
-    let router = Router::new().route("/login", post(login_user));
-    let router = router.with_state(state);
+    let login_router = Router::new()
+        .route("/login", post(login_user))
+        .route_layer(IpRateLimitLayer::new(
+            RateLimitStore::new(),
+            100,
+            Duration::from_secs(60),
+        ))
+        .with_state(state);
 
-    base_router.nest("/api", router)
+    base_router.nest("/api", login_router)
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,35 +144,94 @@ pub async fn login_user(
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
     use axum::{Extension, Router, http::header::COOKIE, routing::get};
-    use axum_test::TestServer;
+    use reqwest::header::CONTENT_TYPE;
+    use tokio::task::JoinHandle;
+    use url::Url;
 
     use super::*;
+
+    pub struct TestApp {
+        pub base_url: Url,
+        pub client: reqwest::Client,
+        server: JoinHandle<()>,
+    }
+
+    // Adapted from https://github.com/tokio-rs/axum/discussions/748
+    impl TestApp {
+        pub async fn new(password: &SinglePassword) -> TestApp {
+            let app = single_password_login_routes(
+                Router::new().route("/", get(protected_route)),
+                password,
+            );
+
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("Could not bind ephemeral socket");
+            let addr = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                axum::serve(
+                    listener,
+                    app.into_make_service_with_connect_info::<SocketAddr>(),
+                )
+                .await
+                .unwrap();
+            });
+
+            TestApp {
+                base_url: Url::parse(&format!("http://{addr}")).unwrap(),
+                client: reqwest::Client::new(),
+                server,
+            }
+        }
+
+        pub fn get(&self, path: &str) -> reqwest::RequestBuilder {
+            let base_url = Some(&self.base_url);
+            let base = Url::options().base_url(base_url);
+            let url = base.parse(path).unwrap();
+            self.client.get(url)
+        }
+
+        pub fn post(&self, path: &str) -> reqwest::RequestBuilder {
+            let base_url = Some(&self.base_url);
+            let base = Url::options().base_url(base_url);
+            let url = base.parse(path).unwrap();
+            self.client.post(url)
+        }
+    }
+
+    impl Drop for TestApp {
+        fn drop(&mut self) {
+            tracing::debug!("Dropping test server at {}", self.base_url.as_str());
+            self.server.abort()
+        }
+    }
 
     async fn protected_route(Extension(user): Extension<AuthenticatedUser>) -> impl IntoResponse {
         user.user().to_string()
     }
 
-    fn build_test_server(password: SinglePassword) -> TestServer {
-        let app =
-            single_password_login_routes(Router::new().route("/", get(protected_route)), &password);
-
-        TestServer::new(app).expect("unable to create test server")
-    }
-
     #[tokio::test]
     async fn test_login_user_success_sets_cookie_and_authenticates_requests() {
         let password = SinglePassword::from("secret");
-        let server = build_test_server(password);
+        let app = TestApp::new(&password).await;
 
-        let response = server
+        let response = app
             .post("/api/login")
-            .json(&serde_json::json!({
-                "password": "secret"
-            }))
-            .await;
+            .body(
+                serde_json::json!({
+                    "password": "secret"
+                })
+                .to_string(),
+            )
+            .header(CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .expect("Should succeed");
 
-        response.assert_status(StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::OK);
         let set_cookie = response
             .headers()
             .get(SET_COOKIE)
@@ -174,45 +247,64 @@ mod tests {
             .split(';')
             .next()
             .expect("expected cookie name/value pair");
-        let response = server.get("/").add_header(COOKIE, cookie_pair).await;
+        let response = app
+            .get("/")
+            .header(COOKIE, cookie_pair)
+            .send()
+            .await
+            .expect("Should succeed");
 
-        response.assert_status(StatusCode::OK);
-        assert_eq!(response.text(), UserId::default().to_string());
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.text().await.unwrap(),
+            UserId::default().to_string()
+        );
     }
 
     #[tokio::test]
     async fn test_login_user_rejects_wrong_password() {
-        let server = build_test_server(SinglePassword::from("secret"));
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
 
-        let response = server
+        let response = app
             .post("/api/login")
-            .json(&serde_json::json!({
-                "password": "not-the-password"
-            }))
-            .await;
+            .body(
+                serde_json::json!({
+                    "password": "not-the-password"
+                })
+                .to_string(),
+            )
+            .header(CONTENT_TYPE, "application/json")
+            .send()
+            .await
+            .expect("Should succeed");
 
-        response.assert_status(StatusCode::UNAUTHORIZED);
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         assert!(response.headers().get(SET_COOKIE).is_none());
     }
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_rejects_missing_cookie() {
-        let server = build_test_server(SinglePassword::from("secret"));
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
 
-        let response = server.get("/").await;
+        let response = app.get("/").send().await.expect("Should succeed");
 
-        response.assert_status(StatusCode::UNAUTHORIZED);
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
     async fn test_cookie_auth_middleware_rejects_invalid_cookie() {
-        let server = build_test_server(SinglePassword::from("secret"));
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
 
-        let response = server
+        let response = app
             .get("/")
-            .add_cookie(Cookie::new("token", "not-a-valid-hmac"))
-            .await;
+            .header(COOKIE, Cookie::new("token", "not-a-valid-hmac").value())
+            .send()
+            .await
+            .unwrap();
 
-        response.assert_status(StatusCode::UNAUTHORIZED);
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }

@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -162,9 +163,13 @@ impl<
 
     pub async fn run(self) -> anyhow::Result<()> {
         tracing::debug!("listening on {}", self.listener.local_addr().unwrap());
-        axum::serve(self.listener, self.router)
-            .await
-            .context("received error from running server")?;
+        axum::serve(
+            self.listener,
+            self.router
+                .into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .context("received error from running server")?;
         Ok(())
     }
 }
