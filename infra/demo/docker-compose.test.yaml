@@ -1,6 +1,6 @@
 services:
   activities:
-    image: ghcr.io/thomas-god/activities:single-user-main
+    image: ghcr.io/thomas-god/activities:main
     environment:
       ACTIVITIES_DATA_PATH: /app/data
     networks:

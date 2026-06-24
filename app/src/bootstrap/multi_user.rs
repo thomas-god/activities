@@ -4,7 +4,7 @@ use anyhow::Ok;
 use tokio::sync::Mutex;
 
 use crate::{
-    config::{Config, load_env},
+    config::{AppMode, Config, MultiUserConfig, load_env},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
     },
@@ -24,7 +24,10 @@ use crate::{
     },
 };
 
-pub async fn bootsrap_multi_user() -> anyhow::Result<
+pub async fn bootsrap_multi_user(
+    mode_config: MultiUserConfig,
+    mode: AppMode,
+) -> anyhow::Result<
     HttpServer<
         ActivityService<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
@@ -46,6 +49,7 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
         PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
+    tracing::info!("Starting multi-user app");
     // start tracing
     let subscriber = tracing_subscriber::fmt()
         .compact()
@@ -63,11 +67,12 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
 
     let (activity_service, parser, training_metrics_service) = build_activity_service().await?;
 
-    let user_service = build_user_service().await?;
+    let user_service = build_user_service(&mode_config).await?;
 
     let preferences_service = build_preferences_service().await?;
 
     let http_server = HttpServer::new(
+        &mode,
         activity_service,
         parser,
         training_metrics_service,
@@ -79,14 +84,14 @@ pub async fn bootsrap_multi_user() -> anyhow::Result<
     Ok(http_server)
 }
 
-fn build_mailer() -> anyhow::Result<SMTPEmailProvider> {
-    let from = load_env("ACTIVITIES_MAILER_FROM")?;
-    let username = load_env("ACTIVITIES_MAILER_USERNAME")?;
-    let password = load_env("ACTIVITIES_MAILER_PASSWORD")?;
-    let relay = load_env("ACTIVITIES_MAILER_RELAY")?;
-    let domain = load_env("ACTIVITIES_MAILER_DOMAIN")?;
-
-    let mailer = SMTPEmailProvider::new(&from, &username, &password, &relay, &domain)?;
+fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
+    let mailer = SMTPEmailProvider::new(
+        &config.mailer_from,
+        &config.mailer_username,
+        &config.mailer_password,
+        &config.mailer_relay,
+        &config.mailer_domain,
+    )?;
 
     Ok(mailer)
 }
@@ -144,7 +149,9 @@ async fn build_activity_service() -> anyhow::Result<(
     anyhow::Ok((activity_service, parser, training_metrics_service))
 }
 
-async fn build_user_service() -> anyhow::Result<
+async fn build_user_service(
+    mode_config: &MultiUserConfig,
+) -> anyhow::Result<
     UserService<
         AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
         SqliteUserRepository,
@@ -161,7 +168,7 @@ async fn build_user_service() -> anyhow::Result<
     let auth_link_repository = Arc::new(Mutex::new(
         SqliteAuthLinkRepository::new(&format!("sqlite:{}", auth_db.to_string_lossy())).await?,
     ));
-    let mail_provider = Arc::new(build_mailer()?);
+    let mail_provider = Arc::new(build_mailer(mode_config)?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
         auth_link_repository,
         mail_provider,

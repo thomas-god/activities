@@ -1,17 +1,22 @@
-#[cfg(feature = "multi-user")]
-async fn run() -> anyhow::Result<()> {
-    app::bootstrap::multi_user::bootsrap_multi_user()
-        .await?
-        .run()
-        .await
-}
+use anyhow::anyhow;
+use app::config::AppMode;
 
-#[cfg(not(feature = "multi-user"))]
 async fn run() -> anyhow::Result<()> {
-    app::bootstrap::single_user::bootsrap_single_user()
-        .await?
-        .run()
-        .await
+    let mode = AppMode::try_from_env().map_err(|err| anyhow!(err))?;
+    match &mode {
+        AppMode::MultiUser(config) => {
+            app::bootstrap::multi_user::bootsrap_multi_user(config.clone(), mode)
+                .await?
+                .run()
+                .await
+        }
+        AppMode::SingleUser(config) => {
+            app::bootstrap::single_user::bootsrap_single_user(config.clone(), mode)
+                .await?
+                .run()
+                .await
+        }
+    }
 }
 
 #[tokio::main]

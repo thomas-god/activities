@@ -2,7 +2,10 @@ use std::fmt::Debug;
 
 use derive_more::{Constructor, From};
 
-use crate::domain::models::UserId;
+use crate::{
+    config::{AppMode, SingleUserConfig},
+    domain::models::UserId,
+};
 
 pub mod email_based;
 pub mod infra;
@@ -44,6 +47,18 @@ impl Debug for AuthStrategy {
             Self::NoAuth => write!(f, "NoAuth"),
             AuthStrategy::EmailBased => write!(f, "EmailBased"),
             AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
+        }
+    }
+}
+
+impl From<&AppMode> for AuthStrategy {
+    fn from(value: &AppMode) -> Self {
+        match value {
+            AppMode::MultiUser(_) => AuthStrategy::EmailBased,
+            AppMode::SingleUser(SingleUserConfig {
+                password: Some(pwd),
+            }) => AuthStrategy::SinglePassword(SinglePassword::from(pwd.clone())),
+            AppMode::SingleUser(SingleUserConfig { password: None }) => AuthStrategy::NoAuth,
         }
     }
 }

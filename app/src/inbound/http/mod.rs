@@ -13,13 +13,14 @@ use cookie::SameSite;
 use tokio::net;
 use tower_http::cors::CorsLayer;
 
-use crate::config::Config;
+use crate::config::{AppMode, Config};
 use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
 
+use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::email_based::IUserService;
-use crate::inbound::auth::infra::{add_auth_router, select_auth_strategy};
+use crate::inbound::auth::infra::add_auth_router;
 use crate::inbound::http::handlers::get_training_metric_templates;
 use crate::inbound::parser::ParseFile;
 use handlers::{
@@ -34,7 +35,6 @@ use handlers::{
     update_training_period, upload_activities,
 };
 
-#[cfg(feature = "multi-user")]
 pub use crate::inbound::auth::email_based::infra::mailer::smtp::SMTPEmailProvider;
 
 pub use crate::inbound::auth::email_based::{
@@ -99,6 +99,7 @@ impl<
 > HttpServer<AS, PF, TMS, US, PS>
 {
     pub async fn new(
+        mode: &AppMode,
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
@@ -127,10 +128,7 @@ impl<
 
         let router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
-        let Ok(auth_strategy) = select_auth_strategy() else {
-            tracing::error!("Unable to load a valid authentication strategy");
-            panic!();
-        };
+        let auth_strategy = AuthStrategy::from(mode);
         tracing::info!(
             "App starting with authentication strategy: {:?}",
             &auth_strategy

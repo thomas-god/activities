@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use crate::{
-    config::{Config, load_env},
+    config::{AppMode, Config, SingleUserConfig, load_env},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
     },
@@ -18,7 +18,10 @@ use crate::{
     },
 };
 
-pub async fn bootsrap_single_user() -> anyhow::Result<
+pub async fn bootsrap_single_user(
+    _mode_config: SingleUserConfig,
+    mode: AppMode,
+) -> anyhow::Result<
     HttpServer<
         ActivityService<
             SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
@@ -36,6 +39,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
         PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
+    tracing::info!("Starting multi-user app");
     // start tracing
     let subscriber = tracing_subscriber::fmt()
         .compact()
@@ -87,6 +91,7 @@ pub async fn bootsrap_single_user() -> anyhow::Result<
     let preferences_service = build_preferences_service().await?;
 
     let http_server = HttpServer::new(
+        &mode,
         activity_service,
         parser,
         training_metrics_service,

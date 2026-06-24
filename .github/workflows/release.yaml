@@ -8,7 +8,6 @@ jobs:
   build-docker-image:
     strategy:
       matrix:
-        feature: ["single-user", "multi-user"]
         arch: ["amd64", "arm64"]
         include:
           - arch: amd64
@@ -51,12 +50,10 @@ jobs:
         with:
           context: "{{defaultContext}}"
           file: ./infra/docker/Dockerfile
-          build-args: |
-            APP_FEATURE=${{ matrix.feature }}
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ghcr.io/thomas-god/activities:${{ matrix.feature }}-${{ github.event.release.tag_name }}
+            ghcr.io/thomas-god/activities:${{ github.event.release.tag_name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
@@ -67,15 +64,15 @@ jobs:
 
       - name: Export digest
         run: |
-          mkdir -p ${{ runner.temp }}/digests/${{ matrix.feature }}
+          mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${{ matrix.feature }}/${digest#sha256:}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.feature }}-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/digests/${{ matrix.feature }}/*
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
 
@@ -91,8 +88,8 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: ${{ runner.temp }}/digests/${{ matrix.feature }}
-          pattern: digests-${{ matrix.feature }}-*
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
           merge-multiple: true
 
       - name: Log in to the Container registry
@@ -113,13 +110,13 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=semver,pattern={{version}},prefix=${{ matrix.feature }}-
-            type=semver,pattern={{major}}.{{minor}},prefix=${{ matrix.feature }}-
-            type=semver,pattern={{major}},prefix=${{ matrix.feature }}-
-            type=raw,value=${{ matrix.feature }}-latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
 
       - name: Create manifest list and push
-        working-directory: ${{ runner.temp }}/digests/${{ matrix.feature }}
+        working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf 'ghcr.io/thomas-god/activities@sha256:%s ' *)

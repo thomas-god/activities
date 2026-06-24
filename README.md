@@ -10,25 +10,23 @@ training journal and track your progress:
 
 ## How to deploy
 
-The application comes in two versions depending on how many users you plan to
-give access to your instance:
+Get the latest image available at `ghcr.io/thomas-god/activities:latest`. All
+images are available for both `amd64` and `arm64`.
 
-- _multi-user_: allows multiple users to use your instance using an email-based
-  password-less authentication process. You will need a valid SMTP server for
-  sending emails containing auth link to users.
-- _single-user_: allows a single user to use the instance without an
-  authentication step, and thus does not require an external email server to
-  work. You can set an optional password through an environment variable if you
-  want to limit the access else your instance will be accessible to all.
+The application authentication flow can be configured in 3 different ways:
 
-Beside the authentication process, both versions offer the same set of features.
+- _multi user_: allows multiple users to use your instance using an email-based,
+  password-less, authentication process. You will need a valid SMTP server for
+  sending emails to users containing their authentication link.
+- _single user, main password_: allows a single user to use the instance using a
+  password set through an environment variable in your deployment. Does not
+  require having an SMTP server.
+- _single user, no password_: allows a single user to use the instance without
+  any form of authentication. Be careful where you plan to host it, as your
+  activities will be accessible to anyone that can reach your instance. Does not
+  require having an SMTP server.
 
-### Available images
-
-- multi-user: `ghcr.io/thomas-god/activities:multi-user-latest`,
-- single-user: `ghcr.io/thomas-god/activities:single-user-latest`.
-
-All images are available for both `amd64` and `arm64`.
+Beside the authentication process, all versions offer the same set of features.
 
 ### Quick start: try it locally
 
@@ -37,7 +35,7 @@ You can quickly test the application locally with a single Docker command:
 ```bash
 docker run --rm -p 8080:80 \
   -e ACTIVITIES_DATA_PATH=/app/data \
-  ghcr.io/thomas-god/activities:single-user-latest
+  ghcr.io/thomas-god/activities:latest
 ```
 
 Then open http://localhost:8080 in your browser. Your data will be stored in an
@@ -48,7 +46,7 @@ your data, add a volume mount:
 docker run --rm -p 8080:80 \
   -e ACTIVITIES_DATA_PATH=/app/data \
   -v activities_data:/app/data \
-  ghcr.io/thomas-god/activities:single-user-latest
+  ghcr.io/thomas-god/activities:latest
 ```
 
 ### Using _docker-compose_ or _docker-stack_
@@ -58,7 +56,7 @@ The most basic `docker-compose.yaml` file looks like that:
 ```yaml
 services:
   activities:
-    image: ghcr.io/thomas-god/activities:single-user-latest
+    image: ghcr.io/thomas-god/activities:latest
     environment:
       ACTIVITIES_DATA_PATH: /app/data
     volumes:
@@ -74,17 +72,22 @@ restarts and to facilitate the backup process.
 
 ### Configuration
 
-The application expect the following environment variables to be set. Each
+The application accept the following environment variables to be set. Each
 environment variable supports a `*_FILE` variant to load the variable content
 from a file
 [instead](https://docs.docker.com/engine/swarm/secrets/#build-support-for-docker-secrets-into-your-images).
 
 #### All versions
 
-| Variable name                   | Required | Purpose                                                                                               | Example   |
-| ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- | --------- |
-| ACTIVITIES_DATA_PATH            | yes      | Location to store application data                                                                    | /app/data |
-| ACTIVITIES_SINGLE_USER_PASSWORD | no       | Add a required password to access the instance. If not set, there will be no authentication in place. | my-secret |
+| Variable name        | Required | Purpose                            | Example   |
+| -------------------- | -------- | ---------------------------------- | --------- |
+| ACTIVITIES_DATA_PATH | yes      | Location to store application data | /app/data |
+
+#### Single user versions
+
+| Variable name                   | Required | Purpose                                                                                                                                            | Example   |
+| ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| ACTIVITIES_SINGLE_USER_PASSWORD | no       | Add a required password to access the instance. If not set, there will be no authentication in place (falling back to _single user, no password_). | my-secret |
 
 #### Multi-user version
 
@@ -95,6 +98,10 @@ from a file
 | ACTIVITIES_MAILER_PASSWORD | yes      | SMTP password                                                                                                                                  |                         |
 | ACTIVITIES_MAILER_RELAY    | yes      | SMTP server                                                                                                                                    |                         |
 | ACTIVITIES_MAILER_DOMAIN   | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server. | https://app.your.domain |
+
+_Note: if any environment variables for the multi-user version is set but others
+are missing the application will fail to start, even if a valid single user
+configuration could be loaded._
 
 ## Upload your training history
 

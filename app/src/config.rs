@@ -2,9 +2,19 @@ use std::{env, fs, path::Path};
 
 use anyhow::Context;
 
+// Base config keys
 const SERVER_PORT_KEY: &str = "SERVER_PORT";
 const ALLOW_ORIGIN_KEY: &str = "ALLOW_ORIGIN";
-pub const SINGLE_USER_PASSWORD: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
+
+// Single user related keys
+const SINGLE_USER_PASSWORD_KEY: &str = "ACTIVITIES_SINGLE_USER_PASSWORD";
+
+// Multi user related keys
+const MULTI_USER_MAILER_FROM_KEY: &str = "ACTIVITIES_MAILER_FROM";
+const MULTI_USER_MAILER_USERNAME_KEY: &str = "ACTIVITIES_MAILER_USERNAME";
+const MULTI_USER_MAILER_PASSWORD_KEY: &str = "ACTIVITIES_MAILER_PASSWORD";
+const MULTI_USER_MAILER_RELAY_KEY: &str = "ACTIVITIES_MAILER_RELAY";
+const MULTI_USER_MAILER_DOMAIN_KEY: &str = "ACTIVITIES_MAILER_DOMAIN";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -24,6 +34,91 @@ impl Config {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum AppMode {
+    SingleUser(SingleUserConfig),
+    MultiUser(MultiUserConfig),
+}
+
+impl AppMode {
+    pub fn try_from_env() -> Result<AppMode, String> {
+        match MultiUserConfig::try_from_env() {
+            Ok(Some(config)) => return Ok(AppMode::MultiUser(config)),
+            Err(err) => return Err(err),
+            Ok(None) => { /* Pass, multi-user mode is not selected */ }
+        }
+
+        Ok(AppMode::SingleUser(SingleUserConfig::try_from_env()?))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SingleUserConfig {
+    pub password: Option<String>,
+}
+
+impl SingleUserConfig {
+    pub fn try_from_env() -> Result<SingleUserConfig, String> {
+        Ok(SingleUserConfig {
+            password: load_optional_env(&SINGLE_USER_PASSWORD_KEY).map_err(|err| {
+                format!("Failed to load env {}: {}", SINGLE_USER_PASSWORD_KEY, err)
+            })?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MultiUserConfig {
+    pub mailer_from: String,
+    pub mailer_username: String,
+    pub mailer_password: String,
+    pub mailer_relay: String,
+    pub mailer_domain: String,
+}
+impl MultiUserConfig {
+    pub fn try_from_env() -> Result<Option<MultiUserConfig>, String> {
+        Ok(Some(MultiUserConfig {
+            mailer_from: load_env(&MULTI_USER_MAILER_FROM_KEY).map_err(|err| {
+                format!("Failed to load env {}: {}", MULTI_USER_MAILER_FROM_KEY, err)
+            })?,
+            mailer_username: load_env(&MULTI_USER_MAILER_USERNAME_KEY).map_err(|err| {
+                format!(
+                    "Failed to load env {}: {}",
+                    MULTI_USER_MAILER_USERNAME_KEY, err
+                )
+            })?,
+            mailer_password: load_env(&MULTI_USER_MAILER_PASSWORD_KEY).map_err(|err| {
+                format!(
+                    "Failed to load env {}: {}",
+                    MULTI_USER_MAILER_PASSWORD_KEY, err
+                )
+            })?,
+            mailer_relay: load_env(&MULTI_USER_MAILER_RELAY_KEY).map_err(|err| {
+                format!(
+                    "Failed to load env {}: {}",
+                    MULTI_USER_MAILER_RELAY_KEY, err
+                )
+            })?,
+            mailer_domain: load_env(&MULTI_USER_MAILER_DOMAIN_KEY).map_err(|err| {
+                format!(
+                    "Failed to load env {}: {}",
+                    MULTI_USER_MAILER_DOMAIN_KEY, err
+                )
+            })?,
+        }))
+    }
+}
+
+pub fn key_is_set(key: &str) -> bool {
+    // First check the env as a path to a file containing the env value
+    if let Ok(path) = env::var(format!("{key}_FILE")) {
+        return Path::new(&path).exists();
+    };
+
+    // Else check if the key is set
+    env::var(key).is_ok()
+}
+// TODO: introduce a GetFromEnv trait to remove the ddep on env::var to allow testing in isolation
 /// Optionnaly load a value from environnemnt variable. See [load_env] for more details.
 pub fn load_optional_env(key: &str) -> Result<Option<String>, String> {
     // First check the env as a path to a file containing the env value
