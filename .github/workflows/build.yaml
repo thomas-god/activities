@@ -97,8 +97,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ghcr.io/thomas-god/activities-main
-            ghcr.io/thomas-god/activities-${{ github.sha }}
+            ghcr.io/thomas-god/activities:main
+            ghcr.io/thomas-god/activities:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
 
@@ -132,7 +132,7 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: ${{ runner.temp }}/digests
+          path: ${{ runner.temp }}/digests/
           pattern: digests-*
           merge-multiple: true
 
@@ -152,7 +152,7 @@ jobs:
         with:
           images: ghcr.io/thomas-god/activities
           flavor: |
-            latest=false
+            latest=auto
           tags: |
             type=ref,event=branch
             type=sha
