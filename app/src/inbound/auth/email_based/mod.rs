@@ -66,12 +66,12 @@ impl AuthToken {
         self.0.as_bytes()
     }
 
-    pub fn as_hash(&self) -> Result<HashedAuthToken, ()> {
+    pub fn as_hash(&self) -> Option<HashedAuthToken> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         match argon2.hash_password(self.0.as_bytes(), &salt) {
-            Ok(hash) => Ok(HashedAuthToken::new(hash.to_string())),
-            Err(_err) => Err(()),
+            Ok(hash) => Some(HashedAuthToken::new(hash.to_string())),
+            Err(_err) => None,
         }
     }
 }
@@ -130,11 +130,9 @@ impl AuthLink {
         &self.expire_at
     }
 
-    pub fn as_hash(&self) -> Result<HashedAuthLink, ()> {
-        let Ok(hash) = self.token().as_hash() else {
-            return Err(());
-        };
-        Ok(HashedAuthLink::new(
+    pub fn as_hash(&self) -> Option<HashedAuthLink> {
+        let hash = self.token().as_hash()?;
+        Some(HashedAuthLink::new(
             self.user().clone(),
             hash,
             *self.expire_at(),
@@ -187,11 +185,9 @@ impl Session {
         &self.expire_at
     }
 
-    pub fn as_hash(&self) -> Result<HashedSession, ()> {
-        let Ok(hash) = self.token().as_hash() else {
-            return Err(());
-        };
-        Ok(HashedSession::new(
+    pub fn as_hash(&self) -> Option<HashedSession> {
+        let hash = self.token().as_hash()?;
+        Some(HashedSession::new(
             self.user().clone(),
             hash,
             *self.expire_at(),
@@ -241,12 +237,12 @@ impl SessionToken {
         self.0.as_bytes()
     }
 
-    pub fn as_hash(&self) -> Result<HashedSessionToken, ()> {
+    pub fn as_hash(&self) -> Option<HashedSessionToken> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         match argon2.hash_password(self.0.as_bytes(), &salt) {
-            Ok(hash) => Ok(HashedSessionToken::new(hash.to_string())),
-            Err(_err) => Err(()),
+            Ok(hash) => Some(HashedSessionToken::new(hash.to_string())),
+            Err(_err) => None,
         }
     }
 }

@@ -31,7 +31,7 @@ where
         let token = SessionToken::new();
         let expire_at = Utc::now() + TimeDelta::days(SESSION_DURATION);
         let session = Session::new(user.clone(), token.clone(), expire_at);
-        let Ok(hashed_session) = session.as_hash() else {
+        let Some(hashed_session) = session.as_hash() else {
             return Err(());
         };
 
@@ -74,7 +74,7 @@ where
             let new_token = SessionToken::new();
             let new_expire_at = now + TimeDelta::days(SESSION_DURATION);
             let new_session = Session::new(user.clone(), new_token.clone(), new_expire_at);
-            if let Ok(hashed) = new_session.as_hash()
+            if let Some(hashed) = new_session.as_hash()
                 && repository.store_session(&hashed).await.is_ok()
             {
                 let _ = repository.delete_session_by_hash(session.hash()).await;

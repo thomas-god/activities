@@ -32,7 +32,7 @@ where
             auth_token.clone(),
             Utc::now() + TimeDelta::minutes(15),
         );
-        let Ok(hashed_auth_link) = auth_link.as_hash() else {
+        let Some(hashed_auth_link) = auth_link.as_hash() else {
             return GenerateAuthLinkResult::Retry;
         };
 
