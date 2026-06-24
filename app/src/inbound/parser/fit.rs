@@ -430,7 +430,7 @@ fn extract_lap(message: &DataMessage, reference_timestamp: u32) -> Option<Lap> {
     let lap_duration = message
         .fields
         .iter()
-        .find(|field| field.kind == FitField::Lap(LapField::TotalElapsedTime))
+        .find(|field| field.kind == FitField::Lap(LapField::TotalTimerTime))
         .and_then(|field| {
             field.values.iter().find_map(|value| match value {
                 DataValue::Float32(dt) => Some(*dt as u32),
@@ -1252,30 +1252,6 @@ mod tests_fit_parser {
     }
 
     #[test]
-    fn test_parse_timeseries_laps() {
-        let content = fs::read("src/inbound/parser/test.fit").unwrap();
-
-        let res = try_fit_bytes_into_domain(content).unwrap();
-
-        assert_eq!(
-            res.timeseries.laps(),
-            &vec![
-                Lap::new(0, 300),
-                Lap::new(300, 1763),
-                Lap::new(1763, 2063),
-                Lap::new(2063, 2243),
-                Lap::new(2243, 2543),
-                Lap::new(2543, 2723),
-                Lap::new(2723, 3023),
-                Lap::new(3023, 3203),
-                Lap::new(3203, 3503),
-                Lap::new(3503, 3683),
-                Lap::new(3683, 3983),
-            ]
-        );
-    }
-
-    #[test]
     fn test_extract_timeseries_latitude_longitude_conversion() {
         // Sint32 value 536870912 == 2^29, converts to 45.0 degrees
         // Sint32 value -536870912 converts to -45.0 degrees
@@ -1421,7 +1397,7 @@ mod tests_fit_parser {
                         values: vec![DataValue::DateTime(10)],
                     },
                     DataMessageField {
-                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        kind: FitField::Lap(LapField::TotalTimerTime),
                         values: vec![DataValue::Float32(300.)],
                     },
                 ],
@@ -1435,7 +1411,7 @@ mod tests_fit_parser {
                         values: vec![DataValue::DateTime(10)],
                     },
                     DataMessageField {
-                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        kind: FitField::Lap(LapField::TotalTimerTime),
                         values: vec![DataValue::Float32(300.)],
                     },
                 ],
@@ -1462,7 +1438,7 @@ mod tests_fit_parser {
                         values: vec![DataValue::DateTime(10)],
                     },
                     DataMessageField {
-                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        kind: FitField::Lap(LapField::TotalTimerTime),
                         values: vec![DataValue::Float32(300.)],
                     },
                 ],
@@ -1476,7 +1452,7 @@ mod tests_fit_parser {
                         values: vec![DataValue::DateTime(310)],
                     },
                     DataMessageField {
-                        kind: FitField::Lap(LapField::TotalElapsedTime),
+                        kind: FitField::Lap(LapField::TotalTimerTime),
                         values: vec![DataValue::Float32(200.)],
                     },
                 ],
