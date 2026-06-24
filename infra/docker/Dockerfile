@@ -28,7 +28,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY app/ app/
 COPY fit-parser/ fit-parser/
 COPY fit-codegen/ fit-codegen/
-RUN cargo build --release -p app --features
+RUN cargo build --release -p app
 
 # Runtime stage
 FROM nginx:alpine
