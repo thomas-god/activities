@@ -450,6 +450,9 @@ def adjust_tcx_file_time(file: str, start: datetime) -> bytes:
         tzinfo=None
     )
     delta = start - initial_start
+    previous_time = initial_start
+    previous_distance = 0.0
+    pause_time = timedelta(seconds=0)
     for lap in laps:
         lap_time = datetime.fromisoformat(lap.attrib["StartTime"]).replace(tzinfo=None)
         lap.attrib["StartTime"] = (lap_time + delta).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -458,7 +461,12 @@ def adjust_tcx_file_time(file: str, start: datetime) -> bytes:
             point_time = datetime.fromisoformat(point.find("Time").text).replace(
                 tzinfo=None
             )
-            point.find("Time").text = (point_time + delta).strftime(
+            if float(point.find("DistanceMeters").text) == previous_distance:
+                if point_time - previous_time > timedelta(seconds=10):
+                    pause_time += point_time - previous_time
+            previous_distance = float(point.find("DistanceMeters").text)
+            previous_time = point_time
+            point.find("Time").text = (point_time + delta - pause_time).strftime(
                 "%Y-%m-%dT%H:%M:%SZ"
             )
 
