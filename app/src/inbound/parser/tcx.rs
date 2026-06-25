@@ -101,6 +101,7 @@ fn find_activity_statistics(doc: &Document) -> ActivityStatistics {
         }
     }
 
+    // TODO: remove as computing elevation gained from summing positive variations is error prone ?
     let elevation_gain = doc
         .descendants()
         .filter_map(|node| {
@@ -111,8 +112,8 @@ fn find_activity_statistics(doc: &Document) -> ActivityStatistics {
             }
         })
         .tuple_windows::<(f64, f64)>()
-        .fold(0., |elev, (a, b)| elev + f64::min(b - a, 0.));
-    if elevation_gain != 0. {
+        .fold(0., |elev, (a, b)| elev + f64::max(b - a, 0.));
+    if elevation_gain >= 0. {
         stats.insert(ActivityStatistic::Elevation, elevation_gain);
     }
 
@@ -540,7 +541,7 @@ mod test_tcx_parser {
             *statistics
                 .get(&ActivityStatistic::Elevation)
                 .expect("Stats should have an elevation"),
-            f64::min(1386.0 - 1399.19, 0.) + f64::min(1399.19 - 1399.40, 0.)
+            f64::max(1386.0 - 1399.19, 0.) + f64::max(1399.19 - 1399.40, 0.)
         );
     }
 
