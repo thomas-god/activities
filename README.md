@@ -1,4 +1,4 @@
-# Activities: self-hosted training journal and performance tracking platform
+# Activities: self-hosted sport training journal
 
 Activities is a self-hosted platform to archive sport activities, manage your
 training journal and track your progress:
