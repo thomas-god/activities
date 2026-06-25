@@ -318,42 +318,6 @@ def update_activity(
         return False
 
 
-def generate_activity(
-    date: str,
-    sport: str,
-    duration_seconds: int,
-    distance_meters: int,
-    avg_hr: int,
-    name: str | None = None,
-    rpe: int | None = None,
-    workout_type: str | None = None,
-    bonk_status: str | None = None,
-    nutrition_details: str | None = None,
-    feedback: str | None = None,
-) -> str | None:
-    """Generate a TCX file, upload it, and update with additional metadata.
-
-    Returns the created activity ID if successful, None otherwise.
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    filename = f"activity_{timestamp}.tcx"
-
-    generate_tcx(date, sport, duration_seconds, distance_meters, avg_hr, filename)
-    tcx_file = TEMP_DIR / filename
-    file_content = tcx_file.read_text()
-
-    return upload_activity_from_content(
-        file_content=file_content,
-        filename=filename,
-        name=name,
-        rpe=rpe,
-        workout_type=workout_type,
-        bonk_status=bonk_status,
-        nutrition_details=nutrition_details,
-        feedback=feedback,
-    )
-
-
 def create_training_period(
     name: str, start: str, end: str, description: str
 ) -> str | None:
@@ -487,9 +451,7 @@ def adjust_tcx_file_time(file: str, start: datetime) -> bytes:
     )
     delta = start - initial_start
     for lap in laps:
-        lap_time = datetime.fromisoformat(lap.attrib["StartTime"]).replace(
-            tzinfo=None
-        )
+        lap_time = datetime.fromisoformat(lap.attrib["StartTime"]).replace(tzinfo=None)
         lap.attrib["StartTime"] = (lap_time + delta).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         for point in lap.find("Track").findall("Trackpoint"):
@@ -510,8 +472,68 @@ def easy_run(start: datetime) -> bytes:
 def intervals(start: datetime) -> bytes:
     return adjust_tcx_file_time("intervals.tcx", start)
 
+
 def long_ride(start: datetime) -> bytes:
     return adjust_tcx_file_time("long_ride.tcx", start)
+
+
+def create_standalone_activity(
+    calories: int,
+    duration: int,
+    date: datetime,
+    sport: str,
+    name: str | None = None,
+    rpe: int | None = None,
+    workout_type: str | None = None,
+    bonk_status: str | None = None,
+    nutrition_details: str | None = None,
+    feedback: str | None = None,
+):
+
+    response = requests.post(
+        f"{API_URL}/activity/standalone",
+        json={
+            "sport": sport,
+            "calories": calories,
+            "duration": duration,
+            "start_time": date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+    )
+
+    if response.status_code != 201:
+        print(
+            f"Failed to create standalone activity: {response.status_code} - {response.text}"
+        )
+        return None
+
+    if not response.text:
+        print("Response body is empty!")
+        return None
+
+    try:
+        data = response.json()
+        created_id = data.get("id")
+        if not created_id:
+            print("No activity ID returned from upload")
+            return None
+    except Exception as e:
+        print(f"Failed to parse JSON: {e}")
+        return None
+
+    print(f"Created activity {created_id}")
+
+    if any([name, rpe, workout_type, bonk_status, nutrition_details, feedback]):
+        update_activity(
+            created_id,
+            name=name,
+            rpe=rpe,
+            workout_type=workout_type,
+            bonk_status=bonk_status,
+            nutrition_details=nutrition_details,
+            feedback=feedback,
+        )
+
+    return created_id
 
 
 def generate_demo_data() -> int:
@@ -575,6 +597,18 @@ def generate_demo_data() -> int:
                 rpe=random.randint(2, 4),
                 workout_type="easy",
             )
+
+    # Standalone activity
+    create_standalone_activity(
+        date=datetime.combine(today - timedelta(days=1), dt_time(hour=10)),
+        calories=200,
+        duration=45 * 60,
+        sport="StrengthTraining",
+        name="A standalone activity",
+        rpe=random.randint(2, 4),
+        workout_type="easy",
+        feedback="You can also create standalone activities (i.e. without needing an activity file) to track sports that you are not recording your sessions.",
+    )
 
     # Today's activity:
     upload_activity_from_content(
