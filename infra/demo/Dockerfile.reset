@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy Python scripts
 COPY reset-demo.py /usr/local/bin/reset-demo.py
+COPY easy_run.tcx /easy_run.tcx
+COPY intervals.tcx /intervals.tcx
+COPY long_ride.tcx /long_ride.tcx
 RUN chmod +x /usr/local/bin/reset-demo.py
 
 # Create crontab for nightly reset at 3 AM UTC

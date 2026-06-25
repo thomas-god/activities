@@ -10,8 +10,9 @@ import sys
 import time
 from typing import Any
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 
 import requests
@@ -218,6 +219,59 @@ def upload_activities() -> list[str]:
     return activity_ids
 
 
+def upload_activity_from_content(
+    file_content: bytes,
+    filename: str | None = None,
+    name: str | None = None,
+    rpe: int | None = None,
+    workout_type: str | None = None,
+    bonk_status: str | None = None,
+    nutrition_details: str | None = None,
+    feedback: str | None = None,
+) -> str | None:
+    """Upload a single TCX activity from raw file content and apply metadata."""
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        filename = f"activity_{timestamp}.tcx"
+
+    files = {"file.tcx": (filename, file_content, "application/xml")}
+    response = requests.post(f"{API_URL}/activity", files=files)
+
+    if response.status_code != 201:
+        print(f"Failed to upload activity: {response.status_code} - {response.text}")
+        return None
+
+    if not response.text:
+        print("Response body is empty!")
+        return None
+
+    try:
+        data = response.json()
+        created_ids = data.get("created_ids", [])
+        if not created_ids:
+            print("No activity ID returned from upload")
+            return None
+    except Exception as e:
+        print(f"Failed to parse JSON: {e}")
+        return None
+
+    activity_id = created_ids[0]
+    print(f"Created activity {activity_id}")
+
+    if any([name, rpe, workout_type, bonk_status, nutrition_details, feedback]):
+        update_activity(
+            activity_id,
+            name=name,
+            rpe=rpe,
+            workout_type=workout_type,
+            bonk_status=bonk_status,
+            nutrition_details=nutrition_details,
+            feedback=feedback,
+        )
+
+    return activity_id
+
+
 def update_activity(
     activity_id: str,
     name: str | None = None,
@@ -281,59 +335,23 @@ def generate_activity(
 
     Returns the created activity ID if successful, None otherwise.
     """
-    # Generate unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     filename = f"activity_{timestamp}.tcx"
 
-    # Generate TCX file
     generate_tcx(date, sport, duration_seconds, distance_meters, avg_hr, filename)
-
-    # Upload the file
     tcx_file = TEMP_DIR / filename
-    with open(tcx_file, "rb") as f:
-        files = {"file.tcx": (filename, f, "application/xml")}
-        response = requests.post(f"{API_URL}/activity", files=files)
+    file_content = tcx_file.read_text()
 
-    if response.status_code != 201:
-        print(f"Failed to upload activity: {response.status_code} - {response.text}")
-        return None
-
-    # # Extract created activity ID
-    # print(f"Upload response (status {response.status_code}):")
-    # print(f"  Content-Type: {response.headers.get('content-type')}")
-    # print(f"  Body length: {len(response.text)}")
-    # print(f"  Body: {response.text}")
-
-    if not response.text:
-        print("Response body is empty!")
-        return None
-
-    try:
-        data = response.json()
-        created_ids = data.get("created_ids", [])
-        if not created_ids:
-            print("No activity ID returned from upload")
-            return None
-    except Exception as e:
-        print(f"Failed to parse JSON: {e}")
-        return None
-
-    activity_id = created_ids[0]
-    print(f"Created activity {activity_id}")
-
-    # Update activity with additional metadata
-    if any([name, rpe, workout_type, bonk_status, nutrition_details, feedback]):
-        update_activity(
-            activity_id,
-            name=name,
-            rpe=rpe,
-            workout_type=workout_type,
-            bonk_status=bonk_status,
-            nutrition_details=nutrition_details,
-            feedback=feedback,
-        )
-
-    return activity_id
+    return upload_activity_from_content(
+        file_content=file_content,
+        filename=filename,
+        name=name,
+        rpe=rpe,
+        workout_type=workout_type,
+        bonk_status=bonk_status,
+        nutrition_details=nutrition_details,
+        feedback=feedback,
+    )
 
 
 def create_training_period(
@@ -460,6 +478,42 @@ def create_training_note(date: str, content: str) -> dict[str, Any] | None:
     return None
 
 
+def adjust_tcx_file_time(file: str, start: datetime) -> bytes:
+    tree = ET.parse(file)
+
+    laps = tree.getroot().find("Activities").find("Activity").findall("Lap")
+    initial_start = datetime.fromisoformat(laps[0].attrib["StartTime"]).replace(
+        tzinfo=None
+    )
+    delta = start - initial_start
+    for lap in laps:
+        lap_time = datetime.fromisoformat(lap.attrib["StartTime"]).replace(
+            tzinfo=None
+        )
+        lap.attrib["StartTime"] = (lap_time + delta).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        for point in lap.find("Track").findall("Trackpoint"):
+            point_time = datetime.fromisoformat(point.find("Time").text).replace(
+                tzinfo=None
+            )
+            point.find("Time").text = (point_time + delta).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+    return ET.tostring(tree.getroot(), encoding="utf8")
+
+
+def easy_run(start: datetime) -> bytes:
+    return adjust_tcx_file_time("easy_run.tcx", start)
+
+
+def intervals(start: datetime) -> bytes:
+    return adjust_tcx_file_time("intervals.tcx", start)
+
+def long_ride(start: datetime) -> bytes:
+    return adjust_tcx_file_time("long_ride.tcx", start)
+
+
 def generate_demo_data() -> int:
     """Generate demo data."""
     today = datetime.now().date()
@@ -482,16 +536,10 @@ def generate_demo_data() -> int:
         week_start = most_recent_monday - timedelta(weeks=week)
 
         # Activity 1: Easy run (Tuesday)
-        date = week_start + timedelta(days=1)
-        duration = random.randint(25, 35) * 60  # 25-35 minutes
-        distance = random.randint(4000, 6000)  # 4-6 km
+        date = week_start + timedelta(days=1) + timedelta(hours=8)
         if date < today:
-            generate_activity(
-                date=date.strftime("%Y-%m-%d"),
-                sport="Running",
-                duration_seconds=duration,
-                distance_meters=distance,
-                avg_hr=random.randint(130, 140),
+            upload_activity_from_content(
+                file_content=easy_run(datetime.combine(date, dt_time(hour=8))),
                 name="Easy Recovery Run",
                 rpe=random.randint(2, 4),
                 workout_type="easy",
@@ -499,15 +547,9 @@ def generate_demo_data() -> int:
 
         # Activity 2: Tempo run (Thursday)
         date = week_start + timedelta(days=3)
-        duration = random.randint(35, 45) * 60  # 35-45 minutes
-        distance = random.randint(7000, 9000)  # 7-9 km
         if date < today:
-            generate_activity(
-                date=date.strftime("%Y-%m-%d"),
-                sport="Running",
-                duration_seconds=duration,
-                distance_meters=distance,
-                avg_hr=random.randint(150, 160),
+            upload_activity_from_content(
+                file_content=intervals(datetime.combine(date, dt_time(hour=8))),
                 name="Tempo Run",
                 rpe=random.randint(6, 7),
                 workout_type="tempo",
@@ -516,44 +558,27 @@ def generate_demo_data() -> int:
 
         # Activity 3: Bike ride (Saturday)
         date = week_start + timedelta(days=5)
-        duration = random.randint(80, 100) * 60  # 80-100 minutes
-        distance = random.randint(35000, 45000)  # 35-45 km
         if date < today:
-            generate_activity(
-                date=date.strftime("%Y-%m-%d"),
-                sport="Biking",
-                duration_seconds=duration,
-                distance_meters=distance,
-                avg_hr=random.randint(135, 145),
-                name="Endurance Bike Ride",
+            upload_activity_from_content(
+                file_content=long_ride(datetime.combine(date, dt_time(hour=8))),
+                name="Long Ride",
+                workout_type="long_run",
                 rpe=random.randint(3, 5),
-                workout_type="easy",
             )
 
         # Activity 4: Long run (Sunday)
         date = week_start + timedelta(days=6)
-        duration = random.randint(70, 90) * 60  # 70-90 minutes
-        distance = random.randint(13000, 17000)  # 13-17 km
         if date < today:
-            generate_activity(
-                date=date.strftime("%Y-%m-%d"),
-                sport="Running",
-                duration_seconds=duration,
-                distance_meters=distance,
-                avg_hr=random.randint(140, 150),
-                name="Long Run",
-                rpe=random.randint(5, 7),
-                workout_type="long_run",
-                feedback="Legs felt strong throughout. Good hydration strategy.",
+            upload_activity_from_content(
+                file_content=easy_run(datetime.combine(date, dt_time(hour=8))),
+                name="Easy Recovery Run",
+                rpe=random.randint(2, 4),
+                workout_type="easy",
             )
 
     # Today's activity:
-    generate_activity(
-        date=today.strftime("%Y-%m-%d"),
-        sport="Running",
-        duration_seconds=3600,
-        distance_meters=10000,
-        avg_hr=random.randint(130, 140),
+    upload_activity_from_content(
+        file_content=easy_run(datetime.combine(today, dt_time(hour=8))),
         name="An imported sport activity",
         rpe=random.randint(2, 4),
         workout_type="easy",
@@ -574,7 +599,6 @@ def generate_demo_data() -> int:
 
     # Create training metrics
     print("\nCreating training metrics...")
-    metric_start = (today - timedelta(days=120)).strftime("%Y-%m-%d")
 
     create_scoped_training_metric(
         "Average heart rate (only for this training period)",
@@ -659,5 +683,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    print("hello world")
     sys.exit(main())
