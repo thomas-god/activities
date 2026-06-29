@@ -51,7 +51,7 @@ mod test {
         let app = Router::new()
             .route("/", get(test_route))
             .route_layer(from_extractor::<DefaultUserExtractor>());
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let response = server.get("/").await;
         response.assert_status(StatusCode::OK);

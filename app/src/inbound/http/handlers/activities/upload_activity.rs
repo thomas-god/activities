@@ -209,7 +209,7 @@ mod tests {
             .route("/test_upload", post(upload_activities))
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let file1_data = b"test fit file content 1".to_vec();
 
@@ -277,7 +277,7 @@ mod tests {
             .route("/test_upload", post(upload_activities))
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let file1_data = b"test fit file content 1".to_vec();
         let file2_data = b"test fit file content 2".to_vec();
@@ -346,7 +346,7 @@ mod tests {
             .route("/test_upload", post(upload_activities))
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let file1_data = b"test fit file content 1".to_vec();
         let file2_data = b"test fit file content 2".to_vec();
@@ -394,7 +394,7 @@ mod tests {
             .route("/test_upload", post(upload_activities))
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let file_data = b"test content".to_vec();
 
