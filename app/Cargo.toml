@@ -32,7 +32,7 @@ roxmltree = "0.21.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 sha2 = "0.11.0"
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "chrono"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "chrono"] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = "0.5.2"
@@ -44,8 +44,8 @@ zip = { version = "8.6.0", features = ["deflate"] }
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
-axum-test = "18.7.0"
-mockall = "0.14.0"
+axum-test = "21.0.0"
+mockall = "0.15.0"
 reqwest = "0.13.4"
 tempfile = "3.23.0"
 url = "2.5.8"
