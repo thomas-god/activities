@@ -153,7 +153,7 @@ mod test {
                     CookieUserExtractor<MockUserService>,
                     AuthAppState<MockUserService>,
                 >(state));
-        TestServer::new(app).expect("unable to create test server")
+        TestServer::new(app)
     }
 
     #[tokio::test]
@@ -214,7 +214,7 @@ mod test {
                 cookie_auth_middleware::<MockUserService>,
             ))
             .with_state(state);
-        TestServer::new(app).expect("unable to create test server")
+        TestServer::new(app)
     }
 
     #[tokio::test]

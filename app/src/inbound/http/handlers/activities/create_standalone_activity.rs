@@ -161,7 +161,7 @@ mod tests {
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
 
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         let response = server
             .post("/activity/standalone")
@@ -201,7 +201,7 @@ mod tests {
             .route_layer(from_extractor::<DefaultUserExtractor>())
             .with_state(state);
 
-        let server = TestServer::new(app).expect("unable to create test server");
+        let server = TestServer::new(app);
 
         // missing required field
         let response = server
