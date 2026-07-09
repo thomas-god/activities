@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset, NaiveDate};
-use sqlx::{QueryBuilder, Sqlite, SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{
+    QueryBuilder, Sqlite, SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+};
 
 use crate::domain::{
     models::{
@@ -64,21 +67,33 @@ type TrainingNoteRow = (
 
 #[derive(Debug, Clone)]
 pub struct SqliteTrainingRepository {
-    pool: SqlitePool,
+    writer: SqlitePool,
+    readers: SqlitePool,
 }
 
 impl SqliteTrainingRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(url)?
+        let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
-            .foreign_keys(true);
+            .journal_mode(SqliteJournalMode::Wal);
 
-        let pool = SqlitePool::connect_with(options).await?;
+        let writer = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(writer_options)
+            .await?;
 
-        // Run migrations
-        sqlx::migrate!("migrations/training").run(&pool).await?;
+        // Run migrations using writer pool
+        sqlx::migrate!("migrations/training").run(&writer).await?;
 
-        Ok(Self { pool })
+        let readers_options = SqliteConnectOptions::from_str(url)?
+            .journal_mode(SqliteJournalMode::Wal)
+            .read_only(true);
+        let readers = SqlitePoolOptions::new()
+            .max_connections(10)
+            .connect_with(readers_options)
+            .await?;
+
+        Ok(Self { writer, readers })
     }
 }
 
@@ -111,7 +126,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(metric.name())
         .bind(metric.scope().period())
         .bind(definition.summary())
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| match err {
             sqlx::Error::Database(err) => {
@@ -132,16 +147,16 @@ impl TrainingRepository for SqliteTrainingRepository {
     ) -> Result<Option<TrainingMetric>, GetTrainingMetricError> {
         match sqlx::query_as::<_, DefinitionRow>(
             "
-        SELECT 
-            id, 
-            name, 
-            user_id, 
-            source, 
-            activity_metric, 
-            granularity, 
-            aggregate, 
-            filters, 
-            group_by, 
+        SELECT
+            id,
+            name,
+            user_id,
+            source,
+            activity_metric,
+            granularity,
+            aggregate,
+            filters,
+            group_by,
             training_period_id,
             summary
         FROM t_training_metrics_definitions
@@ -149,7 +164,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(metric)
         .bind(user)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.readers)
         .await
         {
             Ok((
@@ -197,23 +212,23 @@ impl TrainingRepository for SqliteTrainingRepository {
         user: &UserId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT 
-                id, 
-                name, 
-                user_id, 
-                source, 
-                activity_metric, 
-                granularity, 
-                aggregate, 
-                filters, 
-                group_by, 
+            "SELECT
+                id,
+                name,
+                user_id,
+                source,
+                activity_metric,
+                granularity,
+                aggregate,
+                filters,
+                group_by,
                 training_period_id,
                 summary
             FROM t_training_metrics_definitions
             WHERE user_id = ?1 AND training_period_id IS NULL;",
         )
         .bind(user)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await
         .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
         .map(|rows| {
@@ -263,16 +278,16 @@ impl TrainingRepository for SqliteTrainingRepository {
         period: &TrainingPeriodId,
     ) -> Result<Vec<TrainingMetric>, GetTrainingMetricsDefinitionsError> {
         sqlx::query_as::<_, DefinitionRow>(
-            "SELECT 
-                id, 
-                name, 
-                user_id, 
-                source, 
-                activity_metric, 
-                granularity, 
-                aggregate, 
-                filters, 
-                group_by, 
+            "SELECT
+                id,
+                name,
+                user_id,
+                source,
+                activity_metric,
+                granularity,
+                aggregate,
+                filters,
+                group_by,
                 training_period_id,
                 summary
             FROM t_training_metrics_definitions
@@ -280,7 +295,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(user)
         .bind(period)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await
         .map_err(|err| GetTrainingMetricsDefinitionsError::Unknown(anyhow!(err)))
         .map(|rows| {
@@ -335,7 +350,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(metric)
         .bind(user)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         {
             Ok(res) => {
@@ -363,7 +378,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(name.to_string())
         .bind(metric_id)
         .bind(user)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         {
             Ok(res) if res.rows_affected() == 1 => Ok(()),
@@ -386,7 +401,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .bind(period.name())
             .bind(period.sports())
             .bind(period.note())
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map_err(|err| SaveTrainingPeriodError::Unknown(anyhow!(err)))
             .map(|_| ())
@@ -405,7 +420,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(period)
         .bind(user)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.readers)
         .await
         {
             Ok((id, user_id, start, end, name, sports, note)) => {
@@ -426,7 +441,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             WHERE user_id = ?1;",
         )
         .bind(user)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await
         .map(|rows| {
             rows.into_iter()
@@ -452,7 +467,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(user)
         .bind(ref_date)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await
         .map(|rows| {
             rows.into_iter()
@@ -472,7 +487,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         match sqlx::query("DELETE FROM t_training_periods WHERE id = ?1 AND user_id = ?2;")
             .bind(period_id)
             .bind(user)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
         {
             Ok(res) if res.rows_affected() == 1 => Ok(()),
@@ -493,7 +508,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .bind(name)
             .bind(period_id)
             .bind(user)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
         {
             Ok(res) if res.rows_affected() == 1 => Ok(()),
@@ -514,7 +529,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .bind(note)
             .bind(period_id)
             .bind(user)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
         {
             Ok(res) if res.rows_affected() == 1 => Ok(()),
@@ -539,7 +554,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(end)
         .bind(period_id)
         .bind(user)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         {
             Ok(res) if res.rows_affected() == 1 => Ok(()),
@@ -560,7 +575,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(note.content().to_string())
         .bind(note.date().to_string())
         .bind(note.created_at().to_rfc3339())
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| SaveTrainingNoteError::Unknown(anyhow!(err)))
         .map(|_| ())
@@ -576,7 +591,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(note_id.to_string())
         .bind(user)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.readers)
         .await
         {
             Ok((id, user_id, title, content, date, created_at)) => {
@@ -613,7 +628,7 @@ impl TrainingRepository for SqliteTrainingRepository {
 
         let rows = builder
             .build_query_as::<TrainingNoteRow>()
-            .fetch_all(&self.pool)
+            .fetch_all(&self.readers)
             .await
             .map_err(|err| GetTrainingNoteError::Unknown(anyhow!(err)))?;
 
@@ -642,7 +657,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(date.to_string())
         .bind(note_id.to_string())
         .bind(user)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
         .map(|_| ())
@@ -656,7 +671,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         sqlx::query("DELETE FROM t_training_notes WHERE id = ?1 AND user_id = ?2;")
             .bind(note_id.to_string())
             .bind(user)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
             .map(|_| ())
@@ -681,7 +696,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         )
         .bind(user.to_string())
         .bind(period_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&self.readers)
         .await
         .map_err(|e| GetTrainingMetricsOrderingError::Unknown(e.into()))?;
 
@@ -733,7 +748,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(user.to_string())
         .bind(&period_id)
         .bind(&metric_ids_str)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|e| SetTrainingMetricsOrderingError::Unknown(e.into()))?
         .rows_affected();
@@ -749,7 +764,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .bind(user.to_string())
             .bind(period_id)
             .bind(metric_ids_str)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map_err(|e| SetTrainingMetricsOrderingError::Unknown(e.into()))?;
         }
@@ -795,17 +810,17 @@ mod test_sqlite_training_repository {
             .expect("repo should init");
 
         sqlx::query("select count(*) from t_training_metrics_definitions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
 
         sqlx::query("select count(*) from t_training_periods;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
 
         sqlx::query("select count(*) from t_training_notes;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
     }
@@ -1031,7 +1046,7 @@ mod test_sqlite_training_repository {
             sqlx::query_scalar::<_, Option<TrainingMetricGroupBy>>(
                 "select group_by from t_training_metrics_definitions limit 1;"
             )
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap(),
             Some(TrainingMetricGroupBy::Sport)
@@ -1474,7 +1489,7 @@ mod test_sqlite_training_repository {
         .bind(TrainingMetricFilters::empty())
         .bind(TrainingMetricGroupBy::none())
         .bind::<Option<String>>(None)
-        .execute(&repository.pool)
+        .execute(&repository.writer)
         .await
         .expect("Should insert metric with NULL training_period_id");
 
@@ -1519,7 +1534,7 @@ mod test_sqlite_training_repository {
         assert_eq!(
             sqlx::query_scalar::<_, i64>("select count(*) from t_training_periods where id = ?1")
                 .bind(period.id())
-                .fetch_one(&repository.pool)
+                .fetch_one(&repository.readers)
                 .await
                 .unwrap(),
             1
@@ -2462,7 +2477,7 @@ mod test_sqlite_training_repository {
         assert_eq!(
             sqlx::query_scalar::<_, i64>("select count(*) from t_training_notes where id = ?1")
                 .bind(note.id().to_string())
-                .fetch_one(&repository.pool)
+                .fetch_one(&repository.readers)
                 .await
                 .unwrap(),
             1
@@ -2488,7 +2503,7 @@ mod test_sqlite_training_repository {
                 "select id, user_id, content, created_at from t_training_notes where id = ?1",
             )
             .bind(note.id().to_string())
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
 
