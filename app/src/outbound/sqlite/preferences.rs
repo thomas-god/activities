@@ -1,7 +1,10 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{
+    SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+};
 
 use crate::{
     domain::{
@@ -19,21 +22,35 @@ type RawPreferenceRow = (UserId, String, String);
 
 #[derive(Debug, Clone)]
 pub struct SqlitePreferencesRepository {
-    pool: SqlitePool,
+    writer: SqlitePool,
+    readers: SqlitePool,
 }
 
 impl SqlitePreferencesRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(url)?
+        let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
-            .foreign_keys(true);
+            .journal_mode(SqliteJournalMode::Wal);
 
-        let pool = SqlitePool::connect_with(options).await?;
+        let writer = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(writer_options)
+            .await?;
 
-        // Run migrations
-        sqlx::migrate!("migrations/preferences").run(&pool).await?;
+        // Run migrations using writer pool
+        sqlx::migrate!("migrations/preferences")
+            .run(&writer)
+            .await?;
 
-        Ok(Self { pool })
+        let readers_options = SqliteConnectOptions::from_str(url)?
+            .journal_mode(SqliteJournalMode::Wal)
+            .read_only(true);
+        let readers = SqlitePoolOptions::new()
+            .max_connections(10)
+            .connect_with(readers_options)
+            .await?;
+
+        Ok(Self { writer, readers })
     }
 }
 
@@ -51,7 +68,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         )
         .bind(user)
         .bind(key)
-        .fetch_one(&self.pool)
+        .fetch_one(&self.readers)
         .await
         {
             Ok((_, key, value)) => {
@@ -72,7 +89,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
              WHERE user_id = ?1;",
         )
         .bind(user)
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await?;
 
         let mut preferences = Vec::new();
@@ -110,7 +127,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         .bind(user)
         .bind(&key)
         .bind(value)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| SavePreferenceError::Unknown(anyhow!(err)))?;
 
@@ -128,7 +145,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         )
         .bind(user)
         .bind(key)
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| anyhow!(err))?;
 
@@ -138,19 +155,18 @@ impl PreferencesRepository for SqlitePreferencesRepository {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::NamedTempFile;
+
     use crate::domain::models::training::TrainingMetricId;
 
     use super::*;
 
-    async fn create_test_repo() -> SqlitePreferencesRepository {
-        SqlitePreferencesRepository::new("sqlite::memory:")
-            .await
-            .expect("Failed to create test repository")
-    }
-
     #[tokio::test]
     async fn test_get_preference_returns_none_when_not_exists() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
 
         let result = repo
@@ -163,7 +179,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_get_preference() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
         let preference = Preference::FavoriteMetric(TrainingMetricId::from("test_metric_id"));
 
@@ -188,7 +207,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_preference_updates_existing() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
 
         // Save initial preference
@@ -225,7 +247,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_all_preferences() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
 
         // Save multiple preferences
@@ -249,7 +274,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_preference() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
 
         // Save preference
@@ -284,7 +312,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_gracefully_ignores_unknown_preference_keys() {
-        let repo = create_test_repo().await;
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SqlitePreferencesRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("Failed to create test repository");
         let user = UserId::test_default();
 
         // Save a known preference through the API
@@ -302,7 +333,7 @@ mod tests {
         .bind(&user)
         .bind("unknown_future_preference")
         .bind("some_value")
-        .execute(&repo.pool)
+        .execute(&repo.writer)
         .await
         .unwrap();
 
