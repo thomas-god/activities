@@ -117,10 +117,10 @@
 />
 
 <div class="flex flex-row gap-2">
-	<div class="@container mt-5 grow rounded-box bg-base-100 p-4 shadow-md">
+	<div class="@container/main mt-5 grow rounded-box bg-base-100 p-4 shadow-md">
 		<!-- View Toggle -->
-		<div class="mb-4 flex flex-col justify-between gap-2 @sm:flex-row @sm:items-center">
-			<h1 class="hidden text-2xl font-bold sm:block">History</h1>
+		<div class="mb-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center">
+			<h1 class="hidden text-2xl font-bold @sm/main:block">History</h1>
 			<div class="flex gap-0.5 sm:gap-2">
 				<div class="join">
 					<button
@@ -128,14 +128,14 @@
 						onclick={() => setViewMode('list')}
 					>
 						<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
-						<span class="ml-1 hidden sm:inline">List</span>
+						<span class="ml-1 hidden @sm/main:inline">List</span>
 					</button>
 					<button
 						class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
 						onclick={() => setViewMode('calendar')}
 					>
 						<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
-						<span class="ml-1 hidden sm:inline">Calendar</span>
+						<span class="ml-1 hidden @sm/main:inline">Calendar</span>
 					</button>
 				</div>
 				<div class="join">
@@ -170,7 +170,7 @@
 			</div>
 		{:then [_, notes]}
 			{#if viewMode === 'list'}
-				<div class="flex h-[100vh] flex-row gap-2 overflow-hidden">
+				<div class="flex h-screen flex-row gap-2 overflow-hidden">
 					<div class="grow basis-0 overflow-y-auto">
 						<Timeline
 							activities={filteredActivities}
