@@ -131,7 +131,6 @@ pub async fn patch_activity<
     Query(query): Query<PatchActivityQuery>,
     body: Option<Json<PatchActivityBody>>,
 ) -> Result<StatusCode, StatusCode> {
-    // Update activity name if provided
     if let Some(name) = query.name {
         let req = ModifyActivityRequest::new(
             user.user().clone(),
@@ -139,14 +138,18 @@ pub async fn patch_activity<
             Some(ActivityName::new(name)),
         );
 
-        state
-            .activity_service
-            .modify_activity(req)
-            .await
-            .map_err(StatusCode::from)?;
+        if let Err(err) = state.activity_service.modify_activity(req).await {
+            if matches!(err, ModifyActivityError::Unknown(_)) {
+                tracing::error!(
+                    "Error while updating name of activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        };
     }
 
-    // Update activity RPE if provided
     if let Some(rpe_value) = query.rpe {
         let rpe = if rpe_value == 0 {
             None
@@ -157,14 +160,18 @@ pub async fn patch_activity<
         let req =
             UpdateActivityRpeRequest::new(user.user().clone(), ActivityId::from(&activity_id), rpe);
 
-        state
-            .activity_service
-            .update_activity_rpe(req)
-            .await
-            .map_err(StatusCode::from)?;
+        if let Err(err) = state.activity_service.update_activity_rpe(req).await {
+            if matches!(err, UpdateActivityRpeError::Unknown(_)) {
+                tracing::error!(
+                    "Error while updating rpe of activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        };
     }
 
-    // Update activity workout type if provided
     if let Some(workout_type_str) = query.workout_type {
         let workout_type = if workout_type_str.is_empty() {
             None
@@ -182,14 +189,22 @@ pub async fn patch_activity<
             workout_type,
         );
 
-        state
+        if let Err(err) = state
             .activity_service
             .update_activity_workout_type(req)
             .await
-            .map_err(StatusCode::from)?;
+        {
+            if matches!(err, UpdateActivityWorkoutTypeError::Unknown(_)) {
+                tracing::error!(
+                    "Error while updating workout type of activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        };
     }
 
-    // Update activity nutrition if bonk_status is provided
     if let Some(bonk_status_str) = query.bonk_status {
         let nutrition = if bonk_status_str.is_empty() {
             None
@@ -210,14 +225,18 @@ pub async fn patch_activity<
             nutrition,
         );
 
-        state
-            .activity_service
-            .update_activity_nutrition(req)
-            .await
-            .map_err(StatusCode::from)?;
+        if let Err(err) = state.activity_service.update_activity_nutrition(req).await {
+            if matches!(err, UpdateActivityNutritionError::Unknown(_)) {
+                tracing::error!(
+                    "Error while updating nutrition of activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        };
     }
 
-    // Update activity feedback if provided in request body
     if let Some(Json(body)) = body
         && let Some(feedback_str) = body.feedback
     {
@@ -233,11 +252,16 @@ pub async fn patch_activity<
             feedback,
         );
 
-        state
-            .activity_service
-            .update_activity_feedback(req)
-            .await
-            .map_err(StatusCode::from)?;
+        if let Err(err) = state.activity_service.update_activity_feedback(req).await {
+            if matches!(err, UpdateActivityFeedbackError::Unknown(_)) {
+                tracing::error!(
+                    "Error while updating feedback of activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        };
     }
 
     Ok(StatusCode::OK)

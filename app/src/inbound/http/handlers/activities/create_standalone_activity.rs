@@ -1,6 +1,7 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 
+use crate::domain::ports::activity::CreateActivityError;
 use crate::domain::ports::{preferences::IPreferencesService, training::ITrainingService};
 use crate::inbound::auth::AuthenticatedUser;
 use crate::{
@@ -31,18 +32,23 @@ pub async fn create_standalone_activity<
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let create_request = parsed_content.into_request(user.user());
 
-    let activity = state
-        .activity_service
-        .create_activity(create_request)
-        .await
-        .map_err(StatusCode::from)?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateStandaloneActivityResponse {
-            id: activity.id().to_string(),
-        }),
-    ))
+    match state.activity_service.create_activity(create_request).await {
+        Ok(activity) => Ok((
+            StatusCode::CREATED,
+            Json(CreateStandaloneActivityResponse {
+                id: activity.id().to_string(),
+            }),
+        )),
+        Err(err) => {
+            if matches!(&err, CreateActivityError::Unknown(_)) {
+                tracing::error!(
+                    "Error while creating a standalone activity: {}",
+                    err.to_string()
+                );
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
 
 #[cfg(test)]

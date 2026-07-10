@@ -50,12 +50,16 @@ pub async fn list_activities<
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Query(filters): Query<Filters>,
 ) -> Result<Json<Vec<PublicActivity>>, StatusCode> {
-    let Ok(activities) = state
+    let activities = match state
         .activity_service
         .list_activities_with_metrics(user.user(), &filters.into(), &DEFAULT_METRICS)
         .await
-    else {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    {
+        Ok(activities) => activities,
+        Err(err) => {
+            tracing::error!("Error while getting all activities: {}", err.to_string());
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     };
 
     Ok(Json(

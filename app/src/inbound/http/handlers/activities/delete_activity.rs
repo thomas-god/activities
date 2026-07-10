@@ -33,12 +33,19 @@ pub async fn delete_activity<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
-) -> Result<StatusCode, StatusCode> {
+) -> StatusCode {
     let req = DeleteActivityRequest::new(user.user().clone(), ActivityId::from(&activity_id));
-    state
-        .activity_service
-        .delete_activity(req)
-        .await
-        .map(|_| StatusCode::OK)
-        .map_err(StatusCode::from)
+    match state.activity_service.delete_activity(req).await {
+        Ok(()) => StatusCode::OK,
+        Err(err) => {
+            if matches!(err, DeleteActivityError::Unknown(_)) {
+                tracing::error!(
+                    "Error while deleting activity {}: {}",
+                    activity_id,
+                    err.to_string()
+                )
+            }
+            StatusCode::from(err)
+        }
+    }
 }

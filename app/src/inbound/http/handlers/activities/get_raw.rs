@@ -8,9 +8,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use std::io::Write;
+use zip::result::ZipError;
 
 use crate::domain::models::activity::ActivityId;
-use crate::domain::ports::activity::{GetRawActivityError, GetRawActivityRequest};
+use crate::domain::ports::activity::{
+    GetAllActivitiesError, GetRawActivityError, GetRawActivityRequest, RawActivity,
+};
 use crate::{
     domain::ports::{
         activity::{GetAllActivitiesRequest, IActivityService},
@@ -31,30 +34,31 @@ pub async fn get_all_raw_activities<
 ) -> Result<Response, StatusCode> {
     let request = GetAllActivitiesRequest::new(user.user().clone());
 
-    let activities = state
-        .activity_service
-        .get_all_raw_activities(request)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let activities = match state.activity_service.get_all_raw_activities(request).await {
+        Ok(activities) => activities,
+        Err(err) => {
+            if matches!(err, GetAllActivitiesError::Unknown(_)) {
+                tracing::error!(
+                    "Error while getting all raw activity files: {}",
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
-    // Create a ZIP file containing all activities
-    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+    let zip_data = match zip_activities(activities) {
+        Ok(data) => data,
+        Err(err) => {
+            tracing::error!(
+                "Error while trying to zip raw activity files: {}",
+                err.to_string()
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
-    for activity in activities {
-        zip.start_file(activity.name(), options)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        zip.write_all(activity.content())
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    }
-
-    let zip_data = zip
-        .finish()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .into_inner();
-
-    let response = Response::builder()
+    let response = match Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, "application/zip")
         .header(
@@ -62,9 +66,32 @@ pub async fn get_all_raw_activities<
             "attachment; filename=\"activities.zip\"",
         )
         .body(Body::from(zip_data))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    {
+        Ok(body) => body,
+        Err(err) => {
+            tracing::error!(
+                "Error while building raw activities body: {}",
+                err.to_string()
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     Ok(response)
+}
+
+/// Create a ZIP file containing all activities raw files
+fn zip_activities(activities: Vec<RawActivity>) -> Result<Vec<u8>, ZipError> {
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    for activity in activities {
+        zip.start_file(activity.name(), options)?;
+        zip.write_all(activity.content())?;
+    }
+
+    Ok(zip.finish()?.into_inner())
 }
 
 pub async fn get_raw_activity<
@@ -79,14 +106,18 @@ pub async fn get_raw_activity<
 ) -> Result<Response, StatusCode> {
     let request = GetRawActivityRequest::new(ActivityId::from(&activity), user.user().clone());
 
-    let activity = state
-        .activity_service
-        .get_raw_activity(request)
-        .await
-        .map_err(|err| match err {
-            GetRawActivityError::Unknown(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            GetRawActivityError::ActivityDoesNotExist(_) => StatusCode::NOT_FOUND,
-        })?;
+    let activity = match state.activity_service.get_raw_activity(request).await {
+        Ok(activity) => activity,
+        Err(GetRawActivityError::ActivityDoesNotExist(_)) => return Err(StatusCode::NOT_FOUND),
+        Err(GetRawActivityError::Unknown(err)) => {
+            tracing::error!(
+                "Error while getting raw activity {}: {}",
+                activity,
+                err.to_string()
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     let content_type = if activity.name().ends_with(".tcx") {
         "application/xml"
@@ -94,7 +125,7 @@ pub async fn get_raw_activity<
         "application/octet-stream"
     };
 
-    let response = Response::builder()
+    let response = match Response::builder()
         .status(StatusCode::OK)
         .header(CONTENT_TYPE, content_type)
         .header(
@@ -102,7 +133,16 @@ pub async fn get_raw_activity<
             format!("attachment; filename=\"{}\"", activity.name()),
         )
         .body(Body::from(activity.as_vec()))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    {
+        Ok(body) => body,
+        Err(err) => {
+            tracing::error!(
+                "Error while building raw activity body: {}",
+                err.to_string()
+            );
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     Ok(response)
 }

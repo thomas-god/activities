@@ -8,7 +8,8 @@ use crate::{
     domain::{
         models::activity::{ActivityId, DEFAULT_METRICS},
         ports::{
-            activity::IActivityService, preferences::IPreferencesService,
+            activity::{GetActivityError, IActivityService},
+            preferences::IPreferencesService,
             training::ITrainingService,
         },
     },
@@ -27,20 +28,27 @@ pub async fn get_activity<
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
-    let Ok((activity, metrics)) = state
+    match state
         .activity_service
         .get_activity_with_metrics_and_parsed_data(
             &ActivityId::from(&activity_id),
             &DEFAULT_METRICS,
         )
         .await
-    else {
-        return Err(StatusCode::NOT_FOUND);
-    };
-
-    Ok(Json(PublicActivityWithTimeseries::from(
-        &activity, &metrics,
-    )))
+    {
+        Ok((activity, metrics)) => Ok(Json(PublicActivityWithTimeseries::from(
+            &activity, &metrics,
+        ))),
+        Err(GetActivityError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
+        Err(GetActivityError::Unknown(err)) => {
+            tracing::error!(
+                "Error while getting activity {}: {}",
+                activity_id,
+                err.to_string()
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 #[cfg(test)]

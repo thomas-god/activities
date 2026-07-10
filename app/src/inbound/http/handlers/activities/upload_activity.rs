@@ -105,6 +105,9 @@ pub async fn upload_activities<
                 created_ids.push(activity.id().to_string());
             }
             Err(err) => {
+                if matches!(err, CreateActivityError::Unknown(_)) {
+                    tracing::error!("Error while creating new activity: {}", err.to_string());
+                }
                 unprocessable_files.push((name.to_string(), err.into()));
             }
         }
