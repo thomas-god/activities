@@ -1,7 +1,9 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
 use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    activity::IActivityService,
+    preferences::{IPreferencesService, SetPreferenceError},
+    training::ITrainingService,
 };
 use crate::inbound::parser::ParseFile;
 use crate::{
@@ -23,10 +25,17 @@ pub async fn set_preference<
 ) -> Result<StatusCode, StatusCode> {
     let preference = Preference::from(request);
 
-    state
+    match state
         .preferences_service
         .set_preference(user.user(), preference)
         .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(StatusCode::from)
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, SetPreferenceError::Unknown(_)) {
+                tracing::error!("Error setting preference: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }

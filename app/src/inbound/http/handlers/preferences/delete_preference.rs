@@ -8,7 +8,9 @@ use crate::inbound::parser::ParseFile;
 use crate::{domain::models::preferences::PreferenceKey, inbound::http::AppState};
 use crate::{
     domain::ports::{
-        activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+        activity::IActivityService,
+        preferences::{DeletePreferenceError, IPreferencesService},
+        training::ITrainingService,
     },
     inbound::auth::AuthenticatedUser,
 };
@@ -27,10 +29,17 @@ pub async fn delete_preference<
         .parse::<PreferenceKey>()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    state
+    match state
         .preferences_service
         .delete_preference(user.user(), &preference_key)
         .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(StatusCode::from)
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, DeletePreferenceError::Unknown(_)) {
+                tracing::error!("Error deleting preference: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }

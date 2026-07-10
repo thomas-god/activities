@@ -5,7 +5,9 @@ use axum::{
 };
 
 use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    activity::IActivityService,
+    preferences::{GetPreferenceError, IPreferencesService},
+    training::ITrainingService,
 };
 use crate::inbound::parser::ParseFile;
 use crate::{
@@ -29,10 +31,17 @@ pub async fn get_preference<
         .parse::<PreferenceKey>()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    state
+    match state
         .preferences_service
         .get_preference(user.user(), &preference_key)
         .await
-        .map(|pref| Json(pref.map(PreferenceResponse::from)))
-        .map_err(StatusCode::from)
+    {
+        Ok(pref) => Ok(Json(pref.map(PreferenceResponse::from))),
+        Err(err) => {
+            if matches!(&err, GetPreferenceError::Unknown(_)) {
+                tracing::error!("Error getting preference: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }

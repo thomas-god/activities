@@ -1,7 +1,9 @@
 use axum::{Extension, Json, extract::State, http::StatusCode};
 
 use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    activity::IActivityService,
+    preferences::{GetPreferenceError, IPreferencesService},
+    training::ITrainingService,
 };
 use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
 
@@ -16,10 +18,19 @@ pub async fn get_all_preferences<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
 ) -> Result<Json<Vec<PreferenceResponse>>, StatusCode> {
-    state
+    match state
         .preferences_service
         .get_all_preferences(user.user())
         .await
-        .map(|prefs| Json(prefs.into_iter().map(PreferenceResponse::from).collect()))
-        .map_err(StatusCode::from)
+    {
+        Ok(prefs) => Ok(Json(
+            prefs.into_iter().map(PreferenceResponse::from).collect(),
+        )),
+        Err(err) => {
+            if matches!(&err, GetPreferenceError::Unknown(_)) {
+                tracing::error!("Error getting all preferences: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
