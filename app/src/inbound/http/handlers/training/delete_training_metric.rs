@@ -37,10 +37,13 @@ pub async fn delete_training_metric<
 ) -> Result<StatusCode, StatusCode> {
     let req =
         DeleteTrainingMetricRequest::new(user.user().clone(), TrainingMetricId::from(&metric_id));
-    state
-        .training_metrics_service
-        .delete_metric(req)
-        .await
-        .map(|_| StatusCode::OK)
-        .map_err(StatusCode::from)
+    match state.training_metrics_service.delete_metric(req).await {
+        Ok(_) => Ok(StatusCode::OK),
+        Err(err) => {
+            if matches!(&err, DeleteTrainingMetricError::Unknown(_)) {
+                tracing::error!("Error deleting training metric: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }

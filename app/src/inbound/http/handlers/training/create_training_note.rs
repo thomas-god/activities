@@ -56,16 +56,21 @@ pub async fn create_training_note<
 ) -> Result<Json<CreateTrainingNoteResponse>, StatusCode> {
     let req = build_request(payload, user.user())?;
 
-    state
+    match state
         .training_metrics_service
         .create_training_note(req)
         .await
-        .map(|note_id| {
-            Json(CreateTrainingNoteResponse {
-                id: note_id.to_string(),
-            })
-        })
-        .map_err(StatusCode::from)
+    {
+        Ok(note_id) => Ok(Json(CreateTrainingNoteResponse {
+            id: note_id.to_string(),
+        })),
+        Err(err) => {
+            if matches!(&err, CreateTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error creating training note: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
 
 #[cfg(test)]

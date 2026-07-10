@@ -77,12 +77,21 @@ pub async fn get_training_notes<
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
     let date_range = Option::<DateRange>::from(&query);
 
-    state
+    match state
         .training_metrics_service
         .get_training_notes(user.user(), &date_range)
         .await
-        .map(|notes| Json(notes.into_iter().map(TrainingNoteResponse::from).collect()))
-        .map_err(StatusCode::from)
+    {
+        Ok(notes) => Ok(Json(
+            notes.into_iter().map(TrainingNoteResponse::from).collect(),
+        )),
+        Err(err) => {
+            if matches!(&err, GetTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error getting training notes: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
 
 /// Get all training notes for a specific training period.
@@ -101,10 +110,19 @@ pub async fn get_training_period_notes<
 ) -> Result<Json<Vec<TrainingNoteResponse>>, StatusCode> {
     let period_id = TrainingPeriodId::from(&period_id);
 
-    state
+    match state
         .training_metrics_service
         .get_training_period_notes(user.user(), &period_id)
         .await
-        .map(|notes| Json(notes.into_iter().map(TrainingNoteResponse::from).collect()))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    {
+        Ok(notes) => Ok(Json(
+            notes.into_iter().map(TrainingNoteResponse::from).collect(),
+        )),
+        Err(err) => {
+            if matches!(&err, GetTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error getting training period notes: {}", err.to_string());
+            }
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }

@@ -91,17 +91,18 @@ pub async fn create_training_metric<
         )
     })?;
 
-    state
-        .training_metrics_service
-        .create_metric(req)
-        .await
-        .map(|_| StatusCode::CREATED)
-        .map_err(|e| {
-            (
-                StatusCode::from(e),
+    match state.training_metrics_service.create_metric(req).await {
+        Ok(_) => Ok(StatusCode::CREATED),
+        Err(err) => {
+            if matches!(&err, CreateTrainingMetricError::Unknown(_)) {
+                tracing::error!("Error creating training metric: {}", err.to_string());
+            }
+            Err((
+                StatusCode::from(err),
                 Json(serde_json::json!({ "error": "Failed to create training metric" })),
-            )
-        })
+            ))
+        }
+    }
 }
 
 #[cfg(test)]

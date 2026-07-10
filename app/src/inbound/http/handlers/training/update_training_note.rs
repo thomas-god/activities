@@ -46,12 +46,19 @@ pub async fn update_training_note<
     let content = TrainingNoteContent::from(payload.content);
     let date = TrainingNoteDate::try_from(payload.date).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    state
+    match state
         .training_metrics_service
         .update_training_note(user.user(), &note_id, title, content, date)
         .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(StatusCode::from)
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, UpdateTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error updating training note: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
 
 #[cfg(test)]

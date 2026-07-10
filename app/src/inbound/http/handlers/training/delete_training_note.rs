@@ -34,10 +34,17 @@ pub async fn delete_training_note<
 ) -> Result<StatusCode, StatusCode> {
     let note_id = TrainingNoteId::from(note_id.as_str());
 
-    state
+    match state
         .training_metrics_service
         .delete_training_note(user.user(), &note_id)
         .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(StatusCode::from)
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, DeleteTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error deleting training note: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }

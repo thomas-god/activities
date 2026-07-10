@@ -67,17 +67,22 @@ pub async fn create_training_period<
 ) -> Result<(StatusCode, Json<CreateTrainingPeriodResponse>), StatusCode> {
     let req = build_request(payload, user.user());
 
-    state
+    match state
         .training_metrics_service
         .create_training_period(req)
         .await
-        .map(|id| {
-            (
-                StatusCode::CREATED,
-                Json(CreateTrainingPeriodResponse { id: id.to_string() }),
-            )
-        })
-        .map_err(StatusCode::from)
+    {
+        Ok(id) => Ok((
+            StatusCode::CREATED,
+            Json(CreateTrainingPeriodResponse { id: id.to_string() }),
+        )),
+        Err(err) => {
+            if matches!(&err, CreateTrainingPeriodError::Unknown(_)) {
+                tracing::error!("Error creating training period: {}", err.to_string());
+            }
+            Err(StatusCode::from(err))
+        }
+    }
 }
 
 #[cfg(test)]

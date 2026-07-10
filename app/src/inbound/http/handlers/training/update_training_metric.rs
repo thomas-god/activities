@@ -57,9 +57,14 @@ pub async fn update_training_metric<
         .update_training_metric(request)
         .await
     {
-        Err(UpdateTrainingMetricError::MetricDoesNotExist(_)) => StatusCode::NOT_FOUND,
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         Ok(_) => StatusCode::CREATED,
+        Err(UpdateTrainingMetricError::MetricDoesNotExist(_)) => StatusCode::NOT_FOUND,
+        Err(err) => {
+            if matches!(&err, UpdateTrainingMetricError::Unknown(_)) {
+                tracing::error!("Error updating training metric: {}", err.to_string());
+            }
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 

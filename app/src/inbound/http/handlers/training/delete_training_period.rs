@@ -10,8 +10,8 @@ use crate::domain::ports::training::{DeleteTrainingPeriodError, DeleteTrainingPe
 use crate::domain::ports::{
     activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
 };
-use crate::inbound::http::AppState;
 use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]
@@ -47,12 +47,15 @@ pub async fn delete_training_period<
             }),
         )
             .into_response(),
-        Err(DeleteTrainingPeriodError::Unknown(_)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(ErrorResponse {
-                error: "Internal server error".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(DeleteTrainingPeriodError::Unknown(e)) => {
+            tracing::error!("Error deleting training period: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(ErrorResponse {
+                    error: "Internal server error".to_string(),
+                }),
+            )
+                .into_response()
+        }
     }
 }

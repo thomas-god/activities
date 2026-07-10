@@ -15,8 +15,8 @@ use crate::domain::ports::training::{
     UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
     UpdateTrainingPeriodNoteRequest,
 };
-use crate::inbound::http::AppState;
 use crate::inbound::auth::AuthenticatedUser;
+use crate::inbound::http::AppState;
 use crate::inbound::parser::ParseFile;
 
 #[derive(Serialize)]
@@ -66,7 +66,7 @@ pub async fn update_training_period<
                     .into_response();
             }
             Err(UpdateTrainingPeriodNameError::Unknown(e)) => {
-                eprintln!("Error updating training period name: {:?}", e);
+                tracing::error!("Error updating training period name: {:?}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(ErrorResponse {
@@ -99,7 +99,7 @@ pub async fn update_training_period<
                     .into_response();
             }
             Err(UpdateTrainingPeriodNoteError::Unknown(e)) => {
-                eprintln!("Error updating training period note: {:?}", e);
+                tracing::error!("Error updating training period note: {:?}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(ErrorResponse {
@@ -148,7 +148,7 @@ pub async fn update_training_period<
                     .into_response();
             }
             Err(UpdateTrainingPeriodDatesError::Unknown(e)) => {
-                eprintln!("Error updating training period dates: {:?}", e);
+                tracing::error!("Error updating training period dates: {:?}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(ErrorResponse {

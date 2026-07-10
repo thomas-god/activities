@@ -70,7 +70,7 @@ fn handle_error(error: CopyTrainingMetricError) -> Response {
         )
             .into_response(),
         CopyTrainingMetricError::SaveMetricError(e) => {
-            eprintln!("Error saving copied training metric: {:?}", e);
+            tracing::error!("Error saving copied training metric: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(ErrorResponse {
@@ -80,7 +80,7 @@ fn handle_error(error: CopyTrainingMetricError) -> Response {
                 .into_response()
         }
         CopyTrainingMetricError::Unknown(e) => {
-            eprintln!("Error copying training metric: {:?}", e);
+            tracing::error!("Error copying training metric: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(ErrorResponse {

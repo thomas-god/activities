@@ -9,8 +9,9 @@ use crate::{
     domain::{
         models::training::TrainingMetricId,
         ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{GetTrainingMetricsOrderingError, ITrainingService},
         },
     },
     inbound::{
@@ -46,16 +47,27 @@ pub async fn get_training_metrics_ordering<
 ) -> Result<Json<GetTrainingMetricsOrderingResponse>, (StatusCode, Json<serde_json::Value>)> {
     let scope = query.scope.into();
 
-    let ordering = state
+    let ordering = match state
         .training_metrics_service
         .get_training_metrics_ordering(user.user(), &scope)
         .await
-        .map_err(|e| {
-            (
+    {
+        Ok(ordering) => ordering,
+        Err(err) => {
+            if matches!(&err, GetTrainingMetricsOrderingError::Unknown(_)) {
+                tracing::error!(
+                    "Error getting training metrics ordering: {}",
+                    err.to_string()
+                );
+            }
+            return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": format!("Failed to get metrics ordering: {}", e) })),
-            )
-        })?;
+                Json(
+                    serde_json::json!({ "error": format!("Failed to get metrics ordering: {}", err) }),
+                ),
+            ));
+        }
+    };
 
     Ok(Json(GetTrainingMetricsOrderingResponse {
         metric_ids: ordering.ids().iter().map(|id| id.to_string()).collect(),

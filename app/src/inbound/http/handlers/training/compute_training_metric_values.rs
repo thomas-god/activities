@@ -18,7 +18,8 @@ use crate::{
             activity::IActivityService,
             preferences::IPreferencesService,
             training::{
-                ComputeTrainingMetricValuesError, GetTrainingMetricValuesRequest, ITrainingService,
+                ComputeTrainingMetricValuesError, GetTrainingMetricValuesError,
+                GetTrainingMetricValuesRequest, ITrainingService,
             },
         },
     },
@@ -126,11 +127,22 @@ pub async fn compute_training_metric_values<
         summary: request.summary.into(),
     };
 
-    let values = state
+    let values = match state
         .training_metrics_service
         .get_training_metric_values(req, &date_range)
         .await
-        .map_err(StatusCode::from)?;
+    {
+        Ok(values) => values,
+        Err(err) => {
+            if matches!(&err, GetTrainingMetricValuesError::Unknown(_)) {
+                tracing::error!(
+                    "Error computing training metric values: {}",
+                    err.to_string()
+                );
+            }
+            return Err(StatusCode::from(err));
+        }
+    };
 
     let values = convert_metric_values_unit(group_metric_values(values));
     let values = match window.as_ref() {

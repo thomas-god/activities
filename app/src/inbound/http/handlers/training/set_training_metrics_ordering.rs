@@ -5,8 +5,9 @@ use crate::{
     domain::{
         models::training::{TrainingMetricId, TrainingMetricsOrdering},
         ports::{
-            activity::IActivityService, preferences::IPreferencesService,
-            training::ITrainingService,
+            activity::IActivityService,
+            preferences::IPreferencesService,
+            training::{ITrainingService, SetTrainingMetricsOrderingError},
         },
     },
     inbound::{
@@ -50,17 +51,27 @@ pub async fn set_training_metrics_ordering<
         )
     })?;
 
-    state
+    match state
         .training_metrics_service
         .set_training_metrics_ordering(user.user(), &scope, ordering)
         .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(|e| {
-            (
+    {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(err) => {
+            if matches!(&err, SetTrainingMetricsOrderingError::Unknown(_)) {
+                tracing::error!(
+                    "Error setting training metrics ordering: {}",
+                    err.to_string()
+                );
+            }
+            Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": format!("Failed to set metrics ordering: {}", e) })),
-            )
-        })
+                Json(
+                    serde_json::json!({ "error": format!("Failed to set metrics ordering: {}", err) }),
+                ),
+            ))
+        }
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,9 @@ use axum::{
 };
 
 use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    activity::IActivityService,
+    preferences::IPreferencesService,
+    training::{GetTrainingNoteError, ITrainingService},
 };
 use crate::inbound::parser::ParseFile;
 use crate::{
@@ -27,11 +29,20 @@ pub async fn get_training_note<
 ) -> Result<Json<TrainingNoteResponse>, StatusCode> {
     let note_id = TrainingNoteId::from(note_id.as_str());
 
-    state
+    let note = match state
         .training_metrics_service
         .get_training_note(user.user(), &note_id)
         .await
-        .map_err(StatusCode::from)?
-        .map(|note| Json(TrainingNoteResponse::from(note)))
+    {
+        Ok(note) => note,
+        Err(err) => {
+            if matches!(&err, GetTrainingNoteError::Unknown(_)) {
+                tracing::error!("Error getting training note: {}", err.to_string());
+            }
+            return Err(StatusCode::from(err));
+        }
+    };
+
+    note.map(|note| Json(TrainingNoteResponse::from(note)))
         .ok_or(StatusCode::NOT_FOUND)
 }

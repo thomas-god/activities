@@ -218,14 +218,23 @@ pub async fn get_training_metrics<
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Query(query): Query<MetricsQuery>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let res = state
+    let res = match state
         .training_metrics_service
         .get_training_metrics_values(
             user.user(),
             &DateRange::from(query.date_range()),
             &query.scope(),
         )
-        .await?;
+        .await
+    {
+        Ok(values) => values,
+        Err(err) => {
+            if matches!(&err, GetTrainingMetricValuesError::Unknown(_)) {
+                tracing::error!("Error getting training metric values: {}", err.to_string());
+            }
+            return Err(StatusCode::from(err));
+        }
+    };
 
     let body = ResponseBody(
         res.into_iter()
