@@ -21,7 +21,7 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::email_based::IUserService;
 use crate::inbound::auth::infra::add_auth_router;
-use crate::inbound::http::handlers::get_training_metric_templates;
+use crate::inbound::http::handlers::{get_default_activity_metrics, get_training_metric_templates};
 use crate::inbound::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
@@ -84,7 +84,7 @@ pub struct HttpServer<AS, PF, TMS, UR, PS> {
     router: axum::Router,
     listener: net::TcpListener,
     _marker_activity: PhantomData<AS>,
-    _marker_paser: PhantomData<PF>,
+    _marker_parser: PhantomData<PF>,
     _marker_training_metrics: PhantomData<TMS>,
     _marker_user_service: PhantomData<UR>,
     _marker_preferences_service: PhantomData<PS>,
@@ -152,7 +152,7 @@ impl<
             router,
             listener,
             _marker_activity: PhantomData,
-            _marker_paser: PhantomData,
+            _marker_parser: PhantomData,
             _marker_training_metrics: PhantomData,
             _marker_user_service: PhantomData,
             _marker_preferences_service: PhantomData,
@@ -214,6 +214,10 @@ where
         .route(
             "/activity/{activity_id}",
             delete(delete_activity::<AS, PF, TS, PS>),
+        )
+        .route(
+            "/activity/default_metrics",
+            get(get_default_activity_metrics),
         )
         .route(
             "/training/metrics",

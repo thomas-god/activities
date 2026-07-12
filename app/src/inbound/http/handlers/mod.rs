@@ -6,7 +6,8 @@ mod training;
 
 pub(super) use activities::{
     create_standalone_activity, delete_activity, get_activity, get_all_raw_activities,
-    get_raw_activity, list_activities, patch_activity, upload_activities,
+    get_default_activity_metrics, get_raw_activity, list_activities, patch_activity,
+    upload_activities,
 };
 pub(super) use preferences::{
     delete_preference, get_all_preferences, get_preference, set_preference,
