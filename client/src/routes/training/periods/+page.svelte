@@ -13,14 +13,17 @@
 
 <div class="mx-auto flex flex-col gap-4 pt-5">
 	<div class="rounded-box bg-base-100 shadow-md">
-		<div class="p-2 px-4 text-sm tracking-wide italic opacity-60">
-			Training periods are spans of time with a specific training focus (base training, race, etc.)
+		<div class="p-4 text-sm tracking-wide italic opacity-60">
+			Training periods are spans of time with a specific training focus (base training, race
+			preparation, etc.)
 		</div>
 		<div class="mb-2 flex flex-col gap-2 px-2">
 			{#each periods as period}
 				<TrainingPeriodCard {period} />
 			{:else}
-				<div class="text-center text-sm italic tracking-wide opacity-60">No training periods</div>
+				<div class="text-center text-sm italic tracking-wide opacity-60">
+					No training periods found
+				</div>
 			{/each}
 		</div>
 	</div>
