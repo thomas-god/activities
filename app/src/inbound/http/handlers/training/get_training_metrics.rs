@@ -33,7 +33,7 @@ use crate::{
         http::{
             AppState,
             handlers::training::{
-                types::ScopePayload,
+                types::APITrainingMetricScope,
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
                     convert_metric_values_unit, fill_missing_granules, group_metric_values,
@@ -138,7 +138,7 @@ pub struct ResponseBodyItem {
     show_average: Option<TrainingMetricSummaryAverage>,
     values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
-    scope: ScopePayload,
+    scope: APITrainingMetricScope,
     summary: HashMap<String, f64>,
 }
 
@@ -382,7 +382,7 @@ mod tests {
                 HashMap::from([("2025-09-24".to_string(), 10.5)]),
             )]),
             group_by: Some("Sport".to_string()),
-            scope: ScopePayload::TrainingPeriod {
+            scope: APITrainingMetricScope::TrainingPeriod {
                 training_period_id: "period-1".to_string(),
             },
             summary: HashMap::new(),

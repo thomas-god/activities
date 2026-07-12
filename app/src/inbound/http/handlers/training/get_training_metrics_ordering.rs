@@ -16,7 +16,7 @@ use crate::{
     },
     inbound::{
         auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::ScopePayload},
+        http::{AppState, handlers::training::types::APITrainingMetricScope},
         parser::ParseFile,
     },
 };
@@ -24,7 +24,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct GetTrainingMetricsOrderingQuery {
     #[serde(flatten)]
-    scope: ScopePayload,
+    scope: APITrainingMetricScope,
 }
 
 #[derive(Debug, Serialize)]

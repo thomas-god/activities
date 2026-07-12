@@ -20,7 +20,7 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
-    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, ScopePayload,
+    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, APITrainingMetricScope,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_scope_payload_conversion_to_global() {
-        let payload = ScopePayload::Global;
+        let payload = APITrainingMetricScope::Global;
         let scope: TrainingMetricScope = payload.into();
         assert!(matches!(scope, TrainingMetricScope::Global));
     }

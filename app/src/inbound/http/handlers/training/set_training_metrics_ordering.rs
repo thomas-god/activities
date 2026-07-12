@@ -12,7 +12,7 @@ use crate::{
     },
     inbound::{
         auth::AuthenticatedUser,
-        http::{AppState, handlers::training::types::ScopePayload},
+        http::{AppState, handlers::training::types::APITrainingMetricScope},
         parser::ParseFile,
     },
 };
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct SetTrainingMetricsOrderingBody {
     #[serde(flatten)]
-    scope: ScopePayload,
+    scope: APITrainingMetricScope,
     metric_ids: Vec<String>,
 }
 
@@ -87,7 +87,7 @@ mod tests {
         let body: SetTrainingMetricsOrderingBody = serde_json::from_str(json).unwrap();
 
         assert_eq!(body.metric_ids, vec!["metric-1", "metric-2", "metric-3"]);
-        if let ScopePayload::Global = body.scope {
+        if let APITrainingMetricScope::Global = body.scope {
             // Success
         } else {
             panic!("Expected Global scope");
@@ -104,7 +104,7 @@ mod tests {
         let body: SetTrainingMetricsOrderingBody = serde_json::from_str(json).unwrap();
 
         assert_eq!(body.metric_ids, vec!["metric-1", "metric-2"]);
-        if let ScopePayload::TrainingPeriod { training_period_id } = body.scope {
+        if let APITrainingMetricScope::TrainingPeriod { training_period_id } = body.scope {
             assert_eq!(training_period_id, "123e4567-e89b-12d3-a456-426614174000");
         } else {
             panic!("Expected TrainingPeriod scope");
@@ -120,7 +120,7 @@ mod tests {
         let body: SetTrainingMetricsOrderingBody = serde_json::from_str(json).unwrap();
 
         assert_eq!(body.metric_ids, Vec::<String>::new());
-        if let ScopePayload::Global = body.scope {
+        if let APITrainingMetricScope::Global = body.scope {
             // Success
         } else {
             panic!("Expected Global scope");

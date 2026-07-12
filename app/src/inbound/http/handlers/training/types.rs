@@ -238,7 +238,7 @@ impl From<APITrainingPeriodSports> for TrainingPeriodSports {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum ScopePayload {
+pub enum APITrainingMetricScope {
     Global,
     #[serde(rename_all = "camelCase")]
     TrainingPeriod {
@@ -246,22 +246,22 @@ pub enum ScopePayload {
     },
 }
 
-impl From<ScopePayload> for TrainingMetricScope {
-    fn from(payload: ScopePayload) -> Self {
+impl From<APITrainingMetricScope> for TrainingMetricScope {
+    fn from(payload: APITrainingMetricScope) -> Self {
         match payload {
-            ScopePayload::Global => TrainingMetricScope::Global,
-            ScopePayload::TrainingPeriod { training_period_id } => {
+            APITrainingMetricScope::Global => TrainingMetricScope::Global,
+            APITrainingMetricScope::TrainingPeriod { training_period_id } => {
                 TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from(&training_period_id))
             }
         }
     }
 }
 
-impl From<&TrainingMetricScope> for ScopePayload {
+impl From<&TrainingMetricScope> for APITrainingMetricScope {
     fn from(value: &TrainingMetricScope) -> Self {
         match value {
-            TrainingMetricScope::Global => ScopePayload::Global,
-            TrainingMetricScope::TrainingPeriod(period) => ScopePayload::TrainingPeriod {
+            TrainingMetricScope::Global => APITrainingMetricScope::Global,
+            TrainingMetricScope::TrainingPeriod(period) => APITrainingMetricScope::TrainingPeriod {
                 training_period_id: period.to_string(),
             },
         }

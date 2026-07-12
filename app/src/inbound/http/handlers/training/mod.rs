@@ -15,7 +15,7 @@ mod get_training_notes;
 mod get_training_period;
 mod get_training_periods;
 mod set_training_metrics_ordering;
-mod types;
+pub mod types;
 mod update_training_metric;
 mod update_training_note;
 mod update_training_period;
