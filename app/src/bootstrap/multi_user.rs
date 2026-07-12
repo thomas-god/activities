@@ -53,7 +53,7 @@ pub async fn bootstrap_multi_user(
     // start tracing
     let subscriber = tracing_subscriber::fmt()
         .compact()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)

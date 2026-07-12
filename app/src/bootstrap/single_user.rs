@@ -41,7 +41,7 @@ pub async fn bootstrap_single_user(
         PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
-    tracing::info!("Starting multi-user app");
+    tracing::info!("Starting single-user app");
     // start tracing
     let subscriber = tracing_subscriber::fmt()
         .compact()
