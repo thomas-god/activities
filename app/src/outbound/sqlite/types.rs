@@ -11,7 +11,7 @@ use crate::domain::models::{
         ActivityStatistic, ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric,
         WorkoutType,
     },
-    preferences::{Preference, PreferenceKey},
+    preferences::{ActivityListSummary, Preference, PreferenceKey},
     training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSummary,
@@ -689,6 +689,9 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for PreferenceKey {
 pub fn serialize_preference_value(preference: &Preference) -> Result<String, BoxDynError> {
     match preference {
         Preference::FavoriteMetric(id) => Ok(id.to_string()),
+        Preference::ActivityListSummary(summary) => {
+            serde_json::to_string(summary).map_err(|err| err.to_string().into())
+        }
     }
 }
 
@@ -698,6 +701,10 @@ pub fn deserialize_preference(key: &PreferenceKey, value: &str) -> Result<Prefer
         PreferenceKey::FavoriteMetric => {
             let id = TrainingMetricId::from(value);
             Ok(Preference::FavoriteMetric(id))
+        }
+        PreferenceKey::ActivityListSummary => {
+            let summary = serde_json::from_str::<ActivityListSummary>(value)?;
+            Ok(Preference::ActivityListSummary(summary))
         }
     }
 }

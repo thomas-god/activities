@@ -328,7 +328,7 @@ impl TrainingMetricPatch {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrainingMetricScope {
     Global,
     TrainingPeriod(TrainingPeriodId),
@@ -967,7 +967,7 @@ impl std::iter::IntoIterator for TrainingMetricValues {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, AsRef, Hash, Serialize, Deserialize)]
 pub struct TrainingPeriodId(String);
 
 impl TrainingPeriodId {
