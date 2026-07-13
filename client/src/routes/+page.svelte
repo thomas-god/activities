@@ -15,6 +15,8 @@
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
 	import { dayjs } from '$lib/duration';
 	import { some } from '$lib/Options';
+	import ActivityListSummaryDialog from '$components/organisms/ActivityListSummaryDialog.svelte';
+	import { setPreference, type ActivityListSummaryItems, type PreferencePayload } from '$lib/api';
 
 	let { data }: PageProps = $props();
 
@@ -23,6 +25,8 @@
 	let selectedActivityPromise: Promise<ActivityWithTimeseries | null> | null = $state(null);
 	let selectedActivityId: string | null = $state(null);
 	let screenWidth = $state(0);
+	// TODO: add button to display modal
+	let activityListSummaryOpen = $state(false);
 
 	const startDate = dayjs().startOf('isoWeek').subtract(3, 'weeks').toISOString();
 	const endDate = dayjs().add(1, 'day').endOf('day').toISOString();
@@ -50,6 +54,23 @@
 		// udpate activities locally
 		data.activities.then((a) => (activities = a));
 	});
+
+	let activityListSummaryDialogElement: HTMLDialogElement;
+
+	const updateActivityListSummary = async (items: ActivityListSummaryItems): Promise<boolean> => {
+		const payload: PreferencePayload = {
+			key: 'activity_list_summary',
+			value: {
+				scope: { type: 'global' },
+				items
+			}
+		};
+
+		return setPreference(fetch, payload).then((res) => {
+			invalidate('app:activities');
+			return res;
+		});
+	};
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -58,7 +79,14 @@
 	invalidateActivities={() => invalidate('app:activities')}
 	invalidateTrainingNotes={() => invalidate('app:training-notes')}
 />
-
+{#await Promise.all( [data.defaultMetrics, data.activityListSummary] ) then [defaultMetrics, currentPreference]}
+	<ActivityListSummaryDialog
+		{defaultMetrics}
+		{currentPreference}
+		onSave={updateActivityListSummary}
+		bind:isOpen={activityListSummaryOpen}
+	/>
+{/await}
 <div class="homepage_container">
 	{#await data.trainingPeriods}
 		<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
@@ -178,6 +206,8 @@
 		</div>
 	{/if}
 </div>
+
+<dialog class="modal" bind:this={activityListSummaryDialogElement}></dialog>
 
 <style>
 	.homepage_container {
