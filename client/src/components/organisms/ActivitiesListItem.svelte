@@ -79,7 +79,7 @@
 					{#if metric !== undefined}
 						<span class="font-semibold sm:text-lg">
 							{#if metric.unit === 's'}
-								{formatDuration(activity.metrics[row.value].value ?? 0)}
+								{formatDuration(metric.value)}
 							{:else}
 								{metric.value.toFixed(0)} {metric.unit}
 							{/if}

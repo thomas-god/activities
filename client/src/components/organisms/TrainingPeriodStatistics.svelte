@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TrainingPeriodDetails } from '$lib/api';
-	import { dayjs, formatDurationHoursMinutes } from '$lib/duration';
+	import { formatDurationHoursMinutes } from '$lib/duration';
 
 	interface Props {
 		period: TrainingPeriodDetails;
@@ -17,13 +17,21 @@
 		};
 
 		for (const activity of period.activities) {
-			total.duration += activity.metrics['ActiveDuration'].value ?? 0;
-			total.distance += activity.metrics['Distance'].value ?? 0;
-			total.elevation += activity.metrics['Elevation'].value ?? 0;
+			total.duration += getMetricValue(activity.metrics, 'ActiveDuration');
+			total.distance += getMetricValue(activity.metrics, 'Distance');
+			total.elevation += getMetricValue(activity.metrics, 'Elevation');
 		}
 
 		return total;
 	});
+
+	const getMetricValue = (metrics: Record<string, { value: number }>, key: string): number => {
+		const metric = metrics[key];
+		if (metric === undefined) {
+			return 0;
+		}
+		return metric.value;
+	};
 
 	const formatDistance = (meters: number): string => {
 		if (meters === 0) return '0 km';

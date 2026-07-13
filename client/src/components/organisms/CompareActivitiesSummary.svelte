@@ -99,9 +99,9 @@
 				legend: 'avg / max',
 				values: activities.map((a) => {
 					const avg = a.metrics['AvgHeartRate'].value;
-					const max = a.metrics['MaxHeartRate'].value;
+					const max = a.metrics['MaxHeartRate'];
 					if (avg !== undefined && max !== undefined)
-						return `${avg.toFixed(0)} / ${max.toFixed(0)}`;
+						return `${avg.toFixed(0)} / ${max.value.toFixed(0)}`;
 					if (avg !== undefined) return avg.toFixed(0);
 					return undefined;
 				})
@@ -115,8 +115,9 @@
 				legend: 'avg / normalized',
 				values: activities.map((a) => {
 					const avg = a.metrics['AvgPower'].value;
-					const np = a.metrics['NormalizedPower'].value;
-					if (avg !== undefined && np !== undefined) return `${avg.toFixed(0)} / ${np.toFixed(0)}`;
+					const np = a.metrics['NormalizedPower'];
+					if (avg !== undefined && np !== undefined)
+						return `${avg.toFixed(0)} / ${np.value.toFixed(0)}`;
 					if (avg !== undefined) return avg.toFixed(0);
 					return undefined;
 				})
