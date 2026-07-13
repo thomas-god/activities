@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PreferenceResponseSchema } from './preferences';
+import { PreferenceSchema } from './preferences';
 
 describe('PreferenceResponse Schema', () => {
 	it('should parse favorite_metric preference', () => {
@@ -8,7 +8,7 @@ describe('PreferenceResponse Schema', () => {
 			value: 'metric-123'
 		};
 
-		const result = PreferenceResponseSchema.parse(data);
+		const result = PreferenceSchema.parse(data);
 		expect(result.key).toBe('favorite_metric');
 		expect(result.value).toBe('metric-123');
 	});
@@ -19,7 +19,7 @@ describe('PreferenceResponse Schema', () => {
 			value: 'some-value'
 		};
 
-		expect(() => PreferenceResponseSchema.parse(data)).toThrow();
+		expect(() => PreferenceSchema.parse(data)).toThrow();
 	});
 
 	it('should reject missing value', () => {
@@ -27,6 +27,6 @@ describe('PreferenceResponse Schema', () => {
 			key: 'favorite_metric'
 		};
 
-		expect(() => PreferenceResponseSchema.parse(data)).toThrow();
+		expect(() => PreferenceSchema.parse(data)).toThrow();
 	});
 });

@@ -1,31 +1,43 @@
 import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
+import { none, some, type Option } from '$lib/Options';
 
 // =============================================================================
 // Schemas
 // =============================================================================
 
-export const PreferenceResponseSchema = z.discriminatedUnion('key', [
+export const PreferenceSchema = z.discriminatedUnion('key', [
 	z.object({
 		key: z.literal('favorite_metric'),
 		value: z.string()
+	}),
+	z.object({
+		key: z.literal('activity_list_summary'),
+		value: z.object({
+			scope: z.discriminatedUnion('type', [
+				z.object({ type: z.literal('global') }),
+				z.object({ type: z.literal('trainingPeriod'), trainingPeriodId: z.string() })
+			]),
+			items: z.array(
+				z.discriminatedUnion('type', [
+					z.object({ type: z.literal('metric'), value: z.string() }),
+					z.object({ type: z.literal('rpe') }),
+					z.object({ type: z.literal('workoutType') })
+				])
+			)
+		})
 	})
 ]);
 
-export const PreferencesListSchema = z.array(PreferenceResponseSchema);
+export const PreferencesListSchema = z.array(PreferenceSchema);
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export type PreferenceResponse = z.infer<typeof PreferenceResponseSchema>;
+export type PreferencePayload = z.infer<typeof PreferenceSchema>;
 export type PreferencesList = z.infer<typeof PreferencesListSchema>;
-
-export type SetPreferenceRequest = {
-	key: 'favorite_metric';
-	value: string;
-};
 
 // =============================================================================
 // API Functions
@@ -57,6 +69,23 @@ export async function fetchAllPreferences(
 	return [];
 }
 
+export type ActivityListSummaryItems = Extract<
+	PreferencePayload,
+	{ key: 'activity_list_summary' }
+>['value']['items'];
+
+export const fetchActivityListSummary = async (
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<Option<ActivityListSummaryItems>> => {
+	const preferences = await fetchAllPreferences(fetch);
+	const preference = preferences.find((pref) => pref.key === 'activity_list_summary');
+	if (preference === undefined) {
+		// Default activity list summary
+		return some([{ type: 'workoutType' }, { type: 'rpe' }, { type: 'metric', value: 'Duration' }]);
+	}
+	return some(preference.value.items);
+};
+
 /**
  * Fetch a specific preference by key
  * @param fetch - The fetch function from SvelteKit
@@ -65,8 +94,8 @@ export async function fetchAllPreferences(
  */
 export async function fetchPreference(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	key: string
-): Promise<PreferenceResponse | null> {
+	key: PreferencePayload['key']
+): Promise<Option<PreferencePayload>> {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/preferences/${key}`, {
 		method: 'GET',
 		mode: 'cors',
@@ -75,18 +104,18 @@ export async function fetchPreference(
 
 	if (res.status === 401) {
 		goto('/login');
-		return null;
+		return none();
 	}
 
 	if (res.status === 200) {
 		const data = await res.json();
 		if (data === null) {
-			return null;
+			return none();
 		}
-		return PreferenceResponseSchema.parse(data);
+		return some(PreferenceSchema.parse(data));
 	}
 
-	return null;
+	return none();
 }
 
 /**
@@ -97,7 +126,7 @@ export async function fetchPreference(
  */
 export async function setPreference(
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	preference: SetPreferenceRequest
+	preference: PreferencePayload
 ): Promise<boolean> {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/preferences`, {
 		method: 'POST',

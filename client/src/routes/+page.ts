@@ -1,5 +1,10 @@
 import type { PageLoad } from './$types';
-import { fetchActivities, fetchTrainingMetrics } from '$lib/api';
+import {
+	fetchActivities,
+	fetchActivityDefaultMetrics,
+	fetchActivityListSummary,
+	fetchTrainingMetrics
+} from '$lib/api';
 import { fetchActiveTrainingPeriods, fetchTrainingNotes } from '$lib/api/training';
 import { dayjs } from '$lib/duration';
 
@@ -13,7 +18,9 @@ export const load: PageLoad = async ({ fetch, depends }) => {
 		activities: fetchActivities(fetch, undefined, startDate, endDate),
 		notes: fetchTrainingNotes(fetch, depends, startDate, endDate),
 		metrics: fetchTrainingMetrics(fetch, startDate, dayjs().endOf('day').toDate(), 'global'),
-		trainingPeriods: fetchActiveTrainingPeriods(fetch, new Date())
+		trainingPeriods: fetchActiveTrainingPeriods(fetch, new Date()),
+		defaultMetrics: fetchActivityDefaultMetrics(fetch),
+		activityListSummary: fetchActivityListSummary(fetch)
 	};
 };
 

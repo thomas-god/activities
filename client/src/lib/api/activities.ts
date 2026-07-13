@@ -288,3 +288,16 @@ export async function postStandaloneActivity(
 		return { type: 'error' };
 	}
 }
+
+export async function fetchActivityDefaultMetrics(
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): Promise<string[]> {
+	const response = await fetch(`${PUBLIC_APP_URL}/api/activity/default_metrics`, {
+		method: 'GET',
+		credentials: 'include',
+		mode: 'cors',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	return await response.json();
+}
