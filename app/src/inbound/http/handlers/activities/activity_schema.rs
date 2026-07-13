@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ops::Mul};
 
 use chrono::{DateTime, FixedOffset};
+use derive_more::Constructor;
 use serde::Serialize;
 
 use crate::domain::models::activity::{
@@ -167,7 +168,7 @@ pub struct PublicActivity {
     pub workout_type: Option<String>,
     pub feedback: Option<String>,
     pub nutrition: Option<PublicNutrition>,
-    pub metrics: HashMap<String, f64>,
+    pub metrics: HashMap<String, PublicMetricValue>,
 }
 
 impl PublicActivity {
@@ -183,10 +184,24 @@ impl PublicActivity {
             feedback: activity.feedback().as_ref().map(|f| f.to_string()),
             nutrition: activity.nutrition().as_ref().map(PublicNutrition::from),
             metrics: HashMap::from_iter(metrics.iter().filter_map(|(metric, value)| {
-                value.as_ref().map(|value| (metric.to_string(), *value))
+                value.as_ref().map(|value| {
+                    (
+                        metric.to_string(),
+                        PublicMetricValue {
+                            value: *value,
+                            unit: metric.unit().to_string(),
+                        },
+                    )
+                })
             })),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Constructor)]
+pub struct PublicMetricValue {
+    value: f64,
+    unit: String,
 }
 
 // =============================================================================

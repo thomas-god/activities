@@ -123,8 +123,12 @@ export const applyFiltersToSearchParams = (
 	applyRangeParam(params, 'elevation_min', 'elevation_max', filters.elevationRange);
 };
 
-const applyRangeFilter = (value: number | undefined, range: RangeFilter): boolean => {
+const applyRangeFilter = (metric: { value: number } | undefined, range: RangeFilter): boolean => {
 	if (range.min !== null || range.max !== null) {
+		if (metric === undefined) {
+			return false;
+		}
+		const value = metric.value;
 		if (value === undefined) return false;
 		if (range.min !== null && value < range.min) return false;
 		if (range.max !== null && value > range.max) return false;

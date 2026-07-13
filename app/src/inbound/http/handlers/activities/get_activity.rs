@@ -79,7 +79,8 @@ mod tests {
         },
         inbound::{
             http::handlers::activities::activity_schema::{
-                PublicActivity, PublicActivityTimeseries, PublicTimeseries, PublicTimeseriesValue,
+                PublicActivity, PublicActivityTimeseries, PublicMetricValue, PublicTimeseries,
+                PublicTimeseriesValue,
             },
             parser::test_utils::MockFileParser,
         },
@@ -170,7 +171,10 @@ mod tests {
                     workout_type: None,
                     nutrition: None,
                     feedback: None,
-                    metrics: HashMap::from([("Duration".to_string(), 1200.)]),
+                    metrics: HashMap::from([(
+                        "Duration".to_string(),
+                        PublicMetricValue::new(1200., "s".to_string())
+                    )]),
                 },
                 timeseries: PublicActivityTimeseries {
                     time: vec![0, 1, 2],

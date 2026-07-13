@@ -79,7 +79,8 @@
 	let activityDurationRange = $derived.by(() => {
 		const values = activities
 			.map((a) => a.metrics['ActiveDuration'])
-			.filter((v): v is number => v !== undefined);
+			.filter((m) => m !== undefined)
+			.map((m) => m.value);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values) / 60, max: Math.max(...values) / 60 };
 	});
@@ -87,7 +88,8 @@
 	let activityDistanceRange = $derived.by(() => {
 		const values = activities
 			.map((a) => a.metrics['Distance'])
-			.filter((v): v is number => v !== undefined);
+			.filter((m) => m !== undefined)
+			.map((m) => m.value);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values) / 1000, max: Math.max(...values) / 1000 };
 	});
@@ -95,7 +97,8 @@
 	let activityElevationRange = $derived.by(() => {
 		const values = activities
 			.map((a) => a.metrics['Elevation'])
-			.filter((v): v is number => v !== undefined);
+			.filter((m) => m !== undefined)
+			.map((m) => m.value);
 		if (values.length === 0) return null;
 		return { min: Math.min(...values), max: Math.max(...values) };
 	});

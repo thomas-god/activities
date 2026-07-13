@@ -28,7 +28,7 @@ export const ActivitySchema = z.object({
 	workout_type: z.enum(WORKOUT_TYPE_VALUES).nullable(),
 	feedback: z.string().nullable(),
 	nutrition: NutritionSchema.nullable(),
-	metrics: z.record(z.string(), z.number())
+	metrics: z.record(z.string(), z.object({ value: z.number(), unit: z.string() }))
 });
 
 const ActivityListSchema = z.array(ActivitySchema);

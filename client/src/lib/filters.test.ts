@@ -182,7 +182,7 @@ describe('filterActivities', () => {
 
 	describe('duration range filter', () => {
 		it('includes an activity whose duration is within the range', () => {
-			const activity = makeActivity({ metrics: { ActiveDuration: 3600 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: { value: 3600, unit: 's' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -193,7 +193,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is below the minimum', () => {
-			const activity = makeActivity({ metrics: { ActiveDuration: 600 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: { value: 600, unit: 's' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -204,7 +204,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose duration is above the maximum', () => {
-			const activity = makeActivity({ metrics: { ActiveDuration: 10000 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: { value: 10000, unit: 's' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -226,7 +226,7 @@ describe('filterActivities', () => {
 		});
 
 		it('includes an activity when only min is set and the value equals min', () => {
-			const activity = makeActivity({ metrics: { ActiveDuration: 1800 } });
+			const activity = makeActivity({ metrics: { ActiveDuration: { value: 1800, unit: 's' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -239,7 +239,7 @@ describe('filterActivities', () => {
 
 	describe('distance range filter', () => {
 		it('includes an activity whose distance is within the range', () => {
-			const activity = makeActivity({ metrics: { Distance: 8000 } });
+			const activity = makeActivity({ metrics: { Distance: { value: 8000, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -250,7 +250,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose distance is below the minimum', () => {
-			const activity = makeActivity({ metrics: { Distance: 2000 } });
+			const activity = makeActivity({ metrics: { Distance: { value: 2000, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -261,7 +261,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose distance is above the maximum', () => {
-			const activity = makeActivity({ metrics: { Distance: 15000 } });
+			const activity = makeActivity({ metrics: { Distance: { value: 15000, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -285,7 +285,7 @@ describe('filterActivities', () => {
 
 	describe('elevation range filter', () => {
 		it('includes an activity whose elevation is within the range', () => {
-			const activity = makeActivity({ metrics: { Elevation: 300 } });
+			const activity = makeActivity({ metrics: { Elevation: { value: 300, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -296,7 +296,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose elevation is below the minimum', () => {
-			const activity = makeActivity({ metrics: { Elevation: 50 } });
+			const activity = makeActivity({ metrics: { Elevation: { value: 50, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,
@@ -307,7 +307,7 @@ describe('filterActivities', () => {
 		});
 
 		it('excludes an activity whose elevation is above the maximum', () => {
-			const activity = makeActivity({ metrics: { Elevation: 800 } });
+			const activity = makeActivity({ metrics: { Elevation: { value: 800, unit: 'm' } } });
 
 			const result = filterActivities([activity], {
 				...noFilters,

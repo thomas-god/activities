@@ -17,9 +17,9 @@
 		};
 
 		for (const activity of period.activities) {
-			total.duration += activity.metrics['ActiveDuration'] ?? 0;
-			total.distance += activity.metrics['Distance'] ?? 0;
-			total.elevation += activity.metrics['Elevation'] ?? 0;
+			total.duration += activity.metrics['ActiveDuration'].value ?? 0;
+			total.distance += activity.metrics['Distance'].value ?? 0;
+			total.elevation += activity.metrics['Elevation'].value ?? 0;
 		}
 
 		return total;

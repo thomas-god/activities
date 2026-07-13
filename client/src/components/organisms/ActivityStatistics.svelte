@@ -9,7 +9,7 @@
 
 	let calories = $derived(metrics.get('Calories'));
 	let distance = $derived.by(() => {
-		const value = metrics.get('Distance');
+		const value = metrics.get('Distance')?.value;
 		if (value === undefined) {
 			return value;
 		}
@@ -39,7 +39,7 @@
 			rows.push({
 				icon: 'duration.svg',
 				label: 'Duration',
-				value: formatDuration(duration),
+				value: formatDuration(duration.value),
 				unit: ''
 			});
 		}
@@ -59,7 +59,7 @@
 				rows.push({
 					icon: 'pace.svg',
 					label: 'Pace',
-					value: paceToString((averagePace! * 1000) / 60),
+					value: paceToString((averagePace?.value! * 1000) / 60),
 					unit: '/km',
 					legend: 'avg'
 				});
@@ -67,7 +67,7 @@
 				rows.push({
 					icon: 'pace.svg',
 					label: 'Speed',
-					value: `${(averageSpeed * 3.6).toFixed(2)}`,
+					value: `${(averageSpeed.value * 3.6).toFixed(2)}`,
 					unit: 'km/h',
 					legend: 'avg'
 				});
@@ -78,7 +78,7 @@
 			rows.push({
 				icon: 'elevation.svg',
 				label: 'Elevation',
-				value: `${elevation.toFixed(0)}`,
+				value: `${elevation.value.toFixed(0)}`,
 				unit: 'm'
 			});
 		}
@@ -87,7 +87,7 @@
 			rows.push({
 				icon: 'cardio.svg',
 				label: 'Heart rate',
-				value: `${avgHeartRate.toFixed(0)} / ${maxHeartRate.toFixed(0)}`,
+				value: `${avgHeartRate.value.toFixed(0)} / ${maxHeartRate.value.toFixed(0)}`,
 				unit: 'bpm',
 				legend: 'avg / max'
 			});
@@ -97,7 +97,7 @@
 			rows.push({
 				icon: 'calories.svg',
 				label: 'Calories',
-				value: `${calories.toFixed(0)}`,
+				value: `${calories.value.toFixed(0)}`,
 				unit: 'kcal'
 			});
 		}
@@ -106,7 +106,7 @@
 			rows.push({
 				icon: 'power.svg',
 				label: 'Power',
-				value: `${averagePower.toFixed(0)} / ${normalizedPower.toFixed(0)}`,
+				value: `${averagePower.value.toFixed(0)} / ${normalizedPower.value.toFixed(0)}`,
 				unit: 'W',
 				legend: 'avg / normalized'
 			});

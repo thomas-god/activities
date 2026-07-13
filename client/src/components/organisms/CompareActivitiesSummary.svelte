@@ -28,7 +28,7 @@
 				label: 'Duration',
 				unit: '',
 				values: activities.map((a) => {
-					const v = a.metrics['ActiveDuration'];
+					const v = a.metrics['ActiveDuration'].value;
 					return v !== undefined ? formatDuration(v) : undefined;
 				})
 			});
@@ -39,7 +39,7 @@
 				label: 'Distance',
 				unit: 'km',
 				values: activities.map((a) => {
-					const v = a.metrics['Distance'];
+					const v = a.metrics['Distance'].value;
 					return v !== undefined ? (v / 1000).toFixed(3) : undefined;
 				})
 			});
@@ -50,7 +50,7 @@
 				label: 'Calories',
 				unit: 'kcal',
 				values: activities.map((a) => {
-					const v = a.metrics['Calories'];
+					const v = a.metrics['Calories'].value;
 					return v !== undefined ? v.toFixed(0) : undefined;
 				})
 			});
@@ -64,7 +64,7 @@
 					unit: '/km',
 					legend: 'avg',
 					values: activities.map((a) => {
-						const pace = a.metrics['AvgPace'];
+						const pace = a.metrics['AvgPace'].value;
 						return pace !== undefined ? paceToString((pace * 1000) / 60) : undefined;
 					})
 				});
@@ -74,7 +74,7 @@
 					unit: 'km/h',
 					legend: 'avg',
 					values: activities.map((a) => {
-						const v = a.metrics['AvgSpeed'];
+						const v = a.metrics['AvgSpeed'].value;
 						return v !== undefined ? (v * 3.6).toFixed(2) : undefined;
 					})
 				});
@@ -86,7 +86,7 @@
 				label: 'Elevation',
 				unit: 'm',
 				values: activities.map((a) => {
-					const v = a.metrics['Elevation'];
+					const v = a.metrics['Elevation'].value;
 					return v !== undefined ? v.toFixed(0) : undefined;
 				})
 			});
@@ -98,8 +98,8 @@
 				unit: 'bpm',
 				legend: 'avg / max',
 				values: activities.map((a) => {
-					const avg = a.metrics['AvgHeartRate'];
-					const max = a.metrics['MaxHeartRate'];
+					const avg = a.metrics['AvgHeartRate'].value;
+					const max = a.metrics['MaxHeartRate'].value;
 					if (avg !== undefined && max !== undefined)
 						return `${avg.toFixed(0)} / ${max.toFixed(0)}`;
 					if (avg !== undefined) return avg.toFixed(0);
@@ -114,8 +114,8 @@
 				unit: 'W',
 				legend: 'avg / normalized',
 				values: activities.map((a) => {
-					const avg = a.metrics['AvgPower'];
-					const np = a.metrics['NormalizedPower'];
+					const avg = a.metrics['AvgPower'].value;
+					const np = a.metrics['NormalizedPower'].value;
 					if (avg !== undefined && np !== undefined) return `${avg.toFixed(0)} / ${np.toFixed(0)}`;
 					if (avg !== undefined) return avg.toFixed(0);
 					return undefined;
