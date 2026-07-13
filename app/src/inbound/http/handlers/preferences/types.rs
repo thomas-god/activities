@@ -13,36 +13,46 @@ use crate::{
     inbound::http::handlers::training::types::APITrainingMetricScope,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "key", content = "value")]
-pub enum PreferenceResponse {
+pub enum PreferencePayload {
     #[serde(rename = "favorite_metric")]
     FavoriteMetric(String),
-    #[serde(rename = "favorite_metric")]
-    ActivityListSummary(String),
+    #[serde(rename = "activity_list_summary")]
+    ActivityListSummary(APIActivityListSummary),
 }
 
-impl TryFrom<Preference> for PreferenceResponse {
-    type Error = String;
-
-    fn try_from(value: Preference) -> Result<Self, Self::Error> {
-        match value {
-            Preference::FavoriteMetric(id) => {
-                Ok(PreferenceResponse::FavoriteMetric(id.to_string()))
+impl From<PreferencePayload> for Preference {
+    fn from(req: PreferencePayload) -> Self {
+        match req {
+            PreferencePayload::FavoriteMetric(id) => {
+                Preference::FavoriteMetric(TrainingMetricId::from(id.as_str()))
             }
-            Preference::ActivityListSummary(summary) => {
-                Ok(PreferenceResponse::ActivityListSummary(
-                    serde_json::to_string(&summary)
-                        .map_err(|err| format!("Cannot serialize {:?}: {}", &summary, err))?,
-                ))
+            PreferencePayload::ActivityListSummary(summary) => {
+                Preference::ActivityListSummary(ActivityListSummary::from(summary))
             }
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
+impl TryFrom<Preference> for PreferencePayload {
+    type Error = String;
+
+    fn try_from(value: Preference) -> Result<Self, Self::Error> {
+        match value {
+            Preference::FavoriteMetric(id) => Ok(PreferencePayload::FavoriteMetric(id.to_string())),
+            Preference::ActivityListSummary(summary) => Ok(PreferencePayload::ActivityListSummary(
+                APIActivityListSummary::from(summary),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase", content = "value")]
 pub enum APIActivityListSummaryItem {
     Metric(ActivityMetricV2),
+    #[serde(rename = "rpe")]
     #[allow(clippy::upper_case_acronyms)]
     RPE,
     WorkoutType,
@@ -58,7 +68,17 @@ impl From<APIActivityListSummaryItem> for ActivityListSummaryItem {
     }
 }
 
-#[derive(Debug, Deserialize)]
+impl From<&ActivityListSummaryItem> for APIActivityListSummaryItem {
+    fn from(value: &ActivityListSummaryItem) -> Self {
+        match value {
+            ActivityListSummaryItem::Metric(metric) => Self::Metric(*metric),
+            ActivityListSummaryItem::RPE => Self::RPE,
+            ActivityListSummaryItem::WorkoutType => Self::WorkoutType,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct APIActivityListSummary {
     scope: APITrainingMetricScope,
     items: Vec<APIActivityListSummaryItem>,
@@ -77,24 +97,15 @@ impl From<APIActivityListSummary> for ActivityListSummary {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "key", content = "value")]
-pub enum SetPreferenceRequest {
-    #[serde(rename = "favorite_metric")]
-    FavoriteMetric(String),
-    #[serde(rename = "activity_list_summary")]
-    ActivityListSummary(APIActivityListSummary),
-}
-
-impl From<SetPreferenceRequest> for Preference {
-    fn from(req: SetPreferenceRequest) -> Self {
-        match req {
-            SetPreferenceRequest::FavoriteMetric(id) => {
-                Preference::FavoriteMetric(TrainingMetricId::from(id.as_str()))
-            }
-            SetPreferenceRequest::ActivityListSummary(summary) => {
-                Preference::ActivityListSummary(ActivityListSummary::from(summary))
-            }
+impl From<ActivityListSummary> for APIActivityListSummary {
+    fn from(value: ActivityListSummary) -> Self {
+        Self {
+            scope: value.scope().into(),
+            items: value
+                .items()
+                .iter()
+                .map(APIActivityListSummaryItem::from)
+                .collect(),
         }
     }
 }
@@ -114,5 +125,72 @@ impl From<SetPreferenceError> for StatusCode {
 impl From<DeletePreferenceError> for StatusCode {
     fn from(_value: DeletePreferenceError) -> Self {
         Self::INTERNAL_SERVER_ERROR
+    }
+}
+
+#[cfg(test)]
+mod test_http_preferences {
+    use super::*;
+
+    #[test]
+    fn test_serialize_activity_list_summary() {
+        let json = r#"{
+            "scope": {
+                "type": "trainingPeriod",
+                "trainingPeriodId": "test-id"
+            },
+            "items": [
+                {"type": "metric", "value": "Distance"},
+                {"type": "rpe"},
+                {"type": "workoutType"}
+            ]
+        }"#;
+        let result: Result<APIActivityListSummary, _> = serde_json::from_str(json);
+
+        assert_eq!(
+            APIActivityListSummary {
+                scope: APITrainingMetricScope::TrainingPeriod {
+                    training_period_id: "test-id".to_string()
+                },
+                items: vec![
+                    APIActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                    APIActivityListSummaryItem::RPE,
+                    APIActivityListSummaryItem::WorkoutType,
+                ]
+            },
+            result.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_serialize_preference_payload_activity_list_summary() {
+        let json = r#"{
+         "key": "activity_list_summary",
+         "value": {
+            "scope": {
+                "type": "trainingPeriod",
+                "trainingPeriodId": "test-id"
+            },
+            "items": [
+                {"type": "metric", "value": "Distance"},
+                {"type": "rpe"},
+                {"type": "workoutType"}
+            ]
+        }}"#;
+        let result: Result<PreferencePayload, _> = serde_json::from_str(json);
+
+        assert_eq!(
+            PreferencePayload::ActivityListSummary(APIActivityListSummary {
+                scope: APITrainingMetricScope::TrainingPeriod {
+                    training_period_id: "test-id".to_string()
+                },
+                items: vec![
+                    APIActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                    APIActivityListSummaryItem::RPE,
+                    APIActivityListSummaryItem::WorkoutType,
+                ]
+            }),
+            result.unwrap()
+        );
     }
 }

@@ -11,7 +11,7 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
 
-use super::types::SetPreferenceRequest;
+use super::types::PreferencePayload;
 
 pub async fn set_preference<
     AS: IActivityService,
@@ -21,7 +21,7 @@ pub async fn set_preference<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
-    Json(request): Json<SetPreferenceRequest>,
+    Json(request): Json<PreferencePayload>,
 ) -> Result<StatusCode, StatusCode> {
     let preference = Preference::from(request);
 

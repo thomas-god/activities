@@ -7,7 +7,7 @@ use crate::domain::ports::{
 };
 use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile};
 
-use super::types::PreferenceResponse;
+use super::types::PreferencePayload;
 
 pub async fn get_all_preferences<
     AS: IActivityService,
@@ -17,7 +17,7 @@ pub async fn get_all_preferences<
 >(
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
-) -> Result<Json<Vec<PreferenceResponse>>, StatusCode> {
+) -> Result<Json<Vec<PreferencePayload>>, StatusCode> {
     let preferences = match state
         .preferences_service
         .get_all_preferences(user.user())
@@ -34,7 +34,7 @@ pub async fn get_all_preferences<
 
     let mut items = Vec::new();
     for preference in preferences {
-        match PreferenceResponse::try_from(preference) {
+        match PreferencePayload::try_from(preference) {
             Ok(item) => items.push(item),
             Err(err) => tracing::error!("Error while serializing preference: {}", err),
         }

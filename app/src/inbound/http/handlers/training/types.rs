@@ -236,7 +236,7 @@ impl From<APITrainingPeriodSports> for TrainingPeriodSports {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum APITrainingMetricScope {
     Global,

@@ -15,7 +15,7 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState},
 };
 
-use super::types::PreferenceResponse;
+use super::types::PreferencePayload;
 
 pub async fn get_preference<
     AS: IActivityService,
@@ -26,7 +26,7 @@ pub async fn get_preference<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(key): Path<String>,
-) -> Result<Json<Option<PreferenceResponse>>, StatusCode> {
+) -> Result<Json<Option<PreferencePayload>>, StatusCode> {
     let preference_key = key
         .parse::<PreferenceKey>()
         .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -45,7 +45,7 @@ pub async fn get_preference<
         }
     };
 
-    match pref.map(PreferenceResponse::try_from).transpose() {
+    match pref.map(PreferencePayload::try_from).transpose() {
         Ok(res) => Ok(Json(res)),
         Err(err) => {
             tracing::error!("Error while serializing preference: {}", err.to_string());

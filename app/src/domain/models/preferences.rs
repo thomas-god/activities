@@ -43,6 +43,16 @@ pub struct ActivityListSummary {
     items: Vec<ActivityListSummaryItem>,
 }
 
+impl ActivityListSummary {
+    pub fn scope(&self) -> &TrainingMetricScope {
+        &self.scope
+    }
+
+    pub fn items(&self) -> &[ActivityListSummaryItem] {
+        &self.items
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ActivityListSummaryItem {
     Metric(ActivityMetricV2),
@@ -53,6 +63,7 @@ pub enum ActivityListSummaryItem {
 /// Represents a single preference value with its associated data
 #[derive(Clone, Debug, PartialEq)]
 pub enum Preference {
+    // TODO: remove as it's no longer used
     FavoriteMetric(TrainingMetricId),
     ActivityListSummary(ActivityListSummary),
 }
