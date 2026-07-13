@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
-	import { fetchActivityDetails } from '$lib/api';
+	import { fetchActivityDetails, fetchActivityListSummary } from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
 	import Timeline from '$components/pages/Timeline.svelte';
@@ -164,11 +164,11 @@
 		</div>
 
 		<!-- View Content -->
-		{#await Promise.all([data.activities, data.notes])}
+		{#await Promise.all([data.activities, data.notes, fetchActivityListSummary(fetch)])}
 			<div class="flex w-full flex-col items-center p-4 pt-6">
 				<div class="loading loading-bars"></div>
 			</div>
-		{:then [_, notes]}
+		{:then [_, notes, activityListFormat]}
 			{#if viewMode === 'list'}
 				<div class="flex h-screen flex-row gap-2 overflow-hidden">
 					<div class="grow basis-0 overflow-y-auto">
@@ -177,6 +177,7 @@
 							{notes}
 							{selectedActivityId}
 							selectActivityCallback={handleActivitySelected}
+							{activityListFormat}
 						/>
 					</div>
 				</div>

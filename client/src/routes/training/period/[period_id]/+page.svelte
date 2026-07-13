@@ -27,6 +27,7 @@
 	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
 	import {
+		fetchActivityListSummary,
 		fetchTrainingMetrics,
 		fetchTrainingPeriodDetails,
 		fetchTrainingPeriodMetrics,
@@ -345,7 +346,7 @@
 								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 								<ul
 									tabindex="0"
-									class="dropdown-content menu z-[1] flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
+									class="dropdown-content menu z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 								>
 									<li class="w-full">
 										<button onclick={openEditModal}>
@@ -531,11 +532,11 @@
 					{/if}
 				</div>
 				{#if isSome(trainingNotesPromise)}
-					{#await trainingNotesPromise.value}
+					{#await Promise.all([trainingNotesPromise.value, fetchActivityListSummary(fetch)])}
 						<div class="flex w-full flex-col items-center p-4 pt-6">
 							<div class="loading loading-bars"></div>
 						</div>
-					{:then notes}
+					{:then [notes, activityListFormat]}
 						<!-- Activities section -->
 						<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 							<div class="mb-4 flex items-center justify-between">
@@ -559,6 +560,7 @@
 								{selectedActivityId}
 								{selectActivityCallback}
 								endDate={periodDetails.end}
+								{activityListFormat}
 							/>
 						</div>
 					{/await}

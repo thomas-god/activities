@@ -1,18 +1,20 @@
 <script lang="ts">
 	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
-	import type { Activity } from '$lib/api';
+	import type { Activity, ActivityListSummaryItems } from '$lib/api';
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 
 	let {
 		activity,
 		onClick,
+		listFormat,
 		isSelected = false
 	}: {
 		activity: Activity;
 		onClick?: () => void;
 		isSelected?: boolean;
+		listFormat: ActivityListSummaryItems;
 	} = $props();
 
 	let title = $derived(
@@ -61,21 +63,30 @@
 			</div>
 		</div>
 		<div class="flex flex-row items-center justify-center gap-2">
-			{#if activity.workout_type}
-				<span
-					class={`badge hidden badge-sm @md:inline ${getWorkoutTypeClass(activity.workout_type)}`}
-				>
-					{getWorkoutTypeLabel(activity.workout_type)}
-				</span>
-			{/if}
-			{#if activity.rpe}
-				<span class={`badge hidden badge-sm @md:inline ${getRpeClass(activity.rpe)}`}>
-					RPE {activity.rpe}
-				</span>
-			{/if}
-			<span class="font-semibold sm:text-lg">
-				{formatDuration(activity.metrics['ActiveDuration'] ?? 0)}
-			</span>
+			{#each listFormat as row}
+				{#if row.type === 'rpe' && activity.rpe}
+					<span class={`badge hidden badge-sm @md:inline ${getRpeClass(activity.rpe)}`}>
+						RPE {activity.rpe}
+					</span>
+				{:else if row.type === 'workoutType' && activity.workout_type}
+					<span
+						class={`badge hidden badge-sm @md:inline ${getWorkoutTypeClass(activity.workout_type)}`}
+					>
+						{getWorkoutTypeLabel(activity.workout_type)}
+					</span>
+				{:else if row.type === 'metric'}
+					{@const metric = activity.metrics[row.value]}
+					{#if metric !== undefined}
+						<span class="font-semibold sm:text-lg">
+							{#if metric.unit === 's'}
+								{formatDuration(activity.metrics[row.value].value ?? 0)}
+							{:else}
+								{metric.value.toFixed(0)} {metric.unit}
+							{/if}
+						</span>
+					{/if}
+				{/if}
+			{/each}
 		</div>
 	</div>
 	{#if activity.feedback}

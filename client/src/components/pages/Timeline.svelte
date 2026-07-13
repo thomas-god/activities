@@ -1,5 +1,11 @@
 <script lang="ts">
-	import type { Activity, ActivityList, TrainingNote, TrainingNotesList } from '$lib/api';
+	import type {
+		Activity,
+		ActivityList,
+		ActivityListSummaryItems,
+		TrainingNote,
+		TrainingNotesList
+	} from '$lib/api';
 	import ActivitiesListItem from '$components/organisms/ActivitiesListItem.svelte';
 	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 	import { dayjs } from '$lib/duration';
@@ -9,6 +15,7 @@
 		notes,
 		selectedActivityId,
 		selectActivityCallback,
+		activityListFormat,
 		endDate = null
 	}: {
 		activities: ActivityList;
@@ -16,6 +23,7 @@
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
 		endDate?: string | null;
+		activityListFormat: ActivityListSummaryItems;
 	} = $props();
 
 	// Merge activities and notes, sorted by date (most recent first)
@@ -76,6 +84,7 @@
 							activity={item.data}
 							onClick={() => selectActivityCallback(item.data.id)}
 							isSelected={selectedActivityId === item.data.id}
+							listFormat={activityListFormat}
 						/>
 					{:else}
 						<TrainingNoteListItemCompact note={item.data} />

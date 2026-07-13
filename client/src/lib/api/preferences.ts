@@ -76,14 +76,14 @@ export type ActivityListSummaryItems = Extract<
 
 export const fetchActivityListSummary = async (
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-): Promise<Option<ActivityListSummaryItems>> => {
+): Promise<ActivityListSummaryItems> => {
 	const preferences = await fetchAllPreferences(fetch);
 	const preference = preferences.find((pref) => pref.key === 'activity_list_summary');
 	if (preference === undefined) {
 		// Default activity list summary
-		return some([{ type: 'workoutType' }, { type: 'rpe' }, { type: 'metric', value: 'Duration' }]);
+		return [{ type: 'workoutType' }, { type: 'rpe' }, { type: 'metric', value: 'Duration' }];
 	}
-	return some(preference.value.items);
+	return preference.value.items;
 };
 
 /**

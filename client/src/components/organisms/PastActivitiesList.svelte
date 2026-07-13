@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
-	import type { ActivityList, Activity } from '$lib/api';
+	import type { ActivityList, Activity, ActivityListSummaryItems } from '$lib/api';
 	import type { TrainingNote, TrainingNotesList } from '$lib/api/training';
 	import ActivitiesListItem from './ActivitiesListItem.svelte';
 	import TrainingNoteListItemCompact from './TrainingNoteListItemCompact.svelte';
@@ -14,6 +14,7 @@
 		trainingNotes = [],
 		moreCallback,
 		onActivityClick,
+		activityListFormat,
 		selectedActivityId = null
 	}: {
 		activityList: ActivityList;
@@ -21,6 +22,7 @@
 		moreCallback: () => void;
 		onActivityClick?: (activityId: string) => void;
 		selectedActivityId?: string | null;
+		activityListFormat: ActivityListSummaryItems;
 	} = $props();
 
 	let sorted_activities = $derived(
@@ -97,6 +99,7 @@
 						activity={item.data}
 						onClick={() => onActivityClick?.(item.data.id)}
 						isSelected={selectedActivityId === item.data.id}
+						listFormat={activityListFormat}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact note={item.data} />
@@ -114,6 +117,7 @@
 						activity={item.data}
 						onClick={() => onActivityClick?.(item.data.id)}
 						isSelected={selectedActivityId === item.data.id}
+						listFormat={activityListFormat}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact note={item.data} />
@@ -131,6 +135,7 @@
 						activity={item.data}
 						onClick={() => onActivityClick?.(item.data.id)}
 						isSelected={selectedActivityId === item.data.id}
+						listFormat={activityListFormat}
 					/>
 				{:else}
 					<TrainingNoteListItemCompact note={item.data} />

@@ -114,17 +114,18 @@
 
 	<div class="item history">
 		<div>
-			{#await Promise.all([data.activities, data.notes])}
+			{#await Promise.all([data.activities, data.notes, data.activityListSummary])}
 				<div class="item flex flex-col items-center rounded-box bg-base-100 p-4 pt-6 shadow-md">
 					<div class="loading loading-bars"></div>
 				</div>
-			{:then [_, notes]}
+			{:then [_, notes, activityListFormat]}
 				<PastActivitiesList
 					activityList={activities}
 					trainingNotes={notes}
 					moreCallback={moreActivitiesCallback}
 					onActivityClick={handleActivityClick}
 					{selectedActivityId}
+					{activityListFormat}
 				/>
 			{/await}
 		</div>
