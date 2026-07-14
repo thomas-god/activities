@@ -90,37 +90,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_preference_success_favorite_metric() {
-        let user_id = UserId::from("test_user");
-        let user_id_clone = user_id.clone();
-        let metric_id = TrainingMetricId::from("test_metric_1");
-        let preference = Preference::FavoriteMetric(metric_id.clone());
-
-        let mut preferences_service = MockPreferencesService::new();
-        preferences_service
-            .expect_get_preference()
-            .withf(move |user: &UserId, key: &PreferenceKey| {
-                user == &user_id_clone && key == &PreferenceKey::FavoriteMetric
-            })
-            .times(1)
-            .returning(move |_, _| Ok(Some(preference.clone())));
-
-        let state = create_test_state(preferences_service);
-        let user = AuthenticatedUser::new(user_id);
-
-        let result = get_preference(
-            Extension(user),
-            State(state),
-            Path("favorite_metric".to_string()),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let response = result.unwrap().0;
-        assert!(response.is_some());
-    }
-
-    #[tokio::test]
     async fn test_get_preference_success_activity_list_summary() {
         let user_id = UserId::from("test_user");
         let user_id_clone = user_id.clone();
@@ -166,7 +135,7 @@ mod tests {
         preferences_service
             .expect_get_preference()
             .withf(move |user: &UserId, key: &PreferenceKey| {
-                user == &user_id_clone && key == &PreferenceKey::FavoriteMetric
+                user == &user_id_clone && key == &PreferenceKey::ActivityListSummary
             })
             .times(1)
             .returning(|_, _| Ok(None));
@@ -177,7 +146,7 @@ mod tests {
         let result = get_preference(
             Extension(user),
             State(state),
-            Path("favorite_metric".to_string()),
+            Path("activity-list-summary".to_string()),
         )
         .await;
 
@@ -214,7 +183,7 @@ mod tests {
         preferences_service
             .expect_get_preference()
             .withf(move |user: &UserId, key: &PreferenceKey| {
-                user == &user_id_clone && key == &PreferenceKey::FavoriteMetric
+                user == &user_id_clone && key == &PreferenceKey::ActivityListSummary
             })
             .times(1)
             .returning(|_, _| {
@@ -229,7 +198,7 @@ mod tests {
         let result = get_preference(
             Extension(user),
             State(state),
-            Path("favorite_metric".to_string()),
+            Path("activity-list-summary".to_string()),
         )
         .await;
 

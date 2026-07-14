@@ -1,10 +1,7 @@
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::models::{
-    activity::ActivityMetricV2,
-    training::{TrainingMetricId, TrainingMetricScope},
-};
+use crate::domain::models::{activity::ActivityMetricV2, training::TrainingMetricScope};
 
 ///////////////////////////////////////////////////////////////////
 /// PREFERENCE ENUM AND KEY
@@ -12,14 +9,12 @@ use crate::domain::models::{
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PreferenceKey {
-    FavoriteMetric,
     ActivityListSummary,
 }
 
 impl std::fmt::Display for PreferenceKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PreferenceKey::FavoriteMetric => write!(f, "favorite_metric"),
             PreferenceKey::ActivityListSummary => write!(f, "activity-list-summary"),
         }
     }
@@ -30,7 +25,6 @@ impl std::str::FromStr for PreferenceKey {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "favorite_metric" => Ok(PreferenceKey::FavoriteMetric),
             "activity-list-summary" => Ok(PreferenceKey::ActivityListSummary),
             _ => Err(format!("Unknown preference key: {}", s)),
         }
@@ -63,8 +57,6 @@ pub enum ActivityListSummaryItem {
 /// Represents a single preference value with its associated data
 #[derive(Clone, Debug, PartialEq)]
 pub enum Preference {
-    // TODO: remove as it's no longer used
-    FavoriteMetric(TrainingMetricId),
     ActivityListSummary(ActivityListSummary),
 }
 
@@ -72,7 +64,6 @@ impl Preference {
     /// Returns the preference key for this preference
     pub fn key(&self) -> PreferenceKey {
         match self {
-            Preference::FavoriteMetric(_) => PreferenceKey::FavoriteMetric,
             Preference::ActivityListSummary(_) => PreferenceKey::ActivityListSummary,
         }
     }
@@ -84,11 +75,14 @@ mod tests {
 
     #[test]
     fn test_preference_key_display_and_parse() {
-        assert_eq!(PreferenceKey::FavoriteMetric.to_string(), "favorite_metric");
+        assert_eq!(
+            PreferenceKey::ActivityListSummary.to_string(),
+            "activity-list-summary"
+        );
 
         assert_eq!(
-            "favorite_metric".parse::<PreferenceKey>().unwrap(),
-            PreferenceKey::FavoriteMetric
+            "activity-list-summary".parse::<PreferenceKey>().unwrap(),
+            PreferenceKey::ActivityListSummary
         );
         assert!("unknown".parse::<PreferenceKey>().is_err());
     }

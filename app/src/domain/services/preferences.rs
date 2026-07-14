@@ -159,7 +159,7 @@ mod tests {
 
     use super::*;
     use crate::domain::{
-        models::training::TrainingMetricId,
+        models::{preferences::ActivityListSummary, training::TrainingMetricScope},
         services::preferences::tests_utils::MockPreferencesRepository,
     };
 
@@ -170,13 +170,13 @@ mod tests {
 
         mock_repo
             .expect_get_preference()
-            .with(eq(user.clone()), eq(PreferenceKey::FavoriteMetric))
+            .with(eq(user.clone()), eq(PreferenceKey::ActivityListSummary))
             .times(1)
             .returning(|_, _| Ok(None));
 
         let service = PreferencesService::new(mock_repo);
         let result = service
-            .get_preference(&user, &PreferenceKey::FavoriteMetric)
+            .get_preference(&user, &PreferenceKey::ActivityListSummary)
             .await;
 
         assert!(result.is_ok());
@@ -186,25 +186,31 @@ mod tests {
     #[tokio::test]
     async fn test_get_preference_returns_existing() {
         let user = UserId::test_default();
-        let pref = Preference::FavoriteMetric(TrainingMetricId::from("test_metric_id"));
+        let pref = Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![],
+        ));
         let mut mock_repo = MockPreferencesRepository::new();
 
         mock_repo
             .expect_get_preference()
-            .with(eq(user.clone()), eq(PreferenceKey::FavoriteMetric))
+            .with(eq(user.clone()), eq(PreferenceKey::ActivityListSummary))
             .times(1)
             .returning(move |_, _| Ok(Some(pref.clone())));
 
         let service = PreferencesService::new(mock_repo);
         let result = service
-            .get_preference(&user, &PreferenceKey::FavoriteMetric)
+            .get_preference(&user, &PreferenceKey::ActivityListSummary)
             .await;
 
         assert!(result.is_ok());
         let preference = result.unwrap().unwrap();
         match preference {
-            Preference::FavoriteMetric(id) => {
-                assert_eq!(id, TrainingMetricId::from("test_metric_id"))
+            Preference::ActivityListSummary(summary) => {
+                assert_eq!(
+                    summary,
+                    ActivityListSummary::new(TrainingMetricScope::Global, vec![],)
+                )
             }
             #[allow(unreachable_patterns, reason = "Future proof for future preferences")]
             _ => panic!("Expected UnitSystem preference"),
@@ -214,8 +220,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_all_preferences() {
         let user = UserId::test_default();
-        let prefs = vec![Preference::FavoriteMetric(TrainingMetricId::from(
-            "test_metric_id",
+        let prefs = vec![Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![],
         ))];
 
         let mut mock_repo = MockPreferencesRepository::new();
@@ -232,8 +239,9 @@ mod tests {
         let preferences = result.unwrap();
         assert_eq!(
             preferences,
-            vec![Preference::FavoriteMetric(TrainingMetricId::from(
-                "test_metric_id",
+            vec![Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![],
             ))]
         );
     }
@@ -241,7 +249,10 @@ mod tests {
     #[tokio::test]
     async fn test_set_preference() {
         let user = UserId::test_default();
-        let pref = Preference::FavoriteMetric(TrainingMetricId::from("test_metric_id"));
+        let pref = Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![],
+        ));
 
         let mut mock_repo = MockPreferencesRepository::new();
         mock_repo
@@ -262,13 +273,13 @@ mod tests {
         let mut mock_repo = MockPreferencesRepository::new();
         mock_repo
             .expect_delete_preference()
-            .with(eq(user.clone()), eq(PreferenceKey::FavoriteMetric))
+            .with(eq(user.clone()), eq(PreferenceKey::ActivityListSummary))
             .times(1)
             .returning(|_, _| Ok(()));
 
         let service = PreferencesService::new(mock_repo);
         let result = service
-            .delete_preference(&user, &PreferenceKey::FavoriteMetric)
+            .delete_preference(&user, &PreferenceKey::ActivityListSummary)
             .await;
 
         assert!(result.is_ok());

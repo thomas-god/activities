@@ -83,16 +83,13 @@ mod tests {
         let user_id = UserId::from("test_user");
         let user_id_clone = user_id.clone();
 
-        let preferences = vec![
-            Preference::FavoriteMetric(TrainingMetricId::from("test_metric_1")),
-            Preference::ActivityListSummary(ActivityListSummary::new(
-                TrainingMetricScope::Global,
-                vec![
-                    ActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
-                    ActivityListSummaryItem::RPE,
-                ],
-            )),
-        ];
+        let preferences = vec![Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![
+                ActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                ActivityListSummaryItem::RPE,
+            ],
+        ))];
         let preferences_clone = preferences.clone();
 
         let mut preferences_service = MockPreferencesService::new();
@@ -110,7 +107,7 @@ mod tests {
 
         assert!(result.is_ok());
         let response = result.unwrap().0;
-        assert_eq!(response.len(), 2);
+        assert_eq!(response.len(), 1);
     }
 
     #[tokio::test]
@@ -160,39 +157,5 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), StatusCode::INTERNAL_SERVER_ERROR);
-    }
-
-    #[tokio::test]
-    async fn test_get_all_preferences_multiple_types() {
-        let user_id = UserId::from("test_user");
-        let user_id_clone = user_id.clone();
-
-        let preferences = vec![
-            Preference::FavoriteMetric(TrainingMetricId::from("metric_1")),
-            Preference::FavoriteMetric(TrainingMetricId::from("metric_2")),
-            Preference::ActivityListSummary(ActivityListSummary::new(
-                TrainingMetricScope::Global,
-                vec![ActivityListSummaryItem::WorkoutType],
-            )),
-        ];
-        let preferences_clone = preferences.clone();
-
-        let mut preferences_service = MockPreferencesService::new();
-        preferences_service
-            .expect_get_all_preferences()
-            .with(function(move |user: &UserId| user == &user_id_clone))
-            .times(1)
-            .returning(move |_| Ok(preferences_clone.clone()));
-
-        let state = create_test_state(preferences_service);
-
-        let user = AuthenticatedUser::new(user_id);
-
-        let result = get_all_preferences(Extension(user), State(state)).await;
-
-        assert!(result.is_ok());
-        let response = result.unwrap().0;
-        // All 3 preferences should be serialized successfully
-        assert_eq!(response.len(), 3);
     }
 }

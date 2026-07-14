@@ -688,7 +688,6 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for PreferenceKey {
 /// Serialize a preference value to string for storage
 pub fn serialize_preference_value(preference: &Preference) -> Result<String, BoxDynError> {
     match preference {
-        Preference::FavoriteMetric(id) => Ok(id.to_string()),
         Preference::ActivityListSummary(summary) => {
             serde_json::to_string(summary).map_err(|err| err.to_string().into())
         }
@@ -698,10 +697,6 @@ pub fn serialize_preference_value(preference: &Preference) -> Result<String, Box
 /// Deserialize a preference value from storage
 pub fn deserialize_preference(key: &PreferenceKey, value: &str) -> Result<Preference, BoxDynError> {
     match key {
-        PreferenceKey::FavoriteMetric => {
-            let id = TrainingMetricId::from(value);
-            Ok(Preference::FavoriteMetric(id))
-        }
         PreferenceKey::ActivityListSummary => {
             let summary = serde_json::from_str::<ActivityListSummary>(value)?;
             Ok(Preference::ActivityListSummary(summary))

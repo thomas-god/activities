@@ -157,7 +157,10 @@ impl PreferencesRepository for SqlitePreferencesRepository {
 mod tests {
     use tempfile::NamedTempFile;
 
-    use crate::domain::models::training::TrainingMetricId;
+    use crate::domain::models::{
+        preferences::{ActivityListSummary, ActivityListSummaryItem},
+        training::TrainingMetricScope,
+    };
 
     use super::*;
 
@@ -170,7 +173,7 @@ mod tests {
         let user = UserId::test_default();
 
         let result = repo
-            .get_preference(&user, &PreferenceKey::FavoriteMetric)
+            .get_preference(&user, &PreferenceKey::ActivityListSummary)
             .await;
 
         assert!(result.is_ok());
@@ -184,21 +187,30 @@ mod tests {
             .await
             .expect("Failed to create test repository");
         let user = UserId::test_default();
-        let preference = Preference::FavoriteMetric(TrainingMetricId::from("test_metric_id"));
+        let preference = Preference::ActivityListSummary(ActivityListSummary::new(
+            TrainingMetricScope::Global,
+            vec![ActivityListSummaryItem::WorkoutType],
+        ));
 
         // Save preference
         repo.save_preference(&user, &preference).await.unwrap();
 
         // Get preference
         let result = repo
-            .get_preference(&user, &PreferenceKey::FavoriteMetric)
+            .get_preference(&user, &PreferenceKey::ActivityListSummary)
             .await
             .unwrap()
             .expect("Preference should exist");
 
         match result {
-            Preference::FavoriteMetric(id) => {
-                assert_eq!(id, TrainingMetricId::from("test_metric_id"))
+            Preference::ActivityListSummary(summary) => {
+                assert_eq!(
+                    summary,
+                    ActivityListSummary::new(
+                        TrainingMetricScope::Global,
+                        vec![ActivityListSummaryItem::WorkoutType],
+                    )
+                )
             }
             #[allow(unreachable_patterns, reason = "Future proof for future preferences")]
             _ => panic!("Expected UnitSystem preference"),
@@ -216,7 +228,10 @@ mod tests {
         // Save initial preference
         repo.save_preference(
             &user,
-            &Preference::FavoriteMetric(TrainingMetricId::from("test_metric_id")),
+            &Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
+            )),
         )
         .await
         .unwrap();
@@ -224,21 +239,30 @@ mod tests {
         // Update preference
         repo.save_preference(
             &user,
-            &Preference::FavoriteMetric(TrainingMetricId::from("another_metric_id")),
+            &Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::RPE],
+            )),
         )
         .await
         .unwrap();
 
         // Verify updated preference
         let result = repo
-            .get_preference(&user, &PreferenceKey::FavoriteMetric)
+            .get_preference(&user, &PreferenceKey::ActivityListSummary)
             .await
             .unwrap()
             .unwrap();
 
         match result {
-            Preference::FavoriteMetric(id) => {
-                assert_eq!(id, TrainingMetricId::from("another_metric_id"))
+            Preference::ActivityListSummary(summary) => {
+                assert_eq!(
+                    summary,
+                    ActivityListSummary::new(
+                        TrainingMetricScope::Global,
+                        vec![ActivityListSummaryItem::RPE],
+                    )
+                )
             }
             #[allow(unreachable_patterns, reason = "Future proof for future preferences")]
             _ => panic!("Expected UnitSystem preference"),
@@ -256,7 +280,10 @@ mod tests {
         // Save multiple preferences
         repo.save_preference(
             &user,
-            &Preference::FavoriteMetric(TrainingMetricId::from("another_metric_id")),
+            &Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
+            )),
         )
         .await
         .unwrap();
@@ -266,8 +293,9 @@ mod tests {
 
         assert_eq!(
             result,
-            vec![Preference::FavoriteMetric(TrainingMetricId::from(
-                "another_metric_id"
+            vec![Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
             ))]
         );
     }
@@ -283,27 +311,30 @@ mod tests {
         // Save preference
         repo.save_preference(
             &user,
-            &Preference::FavoriteMetric(TrainingMetricId::from("another_metric_id")),
+            &Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
+            )),
         )
         .await
         .unwrap();
 
         // Verify it exists
         assert!(
-            repo.get_preference(&user, &PreferenceKey::FavoriteMetric)
+            repo.get_preference(&user, &PreferenceKey::ActivityListSummary)
                 .await
                 .unwrap()
                 .is_some()
         );
 
         // Delete preference
-        repo.delete_preference(&user, &PreferenceKey::FavoriteMetric)
+        repo.delete_preference(&user, &PreferenceKey::ActivityListSummary)
             .await
             .unwrap();
 
         // Verify it's gone
         assert!(
-            repo.get_preference(&user, &PreferenceKey::FavoriteMetric)
+            repo.get_preference(&user, &PreferenceKey::ActivityListSummary)
                 .await
                 .unwrap()
                 .is_none()
@@ -321,7 +352,10 @@ mod tests {
         // Save a known preference through the API
         repo.save_preference(
             &user,
-            &Preference::FavoriteMetric(TrainingMetricId::from("another_metric_id")),
+            &Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
+            )),
         )
         .await
         .unwrap();
@@ -345,8 +379,9 @@ mod tests {
         // Should only return the known preference
         assert_eq!(
             prefs,
-            vec![Preference::FavoriteMetric(TrainingMetricId::from(
-                "another_metric_id"
+            vec![Preference::ActivityListSummary(ActivityListSummary::new(
+                TrainingMetricScope::Global,
+                vec![ActivityListSummaryItem::WorkoutType],
             ))]
         );
     }

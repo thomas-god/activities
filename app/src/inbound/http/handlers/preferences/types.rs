@@ -16,8 +16,6 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "key", content = "value")]
 pub enum PreferencePayload {
-    #[serde(rename = "favorite_metric")]
-    FavoriteMetric(String),
     #[serde(rename = "activity_list_summary")]
     ActivityListSummary(APIActivityListSummary),
 }
@@ -25,9 +23,6 @@ pub enum PreferencePayload {
 impl From<PreferencePayload> for Preference {
     fn from(req: PreferencePayload) -> Self {
         match req {
-            PreferencePayload::FavoriteMetric(id) => {
-                Preference::FavoriteMetric(TrainingMetricId::from(id.as_str()))
-            }
             PreferencePayload::ActivityListSummary(summary) => {
                 Preference::ActivityListSummary(ActivityListSummary::from(summary))
             }
@@ -40,7 +35,6 @@ impl TryFrom<Preference> for PreferencePayload {
 
     fn try_from(value: Preference) -> Result<Self, Self::Error> {
         match value {
-            Preference::FavoriteMetric(id) => Ok(PreferencePayload::FavoriteMetric(id.to_string())),
             Preference::ActivityListSummary(summary) => Ok(PreferencePayload::ActivityListSummary(
                 APIActivityListSummary::from(summary),
             )),
