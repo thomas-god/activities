@@ -15,7 +15,7 @@
 		activityList: ActivityList;
 		trainingNotes?: TrainingNotesList;
 		moreCallback: () => void;
-		onActivityClick?: (activityId: string) => void;
+		onActivityClick: (activityId: string) => void;
 		selectedActivityId?: string | null;
 		activityListFormat: ActivityListSummaryItems;
 	} = $props();

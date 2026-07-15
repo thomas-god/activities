@@ -14,7 +14,7 @@
 	}: {
 		timeline: Map<string, TimelineItem[]>;
 		selectedActivityId: string | null;
-		selectActivityCallback?: (id: string) => void;
+		selectActivityCallback: (id: string) => void;
 		activityListFormat: ActivityListSummaryItems;
 		showGroupNumberOfActivities?: boolean;
 	} = $props();
