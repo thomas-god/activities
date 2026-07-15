@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ActivityListSummaryItems } from '$lib/api';
+	import { toTitleCase } from '$lib/utils';
 
 	interface SummaryItem {
 		type: 'metric' | 'rpe' | 'workoutType';
@@ -38,7 +39,7 @@
 		...defaultMetrics.map((metric) => ({
 			type: 'metric' as const,
 			value: metric,
-			displayName: formatMetricName(metric),
+			displayName: toTitleCase(metric),
 			key: `metric:${metric}`
 		}))
 	]);
@@ -60,17 +61,6 @@
 	const availableItems = $derived<SummaryItem[]>(
 		allItems.filter((item) => !selectedItems.some((s) => s.key === item.key))
 	);
-
-	const formatMetricName = (metric: string): string => {
-		// Convert snake_case or camelCase to Title Case
-		return metric
-			.replace(/([A-Z])/g, ' $1')
-			.replace(/_/g, ' ')
-			.split(' ')
-			.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-			.join(' ')
-			.trim();
-	};
 
 	const saveSelection = async () => {
 		const items: ActivityListSummaryItems = selectedItems.map((item) => {

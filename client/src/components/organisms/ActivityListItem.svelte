@@ -1,20 +1,17 @@
 <script lang="ts">
-	import { formatDuration, formatRelativeDuration, dayjs } from '$lib/duration';
+	import { formatRelativeDuration, dayjs, formatDurationCompactWithUnits } from '$lib/duration';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
-	import type { Activity, ActivityListSummaryItems } from '$lib/api';
-	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
-	import { getRpeClass } from '$lib/rpe';
+	import type { Activity } from '$lib/api';
+	import { some, none, type Option, isSome } from '$lib/Options';
 
 	let {
 		activity,
 		onClick,
-		listFormat,
 		isSelected = false
 	}: {
 		activity: Activity;
 		onClick?: () => void;
 		isSelected?: boolean;
-		listFormat: ActivityListSummaryItems;
 	} = $props();
 
 	let title = $derived(
@@ -31,29 +28,44 @@
 		return 'other';
 	};
 
+	let duration: Option<string> = $derived.by(() => {
+		const duration = activity.metrics['ActiveDuration'];
+		if (duration === undefined) {
+			return none();
+		}
+		return some(formatDurationCompactWithUnits(duration.value));
+	});
+
 	const handleClick = (event: MouseEvent) => {
 		if (onClick) {
 			event.preventDefault();
 			onClick();
 		}
 	};
+	let selectedClass = $derived(isSelected ? 'selected' : '');
 </script>
 
 <a
 	href={`/activity/${activity.id}`}
-	class={`item_container @container ${categoryClass(activity.sport_category)} ${isSelected ? 'selected' : ''}`}
+	class={`
+		item_container w-full
+		${categoryClass(activity.sport_category)}
+		${selectedClass}`}
 	onclick={handleClick}
 >
-	<div class={`flex flex-1 items-center pl-2 ${categoryClass(activity.sport_category)}`}>
-		<div class={`icon ${categoryClass(activity.sport_category)}`}>
-			<img
-				src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-				class="h-6 w-6"
-				alt="Sport icon"
-			/>
-		</div>
-		<div class="flex-1">
-			<div class="flex flex-col">
+	<div class="flex-1 flex flex-col">
+		<div class="flex flex-row items-center">
+			<!-- Sport icon -->
+			<div class={`icon ${categoryClass(activity.sport_category)}`}>
+				<img
+					src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+					class="h-6 w-6"
+					alt="Sport icon"
+				/>
+			</div>
+
+			<!-- Activity name -->
+			<div class="flex-1 flex flex-col h-full pl-2">
 				<div class="mb-1 font-semibold">{title}</div>
 				<div class="text-xs font-light">
 					{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
@@ -61,54 +73,47 @@
 					).format('MMM D, YYYY')}
 				</div>
 			</div>
+
+			<!-- Activity duration -->
+			{#if isSome(duration)}
+				<span class="font-semibold">
+					{duration.value}
+				</span>
+			{/if}
 		</div>
-		<div class="flex flex-row items-center justify-center gap-2">
-			{#each listFormat as row}
-				{#if row.type === 'rpe' && activity.rpe}
-					<span class={`badge hidden badge-sm @md:inline ${getRpeClass(activity.rpe)}`}>
-						RPE {activity.rpe}
-					</span>
-				{:else if row.type === 'workoutType' && activity.workout_type}
-					<span
-						class={`badge hidden badge-sm @md:inline ${getWorkoutTypeClass(activity.workout_type)}`}
-					>
-						{getWorkoutTypeLabel(activity.workout_type)}
-					</span>
-				{:else if row.type === 'metric'}
-					{@const metric = activity.metrics[row.value]}
-					{#if metric !== undefined}
-						<span class="font-semibold sm:text-lg">
-							{#if metric.unit === 's'}
-								{formatDuration(metric.value)}
-							{:else}
-								{metric.value.toFixed(0)} {metric.unit}
-							{/if}
-						</span>
-					{/if}
-				{/if}
-			{/each}
-		</div>
-	</div>
-	{#if activity.feedback}
-		<div
-			class="mx-3 my-1 box-border flex flex-row items-start gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
-		>
-			<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
-			<div>
-				{activity.feedback}
+
+		{#if activity.feedback}
+			<div
+				class="sticky-left mx-3 my-1 box-border flex flex-row items-start gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+			>
+				<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
+				<div class="feedback">
+					{activity.feedback}
+				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </a>
 
 <style>
-	.item_container:hover {
+	a {
+		padding-left: 2px;
+		padding-right: 2px;
+	}
+
+	.hovered {
 		background: #f7fafc;
 	}
 
+	.sticky-left {
+		position: sticky;
+		left: 0;
+	}
+
 	.item_container {
-		padding-block: calc(var(--spacing) * 1);
-		padding-right: calc(var(--spacing) * 1);
+		padding-block: calc(var(--spacing) * 2);
+		padding-right: calc(var(--spacing) * 2);
+		padding-left: calc(var(--spacing) * 2);
 		box-sizing: border-box;
 		border-left: 4px solid transparent;
 		border-radius: 0px;
@@ -116,8 +121,10 @@
 
 	@media (min-width: 700px) {
 		.item_container.selected {
-			background: #e6eef5;
 			border-left-width: 6px;
+		}
+		.selected {
+			background: #e6eef5;
 		}
 	}
 
@@ -140,8 +147,6 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		margin-right: 16px;
-		font-size: 20px;
 		flex-shrink: 0;
 	}
 
@@ -213,5 +218,9 @@
 	.rpe-max {
 		background-color: var(--color-rpe-max);
 		color: var(--color-rpe-max-text);
+	}
+
+	.feedback {
+		max-width: min(75vw, 500px);
 	}
 </style>

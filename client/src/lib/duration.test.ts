@@ -4,7 +4,8 @@ import {
 	formatRelativeDuration,
 	formatDateTime,
 	formatWeekInterval,
-	formatDurationHoursMinutes
+	formatDurationHoursMinutes,
+	formatDurationCompactWithUnits
 } from './duration';
 import dayjs from 'dayjs';
 
@@ -96,5 +97,65 @@ describe('formatDurationHoursMinutes', () => {
 		expect(formatDurationHoursMinutes(3600)).toEqual('1h 00m');
 		expect(formatDurationHoursMinutes(3600 * 10)).toEqual('10h 00m');
 		expect(formatDurationHoursMinutes(3600 * 100)).toEqual('100h 00m');
+	});
+});
+
+describe('formatDurationCompactWithUnits', () => {
+	it('Should return 0m for zero seconds', () => {
+		expect(formatDurationCompactWithUnits(0)).toEqual('0m');
+	});
+
+	it('Should format seconds as minutes (rounded down)', () => {
+		// Less than a minute shows 0m
+		expect(formatDurationCompactWithUnits(30)).toEqual('0m');
+		expect(formatDurationCompactWithUnits(59)).toEqual('0m');
+	});
+
+	it('Should format minutes only (no hours)', () => {
+		expect(formatDurationCompactWithUnits(60)).toEqual('1m');
+		expect(formatDurationCompactWithUnits(120)).toEqual('2m');
+		expect(formatDurationCompactWithUnits(300)).toEqual('5m');
+		expect(formatDurationCompactWithUnits(1800)).toEqual('30m');
+		expect(formatDurationCompactWithUnits(3599)).toEqual('59m');
+	});
+
+	it('Should format hours and minutes with zero-padded minutes', () => {
+		expect(formatDurationCompactWithUnits(3600)).toEqual('1h00');
+		expect(formatDurationCompactWithUnits(3660)).toEqual('1h01');
+		expect(formatDurationCompactWithUnits(3660 + 9)).toEqual('1h01'); // Seconds ignored
+		expect(formatDurationCompactWithUnits(5400)).toEqual('1h30');
+		expect(formatDurationCompactWithUnits(7200)).toEqual('2h00');
+		expect(formatDurationCompactWithUnits(36000)).toEqual('10h00');
+		expect(formatDurationCompactWithUnits(86399)).toEqual('23h59');
+	});
+
+	it('Should format days and hours with zero-padded hours', () => {
+		expect(formatDurationCompactWithUnits(86400)).toEqual('1d00h');
+		expect(formatDurationCompactWithUnits(86400 + 3600)).toEqual('1d01h');
+		expect(formatDurationCompactWithUnits(86400 + 3600 * 5)).toEqual('1d05h');
+		expect(formatDurationCompactWithUnits(86400 + 3600 * 12)).toEqual('1d12h');
+		expect(formatDurationCompactWithUnits(86400 * 2)).toEqual('2d00h');
+		expect(formatDurationCompactWithUnits(86400 * 10)).toEqual('10d00h');
+		expect(formatDurationCompactWithUnits(86400 * 10 + 3600 * 23)).toEqual('10d23h');
+	});
+
+	it('Should ignore seconds in all formats', () => {
+		// Minutes format
+		expect(formatDurationCompactWithUnits(61)).toEqual('1m');
+		expect(formatDurationCompactWithUnits(119)).toEqual('1m');
+
+		// Hours format
+		expect(formatDurationCompactWithUnits(3661)).toEqual('1h01');
+		expect(formatDurationCompactWithUnits(3719)).toEqual('1h01');
+
+		// Days format
+		expect(formatDurationCompactWithUnits(86400 + 59)).toEqual('1d00h');
+		expect(formatDurationCompactWithUnits(86400 + 3600 + 59)).toEqual('1d01h');
+	});
+
+	it('Should handle decimal inputs by flooring', () => {
+		expect(formatDurationCompactWithUnits(60.9)).toEqual('1m');
+		expect(formatDurationCompactWithUnits(3600.9)).toEqual('1h00');
+		expect(formatDurationCompactWithUnits(86400.9)).toEqual('1d00h');
 	});
 });

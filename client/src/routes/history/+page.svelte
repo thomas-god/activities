@@ -75,7 +75,7 @@
 
 	const handleActivitySelected = (activityId: string | null) => {
 		if (activityId === null) {
-			activityId = null;
+			selectedActivityId = null;
 			selectedActivityPromise = null;
 			return;
 		}
@@ -91,10 +91,10 @@
 		selectedActivityPromise = fetchActivityDetails(fetch, activityId);
 	};
 
-	const handleActivityDeleted = (activiyId: string) => {
+	const handleActivityDeleted = (activityId: string) => {
 		selectedActivityId = null;
 		selectedActivityPromise = null;
-		activities = activities.filter((activity) => activity.id !== activiyId);
+		activities = activities.filter((activity) => activity.id !== activityId);
 	};
 
 	const handleActivityUpdated = (updatedActivity: ActivityWithTimeseries) => {
@@ -110,7 +110,6 @@
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
-
 <NavbarActivities
 	invalidateActivities={() => invalidate('app:activities')}
 	invalidateTrainingNotes={() => invalidate('app:training-notes')}

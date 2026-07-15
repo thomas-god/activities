@@ -55,15 +55,15 @@ export const formatDurationCompactWithUnits = (time: number): string => {
 	const seconds = remaining - minutes * ONE_MINUTE_IN_SECONDS;
 
 	if (time === 0) {
-		return '';
+		return '0m';
 	}
 
 	if (days === 0 && hours === 0) {
-		return `${minutes.toString().padStart(2, '0')}m`;
+		return `${minutes.toString()}m`;
 	}
 
 	if (days === 0) {
-		return `${hours.toString()}h${minutes.toString().padStart(2, '0')}m`;
+		return `${hours.toString()}h${minutes.toString().padStart(2, '0')}`;
 	}
 
 	return `${days.toString()}d${hours.toString().padStart(2, '0')}h`;
