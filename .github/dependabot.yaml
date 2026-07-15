@@ -25,6 +25,9 @@ updates:
       all:
         patterns:
           - "*"
+    ignore:
+      # ESLint not yet compatible with TS7 https://github.com/typescript-eslint/typescript-eslint/issues/10940
+      - dependency-name: typescript
     schedule:
       interval: "weekly"
       day: "monday"
