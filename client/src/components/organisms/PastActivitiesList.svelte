@@ -12,12 +12,14 @@
 		moreCallback,
 		onActivityClick,
 		activityListFormat,
+		noteChangedCallback,
 		selectedActivityId = null
 	}: {
 		activityList: ActivityList;
 		trainingNotes?: TrainingNotesList;
 		moreCallback: () => void;
 		onActivityClick: (activityId: string) => void;
+		noteChangedCallback: () => void;
 		selectedActivityId?: string | null;
 		activityListFormat: ActivityListSummaryItems;
 	} = $props();
@@ -93,6 +95,7 @@
 		{activityListFormat}
 		{timeline}
 		showGroupNumberOfActivities={false}
+		{noteChangedCallback}
 	/>
 
 	{#if activityList.length !== 0 || trainingNotes.length !== 0}

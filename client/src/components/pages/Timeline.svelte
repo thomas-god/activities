@@ -10,6 +10,7 @@
 		notes,
 		selectedActivityId,
 		selectActivityCallback,
+		noteChangedCallback,
 		activityListFormat,
 		endDate = null
 	}: {
@@ -17,6 +18,7 @@
 		notes: TrainingNotesList;
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
+		noteChangedCallback: () => void;
 		endDate?: string | null;
 		activityListFormat: ActivityListSummaryItems;
 	} = $props();
@@ -64,4 +66,5 @@
 	{selectActivityCallback}
 	{activityListFormat}
 	timeline={timelineByMonth}
+	{noteChangedCallback}
 />

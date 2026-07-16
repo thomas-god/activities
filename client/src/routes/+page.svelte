@@ -126,6 +126,7 @@
 					onActivityClick={handleActivityClick}
 					{selectedActivityId}
 					{activityListFormat}
+					noteChangedCallback={() => invalidate('app:activities')}
 				/>
 			{/await}
 		</div>

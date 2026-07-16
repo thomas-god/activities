@@ -50,8 +50,12 @@
 		period_id === undefined ? none() : some(fetchTrainingPeriodMetrics(fetch, period_id));
 	const updateMetricsPromise = () => (metricsPromise = generateMetricsPromise());
 	let metricsPromise: Option<Promise<TrainingMetricList>> = $derived(generateMetricsPromise());
+
+	const generateTrainingNotesPromise = (): Option<Promise<TrainingNotesList>> =>
+		period_id === undefined ? none() : some(fetchTrainingPeriodNotes(fetch, period_id));
+	const updateTrainingNotesPromise = () => (trainingNotesPromise = generateTrainingNotesPromise());
 	let trainingNotesPromise: Option<Promise<TrainingNotesList>> = $derived(
-		period_id === undefined ? none() : some(fetchTrainingPeriodNotes(fetch, period_id))
+		generateTrainingNotesPromise()
 	);
 
 	let showDeleteModal = $state(false);
@@ -561,6 +565,7 @@
 								{selectActivityCallback}
 								endDate={periodDetails.end}
 								{activityListFormat}
+								noteChangedCallback={updateTrainingNotesPromise}
 							/>
 						</div>
 					{/await}

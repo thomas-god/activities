@@ -9,11 +9,13 @@
 		selectActivityCallback,
 		activityListFormat,
 		timeline,
+		noteChangedCallback,
 		showGroupNumberOfActivities = true
 	}: {
 		timeline: Map<string, TimelineItem[]>;
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
+		noteChangedCallback: () => void;
 		activityListFormat: ActivityListSummaryItems;
 		showGroupNumberOfActivities?: boolean;
 	} = $props();
@@ -93,7 +95,7 @@
 					/>
 				{:else}
 					<div class="training-note">
-						<TrainingNoteComponent note={item.data} />
+						<TrainingNoteComponent note={item.data} noteChanged={noteChangedCallback} />
 					</div>
 				{/if}
 			{/each}

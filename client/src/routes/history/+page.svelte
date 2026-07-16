@@ -208,6 +208,7 @@
 							{selectedActivityId}
 							selectActivityCallback={handleActivitySelected}
 							{activityListFormat}
+							noteChangedCallback={() => invalidate('app:training-notes')}
 						/>
 					</div>
 				</div>

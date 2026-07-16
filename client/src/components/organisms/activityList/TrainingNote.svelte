@@ -2,12 +2,13 @@
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
 	import DeleteModal from '$components/molecules/DeleteModal.svelte';
-	import { invalidate } from '$app/navigation';
 
 	let {
-		note
+		note,
+		noteChanged
 	}: {
 		note: TrainingNote;
+		noteChanged: () => void;
 	} = $props();
 
 	let showEditModal = $state(false);
@@ -42,13 +43,13 @@
 		showEditModal = false;
 		editContent = '';
 		editDate = '';
-		invalidate('app:training-notes');
+		noteChanged();
 	};
 
 	const deleteNote = async () => {
 		const success = await deleteTrainingNote(note.id);
 		if (success) {
-			invalidate('app:training-notes');
+			noteChanged();
 		}
 	};
 </script>
