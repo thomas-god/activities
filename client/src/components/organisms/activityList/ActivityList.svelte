@@ -94,8 +94,12 @@
 											listFormat={activityListFormat}
 										/>
 									{:else}
-										<TrainingNoteListItemCompact note={item.data} />
+										<div
+											style:grid-column={`1 / span ${activityListFormat.length + 2}`}
+											class="training-note sticky-left"
+										>
 											<TrainingNoteComponent note={item.data} />
+										</div>
 									{/if}
 								{/each}
 							{/each}
@@ -158,5 +162,9 @@
 	.sticky-left {
 		position: sticky;
 		left: 0;
+	}
+
+	.training-note {
+		max-width: min(75vw, 500px);
 	}
 </style>
