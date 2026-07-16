@@ -5,7 +5,13 @@
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
 	import { dayjs } from '$lib/duration';
-	import { fetchActivityDetails, fetchActivityListSummary } from '$lib/api';
+	import {
+		fetchActivityDetails,
+		fetchActivityListSummary,
+		setPreference,
+		type ActivityListSummaryItems,
+		type PreferencePayload
+	} from '$lib/api';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
 	import Timeline from '$components/pages/Timeline.svelte';
@@ -13,6 +19,7 @@
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
+	import ActivityListSummaryDialog from '$components/organisms/ActivityListSummaryDialog.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -107,6 +114,22 @@
 	const handleDownloadClick = () => {
 		showDownloadModal = true;
 	};
+
+	let activityListSummaryOpen = $state(false);
+	const updateActivityListSummary = async (items: ActivityListSummaryItems): Promise<boolean> => {
+		const payload: PreferencePayload = {
+			key: 'activity_list_summary',
+			value: {
+				scope: { type: 'global' },
+				items
+			}
+		};
+
+		return setPreference(fetch, payload).then((res) => {
+			invalidate('app:activities');
+			return res;
+		});
+	};
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
@@ -150,6 +173,14 @@
 							}
 						/>
 					{/await}
+					<button
+						class="btn join-item btn-sm hidden @min-[650px]/main:inline-flex"
+						onclick={() => (activityListSummaryOpen = true)}
+						title="Customize history view"
+					>
+						<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
+						<span class="ml-1 hidden sm:inline">Customize</span>
+					</button>
 					<button
 						class="btn join-item btn-sm"
 						onclick={handleDownloadClick}
@@ -242,3 +273,12 @@
 		</div>
 	{/if}
 </div>
+
+{#await Promise.all( [data.defaultMetrics, data.activityListSummary] ) then [defaultMetrics, currentPreference]}
+	<ActivityListSummaryDialog
+		{defaultMetrics}
+		{currentPreference}
+		onSave={updateActivityListSummary}
+		bind:isOpen={activityListSummaryOpen}
+	/>
+{/await}
