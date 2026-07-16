@@ -544,6 +544,28 @@ def create_standalone_activity(
     return created_id
 
 
+def set_activity_list_summery():
+    response = requests.post(
+        f"{API_URL}/preferences",
+        json={
+            "key": "activity_list_summary",
+            "value": {
+                "scope": {"type": "trainingPeriod", "trainingPeriodId": "test-id"},
+                "items": [
+                    {"type": "workoutType"},
+                    {"type": "rpe"},
+                    {"type": "metric", "value": "Distance"},
+                    {"type": "metric", "value": "ActiveDuration"},
+                    {"type": "metric", "value": "Calories"},
+                ],
+            },
+        },
+    )
+
+    if response.status_code != 204:
+        print("Failed to set activity list summary preference")
+
+
 def generate_demo_data() -> int:
     """Generate demo data."""
     today = datetime.now().date()
@@ -691,6 +713,8 @@ def generate_demo_data() -> int:
         note_date,
         "Completed longest run of the training block. Legs felt tired but recovery was ok after 2 days.",
     )
+
+    set_activity_list_summery()
 
     # Cleanup
     import shutil
