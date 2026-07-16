@@ -1,18 +1,27 @@
 <script lang="ts">
 	import { formatRelativeDuration, dayjs, formatDurationCompactWithUnits } from '$lib/duration';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
-	import type { Activity } from '$lib/api';
-	import { some, none, type Option, isSome } from '$lib/Options';
+	import type { Activity, ActivityListSummaryItems } from '$lib/api';
+	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
+	import { getRpeClass } from '$lib/rpe';
 
 	let {
 		activity,
 		onClick,
+		listFormat,
 		isSelected = false
 	}: {
 		activity: Activity;
 		onClick?: () => void;
 		isSelected?: boolean;
+		listFormat: MetricFormat[];
 	} = $props();
+
+	export interface MetricFormat {
+		format: ActivityListSummaryItems[number];
+		width: number;
+		show: boolean;
+	}
 
 	let title = $derived(
 		activity.name === null || activity.name === '' ? sportDisplay(activity.sport) : activity.name
@@ -28,13 +37,18 @@
 		return 'other';
 	};
 
-	let duration: Option<string> = $derived.by(() => {
-		const duration = activity.metrics['ActiveDuration'];
-		if (duration === undefined) {
-			return none();
+	const formatMetric = (
+		name: string,
+		metric: Activity['metrics'][string]
+	): { value: string; unit: string } => {
+		if (metric.unit === 's') {
+			return { value: formatDurationCompactWithUnits(metric.value), unit: '' };
 		}
-		return some(formatDurationCompactWithUnits(duration.value));
-	});
+		if (name === 'Distance' && metric.unit === 'm') {
+			return { value: (metric.value / 1000).toFixed(1), unit: 'km' };
+		}
+		return { value: metric.value.toFixed(0), unit: metric.unit };
+	};
 
 	const handleClick = (event: MouseEvent) => {
 		if (onClick) {
@@ -45,87 +59,134 @@
 	let selectedClass = $derived(isSelected ? 'selected' : '');
 </script>
 
-<a
-	href={`/activity/${activity.id}`}
-	class={`
-		item_container w-full
-		${categoryClass(activity.sport_category)}
-		${selectedClass}`}
-	onclick={handleClick}
+<div
+	class={`${selectedClass}
+    item_container
+    flex flex-row justify-between flex-wrap overflow-hidden gap-1
+    py-2
+    ${categoryClass(activity.sport_category)} hover:bg-base-200`}
 >
-	<div class="flex-1 flex flex-col">
+	<!-- Sport icon, activity title and date -->
+	<a
+		href={`/activity/${activity.id}`}
+		class="shrink grow"
+		style:min-width="350px"
+		style:flex-basis="350px"
+		onclick={handleClick}
+	>
 		<div class="flex flex-row items-center">
-			<!-- Sport icon -->
-			<div class={`icon ${categoryClass(activity.sport_category)}`}>
-				<img
-					src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-					class="h-6 w-6"
-					alt="Sport icon"
-				/>
+			<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
+				<div class={`icon ${categoryClass(activity.sport_category)}`}>
+					<img
+						src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+						class="h-6 w-6"
+						alt="Sport icon"
+					/>
+				</div>
 			</div>
 
-			<!-- Activity name -->
-			<div class="flex-1 flex flex-col h-full pl-2">
-				<div class="mb-1 font-semibold">{title}</div>
+			<div
+				class={`flex flex-col w-full justify-center ${categoryClass(activity.sport_category)} ${selectedClass}`}
+			>
+				<div class="mb-1 font-semibold">
+					{title}
+				</div>
 				<div class="text-xs font-light">
 					{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
 						activity.start_time
 					).format('MMM D, YYYY')}
 				</div>
 			</div>
-
-			<!-- Activity duration -->
-			{#if isSome(duration)}
-				<span class="font-semibold">
-					{duration.value}
-				</span>
-			{/if}
 		</div>
+	</a>
 
-		{#if activity.feedback}
-			<div
-				class="sticky-left mx-3 my-1 box-border flex flex-row items-start gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
-			>
-				<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
-				<div class="feedback">
-					{activity.feedback}
-				</div>
+	<!-- Activity metrics/details -->
+	<div class="flex flex-row items-center justify-start">
+		{#each listFormat as row}
+			<div style:width={`${row.width}px`} hidden={!row.show} class="text-center shrink-0">
+				{#if row.format.type === 'rpe'}
+					{#if activity.rpe}
+						<span class={`badge badge-sm inline ${getRpeClass(activity.rpe)}`}>
+							RPE {activity.rpe}
+						</span>
+					{:else}
+						-
+					{/if}
+				{:else if row.format.type === 'workoutType'}
+					{#if activity.workout_type}
+						<span class={`badge badge-sm ${getWorkoutTypeClass(activity.workout_type)}`}>
+							{getWorkoutTypeLabel(activity.workout_type)}
+						</span>
+					{:else}
+						-
+					{/if}
+				{:else if row.format.type === 'metric'}
+					{@const metric = activity.metrics[row.format.value]}
+					{#if metric !== undefined}
+						{@const formattedMetric = formatMetric(row.format.value, metric)}
+						<span>
+							<span class="font-semibold">
+								{formattedMetric.value}
+							</span>
+							<span class="text-xs font-light">
+								{formattedMetric.unit}
+							</span>
+						</span>
+					{:else}
+						-
+					{/if}
+				{/if}
 			</div>
-		{/if}
+		{/each}
 	</div>
-</a>
+</div>
+
+{#if activity.feedback}
+	<div
+		class={`sticky-left feedback
+		mx-3 my-1  py-2 pl-2 box-border
+		flex flex-row items-start gap-1
+		bg-orange-200/10
+		text-sm whitespace-pre-wrap text-gray-600 italic`}
+	>
+		<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
+		<div>
+			{activity.feedback}
+		</div>
+	</div>
+{/if}
 
 <style>
-	a {
-		padding-left: 2px;
-		padding-right: 2px;
-	}
-
-	.hovered {
-		background: #f7fafc;
-	}
-
 	.sticky-left {
 		position: sticky;
 		left: 0;
 	}
 
-	.item_container {
-		padding-block: calc(var(--spacing) * 2);
-		padding-right: calc(var(--spacing) * 2);
+	.icon_container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
 		padding-left: calc(var(--spacing) * 2);
+		padding-right: calc(var(--spacing) * 2);
 		box-sizing: border-box;
-		border-left: 4px solid transparent;
-		border-radius: 0px;
 	}
 
 	@media (min-width: 700px) {
-		.item_container.selected {
+		.icon_container.selected {
 			border-left-width: 6px;
 		}
 		.selected {
 			background: #e6eef5;
 		}
+	}
+
+	.item_container {
+		padding-block: calc(var(--spacing) * 2);
+		box-sizing: border-box;
+		border-left: 4px solid transparent;
+		border-radius: 0px;
 	}
 
 	.item_container.cycling {
