@@ -566,6 +566,7 @@
 								endDate={periodDetails.end}
 								{activityListFormat}
 								noteChangedCallback={updateTrainingNotesPromise}
+								renderByChunk={false}
 							/>
 						</div>
 					{/await}

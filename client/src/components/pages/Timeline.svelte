@@ -12,6 +12,7 @@
 		selectActivityCallback,
 		noteChangedCallback,
 		activityListFormat,
+		renderByChunk,
 		endDate = null
 	}: {
 		activities: ActivityList;
@@ -20,6 +21,7 @@
 		selectActivityCallback: (id: string) => void;
 		noteChangedCallback: () => void;
 		endDate?: string | null;
+		renderByChunk: boolean;
 		activityListFormat: ActivityListSummaryItems;
 	} = $props();
 
@@ -67,4 +69,5 @@
 	{activityListFormat}
 	timeline={timelineByMonth}
 	{noteChangedCallback}
+	{renderByChunk}
 />

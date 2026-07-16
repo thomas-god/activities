@@ -125,7 +125,7 @@
 					{#if metric !== undefined}
 						{@const formattedMetric = formatMetric(row.format.value, metric)}
 						<span>
-							<span class="font-semibold">
+							<span class="text-sm font-semibold">
 								{formattedMetric.value}
 							</span>
 							<span class="text-xs font-light">

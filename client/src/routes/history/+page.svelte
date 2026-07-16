@@ -133,15 +133,18 @@
 </script>
 
 <svelte:window bind:innerWidth={screenWidth} />
-<NavbarActivities
-	invalidateActivities={() => invalidate('app:activities')}
-	invalidateTrainingNotes={() => invalidate('app:training-notes')}
-/>
 
-<div class="flex flex-row gap-2">
-	<div class="@container/main mt-5 grow rounded-box bg-base-100 p-4 shadow-md">
+<div class="flex flex-col">
+	<NavbarActivities
+		invalidateActivities={() => invalidate('app:activities')}
+		invalidateTrainingNotes={() => invalidate('app:training-notes')}
+	/>
+
+	<div class="@container/main mt-5 rounded-box bg-base-100 px-4 shadow-md flex flex-col">
 		<!-- View Toggle -->
-		<div class="mb-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center">
+		<div
+			class="py-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center sticky top-0 bg-base-100"
+		>
 			<h1 class="hidden text-2xl font-bold @sm/main:block">History</h1>
 			<div class="flex gap-0.5 sm:gap-2">
 				<div class="join">
@@ -200,18 +203,15 @@
 			</div>
 		{:then [_, notes, activityListFormat]}
 			{#if viewMode === 'list'}
-				<div class="flex h-screen flex-row gap-2 overflow-hidden">
-					<div class="grow basis-0 overflow-y-auto">
-						<Timeline
-							activities={filteredActivities}
-							{notes}
-							{selectedActivityId}
-							selectActivityCallback={handleActivitySelected}
-							{activityListFormat}
-							noteChangedCallback={() => invalidate('app:training-notes')}
-						/>
-					</div>
-				</div>
+				<Timeline
+					activities={filteredActivities}
+					{notes}
+					{selectedActivityId}
+					selectActivityCallback={handleActivitySelected}
+					{activityListFormat}
+					noteChangedCallback={() => invalidate('app:training-notes')}
+					renderByChunk={true}
+				/>
 			{:else}
 				<ActivitiesCalendar
 					activityList={filteredActivities}

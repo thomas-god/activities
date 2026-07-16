@@ -96,6 +96,7 @@
 		{timeline}
 		showGroupNumberOfActivities={false}
 		{noteChangedCallback}
+		renderByChunk={false}
 	/>
 
 	{#if activityList.length !== 0 || trainingNotes.length !== 0}
