@@ -114,11 +114,15 @@
 
 {#if activity.feedback}
 	<div
-		class="sticky-left mx-3 my-1 box-border flex flex-row items-start gap-1 bg-orange-200/10 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+		class={`sticky-left feedback
+		mx-3 my-1  py-2 pl-2 box-border
+		flex flex-row items-start gap-1
+		bg-orange-200/10
+		text-sm whitespace-pre-wrap text-gray-600 italic`}
 		style:grid-column={`1 / span ${listFormat.length + 2}`}
 	>
 		<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
-		<div class="feedback">
+		<div>
 			{activity.feedback}
 		</div>
 	</div>

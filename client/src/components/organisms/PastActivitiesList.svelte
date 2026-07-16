@@ -2,7 +2,9 @@
 	import { dayjs } from '$lib/duration';
 	import type { ActivityList, ActivityListSummaryItems } from '$lib/api';
 	import type { TrainingNotesList } from '$lib/api/training';
-	import ActivityListComponent, { type TimelineItem } from './ActivityList.svelte';
+	import ActivityListComponent, {
+		type TimelineItem
+	} from '$components/organisms/activityList/ActivityList.svelte';
 
 	let {
 		activityList,

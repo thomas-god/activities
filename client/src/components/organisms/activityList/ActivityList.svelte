@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { Activity, ActivityListSummaryItems, TrainingNote } from '$lib/api';
-	import ActivityListItem from '$components/organisms/ActivityListItem.svelte';
-	import TrainingNoteListItemCompact from '$components/organisms/TrainingNoteListItemCompact.svelte';
 	import { toTitleCase } from '$lib/utils';
-	import ActivityListItemWithDetails from './ActivityListItemWithDetails.svelte';
 	import LazyKeepAliveObserved from '$components/atoms/utils/LazyKeepAliveObserved.svelte';
 	import ResponsiveSwitch from '$components/atoms/utils/ResponsiveSwitch.svelte';
+	import TrainingNoteComponent from './TrainingNote.svelte';
+	import ActivityComponent from './Activity.svelte';
+	import ActivityWithDetails from './ActivityWithDetails.svelte';
 
 	let {
 		selectedActivityId,
@@ -87,7 +87,7 @@
 								{/if}
 								{#each items as item (item.date)}
 									{#if item.type === 'activity'}
-										<ActivityListItemWithDetails
+										<ActivityWithDetails
 											activity={item.data}
 											onClick={() => selectActivityCallback(item.data.id)}
 											isSelected={selectedActivityId === item.data.id}
@@ -95,6 +95,7 @@
 										/>
 									{:else}
 										<TrainingNoteListItemCompact note={item.data} />
+											<TrainingNoteComponent note={item.data} />
 									{/if}
 								{/each}
 							{/each}
@@ -121,14 +122,14 @@
 								{#each items as item (item.date)}
 									{#if item.type === 'activity'}
 										<div class="flex flex-row">
-											<ActivityListItem
+											<ActivityComponent
 												activity={item.data}
 												onClick={() => selectActivityCallback(item.data.id)}
 												isSelected={selectedActivityId === item.data.id}
 											/>
 										</div>
 									{:else}
-										<TrainingNoteListItemCompact note={item.data} />
+										<TrainingNoteComponent note={item.data} />
 									{/if}
 								{/each}
 							{/each}
