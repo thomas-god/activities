@@ -69,7 +69,7 @@
 </div>
 
 <div
-	class={`flex flex-col h-full w-full justify-center col-start-2 sticky-left bg-base-100 ${categoryClass(activity.sport_category)} ${selectedClass}`}
+	class={`flex flex-col w-full justify-center col-start-2 sticky-left bg-base-100 ${categoryClass(activity.sport_category)} ${selectedClass}`}
 >
 	<div class="mb-1 font-semibold">
 		<a href={`/activity/${activity.id}`} onclick={handleClick} class="hover:link">

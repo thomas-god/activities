@@ -96,7 +96,7 @@
 									{:else}
 										<div
 											style:grid-column={`1 / span ${activityListFormat.length + 2}`}
-											class="training-note sticky-left"
+											class="training-note"
 										>
 											<TrainingNoteComponent note={item.data} />
 										</div>
