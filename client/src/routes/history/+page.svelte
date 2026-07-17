@@ -140,139 +140,144 @@
 		invalidateTrainingNotes={() => invalidate('app:training-notes')}
 	/>
 
-	<div class="@container/main mt-5 rounded-box bg-base-100 px-4 shadow-md flex flex-col">
-		<!-- View Toggle -->
-		<div
-			class="py-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center sticky top-0 bg-base-100"
-		>
-			<h1 class="hidden text-2xl font-bold @sm/main:block">History</h1>
-			<div class="flex gap-0.5 sm:gap-2">
-				<div class="join">
-					<button
-						class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
-						onclick={() => setViewMode('list')}
-					>
-						<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
-						<span class="ml-1 hidden @sm/main:inline">List</span>
-					</button>
-					<button
-						class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
-						onclick={() => setViewMode('calendar')}
-					>
-						<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
-						<span class="ml-1 hidden @sm/main:inline">Calendar</span>
-					</button>
-				</div>
-				<div class="join">
-					{#await data.activities then _}
-						<ActivitiesFiltersComponent
-							{activities}
-							bind:filteredActivities
-							bind:filters={
-								() => filters,
-								(f) => {
-									handleFilterChange(f);
-								}
-							}
-						/>
-					{/await}
-					<button
-						class="btn join-item btn-sm hidden @min-[650px]/main:inline-flex"
-						onclick={() => (activityListSummaryOpen = true)}
-						title="Customize history view"
-					>
-						<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
-						<span class="ml-1 hidden sm:inline">Customize</span>
-					</button>
-					<button
-						class="btn join-item btn-sm"
-						onclick={handleDownloadClick}
-						title="Download all activities as ZIP"
-					>
-						<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
-						<span class="ml-1 hidden sm:inline">Download</span>
-					</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- View Content -->
-		{#await Promise.all([data.activities, data.notes, fetchActivityListSummary(fetch)])}
-			<div class="flex w-full flex-col items-center p-4 pt-6">
-				<div class="loading loading-bars"></div>
-			</div>
-		{:then [_, notes, activityListFormat]}
-			{#if viewMode === 'list'}
-				<Timeline
-					activities={filteredActivities}
-					{notes}
-					{selectedActivityId}
-					selectActivityCallback={handleActivitySelected}
-					{activityListFormat}
-					noteChangedCallback={() => invalidate('app:training-notes')}
-					renderByChunk={true}
-				/>
-			{:else}
-				<ActivitiesCalendar
-					activityList={filteredActivities}
-					onActivitySelected={handleActivitySelected}
-					{currentMonth}
-					onMonthChange={handleMonthChange}
-				/>
-			{/if}
-
-			<DownloadActivitiesModal bind:isOpen={showDownloadModal} activityCount={activities.length} />
-		{/await}
-	</div>
-
-	{#if selectedActivityPromise && screenWidth >= 700}
-		<div
-			class="relative mt-5 w-full grow basis-0 overflow-auto rounded-box bg-base-100 p-4 pt-4 shadow-md"
-		>
-			{#await selectedActivityPromise}
-				<div class="flex items-center justify-center">
-					<span class="loading loading-lg loading-spinner"></span>
-				</div>
-			{:then selectedActivity}
-				{#if selectedActivity}
-					<div class="absolute right-3 join">
+	<div class="flex flex-row gap-2 items-start">
+		<div class="@container/main mt-5 rounded-box bg-base-100 px-4 shadow-md flex flex-col grow">
+			<!-- View Toggle -->
+			<div
+				class="py-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center sticky top-0 bg-base-100"
+			>
+				<h1 class="hidden text-2xl font-bold @sm/main:block">History</h1>
+				<div class="flex gap-0.5 sm:gap-2">
+					<div class="join">
 						<button
-							onclick={() => goto(`/activity/${selectedActivityId}`)}
-							class="btn join-item btn-sm"
+							class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
+							onclick={() => setViewMode('list')}
 						>
-							<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button
-						>
+							<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
+							<span class="ml-1 hidden @sm/main:inline">List</span>
+						</button>
 						<button
-							onclick={() => {
-								handleActivitySelected(null);
-							}}
-							class="btn join-item btn-sm"
+							class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
+							onclick={() => setViewMode('calendar')}
 						>
-							<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
-						>
+							<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
+							<span class="ml-1 hidden @sm/main:inline">Calendar</span>
+						</button>
 					</div>
-					<ActivityDetails
-						activity={selectedActivity}
-						onActivityUpdated={handleActivityUpdated}
-						onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
-						compact={true}
+					<div class="join">
+						{#await data.activities then _}
+							<ActivitiesFiltersComponent
+								{activities}
+								bind:filteredActivities
+								bind:filters={
+									() => filters,
+									(f) => {
+										handleFilterChange(f);
+									}
+								}
+							/>
+						{/await}
+						<button
+							class="btn join-item btn-sm hidden @min-[650px]/main:inline-flex"
+							onclick={() => (activityListSummaryOpen = true)}
+							title="Customize history view"
+						>
+							<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
+							<span class="ml-1 hidden sm:inline">Customize</span>
+						</button>
+						<button
+							class="btn join-item btn-sm"
+							onclick={handleDownloadClick}
+							title="Download all activities as ZIP"
+						>
+							<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
+							<span class="ml-1 hidden sm:inline">Download</span>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- View Content -->
+			{#await Promise.all([data.activities, data.notes, fetchActivityListSummary(fetch)])}
+				<div class="flex w-full flex-col items-center p-4 pt-6">
+					<div class="loading loading-bars"></div>
+				</div>
+			{:then [_, notes, activityListFormat]}
+				{#if viewMode === 'list'}
+					<Timeline
+						activities={filteredActivities}
+						{notes}
+						{selectedActivityId}
+						selectActivityCallback={handleActivitySelected}
+						{activityListFormat}
+						noteChangedCallback={() => invalidate('app:training-notes')}
+						renderByChunk={true}
 					/>
 				{:else}
+					<ActivitiesCalendar
+						activityList={filteredActivities}
+						onActivitySelected={handleActivitySelected}
+						{currentMonth}
+						onMonthChange={handleMonthChange}
+					/>
+				{/if}
+
+				<DownloadActivitiesModal
+					bind:isOpen={showDownloadModal}
+					activityCount={activities.length}
+				/>
+			{/await}
+		</div>
+
+		{#if selectedActivityPromise && screenWidth >= 700}
+			<div
+				class="relative mt-5 w-full grow basis-0 overflow-auto rounded-box bg-base-100 p-4 pt-4 shadow-md"
+			>
+				{#await selectedActivityPromise}
+					<div class="flex items-center justify-center">
+						<span class="loading loading-lg loading-spinner"></span>
+					</div>
+				{:then selectedActivity}
+					{#if selectedActivity}
+						<div class="absolute right-3 join">
+							<button
+								onclick={() => goto(`/activity/${selectedActivityId}`)}
+								class="btn join-item btn-sm"
+							>
+								<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button
+							>
+							<button
+								onclick={() => {
+									handleActivitySelected(null);
+								}}
+								class="btn join-item btn-sm"
+							>
+								<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
+							>
+						</div>
+						<ActivityDetails
+							activity={selectedActivity}
+							onActivityUpdated={handleActivityUpdated}
+							onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
+							compact={true}
+						/>
+					{:else}
+						<div
+							class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+						>
+							Failed to load activity
+						</div>
+					{/if}
+				{:catch error}
 					<div
 						class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
 					>
-						Failed to load activity
+						Failed to load activity: {error.message}
 					</div>
-				{/if}
-			{:catch error}
-				<div
-					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-				>
-					Failed to load activity: {error.message}
-				</div>
-			{/await}
-		</div>
-	{/if}
+				{/await}
+			</div>
+		{/if}
+	</div>
 </div>
 
 {#await Promise.all( [data.defaultMetrics, data.activityListSummary] ) then [defaultMetrics, currentPreference]}
