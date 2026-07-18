@@ -13,7 +13,7 @@ COPY long_ride.tcx /long_ride.tcx
 RUN chmod +x /usr/local/bin/reset-demo.py
 
 # Create crontab for nightly reset at 3 AM UTC
-RUN echo "0 3 * * * /usr/local/bin/uv run /usr/local/bin/reset-demo.py >> /var/log/cron.log 2>&1" | crontab -
+RUN echo "0 3 * * * cd / && /usr/local/bin/uv run /usr/local/bin/reset-demo.py >> /var/log/cron.log 2>&1" | crontab -
 
 # Create entrypoint script
 RUN printf '#!/bin/bash\n\
