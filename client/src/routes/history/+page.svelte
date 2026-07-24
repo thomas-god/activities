@@ -231,7 +231,7 @@
 
 		{#if selectedActivityPromise && screenWidth >= 700}
 			<div
-				class="relative mt-5 w-full grow basis-0 overflow-auto rounded-box bg-base-100 p-4 pt-4 shadow-md"
+				class="selected-activity relative mt-5 w-full grow basis-0 overflow-auto rounded-box bg-base-100 p-4 pt-4 shadow-md"
 			>
 				{#await selectedActivityPromise}
 					<div class="flex items-center justify-center">
@@ -288,3 +288,9 @@
 		bind:isOpen={activityListSummaryOpen}
 	/>
 {/await}
+
+<style>
+	.selected-activity {
+		height: calc(80vh + 64px);
+	}
+</style>
