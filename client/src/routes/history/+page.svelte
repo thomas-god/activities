@@ -183,7 +183,7 @@
 							title="Customize history view"
 						>
 							<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
-							<span class="ml-1 hidden sm:inline">Customize</span>
+							<span class="ml-1 hidden @min-[600px]:inline">Customize</span>
 						</button>
 						<button
 							class="btn join-item btn-sm"
@@ -191,7 +191,7 @@
 							title="Download all activities as ZIP"
 						>
 							<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
-							<span class="ml-1 hidden sm:inline">Download</span>
+							<span class="ml-1 hidden @min-[600px]:inline">Download</span>
 						</button>
 					</div>
 				</div>
