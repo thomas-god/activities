@@ -38,17 +38,17 @@
 </script>
 
 {#if currentMetric && metrics.length > 0}
-	<div class="flex items-start justify-between pt-2 gap-1 px-1">
+	<div class="flex items-start justify-between gap-1 px-1 pt-2">
 		{#if metrics.length > 1}
 			<button
-				class="btn btn-circle btn-ghost btn-sm self-start"
+				class="btn btn-circle self-start btn-ghost btn-sm"
 				onclick={goToPrevious}
 				aria-label="Previous metric"
 			>
 				←
 			</button>
 		{/if}
-		<div class="flex flex-1 flex-row justify-center text-center h-full">
+		<div class="flex h-full flex-1 flex-row justify-center text-center">
 			{#if currentMetric.name}
 				{currentMetric.name}
 			{:else}
@@ -56,7 +56,7 @@
 			{/if}
 		</div>
 
-		<div class="self-start flex flex-row items-center gap-1">
+		<div class="flex flex-row items-center gap-1 self-start">
 			<div>
 				<TrainingMetricMenu
 					metric={currentMetric}

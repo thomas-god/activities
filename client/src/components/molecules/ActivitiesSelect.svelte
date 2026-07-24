@@ -73,7 +73,7 @@
 				/>
 			</div>
 			<button
-				class="btn mr-1 shrink-0 btn-xs btn-secondary"
+				class="btn mr-1 shrink-0 btn-secondary btn-xs"
 				onclick={() => {
 					removeActivity(activity);
 				}}>-</button
@@ -127,7 +127,7 @@
 						/>
 					</div>
 					<button
-						class="btn mr-1 shrink-0 btn-xs btn-primary"
+						class="btn mr-1 shrink-0 btn-primary btn-xs"
 						onclick={() => {
 							selectActivity(activity);
 						}}>+</button

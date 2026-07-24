@@ -21,7 +21,7 @@
 			{#each periods as period}
 				<TrainingPeriodCard {period} />
 			{:else}
-				<div class="text-center text-sm italic tracking-wide opacity-60">
+				<div class="text-center text-sm tracking-wide italic opacity-60">
 					No training periods found
 				</div>
 			{/each}

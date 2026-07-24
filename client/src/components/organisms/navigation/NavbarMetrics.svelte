@@ -18,7 +18,7 @@
 {#snippet cta()}
 	<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 		<button
-			class="btn w-46 rounded-lg btn-sm btn-primary sm:btn-md"
+			class="btn w-46 rounded-lg btn-primary btn-sm sm:btn-md"
 			onclick={() => {
 				showForm = true;
 				createTrainingMetricDialog.showModal();

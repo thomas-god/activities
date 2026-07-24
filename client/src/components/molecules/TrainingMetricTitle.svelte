@@ -8,8 +8,8 @@
 	const capitalize = (str: string) => (str ? str[0].toUpperCase() + str.slice(1) : '');
 </script>
 
-<div class="w-full flex flex-row items-center justify-center gap-1.5">
-	<div class="w-full font-medium text-center">
+<div class="flex w-full flex-row items-center justify-center gap-1.5">
+	<div class="w-full text-center font-medium">
 		{#if metric.name}
 			{metric.name}
 		{:else}

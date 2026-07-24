@@ -79,7 +79,7 @@
 
 		<div>
 			<label class="label" for="sa-date">Date & time</label>
-			<input type="datetime-local" class="input input-sm w-full" id="sa-date" bind:value={date} />
+			<input type="datetime-local" class="input w-full input-sm" id="sa-date" bind:value={date} />
 		</div>
 
 		<div>
@@ -87,7 +87,7 @@
 			<div class="join gap-1">
 				<input
 					type="number"
-					class="input input-sm join-item"
+					class="input join-item input-sm"
 					id="sa-duration-h"
 					min="0"
 					bind:value={durationHours}
@@ -95,7 +95,7 @@
 				<label class="join-item flex items-center bg-base-200 px-1" for="sa-duration-h">h</label>
 				<input
 					type="number"
-					class="input input-sm join-item"
+					class="input join-item input-sm"
 					id="sa-duration-m"
 					min="0"
 					bind:value={durationMinutes}
@@ -108,7 +108,7 @@
 			<label class="label" for="sa-distance">Distance (km, optional)</label>
 			<input
 				type="number"
-				class="input input-sm w-full"
+				class="input w-full input-sm"
 				id="sa-distance"
 				min="0"
 				step="0.1"
@@ -121,7 +121,7 @@
 			<label class="label" for="sa-elevation">Elevation (m, optional)</label>
 			<input
 				type="number"
-				class="input input-sm w-full"
+				class="input w-full input-sm"
 				id="sa-elevation"
 				min="0"
 				placeholder="e.g. 250"
@@ -133,7 +133,7 @@
 			<label class="label" for="sa-calories">Calories (kcal, optional)</label>
 			<input
 				type="number"
-				class="input input-sm w-full"
+				class="input w-full input-sm"
 				id="sa-calories"
 				min="0"
 				placeholder="e.g. 500"
@@ -143,7 +143,7 @@
 	</div>
 
 	<button
-		class="btn mt-3 w-full rounded-lg btn-sm btn-primary"
+		class="btn mt-3 w-full rounded-lg btn-primary btn-sm"
 		disabled={!canSubmit || formState === 'Pending'}
 		onclick={handleSubmit}
 	>

@@ -135,7 +135,7 @@
 		type="month"
 		value={monthInputValue}
 		oninput={handleMonthInput}
-		class="input input-sm input-ghost text-center text-base font-semibold sm:input-md sm:text-lg"
+		class="input input-ghost text-center text-base font-semibold input-sm sm:text-lg sm:input-md"
 	/>
 
 	<button onclick={goToToday} class="btn btn-ghost btn-xs sm:btn-sm">Today</button>

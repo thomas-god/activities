@@ -52,7 +52,7 @@
 
 		<div class="mt-2 flex flex-row items-center justify-center gap-2">
 			<button
-				class="btn flex-1 btn-sm btn-primary"
+				class="btn flex-1 btn-primary btn-sm"
 				onclick={handleCreateNote}
 				disabled={missingInformation || requestPending}
 			>

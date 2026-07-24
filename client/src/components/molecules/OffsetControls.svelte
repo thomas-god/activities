@@ -26,7 +26,7 @@
 		</div>
 		<div class="flex shrink-0 items-center">
 			<button
-				class="btn px-1 btn-ghost btn-xs"
+				class="btn btn-ghost px-1 btn-xs"
 				aria-label="Decrease offset by 10 seconds"
 				onclick={() => offsets.set(id, Math.max(-3600, (offsets.get(id) ?? 0) - 10))}>−</button
 			>
@@ -34,13 +34,13 @@
 				>{fmtOffset(offsets.get(id) ?? 0)}</span
 			>
 			<button
-				class="btn px-1 btn-ghost btn-xs"
+				class="btn btn-ghost px-1 btn-xs"
 				aria-label="Increase offset by 10 seconds"
 				onclick={() => offsets.set(id, Math.min(3600, (offsets.get(id) ?? 0) + 10))}>+</button
 			>
 		</div>
 		<button
-			class="btn px-1 opacity-50 btn-ghost btn-xs"
+			class="btn btn-ghost px-1 opacity-50 btn-xs"
 			class:invisible={(offsets.get(id) ?? 0) === 0}
 			onclick={() => offsets.set(id, 0)}
 			aria-label="Reset offset">✕</button

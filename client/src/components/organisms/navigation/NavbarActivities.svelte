@@ -24,11 +24,11 @@
 {#snippet cta()}
 	<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
 		<button
-			class="btn w-36 rounded-lg btn-sm btn-primary sm:btn-md"
+			class="btn w-36 rounded-lg btn-primary btn-sm sm:btn-md"
 			onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
 		>
 		<button
-			class="btn w-36 rounded-lg btn-sm btn-primary sm:btn-md"
+			class="btn w-36 rounded-lg btn-primary btn-sm sm:btn-md"
 			onclick={() => newTrainingNoteDialog.showModal()}>+ New note</button
 		>
 	</div>

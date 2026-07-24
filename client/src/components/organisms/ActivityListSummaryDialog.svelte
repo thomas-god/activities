@@ -139,7 +139,7 @@
 					<h4 class="mb-2 text-sm font-semibold">Selected statistics (in order)</h4>
 					<div
 						role="list"
-						class="space-y-2 rounded-box border border-base-300 bg-base-100 p-3 max-h-75 overflow-scroll"
+						class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
 						aria-label="Selected items"
 					>
 						{#if selectedItems.length === 0}
@@ -166,7 +166,7 @@
 
 									<!-- Up/down buttons for mobile -->
 									<button
-										class="btn px-0 btn-ghost btn-xs pointer-fine:hidden"
+										class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
 										onclick={() => moveItemUp(index)}
 										disabled={index === 0}
 										aria-label={`Move ${item.displayName} up`}
@@ -174,7 +174,7 @@
 										<img src="/icons/up.svg" class="h-4 w-4" alt="Up arrow" />
 									</button>
 									<button
-										class="btn px-0 btn-ghost btn-xs pointer-fine:hidden"
+										class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
 										onclick={() => moveItemDown(index)}
 										disabled={index === selectedItems.length - 1}
 										aria-label={`Move ${item.displayName} down`}
@@ -204,7 +204,7 @@
 					<h4 class="mb-2 text-sm font-semibold">Available statistics</h4>
 					<div
 						role="list"
-						class="space-y-2 rounded-box border border-base-300 bg-base-100 p-3 max-h-75 overflow-scroll"
+						class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
 						aria-label="Available items"
 					>
 						{#if availableItems.length === 0}

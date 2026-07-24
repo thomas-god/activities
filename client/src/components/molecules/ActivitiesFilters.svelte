@@ -225,7 +225,7 @@
 									min: isNaN(v) ? null : v * 60
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 						<span class="text-sm text-base-content/60">—</span>
 						<input
@@ -242,7 +242,7 @@
 									max: isNaN(v) ? null : v * 60
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 					</div>
 				</div>
@@ -268,7 +268,7 @@
 									min: isNaN(v) ? null : v * 1000
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 						<span class="text-sm text-base-content/60">—</span>
 						<input
@@ -288,7 +288,7 @@
 									max: isNaN(v) ? null : v * 1000
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 					</div>
 				</div>
@@ -311,7 +311,7 @@
 									min: isNaN(v) ? null : v
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 						<span class="text-sm text-base-content/60">—</span>
 						<input
@@ -328,7 +328,7 @@
 									max: isNaN(v) ? null : v
 								});
 							}}
-							class="input-bordered input input-sm w-28"
+							class="input-bordered input w-28 input-sm"
 						/>
 					</div>
 				</div>

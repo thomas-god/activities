@@ -178,14 +178,14 @@
 						/>
 
 						<button
-							class="btn px-0 btn-ghost btn-sm pointer-fine:hidden"
+							class="btn btn-ghost px-0 btn-sm pointer-fine:hidden"
 							aria-hidden="true"
 							onclick={() => moveMetricPositionUp(index)}
 						>
 							<img src="/icons/up.svg" class="h-5 w-5" alt="Up arrow icon" />
 						</button>
 						<button
-							class="btn px-0 btn-ghost btn-sm pointer-fine:hidden"
+							class="btn btn-ghost px-0 btn-sm pointer-fine:hidden"
 							aria-hidden="true"
 							onclick={() => moveMetricPositionDown(index)}
 						>

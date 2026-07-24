@@ -105,7 +105,7 @@
 >
 	{#each visibleItems as item, idx}
 		{#if item.type === 'header'}
-			<div class="flex flex-row justify-between overflow-x-hidden shrink-0">
+			<div class="flex shrink-0 flex-row justify-between overflow-x-hidden">
 				<div
 					class="bg-base-100 py-2 text-xs font-semibold tracking-wide text-base-content/60 uppercase"
 				>
@@ -119,7 +119,7 @@
 					<div class="flex flex-row text-center">
 						{#each metricFormats as header, header_index}
 							<div
-								class="text-xs text-center py-2"
+								class="py-2 text-center text-xs"
 								style:width={`${header.width}px`}
 								hidden={!header.show}
 							>
