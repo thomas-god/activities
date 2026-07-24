@@ -62,99 +62,94 @@
 <div
 	class={`${selectedClass}
     item_container
-    flex flex-row justify-between flex-wrap overflow-hidden gap-1
     py-2
     ${categoryClass(activity.sport_category)} hover:bg-base-200`}
 >
-	<!-- Sport icon, activity title and date -->
-	<a
-		href={`/activity/${activity.id}`}
-		class="shrink grow"
-		style:min-width="350px"
-		style:flex-basis="350px"
-		onclick={handleClick}
-	>
-		<div class="flex flex-row items-center">
-			<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
-				<div class={`icon ${categoryClass(activity.sport_category)}`}>
-					<img
-						src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-						class="h-6 w-6"
-						alt="Sport icon"
-					/>
+	<a href={`/activity/${activity.id}`} onclick={handleClick}>
+		<div class="shring flex grow flex-row flex-wrap justify-between gap-1 overflow-hidden">
+			<!-- Sport icon, activity title and date -->
+			<div class="flex flex-row items-center" style:min-width="350px" style:flex-basis="350px">
+				<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
+					<div class={`icon ${categoryClass(activity.sport_category)}`}>
+						<img
+							src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+							class="h-6 w-6"
+							alt="Sport icon"
+						/>
+					</div>
+				</div>
+
+				<div
+					class={`flex w-full flex-col justify-center ${categoryClass(activity.sport_category)} ${selectedClass}`}
+				>
+					<div class="mb-1 font-semibold">
+						{title}
+					</div>
+					<div class="text-xs font-light">
+						{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
+							activity.start_time
+						).format('MMM D, YYYY')}
+					</div>
 				</div>
 			</div>
 
-			<div
-				class={`flex flex-col w-full justify-center ${categoryClass(activity.sport_category)} ${selectedClass}`}
-			>
-				<div class="mb-1 font-semibold">
-					{title}
-				</div>
-				<div class="text-xs font-light">
-					{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
-						activity.start_time
-					).format('MMM D, YYYY')}
-				</div>
+			<!-- Activity metrics/details -->
+			<div class="flex flex-row items-center justify-start">
+				{#each listFormat as row}
+					<div style:width={`${row.width}px`} hidden={!row.show} class="shrink-0 text-center">
+						{#if row.format.type === 'rpe'}
+							{#if activity.rpe}
+								<span class={`badge inline badge-sm ${getRpeClass(activity.rpe)}`}>
+									RPE {activity.rpe}
+								</span>
+							{:else}
+								-
+							{/if}
+						{:else if row.format.type === 'workoutType'}
+							{#if activity.workout_type}
+								<span class={`badge badge-sm ${getWorkoutTypeClass(activity.workout_type)}`}>
+									{getWorkoutTypeLabel(activity.workout_type)}
+								</span>
+							{:else}
+								-
+							{/if}
+						{:else if row.format.type === 'metric'}
+							{@const metric = activity.metrics[row.format.value]}
+							{#if metric !== undefined}
+								{@const formattedMetric = formatMetric(row.format.value, metric)}
+								<span>
+									<span class="text-sm font-semibold">
+										{formattedMetric.value}
+									</span>
+									<span class="text-xs font-light">
+										{formattedMetric.unit}
+									</span>
+								</span>
+							{:else}
+								-
+							{/if}
+						{/if}
+					</div>
+				{/each}
 			</div>
+
+			{#if activity.feedback}
+				<div
+					class={`feedback
+					mx-3 my-1 box-border flex flex-row
+					items-start gap-1 rounded-xl ${isSelected ? 'bg-base-100/60' : 'bg-base-300/60'}
+					p-2
+					text-sm whitespace-pre-wrap text-gray-600 italic`}
+				>
+					<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
+					<div>
+						{activity.feedback}
+					</div>
+				</div>
+			{/if}
 		</div>
 	</a>
-
-	<!-- Activity metrics/details -->
-	<div class="flex flex-row items-center justify-start">
-		{#each listFormat as row}
-			<div style:width={`${row.width}px`} hidden={!row.show} class="text-center shrink-0">
-				{#if row.format.type === 'rpe'}
-					{#if activity.rpe}
-						<span class={`badge badge-sm inline ${getRpeClass(activity.rpe)}`}>
-							RPE {activity.rpe}
-						</span>
-					{:else}
-						-
-					{/if}
-				{:else if row.format.type === 'workoutType'}
-					{#if activity.workout_type}
-						<span class={`badge badge-sm ${getWorkoutTypeClass(activity.workout_type)}`}>
-							{getWorkoutTypeLabel(activity.workout_type)}
-						</span>
-					{:else}
-						-
-					{/if}
-				{:else if row.format.type === 'metric'}
-					{@const metric = activity.metrics[row.format.value]}
-					{#if metric !== undefined}
-						{@const formattedMetric = formatMetric(row.format.value, metric)}
-						<span>
-							<span class="text-sm font-semibold">
-								{formattedMetric.value}
-							</span>
-							<span class="text-xs font-light">
-								{formattedMetric.unit}
-							</span>
-						</span>
-					{:else}
-						-
-					{/if}
-				{/if}
-			</div>
-		{/each}
-	</div>
 </div>
-
-{#if activity.feedback}
-	<div
-		class={`feedback
-		mx-3 my-1 py-2 pl-2 box-border
-		flex flex-row items-start gap-1
-		bg-base-300/60 rounded-xl
-		text-sm whitespace-pre-wrap text-gray-600 italic`}
-	>
-		<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
-		<div>
-			{activity.feedback}
-		</div>
-	</div>
-{/if}
 
 <style>
 	.sticky-left {
