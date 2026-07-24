@@ -3,6 +3,7 @@
 	import { type ActivityWithTimeseries } from '$lib/api';
 	import { formatDateTime, formatDuration } from '$lib/duration';
 	import { paceToString } from '$lib/speed';
+	import { none, some, unwrapOr, type Option } from '$lib/Options';
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
@@ -10,7 +11,7 @@
 		label: string;
 		unit: string;
 		legend?: string;
-		values: (string | undefined)[];
+		values: Option<string>[];
 	};
 
 	let tableRows = $derived.by<TableRow[]>(() => {
@@ -20,7 +21,7 @@
 		rows.push({
 			label: 'Date',
 			unit: '',
-			values: activities.map((a) => formatDateTime(a.start_time))
+			values: activities.map((a) => some(formatDateTime(a.start_time)))
 		});
 
 		if (hasMetric('ActiveDuration')) {
@@ -28,8 +29,8 @@
 				label: 'Duration',
 				unit: '',
 				values: activities.map((a) => {
-					const v = a.metrics['ActiveDuration'].value;
-					return v !== undefined ? formatDuration(v) : undefined;
+					const v = a.metrics['ActiveDuration'];
+					return v !== undefined ? some(formatDuration(v.value)) : none();
 				})
 			});
 		}
@@ -39,8 +40,8 @@
 				label: 'Distance',
 				unit: 'km',
 				values: activities.map((a) => {
-					const v = a.metrics['Distance'].value;
-					return v !== undefined ? (v / 1000).toFixed(3) : undefined;
+					const v = a.metrics['Distance'];
+					return v !== undefined ? some((v.value / 1000).toFixed(3)) : none();
 				})
 			});
 		}
@@ -50,8 +51,8 @@
 				label: 'Calories',
 				unit: 'kcal',
 				values: activities.map((a) => {
-					const v = a.metrics['Calories'].value;
-					return v !== undefined ? v.toFixed(0) : undefined;
+					const v = a.metrics['Calories'];
+					return v !== undefined ? some(v.value.toFixed(0)) : none();
 				})
 			});
 		}
@@ -64,8 +65,8 @@
 					unit: '/km',
 					legend: 'avg',
 					values: activities.map((a) => {
-						const pace = a.metrics['AvgPace'].value;
-						return pace !== undefined ? paceToString((pace * 1000) / 60) : undefined;
+						const pace = a.metrics['AvgPace'];
+						return pace !== undefined ? some(paceToString((pace.value * 1000) / 60)) : none();
 					})
 				});
 			} else {
@@ -74,8 +75,8 @@
 					unit: 'km/h',
 					legend: 'avg',
 					values: activities.map((a) => {
-						const v = a.metrics['AvgSpeed'].value;
-						return v !== undefined ? (v * 3.6).toFixed(2) : undefined;
+						const v = a.metrics['AvgSpeed'];
+						return v !== undefined ? some((v.value * 3.6).toFixed(2)) : none();
 					})
 				});
 			}
@@ -86,8 +87,8 @@
 				label: 'Elevation',
 				unit: 'm',
 				values: activities.map((a) => {
-					const v = a.metrics['Elevation'].value;
-					return v !== undefined ? v.toFixed(0) : undefined;
+					const v = a.metrics['Elevation'];
+					return v !== undefined ? some(v.value.toFixed(0)) : none();
 				})
 			});
 		}
@@ -98,12 +99,12 @@
 				unit: 'bpm',
 				legend: 'avg / max',
 				values: activities.map((a) => {
-					const avg = a.metrics['AvgHeartRate'].value;
+					const avg = a.metrics['AvgHeartRate'];
 					const max = a.metrics['MaxHeartRate'];
 					if (avg !== undefined && max !== undefined)
-						return `${avg.toFixed(0)} / ${max.value.toFixed(0)}`;
-					if (avg !== undefined) return avg.toFixed(0);
-					return undefined;
+						return some(`${avg.value.toFixed(0)} / ${max.value.toFixed(0)}`);
+					if (avg !== undefined) return some(avg.value.toFixed(0));
+					return none();
 				})
 			});
 		}
@@ -114,12 +115,12 @@
 				unit: 'W',
 				legend: 'avg / normalized',
 				values: activities.map((a) => {
-					const avg = a.metrics['AvgPower'].value;
+					const avg = a.metrics['AvgPower'];
 					const np = a.metrics['NormalizedPower'];
 					if (avg !== undefined && np !== undefined)
-						return `${avg.toFixed(0)} / ${np.value.toFixed(0)}`;
-					if (avg !== undefined) return avg.toFixed(0);
-					return undefined;
+						return some(`${avg.value.toFixed(0)} / ${np.value.toFixed(0)}`);
+					if (avg !== undefined) return some(avg.value.toFixed(0));
+					return none();
 				})
 			});
 		}
@@ -161,7 +162,7 @@
 							{/if}
 						</td>
 						{#each row.values as value}
-							<td>{value ?? '—'}</td>
+							<td>{unwrapOr(value, '—')}</td>
 						{/each}
 					</tr>
 				{/each}
