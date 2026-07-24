@@ -140,11 +140,11 @@
 		invalidateTrainingNotes={() => invalidate('app:training-notes')}
 	/>
 
-	<div class="flex flex-row gap-2 items-start">
-		<div class="@container/main mt-5 rounded-box bg-base-100 px-4 shadow-md flex flex-col grow">
+	<div class="flex flex-row items-start gap-2">
+		<div class="@container/main mt-5 flex grow flex-col rounded-box bg-base-100 px-4 shadow-md">
 			<!-- View Toggle -->
 			<div
-				class="py-4 flex flex-col justify-between gap-2 @sm/main:flex-row @sm:items-center sticky top-0 bg-base-100"
+				class="sticky top-0 flex flex-col justify-between gap-2 bg-base-100 py-4 @sm/main:flex-row @sm:items-center"
 			>
 				<h1 class="hidden text-2xl font-bold @sm/main:block">History</h1>
 				<div class="flex gap-0.5 sm:gap-2">
@@ -178,7 +178,7 @@
 							/>
 						{/await}
 						<button
-							class="btn join-item btn-sm hidden @min-[650px]/main:inline-flex"
+							class="btn join-item btn-sm"
 							onclick={() => (activityListSummaryOpen = true)}
 							title="Customize history view"
 						>
