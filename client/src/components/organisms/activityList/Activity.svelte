@@ -66,73 +66,74 @@
     ${categoryClass(activity.sport_category)} hover:bg-base-200`}
 >
 	<a href={`/activity/${activity.id}`} onclick={handleClick}>
-		<div class="shring flex grow flex-row flex-wrap justify-between gap-1 overflow-hidden">
-			<!-- Sport icon, activity title and date -->
-			<div class="flex flex-row items-center" style:min-width="350px" style:flex-basis="350px">
-				<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
-					<div class={`icon ${categoryClass(activity.sport_category)}`}>
-						<img
-							src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-							class="h-6 w-6"
-							alt="Sport icon"
-						/>
+		<div class="flex flex-col gap-1">
+			<div class="flex shrink grow flex-row flex-wrap justify-between gap-1 overflow-hidden">
+				<!-- Sport icon, activity title and date -->
+				<div class="flex flex-row items-center" style:min-width="350px" style:flex-basis="350px">
+					<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
+						<div class={`icon ${categoryClass(activity.sport_category)}`}>
+							<img
+								src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
+								class="h-6 w-6"
+								alt="Sport icon"
+							/>
+						</div>
+					</div>
+
+					<div
+						class={`flex w-full flex-col justify-center ${categoryClass(activity.sport_category)} ${selectedClass}`}
+					>
+						<div class="mb-1 font-semibold">
+							{title}
+						</div>
+						<div class="text-xs font-light">
+							{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
+								activity.start_time
+							).format('MMM D, YYYY')}
+						</div>
 					</div>
 				</div>
 
-				<div
-					class={`flex w-full flex-col justify-center ${categoryClass(activity.sport_category)} ${selectedClass}`}
-				>
-					<div class="mb-1 font-semibold">
-						{title}
-					</div>
-					<div class="text-xs font-light">
-						{formatRelativeDuration(dayjs(activity.start_time), dayjs())} · {dayjs(
-							activity.start_time
-						).format('MMM D, YYYY')}
-					</div>
+				<!-- Activity metrics/details -->
+				<div class="flex flex-row items-center justify-start">
+					{#each listFormat as row}
+						<div style:width={`${row.width}px`} hidden={!row.show} class="shrink-0 text-center">
+							{#if row.format.type === 'rpe'}
+								{#if activity.rpe}
+									<span class={`badge inline badge-sm ${getRpeClass(activity.rpe)}`}>
+										RPE {activity.rpe}
+									</span>
+								{:else}
+									-
+								{/if}
+							{:else if row.format.type === 'workoutType'}
+								{#if activity.workout_type}
+									<span class={`badge badge-sm ${getWorkoutTypeClass(activity.workout_type)}`}>
+										{getWorkoutTypeLabel(activity.workout_type)}
+									</span>
+								{:else}
+									-
+								{/if}
+							{:else if row.format.type === 'metric'}
+								{@const metric = activity.metrics[row.format.value]}
+								{#if metric !== undefined}
+									{@const formattedMetric = formatMetric(row.format.value, metric)}
+									<span>
+										<span class="text-sm font-semibold">
+											{formattedMetric.value}
+										</span>
+										<span class="text-xs font-light">
+											{formattedMetric.unit}
+										</span>
+									</span>
+								{:else}
+									-
+								{/if}
+							{/if}
+						</div>
+					{/each}
 				</div>
 			</div>
-
-			<!-- Activity metrics/details -->
-			<div class="flex flex-row items-center justify-start">
-				{#each listFormat as row}
-					<div style:width={`${row.width}px`} hidden={!row.show} class="shrink-0 text-center">
-						{#if row.format.type === 'rpe'}
-							{#if activity.rpe}
-								<span class={`badge inline badge-sm ${getRpeClass(activity.rpe)}`}>
-									RPE {activity.rpe}
-								</span>
-							{:else}
-								-
-							{/if}
-						{:else if row.format.type === 'workoutType'}
-							{#if activity.workout_type}
-								<span class={`badge badge-sm ${getWorkoutTypeClass(activity.workout_type)}`}>
-									{getWorkoutTypeLabel(activity.workout_type)}
-								</span>
-							{:else}
-								-
-							{/if}
-						{:else if row.format.type === 'metric'}
-							{@const metric = activity.metrics[row.format.value]}
-							{#if metric !== undefined}
-								{@const formattedMetric = formatMetric(row.format.value, metric)}
-								<span>
-									<span class="text-sm font-semibold">
-										{formattedMetric.value}
-									</span>
-									<span class="text-xs font-light">
-										{formattedMetric.unit}
-									</span>
-								</span>
-							{:else}
-								-
-							{/if}
-						{/if}
-					</div>
-				{/each}
-			</div>
-
 			{#if activity.feedback}
 				<div
 					class={`feedback
