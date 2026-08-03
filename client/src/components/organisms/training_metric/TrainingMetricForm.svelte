@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
+	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
 	import type { TrainingMetricTemplate } from '$lib/api';
 	import TrainingMetricFilters from '../TrainingMetricFilters.svelte';
 	import type { TrainingMetricFields } from '.';
@@ -14,6 +14,10 @@
 		fields: TrainingMetricFields;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
 	} = $props();
+
+	const toggleTarget = (enabled: boolean) => {
+		fields = { ...fields, target: enabled ? some(0) : none() };
+	};
 
 	let templatesByCategory = $derived.by(() => {
 		const groupedMetrics: Map<string, TrainingMetricTemplate[]> = new Map();
@@ -102,6 +106,35 @@
 		bind:checked={() => fields.showAverage, (c) => (fields = { ...fields, showAverage: c })}
 	/>
 </label>
+
+<label class="label" for="metric-target-enabled">
+	Set a target
+	<input
+		type="checkbox"
+		class="checkbox checkbox-sm"
+		id="metric-target-enabled"
+		bind:checked={() => isSome(fields.target), (c) => toggleTarget(c)}
+	/>
+</label>
+
+{#if isSome(fields.target)}
+	<label class="label" for="metric-target-value">
+		Target value
+		<span class="text-sm text-base-content/60">
+			{isSome(fields.selectedTemplate) ? fields.selectedTemplate.value.unit : ''}
+		</span>
+	</label>
+	<input
+		type="number"
+		step="any"
+		class="input"
+		id="metric-target-value"
+		bind:value={
+			() => unwrapOr(fields.target, 0),
+			(v) => (fields = { ...fields, target: map(fields.target, () => Number(v)) })
+		}
+	/>
+{/if}
 
 <label class="label" for="metric-name">Metric name</label>
 <input

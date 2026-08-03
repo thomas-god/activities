@@ -72,6 +72,7 @@ const TrainingMetricSchema = z.object({
 	bonked: z.enum(BONK_STATUS_VALUES).nullable().nullable(),
 	rpes: z.array(z.number()).nullable(),
 	show_average: z.object({ include_zeros: z.boolean() }).nullable(),
+	target: z.object({ value: z.number(), unit: z.string() }).nullable(),
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
 	summary: z.record(z.string(), z.number())
 });
@@ -537,6 +538,10 @@ export interface TrainingMetricBasePayload {
 		average: {
 			include_zeros: boolean;
 		};
+	};
+	target?: {
+		value: number;
+		unit: string;
 	};
 }
 

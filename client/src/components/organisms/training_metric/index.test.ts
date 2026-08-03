@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
-import { isNone, isSome, some } from '$lib/Options';
+import { isNone, isSome, none, some } from '$lib/Options';
 
-import { matchMetricToFormFields } from './index';
+import { fieldsAsPayload, matchMetricToFormFields, type TrainingMetricFields } from './index';
 
 const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): TrainingMetricTemplate => ({
 	display_name: 'Total Duration',
@@ -31,6 +31,7 @@ const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => 
 	bonked: 'none',
 	rpes: [5, 7],
 	show_average: { include_zeros: false },
+	target: { value: 100, unit: 'km' },
 	values: { no_group: { '2026-01-01': 10 } },
 	summary: { total: 10 },
 	...overrides
@@ -53,6 +54,7 @@ describe('matchMetricToFormFields', () => {
 		expect(result.filters.workoutTypes).toEqual(some(['easy']));
 		expect(result.filters.bonked).toEqual(some('none'));
 		expect(result.filters.rpes).toEqual(some([5, 7]));
+		expect(result.target).toEqual(some(100));
 
 		expect(isSome(result.selectedTemplate)).toBe(true);
 		if (isSome(result.selectedTemplate)) {
@@ -69,7 +71,8 @@ describe('matchMetricToFormFields', () => {
 			workout_types: null,
 			bonked: null,
 			rpes: null,
-			show_average: null
+			show_average: null,
+			target: null
 		});
 
 		const result = matchMetricToFormFields(metric, []);
@@ -84,6 +87,7 @@ describe('matchMetricToFormFields', () => {
 		expect(isNone(result.filters.bonked)).toBe(true);
 		expect(isNone(result.filters.rpes)).toBe(true);
 		expect(isNone(result.selectedTemplate)).toBe(true);
+		expect(isNone(result.target)).toBe(true);
 	});
 
 	it('matches template by metric and aggregate when aggregate is set', () => {
@@ -109,6 +113,56 @@ describe('matchMetricToFormFields', () => {
 		expect(isSome(result.selectedTemplate)).toBe(true);
 		if (isSome(result.selectedTemplate)) {
 			expect(result.selectedTemplate.value).toEqual(firstMetricTemplate);
+		}
+	});
+});
+
+describe('fieldsAsPayload', () => {
+	const makeFields = (target: number | null): TrainingMetricFields => ({
+		name: 'Metric',
+		selectedTemplate: some(makeTemplate()),
+		granularity: none(),
+		groupBy: none(),
+		filters: {
+			sports: none(),
+			sportCategories: none(),
+			rpes: none(),
+			bonked: none(),
+			workoutTypes: none()
+		},
+		showAverage: false,
+		target: target === null ? none() : some(target)
+	});
+
+	it('includes target in the payload when set, using the template unit', () => {
+		const payload = fieldsAsPayload(makeFields(100));
+
+		expect(isSome(payload)).toBe(true);
+		if (isSome(payload)) {
+			expect(payload.value.target).toEqual({ value: 100, unit: 's' });
+		}
+	});
+
+	it('uses the selected template unit for the target', () => {
+		const fields: TrainingMetricFields = {
+			...makeFields(50),
+			selectedTemplate: some(makeTemplate({ unit: 'km' }))
+		};
+
+		const payload = fieldsAsPayload(fields);
+
+		expect(isSome(payload)).toBe(true);
+		if (isSome(payload)) {
+			expect(payload.value.target).toEqual({ value: 50, unit: 'km' });
+		}
+	});
+
+	it('omits target from the payload when not set', () => {
+		const payload = fieldsAsPayload(makeFields(null));
+
+		expect(isSome(payload)).toBe(true);
+		if (isSome(payload)) {
+			expect('target' in payload.value).toBe(false);
 		}
 	});
 });

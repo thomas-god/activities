@@ -48,7 +48,8 @@
 			bonked: none(),
 			workoutTypes: none()
 		},
-		showAverage: false
+		showAverage: false,
+		target: none()
 	});
 
 	let chartWidth: number = $state(0);

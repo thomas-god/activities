@@ -17,6 +17,7 @@ export interface TrainingMetricFields {
 	groupBy: Option<TrainingMetricGroupByClause>;
 	filters: TrainingMetricFiltersType;
 	showAverage: boolean;
+	target: Option<number>;
 }
 
 export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
@@ -96,6 +97,17 @@ export const fieldsAsPayload = (
 		payload = { ...payload, summary: { average: { include_zeros: false } } };
 	}
 
+	// Optional target: the unit is forced to the selected template's unit
+	if (isSome(fields.target)) {
+		payload = {
+			...payload,
+			target: {
+				value: fields.target.value,
+				unit: fields.selectedTemplate.value.unit
+			}
+		};
+	}
+
 	return some(payload);
 };
 
@@ -123,6 +135,7 @@ export const matchMetricToFormFields = (
 		granularity: asOption(metric.granularity),
 		groupBy: asOption(metric.group_by),
 		showAverage: metric.show_average !== null,
+		target: asOption(metric.target?.value ?? null),
 		filters
 	};
 };
