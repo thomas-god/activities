@@ -433,6 +433,48 @@ impl TrainingMetricSummaryValues {
     }
 }
 
+/// Serde helper to (de)serialize [`Unit`] using its `Display`/`FromStr` representation
+/// (e.g. `"km"`) instead of the derived variant names.
+mod unit_as_display {
+    use std::str::FromStr;
+
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    use crate::domain::models::activity::Unit;
+
+    pub fn serialize<S>(unit: &Unit, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&unit.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Unit, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Unit::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Constructor, Serialize, Deserialize)]
+pub struct TrainingMetricTarget {
+    value: f64,
+    #[serde(with = "unit_as_display")]
+    unit: Unit,
+}
+
+impl TrainingMetricTarget {
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.unit
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     user: UserId,
@@ -440,6 +482,7 @@ pub struct TrainingMetricDefinition {
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
+    target: Option<TrainingMetricTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
@@ -469,6 +512,7 @@ pub struct TrainingMetricDefinitionPatch {
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
+    target: Option<TrainingMetricTarget>,
 }
 
 impl TrainingMetricDefinitionPatch {
@@ -486,6 +530,10 @@ impl TrainingMetricDefinitionPatch {
 
     pub fn summary(&self) -> &TrainingMetricSummary {
         &self.summary
+    }
+
+    pub fn target(&self) -> &Option<TrainingMetricTarget> {
+        &self.target
     }
 }
 
@@ -510,6 +558,10 @@ impl TrainingMetricDefinition {
         &self.summary
     }
 
+    pub fn target(&self) -> &Option<TrainingMetricTarget> {
+        &self.target
+    }
+
     pub fn unit(&self) -> Unit {
         match self.window.as_ref().map(|w| w.aggregate) {
             Some(TrainingMetricAggregate::NumberOfActivities) => Unit::NumberOfActivities,
@@ -524,6 +576,7 @@ impl TrainingMetricDefinition {
             window: patch.window,
             filters: patch.filters,
             summary: patch.summary,
+            target: patch.target,
         }
     }
 
@@ -534,6 +587,7 @@ impl TrainingMetricDefinition {
             window: self.window,
             summary: self.summary,
             filters: self.filters.merge_default_sports(default_sports),
+            target: self.target,
         }
     }
 
@@ -1630,6 +1684,7 @@ mod test_training_metrics {
                 None,
             ),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1653,6 +1708,7 @@ mod test_training_metrics {
             )),
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1693,6 +1749,7 @@ mod test_training_metrics {
             window,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -1739,6 +1796,7 @@ mod test_training_metrics {
                 None,
             ),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let metrics = metric_definition.compute_values(&activities);
@@ -3214,6 +3272,7 @@ mod test_training_metrics_ordering {
             )),
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let ids = ["a", "c", "b", "d"];
@@ -3449,5 +3508,124 @@ mod test_training_metric_summary {
         let summary = TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true)));
 
         assert_eq!(summary.compute(&values).average, Some(15.0));
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_target {
+    use super::*;
+
+    fn definition_with_target() -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricV2::Distance,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
+        )
+    }
+
+    #[test]
+    fn test_target_accessors() {
+        let target = TrainingMetricTarget::new(42.0, Unit::KiloCalorie);
+
+        assert_eq!(target.value(), 42.0);
+        assert_eq!(target.unit(), Unit::KiloCalorie);
+    }
+
+    #[test]
+    fn test_definition_target_is_some_when_set() {
+        let definition = definition_with_target();
+
+        let target = definition.target().expect("target should be set");
+        assert_eq!(target.value(), 100.0);
+        assert_eq!(target.unit(), Unit::Kilometer);
+    }
+
+    #[test]
+    fn test_definition_target_is_none_when_not_set() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            ActivityMetricV2::Distance,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        assert!(definition.target().is_none());
+    }
+
+    #[test]
+    fn test_apply_patch_updates_target() {
+        let definition = definition_with_target();
+        let patch = TrainingMetricDefinitionPatch::new(
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            Some(TrainingMetricTarget::new(2000.0, Unit::KiloCalorie)),
+        );
+
+        let patched = definition.apply_patch(patch);
+
+        let target = patched.target().expect("target should be set");
+        assert_eq!(target.value(), 2000.0);
+        assert_eq!(target.unit(), Unit::KiloCalorie);
+        assert_eq!(*patched.metric(), ActivityMetricV2::Calories);
+    }
+
+    #[test]
+    fn test_apply_patch_clears_target() {
+        let definition = definition_with_target();
+        let patch = TrainingMetricDefinitionPatch::new(
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let patched = definition.apply_patch(patch);
+
+        assert!(patched.target().is_none());
+    }
+
+    #[test]
+    fn test_merge_default_sports_preserves_target() {
+        let definition = definition_with_target();
+
+        let merged =
+            definition.merge_default_sports(&Some(vec![SportFilter::Sport(Sport::Running)]));
+
+        let target = merged.target().expect("target should be preserved");
+        assert_eq!(target.value(), 100.0);
+        assert_eq!(target.unit(), Unit::Kilometer);
+    }
+
+    #[test]
+    fn test_target_serde_uses_display_unit() {
+        let target = TrainingMetricTarget::new(3.5, Unit::Kilometer);
+
+        let json = serde_json::to_string(&target).unwrap();
+
+        assert_eq!(json, r#"{"value":3.5,"unit":"km"}"#);
+    }
+
+    #[test]
+    fn test_target_deserialize_from_display_unit() {
+        let target: TrainingMetricTarget =
+            serde_json::from_str(r#"{"value":3.5,"unit":"km"}"#).unwrap();
+
+        assert_eq!(target, TrainingMetricTarget::new(3.5, Unit::Kilometer));
+    }
+
+    #[test]
+    fn test_target_deserialize_unknown_unit_fails() {
+        let result: Result<TrainingMetricTarget, _> =
+            serde_json::from_str(r#"{"value":3.5,"unit":"parsec"}"#);
+
+        assert!(result.is_err());
     }
 }

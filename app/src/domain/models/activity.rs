@@ -881,6 +881,7 @@ impl fmt::Display for Unit {
             Self::Kilometer => "km",
             Self::MeterPerSecond => "m/s",
             Self::KilometerPerHour => "km/h",
+            // TODO: typo ? s:m => s/m
             Self::SecondPerMeter => "s:m",
             Self::SecondPerKilometer => "s/km",
             Self::Watt => "W",
@@ -892,6 +893,29 @@ impl fmt::Display for Unit {
         };
 
         write!(f, "{}", unit)
+    }
+}
+
+impl FromStr for Unit {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "kcal" => Ok(Self::KiloCalorie),
+            "m" => Ok(Self::Meter),
+            "km" => Ok(Self::Kilometer),
+            "m/s" => Ok(Self::MeterPerSecond),
+            "km/h" => Ok(Self::KilometerPerHour),
+            "s:m" => Ok(Self::SecondPerMeter),
+            "s/km" => Ok(Self::SecondPerKilometer),
+            "W" => Ok(Self::Watt),
+            "bpm" => Ok(Self::BeatPerMinute),
+            "rpm" => Ok(Self::RevolutionPerMinute),
+            "s" => Ok(Self::Second),
+            "activities" => Ok(Self::NumberOfActivities),
+            "°" => Ok(Self::Degree),
+            _ => Err(format!("Unknown Unit: {s}")),
+        }
     }
 }
 

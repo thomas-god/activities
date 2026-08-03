@@ -199,6 +199,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                     window,
                     filters,
                     summary.unwrap_or_else(TrainingMetricSummary::empty),
+                    None,
                 );
                 Ok(Some(TrainingMetric::new(id, name, scope, definition)))
             }
@@ -264,6 +265,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 window,
                                 filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
+                                None,
                             ),
                         ))
                     },
@@ -331,6 +333,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 window,
                                 filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
+                                None,
                             ),
                         ))
                     },
@@ -840,6 +843,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }
@@ -859,6 +863,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }
@@ -883,6 +888,7 @@ mod test_sqlite_training_repository {
                     None,
                 ),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }
@@ -907,6 +913,7 @@ mod test_sqlite_training_repository {
                     None,
                 ),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }
@@ -930,6 +937,7 @@ mod test_sqlite_training_repository {
                     None,
                 ),
                 TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
+                None,
             ),
         )
     }
@@ -966,6 +974,7 @@ mod test_sqlite_training_repository {
                 None,
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -1097,6 +1106,7 @@ mod test_sqlite_training_repository {
                 None,
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         ));
 
@@ -1416,6 +1426,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
         let metric2 = TrainingMetric::new(
@@ -1432,6 +1443,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3007,6 +3019,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3026,6 +3039,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3080,6 +3094,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3099,6 +3114,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3118,6 +3134,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3205,6 +3222,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 
@@ -3224,6 +3242,7 @@ mod test_sqlite_training_repository {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         );
 

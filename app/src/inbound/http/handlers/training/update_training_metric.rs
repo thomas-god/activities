@@ -20,7 +20,7 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
-    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricSummary, APITrainingMetricScope,
+    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSummary,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -89,6 +89,7 @@ fn build_request(
         body.window.map(TrainingMetricWindow::from),
         filters,
         body.summary.into(),
+        None,
     ))
 }
 

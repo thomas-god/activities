@@ -65,6 +65,7 @@ fn build_request(
         filters,
         body.summary.into(),
         body.scope.into(),
+        None,
     ))
 }
 

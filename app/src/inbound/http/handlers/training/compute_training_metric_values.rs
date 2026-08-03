@@ -125,6 +125,7 @@ pub async fn compute_training_metric_values<
         window: window.clone(),
         filters,
         summary: request.summary.into(),
+        target: None,
     };
 
     let values = match state

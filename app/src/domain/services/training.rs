@@ -113,6 +113,7 @@ where
             req.window().clone(),
             req.filters().clone().merge_default_sports(&default_sports),
             req.summary().clone(),
+            req.target().clone(),
         );
         let training_metric = TrainingMetric::new(
             id.clone(),
@@ -256,7 +257,8 @@ where
                 window,
                 filters,
                 summary,
-            } => TrainingMetricDefinition::new(user, metric, window, filters, summary),
+                target,
+            } => TrainingMetricDefinition::new(user, metric, window, filters, summary, target),
             GetTrainingMetricValuesRequest::ByTrainingMetricId(user, id) => self
                 .training_repository
                 .get_metric(&user, &id)
@@ -975,12 +977,12 @@ mod tests_training_metrics_service {
     use super::*;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
-        ActivityStartTime, Sport,
+        ActivityStartTime, Sport, Unit,
     };
 
     use crate::domain::models::training::{
-        SportFilter, TrainingMetricBin, TrainingMetricSummary, TrainingMetricWindow,
-        TrainingPeriod, TrainingPeriodSports,
+        SportFilter, TrainingMetricBin, TrainingMetricSummary, TrainingMetricTarget,
+        TrainingMetricWindow, TrainingPeriod, TrainingPeriodSports,
     };
     use crate::domain::ports::DateRange;
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -1014,6 +1016,42 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
+            None,
+        );
+
+        let _ = service
+            .create_metric(req)
+            .await
+            .expect("Should have return ok");
+    }
+
+    #[tokio::test]
+    async fn test_create_metric_with_target() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_metric()
+            .withf(|metric| {
+                metric.definition().target()
+                    == &Some(TrainingMetricTarget::new(100.0, Unit::Kilometer))
+            })
+            .returning(|_| Ok(()));
+        let activities = MockActivityService::new();
+
+        let service = TrainingService::new(repository, activities);
+
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Test Metric"),
+            ActivityMetricV2::Calories,
+            Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+                TrainingMetricGroupBy::none(),
+            )),
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::Global,
+            Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
         );
 
         let _ = service
@@ -1066,6 +1104,7 @@ mod tests_training_metrics_service {
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            None,
         );
 
         let _ = service
@@ -1098,6 +1137,7 @@ mod tests_training_metrics_service {
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
+            None,
         );
 
         let Err(CreateTrainingMetricError::TrainingPeriodDoesNotExist(period)) =
@@ -1129,6 +1169,7 @@ mod tests_training_metrics_service {
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
+            None,
         );
 
         let _ = service
@@ -1184,6 +1225,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )])
         });
@@ -1229,6 +1271,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )
         );
@@ -1253,6 +1296,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )])
         });
@@ -1301,6 +1345,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )
         );
@@ -1326,6 +1371,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )])
         });
@@ -1385,6 +1431,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )])
         });
@@ -1465,6 +1512,7 @@ mod tests_training_metrics_service {
                     )),
                     TrainingMetricFilters::empty(),
                     TrainingMetricSummary::empty(),
+                    None,
                 ),
             )])
         });
@@ -1539,6 +1587,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 )])
             });
@@ -1646,6 +1695,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 ),
                 TrainingMetric::new(
@@ -1662,6 +1712,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 ),
             ])
@@ -1735,6 +1786,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 ),
                 TrainingMetric::new(
@@ -1751,6 +1803,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 ),
                 TrainingMetric::new(
@@ -1767,6 +1820,7 @@ mod tests_training_metrics_service {
                         )),
                         TrainingMetricFilters::empty(),
                         TrainingMetricSummary::empty(),
+                        None,
                     ),
                 ),
             ])
@@ -1850,6 +1904,7 @@ mod tests_training_metrics_service {
                                 SportFilter::Sport(Sport::AlpineSki),
                             ])),
                             TrainingMetricSummary::empty(),
+                            None,
                         ),
                     ),
                     TrainingMetric::new(
@@ -1866,6 +1921,7 @@ mod tests_training_metrics_service {
                             )),
                             TrainingMetricFilters::empty(),
                             TrainingMetricSummary::empty(),
+                            None,
                         ),
                     ),
                 ])
@@ -1978,6 +2034,7 @@ mod tests_training_metrics_service {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }
@@ -2092,6 +2149,7 @@ mod tests_training_metrics_service {
             )),
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let res = service.update_training_metric(req).await;
@@ -2119,6 +2177,7 @@ mod tests_training_metrics_service {
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let res = service.update_training_metric(req).await;
@@ -2152,6 +2211,7 @@ mod tests_training_metrics_service {
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let res = service.update_training_metric(req).await;
@@ -2184,6 +2244,7 @@ mod tests_training_metrics_service {
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let res = service.update_training_metric(req).await;
@@ -3583,6 +3644,7 @@ mod test_training_service_metric_values {
             )),
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         let mut activity_service = MockActivityService::default();
@@ -3620,6 +3682,7 @@ mod test_training_service_metric_values {
             )),
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
+            None,
         );
 
         // Create some test activities
@@ -3961,6 +4024,7 @@ mod test_training_service_copy_metric {
                 )),
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
+                None,
             ),
         )
     }

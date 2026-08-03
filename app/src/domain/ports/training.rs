@@ -9,10 +9,10 @@ use crate::domain::{
         training::{
             TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricFilters, TrainingMetricId,
             TrainingMetricName, TrainingMetricPatch, TrainingMetricScope, TrainingMetricSummary,
-            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-            TrainingPeriodWithActivities,
+            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
         },
     },
     ports::DateRange,
@@ -27,6 +27,7 @@ pub struct CreateTrainingMetricRequest {
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
     scope: TrainingMetricScope,
+    target: Option<TrainingMetricTarget>,
 }
 
 impl CreateTrainingMetricRequest {
@@ -56,6 +57,10 @@ impl CreateTrainingMetricRequest {
 
     pub fn scope(&self) -> &TrainingMetricScope {
         &self.scope
+    }
+
+    pub fn target(&self) -> &Option<TrainingMetricTarget> {
+        &self.target
     }
 }
 
@@ -92,6 +97,7 @@ pub struct UpdateTrainingMetricRequest {
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
+    target: Option<TrainingMetricTarget>,
 }
 
 impl UpdateTrainingMetricRequest {
@@ -109,6 +115,7 @@ impl UpdateTrainingMetricRequest {
                 self.window,
                 self.filters,
                 self.summary,
+                self.target,
             ),
         )
     }
@@ -144,6 +151,7 @@ pub enum GetTrainingMetricValuesRequest {
         window: Option<TrainingMetricWindow>,
         filters: TrainingMetricFilters,
         summary: TrainingMetricSummary,
+        target: Option<TrainingMetricTarget>,
     },
 }
 
@@ -867,4 +875,67 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         scope: &TrainingMetricScope,
         ordering: TrainingMetricsOrdering,
     ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::domain::models::activity::Unit;
+    use crate::domain::models::training::TrainingMetricTarget;
+
+    fn sample_target() -> TrainingMetricTarget {
+        TrainingMetricTarget::new(100.0, Unit::Kilometer)
+    }
+
+    #[test]
+    fn test_create_request_exposes_target() {
+        let req = CreateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricName::from("Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            TrainingMetricScope::Global,
+            Some(sample_target()),
+        );
+
+        assert_eq!(req.target(), &Some(sample_target()));
+    }
+
+    #[test]
+    fn test_update_request_patch_carries_target() {
+        let req = UpdateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricId::from("id"),
+            TrainingMetricName::from("Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            Some(sample_target()),
+        );
+
+        let patch = req.patch();
+        assert_eq!(patch.definition().target(), &Some(sample_target()));
+        assert_eq!(*patch.name(), TrainingMetricName::from("Metric"));
+    }
+
+    #[test]
+    fn test_update_request_patch_without_target() {
+        let req = UpdateTrainingMetricRequest::new(
+            UserId::test_default(),
+            TrainingMetricId::from("id"),
+            TrainingMetricName::from("Metric"),
+            ActivityMetricV2::Calories,
+            None,
+            TrainingMetricFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let patch = req.patch();
+        assert!(patch.definition().target().is_none());
+    }
 }
