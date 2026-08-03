@@ -15,9 +15,9 @@ use crate::domain::{
             TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
             TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSummary,
-            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingMetricTarget, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     ports::{
@@ -46,6 +46,7 @@ type DefinitionRow = (
     Option<TrainingMetricGroupBy>,
     Option<TrainingPeriodId>,
     Option<TrainingMetricSummary>,
+    Option<TrainingMetricTarget>,
 );
 type TrainingPeriodRow = (
     TrainingPeriodId,
@@ -102,8 +103,8 @@ impl TrainingRepository for SqliteTrainingRepository {
         let definition = metric.definition();
         sqlx::query(
             "INSERT INTO t_training_metrics_definitions
-                (id, user_id, activity_metric, granularity, aggregate, filters, group_by, name, training_period_id, summary)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                (id, user_id, activity_metric, granularity, aggregate, filters, group_by, name, training_period_id, summary, target)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                 ON CONFLICT (id) DO UPDATE SET
                     user_id=excluded.user_id,
                     activity_metric=excluded.activity_metric,
@@ -113,7 +114,8 @@ impl TrainingRepository for SqliteTrainingRepository {
                     group_by=excluded.group_by,
                     name=excluded.name,
                     training_period_id=excluded.training_period_id,
-                    summary=excluded.summary;",
+                    summary=excluded.summary,
+                    target=excluded.target;",
 
         )
         .bind(metric.id())
@@ -126,6 +128,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(metric.name())
         .bind(metric.scope().period())
         .bind(definition.summary())
+        .bind(definition.target())
         .execute(&self.writer)
         .await
         .map_err(|err| match err {
@@ -158,7 +161,8 @@ impl TrainingRepository for SqliteTrainingRepository {
             filters,
             group_by,
             training_period_id,
-            summary
+            summary,
+            target
         FROM t_training_metrics_definitions
         WHERE id = ?1 AND user_id = ?2 LIMIT 1;",
         )
@@ -179,6 +183,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                 group_by,
                 training_period_id,
                 summary,
+                target,
             )) => {
                 let Some(metric) = parse_definition_row_metric(metric, source) else {
                     return Ok(None);
@@ -199,7 +204,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                     window,
                     filters,
                     summary.unwrap_or_else(TrainingMetricSummary::empty),
-                    None,
+                    target,
                 );
                 Ok(Some(TrainingMetric::new(id, name, scope, definition)))
             }
@@ -224,7 +229,8 @@ impl TrainingRepository for SqliteTrainingRepository {
                 filters,
                 group_by,
                 training_period_id,
-                summary
+                summary,
+                target
             FROM t_training_metrics_definitions
             WHERE user_id = ?1 AND training_period_id IS NULL;",
         )
@@ -247,6 +253,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                         group_by,
                         training_period_id,
                         summary,
+                        target,
                     )| {
                         let metric = parse_definition_row_metric(metric, source)?;
                         let window = match (granularity, aggregate) {
@@ -265,7 +272,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 window,
                                 filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
-                                None,
+                                target,
                             ),
                         ))
                     },
@@ -291,7 +298,8 @@ impl TrainingRepository for SqliteTrainingRepository {
                 filters,
                 group_by,
                 training_period_id,
-                summary
+                summary,
+                target
             FROM t_training_metrics_definitions
             WHERE user_id = ?1 AND training_period_id = ?2;",
         )
@@ -315,6 +323,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                         group_by,
                         training_period_id,
                         summary,
+                        target,
                     )| {
                         let metric = parse_definition_row_metric(metric, source)?;
                         let window = match (granularity, aggregate) {
@@ -333,7 +342,7 @@ impl TrainingRepository for SqliteTrainingRepository {
                                 window,
                                 filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
-                                None,
+                                target,
                             ),
                         ))
                     },
@@ -794,12 +803,13 @@ mod test_sqlite_training_repository {
     use tempfile::NamedTempFile;
 
     use crate::domain::models::{
-        activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric},
+        activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric, Unit},
         training::{
             SportFilter, TrainingMetricAggregate, TrainingMetricDefinitionPatch,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricPatch,
-            TrainingMetricSummaryAverage, TrainingNote, TrainingNoteContent, TrainingNoteId,
-            TrainingNoteTitle, TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+            TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingNote, TrainingNoteContent,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
+            TrainingPeriodSports,
         },
     };
 
@@ -914,6 +924,25 @@ mod test_sqlite_training_repository {
                 ),
                 TrainingMetricSummary::empty(),
                 None,
+            ),
+        )
+    }
+    fn build_metric_definition_with_target() -> TrainingMetric {
+        TrainingMetric::new(
+            TrainingMetricId::new(),
+            None,
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                ActivityMetricV2::Distance,
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Weekly,
+                    TrainingMetricAggregate::Sum,
+                    None,
+                )),
+                TrainingMetricFilters::empty(),
+                TrainingMetricSummary::empty(),
+                Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             ),
         )
     }
@@ -1075,6 +1104,38 @@ mod test_sqlite_training_repository {
             .save_metric(metric.clone())
             .await
             .expect("Should have return Ok");
+
+        let saved_metric = repository
+            .get_metric(metric.definition().user(), metric.id())
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(metric, saved_metric);
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metric_definition_target() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let metric = build_metric_definition_with_target();
+
+        repository
+            .save_metric(metric.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let raw_target = sqlx::query_scalar::<_, Option<TrainingMetricTarget>>(
+            "select target from t_training_metrics_definitions limit 1;",
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .expect("target column should exist");
+
+        assert_eq!(raw_target, *metric.definition().target());
 
         let saved_metric = repository
             .get_metric(metric.definition().user(), metric.id())
