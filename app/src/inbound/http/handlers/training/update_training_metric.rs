@@ -9,7 +9,7 @@ use crate::domain::models::UserId;
 use crate::domain::models::activity::ActivityMetricV2;
 use crate::domain::models::training::{
     TrainingMetricFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-    TrainingMetricWindow, TrainingPeriodId,
+    TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
 };
 use crate::domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
 use crate::domain::ports::{
@@ -20,7 +20,8 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
-    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSummary,
+    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope,
+    APITrainingMetricSummary, APITrainingMetricTarget,
 };
 use crate::inbound::parser::ParseFile;
 
@@ -33,6 +34,8 @@ pub struct UpdateTrainingMetricBody {
     filters: Option<APITrainingMetricFilters>,
     #[serde(default)]
     summary: APITrainingMetricSummary,
+    #[serde(default)]
+    target: Option<APITrainingMetricTarget>,
 }
 
 pub async fn update_training_metric<
@@ -81,6 +84,12 @@ fn build_request(
         .map_err(|_| "Invalid fitlers".to_string())?
         .unwrap_or_else(TrainingMetricFilters::empty);
 
+    let target = body
+        .target
+        .map(TrainingMetricTarget::try_from)
+        .transpose()
+        .map_err(|_| "Invalid target unit".to_string())?;
+
     Ok(UpdateTrainingMetricRequest::new(
         user,
         metric,
@@ -89,13 +98,15 @@ fn build_request(
         body.window.map(TrainingMetricWindow::from),
         filters,
         body.summary.into(),
-        None,
+        target,
     ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::domain::models::activity::Unit;
 
     #[test]
     fn test_deserialize_required_fields_only() {
@@ -119,5 +130,45 @@ mod tests {
         let payload = APITrainingMetricScope::Global;
         let scope: TrainingMetricScope = payload.into();
         assert!(matches!(scope, TrainingMetricScope::Global));
+    }
+
+    #[test]
+    fn test_build_request_with_target() {
+        let json = r#"{
+            "name": "New Metric Name",
+            "metric": "Calories",
+            "target": {"value": 2000.0, "unit": "kcal"}
+        }"#;
+        let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
+
+        let req = build_request(
+            UserId::test_default(),
+            TrainingMetricId::from("metric-id"),
+            body,
+        )
+        .unwrap();
+
+        let target = req.target().as_ref().expect("target should be set");
+        assert_eq!(target.value(), 2000.0);
+        assert_eq!(target.unit(), Unit::KiloCalorie);
+    }
+
+    #[test]
+    fn test_build_request_with_invalid_target_unit_rejected() {
+        let json = r#"{
+            "name": "New Metric Name",
+            "metric": "Calories",
+            "target": {"value": 2000.0, "unit": "parsec"}
+        }"#;
+        let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
+
+        assert!(
+            build_request(
+                UserId::test_default(),
+                TrainingMetricId::from("metric-id"),
+                body,
+            )
+            .is_err()
+        );
     }
 }

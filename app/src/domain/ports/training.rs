@@ -107,6 +107,9 @@ impl UpdateTrainingMetricRequest {
     pub fn id(&self) -> &TrainingMetricId {
         &self.id
     }
+    pub fn target(&self) -> &Option<TrainingMetricTarget> {
+        &self.target
+    }
     pub fn patch(self) -> TrainingMetricPatch {
         TrainingMetricPatch::new(
             self.name,

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use derive_more::Constructor;
 /// Mappings between domain types and types part of the HTTP API
 use serde::{Deserialize, Serialize};
@@ -5,12 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::domain::models::{
     activity::{
         ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus, Sport,
-        TimeseriesAggregate, TimeseriesMetric, WorkoutType,
+        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
     },
     training::{
         SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSummary,
-        TrainingMetricSummaryAverage, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
+        TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 
@@ -101,6 +104,21 @@ impl From<APITrainingMetricSummaryAverage> for TrainingMetricSummaryAverage {
 impl From<APITrainingMetricSummary> for TrainingMetricSummary {
     fn from(value: APITrainingMetricSummary) -> Self {
         Self::new(value.average.map(TrainingMetricSummaryAverage::from))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Constructor, Deserialize)]
+pub struct APITrainingMetricTarget {
+    value: f64,
+    unit: String,
+}
+
+impl TryFrom<APITrainingMetricTarget> for TrainingMetricTarget {
+    type Error = String;
+
+    fn try_from(value: APITrainingMetricTarget) -> Result<Self, Self::Error> {
+        let unit = Unit::from_str(&value.unit)?;
+        Ok(TrainingMetricTarget::new(value.value, unit))
     }
 }
 
@@ -265,5 +283,27 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
                 training_period_id: period.to_string(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::domain::models::activity::Unit;
+    use crate::domain::models::training::TrainingMetricTarget;
+
+    #[test]
+    fn test_api_target_conversion_ok() {
+        let api = APITrainingMetricTarget::new(100.0, "km".to_string());
+        let target: TrainingMetricTarget = api.try_into().unwrap();
+        assert_eq!(target, TrainingMetricTarget::new(100.0, Unit::Kilometer));
+    }
+
+    #[test]
+    fn test_api_target_conversion_invalid_unit_fails() {
+        let api = APITrainingMetricTarget::new(100.0, "parsec".to_string());
+        let result: Result<TrainingMetricTarget, _> = api.try_into();
+        assert!(result.is_err());
     }
 }

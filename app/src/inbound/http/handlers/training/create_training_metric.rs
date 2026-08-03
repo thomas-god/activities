@@ -8,7 +8,7 @@ use crate::{
             activity::ActivityMetricV2,
             training::{
                 TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName,
-                TrainingMetricWindow,
+                TrainingMetricTarget, TrainingMetricWindow,
             },
         },
         ports::{
@@ -24,7 +24,7 @@ use crate::{
             handlers::training::types::{
                 APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                 APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricScope,
-                APITrainingMetricSource, APITrainingMetricSummary,
+                APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
             },
         },
         parser::ParseFile,
@@ -40,6 +40,8 @@ pub struct CreateTrainingMetricBody {
     filters: Option<APITrainingMetricFilters>,
     #[serde(default)]
     summary: APITrainingMetricSummary,
+    #[serde(default)]
+    target: Option<APITrainingMetricTarget>,
     scope: APITrainingMetricScope,
 }
 
@@ -57,6 +59,12 @@ fn build_request(
         .map_err(|_| "Invalid fitlers".to_string())?
         .unwrap_or_else(TrainingMetricFilters::empty);
 
+    let target = body
+        .target
+        .map(TrainingMetricTarget::try_from)
+        .transpose()
+        .map_err(|_| "Invalid target unit".to_string())?;
+
     Ok(CreateTrainingMetricRequest::new(
         user.clone(),
         TrainingMetricName::from(body.name),
@@ -65,7 +73,7 @@ fn build_request(
         filters,
         body.summary.into(),
         body.scope.into(),
-        None,
+        target,
     ))
 }
 
@@ -110,6 +118,8 @@ pub async fn create_training_metric<
 mod tests_create_training_metric {
 
     use super::*;
+
+    use crate::domain::models::activity::Unit;
 
     #[test]
     fn test_payload_format() {
@@ -216,5 +226,44 @@ mod tests_create_training_metric {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn test_payload_with_target() {
+        let body: CreateTrainingMetricBody = serde_json::from_str(
+            r#"{
+            "name": "Test Metric",
+            "metric": "Calories",
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "scope": {"type": "global"},
+            "target": {"value": 100.0, "unit": "km"}
+        }"#,
+        )
+        .unwrap();
+
+        let req = build_request(body, &UserId::test_default()).unwrap();
+        let target = req.target().as_ref().expect("target should be set");
+        assert_eq!(target.value(), 100.0);
+        assert_eq!(target.unit(), Unit::Kilometer);
+    }
+
+    #[test]
+    fn test_payload_with_invalid_target_unit_rejected() {
+        let body: CreateTrainingMetricBody = serde_json::from_str(
+            r#"{
+            "name": "Test Metric",
+            "metric": "Calories",
+            "granularity": "Weekly",
+            "aggregate": "Min",
+            "filters": {},
+            "scope": {"type": "global"},
+            "target": {"value": 100.0, "unit": "parsec"}
+        }"#,
+        )
+        .unwrap();
+
+        assert!(build_request(body, &UserId::test_default()).is_err());
     }
 }

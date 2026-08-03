@@ -10,7 +10,7 @@ use crate::{
             activity::{ActivityMetricSource, ActivityMetricV2},
             training::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
-                TrainingMetricGranularity, TrainingMetricWindow,
+                TrainingMetricGranularity, TrainingMetricTarget, TrainingMetricWindow,
             },
         },
         ports::{
@@ -31,7 +31,7 @@ use crate::{
                 types::{
                     APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
                     APITrainingMetricGranularity, APITrainingMetricGroupBy,
-                    APITrainingMetricSource, APITrainingMetricSummary,
+                    APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
                 },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
@@ -52,6 +52,8 @@ pub struct ComputeMetricValuesRequest {
     filters: Option<APITrainingMetricFilters>,
     #[serde(default)]
     summary: APITrainingMetricSummary,
+    #[serde(default)]
+    target: Option<APITrainingMetricTarget>,
     start: DateTime<FixedOffset>,
     end: Option<DateTime<FixedOffset>>,
 }
@@ -113,6 +115,12 @@ pub async fn compute_training_metric_values<
         .map_err(|_| StatusCode::BAD_REQUEST)?
         .unwrap_or_else(TrainingMetricFilters::empty);
 
+    let target = request
+        .target
+        .map(TrainingMetricTarget::try_from)
+        .transpose()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
     let window: Option<TrainingMetricWindow> = request.window.map(|w| w.into());
     let range = MetricsDateRange {
         start: request.start,
@@ -125,7 +133,7 @@ pub async fn compute_training_metric_values<
         window: window.clone(),
         filters,
         summary: request.summary.into(),
-        target: None,
+        target,
     };
 
     let values = match state
@@ -220,5 +228,22 @@ mod tests {
             )
         );
         assert!(request.end.is_some());
+    }
+
+    #[test]
+    fn test_request_deserialize_with_target() {
+        let json = r#"{
+            "metric": "Calories",
+            "target": {"value": 100.0, "unit": "km"},
+            "start": "2024-01-01T00:00:00+00:00"
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+        assert_eq!(
+            request.target,
+            Some(APITrainingMetricTarget::new(100.0, "km".to_string()))
+        );
     }
 }

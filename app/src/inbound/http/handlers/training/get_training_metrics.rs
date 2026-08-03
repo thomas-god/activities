@@ -17,8 +17,8 @@ use crate::{
             activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric},
             training::{
                 SportFilter, TrainingMetric, TrainingMetricDefinition, TrainingMetricScope,
-                TrainingMetricSummaryAverage, TrainingMetricValues, TrainingPeriodId,
-                TrainingPeriodSports,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricValues,
+                TrainingPeriodId, TrainingPeriodSports,
             },
         },
         ports::{
@@ -136,6 +136,7 @@ pub struct ResponseBodyItem {
     bonked: Option<String>,
     rpes: Option<Vec<u8>>,
     show_average: Option<TrainingMetricSummaryAverage>,
+    target: Option<TrainingMetricTarget>,
     values: HashMap<String, GranuleValues>,
     group_by: Option<String>,
     scope: APITrainingMetricScope,
@@ -187,6 +188,7 @@ fn to_response_body_item(
             .as_ref()
             .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
         show_average: definition.summary().average().clone(),
+        target: definition.target().clone(),
         values,
         group_by: definition
             .window()
@@ -306,8 +308,9 @@ mod tests {
     use serde_json::json;
 
     use crate::domain::models::activity::{
-        ActivityStatistic, TimeseriesAggregate, TimeseriesMetric,
+        ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
     };
+    use crate::domain::models::training::TrainingMetricTarget;
 
     use super::*;
 
@@ -377,6 +380,7 @@ mod tests {
             bonked: Some("bonked".to_string()),
             rpes: Some(vec![1, 2]),
             show_average: Some(TrainingMetricSummaryAverage::new(false)),
+            target: Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             values: HashMap::from([(
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 10.5)]),
@@ -409,6 +413,7 @@ mod tests {
                     "bonked": "bonked",
                     "rpes": [1, 2],
                     "show_average": {"include_zeros": false},
+                    "target": {"value": 100.0, "unit": "km"},
                     "values": {
                         "Running": {
                             "2025-09-24": 10.5
