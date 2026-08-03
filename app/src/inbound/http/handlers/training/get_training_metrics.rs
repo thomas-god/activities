@@ -36,7 +36,8 @@ use crate::{
                 types::APITrainingMetricScope,
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
-                    convert_metric_values_unit, fill_missing_granules, group_metric_values,
+                    convert_metric_target_unit, convert_metric_values_unit, fill_missing_granules,
+                    group_metric_values,
                 },
             },
         },
@@ -156,6 +157,11 @@ fn to_response_body_item(
     };
     let unit = values.unit();
     let (values, summary) = values.values_and_summary();
+    // Convert the target to the values' display unit so it can be drawn on the chart
+    let target = definition
+        .target()
+        .as_ref()
+        .and_then(|t| convert_metric_target_unit(t, unit));
 
     ResponseBodyItem {
         id: metric.id().to_string(),
@@ -188,7 +194,7 @@ fn to_response_body_item(
             .as_ref()
             .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
         show_average: definition.summary().average().clone(),
-        target: definition.target().clone(),
+        target,
         values,
         group_by: definition
             .window()

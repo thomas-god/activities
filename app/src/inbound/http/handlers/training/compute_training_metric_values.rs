@@ -34,7 +34,7 @@ use crate::{
                     APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
                 },
                 utils::{
-                    GranuleValues, GroupedMetricValues, MetricsDateRange,
+                    GranuleValues, MetricsDateRange, convert_metric_target_unit,
                     convert_metric_values_unit, fill_missing_granules, group_metric_values,
                 },
             },
@@ -74,18 +74,7 @@ pub struct ResponseBody {
     values: HashMap<String, GranuleValues>,
     summary: HashMap<String, f64>,
     unit: String,
-}
-
-impl From<GroupedMetricValues> for ResponseBody {
-    fn from(value: GroupedMetricValues) -> Self {
-        let unit = value.unit();
-        let (values, summary) = value.values_and_summary();
-        ResponseBody {
-            unit: unit.to_string(),
-            values,
-            summary,
-        }
-    }
+    target: Option<TrainingMetricTarget>,
 }
 
 impl From<ComputeTrainingMetricValuesError> for StatusCode {
@@ -158,14 +147,28 @@ pub async fn compute_training_metric_values<
         Some(window) => fill_missing_granules(values, window, &range),
         None => values,
     };
+    let unit = values.unit();
+    let (values, summary) = values.values_and_summary();
+    // Convert the target to the values' display unit so it can be drawn on the chart
+    let target = target
+        .as_ref()
+        .and_then(|t| convert_metric_target_unit(t, unit));
 
-    Ok(Json(ResponseBody::from(values)))
+    Ok(Json(ResponseBody {
+        values,
+        summary,
+        unit: unit.to_string(),
+        target,
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json;
+
+    use crate::domain::models::activity::Unit;
+    use crate::domain::models::training::TrainingMetricTarget;
 
     #[test]
     fn test_request_deserialize_minimal() {
@@ -244,6 +247,26 @@ mod tests {
         assert_eq!(
             request.target,
             Some(APITrainingMetricTarget::new(100.0, "km".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_response_body_with_target() {
+        let body = ResponseBody {
+            values: HashMap::from([(
+                "Other".to_string(),
+                HashMap::from([("2025-09-24".to_string(), 5.0)]),
+            )]),
+            summary: HashMap::new(),
+            unit: "km".to_string(),
+            target: Some(TrainingMetricTarget::new(5.0, Unit::Kilometer)),
+        };
+
+        let json = serde_json::to_value(&body).unwrap();
+
+        assert_eq!(
+            json["target"],
+            serde_json::json!({"value": 5.0, "unit": "km"})
         );
     }
 }

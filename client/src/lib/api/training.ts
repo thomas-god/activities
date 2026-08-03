@@ -102,7 +102,8 @@ const TrainingMetricTemplatesSchema = z.array(
 const TrainingMetricValuesPreviewSchema = z.object({
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
 	summary: z.record(z.string(), z.number()),
-	unit: z.string()
+	unit: z.string(),
+	target: z.object({ value: z.number(), unit: z.string() }).nullable()
 });
 
 // =============================================================================

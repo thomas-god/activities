@@ -12,7 +12,7 @@ use crate::domain::{
         activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric, ToUnit, Unit},
         training::{
             TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
-            TrainingMetricValues, TrainingMetricWindow,
+            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
         },
     },
     ports::DateRange,
@@ -225,16 +225,36 @@ pub fn convert_metric_values_unit(values: GroupedMetricValues) -> GroupedMetricV
     }
 }
 
+/// Convert a training metric target from its raw unit to the display unit of the metric
+/// values (e.g. meters → kilometers).
+///
+/// Returns `None` when the target unit cannot be expressed in the display unit, so the
+/// target is simply not shown in that case.
+pub fn convert_metric_target_unit(
+    target: &TrainingMetricTarget,
+    display_unit: Unit,
+) -> Option<TrainingMetricTarget> {
+    let converted_value = match (target.unit(), display_unit) {
+        (Unit::Meter, Unit::Kilometer) => target.value() / 1000.,
+        (Unit::MeterPerSecond, Unit::KilometerPerHour) => target.value() * 3.6,
+        (Unit::SecondPerMeter, Unit::SecondPerKilometer) => target.value() * 1000.,
+        (unit, display) if unit == display => target.value(),
+        _ => return None,
+    };
+
+    Some(TrainingMetricTarget::new(converted_value, display_unit))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use chrono::DateTime;
 
-    use crate::domain::models::activity::TimeseriesAggregate;
+    use crate::domain::models::activity::{TimeseriesAggregate, Unit};
     use crate::domain::models::training::{
-        TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity, TrainingMetricValue,
-        TrainingMetricValues,
+        TrainingMetricAggregate, TrainingMetricBin, TrainingMetricGranularity,
+        TrainingMetricTarget, TrainingMetricValue, TrainingMetricValues,
     };
 
     use super::*;
@@ -909,4 +929,53 @@ mod test_fill_grouped_metric_values {
             )
         );
     }
+}
+
+#[test]
+fn test_convert_target_meter_to_kilometer() {
+    let target = TrainingMetricTarget::new(5000.0, Unit::Meter);
+
+    let converted = convert_metric_target_unit(&target, Unit::Kilometer).unwrap();
+
+    assert_eq!(converted, TrainingMetricTarget::new(5.0, Unit::Kilometer));
+}
+
+#[test]
+fn test_convert_target_meter_per_second_to_kilometer_per_hour() {
+    let target = TrainingMetricTarget::new(10.0, Unit::MeterPerSecond);
+
+    let converted = convert_metric_target_unit(&target, Unit::KilometerPerHour).unwrap();
+
+    assert_eq!(
+        converted,
+        TrainingMetricTarget::new(36.0, Unit::KilometerPerHour)
+    );
+}
+
+#[test]
+fn test_convert_target_second_per_meter_to_second_per_kilometer() {
+    let target = TrainingMetricTarget::new(3.0, Unit::SecondPerMeter);
+
+    let converted = convert_metric_target_unit(&target, Unit::SecondPerKilometer).unwrap();
+
+    assert_eq!(
+        converted,
+        TrainingMetricTarget::new(3000.0, Unit::SecondPerKilometer)
+    );
+}
+
+#[test]
+fn test_convert_target_same_unit_unchanged() {
+    let target = TrainingMetricTarget::new(2000.0, Unit::KiloCalorie);
+
+    let converted = convert_metric_target_unit(&target, Unit::KiloCalorie).unwrap();
+
+    assert_eq!(converted, target);
+}
+
+#[test]
+fn test_convert_target_incompatible_units_returns_none() {
+    let target = TrainingMetricTarget::new(100.0, Unit::Meter);
+
+    assert!(convert_metric_target_unit(&target, Unit::Watt).is_none());
 }

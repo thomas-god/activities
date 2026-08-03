@@ -41,6 +41,7 @@
 				? true
 				: false}
 		average={'average' in values.summary ? some(values.summary.average) : none()}
+		target={values.target === null ? none() : some(values.target.value)}
 	/>
 {:else}
 	<TrainingMetricsChartLine
@@ -50,6 +51,7 @@
 		unit={values.unit}
 		format={previewFormat(values.unit)}
 		average={'average' in values.summary ? some(values.summary.average) : none()}
+		target={values.target === null ? none() : some(values.target.value)}
 		{timeDomain}
 	/>
 {/if}

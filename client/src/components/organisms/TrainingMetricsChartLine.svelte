@@ -12,6 +12,7 @@
 		unit: string;
 		format: 'number' | 'duration' | 'pace';
 		average: Option<number>;
+		target: Option<number>;
 		timeDomain?: Option<{ start: string; end: string | null }>;
 	}
 
@@ -22,6 +23,7 @@
 		unit,
 		format,
 		average,
+		target,
 		timeDomain = none()
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
@@ -70,12 +72,14 @@
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
 	});
 
+	let maxValue = $derived(Math.max(d3.max(valuesAsTime, (v) => v.value) ?? 0, unwrapOr(target, 0)));
+
 	let yAxisDefaultTickValues = (): number[] => {
 		if (valuesAsTime.length === 0) {
 			return [];
 		}
 
-		return d3.ticks(0, d3.max(valuesAsTime, (v) => v.value) ?? 0, 6);
+		return d3.ticks(0, maxValue, 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
@@ -84,7 +88,7 @@
 		}
 		if (format === 'duration') {
 			const dt = 600;
-			const maxDuration = d3.max(valuesAsTime, (v) => v.value) ?? 0;
+			const maxDuration = maxValue;
 			const roundedUpMaxDuration = Math.ceil(maxDuration / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
 			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
@@ -138,7 +142,7 @@
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([0, (d3.max(valuesAsTime, (v) => v.value) ?? 0) * 1.1])
+			.domain([0, maxValue * 1.1])
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
@@ -149,6 +153,12 @@
 		)
 	);
 	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
+
+	let targetLineY = $derived(map(target, (t) => y(t)));
+	let targetLegendY = $derived(
+		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
+	);
+	let targetLegend = $derived(map(target, (t) => `Target = ${formatTooltipValue(t)}`));
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -324,6 +334,28 @@
 				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
 			>
 				{unwrapOr(averageLegend, '')}
+			</text>
+		{/if}
+
+		{#if isSome(target)}
+			<line
+				x1={marginLeft}
+				x2={width - marginRight}
+				y1={unwrapOr(targetLineY, 0)}
+				y2={unwrapOr(targetLineY, 0)}
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-dasharray="4 4"
+				opacity="0.6"
+			/>
+			<text
+				x={width - marginRight - 4}
+				y={unwrapOr(targetLegendY, 0)}
+				text-anchor="end"
+				class="fill-current text-xs"
+				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+			>
+				{unwrapOr(targetLegend, '')}
 			</text>
 		{/if}
 

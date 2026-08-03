@@ -89,6 +89,7 @@
 					average={'average' in currentMetric.summary
 						? some(currentMetric.summary.average)
 						: none()}
+					target={currentMetric.target === null ? none() : some(currentMetric.target.value)}
 				/>
 			{:else}
 				<TrainingMetricsChartLine
@@ -100,6 +101,7 @@
 					average={'average' in currentMetric.summary
 						? some(currentMetric.summary.average)
 						: none()}
+					target={currentMetric.target === null ? none() : some(currentMetric.target.value)}
 					{timeDomain}
 				/>
 			{/if}

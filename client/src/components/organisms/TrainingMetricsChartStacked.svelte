@@ -17,6 +17,7 @@
 		groupBy: TrainingMetricGroupByClause | null;
 		stacked?: boolean;
 		average: Option<number>;
+		target: Option<number>;
 	}
 
 	let {
@@ -28,6 +29,7 @@
 		format,
 		groupBy,
 		average,
+		target,
 		showGroup = true,
 		stacked = true
 	}: TimeseriesChartProps = $props();
@@ -134,7 +136,7 @@
 					.entries()
 					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
 			: (d3.max(formatedValues, (v) => v.value) ?? 0);
-		return d3.ticks(0, maxGroupValue, 6);
+		return d3.ticks(0, Math.max(maxGroupValue, unwrapOr(target, 0)), 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
@@ -157,7 +159,8 @@
 						.entries()
 						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
 				: (d3.max(formatedValues, (v) => v.value) ?? 0);
-			const roundedUpMaxDuration = Math.ceil(maxDuration / dt) * dt;
+			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
+			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
 			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
 
@@ -203,15 +206,19 @@
 			.padding(0.6)
 	);
 
+	let maxValue = $derived(
+		Math.max(
+			stacked
+				? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
+				: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
+			unwrapOr(target, 0)
+		)
+	);
+
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([
-				0,
-				stacked
-					? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
-					: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!
-			])
+			.domain([0, maxValue])
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
@@ -222,6 +229,12 @@
 		)
 	);
 	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
+
+	let targetLineY = $derived(map(target, (t) => y(t)));
+	let targetLegendY = $derived(
+		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
+	);
+	let targetLegend = $derived(map(target, (t) => `Target = ${formatTooltipValue(t)}`));
 
 	const colors = $derived.by(() => {
 		const scale = d3.scaleOrdinal(d3.schemeObservable10);
@@ -465,6 +478,28 @@
 				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
 			>
 				{unwrapOr(averageLegend, '')}
+			</text>
+		{/if}
+
+		{#if isSome(target)}
+			<line
+				x1={marginLeft}
+				x2={width - marginRight}
+				y1={unwrapOr(targetLineY, 0)}
+				y2={unwrapOr(targetLineY, 0)}
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-dasharray="4 4"
+				opacity="0.6"
+			/>
+			<text
+				x={width - marginRight - 4}
+				y={unwrapOr(targetLegendY, 0)}
+				text-anchor="end"
+				class="fill-current text-xs"
+				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+			>
+				{unwrapOr(targetLegend, '')}
 			</text>
 		{/if}
 

@@ -132,6 +132,7 @@
 						groupBy={metric.group_by}
 						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
 						average={'average' in metric.summary ? some(metric.summary.average) : none()}
+						target={metric.target === null ? none() : some(metric.target.value)}
 					/>
 				{:else}
 					<TrainingMetricsChartLine
@@ -141,6 +142,7 @@
 						unit={metric.unit}
 						format={metricValuesDisplayFormat(metric)}
 						average={'average' in metric.summary ? some(metric.summary.average) : none()}
+						target={metric.target === null ? none() : some(metric.target.value)}
 						{timeDomain}
 					/>
 				{/if}

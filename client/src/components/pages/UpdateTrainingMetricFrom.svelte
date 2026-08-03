@@ -103,13 +103,13 @@
 
 	const fetchPreview = async (request: typeof previewRequest) => {
 		if (isNone(request)) {
-			return { values: {}, unit: '', summary: {} };
+			return { values: {}, unit: '', summary: {}, target: null };
 		}
 
 		const values = await getTrainingMetricPreview(request.value);
 
 		if (isNone(values)) {
-			return { values: {}, unit: '', summary: {} };
+			return { values: {}, unit: '', summary: {}, target: null };
 		}
 
 		return values.value;
