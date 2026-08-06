@@ -12,11 +12,10 @@
 	interface Props {
 		defaultMetrics: string[];
 		currentPreference: ActivityListSummaryItems;
-		isOpen: boolean;
 		onSave: (items: ActivityListSummaryItems) => Promise<boolean>;
 	}
 
-	let { defaultMetrics, currentPreference, onSave, isOpen = $bindable() }: Props = $props();
+	let { defaultMetrics, currentPreference, onSave }: Props = $props();
 
 	let draggedIndex = $state<number | null>(null);
 
@@ -70,7 +69,7 @@
 			return { type: item.type as 'rpe' | 'workoutType' };
 		});
 		await onSave(items);
-		isOpen = false;
+		closeDialog();
 	};
 
 	const addItem = (item: SummaryItem) => {
@@ -118,131 +117,136 @@
 		newOrder.splice(currentIndex + 1, 0, movedItem);
 		selectedItems = newOrder;
 	};
+
+	let dialog: HTMLDialogElement;
+	const closeDialog = () => {
+		dialog.close();
+	};
+
+	export function open() {
+		dialog.showModal();
+	}
 </script>
 
-{#if isOpen}
-	<dialog class="modal" open>
-		<div class="modal-box max-w-4xl">
-			<form method="dialog">
-				<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-			</form>
-			<h3 class="mb-4 text-lg font-bold">Configure Activity List</h3>
+<dialog class="modal" bind:this={dialog}>
+	<div class="modal-box max-w-4xl">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm" onclick={closeDialog}
+				>✕</button
+			>
+		</form>
+		<h3 class="mb-4 text-lg font-bold">Configure Activity List</h3>
 
-			<p class="mb-4 text-sm opacity-70">
-				Select activity's statistics to show in the activity list and arrange them in your preferred
-				order.
-			</p>
+		<p class="mb-4 text-sm opacity-70">
+			Select activity's statistics to show in the activity list and arrange them in your preferred
+			order.
+		</p>
 
-			<div class="grid gap-4">
-				<!-- Selected Items (with ordering) -->
-				<div>
-					<h4 class="mb-2 text-sm font-semibold">Selected statistics (in order)</h4>
-					<div
-						role="list"
-						class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
-						aria-label="Selected items"
-					>
-						{#if selectedItems.length === 0}
-							<div class="py-8 text-center text-sm italic opacity-70">No items selected</div>
-						{:else}
-							{#each selectedItems as item, index (item.key)}
-								<div
-									role="listitem"
-									draggable="true"
-									ondragstart={() => handleDragStart(index)}
-									ondragover={(e) => handleDragOver(e, index)}
-									ondragend={handleDragEnd}
-									aria-label={`${item.displayName}, position ${index + 1} of ${selectedItems.length}`}
-									class="flex cursor-move items-center gap-1 rounded-box bg-base-200 p-2 transition-colors hover:bg-base-300"
-									class:opacity-50={draggedIndex === index}
+		<div class="grid gap-4">
+			<!-- Selected Items (with ordering) -->
+			<div>
+				<h4 class="mb-2 text-sm font-semibold">Selected statistics (in order)</h4>
+				<div
+					role="list"
+					class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
+					aria-label="Selected items"
+				>
+					{#if selectedItems.length === 0}
+						<div class="py-8 text-center text-sm italic opacity-70">No items selected</div>
+					{:else}
+						{#each selectedItems as item, index (item.key)}
+							<div
+								role="listitem"
+								draggable="true"
+								ondragstart={() => handleDragStart(index)}
+								ondragover={(e) => handleDragOver(e, index)}
+								ondragend={handleDragEnd}
+								aria-label={`${item.displayName}, position ${index + 1} of ${selectedItems.length}`}
+								class="flex cursor-move items-center gap-1 rounded-box bg-base-200 p-2 transition-colors hover:bg-base-300"
+								class:opacity-50={draggedIndex === index}
+							>
+								<!-- Drag handle for desktop -->
+								<img
+									src="/icons/list.svg"
+									class="h-4 w-4 pointer-coarse:hidden"
+									aria-hidden="true"
+									alt="Drag handle"
+								/>
+
+								<!-- Up/down buttons for mobile -->
+								<button
+									class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
+									onclick={() => moveItemUp(index)}
+									disabled={index === 0}
+									aria-label={`Move ${item.displayName} up`}
 								>
-									<!-- Drag handle for desktop -->
-									<img
-										src="/icons/list.svg"
-										class="h-4 w-4 pointer-coarse:hidden"
-										aria-hidden="true"
-										alt="Drag handle"
-									/>
-
-									<!-- Up/down buttons for mobile -->
-									<button
-										class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
-										onclick={() => moveItemUp(index)}
-										disabled={index === 0}
-										aria-label={`Move ${item.displayName} up`}
-									>
-										<img src="/icons/up.svg" class="h-4 w-4" alt="Up arrow" />
-									</button>
-									<button
-										class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
-										onclick={() => moveItemDown(index)}
-										disabled={index === selectedItems.length - 1}
-										aria-label={`Move ${item.displayName} down`}
-									>
-										<img src="/icons/down.svg" class="h-4 w-4" alt="Down arrow" />
-									</button>
-
-									<span class="flex-1 text-sm">{item.displayName}</span>
-									<span class="badge badge-xs">{index + 1}</span>
-
-									<!-- Remove button -->
-									<button
-										class="btn btn-ghost btn-xs"
-										onclick={() => removeItem(item)}
-										aria-label={`Remove ${item.displayName}`}
-									>
-										<img src="/icons/close.svg" class="h-4 w-4" alt="Remove icon" />
-									</button>
-								</div>
-							{/each}
-						{/if}
-					</div>
-				</div>
-
-				<!-- Available Items -->
-				<div>
-					<h4 class="mb-2 text-sm font-semibold">Available statistics</h4>
-					<div
-						role="list"
-						class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
-						aria-label="Available items"
-					>
-						{#if availableItems.length === 0}
-							<div class="py-8 text-center text-sm italic opacity-70">All items are selected</div>
-						{:else}
-							{#each availableItems as item (item.key)}
-								<div
-									role="listitem"
-									class="flex items-center justify-between rounded-box bg-base-200 p-2 transition-colors hover:bg-base-300"
+									<img src="/icons/up.svg" class="h-4 w-4" alt="Up arrow" />
+								</button>
+								<button
+									class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
+									onclick={() => moveItemDown(index)}
+									disabled={index === selectedItems.length - 1}
+									aria-label={`Move ${item.displayName} down`}
 								>
-									<span class="text-sm">{item.displayName}</span>
-									<button
-										class="btn btn-primary btn-sm"
-										onclick={() => addItem(item)}
-										aria-label={`Add ${item.displayName}`}
-									>
-										<img src="/icons/plus.svg" class="h-4 w-4" alt="Add icon" />
-									</button>
-								</div>
-							{/each}
-						{/if}
-					</div>
+									<img src="/icons/down.svg" class="h-4 w-4" alt="Down arrow" />
+								</button>
+
+								<span class="flex-1 text-sm">{item.displayName}</span>
+								<span class="badge badge-xs">{index + 1}</span>
+
+								<!-- Remove button -->
+								<button
+									class="btn btn-ghost btn-xs"
+									onclick={() => removeItem(item)}
+									aria-label={`Remove ${item.displayName}`}
+								>
+									<img src="/icons/close.svg" class="h-4 w-4" alt="Remove icon" />
+								</button>
+							</div>
+						{/each}
+					{/if}
 				</div>
 			</div>
 
-			<div class="modal-action">
-				<button class="btn" onclick={() => (isOpen = false)}> Cancel </button>
-				<button
-					class="btn btn-primary"
-					onclick={saveSelection}
-					disabled={selectedItems.length === 0}
+			<!-- Available Items -->
+			<div>
+				<h4 class="mb-2 text-sm font-semibold">Available statistics</h4>
+				<div
+					role="list"
+					class="max-h-75 space-y-2 overflow-scroll rounded-box border border-base-300 bg-base-100 p-3"
+					aria-label="Available items"
 				>
-					Save
-				</button>
+					{#if availableItems.length === 0}
+						<div class="py-8 text-center text-sm italic opacity-70">All items are selected</div>
+					{:else}
+						{#each availableItems as item (item.key)}
+							<div
+								role="listitem"
+								class="flex items-center justify-between rounded-box bg-base-200 p-2 transition-colors hover:bg-base-300"
+							>
+								<span class="text-sm">{item.displayName}</span>
+								<button
+									class="btn btn-primary btn-sm"
+									onclick={() => addItem(item)}
+									aria-label={`Add ${item.displayName}`}
+								>
+									<img src="/icons/plus.svg" class="h-4 w-4" alt="Add icon" />
+								</button>
+							</div>
+						{/each}
+					{/if}
+				</div>
 			</div>
 		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button>close</button>
-		</form>
-	</dialog>
-{/if}
+
+		<div class="modal-action">
+			<button class="btn" onclick={closeDialog}> Cancel </button>
+			<button class="btn btn-primary" onclick={saveSelection} disabled={selectedItems.length === 0}>
+				Save
+			</button>
+		</div>
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button onclick={closeDialog}>close</button>
+	</form>
+</dialog>

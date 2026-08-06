@@ -115,7 +115,6 @@
 		showDownloadModal = true;
 	};
 
-	let activityListSummaryOpen = $state(false);
 	const updateActivityListSummary = async (items: ActivityListSummaryItems): Promise<boolean> => {
 		const payload: PreferencePayload = {
 			key: 'activity_list_summary',
@@ -129,6 +128,13 @@
 			invalidate('app:activities');
 			return res;
 		});
+	};
+
+	let summaryDialog: ActivityListSummaryDialog | null = $state(null);
+	const openSummaryDialog = () => {
+		if (summaryDialog !== null) {
+			summaryDialog.open();
+		}
 	};
 </script>
 
@@ -179,7 +185,7 @@
 						{/await}
 						<button
 							class="btn join-item btn-sm"
-							onclick={() => (activityListSummaryOpen = true)}
+							onclick={openSummaryDialog}
 							title="Customize history view"
 						>
 							<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
@@ -282,10 +288,10 @@
 
 {#await Promise.all( [data.defaultMetrics, data.activityListSummary] ) then [defaultMetrics, currentPreference]}
 	<ActivityListSummaryDialog
+		bind:this={summaryDialog}
 		{defaultMetrics}
 		{currentPreference}
 		onSave={updateActivityListSummary}
-		bind:isOpen={activityListSummaryOpen}
 	/>
 {/await}
 
