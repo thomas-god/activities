@@ -1,0 +1,23 @@
+[
+  {
+    "label": "Run Server",
+    "command": "cargo run; fish",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    // One terminal tab per task (equivalent of the VSCode "separate shell").
+    "use_new_terminal": true,
+    // Don't wait for a previous instance to finish before rerunning.
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    // Keep the tab (and its fish shell) open after the command exits.
+    "hide": "never",
+  },
+  {
+    "label": "Run Client",
+    "command": "nvm use 26 && npm run dev; fish",
+    "cwd": "$ZED_WORKTREE_ROOT/client",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    "hide": "never",
+  },
+]
