@@ -40,6 +40,8 @@
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import CreateTrainingMetricFromTemplate from '$components/pages/CreateTrainingMetricFromTemplate.svelte';
 	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
+	import { resolve } from '$app/paths';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let period_id = $state(page.params.period_id);
 
@@ -69,6 +71,8 @@
 	let importTrainingMetricDialog: HTMLDialogElement;
 	// svelte-ignore non_reactive_update
 	let metricsOrderingDialog: MetricsOrderingDialog;
+	// svelte-ignore non_reactive_update
+	let metricListDialog: HTMLDialogElement;
 
 	let chartWidth: number = $state(300);
 	let chartHeight = $derived(Math.max(150, Math.min(300, chartWidth * 0.6)));
@@ -101,7 +105,7 @@
 
 		if (response.ok) {
 			await invalidate('app:training-periods');
-			await goto('/training/periods');
+			await goto(resolve('/training/periods'));
 		} else {
 			throw new Error('Failed to delete training period');
 		}
@@ -177,7 +181,7 @@
 	const sportsByCategory = (sports: TrainingPeriodDetails['sports']) => {
 		// Map category -> { category, icon, sports[], showAll }
 		const categorySet: Set<SportCategory | 'Other'> = new Set(sports.categories);
-		const map = new Map<
+		const map = new SvelteMap<
 			string,
 			{ category: SportCategory | 'Other'; icon: string; sports: string[]; showAll: boolean }
 		>();
@@ -254,7 +258,7 @@
 
 	const selectActivityCallback = (activityId: string) => {
 		if (screenWidth < 700) {
-			goto(`/activity/${activityId}`);
+			goto(resolve(`/activity/${activityId}`));
 			return;
 		}
 
@@ -278,6 +282,14 @@
 
 	const openMetricsOrderingDialog = () => {
 		metricsOrderingDialog.open();
+	};
+
+	const toggleMetricListFullscreen = () => {
+		if (metricListDialog.open) {
+			metricListDialog.close();
+		} else {
+			metricListDialog.showModal();
+		}
 	};
 
 	let getGlobalMetricsPromise = $derived.by(async () => {
@@ -328,7 +340,7 @@
 							{#if sportsByCategory(periodDetails.sports).length > 0}
 								<div class="flex items-center gap-1.5">
 									<span class="opacity-50">·</span>
-									{#each sportsByCategory(periodDetails.sports) as group}
+									{#each sportsByCategory(periodDetails.sports) as group (group.category)}
 										<div
 											class="tooltip tooltip-bottom text-base"
 											data-tip={group.showAll
@@ -416,68 +428,16 @@
 						<div
 							class={`item metrics flex-col rounded-box bg-base-100 pb-3 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
 						>
-							<div bind:clientWidth={chartWidth}>
-								<div class="flex flex-row items-center gap-2 pt-4">
-									<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
-									<div class="join">
-										<div class="tooltip tooltip-bottom" data-tip="New metric">
-											<button
-												onclick={() => newTrainingMetricDialog.show()}
-												class="btn join-item btn-sm"
-											>
-												<img src="/icons/plus.svg" class="inline h-5 w-5" alt="Plus sign icon" />
-											</button>
-										</div>
-										<div class="tooltip tooltip-bottom" data-tip="Import metric">
-											<button
-												onclick={() => importTrainingMetricDialog.show()}
-												class="btn join-item btn-sm"
-											>
-												<img
-													src="/icons/import.svg"
-													class="inline h-5 w-5"
-													alt="Import sign icon"
-												/>
-											</button>
-										</div>
-										<div class="tooltip tooltip-bottom" data-tip="Order metrics">
-											<button onclick={openMetricsOrderingDialog} class="btn join-item btn-sm">
-												<img src="/icons/order.svg" class="inline h-5 w-5" alt="List order icon" />
-											</button>
-										</div>
-									</div>
-								</div>
-								{#if metrics.length > 0}
-									{#if screenWidth < 700}
-										<TrainingMetricsCarousel
-											{metrics}
-											height={chartHeight}
-											onMetricUpdate={updateMetricsPromise}
-											timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
-										/>
-									{:else}
-										<TrainingMetricsList
-											{metrics}
-											height={chartHeight}
-											onUpdate={updateMetricsPromise}
-											onDelete={updateMetricsPromise}
-											timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
-										/>
-									{/if}
-								{:else}
-									<div class="mt-4 text-center text-sm tracking-wide italic opacity-60">
-										No training metrics
-									</div>
-								{/if}
-							</div>
+							{@render metricList(periodDetails, metrics)}
 						</div>
-
-						<MetricsOrderingDialog
-							bind:this={metricsOrderingDialog}
-							scope={{ type: 'trainingPeriod', trainingPeriodId: periodDetails.id }}
-							{metrics}
-							onSaved={updateMetricsPromise}
-						/>
+						<dialog class="modal" bind:this={metricListDialog}>
+							<div class="modal-box w-full max-w-full">
+								{@render metricList(periodDetails, metrics)}
+							</div>
+							<form method="dialog" class="modal-backdrop">
+								<button>close</button>
+							</form>
+						</dialog>
 					{/await}
 				{/if}
 
@@ -496,7 +456,7 @@
 								<div class="relative w-full">
 									<div class="absolute right-3 join">
 										<button
-											onclick={() => goto(`/activity/${selectedActivityId}`)}
+											onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 											class="btn join-item btn-sm"
 										>
 											<img
@@ -649,13 +609,77 @@
 			</dialog>
 		{:else}
 			<p class="pt-4 pl-4 text-sm tracking-wide italic opacity-80">
-				Error while loading training period's details. <a class="link" href="/training/periods">
+				Error while loading training period's details. <a
+					class="link"
+					href={resolve('/training/periods')}
+				>
 					Go back to periods.
 				</a>
 			</p>
 		{/if}
 	{/await}
 {/if}
+
+{#snippet metricList(periodDetails: TrainingPeriodDetails, metrics: TrainingMetricList)}
+	<div bind:clientWidth={chartWidth}>
+		<div class="flex flex-row items-center gap-2 pt-4">
+			<h2 class=" pl-4 text-lg font-semibold">Training metrics</h2>
+			<div class="join">
+				<div class="tooltip tooltip-bottom" data-tip="New metric">
+					<button onclick={() => newTrainingMetricDialog.show()} class="btn join-item btn-sm">
+						<img src="/icons/plus.svg" class="inline h-5 w-5" alt="Plus sign icon" />
+					</button>
+				</div>
+				<div class="tooltip tooltip-bottom" data-tip="Import metric">
+					<button onclick={() => importTrainingMetricDialog.show()} class="btn join-item btn-sm">
+						<img src="/icons/import.svg" class="inline h-5 w-5" alt="Import sign icon" />
+					</button>
+				</div>
+				<div class="tooltip tooltip-bottom" data-tip="Order metrics">
+					<button onclick={openMetricsOrderingDialog} class="btn join-item btn-sm">
+						<img src="/icons/order.svg" class="inline h-5 w-5" alt="List order icon" />
+					</button>
+				</div>
+				{#if screenWidth >= 700}
+					<div class="tooltip tooltip-bottom" data-tip="Toggle fullscreen">
+						<button onclick={toggleMetricListFullscreen} class="btn join-item btn-sm">
+							<img src="/icons/expand.svg" class="inline h-4 w-4" alt="Expand/fullscreen icon" />
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+		{#if metrics.length > 0}
+			{#if screenWidth < 700}
+				<TrainingMetricsCarousel
+					{metrics}
+					height={chartHeight}
+					onMetricUpdate={updateMetricsPromise}
+					timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
+				/>
+			{:else}
+				<TrainingMetricsList
+					{metrics}
+					height={chartHeight}
+					onUpdate={updateMetricsPromise}
+					onDelete={updateMetricsPromise}
+					timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
+				/>
+			{/if}
+		{:else}
+			<div class="mt-4 text-center text-sm tracking-wide italic opacity-60">
+				No training metrics
+			</div>
+		{/if}
+	</div>
+
+	<MetricsOrderingDialog
+		bind:this={metricsOrderingDialog}
+		scope={{ type: 'trainingPeriod', trainingPeriodId: periodDetails.id }}
+		{metrics}
+		onSaved={updateMetricsPromise}
+	/>
+{/snippet}
 
 <style>
 	.period_container {
