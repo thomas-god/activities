@@ -18,7 +18,7 @@
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
 	import Timeline from '$components/pages/Timeline.svelte';
-	import EditButton from '$components/atoms/EditButton.svelte';
+	import EditButton from '$ui/core/EditButton.svelte';
 	import {
 		applyFiltersToSearchParams,
 		filtersFromSearchParams,

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import EditButton from '$components/atoms/EditButton.svelte';
-	import SaveButton from '$components/atoms/SaveButton.svelte';
+	import SaveButton from '$ui/core/SaveButton.svelte';
+	import EditButton from '$ui/core/EditButton.svelte';
 
 	let {
 		feedback: initialFeedback,

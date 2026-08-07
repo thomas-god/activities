@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CopyUploadButton from '$components/atoms/CopyUploadButton.svelte';
+	import CopyUploadButton from '$ui/core/CopyUploadButton.svelte';
 	import {
 		copyTrainingMetricIntoPeriod,
 		type TrainingMetric,

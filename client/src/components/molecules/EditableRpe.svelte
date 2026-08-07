@@ -1,6 +1,6 @@
 <script lang="ts">
-	import EditButton from '$components/atoms/EditButton.svelte';
-	import SaveButton from '$components/atoms/SaveButton.svelte';
+	import EditButton from '$ui/core/EditButton.svelte';
+	import SaveButton from '$ui/core/SaveButton.svelte';
 	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '$lib/rpe';
 
 	let {

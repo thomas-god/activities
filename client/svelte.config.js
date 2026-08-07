@@ -23,7 +23,8 @@ const config = {
 			handleHttpError: 'fail'
 		},
 		alias: {
-			$components: './src/components'
+			$components: './src/components',
+			$ui: './src/ui'
 		}
 	}
 };
