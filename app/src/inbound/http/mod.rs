@@ -127,16 +127,19 @@ impl<
             .parse::<HeaderValue>()
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
-        let router = axum::Router::new()
-            .route("/health", get(health))
-            .nest("/api", core_routes(state.clone()));
+        let router = axum::Router::new().nest("/api", core_routes(state.clone()));
 
         let auth_strategy = AuthStrategy::from(mode);
         tracing::info!(
             "App starting with authentication strategy: {:?}",
             &auth_strategy
         );
-        let mut router = add_auth_router(auth_strategy, router, user_service);
+        // Mount /health *after* the auth router: `route_layer` inside
+        // `add_auth_router` only wraps the routes that already exist when it
+        // is called, so mounting afterwards keeps the healthcheck outside the
+        // auth middleware.
+        let mut router = add_auth_router(auth_strategy, router, user_service)
+            .route("/health", get(health));
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()
@@ -177,9 +180,10 @@ impl<
 
 /// Dedicated health-check endpoint, used by the Docker `HEALTHCHECK`.
 ///
-/// Mounted at the router root (not under `/api`) so it stays unauthenticated
-/// and reachable by infrastructure probes. nginx proxies `/health` to this
-/// route, so a successful probe also validates the reverse-proxy wiring.
+/// Mounted at the router root (not under `/api`) *after* the auth router is
+/// applied, so it stays unauthenticated and reachable by infrastructure
+/// probes. nginx proxies `/health` to this route, so a successful probe also
+/// validates the reverse-proxy wiring.
 async fn health() -> impl IntoResponse {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
 }
@@ -326,6 +330,16 @@ mod tests {
     use super::*;
     use axum_test::TestServer;
 
+    use crate::domain::services::{
+        activity::test_utils::MockActivityService,
+        preferences::tests_utils::MockPreferencesService,
+        training::test_utils::MockTrainingService,
+    };
+    use crate::inbound::{
+        auth::{SinglePassword, email_based::test_utils::MockUserService},
+        parser::test_utils::MockFileParser,
+    };
+
     #[tokio::test]
     async fn health_returns_ok() {
         let app = Router::new().route("/health", get(health));
@@ -334,5 +348,37 @@ mod tests {
         let response = server.get("/health").await;
         response.assert_status(StatusCode::OK);
         assert_eq!(response.json::<serde_json::Value>()["status"], "ok");
+    }
+
+    /// Regression test: /health must be mounted *after* the auth router so the
+    /// auth middleware (added via `route_layer` inside `add_auth_router`) does
+    /// not wrap it, even with an auth strategy enabled.
+    #[tokio::test]
+    async fn health_bypasses_auth_middleware() {
+        let state = AppState {
+            activity_service: Arc::new(MockActivityService::test_default()),
+            file_parser: Arc::new(MockFileParser::test_default()),
+            training_metrics_service: Arc::new(MockTrainingService::test_default()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+        };
+
+        let router = add_auth_router(
+            AuthStrategy::SinglePassword(SinglePassword::from("secret")),
+            Router::new().nest("/api", core_routes(state)),
+            MockUserService::new(),
+        );
+        let app = router.route("/health", get(health));
+        let server = TestServer::new(app);
+
+        // The healthcheck must work without any auth cookie...
+        let response = server.get("/health").await;
+        response.assert_status(StatusCode::OK);
+        assert_eq!(response.json::<serde_json::Value>()["status"], "ok");
+
+        // ...while the API itself is still protected.
+        server
+            .get("/api/activities")
+            .await
+            .assert_status(StatusCode::UNAUTHORIZED);
     }
 }
