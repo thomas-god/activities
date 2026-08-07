@@ -2,8 +2,8 @@
 	import type { TrainingMetricValuesPreview } from '$lib/api';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import type { TrainingMetricFields } from '.';
-	import TrainingMetricsChartLine from '../TrainingMetricsChartLine.svelte';
-	import TrainingMetricsChartStacked from '../TrainingMetricsChartStacked.svelte';
+	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
+	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
 
 	let {
 		fields,
@@ -26,7 +26,7 @@
 </script>
 
 {#if isSome(fields.granularity)}
-	<TrainingMetricsChartStacked
+	<TrainingMetricChartStacked
 		height={300}
 		{width}
 		values={values.values}
@@ -44,7 +44,7 @@
 		target={values.target === null ? none() : some(values.target.value)}
 	/>
 {:else}
-	<TrainingMetricsChartLine
+	<TrainingMetricChartLine
 		height={300}
 		{width}
 		values={values.values}

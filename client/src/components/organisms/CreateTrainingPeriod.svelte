@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import SportFilterV2 from '$components/molecules/SportFilterV2.svelte';
+	import SportFilterV2 from '$ui/features/training_metrics/internal/SportFilter.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import DateRange from '../molecules/DateRange.svelte';
+	import DateRange from '$ui/core/DateRange.svelte';
 	import { unwrapOr, some } from '$lib/Options';
 
 	let { callback }: { callback: () => void } = $props();

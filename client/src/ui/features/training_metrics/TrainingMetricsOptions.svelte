@@ -1,6 +1,6 @@
 <script lang="ts">
-	import DateRange from '../molecules/DateRange.svelte';
-	import MetricsOrderingDialog from './MetricsOrderingDialog.svelte';
+	import DateRange from '$ui/core/DateRange.svelte';
+	import TrainingMetricsOrderingDialog from './TrainingMetricsOrderingDialog.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
 	import type { TrainingMetricList, TrainingPeriodList } from '$lib/api';
 	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
@@ -24,7 +24,7 @@
 		onMetricsReordered
 	}: Props = $props();
 
-	let metricsOrderingDialog: MetricsOrderingDialog;
+	let trainingMetricsOrderingDialog: TrainingMetricsOrderingDialog;
 
 	let selectedPeriodId: Option<string> = $state(none());
 	let selectedQuickRange: Option<'4weeks' | '12weeks' | 'year'> = $state(none());
@@ -120,14 +120,14 @@
 			</select>
 		{/await}
 	</div>
-	<button onclick={() => metricsOrderingDialog.open()} class="btn btn-sm">
+	<button onclick={() => trainingMetricsOrderingDialog.open()} class="btn btn-sm">
 		<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
 		Metrics order
 	</button>
 </div>
 
-<MetricsOrderingDialog
-	bind:this={metricsOrderingDialog}
+<TrainingMetricsOrderingDialog
+	bind:this={trainingMetricsOrderingDialog}
 	scope={metricsOrderingScope}
 	metrics={await unwrapOr(metricsPromise, Promise.resolve([]))}
 	onSaved={onMetricsReordered}

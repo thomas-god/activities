@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import { none, some, type Option } from '$lib/Options';
 import type { BonkStatus } from '$lib/nutrition';
-import BonkStatusFilterV2 from './BonkStatusFilterV2.svelte';
+import BonkStatusFilter from './BonkStatusFilter.svelte';
 
 afterEach(() => {
 	cleanup();
@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('BonkStatusFilterV2', () => {
 	it('does not render anything when bonk status is not set', () => {
-		const { container } = render(BonkStatusFilterV2, {
+		const { container } = render(BonkStatusFilter, {
 			props: { bonkStatus: none<BonkStatus>() as Option<BonkStatus> }
 		});
 
@@ -23,7 +23,7 @@ describe('BonkStatusFilterV2', () => {
 	it('shows the selected bonk status and updates when editing', async () => {
 		const user = userEvent.setup();
 
-		render(BonkStatusFilterV2, {
+		render(BonkStatusFilter, {
 			props: { bonkStatus: some<BonkStatus>('none') as Option<BonkStatus> }
 		});
 
@@ -44,7 +44,7 @@ describe('BonkStatusFilterV2', () => {
 
 	it('clears the filter when delete is clicked', async () => {
 		const user = userEvent.setup();
-		const { container } = render(BonkStatusFilterV2, {
+		const { container } = render(BonkStatusFilter, {
 			props: { bonkStatus: some<BonkStatus>('bonked') as Option<BonkStatus> }
 		});
 

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import { none, some, type Option } from '$lib/Options';
 import type { RPEValue } from '$lib/rpe';
-import RpeFilterV2 from './RpeFilterV2.svelte';
+import RpeFilter from './RpeFilter.svelte';
 
 afterEach(() => {
 	cleanup();
@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('RpeFilterV2', () => {
 	it('does not render anything when rpes are not set', () => {
-		const { container } = render(RpeFilterV2, {
+		const { container } = render(RpeFilter, {
 			props: { rpes: none<RPEValue[]>() as Option<RPEValue[]> }
 		});
 
@@ -23,7 +23,7 @@ describe('RpeFilterV2', () => {
 	it('shows the selected rpes and updates when editing', async () => {
 		const user = userEvent.setup();
 
-		render(RpeFilterV2, {
+		render(RpeFilter, {
 			props: { rpes: some<RPEValue[]>([8, 3]) as Option<RPEValue[]> }
 		});
 
@@ -43,7 +43,7 @@ describe('RpeFilterV2', () => {
 
 	it('clears the filter when delete is clicked', async () => {
 		const user = userEvent.setup();
-		const { container } = render(RpeFilterV2, {
+		const { container } = render(RpeFilter, {
 			props: { rpes: some<RPEValue[]>([5]) as Option<RPEValue[]> }
 		});
 

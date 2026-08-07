@@ -1,8 +1,8 @@
 <script lang="ts">
-	import DeleteModal from '$components/molecules/DeleteModal.svelte';
+	import DeleteModal from '$ui/core/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
-	import UpdateTrainingMetricFrom from '$components/pages/UpdateTrainingMetricFrom.svelte';
+	import UpdateTrainingMetricFrom from '../UpdateTrainingMetric.svelte';
 	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
 
@@ -42,7 +42,7 @@
 		<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
 	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-	<ul tabindex="0" class="dropdown-content menu z-[1] w-40 rounded-box bg-base-100 p-2 shadow">
+	<ul tabindex="0" class="dropdown-content menu z-1 w-40 rounded-box bg-base-100 p-2 shadow">
 		<li>
 			<button
 				onclick={() => {

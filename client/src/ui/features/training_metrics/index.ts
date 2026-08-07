@@ -8,7 +8,7 @@ import { asOption, isNone, isSome, none, some, type Option } from '$lib/Options'
 import type { Sport, SportCategory } from '$lib/sport';
 import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
 import { workoutTypeToAPI } from '$lib/workout-type';
-import type { TrainingMetricFiltersType } from '../TrainingMetricFilters.svelte';
+import type { TrainingMetricFiltersType } from './internal/TrainingMetricFilters.svelte';
 
 export interface TrainingMetricFields {
 	name: string;

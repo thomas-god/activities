@@ -2,8 +2,8 @@
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
 	import type { TrainingMetricTemplate } from '$lib/api';
-	import TrainingMetricFilters from '../TrainingMetricFilters.svelte';
-	import type { TrainingMetricFields } from '.';
+	import TrainingMetricFilters from './TrainingMetricFilters.svelte';
+	import type { TrainingMetricFields } from '..';
 
 	let {
 		templates,

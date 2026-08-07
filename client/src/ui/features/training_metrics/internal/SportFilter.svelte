@@ -137,7 +137,7 @@
 {#if isSome(sports) && isSome(categories)}
 	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
-			<div class="flex-1 text-wrap break-words">
+			<div class="flex-1 text-wrap wrap-break-word">
 				Sports: {display}
 			</div>
 			<div class="join shrink-0">
@@ -164,7 +164,7 @@
 					{#if shouldDisplayCategory(category)}
 						<div class="flex flex-col gap-1 p-1">
 							<div
-								class="flex flex-row items-center gap-1.5 border-b-1 border-b-black/45 pb-0.5 pl-0.5"
+								class="flex flex-row items-center gap-1.5 border-b border-b-black/45 pb-0.5 pl-0.5"
 							>
 								<span class="font-semibold">
 									{#if ['WaterSports', 'TeamSports'].includes(category)}

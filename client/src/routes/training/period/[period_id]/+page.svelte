@@ -2,9 +2,9 @@
 	import { dayjs } from '$lib/duration';
 	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
-	import DeleteModal from '$components/molecules/DeleteModal.svelte';
+	import DeleteModal from '$ui/core/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import TrainingMetricsCarousel from '$components/organisms/TrainingMetricsCarousel.svelte';
+	import TrainingMetricsCarousel from '$ui/features/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
@@ -12,8 +12,8 @@
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import TrainingMetricsList from '$components/organisms/TrainingMetricsList.svelte';
-	import MetricsOrderingDialog from '$components/organisms/MetricsOrderingDialog.svelte';
+	import TrainingMetricsList from '$ui/features/training_metrics/TrainingMetricsList.svelte';
+	import TrainingMetricsOrderingDialog from '$ui/features/training_metrics/TrainingMetricsOrderingDialog.svelte';
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
@@ -24,7 +24,7 @@
 		filtersFromSearchParams,
 		type ActivitiesFilters
 	} from '$lib/filters';
-	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
+	import ActivitiesFiltersComponent from '$ui/core/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
 	import {
 		fetchActivityListSummary,
@@ -36,9 +36,9 @@
 		type TrainingNotesList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
-	import ImportTrainingMetric from '$components/organisms/ImportTrainingMetric.svelte';
+	import ImportTrainingMetric from '$ui/features/training_metrics/ImportTrainingMetric.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import CreateTrainingMetricFromTemplate from '$components/pages/CreateTrainingMetricFromTemplate.svelte';
+	import CreateTrainingMetricFromTemplate from '$ui/features/training_metrics/CreateTrainingMetric.svelte';
 	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -70,7 +70,7 @@
 	// svelte-ignore non_reactive_update
 	let importTrainingMetricDialog: HTMLDialogElement;
 	// svelte-ignore non_reactive_update
-	let metricsOrderingDialog: MetricsOrderingDialog;
+	let metricsOrderingDialog: TrainingMetricsOrderingDialog;
 	// svelte-ignore non_reactive_update
 	let metricListDialog: HTMLDialogElement;
 
@@ -280,7 +280,7 @@
 		}
 	};
 
-	const openMetricsOrderingDialog = () => {
+	const openTrainingMetricsOrderingDialog = () => {
 		metricsOrderingDialog.open();
 	};
 
@@ -636,7 +636,7 @@
 					</button>
 				</div>
 				<div class="tooltip tooltip-bottom" data-tip="Order metrics">
-					<button onclick={openMetricsOrderingDialog} class="btn join-item btn-sm">
+					<button onclick={openTrainingMetricsOrderingDialog} class="btn join-item btn-sm">
 						<img src="/icons/order.svg" class="inline h-5 w-5" alt="List order icon" />
 					</button>
 				</div>
@@ -673,7 +673,7 @@
 		{/if}
 	</div>
 
-	<MetricsOrderingDialog
+	<TrainingMetricsOrderingDialog
 		bind:this={metricsOrderingDialog}
 		scope={{ type: 'trainingPeriod', trainingPeriodId: periodDetails.id }}
 		{metrics}

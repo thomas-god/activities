@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
-import { none, some, type Option } from '$lib/Options';
-import WorkoutTypeFilterV2 from './WorkoutTypeFilterV2.svelte';
+import { none, some } from '$lib/Options';
+import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
 import type { WorkoutType } from '$lib/workout-type';
 
 afterEach(() => {
@@ -12,7 +12,7 @@ afterEach(() => {
 
 describe('WorkoutTypeFilterV2', () => {
 	it('does not render anything when workout types are not set', () => {
-		const { container } = render(WorkoutTypeFilterV2, {
+		const { container } = render(WorkoutTypeFilter, {
 			props: { workoutTypes: none<WorkoutType[]>() }
 		});
 
@@ -23,7 +23,7 @@ describe('WorkoutTypeFilterV2', () => {
 	it('shows the selected workout types and updates when editing', async () => {
 		const user = userEvent.setup();
 
-		render(WorkoutTypeFilterV2, {
+		render(WorkoutTypeFilter, {
 			props: { workoutTypes: some<WorkoutType[]>(['tempo', 'easy']) }
 		});
 
@@ -44,7 +44,7 @@ describe('WorkoutTypeFilterV2', () => {
 
 	it('clears the filter when delete is clicked', async () => {
 		const user = userEvent.setup();
-		const { container } = render(WorkoutTypeFilterV2, {
+		const { container } = render(WorkoutTypeFilter, {
 			props: { workoutTypes: some<WorkoutType[]>(['race']) }
 		});
 

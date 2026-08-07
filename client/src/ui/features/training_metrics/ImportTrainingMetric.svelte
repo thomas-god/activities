@@ -11,8 +11,8 @@
 		metricValuesDisplayFormat
 	} from '$lib/trainingMetric';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
-	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
+	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
+	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
 
 	let {
 		metrics,
@@ -121,7 +121,7 @@
 		{#if Object.entries(metric.values).length > 0}
 			<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 				{#if metric.granularity !== null}
-					<TrainingMetricsChartStacked
+					<TrainingMetricChartStacked
 						height={300}
 						width={chartWidth}
 						values={metric.values}
@@ -135,7 +135,7 @@
 						target={metric.target === null ? none() : some(metric.target.value)}
 					/>
 				{:else}
-					<TrainingMetricsChartLine
+					<TrainingMetricChartLine
 						height={300}
 						width={chartWidth}
 						values={metric.values}

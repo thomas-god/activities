@@ -3,11 +3,11 @@
 	import { isNone, isSome, none, type Option, some } from '$lib/Options';
 	import type { RPEValue } from '$lib/rpe';
 	import type { BonkStatus } from '$lib/nutrition';
-	import RpeFilterV2 from '$components/molecules/RpeFilterV2.svelte';
-	import BonkStatusFilterV2 from '$components/molecules/BonkStatusFilterV2.svelte';
+	import RpeFilter from './RpeFilter.svelte';
+	import BonkStatusFilter from './BonkStatusFilter.svelte';
 	import type { WorkoutType } from '$lib/workout-type';
-	import WorkoutTypeFilterV2 from '$components/molecules/WorkoutTypeFilterV2.svelte';
-	import SportFilterV2 from '$components/molecules/SportFilterV2.svelte';
+	import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
+	import SportFilter from './SportFilter.svelte';
 
 	export interface TrainingMetricFiltersType {
 		sports: Option<Sport[]>;
@@ -84,17 +84,17 @@
 	{/if}
 </label>
 <div class="flex flex-col gap-2 pl-2">
-	<SportFilterV2
+	<SportFilter
 		bind:sports={() => filters.sports, (v) => (filters.sports = v)}
 		bind:categories={() => filters.sportCategories, (v) => (filters.sportCategories = v)}
 		{existingSportsConstraints}
 	/>
 
-	<RpeFilterV2 bind:rpes={() => filters.rpes, (v) => (filters.rpes = v)} />
+	<RpeFilter bind:rpes={() => filters.rpes, (v) => (filters.rpes = v)} />
 
-	<WorkoutTypeFilterV2
+	<WorkoutTypeFilter
 		bind:workoutTypes={() => filters.workoutTypes, (v) => (filters.workoutTypes = v)}
 	/>
 
-	<BonkStatusFilterV2 bind:bonkStatus={() => filters.bonked, (v) => (filters.bonked = v)} />
+	<BonkStatusFilter bind:bonkStatus={() => filters.bonked, (v) => (filters.bonked = v)} />
 </div>

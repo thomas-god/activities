@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { type TrainingMetric } from '$lib/api';
 	import { aggregateFunctionDisplay } from '$lib/trainingMetric';
-	import TrainingMetricMenu from './TrainingMetricMenu.svelte';
+	import TrainingMetricMenu from './internal/TrainingMetricMenu.svelte';
 
 	let { metric, onUpdate }: { metric: TrainingMetric; onUpdate: () => void } = $props();
 

@@ -13,7 +13,7 @@
 {#if isSome(bonkStatus)}
 	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
-			<div class="flex-1 text-wrap break-words">
+			<div class="flex-1 text-wrap wrap-break-word">
 				Bonk status: {bonkStatus.value === 'none' ? 'No bonk' : 'Bonked'}
 			</div>
 			<div class="join shrink-0">

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
-	import DeleteModal from '$components/molecules/DeleteModal.svelte';
+	import DeleteModal from '$ui/core/DeleteModal.svelte';
 
 	let {
 		note,

@@ -2,12 +2,6 @@
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import { isNone, none, some, type Option } from '$lib/Options';
-	import TrainingMetricForm from '$components/organisms/training_metric/TrainingMetricForm.svelte';
-	import {
-		fieldsAsPayload,
-		type Scope,
-		type TrainingMetricFields
-	} from '$components/organisms/training_metric';
 	import {
 		createTrainingMetric,
 		fetchTrainingMetricTemplates,
@@ -15,7 +9,9 @@
 		type CreateTrainingMetricPayload,
 		type PreviewTrainingMetricPayload
 	} from '$lib/api';
-	import PreviewChart from '$components/organisms/training_metric/PreviewChart.svelte';
+	import TrainingMetricForm from './internal/TrainingMetricForm.svelte';
+	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
+	import PreviewChart from './TrainingMetricPreviewChart.svelte';
 
 	let {
 		callback,

@@ -15,7 +15,7 @@
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
 	import Timeline from '$components/pages/Timeline.svelte';
-	import ActivitiesFiltersComponent from '$components/molecules/ActivitiesFilters.svelte';
+	import ActivitiesFiltersComponent from '$ui/core/ActivitiesFilters.svelte';
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';

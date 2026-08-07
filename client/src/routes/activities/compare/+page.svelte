@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ActivitiesSelect from '$components/molecules/ActivitiesSelect.svelte';
+	import ActivitiesSelect from '$ui/core/ActivitiesSelect.svelte';
 	import CompareActivities from '$components/organisms/CompareActivities.svelte';
 	import CompareActivitiesSummary from '$components/organisms/CompareActivitiesSummary.svelte';
 	import Navbar from '$components/organisms/navigation/Navbar.svelte';

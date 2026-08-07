@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import { none, some, type Option } from '$lib/Options';
 import type { Sport, SportCategory } from '$lib/sport';
-import SportFilterV2 from './SportFilterV2.svelte';
+import SportFilter from './SportFilter.svelte';
 
 const getSummaryText = (container: HTMLElement): string => {
 	return container.querySelector('.break-words')?.textContent?.trim() ?? '';
@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe('SportFilterV2', () => {
 	it('does not render anything when sports are not set', () => {
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: none<Sport[]>() as Option<Sport[]>,
 				categories: some<SportCategory[]>([]) as Option<SportCategory[]>
@@ -30,7 +30,7 @@ describe('SportFilterV2', () => {
 	it('toggles an individual sport when its category is not selected', async () => {
 		const user = userEvent.setup();
 
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: some<Sport[]>(['Running']) as Option<Sport[]>,
 				categories: some<SportCategory[]>([]) as Option<SportCategory[]>
@@ -53,7 +53,7 @@ describe('SportFilterV2', () => {
 	it('toggles a category on and replaces its selected sports with the category', async () => {
 		const user = userEvent.setup();
 
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: some<Sport[]>(['Yoga']) as Option<Sport[]>,
 				categories: some<SportCategory[]>([]) as Option<SportCategory[]>
@@ -85,7 +85,7 @@ describe('SportFilterV2', () => {
 	it('only shows categories and sports allowed by existingSportsConstraints', async () => {
 		const user = userEvent.setup();
 
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: some<Sport[]>(['Running']) as Option<Sport[]>,
 				categories: some<SportCategory[]>(['Cardio']) as Option<SportCategory[]>,
@@ -112,7 +112,7 @@ describe('SportFilterV2', () => {
 	it('turns a category off and selects the other sports when one sport is toggled from that category', async () => {
 		const user = userEvent.setup();
 
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: some<Sport[]>([]) as Option<Sport[]>,
 				categories: some<SportCategory[]>(['Cardio']) as Option<SportCategory[]>
@@ -133,7 +133,7 @@ describe('SportFilterV2', () => {
 
 	it('clears sports and categories when delete is clicked', async () => {
 		const user = userEvent.setup();
-		const { container } = render(SportFilterV2, {
+		const { container } = render(SportFilter, {
 			props: {
 				sports: some<Sport[]>(['Running']) as Option<Sport[]>,
 				categories: some<SportCategory[]>(['Cardio']) as Option<SportCategory[]>

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import TrainingMetricsChartStacked from './TrainingMetricsChartStacked.svelte';
 	import type { TrainingMetric } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
-	import TrainingMetricsChartLine from './TrainingMetricsChartLine.svelte';
 	import { none, some, type Option } from '$lib/Options';
-	import TrainingMetricMenu from '$components/molecules/TrainingMetricMenu.svelte';
+	import TrainingMetricMenu from '$ui/features/training_metrics/internal/TrainingMetricMenu.svelte';
+	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
+	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
 
 	let {
 		metrics,
@@ -75,7 +75,7 @@
 	{#if Object.entries(currentMetric.values).length > 0}
 		<div bind:clientWidth={chartWidth}>
 			{#if currentMetric.granularity !== null}
-				<TrainingMetricsChartStacked
+				<TrainingMetricChartStacked
 					{height}
 					width={chartWidth}
 					values={currentMetric.values}
@@ -92,7 +92,7 @@
 					target={currentMetric.target === null ? none() : some(currentMetric.target.value)}
 				/>
 			{:else}
-				<TrainingMetricsChartLine
+				<TrainingMetricChartLine
 					height={300}
 					width={chartWidth}
 					values={currentMetric.values}
