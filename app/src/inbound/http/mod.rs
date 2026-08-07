@@ -5,11 +5,12 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::extract::DefaultBodyLimit;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
-use axum::http::{HeaderValue, Method};
+use axum::http::{HeaderValue, Method, StatusCode};
 
 use axum::routing::{delete, get, patch};
-use axum::{Router, routing::post};
+use axum::{Json, Router, routing::post, response::IntoResponse};
 use cookie::SameSite;
+use serde_json::json;
 use tokio::net;
 use tower_http::cors::CorsLayer;
 
@@ -126,7 +127,9 @@ impl<
             .parse::<HeaderValue>()
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
-        let router = axum::Router::new().nest("/api", core_routes(state.clone()));
+        let router = axum::Router::new()
+            .route("/health", get(health))
+            .nest("/api", core_routes(state.clone()));
 
         let auth_strategy = AuthStrategy::from(mode);
         tracing::info!(
@@ -170,6 +173,15 @@ impl<
         .context("received error from running server")?;
         Ok(())
     }
+}
+
+/// Dedicated health-check endpoint, used by the Docker `HEALTHCHECK`.
+///
+/// Mounted at the router root (not under `/api`) so it stays unauthenticated
+/// and reachable by infrastructure probes. nginx proxies `/health` to this
+/// route, so a successful probe also validates the reverse-proxy wiring.
+async fn health() -> impl IntoResponse {
+    (StatusCode::OK, Json(json!({ "status": "ok" })))
 }
 
 fn core_routes<
@@ -307,4 +319,20 @@ where
         );
 
     router.with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum_test::TestServer;
+
+    #[tokio::test]
+    async fn health_returns_ok() {
+        let app = Router::new().route("/health", get(health));
+        let server = TestServer::new(app);
+
+        let response = server.get("/health").await;
+        response.assert_status(StatusCode::OK);
+        assert_eq!(response.json::<serde_json::Value>()["status"], "ok");
+    }
 }

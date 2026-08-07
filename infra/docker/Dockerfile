@@ -41,4 +41,9 @@ COPY --chmod=0755 infra/docker/start.sh ./
 
 EXPOSE 80
 
+# Probe the /health endpoint through nginx; it is proxied to the Rust API,
+# so this only passes when nginx AND the backend are healthy.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1/health || exit 1
+
 CMD ["./start.sh"]
