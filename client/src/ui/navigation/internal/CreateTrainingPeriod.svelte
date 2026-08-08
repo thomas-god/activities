@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import SportFilterV2 from '$ui/training_metrics/internal/SportFilter.svelte';
+	import SportFilter from '$ui/shared/SportFilter.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import DateRange from '$ui/shared/DateRange.svelte';
@@ -84,7 +84,7 @@
 		<div class="my-2 font-semibold">
 			<span class="pr-2"> Filter by sports </span>
 		</div>
-		<SportFilterV2
+		<SportFilter
 			bind:sports={() => some(selectedSports), (v) => (selectedSports = unwrapOr(v, []))}
 			bind:categories={
 				() => some(selectedSportCategories), (v) => (selectedSportCategories = unwrapOr(v, []))
