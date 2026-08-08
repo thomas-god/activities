@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { none, some, type Option } from '$lib/Options';
+	import { none, type Option } from '$lib/Options';
 	import type { TrainingMetric } from '$lib/api/training';
-	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
-	import TrainingMetricChartStacked from '../TrainingMetricChartStacked.svelte';
-	import TrainingMetricChartLine from '../TrainingMetricChartLine.svelte';
+	import TrainingMetricChart from '../TrainingMetricChart.svelte';
 
 	let {
 		metrics,
@@ -55,37 +53,7 @@
 			<div class="px-4 pt-4">
 				<TrainingMetricTitle {metric} onUpdate={onMetricUpdate} />
 			</div>
-
-			{#if Object.entries(metric.values).length > 0}
-				{#if metric.granularity !== null}
-					<TrainingMetricChartStacked
-						{height}
-						width={chartWidth}
-						values={metric.values}
-						unit={metric.unit}
-						granularity={metric.granularity}
-						format={metricValuesDisplayFormat(metric)}
-						showGroup={metric.group_by !== null}
-						groupBy={metric.group_by}
-						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-						average={'average' in metric.summary ? some(metric.summary.average) : none()}
-						target={metric.target === null ? none() : some(metric.target.value)}
-					/>
-				{:else}
-					<TrainingMetricChartLine
-						height={300}
-						width={chartWidth}
-						values={metric.values}
-						unit={metric.unit}
-						format={metricValuesDisplayFormat(metric)}
-						average={'average' in metric.summary ? some(metric.summary.average) : none()}
-						target={metric.target === null ? none() : some(metric.target.value)}
-						{timeDomain}
-					/>
-				{/if}
-			{:else}
-				<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
-			{/if}
+			<TrainingMetricChart {metric} width={chartWidth} {height} {timeDomain} />
 
 			{#if idx !== metricProps.length - 1}
 				<div class="divider"></div>

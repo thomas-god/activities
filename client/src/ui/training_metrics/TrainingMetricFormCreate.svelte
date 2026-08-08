@@ -12,7 +12,7 @@
 	} from '$lib/api';
 	import TrainingMetricForm from './internal/TrainingMetricForm.svelte';
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
-	import PreviewChart from './TrainingMetricChartPreview.svelte';
+	import TrainingMetricChart from './TrainingMetricChart.svelte';
 
 	let {
 		callback,
@@ -154,7 +154,7 @@
 			{:then temporaryMetric}
 				{#if isSome(temporaryMetric)}
 					<div bind:clientWidth={chartWidth}>
-						<PreviewChart
+						<TrainingMetricChart
 							width={chartWidth}
 							metric={temporaryMetric.value}
 							timeDomain={some(dates)}

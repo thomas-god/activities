@@ -3,13 +3,11 @@
 	import { page } from '$app/state';
 	import TrainingMetricsOptions from '$ui/training_metrics/TrainingMetricsOptions.svelte';
 	import { dayjs } from '$lib/duration';
-	import TrainingMetricChartStacked from '$ui/training_metrics/TrainingMetricChartStacked.svelte';
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
-	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
-	import { isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricChartLine from '$ui/training_metrics/TrainingMetricChartLine.svelte';
+	import { isSome, some, type Option } from '$lib/Options';
 	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
+	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	let chartWidth: number = $state(0);
 
@@ -58,36 +56,7 @@
 					<div class="relative p-4 text-center">
 						<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
 					</div>
-					{#if Object.entries(metric.values).length > 0}
-						{#if metric.granularity !== null}
-							<TrainingMetricChartStacked
-								height={250}
-								width={chartWidth}
-								values={metric.values}
-								unit={metric.unit}
-								granularity={metric.granularity}
-								format={metricValuesDisplayFormat(metric)}
-								showGroup={metric.group_by !== null}
-								groupBy={metric.group_by}
-								stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-								average={'average' in metric.summary ? some(metric.summary.average) : none()}
-								target={metric.target === null ? none() : some(metric.target.value)}
-							/>
-						{:else}
-							<TrainingMetricChartLine
-								height={300}
-								width={chartWidth}
-								values={metric.values}
-								unit={metric.unit}
-								format={metricValuesDisplayFormat(metric)}
-								average={'average' in metric.summary ? some(metric.summary.average) : none()}
-								target={metric.target === null ? none() : some(metric.target.value)}
-								timeDomain={some(dates)}
-							/>
-						{/if}
-					{:else}
-						<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
-					{/if}
+					<TrainingMetricChart {metric} width={chartWidth} timeDomain={some(dates)} />
 				</div>
 			{/each}
 		{/await}

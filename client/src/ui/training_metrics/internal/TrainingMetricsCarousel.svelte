@@ -1,10 +1,8 @@
 <script lang="ts">
 	import type { TrainingMetric } from '$lib/api/training';
-	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { none, some, type Option } from '$lib/Options';
 	import TrainingMetricMenu from '$ui/training_metrics/internal/TrainingMetricMenu.svelte';
-	import TrainingMetricChartLine from '../TrainingMetricChartLine.svelte';
-	import TrainingMetricChartStacked from '../TrainingMetricChartStacked.svelte';
+	import TrainingMetricChart from '../TrainingMetricChart.svelte';
 
 	let {
 		metrics,
@@ -70,43 +68,9 @@
 		</div>
 	</div>
 
-	{#if Object.entries(currentMetric.values).length > 0}
-		<div bind:clientWidth={chartWidth}>
-			{#if currentMetric.granularity !== null}
-				<TrainingMetricChartStacked
-					{height}
-					width={chartWidth}
-					values={currentMetric.values}
-					unit={currentMetric.unit}
-					granularity={currentMetric.granularity}
-					format={metricValuesDisplayFormat(currentMetric)}
-					showGroup={currentMetric.group_by !== null}
-					groupBy={currentMetric.group_by}
-					stacked={currentMetric.aggregate === 'Sum' ||
-						currentMetric.aggregate === 'NumberOfActivities'}
-					average={'average' in currentMetric.summary
-						? some(currentMetric.summary.average)
-						: none()}
-					target={currentMetric.target === null ? none() : some(currentMetric.target.value)}
-				/>
-			{:else}
-				<TrainingMetricChartLine
-					height={300}
-					width={chartWidth}
-					values={currentMetric.values}
-					unit={currentMetric.unit}
-					format={metricValuesDisplayFormat(currentMetric)}
-					average={'average' in currentMetric.summary
-						? some(currentMetric.summary.average)
-						: none()}
-					target={currentMetric.target === null ? none() : some(currentMetric.target.value)}
-					{timeDomain}
-				/>
-			{/if}
-		</div>
-	{:else}
-		<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>
-	{/if}
+	<div bind:clientWidth={chartWidth}>
+		<TrainingMetricChart metric={currentMetric} width={chartWidth} {height} {timeDomain} />
+	</div>
 
 	{#if metrics.length > 1}
 		<div class="flex items-center justify-center gap-2 py-2">

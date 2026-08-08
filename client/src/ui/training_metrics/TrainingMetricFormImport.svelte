@@ -5,14 +5,9 @@
 		type TrainingMetric,
 		type TrainingMetricList
 	} from '$lib/api';
-	import {
-		aggregateFunctionDisplay,
-		groupByClauseDisplay,
-		metricValuesDisplayFormat
-	} from '$lib/trainingMetric';
+	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/trainingMetric';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
-	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
+	import TrainingMetricChart from './TrainingMetricChart.svelte';
 
 	let {
 		metrics,
@@ -118,39 +113,8 @@
 
 	{#if isSome(selectedMetric)}
 		{@const metric = selectedMetric.value}
-		{#if Object.entries(metric.values).length > 0}
-			<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
-				{#if metric.granularity !== null}
-					<TrainingMetricChartStacked
-						height={300}
-						width={chartWidth}
-						values={metric.values}
-						unit={metric.unit}
-						granularity={metric.granularity}
-						format={metricValuesDisplayFormat(metric)}
-						showGroup={metric.group_by !== null}
-						groupBy={metric.group_by}
-						stacked={metric.aggregate === 'Sum' || metric.aggregate === 'NumberOfActivities'}
-						average={'average' in metric.summary ? some(metric.summary.average) : none()}
-						target={metric.target === null ? none() : some(metric.target.value)}
-					/>
-				{:else}
-					<TrainingMetricChartLine
-						height={300}
-						width={chartWidth}
-						values={metric.values}
-						unit={metric.unit}
-						format={metricValuesDisplayFormat(metric)}
-						average={'average' in metric.summary ? some(metric.summary.average) : none()}
-						target={metric.target === null ? none() : some(metric.target.value)}
-						{timeDomain}
-					/>
-				{/if}
-			</div>
-		{:else}
-			<div class="alert rounded-box alert-info">
-				<span>No data available for the selected period and filters.</span>
-			</div>
-		{/if}
+		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
+			<TrainingMetricChart {metric} width={chartWidth} {timeDomain} />
+		</div>
 	{/if}
 </div>

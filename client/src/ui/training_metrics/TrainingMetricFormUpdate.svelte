@@ -16,7 +16,7 @@
 		type TrainingMetric,
 		type UpdateTrainingMetricPayload
 	} from '$lib/api';
-	import PreviewChart from './TrainingMetricChartPreview.svelte';
+	import TrainingMetricChart from './TrainingMetricChart.svelte';
 
 	let {
 		initialMetric,
@@ -144,7 +144,7 @@
 			{:then temporaryMetric}
 				{#if isSome(temporaryMetric)}
 					<div bind:clientWidth={chartWidth}>
-						<PreviewChart
+						<TrainingMetricChart
 							width={chartWidth}
 							metric={temporaryMetric.value}
 							timeDomain={some(dates)}
