@@ -445,8 +445,6 @@
 	});
 </script>
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 <div class="flex flex-col gap-2">
 	<svg
 		{width}

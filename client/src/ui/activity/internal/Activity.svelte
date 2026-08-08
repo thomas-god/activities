@@ -97,7 +97,7 @@
 
 				<!-- Activity metrics/details -->
 				<div class="flex flex-row items-center justify-start">
-					{#each listFormat as row (row.format.type)}
+					{#each listFormat as row, idx (idx)}
 						<div style:width={`${row.width}px`} hidden={!row.show} class="shrink-0 text-center">
 							{#if row.format.type === 'rpe'}
 								{#if activity.rpe}
