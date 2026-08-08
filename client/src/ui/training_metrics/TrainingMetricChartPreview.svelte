@@ -1,18 +1,15 @@
 <script lang="ts">
-	import type { TrainingMetricValuesPreview } from '$lib/api';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import type { TrainingMetricFields } from '.';
+	import type { TrainingMetric } from '$lib/api';
+	import { none, some, type Option } from '$lib/Options';
 	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
 	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
 
 	let {
-		fields,
-		values,
+		metric,
 		width,
 		timeDomain = none()
 	}: {
-		fields: TrainingMetricFields;
-		values: TrainingMetricValuesPreview;
+		metric: TrainingMetric;
 		width: number;
 		timeDomain?: Option<{ start: string; end: string | null }>;
 	} = $props();
@@ -25,33 +22,29 @@
 	};
 </script>
 
-{#if isSome(fields.granularity)}
+{#if metric.granularity !== null}
 	<TrainingMetricChartStacked
 		height={300}
 		{width}
-		values={values.values}
-		unit={values.unit}
-		granularity={fields.granularity.value}
-		format={previewFormat(values.unit)}
-		showGroup={isSome(fields.groupBy)}
-		groupBy={isSome(fields.groupBy) ? fields.groupBy.value : null}
-		stacked={isNone(fields.selectedTemplate)
-			? false
-			: fields.selectedTemplate.value.aggregate === 'Sum'
-				? true
-				: false}
-		average={'average' in values.summary ? some(values.summary.average) : none()}
-		target={values.target === null ? none() : some(values.target.value)}
+		values={metric.values}
+		unit={metric.unit}
+		granularity={metric.granularity}
+		format={previewFormat(metric.unit)}
+		showGroup={metric.group_by !== null}
+		groupBy={metric.group_by}
+		stacked={metric.aggregate === 'Sum'}
+		average={'average' in metric.summary ? some(metric.summary.average) : none()}
+		target={metric.target === null ? none() : some(metric.target.value)}
 	/>
 {:else}
 	<TrainingMetricChartLine
 		height={300}
 		{width}
-		values={values.values}
-		unit={values.unit}
-		format={previewFormat(values.unit)}
-		average={'average' in values.summary ? some(values.summary.average) : none()}
-		target={values.target === null ? none() : some(values.target.value)}
+		values={metric.values}
+		unit={metric.unit}
+		format={previewFormat(metric.unit)}
+		average={'average' in metric.summary ? some(metric.summary.average) : none()}
+		target={metric.target === null ? none() : some(metric.target.value)}
 		{timeDomain}
 	/>
 {/if}

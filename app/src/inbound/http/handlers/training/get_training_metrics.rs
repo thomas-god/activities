@@ -33,7 +33,10 @@ use crate::{
         http::{
             AppState,
             handlers::training::{
-                types::{APITrainingMetricScope, SportsResponse, TrainingMetricBody},
+                types::{
+                    APITrainingMetricScope, SportsResponse, TrainingMetricBody,
+                    format_source_metric,
+                },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
                     convert_metric_target_unit, convert_metric_values_unit, fill_missing_granules,
@@ -152,17 +155,6 @@ fn to_response_body_item(
             .and_then(|w| w.group_by().as_ref().map(|g| format!("{:?}", g))),
         scope: metric.scope().into(),
         summary,
-    }
-}
-
-fn format_source_metric(source: &ActivityMetricSource) -> String {
-    match source {
-        ActivityMetricSource::Statistic(stat) => stat.to_string(),
-        ActivityMetricSource::Timeseries((metric, aggregate)) => {
-            format!("Activity {aggregate:?} {metric:?}")
-        }
-        ActivityMetricSource::ActiveDuration => "ActiveDuration".into(),
-        ActivityMetricSource::NumberOfActivities => "Number of activities".into(),
     }
 }
 

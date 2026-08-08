@@ -1,4 +1,8 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Write},
+    str::FromStr,
+};
 
 use derive_more::Constructor;
 /// Mappings between domain types and types part of the HTTP API
@@ -90,23 +94,39 @@ impl From<APITrainingMetricSource> for ActivityMetricSource {
 
 #[derive(Debug, Clone, PartialEq, Constructor, Deserialize, Default)]
 pub struct APITrainingMetricSummary {
-    average: Option<APITrainingMetricSummaryAverage>,
+    pub average: Option<APITrainingMetricSummaryAverage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor, Deserialize)]
 pub struct APITrainingMetricSummaryAverage {
-    include_zeros: bool,
+    pub include_zeros: bool,
+}
+impl From<&APITrainingMetricSummaryAverage> for TrainingMetricSummaryAverage {
+    fn from(value: &APITrainingMetricSummaryAverage) -> Self {
+        Self::new(value.include_zeros)
+    }
 }
 
 impl From<APITrainingMetricSummaryAverage> for TrainingMetricSummaryAverage {
     fn from(value: APITrainingMetricSummaryAverage) -> Self {
-        Self::new(value.include_zeros)
+        Self::from(&value)
     }
 }
 
 impl From<APITrainingMetricSummary> for TrainingMetricSummary {
     fn from(value: APITrainingMetricSummary) -> Self {
-        Self::new(value.average.map(TrainingMetricSummaryAverage::from))
+        Self::from(&value)
+    }
+}
+
+impl From<&APITrainingMetricSummary> for TrainingMetricSummary {
+    fn from(value: &APITrainingMetricSummary) -> Self {
+        Self::new(
+            value
+                .average
+                .as_ref()
+                .map(TrainingMetricSummaryAverage::from),
+        )
     }
 }
 
@@ -116,12 +136,20 @@ pub struct APITrainingMetricTarget {
     unit: String,
 }
 
+impl TryFrom<&APITrainingMetricTarget> for TrainingMetricTarget {
+    type Error = String;
+
+    fn try_from(value: &APITrainingMetricTarget) -> Result<Self, Self::Error> {
+        let unit = Unit::from_str(&value.unit)?;
+        Ok(TrainingMetricTarget::new(value.value, unit))
+    }
+}
+
 impl TryFrom<APITrainingMetricTarget> for TrainingMetricTarget {
     type Error = String;
 
     fn try_from(value: APITrainingMetricTarget) -> Result<Self, Self::Error> {
-        let unit = Unit::from_str(&value.unit)?;
-        Ok(TrainingMetricTarget::new(value.value, unit))
+        Self::try_from(&value)
     }
 }
 
@@ -132,13 +160,30 @@ pub struct APITimeseriesWindow {
     group_by: Option<APITrainingMetricGroupBy>,
 }
 
+impl APITimeseriesWindow {
+    pub fn granularity(&self) -> &APITrainingMetricGranularity {
+        &self.granularity
+    }
+    pub fn aggregate(&self) -> &APITrainingMetricAggregate {
+        &self.aggregate
+    }
+    pub fn group_by(&self) -> &Option<APITrainingMetricGroupBy> {
+        &self.group_by
+    }
+}
+impl From<&APITimeseriesWindow> for TrainingMetricWindow {
+    fn from(value: &APITimeseriesWindow) -> Self {
+        Self::new(
+            TrainingMetricGranularity::from(&value.granularity),
+            TrainingMetricAggregate::from(&value.aggregate),
+            value.group_by.as_ref().map(TrainingMetricGroupBy::from),
+        )
+    }
+}
+
 impl From<APITimeseriesWindow> for TrainingMetricWindow {
     fn from(value: APITimeseriesWindow) -> Self {
-        Self::new(
-            value.granularity.into(),
-            value.aggregate.into(),
-            value.group_by.map(TrainingMetricGroupBy::from),
-        )
+        Self::from(&value)
     }
 }
 
@@ -168,8 +213,20 @@ pub enum APITrainingMetricAggregate {
     NumberOfActivities,
 }
 
-impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
-    fn from(value: APITrainingMetricAggregate) -> Self {
+impl Display for APITrainingMetricAggregate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let d = match self {
+            Self::Min => "Min",
+            Self::Max => "Max",
+            Self::Average => "Average",
+            Self::Sum => "Sum",
+            Self::NumberOfActivities => "NumberOfActivities",
+        };
+        f.write_str(d)
+    }
+}
+impl From<&APITrainingMetricAggregate> for TrainingMetricAggregate {
+    fn from(value: &APITrainingMetricAggregate) -> Self {
         match value {
             APITrainingMetricAggregate::Min => Self::Min,
             APITrainingMetricAggregate::Max => Self::Max,
@@ -180,6 +237,12 @@ impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
     }
 }
 
+impl From<APITrainingMetricAggregate> for TrainingMetricAggregate {
+    fn from(value: APITrainingMetricAggregate) -> Self {
+        Self::from(&value)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub enum APITrainingMetricGranularity {
     Daily,
@@ -187,8 +250,8 @@ pub enum APITrainingMetricGranularity {
     Monthly,
 }
 
-impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
-    fn from(value: APITrainingMetricGranularity) -> Self {
+impl From<&APITrainingMetricGranularity> for TrainingMetricGranularity {
+    fn from(value: &APITrainingMetricGranularity) -> Self {
         match value {
             APITrainingMetricGranularity::Daily => Self::Daily,
             APITrainingMetricGranularity::Weekly => Self::Weekly,
@@ -197,19 +260,38 @@ impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct APITrainingMetricFilters {
-    sports: Option<Vec<SportFilter>>,
-    workout_types: Option<Vec<WorkoutType>>,
-    bonked: Option<BonkStatus>,
-    rpes: Option<Vec<u8>>,
+impl From<APITrainingMetricGranularity> for TrainingMetricGranularity {
+    fn from(value: APITrainingMetricGranularity) -> Self {
+        Self::from(&value)
+    }
 }
 
-impl TryFrom<APITrainingMetricFilters> for TrainingMetricFilters {
+impl Display for APITrainingMetricGranularity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let d = match self {
+            Self::Daily => "Daily",
+            Self::Weekly => "Weekly",
+            Self::Monthly => "Monthly",
+        };
+        f.write_str(d)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct APITrainingMetricFilters {
+    pub sports: Option<Vec<SportFilter>>,
+    pub workout_types: Option<Vec<WorkoutType>>,
+    pub bonked: Option<BonkStatus>,
+    pub rpes: Option<Vec<u8>>,
+}
+
+impl TryFrom<&APITrainingMetricFilters> for TrainingMetricFilters {
     type Error = String;
-    fn try_from(value: APITrainingMetricFilters) -> Result<Self, Self::Error> {
+
+    fn try_from(value: &APITrainingMetricFilters) -> Result<Self, Self::Error> {
         let rpes = value
             .rpes
+            .as_ref()
             .map(|raw_rpes| {
                 raw_rpes
                     .iter()
@@ -219,11 +301,18 @@ impl TryFrom<APITrainingMetricFilters> for TrainingMetricFilters {
             .transpose()?;
 
         Ok(Self::new(
-            value.sports,
-            value.workout_types,
-            value.bonked,
+            value.sports.clone(),
+            value.workout_types.clone(),
+            value.bonked.clone(),
             rpes,
         ))
+    }
+}
+
+impl TryFrom<APITrainingMetricFilters> for TrainingMetricFilters {
+    type Error = String;
+    fn try_from(value: APITrainingMetricFilters) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 
@@ -236,8 +325,21 @@ pub enum APITrainingMetricGroupBy {
     Bonked,
 }
 
-impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
-    fn from(value: APITrainingMetricGroupBy) -> Self {
+impl Display for APITrainingMetricGroupBy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let d = match self {
+            Self::Sport => "Sport",
+            Self::SportCategory => "SportCategory",
+            Self::WorkoutType => "WorkoutType",
+            Self::RpeRange => "RpeRange",
+            Self::Bonked => "Bonked",
+        };
+        f.write_str(d)
+    }
+}
+
+impl From<&APITrainingMetricGroupBy> for TrainingMetricGroupBy {
+    fn from(value: &APITrainingMetricGroupBy) -> Self {
         match value {
             APITrainingMetricGroupBy::Sport => Self::Sport,
             APITrainingMetricGroupBy::SportCategory => Self::SportCategory,
@@ -245,6 +347,11 @@ impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
             APITrainingMetricGroupBy::RpeRange => Self::RpeRange,
             APITrainingMetricGroupBy::Bonked => Self::Bonked,
         }
+    }
+}
+impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
+    fn from(value: APITrainingMetricGroupBy) -> Self {
+        Self::from(&value)
     }
 }
 
@@ -289,7 +396,7 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct SportsResponse {
     pub categories: Vec<String>,
     pub sports: Vec<String>,
@@ -360,6 +467,17 @@ pub struct TrainingMetricBody {
     pub group_by: Option<String>,
     pub scope: APITrainingMetricScope,
     pub summary: HashMap<String, f64>,
+}
+
+pub fn format_source_metric(source: &ActivityMetricSource) -> String {
+    match source {
+        ActivityMetricSource::Statistic(stat) => stat.to_string(),
+        ActivityMetricSource::Timeseries((metric, aggregate)) => {
+            format!("Activity {aggregate:?} {metric:?}")
+        }
+        ActivityMetricSource::ActiveDuration => "ActiveDuration".into(),
+        ActivityMetricSource::NumberOfActivities => "Number of activities".into(),
+    }
 }
 
 #[cfg(test)]

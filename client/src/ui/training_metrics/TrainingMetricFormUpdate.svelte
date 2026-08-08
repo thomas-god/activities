@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
 	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, none, some, type Option } from '$lib/Options';
+	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricForm from '$ui/training_metrics/internal/TrainingMetricForm.svelte';
 	import {
 		fieldsAsPayload,
@@ -101,18 +101,12 @@
 		callback();
 	};
 
-	const fetchPreview = async (request: typeof previewRequest) => {
+	const fetchPreview = async (request: typeof previewRequest): Promise<Option<TrainingMetric>> => {
 		if (isNone(request)) {
-			return { values: {}, unit: '', summary: {}, target: null };
+			return none();
 		}
 
-		const values = await getTrainingMetricPreview(request.value);
-
-		if (isNone(values)) {
-			return { values: {}, unit: '', summary: {}, target: null };
-		}
-
-		return values.value;
+		return await getTrainingMetricPreview(request.value);
 	};
 </script>
 
@@ -147,10 +141,14 @@
 				<div class="p-8 text-center">
 					<span class="loading loading-lg loading-spinner"></span>
 				</div>
-			{:then values}
-				{#if Object.entries(values.values).length > 0}
+			{:then temporaryMetric}
+				{#if isSome(temporaryMetric)}
 					<div bind:clientWidth={chartWidth}>
-						<PreviewChart width={chartWidth} {values} {fields} timeDomain={some(dates)} />
+						<PreviewChart
+							width={chartWidth}
+							metric={temporaryMetric.value}
+							timeDomain={some(dates)}
+						/>
 					</div>
 				{:else}
 					<div class="alert rounded-box alert-info">

@@ -99,13 +99,6 @@ const TrainingMetricTemplatesSchema = z.array(
 	})
 );
 
-const TrainingMetricValuesPreviewSchema = z.object({
-	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
-	summary: z.record(z.string(), z.number()),
-	unit: z.string(),
-	target: z.object({ value: z.number(), unit: z.string() }).nullable()
-});
-
 // =============================================================================
 // Types
 // =============================================================================
@@ -118,7 +111,6 @@ export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
 export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchema>[number];
-export type TrainingMetricValuesPreview = z.infer<typeof TrainingMetricValuesPreviewSchema>;
 
 // =============================================================================
 // API Functions
@@ -593,7 +585,7 @@ export const updateTrainingMetric = async (
 
 export const getTrainingMetricPreview = async (
 	payload: PreviewTrainingMetricPayload
-): Promise<Option<TrainingMetricValuesPreview>> => {
+): Promise<Option<TrainingMetric>> => {
 	const body = JSON.stringify(payload);
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
 		body,
@@ -611,5 +603,5 @@ export const getTrainingMetricPreview = async (
 		return none();
 	}
 
-	return some(TrainingMetricValuesPreviewSchema.parse(await res.json()));
+	return some(TrainingMetricSchema.parse(await res.json()));
 };
