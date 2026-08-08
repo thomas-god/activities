@@ -10,3 +10,4 @@ resulting trade-offs.
 - [Training metrics values computation and storage strategy](20251110-training-metrics-computation.md)
 - [Maintaining feature availability and user experience across screen widths and platforms](20251121-screen-width-and-user-experienc.md)
 - [Computation of activity metrics derived from timeseries](20260216-activity-timeseries-metrics-computation.md)
+- [Client Component Organization Strategy](20260808-client-component-organization.md)
