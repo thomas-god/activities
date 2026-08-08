@@ -4,7 +4,6 @@
 	import { goto, invalidate } from '$app/navigation';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import TrainingMetricsCarousel from '$ui/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
@@ -12,7 +11,6 @@
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import TrainingMetricsList from '$ui/training_metrics/TrainingMetricsList.svelte';
 	import TrainingMetricsOrderingDialog from '$ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
@@ -42,6 +40,7 @@
 	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
+	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -649,28 +648,14 @@
 				{/if}
 			</div>
 		</div>
-		{#if metrics.length > 0}
-			{#if screenWidth < 700}
-				<TrainingMetricsCarousel
-					{metrics}
-					height={chartHeight}
-					onMetricUpdate={updateMetricsPromise}
-					timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
-				/>
-			{:else}
-				<TrainingMetricsList
-					{metrics}
-					height={chartHeight}
-					onUpdate={updateMetricsPromise}
-					onDelete={updateMetricsPromise}
-					timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
-				/>
-			{/if}
-		{:else}
-			<div class="mt-4 text-center text-sm tracking-wide italic opacity-60">
-				No training metrics
-			</div>
-		{/if}
+		<TrainingMetrics
+			{metrics}
+			height={chartHeight}
+			onMetricUpdate={updateMetricsPromise}
+			timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
+			{screenWidth}
+			breakpoint={some(700)}
+		/>
 	</div>
 
 	<TrainingMetricsOrderingDialog

@@ -3,25 +3,23 @@
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { none, some, type Option } from '$lib/Options';
 	import TrainingMetricMenu from '$ui/training_metrics/internal/TrainingMetricMenu.svelte';
-	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
-	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
+	import TrainingMetricChartLine from '../TrainingMetricChartLine.svelte';
+	import TrainingMetricChartStacked from '../TrainingMetricChartStacked.svelte';
 
 	let {
 		metrics,
 		height,
 		onMetricUpdate,
-		initialIndex = 0,
 		timeDomain = none()
 	}: {
 		metrics: TrainingMetric[];
 		height: number;
 		onMetricUpdate: () => void;
-		initialIndex?: number;
 		timeDomain?: Option<{ start: string; end: string | null }>;
 	} = $props();
 
 	let chartWidth: number = $state(300);
-	let currentIndex = $derived(initialIndex);
+	let currentIndex = $derived(0);
 	let currentMetric = $derived(metrics[currentIndex]);
 
 	const goToPrevious = () => {

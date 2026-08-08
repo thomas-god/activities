@@ -3,19 +3,18 @@
 	import type { TrainingMetric } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
-	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
-	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
+	import TrainingMetricChartStacked from '../TrainingMetricChartStacked.svelte';
+	import TrainingMetricChartLine from '../TrainingMetricChartLine.svelte';
 
 	let {
 		metrics,
 		height,
-		onUpdate,
+		onMetricUpdate,
 		timeDomain = none()
 	}: {
 		metrics: TrainingMetric[];
 		height: number;
-		onUpdate: () => void;
-		onDelete: () => void;
+		onMetricUpdate: () => void;
 		timeDomain?: Option<{ start: string; end: string | null }>;
 	} = $props();
 
@@ -54,7 +53,7 @@
 	{#each metrics as metric, idx (metric.id)}
 		<div class="flex w-full flex-col gap-0" bind:clientWidth={chartWidth}>
 			<div class="px-4 pt-4">
-				<TrainingMetricTitle {metric} {onUpdate} />
+				<TrainingMetricTitle {metric} onUpdate={onMetricUpdate} />
 			</div>
 
 			{#if Object.entries(metric.values).length > 0}

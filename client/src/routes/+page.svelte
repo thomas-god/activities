@@ -3,18 +3,17 @@
 	import { invalidate } from '$app/navigation';
 	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingMetricsCarousel from '$ui/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import TrainingMetricsList from '$ui/training_metrics/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
 	import { dayjs } from '$lib/duration';
 	import { some } from '$lib/Options';
+	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -93,22 +92,14 @@
 				<div class="loading loading-bars"></div>
 			</div>
 		{:then metrics}
-			{#if screenWidth < 700}
-				<TrainingMetricsCarousel
-					{metrics}
-					height={chartHeight}
-					onMetricUpdate={() => invalidate(`app:activities`)}
-					timeDomain={some({ start: startDate, end: endDate })}
-				/>
-			{:else}
-				<TrainingMetricsList
-					{metrics}
-					height={chartHeight}
-					onUpdate={() => invalidate(`app:activities`)}
-					onDelete={() => invalidate(`app:activities`)}
-					timeDomain={some({ start: startDate, end: endDate })}
-				/>
-			{/if}
+			<TrainingMetrics
+				{metrics}
+				height={chartHeight}
+				onMetricUpdate={() => invalidate(`app:activities`)}
+				timeDomain={some({ start: startDate, end: endDate })}
+				{screenWidth}
+				breakpoint={some(700)}
+			/>
 		{/await}
 	</div>
 
