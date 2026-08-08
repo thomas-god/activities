@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { localiseDateTime } from '$lib/duration';
-	import EditableActivityName from '$components/molecules/EditableActivityName.svelte';
+	import EditableActivityName from '$ui/activity/internal/EditableActivityName.svelte';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
 	import type { Activity } from '$lib/api/activities';
 	import { goto } from '$app/navigation';

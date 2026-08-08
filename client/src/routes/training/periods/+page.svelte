@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
-	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
+	import NavbarPeriods from '$ui/navigation/NavbarPeriods.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

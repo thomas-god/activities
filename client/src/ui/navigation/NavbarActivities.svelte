@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ActivitiesUploader from '$components/organisms/ActivitiesUploader.svelte';
+	import ActivitiesUploader from '$ui/navigation/internal/ActivitiesUploader.svelte';
 	import CreateTrainingNote from '$components/organisms/CreateTrainingNote.svelte';
 	import Navbar from './Navbar.svelte';
 

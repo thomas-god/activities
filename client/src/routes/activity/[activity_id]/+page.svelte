@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import Navbar from '$components/organisms/navigation/Navbar.svelte';
-	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
+	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

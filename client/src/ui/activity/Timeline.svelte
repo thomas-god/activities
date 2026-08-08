@@ -3,7 +3,7 @@
 	import { dayjs } from '$lib/duration';
 	import ActivityListComponent, {
 		type TimelineItem
-	} from '$components/organisms/activityList/ActivityList.svelte';
+	} from '$ui/activity/internal/ActivityList.svelte';
 
 	let {
 		activities,

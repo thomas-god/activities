@@ -5,7 +5,7 @@
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
-	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
@@ -15,7 +15,7 @@
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
-	import Timeline from '$components/pages/Timeline.svelte';
+	import Timeline from '$ui/activity/Timeline.svelte';
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import {
 		applyFiltersToSearchParams,
@@ -37,7 +37,7 @@
 	import TrainingMetricImportForm from '$ui/training_metrics/TrainingMetricFormImport.svelte';
 	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
+	import NavbarPeriods from '$ui/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';

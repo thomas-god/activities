@@ -6,7 +6,7 @@
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
 	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
 	import { isSome, some, type Option } from '$lib/Options';
-	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
+	import NavbarMetrics from '$ui/navigation/NavbarMetrics.svelte';
 	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	let chartWidth: number = $state(0);

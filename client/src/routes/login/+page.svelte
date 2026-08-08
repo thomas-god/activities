@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import Navbar from '$components/organisms/navigation/Navbar.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { isNone, none, some, type Option } from '$lib/Options';
 	import z from 'zod';

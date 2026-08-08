@@ -1,8 +1,8 @@
 <script lang="ts">
 	import ActivitiesSelect from '$ui/shared/ActivitiesSelect.svelte';
-	import CompareActivities from '$components/organisms/CompareActivities.svelte';
-	import CompareActivitiesSummary from '$components/organisms/CompareActivitiesSummary.svelte';
-	import Navbar from '$components/organisms/navigation/Navbar.svelte';
+	import CompareActivities from '$ui/activity/CompareActivities.svelte';
+	import CompareActivitiesSummary from '$ui/activity/CompareActivitiesSummary.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
 	import type { PageProps } from './$types';
 

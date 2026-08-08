@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ActivitiesCalendar from '$components/organisms/ActivitiesCalendar.svelte';
-	import DownloadActivitiesModal from '$components/molecules/DownloadActivitiesModal.svelte';
+	import ActivitiesCalendar from '$ui/activity/ActivitiesCalendar.svelte';
+	import DownloadActivitiesModal from '$ui/activity/DownloadActivitiesModal.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
@@ -12,14 +12,14 @@
 		type ActivityListSummaryItems,
 		type PreferencePayload
 	} from '$lib/api';
-	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
+	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
-	import Timeline from '$components/pages/Timeline.svelte';
+	import Timeline from '$ui/activity/Timeline.svelte';
 	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
-	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
-	import ActivityListSummaryDialog from '$components/organisms/ActivityListSummaryDialog.svelte';
+	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
+	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 
 	let { data }: PageProps = $props();
 

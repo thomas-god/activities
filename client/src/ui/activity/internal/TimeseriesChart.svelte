@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
-	import TimseriesLine, { type LineOrder } from '../molecules/TimseriesLine.svelte';
+	import TimeseriesLine, { type LineOrder } from './TimeseriesLine.svelte';
 	import { formatMetricValue, matchMetric, textColors } from '$lib/colors';
 	import { untrack } from 'svelte';
 	import type { ActivityWithTimeseries } from '$lib/api';
@@ -336,7 +336,7 @@
 		{/if}
 	{/if}
 	{#each metricsProps as props}
-		<TimseriesLine
+		<TimeseriesLine
 			range={props.range}
 			values={props.values}
 			xScale={zoomedXScale}

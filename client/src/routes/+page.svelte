@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
-	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
+	import PastActivitiesList from '$ui/activity/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import {
@@ -9,8 +9,8 @@
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
-	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
+	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import { dayjs } from '$lib/duration';
 	import { some } from '$lib/Options';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
