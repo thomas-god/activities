@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SaveButton from '$ui/core/SaveButton.svelte';
-	import EditButton from '$ui/core/EditButton.svelte';
+	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import EditButton from '$ui/shared/EditButton.svelte';
 
 	let {
 		feedback: initialFeedback,

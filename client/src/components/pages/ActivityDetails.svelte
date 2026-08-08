@@ -7,7 +7,7 @@
 	import EditableNutrition from '$components/molecules/EditableNutrition.svelte';
 	import EditableFeedback from '$components/molecules/EditableFeedback.svelte';
 	import MetricsMultiSelect from '$components/molecules/MetricsMultiSelect.svelte';
-	import DeleteModal from '$ui/core/DeleteModal.svelte';
+	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import type { Metric } from '$lib/colors';
 	import ActivityStatistics from '$components/organisms/ActivityStatistics.svelte';
 	import ActivityLaps from '$components/organisms/ActivityLaps.svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import DateRange from '$ui/core/DateRange.svelte';
+	import DateRange from '$ui/shared/DateRange.svelte';
 	import TrainingMetricsOrderingDialog from './TrainingMetricsOrderingDialog.svelte';
 	import { dayjs, localiseDate } from '$lib/duration';
 	import type { TrainingMetricList, TrainingPeriodList } from '$lib/api';

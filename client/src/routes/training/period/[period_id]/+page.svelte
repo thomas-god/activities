@@ -2,7 +2,7 @@
 	import { dayjs } from '$lib/duration';
 	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
-	import DeleteModal from '$ui/core/DeleteModal.svelte';
+	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import TrainingMetricsCarousel from '$ui/features/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
@@ -18,13 +18,13 @@
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
 	import Timeline from '$components/pages/Timeline.svelte';
-	import EditButton from '$ui/core/EditButton.svelte';
+	import EditButton from '$ui/shared/EditButton.svelte';
 	import {
 		applyFiltersToSearchParams,
 		filtersFromSearchParams,
 		type ActivitiesFilters
 	} from '$lib/filters';
-	import ActivitiesFiltersComponent from '$ui/core/ActivitiesFilters.svelte';
+	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
 	import {
 		fetchActivityListSummary,
