@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
-	import SportFilterV2 from '$ui/features/training_metrics/internal/SportFilter.svelte';
+	import SportFilterV2 from '$ui/training_metrics/internal/SportFilter.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import DateRange from '$ui/shared/DateRange.svelte';

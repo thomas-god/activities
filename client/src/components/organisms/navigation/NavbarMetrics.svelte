@@ -1,5 +1,5 @@
 <script lang="ts">
-	import TrainingMetricFormCreate from '$ui/features/training_metrics/TrainingMetricFormCreate.svelte';
+	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import Navbar from './Navbar.svelte';
 
 	let { invalidateTrainingMetrics }: { invalidateTrainingMetrics: () => void } = $props();

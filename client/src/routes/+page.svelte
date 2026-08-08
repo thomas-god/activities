@@ -3,14 +3,14 @@
 	import { invalidate } from '$app/navigation';
 	import PastActivitiesList from '$components/organisms/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingMetricsCarousel from '$ui/features/training_metrics/TrainingMetricsCarousel.svelte';
+	import TrainingMetricsCarousel from '$ui/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import TrainingMetricsList from '$ui/features/training_metrics/TrainingMetricsList.svelte';
+	import TrainingMetricsList from '$ui/training_metrics/TrainingMetricsList.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import NavbarActivities from '$components/organisms/navigation/NavbarActivities.svelte';
 	import { dayjs } from '$lib/duration';

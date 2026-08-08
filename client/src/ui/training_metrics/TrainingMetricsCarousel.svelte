@@ -2,7 +2,7 @@
 	import type { TrainingMetric } from '$lib/api/training';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { none, some, type Option } from '$lib/Options';
-	import TrainingMetricMenu from '$ui/features/training_metrics/internal/TrainingMetricMenu.svelte';
+	import TrainingMetricMenu from '$ui/training_metrics/internal/TrainingMetricMenu.svelte';
 	import TrainingMetricChartLine from './TrainingMetricChartLine.svelte';
 	import TrainingMetricChartStacked from './TrainingMetricChartStacked.svelte';
 

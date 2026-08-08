@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import TrainingMetricsOptions from '$ui/features/training_metrics/TrainingMetricsOptions.svelte';
+	import TrainingMetricsOptions from '$ui/training_metrics/TrainingMetricsOptions.svelte';
 	import { dayjs } from '$lib/duration';
-	import TrainingMetricChartStacked from '$ui/features/training_metrics/TrainingMetricChartStacked.svelte';
-	import TrainingMetricTitle from '$ui/features/training_metrics/TrainingMetricTitle.svelte';
+	import TrainingMetricChartStacked from '$ui/training_metrics/TrainingMetricChartStacked.svelte';
+	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricChartLine from '$ui/features/training_metrics/TrainingMetricChartLine.svelte';
+	import TrainingMetricChartLine from '$ui/training_metrics/TrainingMetricChartLine.svelte';
 	import NavbarMetrics from '$components/organisms/navigation/NavbarMetrics.svelte';
 
 	let chartWidth: number = $state(0);

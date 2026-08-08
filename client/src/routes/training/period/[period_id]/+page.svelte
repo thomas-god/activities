@@ -4,7 +4,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import TrainingMetricsCarousel from '$ui/features/training_metrics/TrainingMetricsCarousel.svelte';
+	import TrainingMetricsCarousel from '$ui/training_metrics/TrainingMetricsCarousel.svelte';
 	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$components/pages/ActivityDetails.svelte';
 	import {
@@ -12,8 +12,8 @@
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
-	import TrainingMetricsList from '$ui/features/training_metrics/TrainingMetricsList.svelte';
-	import TrainingMetricsOrderingDialog from '$ui/features/training_metrics/TrainingMetricsOrderingDialog.svelte';
+	import TrainingMetricsList from '$ui/training_metrics/TrainingMetricsList.svelte';
+	import TrainingMetricsOrderingDialog from '$ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
 	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
 	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
 	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
@@ -36,8 +36,8 @@
 		type TrainingNotesList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
-	import TrainingMetricImportForm from '$ui/features/training_metrics/TrainingMetricFormImport.svelte';
-	import TrainingMetricFormCreate from '$ui/features/training_metrics/TrainingMetricFormCreate.svelte';
+	import TrainingMetricImportForm from '$ui/training_metrics/TrainingMetricFormImport.svelte';
+	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
