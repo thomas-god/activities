@@ -108,7 +108,7 @@
 				}}
 			>
 				<option value="" disabled selected>Training period</option>
-				{#each periods as period}
+				{#each periods as period (period.id)}
 					<option value={period.id}
 						>{period.name} ({localiseDate(period.start)} - {period.end === null
 							? 'Ongoing'

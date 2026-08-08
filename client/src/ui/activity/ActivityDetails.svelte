@@ -20,6 +20,8 @@
 	import { sportDisplay } from '$lib/sport';
 	import type { ActivityWithTimeseries } from '$lib/api/activities';
 	import { isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	interface Props {
 		activity: ActivityWithTimeseries;
@@ -121,7 +123,7 @@
 			credentials: 'include'
 		});
 		if (response.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 			throw new Error('Unauthorized');
 		}
 
@@ -149,7 +151,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 			return;
 		}
 
@@ -174,7 +176,7 @@
 		);
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		// Update local state
@@ -192,7 +194,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		// Update local state
@@ -213,7 +215,7 @@
 		);
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		// Update local state
@@ -224,7 +226,7 @@
 	};
 
 	const updateActivityNutritionCallback = async (newNutrition: Nutrition | null) => {
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 
 		if (newNutrition === null) {
 			params.set('bonk_status', '');
@@ -241,7 +243,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		// Update local state
@@ -264,7 +266,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		// Update local state

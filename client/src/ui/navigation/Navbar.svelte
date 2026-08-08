@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { Snippet } from 'svelte';
 
@@ -15,20 +16,21 @@
 
 <div class="flex flex-col justify-between gap-3 min-[750px]:flex-row min-[750px]:items-center">
 	<div class="flex gap-3 sm:gap-6">
-		<a class={`btn btn-ghost px-2 text-lg font-bold sm:text-xl ${classExactPath('/')}`} href="/"
-			>Activities</a
+		<a
+			class={`btn btn-ghost px-2 text-lg font-bold sm:text-xl ${classExactPath('/')}`}
+			href={resolve('/')}>Activities</a
 		>
 		<a
 			class={`btn btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classExactPath('/history')}`}
-			href="/history">History</a
+			href={resolve('/history')}>History</a
 		>
 		<a
 			class={`btn btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classPathStartWith('/training/metrics')}`}
-			href="/training/metrics">Metrics</a
+			href={resolve('/training/metrics')}>Metrics</a
 		>
 		<a
 			class={`btn btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classPathStartWith('/training/period')}`}
-			href="/training/periods">Periods</a
+			href={resolve('/training/periods')}>Periods</a
 		>
 	</div>
 

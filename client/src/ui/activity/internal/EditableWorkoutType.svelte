@@ -41,7 +41,7 @@
 			>
 				Clear
 			</button>
-			{#each WORKOUT_TYPE_LABELS as type}
+			{#each WORKOUT_TYPE_LABELS as type (type.label)}
 				<button
 					class={`btn btn-sm ${workoutType === type.value ? `btn-active ${getWorkoutTypeColor(type.value)}` : 'btn-ghost'}`}
 					onclick={() => (workoutType = type.value)}

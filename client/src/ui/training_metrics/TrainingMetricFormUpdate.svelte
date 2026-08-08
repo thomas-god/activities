@@ -155,7 +155,7 @@
 						<span>No data available for the selected period and filters.</span>
 					</div>
 				{/if}
-			{:catch error}
+			{:catch _error}
 				<div class="alert rounded-box alert-error">
 					<span>Failed to load preview. Please try again.</span>
 				</div>

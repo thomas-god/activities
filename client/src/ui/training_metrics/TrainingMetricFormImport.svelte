@@ -83,7 +83,7 @@
 							style="min-width: 200px;"
 						>
 							<div class="space-y-1 text-left text-sm">
-								{#each tooltipLines(metric) as line}
+								{#each tooltipLines(metric) as line (line.label)}
 									<div>
 										<span class="font-semibold">{line.label}:</span>
 										<span class="text-base-content/80">{line.value}</span>

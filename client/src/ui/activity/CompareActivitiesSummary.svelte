@@ -4,6 +4,7 @@
 	import { formatDateTime, formatDuration } from '$lib/duration';
 	import { paceToString } from '$lib/speed';
 	import { none, some, unwrapOr, type Option } from '$lib/Options';
+	import { resolve } from '$app/paths';
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
@@ -136,13 +137,13 @@
 			<thead>
 				<tr>
 					<th class="w-32">Metric</th>
-					{#each activities as activity, idx}
+					{#each activities as activity, idx (idx)}
 						<th>
 							<span
 								class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full"
 								style="background-color: {d3.schemeTableau10[idx % d3.schemeTableau10.length]}"
 							></span>
-							<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+							<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
 								{activity.name ?? activity.start_time.slice(0, 10)}
 							</a>
 						</th>
@@ -150,7 +151,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each tableRows as row}
+				{#each tableRows as row (row.label)}
 					<tr>
 						<td class="font-medium">
 							{row.label}
@@ -161,7 +162,7 @@
 								<div class="text-xs opacity-50">{row.legend}</div>
 							{/if}
 						</td>
-						{#each row.values as value}
+						{#each row.values as value (value)}
 							<td>{unwrapOr(value, '—')}</td>
 						{/each}
 					</tr>

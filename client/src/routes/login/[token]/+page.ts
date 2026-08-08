@@ -3,15 +3,16 @@ import type { PageLoad } from './$types';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { error } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
 
 export const load: PageLoad = async ({ fetch, params }) => {
-	let res = await fetch(`${PUBLIC_APP_URL}/api/login/validate/${params.token}`, {
+	const res = await fetch(`${PUBLIC_APP_URL}/api/login/validate/${params.token}`, {
 		method: 'POST',
 		credentials: 'include',
 		mode: 'cors'
 	});
 	if (res.status === 200) {
-		goto('/');
+		goto(resolve('/'));
 	} else {
 		error(res.status, 'login failed');
 	}

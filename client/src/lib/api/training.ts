@@ -17,6 +17,7 @@ import { none, type Option, some } from '$lib/Options';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
 import type { RPEValue } from '$lib/rpe';
+import { resolve } from '$app/paths';
 
 // =============================================================================
 // Schemas
@@ -131,7 +132,7 @@ export async function fetchTrainingPeriods(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -162,7 +163,7 @@ export async function fetchActiveTrainingPeriods(
 	);
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -190,7 +191,7 @@ export async function fetchTrainingPeriodDetails(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return null;
 	}
 
@@ -243,7 +244,7 @@ export async function fetchTrainingMetrics(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -285,7 +286,7 @@ export async function copyTrainingMetricIntoPeriod(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return;
 	}
 
@@ -297,7 +298,7 @@ export async function copyTrainingMetricIntoPeriod(
 }
 
 export const groupMetricValues = (metric: TrainingMetric) => {
-	let values = [];
+	const values = [];
 	for (const [group, time_values] of Object.entries(metric.values)) {
 		for (const [dt, value] of Object.entries(time_values)) {
 			values.push({ time: dt, group, value });
@@ -346,7 +347,7 @@ export async function fetchTrainingNotes(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -376,7 +377,7 @@ export async function fetchTrainingPeriodNotes(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -406,7 +407,7 @@ export async function fetchTrainingPeriodMetrics(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -439,7 +440,7 @@ export async function createTrainingNote(content: string, date: string): Promise
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 	}
 
 	return;
@@ -472,7 +473,7 @@ export async function updateTrainingNote(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return false;
 	}
 
@@ -492,7 +493,7 @@ export async function deleteTrainingNote(noteId: string): Promise<boolean> {
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return false;
 	}
 
@@ -562,7 +563,7 @@ export const createTrainingMetric = async (payload: CreateTrainingMetricPayload)
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 	}
 };
 
@@ -579,7 +580,7 @@ export const updateTrainingMetric = async (
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 	}
 };
 
@@ -596,7 +597,7 @@ export const getTrainingMetricPreview = async (
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 	}
 
 	if (res.status !== 200) {

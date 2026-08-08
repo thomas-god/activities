@@ -52,7 +52,6 @@ export const formatDurationCompactWithUnits = (time: number): string => {
 	remaining = remaining - hours * ONE_HOUR_IN_SECONDS;
 
 	const minutes = Math.floor(remaining / ONE_MINUTE_IN_SECONDS);
-	const seconds = remaining - minutes * ONE_MINUTE_IN_SECONDS;
 
 	if (time === 0) {
 		return '0m';

@@ -2,6 +2,7 @@
 	import type { ActivityList } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let {
 		activityList,
@@ -20,7 +21,7 @@
 
 	// Compute activities grouped by date
 	let activitiesByDate = $derived.by(() => {
-		const grouped = new Map<string, typeof activityList>();
+		const grouped = new SvelteMap<string, typeof activityList>();
 
 		activityList.forEach((activity) => {
 			const dateKey = dayjs(activity.start_time).format('YYYY-MM-DD');
@@ -145,14 +146,14 @@
 <div class="p-2 sm:p-4">
 	<!-- Day Headers -->
 	<div class="mb-2 grid grid-cols-7 gap-1 sm:gap-2">
-		{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dayName}
+		{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dayName (dayName)}
 			<div class="text-center text-xs font-medium opacity-60 sm:text-sm">{dayName}</div>
 		{/each}
 	</div>
 
 	<!-- Calendar Days -->
 	<div class="grid grid-cols-7 gap-1 sm:gap-2">
-		{#each calendarDays as day}
+		{#each calendarDays as day (day.dateKey)}
 			<div
 				role="button"
 				tabindex={day.isCurrentMonth ? 0 : -1}
@@ -182,7 +183,7 @@
 				<!-- Activities for this day -->
 				<!-- Mobile: Show only colored dots -->
 				<div class="flex flex-wrap gap-0.5 sm:hidden">
-					{#each day.activities.slice(0, 6) as activity}
+					{#each day.activities.slice(0, 6) as activity (activity.id)}
 						<button
 							onclick={() => onActivitySelected(activity.id)}
 							class={`activity-dot h-2 w-2 cursor-pointer rounded-full ${activitySportCategoryClass(activity.sport_category)}`}
@@ -194,7 +195,7 @@
 
 				<!-- Desktop: Show activity details -->
 				<div class="hidden flex-col gap-1 sm:flex">
-					{#each day.activities.slice(0, 3) as activity}
+					{#each day.activities.slice(0, 3) as activity (activity.id)}
 						<button
 							onclick={() => onActivitySelected(activity.id)}
 							class={`activity-details flex cursor-pointer items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
@@ -239,7 +240,7 @@
 			</div>
 			{#if selectedDayActivities.length > 0}
 				<div class="flex flex-col gap-2">
-					{#each selectedDayActivities as activity}
+					{#each selectedDayActivities as activity (activity.id)}
 						<button
 							onclick={() => onActivitySelected(activity.id)}
 							class={`activity-card flex cursor-pointer items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}

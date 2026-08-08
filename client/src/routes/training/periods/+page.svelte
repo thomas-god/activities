@@ -18,7 +18,7 @@
 			preparation, etc.)
 		</div>
 		<div class="mb-2 flex flex-col gap-2 px-2">
-			{#each periods as period}
+			{#each periods as period (period.id)}
 				<TrainingPeriodCard {period} />
 			{:else}
 				<div class="text-center text-sm tracking-wide italic opacity-60">

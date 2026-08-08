@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { postActivities } from '$lib/api';
 	import CreateStandaloneActivity from './CreateStandaloneActivity.svelte';
 
@@ -59,7 +60,7 @@
 		file_upload_content = '';
 
 		if (res.type === 'authentication-error') {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 
 		activitiesUploadedCallback();
@@ -101,7 +102,7 @@
 				<div class="mt-2 rounded-box bg-warning/20 p-3 text-warning-content">
 					Some files ({duplicatedFiles.length}) were already imported and have been skipped
 					<ul>
-						{#each duplicatedFiles as file}
+						{#each duplicatedFiles as file (file)}
 							<li>
 								{file}
 							</li>
@@ -113,7 +114,7 @@
 				<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
 					Some files ({invalidFiles.length}) could not be processed
 					<ul>
-						{#each invalidFiles as file}
+						{#each invalidFiles as file (file)}
 							<li>
 								{file}
 							</li>

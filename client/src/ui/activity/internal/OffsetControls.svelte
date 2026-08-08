@@ -16,7 +16,7 @@
 	};
 </script>
 
-{#each activities as { color, label, id }}
+{#each activities as { color, label, id } (id)}
 	<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 		<!-- row 1: color swatch + label + +/- controls (+ reset) -->
 		<div class="flex min-w-0 flex-1 items-center gap-2">

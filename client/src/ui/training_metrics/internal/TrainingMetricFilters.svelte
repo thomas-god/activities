@@ -7,7 +7,7 @@
 	import BonkStatusFilter from './BonkStatusFilter.svelte';
 	import type { WorkoutType } from '$lib/workout-type';
 	import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
-	import SportFilter from './SportFilter.svelte';
+	import SportFilter from '$ui/shared/SportFilter.svelte';
 
 	export interface TrainingMetricFiltersType {
 		sports: Option<Sport[]>;

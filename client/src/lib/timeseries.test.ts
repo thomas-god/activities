@@ -16,7 +16,7 @@ describe('Converting a time series from absolute time to active time', () => {
 			laps: []
 		};
 
-		let activeTimeseries = convertTimeseriesToActiveTime(timeseries);
+		const activeTimeseries = convertTimeseriesToActiveTime(timeseries);
 
 		expect(activeTimeseries.time).toEqual([1, 2]);
 		expect(activeTimeseries.metrics.power.values).toEqual([100, 130]);

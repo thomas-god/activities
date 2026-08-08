@@ -4,6 +4,7 @@
 	import ActivityListComponent, {
 		type TimelineItem
 	} from '$ui/activity/internal/ActivityList.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let {
 		activities,
@@ -42,12 +43,12 @@
 		return items.sort((a, b) => (a.date > b.date ? -1 : 1));
 	});
 
-	const timelineByMonth: Map<string, TimelineItem[]> = $derived.by(() => {
+	const timelineByMonth: SvelteMap<string, TimelineItem[]> = $derived.by(() => {
 		let timelineStartMonth = dayjs(timeline.at(-1)?.date).startOf('month');
 		let timelineEndMonth =
 			endDate === null ? dayjs().startOf('month') : dayjs(endDate).startOf('month');
 
-		const timelineByMonth = new Map();
+		const timelineByMonth: SvelteMap<string, TimelineItem[]> = new SvelteMap();
 		let date = timelineEndMonth;
 		while (date >= timelineStartMonth) {
 			timelineByMonth.set(date.format('MMMM YYYY'), []);

@@ -5,6 +5,7 @@ import { SportCategories, sports } from '$lib/sport';
 import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
 import { BONK_STATUS_VALUES } from '$lib/nutrition';
 import { dayjs } from '$lib/duration';
+import { resolve } from '$app/paths';
 
 // =============================================================================
 // Schemas
@@ -106,7 +107,7 @@ export async function fetchActivities(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -134,7 +135,7 @@ export async function fetchActivityDetails(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return null;
 	}
 
@@ -198,7 +199,7 @@ export async function postActivities(body: FormData): Promise<PostActivitiesResp
 		}
 
 		return { type: 'error' };
-	} catch (error) {
+	} catch {
 		return { type: 'error' };
 	}
 }
@@ -215,7 +216,7 @@ export async function downloadAllActivities(): Promise<void> {
 	});
 
 	if (response.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		throw new Error('Unauthorized');
 	}
 

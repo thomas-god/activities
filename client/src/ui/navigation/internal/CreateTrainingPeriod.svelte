@@ -5,6 +5,7 @@
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import DateRange from '$ui/shared/DateRange.svelte';
 	import { unwrapOr, some } from '$lib/Options';
+	import { resolve } from '$app/paths';
 
 	let { callback }: { callback: () => void } = $props();
 
@@ -46,7 +47,7 @@
 		return basePayload;
 	});
 
-	const createPeriodCallback = async (payload: Object): Promise<void> => {
+	const createPeriodCallback = async (payload: object): Promise<void> => {
 		const body = JSON.stringify(payload);
 		const res = await fetch(`${PUBLIC_APP_URL}/api/training/period`, {
 			body,
@@ -57,7 +58,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 		invalidate('app:training-metrics');
 		callback();

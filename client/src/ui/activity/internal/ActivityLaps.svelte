@@ -168,14 +168,14 @@
 			<div role="columnheader" class="border-b border-base-300 px-3 py-2 font-semibold">
 				Duration
 			</div>
-			{#each metrics as metric}
+			{#each metrics as metric (metric)}
 				<div role="columnheader" class="border-b border-base-300 px-3 py-2 font-semibold">
 					{getMetricLabel(metric)}
 				</div>
 			{/each}
 		</div>
 
-		{#each laps as lap, index}
+		{#each laps as lap, index (index)}
 			{@const isHovered = hoveredLapIndex === index}
 			{@const isOdd = index % 2 === 1}
 			<div
@@ -207,7 +207,7 @@
 				>
 					{formatDuration(lap.end - lap.start)}
 				</div>
-				{#each metrics as metric}
+				{#each metrics as metric (metric)}
 					<div
 						role="gridcell"
 						class="px-3 py-2"

@@ -5,6 +5,7 @@
 	import ActivityListComponent, {
 		type TimelineItem
 	} from '$ui/activity/internal/ActivityList.svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	let {
 		activityList,
@@ -75,7 +76,7 @@
 		thisMonth.sort((a, b) => dayjs(b.date).diff(dayjs(a.date)));
 		earlier.sort((a, b) => dayjs(b.date).diff(dayjs(a.date)));
 
-		const timeline = new Map();
+		const timeline: SvelteMap<string, TimelineItem[]> = new SvelteMap();
 		timeline.set('This week', thisWeek);
 		timeline.set('This month', thisMonth);
 		timeline.set('Earlier', earlier);

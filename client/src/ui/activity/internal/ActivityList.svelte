@@ -2,6 +2,7 @@
 	import type { Activity, ActivityListSummaryItems, TrainingNote } from '$lib/api';
 	import { toTitleCase } from '$lib/utils';
 	import TrainingNoteComponent from '$ui/training_note/TrainingNote.svelte';
+	import type { SvelteMap } from 'svelte/reactivity';
 	import ActivityComponent from './Activity.svelte';
 
 	let {
@@ -13,7 +14,7 @@
 		renderByChunk = false,
 		showGroupNumberOfActivities = true
 	}: {
-		timeline: Map<string, TimelineItem[]>;
+		timeline: SvelteMap<string, TimelineItem[]>;
 		selectedActivityId: string | null;
 		selectActivityCallback: (id: string) => void;
 		noteChangedCallback: () => void;
@@ -103,7 +104,7 @@
 	bind:clientWidth={containerWidth}
 	bind:this={scrollElement}
 >
-	{#each visibleItems as item, idx}
+	{#each visibleItems as item, idx (idx)}
 		{#if item.type === 'header'}
 			<div class="flex shrink-0 flex-row justify-between overflow-x-hidden">
 				<div
@@ -117,7 +118,7 @@
 				<!-- Metrics headers aligned to first group of the timeline -->
 				{#if idx === 0 && !headersOverflow}
 					<div class="flex flex-row text-center">
-						{#each metricFormats as header, header_index}
+						{#each metricFormats as header, header_index (header_index)}
 							<div
 								class="py-2 text-center text-xs"
 								style:width={`${header.width}px`}

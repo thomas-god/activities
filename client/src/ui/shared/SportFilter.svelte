@@ -160,7 +160,7 @@
 		{#if editing}
 			<div class="divider my-0.5 px-2"></div>
 			<div class="flex max-h-64 flex-col gap-2 overflow-scroll px-1">
-				{#each SportCategories as category}
+				{#each SportCategories as category (category)}
 					{#if shouldDisplayCategory(category)}
 						<div class="flex flex-col gap-1 p-1">
 							<div
@@ -181,7 +181,7 @@
 								/>
 							</div>
 							<div class="flex flex-row flex-wrap gap-1">
-								{#each sportsPerCategory[category].toSorted() as sport}
+								{#each sportsPerCategory[category].toSorted() as sport (sport)}
 									{#if shouldDisplaySport(sport, category)}
 										<input
 											type="checkbox"

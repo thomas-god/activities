@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TrainingMetric } from '$lib/api/training';
-	import { none, some, type Option } from '$lib/Options';
+	import { none, type Option } from '$lib/Options';
 	import TrainingMetricMenu from '$ui/training_metrics/internal/TrainingMetricMenu.svelte';
 	import TrainingMetricChart from '../TrainingMetricChart.svelte';
 
@@ -74,7 +74,7 @@
 
 	{#if metrics.length > 1}
 		<div class="flex items-center justify-center gap-2 py-2">
-			{#each metrics as _, index}
+			{#each metrics as _, index (index)}
 				<button
 					class="h-2 w-2 rounded-full {index === currentIndex ? 'w-6 bg-primary' : 'bg-base-300'}"
 					onclick={() => goToMetric(index)}

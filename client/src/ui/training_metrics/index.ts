@@ -23,7 +23,7 @@ export interface TrainingMetricFields {
 export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 
 const fieldsActiveFilters = (fields: TrainingMetricFields) => {
-	let activeFilters: Object = {};
+	let activeFilters: object = {};
 
 	if (isSome(fields.filters.sports) && isSome(fields.filters.sportCategories)) {
 		const sportFilter = fields.filters.sports.value.map((sport) => ({

@@ -24,7 +24,7 @@
 			content = '';
 			date = dayjs().format('YYYY-MM-DD');
 			callback();
-		} catch (error) {
+		} catch {
 			errorMessage = 'An error occurred. Please try again.';
 		} finally {
 			requestPending = false;

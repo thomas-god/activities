@@ -7,6 +7,7 @@
 	import ActivitiesFilters from './ActivitiesFilters.svelte';
 	import { emptyFilters } from '$lib/filters';
 	import { getSportCategoryIcon } from '$lib/sport';
+	import { resolve } from '$app/paths';
 
 	let {
 		activities,
@@ -63,7 +64,7 @@
 
 <h2 class="mb-1 text-lg">Selected activities</h2>
 <div class="overflow-scroll">
-	{#each selectedActivities as activity}
+	{#each selectedActivities as activity (activity.id)}
 		<div class="flex flex-row items-center gap-2 py-0.5">
 			<div class="shrink-0">
 				<img
@@ -79,7 +80,7 @@
 				}}>-</button
 			>
 			<div class="shrink-0">
-				<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+				<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
 					{activity.name || activity.sport}
 				</a>
 			</div>
@@ -133,7 +134,7 @@
 						}}>+</button
 					>
 					<div class="shrink-0">
-						<a href={`/activity/${activity.id}`} class="link link-hover" target="_blank">
+						<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
 							{activity.name || activity.sport}
 						</a>
 					</div>

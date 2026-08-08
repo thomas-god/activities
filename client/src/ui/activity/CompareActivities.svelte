@@ -54,7 +54,7 @@
 	// svelte-ignore state_referenced_locally
 	let selectedMetricOptions = $state(possibleMetricOptions);
 
-	let offsets: SvelteMap<string, number> = $state(new SvelteMap());
+	let offsets: SvelteMap<string, number> = new SvelteMap();
 	let zoomDomain: [number, number] | null = $state(null);
 	let offsetsDialogElement: HTMLDialogElement;
 	let offsetsDialogElementWidth = $state(0);
@@ -84,7 +84,7 @@
 		useMetricColors={false}
 	/>
 	<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-		{#each selectedMetricOptions as metric}
+		{#each selectedMetricOptions as metric (metric.display)}
 			<h2 class="mt-2 mb-1 text-center text-lg">{metric.display}</h2>
 			<ActivityCompareChart
 				{activities}
@@ -109,7 +109,7 @@
 		<h3 class="text-lg font-bold">Timeseries alignment</h3>
 		<p class="opacity-75">You can align timeseries by adding a time offset for each activity.</p>
 		<select class="select" bind:value={offsetsDialogMetric}>
-			{#each possibleMetricOptions as metric}
+			{#each possibleMetricOptions as metric (metric.display)}
 				<option value={metric.option}>{metric.display}</option>
 			{/each}
 		</select>

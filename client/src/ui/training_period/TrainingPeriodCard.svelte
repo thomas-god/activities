@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { dayjs } from '$lib/duration';
 	import {
 		getSportCategory,
@@ -7,6 +8,7 @@
 		type Sport,
 		type SportCategory
 	} from '$lib/sport';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let {
 		period
@@ -21,7 +23,7 @@
 	} = $props();
 
 	let sportIcons = $derived.by(() => {
-		const icons: Set<string> = new Set();
+		const icons: Set<string> = new SvelteSet();
 
 		for (const category of period.sports.categories) {
 			if (SportCategories.includes(category)) {
@@ -40,7 +42,7 @@
 	});
 </script>
 
-<a href={`/training/period/${period.id}`} class="item flex flex-1 items-center py-1">
+<a href={resolve(`/training/period/${period.id}`)} class="item flex flex-1 items-center py-1">
 	<div class="icon"><img src="/icons/calendar.svg" class="h-6 w-6" alt="Calendar icon" /></div>
 	<div class="flex-1">
 		<div class="flex flex-col">
@@ -52,7 +54,7 @@
 						: dayjs(period.end).format('MMM D, YYYY')}
 				</div>
 				<div class="flex flex-row items-center gap-2">
-					{#each sportIcons as icon}
+					{#each sportIcons as icon (icon)}
 						<img src={`/icons/${icon}`} class="h-5 w-5" alt={`${icon} icon`} />
 					{:else}
 						<div class="text-sm italic opacity-70">All sports</div>

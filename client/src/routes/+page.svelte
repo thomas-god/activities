@@ -14,6 +14,7 @@
 	import { dayjs } from '$lib/duration';
 	import { some } from '$lib/Options';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
+	import { resolve } from '$app/paths';
 
 	let { data }: PageProps = $props();
 
@@ -27,13 +28,13 @@
 	const endDate = dayjs().add(1, 'day').endOf('day').toISOString();
 
 	const moreActivitiesCallback = () => {
-		goto('/history');
+		goto(resolve('/history'));
 	};
 
 	const handleActivityClick = async (activityId: string) => {
 		// On mobile, navigate to activity page
 		if (screenWidth < 700) {
-			goto(`/activity/${activityId}`);
+			goto(resolve(`/activity/${activityId}`));
 			return;
 		}
 
@@ -70,7 +71,7 @@
 			<div class="w-full p-4">
 				<h2 class="mb-3 text-lg font-semibold">Ongoing Training Periods</h2>
 				<div class="flex flex-col gap-2">
-					{#each periods as period}
+					{#each periods as period (period.id)}
 						<TrainingPeriodCard {period} />
 					{:else}
 						<div class="p-2 pb-2 text-center text-sm tracking-wide italic opacity-60">
@@ -124,7 +125,7 @@
 	</div>
 
 	{#if selectedActivityPromise}
-		<div class={`item activity_details rounded-box bg-base-100 pt-4 shadow-md `}>
+		<div class="item activity_details rounded-box bg-base-100 pt-4 shadow-md">
 			{#await selectedActivityPromise}
 				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
 					<span class="loading loading-lg loading-spinner"></span>
@@ -134,7 +135,7 @@
 					<div class="relative w-full">
 						<div class="absolute right-3 join">
 							<button
-								onclick={() => goto(`/activity/${selectedActivityId}`)}
+								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 								class="btn join-item btn-sm"
 							>
 								<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button

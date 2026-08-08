@@ -296,7 +296,7 @@
 			/>{nearestValues.distance.toFixed(2)} km
 		</span>
 	{/if}
-	{#each nearestValues.values as value}
+	{#each nearestValues.values as value (value.metric)}
 		<span class={`px-1.5 ${textColors[value.metric]}`}>
 			{value.metric}: {formatMetricValue(value.value, value.metric)}
 			{value.unit}
@@ -335,7 +335,7 @@
 			/>
 		{/if}
 	{/if}
-	{#each metricsProps as props}
+	{#each metricsProps as props (props.name)}
 		<TimeseriesLine
 			range={props.range}
 			values={props.values}

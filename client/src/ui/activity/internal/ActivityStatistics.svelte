@@ -55,11 +55,11 @@
 
 		// Speed
 		if (averageSpeed !== undefined) {
-			if (activity.sport_category === 'Running') {
+			if (activity.sport_category === 'Running' && averagePace !== undefined) {
 				rows.push({
 					icon: 'pace.svg',
 					label: 'Pace',
-					value: paceToString((averagePace?.value! * 1000) / 60),
+					value: paceToString((averagePace.value! * 1000) / 60),
 					unit: '/km',
 					legend: 'avg'
 				});
@@ -118,7 +118,7 @@
 
 <div class="@container">
 	<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
-		{#each statRows as row}
+		{#each statRows as row (row.label)}
 			<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
 				<img src={`/icons/${row.icon}`} class="h-6 w-6" alt={`${row.label} icon`} />
 				<div class=" flex-1 font-medium">{row.label}</div>
@@ -135,7 +135,7 @@
 	</div>
 
 	<div class="grid grid-cols-3 gap-0.5">
-		{#each statRows as row}
+		{#each statRows as row (row.label)}
 			<div class="flex h-16 flex-col gap-0 pb-3 text-left @lg:hidden">
 				<div class="text-lg font-semibold">
 					{row.value || '-'}

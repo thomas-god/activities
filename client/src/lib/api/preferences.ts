@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { PUBLIC_APP_URL } from '$env/static/public';
 import { goto } from '$app/navigation';
 import { none, some, type Option } from '$lib/Options';
+import { resolve } from '$app/paths';
 
 // =============================================================================
 // Schemas
@@ -58,7 +59,7 @@ export async function fetchAllPreferences(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return [];
 	}
 
@@ -103,7 +104,7 @@ export async function fetchPreference(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return none();
 	}
 
@@ -139,7 +140,7 @@ export async function setPreference(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return false;
 	}
 
@@ -163,7 +164,7 @@ export async function deletePreference(
 	});
 
 	if (res.status === 401) {
-		goto('/login');
+		goto(resolve('/login'));
 		return false;
 	}
 

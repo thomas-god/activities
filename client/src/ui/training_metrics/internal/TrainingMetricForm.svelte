@@ -48,9 +48,9 @@
 		}
 	}
 >
-	{#each templatesByCategory as [category, group]}
+	{#each templatesByCategory as [category, templates] (category)}
 		<optgroup label={category}>
-			{#each group as template}
+			{#each templates as template (template.display_name)}
 				<option value={template}>{template.display_name}</option>
 				{template}
 			{/each}

@@ -4,6 +4,7 @@
 	import type { Activity, ActivityListSummaryItems } from '$lib/api';
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
+	import { resolve } from '$app/paths';
 
 	let {
 		activity,
@@ -65,7 +66,7 @@
     py-2
     ${categoryClass(activity.sport_category)} hover:bg-base-200`}
 >
-	<a href={`/activity/${activity.id}`} onclick={handleClick}>
+	<a href={resolve(`/activity/${activity.id}`)} onclick={handleClick}>
 		<div class="flex flex-col gap-1">
 			<div class="flex shrink grow flex-row flex-wrap justify-between gap-1 overflow-hidden">
 				<!-- Sport icon, activity title and date -->
@@ -96,7 +97,7 @@
 
 				<!-- Activity metrics/details -->
 				<div class="flex flex-row items-center justify-start">
-					{#each listFormat as row}
+					{#each listFormat as row (row.format.type)}
 						<div style:width={`${row.width}px`} hidden={!row.show} class="shrink-0 text-center">
 							{#if row.format.type === 'rpe'}
 								{#if activity.rpe}

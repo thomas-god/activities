@@ -343,7 +343,7 @@
 		{/if}
 
 		<!-- One line per activity -->
-		{#each linePaths as { d, color }}
+		{#each linePaths as { d, color, label } (label)}
 			<path {d} fill="none" stroke={color} stroke-width="1.5" clip-path="url(#{clipId})" />
 		{/each}
 
@@ -359,7 +359,7 @@
 				opacity="0.35"
 				stroke-dasharray="4 3"
 			/>
-			{#each tooltipData as row, i}
+			{#each tooltipData as row, i (i)}
 				{@const yPx = yScale(row.yVal)}
 				{#if yPx >= marginTop && yPx <= marginTop + innerHeight}
 					<circle cx={mouseX} cy={yPx} r="3.5" fill={row.color} stroke="white" stroke-width="1.5" />
@@ -386,7 +386,7 @@
 			style="left:{tooltipLeft}px; top:{marginTop}px"
 		>
 			<p class="mb-1 text-base-content/60">{formatDuration(xScale.invert(mouseX))}</p>
-			{#each tooltipData as row}
+			{#each tooltipData as row (row.label)}
 				<div class="flex items-center gap-1.5">
 					<span
 						class="inline-block h-2 w-2 shrink-0 rounded-full"
@@ -403,7 +403,7 @@
 <!-- Legend + offset controls -->
 {#if linePaths.length > 0}
 	<div class="mt-2 flex flex-row flex-wrap gap-3 pl-12 text-sm">
-		{#each linePaths as { color, label }}
+		{#each linePaths as { color, label } (label)}
 			<div class="flex items-center gap-2">
 				<span class="inline-block h-0.5 w-5 shrink-0 rounded-full" style="background-color:{color}"
 				></span>

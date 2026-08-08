@@ -3,6 +3,7 @@
 	import Navbar from '$ui/navigation/Navbar.svelte';
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
+	import { resolve } from '$app/paths';
 
 	let { data }: PageProps = $props();
 </script>
@@ -19,13 +20,13 @@
 			<ActivityDetails
 				{activity}
 				onActivityUpdated={() => {}}
-				onActivityDeleted={() => goto('/')}
+				onActivityDeleted={() => goto(resolve('/'))}
 			/>
 		{:else}
 			<div class="bg-warning p-4 text-warning-content">
-				An error occured when trying to load this activity
+				An error occurred when trying to load this activity
 				<button class="btn mt-4 btn-accent">
-					<a href="/"> Go home </a>
+					<a href={resolve('/')}> Go home </a>
 				</button>
 			</div>
 		{/if}

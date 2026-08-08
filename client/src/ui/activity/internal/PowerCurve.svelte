@@ -160,7 +160,7 @@
 		</defs>
 
 		<!-- Horizontal grid lines + Y axis labels -->
-		{#each yTicks as tick}
+		{#each yTicks as tick (tick)}
 			<g transform="translate(0, {yScale(tick)})">
 				<text
 					x={marginLeft - 6}
@@ -201,7 +201,7 @@
 		/>
 
 		<!-- X axis ticks and labels -->
-		{#each FIXED_DURATIONS as tick}
+		{#each FIXED_DURATIONS as tick (tick)}
 			<g transform="translate({xScale(tick)}, {height - marginBottom})">
 				<line y2="4" class="stroke-current" stroke-opacity="0.4" />
 				<text

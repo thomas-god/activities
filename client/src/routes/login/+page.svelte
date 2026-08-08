@@ -4,6 +4,7 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { isNone, none, some, type Option } from '$lib/Options';
 	import z from 'zod';
+	import { resolve } from '$app/paths';
 
 	let email = $state('');
 	const validator = z.email();
@@ -35,7 +36,7 @@
 				body: JSON.stringify({ password })
 			}).then((res) => {
 				if (res.status === 200) {
-					goto('/');
+					goto(resolve('/'));
 				}
 				return res;
 			})

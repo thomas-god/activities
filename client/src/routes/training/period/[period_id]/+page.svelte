@@ -68,7 +68,6 @@
 	let newTrainingMetricDialog: HTMLDialogElement;
 	// svelte-ignore non_reactive_update
 	let importTrainingMetricDialog: HTMLDialogElement;
-	// svelte-ignore non_reactive_update
 	let metricsOrderingDialog: TrainingMetricsOrderingDialog;
 	// svelte-ignore non_reactive_update
 	let metricListDialog: HTMLDialogElement;

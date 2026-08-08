@@ -32,7 +32,7 @@
 			>
 				Clear
 			</button>
-			{#each RPE_VALUES as value}
+			{#each RPE_VALUES as value (value)}
 				<button
 					class={`btn btn-sm ${getRpeColor(value)} ${rpe === value ? ` border-2 border-base-content` : ''}`}
 					onclick={() => (rpe = value)}

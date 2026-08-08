@@ -10,6 +10,7 @@
 	} from '$lib/sport';
 	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
 	import type { RangeFilter } from '$lib/filters';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	let {
 		activities,
@@ -31,7 +32,7 @@
 
 	// Get unique sport categories from activities
 	let availableSportCategories = $derived.by(() => {
-		const categories = new Set<SportCategory>();
+		const categories = new SvelteSet<SportCategory>();
 		for (const activity of activities) {
 			if (activity.sport_category) {
 				categories.add(activity.sport_category);
@@ -160,7 +161,7 @@
 					<div>
 						<div class="mb-2 text-sm font-medium">Sport</div>
 						<div class="flex flex-wrap gap-2">
-							{#each availableSportCategories as category}
+							{#each availableSportCategories as category (category)}
 								<button
 									class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
 									onclick={() => toggleSportCategory(category)}
@@ -181,7 +182,7 @@
 				<div>
 					<div class="mb-2 text-sm font-medium">Workout Type</div>
 					<div class="flex flex-wrap gap-2">
-						{#each WORKOUT_TYPE_LABELS as { value, label }}
+						{#each WORKOUT_TYPE_LABELS as { value, label } (label)}
 							<button
 								class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
 								onclick={() => toggleWorkoutType(value)}
@@ -196,7 +197,7 @@
 				<div>
 					<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
 					<div class="flex flex-wrap gap-2">
-						{#each RPE_VALUES as rpe}
+						{#each RPE_VALUES as rpe (rpe)}
 							<button
 								class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
 								onclick={() => toggleRpe(rpe)}

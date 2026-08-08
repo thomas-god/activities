@@ -5,6 +5,7 @@
 	import TrainingMetricFormUpdate from '../TrainingMetricFormUpdate.svelte';
 	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
+	import { resolve } from '$app/paths';
 
 	let {
 		metric,
@@ -30,7 +31,7 @@
 		});
 
 		if (res.status === 401) {
-			goto('/login');
+			goto(resolve('/login'));
 		}
 		showDeleteModal = false;
 		onDelete();

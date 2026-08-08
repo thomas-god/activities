@@ -53,7 +53,7 @@
 			>
 				Clear
 			</button>
-			{#each BONK_STATUS_VALUES as status}
+			{#each BONK_STATUS_VALUES as status (status)}
 				<button
 					class={`btn btn-sm ${nutrition !== null && nutrition.bonk_status === status ? `btn-active ${getBonkStatusColor(status)}` : 'btn-ghost'}`}
 					onclick={() => updateNutritionBonkStatus(status)}

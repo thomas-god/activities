@@ -1,4 +1,6 @@
 <script lang="ts">
+	/* typing with d3.js is something...*/
+	/* eslint-disable @typescript-eslint/no-explicit-any */
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
 	import { displayGroupName, type TrainingMetricGroupByClause } from '$lib/trainingMetric';
 	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
@@ -443,6 +445,8 @@
 	});
 </script>
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 <div class="flex flex-col gap-2">
 	<svg
 		{width}
@@ -543,7 +547,7 @@
 	<!-- Legend -->
 	{#if showGroup}
 		<div class="flex flex-wrap items-center justify-center gap-3 px-2 text-sm">
-			{#each groups as group}
+			{#each groups as group (group)}
 				<div class="flex items-center gap-1.5">
 					<div class="h-3 w-3 rounded-sm" style="background-color: {colors(group)}"></div>
 					<span>{group}</span>

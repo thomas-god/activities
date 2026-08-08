@@ -20,6 +20,7 @@
 	import type { ActivitiesFilters } from '$lib/filters';
 	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
+	import { resolve } from '$app/paths';
 
 	let { data }: PageProps = $props();
 
@@ -89,7 +90,7 @@
 
 		// On small screens, navigate to activity page
 		if (screenWidth < 700) {
-			goto(`/activity/${activityId}`);
+			goto(resolve(`/activity/${activityId}`));
 			return;
 		}
 
@@ -247,7 +248,7 @@
 					{#if selectedActivity}
 						<div class="absolute right-3 join">
 							<button
-								onclick={() => goto(`/activity/${selectedActivityId}`)}
+								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 								class="btn join-item btn-sm"
 							>
 								<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button

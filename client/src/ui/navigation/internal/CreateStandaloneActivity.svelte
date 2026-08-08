@@ -9,6 +9,7 @@
 		sportDisplay
 	} from '$lib/sport';
 	import { dayjs } from '$lib/duration';
+	import { resolve } from '$app/paths';
 
 	let { activityCreatedCallback }: { activityCreatedCallback: () => void } = $props();
 
@@ -42,7 +43,7 @@
 		});
 
 		if (res.type === 'authentication-error') {
-			goto('/login');
+			goto(resolve('/login'));
 			return;
 		}
 
@@ -68,9 +69,9 @@
 		<div>
 			<label class="label" for="sa-sport">Sport</label>
 			<select class="select w-full select-sm" id="sa-sport" bind:value={sport}>
-				{#each Object.entries(sportsPerCategory) as [category, sports]}
+				{#each Object.entries(sportsPerCategory) as [category, sports] (category)}
 					<optgroup label={sportCategoryDisplay(category as SportCategory)}></optgroup>
-					{#each sports as s}
+					{#each sports as s (s)}
 						<option value={s}>{sportDisplay(s)}</option>
 					{/each}
 				{/each}
