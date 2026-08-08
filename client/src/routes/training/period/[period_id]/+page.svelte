@@ -4,7 +4,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import TrainingPeriodStatistics from '$components/organisms/TrainingPeriodStatistics.svelte';
+	import TrainingPeriodStatistics from '$ui/training_period/TrainingPeriodStatistics.svelte';
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
@@ -12,9 +12,9 @@
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
 	import TrainingMetricsOrderingDialog from '$ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
-	import EditPeriodNameModal from '$components/molecules/EditPeriodNameModal.svelte';
-	import EditPeriodDatesModal from '$components/molecules/EditPeriodDatesModal.svelte';
-	import EditPeriodNoteModal from '$components/molecules/EditPeriodNoteModal.svelte';
+	import EditPeriodNameModal from '$ui/training_period/EditPeriodNameModal.svelte';
+	import EditPeriodDatesModal from '$ui/training_period/EditPeriodDatesModal.svelte';
+	import EditPeriodNoteModal from '$ui/training_period/EditPeriodNoteModal.svelte';
 	import Timeline from '$ui/activity/Timeline.svelte';
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import {

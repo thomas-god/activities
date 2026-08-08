@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Activity, ActivityListSummaryItems, TrainingNote } from '$lib/api';
 	import { toTitleCase } from '$lib/utils';
-	import TrainingNoteComponent from '$components/organisms/activityList/TrainingNote.svelte';
+	import TrainingNoteComponent from '$ui/training_note/TrainingNote.svelte';
 	import ActivityComponent from './Activity.svelte';
 
 	let {

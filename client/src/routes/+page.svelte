@@ -3,7 +3,7 @@
 	import { invalidate } from '$app/navigation';
 	import PastActivitiesList from '$ui/activity/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingPeriodCard from '$components/molecules/TrainingPeriodCard.svelte';
+	import TrainingPeriodCard from '$ui/training_period/TrainingPeriodCard.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CreateTrainingPeriod from '$components/organisms/CreateTrainingPeriod.svelte';
+	import CreateTrainingPeriod from '$ui/navigation/internal/CreateTrainingPeriod.svelte';
 	import Navbar from './Navbar.svelte';
 
 	let {
