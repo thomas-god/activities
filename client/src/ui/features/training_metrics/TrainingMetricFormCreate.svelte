@@ -11,7 +11,7 @@
 	} from '$lib/api';
 	import TrainingMetricForm from './internal/TrainingMetricForm.svelte';
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
-	import PreviewChart from './TrainingMetricPreviewChart.svelte';
+	import PreviewChart from './TrainingMetricChartPreview.svelte';
 
 	let {
 		callback,

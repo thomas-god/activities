@@ -16,7 +16,7 @@
 		type TrainingMetric,
 		type UpdateTrainingMetricPayload
 	} from '$lib/api';
-	import PreviewChart from './TrainingMetricPreviewChart.svelte';
+	import PreviewChart from './TrainingMetricChartPreview.svelte';
 
 	let {
 		initialMetric,

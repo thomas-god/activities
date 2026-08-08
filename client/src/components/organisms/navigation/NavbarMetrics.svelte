@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CreateTrainingMetricFromTemplate from '$ui/features/training_metrics/CreateTrainingMetric.svelte';
+	import TrainingMetricFormCreate from '$ui/features/training_metrics/TrainingMetricFormCreate.svelte';
 	import Navbar from './Navbar.svelte';
 
 	let { invalidateTrainingMetrics }: { invalidateTrainingMetrics: () => void } = $props();
@@ -35,7 +35,7 @@
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
 		{#if showForm}
-			<CreateTrainingMetricFromTemplate callback={createTrainingMetricCallback} />
+			<TrainingMetricFormCreate callback={createTrainingMetricCallback} />
 		{/if}
 	</div>
 	<form method="dialog" class="modal-backdrop">

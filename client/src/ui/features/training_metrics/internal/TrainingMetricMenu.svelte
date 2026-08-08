@@ -2,7 +2,7 @@
 	import DeleteModal from '$ui/core/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { goto } from '$app/navigation';
-	import UpdateTrainingMetricFrom from '../UpdateTrainingMetric.svelte';
+	import TrainingMetricFormUpdate from '../TrainingMetricFormUpdate.svelte';
 	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
 
@@ -68,7 +68,7 @@
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
 		{#if showEditForm}
-			<UpdateTrainingMetricFrom
+			<TrainingMetricFormUpdate
 				initialMetric={metric}
 				callback={onUpdate}
 				existingSportsConstraints={none()}

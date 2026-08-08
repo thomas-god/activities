@@ -36,9 +36,9 @@
 		type TrainingNotesList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
-	import ImportTrainingMetric from '$ui/features/training_metrics/ImportTrainingMetric.svelte';
+	import TrainingMetricImportForm from '$ui/features/training_metrics/TrainingMetricFormImport.svelte';
+	import TrainingMetricFormCreate from '$ui/features/training_metrics/TrainingMetricFormCreate.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import CreateTrainingMetricFromTemplate from '$ui/features/training_metrics/CreateTrainingMetric.svelte';
 	import NavbarPeriods from '$components/organisms/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -566,7 +566,7 @@
 					<form method="dialog">
 						<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 					</form>
-					<CreateTrainingMetricFromTemplate
+					<TrainingMetricFormCreate
 						callback={() => {
 							newTrainingMetricDialog.close();
 							updateMetricsPromise();
@@ -595,7 +595,7 @@
 					{#await getGlobalMetricsPromise}
 						<div class="loading"></div>
 					{:then globalMetrics}
-						<ImportTrainingMetric
+						<TrainingMetricImportForm
 							metrics={globalMetrics}
 							period_id={periodDetails.id}
 							metricCopiedCallback={updateMetricsPromise}
