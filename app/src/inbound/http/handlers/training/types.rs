@@ -1,20 +1,23 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use derive_more::Constructor;
 /// Mappings between domain types and types part of the HTTP API
 use serde::{Deserialize, Serialize};
 
-use crate::domain::models::{
-    activity::{
-        ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus, Sport,
-        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+use crate::{
+    domain::models::{
+        activity::{
+            ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus, Sport,
+            TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+        },
+        training::{
+            SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+            TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSummary,
+            TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
+            TrainingPeriodId, TrainingPeriodSports,
+        },
     },
-    training::{
-        SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSummary,
-        TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
-        TrainingPeriodSports,
-    },
+    inbound::http::handlers::training::utils::GranuleValues,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
@@ -286,12 +289,87 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SportsResponse {
+    pub categories: Vec<String>,
+    pub sports: Vec<String>,
+}
+
+impl From<&TrainingPeriodSports> for SportsResponse {
+    fn from(value: &TrainingPeriodSports) -> Self {
+        let Some(items) = value.items() else {
+            return Self {
+                categories: vec![],
+                sports: vec![],
+            };
+        };
+
+        let mut sports = Vec::new();
+        let mut categories = Vec::new();
+
+        for sport in items {
+            match sport {
+                SportFilter::Sport(sport) => sports.push(sport.to_string()),
+                SportFilter::SportCategory(category) => categories.push(category.to_string()),
+            }
+        }
+
+        Self { categories, sports }
+    }
+}
+
+impl From<&Option<Vec<SportFilter>>> for SportsResponse {
+    fn from(value: &Option<Vec<SportFilter>>) -> Self {
+        let Some(items) = value else {
+            return Self {
+                categories: vec![],
+                sports: vec![],
+            };
+        };
+
+        let mut sports = Vec::new();
+        let mut categories = Vec::new();
+
+        for sport in items {
+            match sport {
+                SportFilter::Sport(sport) => sports.push(sport.to_string()),
+                SportFilter::SportCategory(category) => categories.push(category.to_string()),
+            }
+        }
+
+        Self { categories, sports }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TrainingMetricBody {
+    pub id: String,
+    pub name: Option<String>,
+    pub metric: String,
+    pub metric_formated: String,
+    pub unit: String,
+    pub granularity: Option<String>,
+    pub aggregate: Option<String>,
+    pub sports: SportsResponse,
+    pub workout_types: Option<Vec<String>>,
+    pub bonked: Option<String>,
+    pub rpes: Option<Vec<u8>>,
+    pub show_average: Option<TrainingMetricSummaryAverage>,
+    pub target: Option<TrainingMetricTarget>,
+    pub values: HashMap<String, GranuleValues>,
+    pub group_by: Option<String>,
+    pub scope: APITrainingMetricScope,
+    pub summary: HashMap<String, f64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::domain::models::activity::Unit;
-    use crate::domain::models::training::TrainingMetricTarget;
+    use crate::domain::models::activity::{Sport, SportCategory, Unit};
+    use crate::domain::models::training::{
+        SportFilter, TrainingMetricTarget, TrainingPeriodSports,
+    };
 
     #[test]
     fn test_api_target_conversion_ok() {
@@ -305,5 +383,115 @@ mod tests {
         let api = APITrainingMetricTarget::new(100.0, "parsec".to_string());
         let result: Result<TrainingMetricTarget, _> = api.try_into();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_response_sports_from_training_period_sports_with_mixed_filters() {
+        let sports = TrainingPeriodSports::new(Some(vec![
+            SportFilter::Sport(Sport::Running),
+            SportFilter::SportCategory(SportCategory::Cycling),
+            SportFilter::Sport(Sport::Swimming),
+            SportFilter::SportCategory(SportCategory::Climbing),
+        ]));
+
+        let response = SportsResponse::from(&sports);
+
+        assert_eq!(
+            response.sports,
+            vec!["Running".to_string(), "Swimming".to_string()]
+        );
+        assert_eq!(
+            response.categories,
+            vec!["Cycling".to_string(), "Climbing".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_response_sports_from_training_period_sports_only_sports() {
+        let sports = TrainingPeriodSports::new(Some(vec![
+            SportFilter::Sport(Sport::TrailRunning),
+            SportFilter::Sport(Sport::IndoorCycling),
+        ]));
+
+        let response = SportsResponse::from(&sports);
+
+        assert_eq!(
+            response.sports,
+            vec!["TrailRunning".to_string(), "IndoorCycling".to_string()]
+        );
+        assert!(response.categories.is_empty());
+    }
+
+    #[test]
+    fn test_response_sports_from_training_period_sports_only_categories() {
+        let sports = TrainingPeriodSports::new(Some(vec![
+            SportFilter::SportCategory(SportCategory::Running),
+            SportFilter::SportCategory(SportCategory::WaterSports),
+        ]));
+
+        let response = SportsResponse::from(&sports);
+
+        assert!(response.sports.is_empty());
+        assert_eq!(
+            response.categories,
+            vec!["Running".to_string(), "WaterSports".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_response_sports_from_training_period_sports_none_is_empty() {
+        let sports = TrainingPeriodSports::new(None);
+
+        let response = SportsResponse::from(&sports);
+
+        assert!(response.sports.is_empty());
+        assert!(response.categories.is_empty());
+    }
+
+    #[test]
+    fn test_response_sports_from_training_period_sports_empty_vec_is_empty() {
+        let sports = TrainingPeriodSports::new(Some(vec![]));
+
+        let response = SportsResponse::from(&sports);
+
+        assert!(response.sports.is_empty());
+        assert!(response.categories.is_empty());
+    }
+
+    #[test]
+    fn test_response_sports_from_option_sports_with_mixed_filters() {
+        let sports = Some(vec![
+            SportFilter::Sport(Sport::Hiking),
+            SportFilter::SportCategory(SportCategory::Racket),
+            SportFilter::Sport(Sport::Kayaking),
+        ]);
+
+        let response = SportsResponse::from(&sports);
+
+        assert_eq!(
+            response.sports,
+            vec!["Hiking".to_string(), "Kayaking".to_string()]
+        );
+        assert_eq!(response.categories, vec!["Racket".to_string()]);
+    }
+
+    #[test]
+    fn test_response_sports_from_option_sports_none_is_empty() {
+        let sports: Option<Vec<SportFilter>> = None;
+
+        let response = SportsResponse::from(&sports);
+
+        assert!(response.sports.is_empty());
+        assert!(response.categories.is_empty());
+    }
+
+    #[test]
+    fn test_response_sports_from_option_sports_empty_vec_is_empty() {
+        let sports: Option<Vec<SportFilter>> = Some(vec![]);
+
+        let response = SportsResponse::from(&sports);
+
+        assert!(response.sports.is_empty());
+        assert!(response.categories.is_empty());
     }
 }

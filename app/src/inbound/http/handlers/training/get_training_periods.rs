@@ -24,7 +24,11 @@ use crate::{
             training::ITrainingService,
         },
     },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
+    inbound::{
+        auth::AuthenticatedUser,
+        http::{AppState, handlers::training::types::SportsResponse},
+        parser::ParseFile,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -36,37 +40,8 @@ pub struct ResponseBodyItem {
     start: NaiveDate,
     end: Option<NaiveDate>,
     name: String,
-    sports: ResponseSports,
+    sports: SportsResponse,
     note: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseSports {
-    categories: Vec<String>,
-    sports: Vec<String>,
-}
-
-impl From<&TrainingPeriodSports> for ResponseSports {
-    fn from(value: &TrainingPeriodSports) -> Self {
-        let Some(items) = value.items() else {
-            return Self {
-                categories: vec![],
-                sports: vec![],
-            };
-        };
-
-        let mut sports = Vec::new();
-        let mut categories = Vec::new();
-
-        for sport in items {
-            match sport {
-                SportFilter::Sport(sport) => sports.push(sport.to_string()),
-                SportFilter::SportCategory(category) => categories.push(category.to_string()),
-            }
-        }
-
-        Self { categories, sports }
-    }
 }
 
 impl From<TrainingPeriod> for ResponseBodyItem {
@@ -76,7 +51,7 @@ impl From<TrainingPeriod> for ResponseBodyItem {
             start: *value.start(),
             end: *value.end(),
             name: value.name().to_string(),
-            sports: ResponseSports::from(value.sports()),
+            sports: SportsResponse::from(value.sports()),
             note: value.note().clone(),
         }
     }

@@ -33,7 +33,7 @@ use crate::{
         http::{
             AppState,
             handlers::training::{
-                types::APITrainingMetricScope,
+                types::{APITrainingMetricScope, SportsResponse, TrainingMetricBody},
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
                     convert_metric_target_unit, convert_metric_values_unit, fill_missing_granules,
@@ -46,7 +46,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ResponseBody(Vec<ResponseBodyItem>);
+pub struct ResponseBody(Vec<TrainingMetricBody>);
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "scope", rename_all = "lowercase")]
@@ -94,60 +94,10 @@ impl From<GetTrainingMetricValuesError> for StatusCode {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseSports {
-    categories: Vec<String>,
-    sports: Vec<String>,
-}
-
-impl From<&Option<Vec<SportFilter>>> for ResponseSports {
-    fn from(value: &Option<Vec<SportFilter>>) -> Self {
-        let Some(items) = value else {
-            return Self {
-                categories: vec![],
-                sports: vec![],
-            };
-        };
-
-        let mut sports = Vec::new();
-        let mut categories = Vec::new();
-
-        for sport in items {
-            match sport {
-                SportFilter::Sport(sport) => sports.push(sport.to_string()),
-                SportFilter::SportCategory(category) => categories.push(category.to_string()),
-            }
-        }
-
-        Self { categories, sports }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseBodyItem {
-    id: String,
-    name: Option<String>,
-    metric: String,
-    metric_formated: String,
-    unit: String,
-    granularity: Option<String>,
-    aggregate: Option<String>,
-    sports: ResponseSports,
-    workout_types: Option<Vec<String>>,
-    bonked: Option<String>,
-    rpes: Option<Vec<u8>>,
-    show_average: Option<TrainingMetricSummaryAverage>,
-    target: Option<TrainingMetricTarget>,
-    values: HashMap<String, GranuleValues>,
-    group_by: Option<String>,
-    scope: APITrainingMetricScope,
-    summary: HashMap<String, f64>,
-}
-
 fn to_response_body_item(
     metric: (TrainingMetric, TrainingMetricValues),
     range: &MetricsDateRange,
-) -> ResponseBodyItem {
+) -> TrainingMetricBody {
     let (metric, metric_values) = metric;
     let definition = metric.definition();
     let values = convert_metric_values_unit(group_metric_values(metric_values));
@@ -163,7 +113,7 @@ fn to_response_body_item(
         .as_ref()
         .and_then(|t| convert_metric_target_unit(t, unit));
 
-    ResponseBodyItem {
+    TrainingMetricBody {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
         metric: metric.definition().metric().to_string(),
@@ -177,7 +127,7 @@ fn to_response_body_item(
             .window()
             .as_ref()
             .map(|w| w.aggregate().to_string()),
-        sports: ResponseSports::from(definition.filters().sports()),
+        sports: SportsResponse::from(definition.filters().sports()),
         workout_types: definition
             .filters()
             .workout_types()
@@ -370,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_response_body_shape() {
-        let body = ResponseBody(vec![ResponseBodyItem {
+        let body = ResponseBody(vec![TrainingMetricBody {
             id: "metric-id-1".to_string(),
             name: Some("My Metric".to_string()),
             metric: "Calories".to_string(),
@@ -378,7 +328,7 @@ mod tests {
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),
             aggregate: Some("Average".to_string()),
-            sports: ResponseSports {
+            sports: SportsResponse {
                 sports: vec!["TrailRunning".to_string()],
                 categories: vec!["Cycling".to_string()],
             },

@@ -12,7 +12,9 @@ use serde_json::json;
 
 use crate::{
     domain::models::activity::DEFAULT_METRICS,
-    inbound::http::handlers::activities::activity_schema::PublicActivity,
+    inbound::http::handlers::{
+        activities::activity_schema::PublicActivity, training::types::SportsResponse,
+    },
 };
 use crate::{
     domain::{
@@ -37,38 +39,9 @@ pub struct ResponseBody {
     start: NaiveDate,
     end: Option<NaiveDate>,
     name: String,
-    sports: ResponseSports,
+    sports: SportsResponse,
     note: Option<String>,
     activities: Vec<PublicActivity>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ResponseSports {
-    categories: Vec<String>,
-    sports: Vec<String>,
-}
-
-impl From<&TrainingPeriodSports> for ResponseSports {
-    fn from(value: &TrainingPeriodSports) -> Self {
-        let Some(items) = value.items() else {
-            return Self {
-                categories: vec![],
-                sports: vec![],
-            };
-        };
-
-        let mut sports = Vec::new();
-        let mut categories = Vec::new();
-
-        for sport in items {
-            match sport {
-                SportFilter::Sport(sport) => sports.push(sport.to_string()),
-                SportFilter::SportCategory(category) => categories.push(category.to_string()),
-            }
-        }
-
-        Self { categories, sports }
-    }
 }
 
 pub async fn get_training_period<
@@ -105,7 +78,7 @@ pub async fn get_training_period<
         start: *period.start(),
         end: *period.end(),
         name: period.name().to_string(),
-        sports: ResponseSports::from(period.sports()),
+        sports: SportsResponse::from(period.sports()),
         note: period.note().clone(),
         activities,
     };
