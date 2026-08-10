@@ -180,13 +180,19 @@
 		return yAxisDefaultTickValues();
 	};
 
+	// Order of the groups inside the stacked series, sorted alphabetically ascending by
+	// display name. First entry in the array is stacked at the bottom.
+	let groupOrdering = $derived(
+		Array.from(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy)))).sort()
+	);
+
 	// Create stacked series data structure
 	// Each series represents one group (e.g., "Cycling", "Running")
 	// d3.stack() transforms the data into layers for stacked bar visualization
 	let series = $derived(
 		d3
 			.stack<SeriesDatum, string>()
-			.keys(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy))))
+			.keys(groupOrdering)
 			.value(([, groupMap], groupKey) => groupMap.get(groupKey)!.value)(
 			d3.index(
 				formatedValues,
@@ -249,10 +255,8 @@
 		return customScale;
 	});
 
-	// Extract unique group names for the legend
-	let groups = $derived(
-		Array.from(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy)))).sort()
-	);
+	// Extract unique group names for the legend (alphabetical ascending).
+	let groups = $derived(groupOrdering);
 
 	let xGroup = $derived(d3.scaleBand().domain(groups).range([0, x.bandwidth()]).padding(0.1));
 
