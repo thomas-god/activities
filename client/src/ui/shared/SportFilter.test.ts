@@ -7,7 +7,7 @@ import type { Sport, SportCategory } from '$lib/sport';
 import SportFilter from './SportFilter.svelte';
 
 const getSummaryText = (container: HTMLElement): string => {
-	return container.querySelector('.break-words')?.textContent?.trim() ?? '';
+	return container.querySelector('.wrap-break-word')?.textContent?.trim() ?? '';
 };
 
 afterEach(() => {
@@ -139,6 +139,8 @@ describe('SportFilterV2', () => {
 				categories: some<SportCategory[]>(['Cardio']) as Option<SportCategory[]>
 			}
 		});
+
+		expect(getSummaryText(container)).toBe('Sports: Running, Gym & Fitness');
 
 		await user.click(screen.getByRole('button', { name: 'Bin delete icon' }));
 
