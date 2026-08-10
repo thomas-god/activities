@@ -43,14 +43,14 @@ export async function setMetricsOrdering(
 	metricIds: string[]
 ): Promise<boolean> {
 	try {
-		const body: any = {
+		const body = {
 			type: scope.type,
-			metric_ids: metricIds
+			metric_ids: metricIds,
+			trainingPeriodId:
+				scope.type === 'trainingPeriod' && scope.trainingPeriodId
+					? scope.trainingPeriodId
+					: undefined
 		};
-
-		if (scope.type === 'trainingPeriod' && scope.trainingPeriodId) {
-			body.trainingPeriodId = scope.trainingPeriodId;
-		}
 
 		const response = await fetch(`${PUBLIC_APP_URL}/api/training/metrics/ordering`, {
 			method: 'POST',

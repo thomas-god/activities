@@ -11,6 +11,8 @@
 		onLapSelectedCallback: (lap: ActivityWithTimeseries['timeseries']['laps'][number]) => void;
 	}
 
+	// For selectedLap
+	/* eslint-disable no-useless-assignment */
 	let { activity, selectedLap = $bindable(), onLapSelectedCallback }: Props = $props();
 
 	let laps = $derived(activity.timeseries.laps);

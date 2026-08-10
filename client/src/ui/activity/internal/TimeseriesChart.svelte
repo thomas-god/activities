@@ -196,7 +196,7 @@
 	let zoomedDomain = $state.raw([x_min, x_max]);
 	let zoomedIn = $derived(zoomedDomain[0] !== x_min || zoomedDomain[1] !== x_max);
 
-	function zoomed(event: d3.D3ZoomEvent<SVGElement, any>) {
+	function zoomed(event: d3.D3ZoomEvent<SVGElement, unknown>) {
 		zoomedDomain = [
 			xScale.invert(event.transform.invertX(xScale.range()[0])),
 			xScale.invert(event.transform.invertX(xScale.range()[1]))

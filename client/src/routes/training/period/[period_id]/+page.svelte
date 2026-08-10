@@ -91,6 +91,7 @@
 	const handleFilterChange = (filters: ActivitiesFilters) => {
 		const url = new URL(page.url);
 		applyFiltersToSearchParams(url.searchParams, filters);
+		/* eslint-disable svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: false, keepFocus: true });
 	};
 

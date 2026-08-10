@@ -61,6 +61,7 @@
 		} else {
 			url.searchParams.set('view', mode);
 		}
+		/* eslint-disable svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: true, keepFocus: true });
 	};
 
@@ -72,6 +73,7 @@
 		} else {
 			url.searchParams.set('month', month.format('YYYY-MM'));
 		}
+		/* eslint-disable svelte/no-navigation-without-resolve */
 		goto(url, { replaceState: true, keepFocus: true });
 	};
 

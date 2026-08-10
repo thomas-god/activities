@@ -114,7 +114,7 @@
 			{/each}
 		</select>
 		<OffsetControls
-			bind:offsets
+			{offsets}
 			activities={activities.map((activity, idx) => ({
 				label: activity.name ?? activity.start_time.slice(0, 10),
 				id: activity.id,

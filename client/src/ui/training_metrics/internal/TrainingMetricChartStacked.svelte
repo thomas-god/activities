@@ -1,6 +1,4 @@
 <script lang="ts">
-	/* typing with d3.js is something...*/
-	/* eslint-disable @typescript-eslint/no-explicit-any */
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
 	import { displayGroupName, type TrainingMetricGroupByClause } from '$lib/trainingMetric';
 	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
@@ -46,8 +44,12 @@
 	let gBars: SVGGElement;
 	let svgElement: SVGElement;
 
+	type FormattedValue = { time: string; group: string; value: number };
+	type SeriesDatum = [string, d3.InternMap<string, FormattedValue>];
+	type StackedDataPoint = d3.SeriesPoint<SeriesDatum> & { key: string };
+
 	let formatedValues = $derived.by(() => {
-		const _values: { time: string; group: string; value: number }[] = [];
+		const _values: FormattedValue[] = [];
 		for (const [group, granuleValues] of Object.entries(values)) {
 			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
 				_values.push({ time, group, value });
@@ -183,14 +185,14 @@
 	// d3.stack() transforms the data into layers for stacked bar visualization
 	let series = $derived(
 		d3
-			.stack()
+			.stack<SeriesDatum, string>()
 			.keys(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy))))
-			.value(([_time, groupMap]: any, groupKey) => groupMap.get(groupKey).value)(
+			.value(([, groupMap], groupKey) => groupMap.get(groupKey)!.value)(
 			d3.index(
-				formatedValues as any,
-				(value: any) => value.time,
-				(value: any) => displayGroupName(value.group, groupBy)
-			) as any
+				formatedValues,
+				(value) => value.time,
+				(value) => displayGroupName(value.group, groupBy)
+			)
 		)
 	);
 
@@ -316,30 +318,30 @@
 				.attr('fill', (groupSeries) => colors(groupSeries.key))
 				.selectAll('rect')
 				.data((groupSeries) =>
-					groupSeries.map((stackedDataPoint: any) => {
+					groupSeries.map(
 						// Attach the group key (e.g., "Cycling", "Running") to each data point
 						// so we can identify which group each rectangle belongs to
-						stackedDataPoint.key = groupSeries.key;
-						return stackedDataPoint;
-					})
+						(stackedDataPoint): StackedDataPoint =>
+							Object.assign(stackedDataPoint, { key: groupSeries.key })
+					)
 				)
 				.join('rect')
-				.attr('x', (stackedDataPoint: any) =>
+				.attr('x', (stackedDataPoint) =>
 					stacked
 						? x(stackedDataPoint.data[0])!
 						: x(stackedDataPoint.data[0])! + xGroup(stackedDataPoint.key)!
 				)
-				.attr('y', (stackedDataPoint: any) =>
+				.attr('y', (stackedDataPoint) =>
 					stacked ? y(stackedDataPoint[1]) : y(stackedDataPoint[1] - stackedDataPoint[0])
 				)
-				.attr('height', (stackedDataPoint: any) =>
+				.attr('height', (stackedDataPoint) =>
 					stacked
 						? y(stackedDataPoint[0]) - y(stackedDataPoint[1])
 						: y(0) - y(stackedDataPoint[1] - stackedDataPoint[0])
 				)
 				.attr('width', stacked ? x.bandwidth() : xGroup.bandwidth())
 				.attr('stroke', 'none')
-				.on('mouseenter', function (event: MouseEvent, stackedDataPoint: any) {
+				.on('mouseenter', function (event: MouseEvent, stackedDataPoint) {
 					// Show tooltip
 					const rect = event.target as SVGRectElement;
 					const value = stackedDataPoint[1] - stackedDataPoint[0]; // Height of this segment

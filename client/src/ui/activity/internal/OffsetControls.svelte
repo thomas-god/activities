@@ -4,7 +4,7 @@
 
 	let {
 		activities,
-		offsets = $bindable()
+		offsets
 	}: {
 		activities: { color: string; label: string; id: string }[];
 		offsets: SvelteMap<string, number>;
