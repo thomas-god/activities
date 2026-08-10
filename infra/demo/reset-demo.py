@@ -5,15 +5,15 @@
 # ///
 """Reset demo environment with fresh data using the API."""
 
-from math import floor
+import random
 import sys
 import time
-from typing import Any
-import random
-from datetime import datetime, timedelta, time as dt_time
-from pathlib import Path
 import xml.etree.ElementTree as ET
-
+from datetime import datetime, timedelta
+from datetime import time as dt_time
+from math import floor
+from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -350,6 +350,8 @@ def create_global_training_metric(
     aggregate: str | None,
     group_by: str | None = None,
     average: bool = False,
+    target: int | None = None,
+    target_unit: str | None = None,
 ) -> dict[str, Any] | None:
     """Create a training metric."""
     payload: dict[str, Any] = {
@@ -368,6 +370,9 @@ def create_global_training_metric(
 
     if average:
         payload["summary"] = {"average": {"include_zeros": False}}
+
+    if target and target_unit:
+        payload["target"] = {"unit": target_unit, "value": target}
 
     response = requests.post(
         f"{API_URL}/training/metric",
@@ -674,15 +679,14 @@ def generate_demo_data() -> int:
     )
 
     create_global_training_metric(
-        "Weekly calories", "Calories", "Weekly", "Sum", average=True
-    )
-
-    create_global_training_metric(
         "Weekly distance",
         "Distance",
         "Weekly",
         "Sum",
         group_by="SportCategory",
+        average=True,
+        target=100_000,
+        target_unit="m",
     )
 
     create_global_training_metric(
