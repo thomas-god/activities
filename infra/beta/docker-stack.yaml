@@ -37,6 +37,13 @@ services:
     volumes:
       - databases:/app/data
     deploy:
+      resources:
+        reservations:
+          cpus: "0.50"
+          memory: 64M
+        limits:
+          cpus: "1"
+          memory: 128M
       update_config:
         order: start-first
 

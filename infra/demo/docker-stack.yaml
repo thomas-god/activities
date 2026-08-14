@@ -14,6 +14,13 @@ services:
       - traefik-public
       - demo-internal
     deploy:
+      resources:
+        reservations:
+          cpus: "0.50"
+          memory: 64M
+        limits:
+          cpus: "1"
+          memory: 128M
       update_config:
         order: start-first
 
@@ -23,6 +30,13 @@ services:
       - demo-internal
     deploy:
       replicas: 1
+      resources:
+        reservations:
+          cpus: "0.50"
+          memory: 128M
+        limits:
+          cpus: "1"
+          memory: 256M
       update_config:
         order: start-first
       restart_policy:
