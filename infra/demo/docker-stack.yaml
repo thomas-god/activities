@@ -15,9 +15,6 @@ services:
       - demo-internal
     deploy:
       resources:
-        reservations:
-          cpus: "0.50"
-          memory: 64M
         limits:
           cpus: "1"
           memory: 128M
@@ -31,9 +28,6 @@ services:
     deploy:
       replicas: 1
       resources:
-        reservations:
-          cpus: "0.50"
-          memory: 128M
         limits:
           cpus: "1"
           memory: 256M
