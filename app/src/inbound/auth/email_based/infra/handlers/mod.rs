@@ -52,8 +52,7 @@ where
     let router = Router::new()
         .route("/register", post(register_user::<US>))
         .route("/login", post(login_user::<US>))
-        .route("/login/validate/{auth_token}", post(validate_login::<US>));
-    let router = router.with_state(auth_state);
+        .route("/login/validate", post(validate_login::<US>));
 
     base_router.nest("/api", router)
 }

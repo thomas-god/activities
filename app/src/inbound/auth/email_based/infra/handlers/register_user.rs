@@ -1,7 +1,4 @@
-use axum::{
-    extract::{Query, State},
-    http::StatusCode,
-};
+use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::inbound::auth::email_based::{
@@ -9,15 +6,15 @@ use crate::inbound::auth::email_based::{
 };
 
 #[derive(Debug, Deserialize)]
-pub struct RegisterUserQuery {
+pub struct RegisterUserBody {
     email: String,
 }
 
 pub async fn register_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
-    Query(query): Query<RegisterUserQuery>,
+    Json(body): Json<RegisterUserBody>,
 ) -> StatusCode {
-    let Ok(email) = EmailAddress::try_from(query.email) else {
+    let Ok(email) = EmailAddress::try_from(body.email) else {
         return StatusCode::BAD_REQUEST;
     };
 

@@ -48,10 +48,14 @@
 			return;
 		}
 
-		emailPromise = fetch(`${PUBLIC_APP_URL}/api/login?email=${encodeURIComponent(email)}`, {
+		emailPromise = fetch(`${PUBLIC_APP_URL}/api/login`, {
 			method: 'POST',
 			credentials: 'include',
-			mode: 'cors'
+			mode: 'cors',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ email })
 		});
 		await emailPromise;
 	};
@@ -61,10 +65,14 @@
 			return;
 		}
 
-		emailPromise = fetch(`${PUBLIC_APP_URL}/api/register?email=${encodeURIComponent(email)}`, {
+		emailPromise = fetch(`${PUBLIC_APP_URL}/api/register`, {
 			method: 'POST',
 			credentials: 'include',
-			mode: 'cors'
+			mode: 'cors',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ email })
 		});
 		await emailPromise;
 	};

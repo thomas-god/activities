@@ -1,19 +1,26 @@
 use axum::{
-    extract::{Path, State},
+    Json,
+    extract::State,
     http::{StatusCode, header::SET_COOKIE},
     response::{AppendHeaders, IntoResponse},
 };
+use serde::Deserialize;
 
 use crate::inbound::auth::email_based::{
     AuthLinkValidationResult, AuthToken, IUserService,
     infra::handlers::{AuthAppState, extractor::build_session_cookie},
 };
 
+#[derive(Debug, Deserialize)]
+pub struct ValidateLoginBody {
+    token: String,
+}
+
 pub async fn validate_login<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
-    Path(auth_token): Path<String>,
+    Json(body): Json<ValidateLoginBody>,
 ) -> impl IntoResponse {
-    let token = AuthToken::from(auth_token);
+    let token = AuthToken::from(body.token);
 
     match state.user_service.validate_auth_link(token).await {
         Ok(AuthLinkValidationResult::Success(session)) => {
