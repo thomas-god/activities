@@ -20,7 +20,7 @@ use crate::{
     inbound::{
         auth::SinglePassword,
         http::{
-            CookieConfig,
+            CookieConfig, build_removal_cookie,
             middlewares::rate_limit::{IpRateLimitLayer, RateLimitStore},
         },
     },
@@ -108,6 +108,7 @@ where
 
     let login_router = Router::new()
         .route("/login", post(login_user))
+        .route("/logout", post(logout))
         .route_layer(IpRateLimitLayer::new(
             RateLimitStore::new(),
             100,
@@ -140,6 +141,15 @@ pub async fn login_user(
 
     let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
     (headers, StatusCode::OK).into_response()
+}
+
+/// Clears the auth cookie in this browser. There is no server-side session state in this mode
+/// (the token is a stateless HMAC), so this cannot revoke the credential itself — only rotating
+/// the password does that, which also logs out every other browser.
+pub async fn logout(State(state): State<SinglePasswordAuthState>) -> impl IntoResponse {
+    let cookie = build_removal_cookie("token", &state.cookie_config);
+    let headers = AppendHeaders([(SET_COOKIE, cookie.encoded().to_string())]);
+    (headers, StatusCode::OK)
 }
 
 #[cfg(test)]
@@ -306,5 +316,27 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_logout_clears_cookie() {
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
+
+        let response = app
+            .post("/api/logout")
+            .send()
+            .await
+            .expect("Should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(SET_COOKIE)
+            .expect("expected Set-Cookie header on logout")
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.contains("token="));
+        assert!(set_cookie.contains("1970"));
     }
 }

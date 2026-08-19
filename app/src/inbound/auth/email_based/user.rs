@@ -108,6 +108,10 @@ where
             .check_session_token(token)
             .await
     }
+
+    async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
+        self.session_service.lock().await.logout(token).await
+    }
 }
 
 pub trait UserRepository: Clone + Send + Sync + 'static {
@@ -408,6 +412,10 @@ impl IUserService for DisabledUserService {
         &self,
         _token: AuthToken,
     ) -> Result<crate::inbound::auth::email_based::AuthLinkValidationResult, ()> {
+        panic!("User service is disabled")
+    }
+
+    async fn logout(&self, _token: &SessionToken) -> Result<(), ()> {
         panic!("User service is disabled")
     }
 }

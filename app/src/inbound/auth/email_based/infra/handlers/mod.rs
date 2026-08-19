@@ -11,6 +11,7 @@ use crate::inbound::http::middlewares::rate_limit::{IpRateLimitLayer, RateLimitS
 
 pub use extractor::cookie_auth_middleware;
 pub use login_user::login_user;
+pub use logout::logout;
 pub use register_user::register_user;
 pub use validate_login::validate_login;
 
@@ -67,6 +68,7 @@ where
     // isn't realistic, but this still caps the cost of the Argon2 verification per IP.
     let validate_router = Router::new()
         .route("/login/validate", post(validate_login::<US>))
+        .route("/logout", post(logout::<US>))
         .route_layer(IpRateLimitLayer::new(
             RateLimitStore::new(),
             30,

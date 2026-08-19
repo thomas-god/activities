@@ -322,6 +322,8 @@ pub trait IUserService: Clone + Send + Sync + 'static {
         &self,
         token: &SessionToken,
     ) -> impl Future<Output = Result<CheckSessionResult, ()>> + Send;
+
+    fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
 #[derive(Debug, Clone, Constructor)]
@@ -404,6 +406,8 @@ pub trait ISessionService: Clone + Send + Sync + 'static {
         &self,
         token: &SessionToken,
     ) -> impl Future<Output = Result<CheckSessionResult, ()>> + Send;
+
+    fn logout(&self, token: &SessionToken) -> impl Future<Output = Result<(), ()>> + Send;
 }
 
 #[cfg(test)]
@@ -439,6 +443,8 @@ pub mod test_utils {
                 &self,
                 _token: &SessionToken
             ) -> Result<CheckSessionResult, ()>;
+
+            async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
         }
     }
 
@@ -479,6 +485,8 @@ pub mod test_utils {
                 &self,
                 _token: &SessionToken
             ) -> Result<CheckSessionResult, ()>;
+
+            async fn logout(&self, token: &SessionToken) -> Result<(), ()>;
         }
     }
 }

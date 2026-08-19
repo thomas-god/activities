@@ -88,6 +88,17 @@ where
             refreshed: None,
         })
     }
+
+    async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
+        let repository = self.session_repository.lock().await;
+
+        let sessions = repository.get_all_sessions().await;
+        let Some(session) = sessions.into_iter().find(|s| s.hash().verify_token(token)) else {
+            return Ok(());
+        };
+
+        repository.delete_session_by_hash(session.hash()).await
+    }
 }
 
 pub trait SessionRepository: Clone + Send + Sync + 'static {
@@ -230,5 +241,53 @@ mod test_session_service_check_session_token {
         let res = service.check_session_token(&token).await;
 
         assert!(res.is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_session_service_logout {
+    use crate::inbound::auth::email_based::session::test_utils::MockSessionRepository;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_deletes_matching_session() {
+        let mut repository = MockSessionRepository::new();
+        let token = SessionToken::new();
+        let hashed_token = token.as_hash().unwrap();
+        let cloned_hashed_token = hashed_token.clone();
+        repository.expect_get_all_sessions().returning(move || {
+            vec![HashedSession::new(
+                UserId::test_default(),
+                cloned_hashed_token.clone(),
+                Utc::now() + TimeDelta::days(30),
+            )]
+        });
+        let cloned_token = token.clone();
+        repository
+            .expect_delete_session_by_hash()
+            .times(1)
+            .withf(move |hash| hash.verify_token(&cloned_token))
+            .returning(|_| Ok(()));
+
+        let service = SessionService::new(Arc::new(Mutex::new(repository)));
+
+        let res = service.logout(&token).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_ok_when_no_matching_session() {
+        let mut repository = MockSessionRepository::new();
+        let token = SessionToken::new();
+        repository.expect_get_all_sessions().returning(Vec::new);
+        repository.expect_delete_session_by_hash().times(0);
+
+        let service = SessionService::new(Arc::new(Mutex::new(repository)));
+
+        let res = service.logout(&token).await;
+
+        assert!(res.is_ok());
     }
 }

@@ -9,7 +9,7 @@ use axum::http::{HeaderValue, Method, StatusCode};
 
 use axum::routing::{delete, get, patch};
 use axum::{Json, Router, routing::post, response::IntoResponse};
-use cookie::SameSite;
+use cookie::{Cookie, SameSite, time::OffsetDateTime};
 use serde_json::json;
 use tokio::net;
 use tower_http::cors::CorsLayer;
@@ -69,6 +69,22 @@ impl Default for CookieConfig {
             domain: None,
         }
     }
+}
+
+/// Builds a cookie that instructs the browser to immediately drop `name`, for use by logout
+/// handlers. Attributes (path/domain/etc) must match the cookie that was originally set for the
+/// browser to actually overwrite it.
+pub fn build_removal_cookie(name: &'static str, cookie_config: &CookieConfig) -> Cookie<'static> {
+    let mut builder = Cookie::build((name, ""))
+        .expires(OffsetDateTime::UNIX_EPOCH)
+        .secure(cookie_config.secure)
+        .http_only(cookie_config.http_only)
+        .same_site(cookie_config.same_site)
+        .path("/");
+    if let Some(domain) = cookie_config.domain.clone() {
+        builder = builder.domain(domain);
+    }
+    builder.build()
 }
 
 #[derive(Debug, Clone)]
