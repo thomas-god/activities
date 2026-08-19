@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import type { Snippet } from 'svelte';
+	import { getAuthInfo, logout, type AuthInfo } from '$lib/api/auth';
 
 	let { cta }: { cta?: Snippet } = $props();
+
+	let authInfo: AuthInfo | undefined = $state(undefined);
+	getAuthInfo().then((info) => (authInfo = info));
 
 	const classExactPath = (targetPath: string): string => {
 		return page.url.pathname === targetPath ? 'active' : '';
@@ -11,6 +16,11 @@
 
 	const classPathStartWith = (targetPath: string): string => {
 		return page.url.pathname.startsWith(targetPath) ? 'active' : '';
+	};
+
+	const handleLogout = async () => {
+		await logout();
+		goto(resolve('/login'));
 	};
 </script>
 
@@ -34,7 +44,12 @@
 		>
 	</div>
 
-	{@render cta?.()}
+	<div class="flex items-center gap-3">
+		{@render cta?.()}
+		{#if authInfo && authInfo !== 'NoAuth'}
+			<button class="btn btn-ghost btn-sm" onclick={handleLogout}>Log out</button>
+		{/if}
+	</div>
 </div>
 
 <style>
