@@ -46,7 +46,7 @@ pub async fn cookie_auth_middleware(
         return StatusCode::UNAUTHORIZED.into_response();
     };
 
-    if verify_cookie(cookie, &state.password).is_none() {
+    if verify_cookie(cookie, &state.password, &Utc::now()).is_none() {
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
@@ -58,19 +58,32 @@ pub async fn cookie_auth_middleware(
 
 type HmacSha256 = Hmac<Sha256>;
 
+/// Signs a token binding the default [UserId] to `expiry`, so that expiry is a fact verified
+/// server-side on every request rather than a hint the client's cookie jar is trusted to enforce.
+fn sign_token(pwd: &SinglePassword, expiry: &DateTime<Utc>) -> Result<String, String> {
+    let mut mac = HmacSha256::new_from_slice(pwd.as_bytes())
+        .map_err(|_| "Error while build the HMAC instance")?;
+    mac.update(UserId::default().as_bytes());
+    mac.update(&expiry.timestamp().to_be_bytes());
+    let signature = mac.finalize().into_bytes();
+
+    Ok(format!(
+        "{}.{}",
+        expiry.timestamp(),
+        const_hex::encode(signature)
+    ))
+}
+
 fn build_cookie<'a>(
     pwd: &'a SinglePassword,
     expiry: &DateTime<Utc>,
     cookie_config: &CookieConfig,
 ) -> Result<Cookie<'a>, String> {
-    let mut mac = HmacSha256::new_from_slice(pwd.as_bytes())
-        .map_err(|_| "Error while build the HMAC instance")?;
-    mac.update(UserId::default().as_bytes());
-    let results = mac.finalize().into_bytes();
+    let token = sign_token(pwd, expiry)?;
 
     let expire_at = OffsetDateTime::from_unix_timestamp(expiry.timestamp())
         .map_err(|_| format!("Cannot build datetime offset form expiry {expiry:?}"))?;
-    let mut builder = Cookie::build(("token", const_hex::encode(results)))
+    let mut builder = Cookie::build(("token", token))
         .expires(expire_at)
         .http_only(cookie_config.http_only)
         .same_site(cookie_config.same_site)
@@ -82,10 +95,17 @@ fn build_cookie<'a>(
     Ok(cookie)
 }
 
-fn verify_cookie(cookie: &Cookie<'_>, pwd: &SinglePassword) -> Option<()> {
-    let bytes = const_hex::decode(cookie.value()).ok()?;
+fn verify_cookie(cookie: &Cookie<'_>, pwd: &SinglePassword, now: &DateTime<Utc>) -> Option<()> {
+    let (expiry_str, signature_hex) = cookie.value().split_once('.')?;
+    let expiry_ts: i64 = expiry_str.parse().ok()?;
+    if now.timestamp() >= expiry_ts {
+        return None;
+    }
+
+    let bytes = const_hex::decode(signature_hex).ok()?;
     let mut verifier = HmacSha256::new_from_slice(pwd.as_bytes()).ok()?;
     verifier.update(UserId::default().as_bytes());
+    verifier.update(&expiry_ts.to_be_bytes());
     verifier.verify_slice(&bytes).ok()
 }
 
@@ -319,6 +339,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_cookie_auth_middleware_rejects_expired_cookie() {
+        let password = SinglePassword::from("secret");
+        let app = TestApp::new(&password).await;
+
+        // The token is otherwise valid (correct signature for that expiry), but the expiry
+        // itself is in the past: the server must reject it regardless of what the client's
+        // cookie jar would have done.
+        let expired_at = Utc::now() - TimeDelta::minutes(1);
+        let token = sign_token(&password, &expired_at).unwrap();
+
+        let response = app
+            .get("/")
+            .header(COOKIE, Cookie::new("token", token).value())
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_verify_cookie_rejects_wrong_password() {
+        let expiry = Utc::now() + TimeDelta::days(1);
+        let token = sign_token(&SinglePassword::from("secret"), &expiry).unwrap();
+        let cookie = Cookie::new("token", token);
+
+        assert!(verify_cookie(&cookie, &SinglePassword::from("not-secret"), &Utc::now()).is_none());
+    }
+
+    #[test]
+    fn test_verify_cookie_rejects_tampered_expiry() {
+        let password = SinglePassword::from("secret");
+        let expiry = Utc::now() + TimeDelta::days(1);
+        let token = sign_token(&password, &expiry).unwrap();
+
+        // Swap in a further-out expiry while keeping the original signature.
+        let (_, signature) = token.split_once('.').unwrap();
+        let tampered_expiry = expiry + TimeDelta::days(365);
+        let tampered = format!("{}.{}", tampered_expiry.timestamp(), signature);
+        let cookie = Cookie::new("token", tampered);
+
+        assert!(verify_cookie(&cookie, &password, &Utc::now()).is_none());
+    }
+
+    #[tokio::test]
     async fn test_logout_clears_cookie() {
         let password = SinglePassword::from("secret");
         let app = TestApp::new(&password).await;
@@ -338,5 +403,15 @@ mod tests {
             .unwrap();
         assert!(set_cookie.contains("token="));
         assert!(set_cookie.contains("1970"));
+    }
+
+    #[test]
+    fn test_verify_cookie_accepts_valid_unexpired_token() {
+        let password = SinglePassword::from("secret");
+        let expiry = Utc::now() + TimeDelta::days(1);
+        let token = sign_token(&password, &expiry).unwrap();
+        let cookie = Cookie::new("token", token);
+
+        assert!(verify_cookie(&cookie, &password, &Utc::now()).is_some());
     }
 }

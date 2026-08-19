@@ -28,52 +28,6 @@ The application authentication flow can be configured in 3 different ways:
 
 Beside the authentication process, all versions offer the same set of features.
 
-### HTTPS is required once you enable a password or email login
-
-The bundled image only serves plain HTTP and does not terminate TLS by itself. The
-_single user, main password_ and _multi user_ modes protect the session with a
-cookie that only travels over HTTPS, so if you enable either of them you must
-put a TLS-terminating reverse proxy (e.g. [Caddy](https://caddyserver.com/) or
-[Traefik](https://traefik.io/)) in front of the container. Without one, the
-browser will silently refuse to keep the session cookie and login will appear
-to fail with no useful error. _The `single user, no password` mode never sets a
-cookie, so it works fine over plain HTTP, as in the quick-start example below._
-
-A minimal `docker-compose.yaml` with Caddy handling TLS looks like:
-
-```yaml
-services:
-  activities:
-    image: ghcr.io/thomas-god/activities:latest
-    environment:
-      ACTIVITIES_DATA_PATH: /app/data
-      ACTIVITIES_SINGLE_USER_PASSWORD: my-secret
-    volumes:
-      - activities_data:/app/data
-
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-    depends_on:
-      - activities
-
-volumes:
-  activities_data:
-  caddy_data:
-```
-
-```
-# Caddyfile
-your.domain {
-    reverse_proxy activities:80
-}
-```
-
 ### Quick start: try it locally
 
 You can quickly test the application locally with a single Docker command:
@@ -115,6 +69,52 @@ volumes:
 The application will store all its data at the location pointed by
 `ACTIVITIES_DATA_PATH`, so use a docker volume to persist your data between
 restarts and to facilitate the backup process.
+
+### HTTPS is required once you enable email login
+
+The bundled image only serves plain HTTP and does not terminate TLS by itself.
+The _multi user_ mode protects the session with a cookie that only travels over
+HTTPS, so if you enable it you must put a TLS-terminating reverse proxy (e.g.
+[Caddy](https://caddyserver.com/) or [Traefik](https://traefik.io/)) in front of
+the container. Without one, the browser will silently refuse to keep the session
+cookie and login will appear to fail with no useful error. _The
+`single user, no password` and `single user, main password` modes don't set a
+secure cookie, so they work fine over plain HTTP._
+
+A minimal `docker-compose.yaml` with Caddy handling TLS looks like:
+
+```yaml
+services:
+  activities:
+    image: ghcr.io/thomas-god/activities:latest
+    environment:
+      ACTIVITIES_DATA_PATH: /app/data
+      ACTIVITIES_SINGLE_USER_PASSWORD: my-secret
+    volumes:
+      - activities_data:/app/data
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on:
+      - activities
+
+volumes:
+  activities_data:
+  caddy_data:
+```
+
+```
+# Caddyfile
+your.domain {
+    reverse_proxy activities:80
+}
+```
 
 ### Configuration
 
