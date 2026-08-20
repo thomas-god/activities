@@ -84,7 +84,7 @@ cookie and login will appear to fail with no useful error. _The
 `single user, no password` and `single user, main password` modes don't set a
 secure cookie, so they work fine over plain HTTP._
 
-A minimal `docker-compose.yaml` with Caddy handling TLS looks like:
+A minimal `docker-compose.yaml` with Traefik handling TLS looks like:
 
 ```yaml
 services:
@@ -95,28 +95,34 @@ services:
       ACTIVITIES_SINGLE_USER_PASSWORD: my-secret
     volumes:
       - activities_data:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.activities.rule=Host(`your.domain`)"
+      - "traefik.http.routers.activities.entrypoints=websecure"
+      - "traefik.http.routers.activities.tls.certresolver=letsencrypt"
+      - "traefik.http.services.activities.loadbalancer.server.port=80"
 
-  caddy:
-    image: caddy:2
+  traefik:
+    image: traefik:v3.2
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=you@your.domain"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-    depends_on:
-      - activities
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
 
 volumes:
   activities_data:
-  caddy_data:
-```
-
-```
-# Caddyfile
-your.domain {
-    reverse_proxy activities:80
-}
+  traefik_letsencrypt:
 ```
 
 ### Configuration
