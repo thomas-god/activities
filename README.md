@@ -16,15 +16,18 @@ images are available for both `amd64` and `arm64`.
 The application authentication flow can be configured in 3 different ways:
 
 - _multi user_: allows multiple users to use your instance using an email-based,
-  password-less, authentication process. You will need a valid SMTP server for
-  sending emails to users containing their authentication link.
+  password-less, authentication process. You will need a valid **SMTP server**
+  for sending emails to users containing their authentication link and **HTTPS**
+  for secure cookies.
 - _single user, main password_: allows a single user to use the instance using a
   password set through an environment variable in your deployment. Does not
-  require having an SMTP server.
+  require having an SMTP server nor having HTTPS (HTTP only might be fine for
+  local deployment but HTTPS is still recommended as password and cookie will
+  travel in clear otherwise).
 - _single user, no password_: allows a single user to use the instance without
   any form of authentication. Be careful where you plan to host it, as your
   activities will be accessible to anyone that can reach your instance. Does not
-  require having an SMTP server.
+  require having an SMTP server nor having HTTPS.
 
 Beside the authentication process, all versions offer the same set of features.
 
