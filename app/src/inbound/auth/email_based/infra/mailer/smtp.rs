@@ -84,7 +84,10 @@ impl MailProvider for SMTPEmailProvider {
         email: &EmailAddress,
         auth_link: &AuthLink,
     ) -> Result<(), ()> {
-        let link = format!("{}/login/{}", self.domain, auth_link.token());
+        // The token is a URL fragment rather than a path segment: fragments are never sent to
+        // the server, so the token doesn't end up in the reverse proxy's access logs when the
+        // user opens this link from their mail client.
+        let link = format!("{}/login#{}", self.domain, auth_link.token());
 
         let text_body = format!(
             "Hello!\n\nClick this link to sign in to your account:\n{}\n\nThis link expires in 15 minutes.\n\nIf you didn't request this, you can ignore this email.",

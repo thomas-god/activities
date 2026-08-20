@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Navbar from '$ui/navigation/Navbar.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { isNone, none, some, type Option } from '$lib/Options';
+	import { isNone, isSome, none, some, type Option } from '$lib/Options';
 	import z from 'zod';
 	import { resolve } from '$app/paths';
 
@@ -13,6 +13,29 @@
 
 	let emailPromise: Promise<Response> | undefined = $state(undefined);
 	let passwordPromise: Option<Promise<Response>> = $state(none());
+
+	// The auth-link token is a URL fragment /login#token
+	const authLinkToken: Option<string> =
+		window.location.hash.length > 1 ? some(window.location.hash.slice(1)) : none();
+
+	const authLinkPromise: Option<Promise<Response>> = isSome(authLinkToken)
+		? some(
+				fetch(`${PUBLIC_APP_URL}/api/login/validate`, {
+					method: 'POST',
+					credentials: 'include',
+					mode: 'cors',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ token: authLinkToken.value })
+				}).then((res) => {
+					if (res.status === 200) {
+						goto(resolve('/'));
+					}
+					return res;
+				})
+			)
+		: none();
 
 	let authInfo = (await (
 		await fetch(`${PUBLIC_APP_URL}/api/auth_info`, {
@@ -80,7 +103,19 @@
 
 <Navbar />
 
-{#if authInfo === 'EmailBased'}
+{#if isSome(authLinkPromise)}
+	{#await authLinkPromise.value}
+		<div class="mx-auto mt-12 flex w-full justify-center">
+			<span class="loading loading-xl loading-spinner"></span>
+		</div>
+	{:then res}
+		{#if res.status !== 200}
+			<div class="card mx-2 mt-6 rounded-box bg-base-100 p-4 sm:mx-auto sm:w-sm">
+				<p class="text-error">This login link is invalid or has expired.</p>
+			</div>
+		{/if}
+	{/await}
+{:else if authInfo === 'EmailBased'}
 	{#if emailPromise === undefined}
 		<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
 			<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
