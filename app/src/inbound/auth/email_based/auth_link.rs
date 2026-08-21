@@ -42,16 +42,25 @@ where
             return GenerateAuthLinkResult::Retry;
         };
 
-        let Ok(()) = self
-            .mail_provider
-            .send_auth_link_email(req.email(), &auth_link)
-            .await
-        else {
-            let _ = repository
-                .delete_auth_link_by_hash(hashed_auth_link.hash())
-                .await;
-            return GenerateAuthLinkResult::Retry;
-        };
+        // The email is sent in the background rather than awaited here, so that this endpoint's
+        // response time doesn't depend on SMTP round-trip time to avoid information leak by timing
+        // attack.
+        let auth_link_repository = self.auth_link_repository.clone();
+        let mail_provider = self.mail_provider.clone();
+        let email = req.email().clone();
+        tokio::spawn(async move {
+            if mail_provider
+                .send_auth_link_email(&email, &auth_link)
+                .await
+                .is_err()
+            {
+                tracing::error!(%email, "Failed to send authentication link email");
+                let repository = auth_link_repository.lock().await;
+                let _ = repository
+                    .delete_auth_link_by_hash(hashed_auth_link.hash())
+                    .await;
+            }
+        });
 
         GenerateAuthLinkResult::Success
     }
@@ -194,7 +203,7 @@ mod test_auth_link_service_generate_auth_link {
     }
 
     #[tokio::test]
-    async fn test_return_failure_and_delete_auth_link_if_sending_auth_link_err() {
+    async fn test_returns_success_and_deletes_auth_link_if_sending_email_fails_in_background() {
         let mut repository = MockSessionRepository::new();
         repository.expect_store_auth_link().returning(|_| Ok(()));
         repository
@@ -204,6 +213,7 @@ mod test_auth_link_service_generate_auth_link {
         let mut email_provider = MockMailProvider::new();
         email_provider
             .expect_send_auth_link_email()
+            .times(1)
             .returning(|_, _| Err(()));
         let service =
             AuthLinkService::new(Arc::new(Mutex::new(repository)), Arc::new(email_provider));
@@ -215,13 +225,20 @@ mod test_auth_link_service_generate_auth_link {
 
         let res = service.generate_auth_link(req).await;
 
-        let GenerateAuthLinkResult::Retry = res else {
-            unreachable!("Should have return a GenerateAuthLinkResult::Retry")
+        // The email is sent in the background, so its outcome can no longer be
+        // reflected in the result: the caller always sees Success once the link is
+        // persisted, regardless of delivery.
+        let GenerateAuthLinkResult::Success = res else {
+            unreachable!("Should have returned a GenerateAuthLinkResult::Success")
         };
+
+        // Give the spawned background task a chance to run before the mocks (and
+        // their `.times(1)` expectations) are checked on drop at the end of the test.
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
 
     #[tokio::test]
-    async fn test_ok_store_link_and_send_email() {
+    async fn test_ok_store_link_and_send_email_in_background() {
         let mut repository = MockSessionRepository::new();
         repository
             .expect_store_auth_link()
@@ -252,6 +269,10 @@ mod test_auth_link_service_generate_auth_link {
         let GenerateAuthLinkResult::Success = res else {
             unreachable!("Should have return a GenerateAuthLinkResult::Success")
         };
+
+        // Give the spawned background task a chance to run before the mocks (and
+        // their `.times(1)` expectations) are checked on drop at the end of the test.
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
 }
 

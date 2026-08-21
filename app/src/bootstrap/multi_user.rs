@@ -85,7 +85,7 @@ pub async fn bootstrap_multi_user(
     Ok(http_server)
 }
 
-fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
+async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
     let mailer = SMTPEmailProvider::new(
         &config.mailer_from,
         &config.mailer_username,
@@ -93,6 +93,12 @@ fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
         &config.mailer_relay,
         &config.mailer_domain,
     )?;
+
+    if let Err(err) = mailer.test_connection().await {
+        tracing::error!(
+            "Failed to connect to the configured SMTP relay: {err}. Application will start but won't be able to authenticate new users"
+        );
+    }
 
     Ok(mailer)
 }
@@ -172,7 +178,7 @@ async fn build_user_service(
     let auth_link_repository = Arc::new(Mutex::new(
         SqliteAuthLinkRepository::new(&format!("sqlite:{}", auth_db.to_string_lossy())).await?,
     ));
-    let mail_provider = Arc::new(build_mailer(mode_config)?);
+    let mail_provider = Arc::new(build_mailer(mode_config).await?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
         auth_link_repository,
         mail_provider,

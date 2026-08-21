@@ -348,7 +348,9 @@ pub enum GenerateAuthLinkResult {
     /// existing to not leak that information.
     Success,
     /// [GenerateAuthLinkResult::Retry] only covers infrastructure related issues for which the
-    /// user can actually retry (e.g. we fail to send the email containing the auth link).
+    /// user can actually retry (e.g. we fail to hash the auth token, or to persist it). Failure
+    /// to send the email itself is not covered here: that happens in the background after this
+    /// result is returned, so it can't be reported to the caller. It's logged instead.
     Retry,
 }
 

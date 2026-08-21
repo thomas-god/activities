@@ -63,7 +63,12 @@ where
             .await
         {
             Ok(Some(user)) => user,
-            Ok(None) => return UserLoginResult::Success,
+            Ok(None) => {
+                // Perform the same Argon2 hash the found-user path pays for in order to prevent
+                // information leak via timing attack.
+                let _ = AuthToken::new().as_hash();
+                return UserLoginResult::Success;
+            }
             Err(()) => return UserLoginResult::Retry,
         };
 

@@ -63,6 +63,11 @@ impl SMTPEmailProvider {
         })
     }
 
+    pub async fn test_connection(&self) -> Result<(), lettre::transport::smtp::Error> {
+        self.mailer.test_connection().await?;
+        Ok(())
+    }
+
     fn render_auth_link_template(
         &self,
         auth_link_url: &str,
