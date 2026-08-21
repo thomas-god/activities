@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use derive_more::{Constructor, From};
+use subtle::ConstantTimeEq;
 
 use crate::{
     config::{AppMode, SingleUserConfig},
@@ -12,7 +13,7 @@ pub mod infra;
 pub mod no_auth;
 pub mod single_password;
 
-#[derive(Clone, Constructor, From, PartialEq)]
+#[derive(Clone, Constructor, From)]
 #[from(String, &str)]
 pub struct SinglePassword(String);
 
@@ -25,6 +26,15 @@ impl SinglePassword {
         self.0.as_bytes()
     }
 }
+
+/// Constant-time comparison to avoid leaking information through response timing attacks.
+impl PartialEq for SinglePassword {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    }
+}
+
+impl Eq for SinglePassword {}
 
 /// Manual impl of Debug to avoid leaking the inner value.
 impl Debug for SinglePassword {
@@ -82,5 +92,43 @@ mod test_auth {
         assert_eq!(format!("{password:?}"), "SinglePassword");
         let strategy = AuthStrategy::SinglePassword(SinglePassword::from("secret"));
         assert_eq!(format!("{strategy:?}"), "SinglePassword")
+    }
+
+    #[test]
+    fn test_single_password_eq_identical_values() {
+        assert_eq!(
+            SinglePassword::from("secret"),
+            SinglePassword::from("secret")
+        );
+    }
+
+    #[test]
+    fn test_single_password_eq_both_empty() {
+        assert_eq!(SinglePassword::from(""), SinglePassword::from(""));
+    }
+
+    #[test]
+    fn test_single_password_not_eq_different_values_same_length() {
+        assert_ne!(
+            SinglePassword::from("secret1"),
+            SinglePassword::from("secreu1")
+        );
+    }
+
+    #[test]
+    fn test_single_password_not_eq_different_length() {
+        assert_ne!(
+            SinglePassword::from("secret"),
+            SinglePassword::from("secret-but-longer")
+        );
+        assert_ne!(SinglePassword::from("secret"), SinglePassword::from(""));
+    }
+
+    #[test]
+    fn test_single_password_not_eq_prefix_of_other() {
+        assert_ne!(
+            SinglePassword::from("secret"),
+            SinglePassword::from("secretsecret")
+        );
     }
 }
