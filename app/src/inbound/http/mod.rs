@@ -8,7 +8,7 @@ use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderValue, Method, StatusCode};
 
 use axum::routing::{delete, get, patch};
-use axum::{Json, Router, routing::post, response::IntoResponse};
+use axum::{Json, Router, response::IntoResponse, routing::post};
 use cookie::{Cookie, SameSite, time::OffsetDateTime};
 use serde_json::json;
 use tokio::net;
@@ -47,6 +47,7 @@ pub use crate::inbound::auth::email_based::{
             user::SqliteUserRepository,
         },
     },
+    spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
 };
 
 mod handlers;
@@ -154,8 +155,8 @@ impl<
         // `add_auth_router` only wraps the routes that already exist when it
         // is called, so mounting afterwards keeps the healthcheck outside the
         // auth middleware.
-        let mut router = add_auth_router(auth_strategy, router, user_service)
-            .route("/health", get(health));
+        let mut router =
+            add_auth_router(auth_strategy, router, user_service).route("/health", get(health));
 
         router = router.layer(trace_layer).layer(
             CorsLayer::new()

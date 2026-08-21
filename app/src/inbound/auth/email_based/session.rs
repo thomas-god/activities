@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 use tokio::sync::Mutex;
 
@@ -111,6 +111,33 @@ pub trait SessionRepository: Clone + Send + Sync + 'static {
         &self,
         hash: &HashedSessionToken,
     ) -> impl Future<Output = Result<(), ()>> + Send;
+
+    fn delete_expired_sessions(
+        &self,
+        reference: DateTime<Utc>,
+    ) -> impl Future<Output = Result<(), ()>> + Send;
+}
+
+pub fn spawn_expired_sessions_cleanup<SR: SessionRepository>(
+    repository: Arc<Mutex<SR>>,
+    interval: std::time::Duration,
+) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            if repository
+                .lock()
+                .await
+                .delete_expired_sessions(Utc::now())
+                .await
+                .is_err()
+            {
+                tracing::warn!("Failed to clean up expired sessions");
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -130,6 +157,7 @@ mod test_utils {
             async fn store_session(&self, session: &HashedSession) -> Result<(), ()>;
             async fn get_all_sessions(&self) -> Vec<HashedSession>;
             async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()>;
+            async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()>;
         }
     }
 }

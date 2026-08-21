@@ -12,6 +12,7 @@ use crate::{
         http::{
             AuthLinkService, HttpServer, SMTPEmailProvider, SessionService,
             SqliteAuthLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
+            spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -23,6 +24,9 @@ use crate::{
         },
     },
 };
+
+const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(3600 * 24);
 
 pub async fn bootstrap_multi_user(
     mode_config: MultiUserConfig,
@@ -178,6 +182,10 @@ async fn build_user_service(
     let auth_link_repository = Arc::new(Mutex::new(
         SqliteAuthLinkRepository::new(&format!("sqlite:{}", auth_db.to_string_lossy())).await?,
     ));
+    spawn_expired_auth_links_cleanup(
+        auth_link_repository.clone(),
+        EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
+    );
     let mail_provider = Arc::new(build_mailer(mode_config).await?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
         auth_link_repository,
@@ -193,6 +201,10 @@ async fn build_user_service(
     let session_repository = Arc::new(Mutex::new(
         SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?,
     ));
+    spawn_expired_sessions_cleanup(
+        session_repository.clone(),
+        EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
+    );
     let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
     let user_service = UserService::new(auth_link_service, user_repository, session_service);
 

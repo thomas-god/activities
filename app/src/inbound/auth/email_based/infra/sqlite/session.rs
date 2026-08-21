@@ -76,6 +76,15 @@ impl SessionRepository for SqliteSessionRepository {
             .map(|_| ())
             .map_err(|_| ())
     }
+
+    async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()> {
+        sqlx::query("DELETE FROM t_sessions WHERE expire_at <= ?1;")
+            .bind(reference)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|_| ())
+    }
 }
 
 #[cfg(test)]
@@ -319,6 +328,40 @@ mod test_sqlite_session_repository {
             .await
             .unwrap();
         assert_eq!(n_rows, 0);
+    }
+
+    #[tokio::test]
+    async fn test_delete_expired_sessions_only_deletes_expired_ones() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteSessionRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let expired = Session::new(
+            UserId::test_default(),
+            SessionToken::from("expired_token".to_string()),
+            Utc::now() - TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        let still_valid = Session::new(
+            UserId::test_default(),
+            SessionToken::from("valid_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash()
+        .unwrap();
+        repository.store_session(&expired).await.unwrap();
+        repository.store_session(&still_valid).await.unwrap();
+
+        repository
+            .delete_expired_sessions(Utc::now())
+            .await
+            .unwrap();
+
+        let res = repository.get_all_sessions().await;
+        assert_eq!(res.len(), 1);
+        assert_eq!(res.first().unwrap().hash(), still_valid.hash());
     }
 
     #[tokio::test]

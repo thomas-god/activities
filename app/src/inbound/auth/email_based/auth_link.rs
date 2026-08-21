@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chrono::{TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use derive_more::Constructor;
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -111,6 +111,32 @@ pub trait AuthLinkRepository: Clone + Send + Sync + 'static {
         &self,
         hash: &HashedAuthToken,
     ) -> impl Future<Output = Result<(), AuthLinkRepositoryError>> + Send;
+
+    fn delete_expired_auth_links(
+        &self,
+        reference: DateTime<Utc>,
+    ) -> impl Future<Output = Result<(), AuthLinkRepositoryError>> + Send;
+}
+
+pub fn spawn_expired_auth_links_cleanup<SR: AuthLinkRepository>(
+    repository: Arc<Mutex<SR>>,
+    interval: std::time::Duration,
+) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            ticker.tick().await;
+            if let Err(err) = repository
+                .lock()
+                .await
+                .delete_expired_auth_links(Utc::now())
+                .await
+            {
+                tracing::warn!("Failed to clean up expired auth links: {err}");
+            }
+        }
+    });
 }
 
 pub trait MailProvider: Clone + Send + Sync + 'static {
@@ -145,6 +171,11 @@ mod test_utils {
             async fn delete_auth_link_by_hash(
                 &self,
                 hash: &HashedAuthToken,
+            ) -> Result<(), AuthLinkRepositoryError>;
+
+            async fn delete_expired_auth_links(
+                &self,
+                reference: DateTime<Utc>,
             ) -> Result<(), AuthLinkRepositoryError>;
         }
     }

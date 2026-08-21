@@ -14,8 +14,8 @@ pub mod infra;
 pub mod session;
 pub mod user;
 
-pub use auth_link::AuthLinkService;
-pub use session::SessionService;
+pub use auth_link::{AuthLinkService, spawn_expired_auth_links_cleanup};
+pub use session::{SessionService, spawn_expired_sessions_cleanup};
 pub use user::{DisabledUserService, UserService};
 
 use crate::domain::models::UserId;
