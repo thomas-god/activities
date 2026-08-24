@@ -24,6 +24,7 @@ pub struct SetTrainingMetricsOrderingBody {
     metric_ids: Vec<String>,
 }
 
+#[tracing::instrument(skip_all, err(Debug))]
 pub async fn set_training_metrics_ordering<
     AS: IActivityService,
     PF: ParseFile,

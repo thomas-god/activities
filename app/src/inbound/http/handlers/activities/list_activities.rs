@@ -40,6 +40,7 @@ impl From<Filters> for ListActivitiesFilters {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn list_activities<
     AS: IActivityService,
     PF: ParseFile,

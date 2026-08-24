@@ -18,6 +18,7 @@ use crate::{
 
 use super::activity_schema::PublicActivityWithTimeseries;
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_activity<
     AS: IActivityService,
     PF: ParseFile,

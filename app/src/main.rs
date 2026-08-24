@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use app::config::{AppMode, StdEnvironment};
+use app::config::{AppMode, StdEnvironment, TelemetryConfig};
 
 async fn run() -> anyhow::Result<()> {
     let mode = AppMode::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
@@ -21,5 +21,9 @@ async fn run() -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    run().await
+    let telemetry_config = TelemetryConfig::from_env(&StdEnvironment {});
+    let telemetry = app::telemetry::init(&telemetry_config)?;
+    let result = run().await;
+    telemetry.shutdown();
+    result
 }

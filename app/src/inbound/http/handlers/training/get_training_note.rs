@@ -17,6 +17,7 @@ use crate::{
 
 use super::get_training_notes::TrainingNoteResponse;
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_note<
     AS: IActivityService,
     PF: ParseFile,

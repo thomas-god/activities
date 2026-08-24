@@ -9,6 +9,7 @@ use crate::inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile}
 
 use super::types::PreferencePayload;
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_all_preferences<
     AS: IActivityService,
     PF: ParseFile,

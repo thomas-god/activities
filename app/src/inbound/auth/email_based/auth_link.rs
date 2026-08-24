@@ -25,6 +25,7 @@ where
     SR: AuthLinkRepository,
     MP: MailProvider,
 {
+    #[tracing::instrument(skip_all)]
     async fn generate_auth_link(&self, req: GenerateAuthLinkRequest) -> GenerateAuthLinkResult {
         let auth_token = AuthToken::new();
         let auth_link = AuthLink::new(
@@ -65,6 +66,7 @@ where
         GenerateAuthLinkResult::Success
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn validate_auth_token(
         &self,
         token: &AuthToken,

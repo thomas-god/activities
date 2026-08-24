@@ -54,6 +54,7 @@ impl From<TrainingPeriod> for ResponseBodyItem {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_active_training_periods<
     AS: IActivityService,
     PF: ParseFile,

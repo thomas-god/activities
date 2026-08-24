@@ -32,6 +32,7 @@ pub struct UpdateTrainingPeriodBody {
     end: Option<NaiveDate>,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn update_training_period<
     AS: IActivityService,
     PF: ParseFile,

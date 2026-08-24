@@ -10,6 +10,7 @@ pub struct RegisterUserBody {
     email: String,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn register_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<RegisterUserBody>,

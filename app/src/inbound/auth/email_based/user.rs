@@ -25,6 +25,7 @@ where
     UR: UserRepository,
     SS: ISessionService,
 {
+    #[tracing::instrument(skip_all)]
     async fn register_user(&self, email: EmailAddress) -> UserRegistrationResult {
         let repo = self.user_repository.lock().await;
         let user = match repo.get_user_by_email(&email).await {
@@ -54,6 +55,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn login_user(&self, email: EmailAddress) -> UserLoginResult {
         let user = match self
             .user_repository
@@ -85,6 +87,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn validate_auth_link(&self, token: AuthToken) -> Result<AuthLinkValidationResult, ()> {
         let user = match self
             .auth_link_service
@@ -106,6 +109,7 @@ where
             .map(AuthLinkValidationResult::Success)
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
         self.session_service
             .lock()
@@ -114,6 +118,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
         self.session_service.lock().await.logout(token).await
     }

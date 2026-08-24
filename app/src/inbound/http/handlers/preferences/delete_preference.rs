@@ -15,6 +15,7 @@ use crate::{
     inbound::auth::AuthenticatedUser,
 };
 
+#[tracing::instrument(skip_all, err)]
 pub async fn delete_preference<
     AS: IActivityService,
     PF: ParseFile,

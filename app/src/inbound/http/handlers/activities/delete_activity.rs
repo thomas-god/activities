@@ -24,6 +24,7 @@ impl From<DeleteActivityError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn delete_activity<
     AS: IActivityService,
     PF: ParseFile,

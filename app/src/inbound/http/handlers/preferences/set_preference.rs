@@ -13,6 +13,7 @@ use crate::{
 
 use super::types::PreferencePayload;
 
+#[tracing::instrument(skip_all, err)]
 pub async fn set_preference<
     AS: IActivityService,
     PF: ParseFile,

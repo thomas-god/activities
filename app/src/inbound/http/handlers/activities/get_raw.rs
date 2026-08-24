@@ -23,6 +23,7 @@ use crate::{
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
 };
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_all_raw_activities<
     AS: IActivityService,
     PF: ParseFile,
@@ -94,6 +95,7 @@ fn zip_activities(activities: Vec<RawActivity>) -> Result<Vec<u8>, ZipError> {
     Ok(zip.finish()?.into_inner())
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_raw_activity<
     AS: IActivityService,
     PF: ParseFile,

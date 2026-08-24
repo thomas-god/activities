@@ -44,6 +44,7 @@ impl From<CreateTrainingNoteError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn create_training_note<
     AS: IActivityService,
     PF: ParseFile,

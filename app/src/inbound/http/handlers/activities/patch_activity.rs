@@ -119,6 +119,7 @@ pub struct PatchActivityBody {
 ///
 /// To clear feedback:
 /// Body: {"feedback": ""} or {"feedback": null}
+#[tracing::instrument(skip_all, err)]
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,

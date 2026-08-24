@@ -186,6 +186,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     templates
 });
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_metric_templates() -> Result<impl IntoResponse, StatusCode> {
     let body = ResponseBody(
         TRAINING_METRIC_TEMPLATES

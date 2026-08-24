@@ -42,18 +42,6 @@ pub async fn bootstrap_single_user(
     >,
 > {
     tracing::info!("Starting single-user app");
-    // start tracing
-    let subscriber = tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(tracing::Level::INFO)
-        .with_file(true)
-        .with_line_number(true)
-        .with_thread_ids(true)
-        .with_target(false)
-        .finish();
-    if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
-        tracing::error!("Error while setting up tracing subscriber: {err:?}");
-    };
 
     let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     let root_path = PathBuf::from(config.activities_data_path.clone());

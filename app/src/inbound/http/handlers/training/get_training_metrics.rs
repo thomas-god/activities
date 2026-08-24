@@ -158,6 +158,7 @@ fn to_response_body_item(
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_metrics<
     AS: IActivityService,
     PF: ParseFile,
@@ -199,6 +200,7 @@ pub async fn get_training_metrics<
 ///
 /// Returns all computed metrics that fall within the date range of the specified training period.
 /// For open-ended periods (no end date), includes today's activities.
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_period_metrics<
     AS: IActivityService,
     PF: ParseFile,

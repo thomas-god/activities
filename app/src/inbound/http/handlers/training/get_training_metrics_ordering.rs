@@ -35,6 +35,7 @@ pub struct GetTrainingMetricsOrderingResponse {
 /// # Example
 /// GET /api/training/metrics/ordering?type=global
 /// GET /api/training/metrics/ordering?type=trainingPeriod&trainingPeriodId=5e410a51-9274-4a1d-bdaa-db69a1c4874b
+#[tracing::instrument(skip_all, err(Debug))]
 pub async fn get_training_metrics_ordering<
     AS: IActivityService,
     PF: ParseFile,

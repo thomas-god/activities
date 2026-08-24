@@ -54,6 +54,7 @@ impl From<CreateActivityError> for RejectionReason {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn upload_activities<
     AS: IActivityService,
     PF: ParseFile,

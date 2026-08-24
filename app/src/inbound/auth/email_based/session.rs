@@ -24,6 +24,7 @@ impl<SR> ISessionService for SessionService<SR>
 where
     SR: SessionRepository,
 {
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn generate_session_token(
         &self,
         user: &UserId,
@@ -47,6 +48,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
         let repository = self.session_repository.lock().await;
 
@@ -89,6 +91,7 @@ where
         })
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
         let repository = self.session_repository.lock().await;
 

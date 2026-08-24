@@ -55,6 +55,7 @@ impl From<CreateTrainingPeriodError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn create_training_period<
     AS: IActivityService,
     PF: ParseFile,

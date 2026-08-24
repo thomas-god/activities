@@ -38,6 +38,7 @@ pub struct UpdateTrainingMetricBody {
     target: Option<APITrainingMetricTarget>,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn update_training_metric<
     AS: IActivityService,
     PF: ParseFile,

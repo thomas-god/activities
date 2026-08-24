@@ -17,6 +17,7 @@ pub struct CreateStandaloneActivityResponse {
     id: String,
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn create_standalone_activity<
     AS: IActivityService,
     PF: ParseFile,

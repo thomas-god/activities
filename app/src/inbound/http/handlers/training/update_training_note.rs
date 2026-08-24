@@ -30,6 +30,7 @@ impl From<UpdateTrainingNoteError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn update_training_note<
     AS: IActivityService,
     PF: ParseFile,

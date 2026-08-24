@@ -87,6 +87,7 @@ where
     TMR: TrainingRepository,
     AS: IActivityService,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn create_metric(
         &self,
         req: CreateTrainingMetricRequest,
@@ -128,6 +129,7 @@ where
         Ok(id)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_metric(
         &self,
         req: UpdateTrainingMetricRequest,
@@ -147,6 +149,7 @@ where
             .map_err(UpdateTrainingMetricError::SaveMetricError)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn copy_training_metric(
         &self,
         req: CopyTrainingMetricRequest,
@@ -184,6 +187,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_metrics_values(
         &self,
         user: &UserId,
@@ -245,6 +249,7 @@ where
         Ok(res)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_metric_values(
         &self,
         req: GetTrainingMetricValuesRequest,
@@ -274,6 +279,7 @@ where
             .map_err(GetTrainingMetricValuesError::from)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_metric(
         &self,
         req: DeleteTrainingMetricRequest,
@@ -283,6 +289,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_metric_name(
         &self,
         req: UpdateTrainingMetricNameRequest,
@@ -292,6 +299,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn create_training_period(
         &self,
         req: CreateTrainingPeriodRequest,
@@ -309,6 +317,7 @@ where
         Ok(id)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_training_period(
         &self,
         user: &UserId,
@@ -319,6 +328,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_training_periods(
         &self,
         user: &UserId,
@@ -326,6 +336,7 @@ where
         self.training_repository.get_training_periods(user).await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_active_training_periods(
         &self,
         user: &UserId,
@@ -336,6 +347,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_training_period_with_activities_with_metrics(
         &self,
         user: &UserId,
@@ -373,6 +385,7 @@ where
         ))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_training_period(
         &self,
         req: DeleteTrainingPeriodRequest,
@@ -382,6 +395,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_name(
         &self,
         req: UpdateTrainingPeriodNameRequest,
@@ -391,6 +405,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_note(
         &self,
         req: UpdateTrainingPeriodNoteRequest,
@@ -400,6 +415,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_dates(
         &self,
         req: UpdateTrainingPeriodDatesRequest,
@@ -417,6 +433,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn create_training_note(
         &self,
         req: CreateTrainingNoteRequest,
@@ -443,6 +460,7 @@ where
         Ok(note_id)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_note(
         &self,
         user: &UserId,
@@ -463,6 +481,7 @@ where
         Ok(note)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_notes(
         &self,
         user: &UserId,
@@ -473,6 +492,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_note(
         &self,
         user: &UserId,
@@ -501,6 +521,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_training_note(
         &self,
         user: &UserId,
@@ -526,6 +547,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_period_notes(
         &self,
         user: &UserId,
@@ -549,6 +571,7 @@ where
         self.get_training_notes(user, &Some(date_range)).await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_period_metrics_values(
         &self,
         user: &UserId,
@@ -571,6 +594,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_metrics_ordering(
         &self,
         user: &UserId,
@@ -592,6 +616,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn set_training_metrics_ordering(
         &self,
         user: &UserId,

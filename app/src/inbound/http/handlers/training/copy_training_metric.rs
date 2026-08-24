@@ -26,6 +26,7 @@ pub struct CopyTrainingMetricBody {
     new_name: Option<String>,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn copy_training_metric<
     AS: IActivityService,
     PF: ParseFile,

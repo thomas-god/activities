@@ -65,6 +65,7 @@ impl From<GetTrainingNoteError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_notes<
     AS: IActivityService,
     PF: ParseFile,
@@ -98,6 +99,7 @@ pub async fn get_training_notes<
 ///
 /// Returns all notes that fall within the date range of the specified training period.
 /// For open-ended periods (no end date), includes today's activities.
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_period_notes<
     AS: IActivityService,
     PF: ParseFile,

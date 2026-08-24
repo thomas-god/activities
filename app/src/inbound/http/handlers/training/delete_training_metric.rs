@@ -25,6 +25,7 @@ impl From<DeleteTrainingMetricError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn delete_training_metric<
     AS: IActivityService,
     PF: ParseFile,

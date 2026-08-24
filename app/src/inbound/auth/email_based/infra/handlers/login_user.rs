@@ -10,6 +10,7 @@ pub struct LoginUserBody {
     email: String,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn login_user<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<LoginUserBody>,

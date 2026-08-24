@@ -158,6 +158,24 @@ _Note: if any environment variables for the multi-user version is set but others
 are missing the application will fail to start, even if a valid single user
 configuration could be loaded._
 
+#### Observability
+
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` go through the
+application's own config loader like the variables above, so the `*_FILE`
+variant described above works for them too (e.g.
+`OTEL_EXPORTER_OTLP_ENDPOINT_FILE`). They keep the standard OpenTelemetry names
+(rather than an `ACTIVITIES_` prefix) for interoperability with
+collectors/dashboards that expect them. `RUST_LOG` is read directly by the
+`tracing` ecosystem instead, since it's a generic `tracing`/`log` convention
+rather than something specific to this app (the `*_FILE` variant does not apply
+to it).
+
+| Variable name               | Required | Purpose                                                                                                                                                                              | Example                    |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
+| OTEL_EXPORTER_OTLP_ENDPOINT | no       | OTLP/HTTP (protobuf) collector base endpoint — `/v1/traces` is appended automatically. When unset, tracing spans are only logged to stdout and no OpenTelemetry exporter is started. | http://otel-collector:4318 |
+| OTEL_SERVICE_NAME           | no       | `service.name` resource attribute reported on exported spans. Defaults to `activities-app`.                                                                                          | activities-app             |
+| RUST_LOG                    | no       | Log/span level filter ([`EnvFilter` syntax](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html)). Defaults to `info`.                         | app=debug,tower_http=info  |
+
 ## Upload your training history
 
 Most device manufacturers and training platforms allow you to download your

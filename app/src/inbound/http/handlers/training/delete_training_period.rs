@@ -19,6 +19,7 @@ struct ErrorResponse {
     error: String,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn delete_training_period<
     AS: IActivityService,
     PF: ParseFile,

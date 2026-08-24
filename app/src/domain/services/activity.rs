@@ -47,6 +47,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn create_activity(
         &self,
         req: CreateActivityRequest,
@@ -104,6 +105,7 @@ where
         Ok(activity)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities(
         &self,
         user: &UserId,
@@ -114,6 +116,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities_with_parsed_data(
         &self,
         user: &UserId,
@@ -124,6 +127,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities_with_metrics(
         &self,
         user: &UserId,
@@ -168,6 +172,7 @@ where
         Ok(activities)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities_with_metrics_and_parsed_data(
         &self,
         user: &UserId,
@@ -191,6 +196,7 @@ where
         Ok(res)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_parsed_data(
         &self,
         activity_id: &ActivityId,
@@ -206,6 +212,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_metrics_and_parsed_data(
         &self,
         activity_id: &ActivityId,
@@ -234,6 +241,7 @@ where
         Ok((activity, metrics))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
         let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(ModifyActivityError::ActivityDoesNotExist(
@@ -256,6 +264,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_rpe(
         &self,
         req: UpdateActivityRpeRequest,
@@ -281,6 +290,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_workout_type(
         &self,
         req: UpdateActivityWorkoutTypeRequest,
@@ -306,6 +316,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_nutrition(
         &self,
         req: UpdateActivityNutritionRequest,
@@ -331,6 +342,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_feedback(
         &self,
         req: UpdateActivityFeedbackRequest,
@@ -356,6 +368,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
         let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(DeleteActivityError::ActivityDoesNotExist(
@@ -377,6 +390,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_raw_activity(
         &self,
         req: GetRawActivityRequest,
@@ -386,6 +400,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_all_raw_activities(
         &self,
         req: GetAllActivitiesRequest,

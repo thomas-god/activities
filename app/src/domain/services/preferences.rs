@@ -32,6 +32,7 @@ impl<PR> IPreferencesService for PreferencesService<PR>
 where
     PR: PreferencesRepository,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn get_preference(
         &self,
         user: &UserId,
@@ -43,6 +44,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_all_preferences(
         &self,
         user: &UserId,
@@ -53,6 +55,7 @@ where
             .await?)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn set_preference(
         &self,
         user: &UserId,
@@ -65,6 +68,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_preference(
         &self,
         user: &UserId,

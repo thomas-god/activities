@@ -16,6 +16,7 @@ pub struct ValidateLoginBody {
     token: String,
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn validate_login<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     Json(body): Json<ValidateLoginBody>,

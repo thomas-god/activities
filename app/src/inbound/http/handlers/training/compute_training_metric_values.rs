@@ -79,6 +79,7 @@ impl From<ComputeTrainingMetricValuesError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn compute_training_metric_values<
     AS: IActivityService,
     PF: ParseFile,

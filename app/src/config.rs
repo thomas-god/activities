@@ -19,6 +19,12 @@ const MULTI_USER_MAILER_PASSWORD_KEY: &str = "ACTIVITIES_MAILER_PASSWORD";
 const MULTI_USER_MAILER_RELAY_KEY: &str = "ACTIVITIES_MAILER_RELAY";
 const MULTI_USER_MAILER_DOMAIN_KEY: &str = "ACTIVITIES_MAILER_DOMAIN";
 
+// Telemetry related keys. Named after the standard OpenTelemetry env var conventions `OTEL_`
+// (rather than prefixed with ACTIVITIES_) so they stay interoperable with collectors/dashboards
+// that expect them.
+const OTEL_EXPORTER_OTLP_ENDPOINT_KEY: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+const OTEL_SERVICE_NAME_KEY: &str = "OTEL_SERVICE_NAME";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseConfig {
     pub server_port: String,
@@ -143,6 +149,23 @@ impl MultiUserConfig {
                     errs.join(", ")
                 ))
             }
+        }
+    }
+}
+
+/// Telemetry (tracing/OpenTelemetry) configuration. Every field is optional: with nothing set,
+/// the app just logs to stdout and no OTLP exporter is started (see `crate::telemetry`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TelemetryConfig {
+    pub otlp_endpoint: Option<String>,
+    pub service_name: Option<String>,
+}
+
+impl TelemetryConfig {
+    pub fn from_env<T: Environment>(env: &T) -> TelemetryConfig {
+        TelemetryConfig {
+            otlp_endpoint: load_env(env, OTEL_EXPORTER_OTLP_ENDPOINT_KEY).as_string(),
+            service_name: load_env(env, OTEL_SERVICE_NAME_KEY).as_string(),
         }
     }
 }
@@ -466,5 +489,39 @@ mod test_config {
         );
 
         assert!(AppMode::try_from_env(&env).is_err());
+    }
+
+    #[test]
+    fn test_telemetry_config_from_env_with_values() {
+        let mut env = MockEnvironment::default();
+        env.set_var(
+            OTEL_EXPORTER_OTLP_ENDPOINT_KEY,
+            EnvironmentVariable::Set("http://otel-collector:4317".to_string()),
+        );
+        env.set_var(
+            OTEL_SERVICE_NAME_KEY,
+            EnvironmentVariable::Set("activities-app".to_string()),
+        );
+
+        assert_eq!(
+            TelemetryConfig::from_env(&env),
+            TelemetryConfig {
+                otlp_endpoint: Some("http://otel-collector:4317".to_string()),
+                service_name: Some("activities-app".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_telemetry_config_from_env_defaults_to_none() {
+        let env = MockEnvironment::default();
+
+        assert_eq!(
+            TelemetryConfig::from_env(&env),
+            TelemetryConfig {
+                otlp_endpoint: None,
+                service_name: None,
+            }
+        );
     }
 }

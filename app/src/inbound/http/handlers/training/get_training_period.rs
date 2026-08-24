@@ -44,6 +44,7 @@ pub struct ResponseBody {
     activities: Vec<PublicActivity>,
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn get_training_period<
     AS: IActivityService,
     PF: ParseFile,

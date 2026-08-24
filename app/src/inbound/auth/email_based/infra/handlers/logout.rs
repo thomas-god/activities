@@ -12,6 +12,7 @@ use crate::inbound::{
 
 /// Always succeeds and clears the session cookie, whether or not a session was found: from the
 /// client's point of view logout is idempotent, it just means "no session" afterwards.
+#[tracing::instrument(skip_all)]
 pub async fn logout<UR: IUserService>(
     State(state): State<AuthAppState<UR>>,
     jar: CookieJar,

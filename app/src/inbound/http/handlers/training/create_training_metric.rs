@@ -83,6 +83,7 @@ impl From<CreateTrainingMetricError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err(Debug))]
 pub async fn create_training_metric<
     AS: IActivityService,
     PF: ParseFile,

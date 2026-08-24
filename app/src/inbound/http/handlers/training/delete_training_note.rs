@@ -22,6 +22,7 @@ impl From<DeleteTrainingNoteError> for StatusCode {
     }
 }
 
+#[tracing::instrument(skip_all, err)]
 pub async fn delete_training_note<
     AS: IActivityService,
     PF: ParseFile,
