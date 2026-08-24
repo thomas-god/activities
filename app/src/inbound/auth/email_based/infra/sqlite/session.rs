@@ -1,7 +1,10 @@
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
-use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::{
+    ConnectOptions, SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+};
 
 use crate::{
     domain::models::UserId,
@@ -10,20 +13,39 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct SqliteSessionRepository {
-    pool: SqlitePool,
+    writer: SqlitePool,
+    readers: SqlitePool,
 }
 
 impl SqliteSessionRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(url)?.create_if_missing(true);
+        let writer_options = SqliteConnectOptions::from_str(url)?
+            .create_if_missing(true)
+            .log_slow_statements(
+                log::LevelFilter::Warn,
+                std::time::Duration::from_millis(100),
+            )
+            .journal_mode(SqliteJournalMode::Wal);
 
-        let pool = SqlitePool::connect_with(options).await?;
+        let writer = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(writer_options)
+            .await?;
 
         // Run migrations
         sqlx::migrate!("migrations/auth/sessions")
-            .run(&pool)
+            .run(&writer)
             .await?;
-        Ok(Self { pool })
+
+        let readers_options = SqliteConnectOptions::from_str(url)?
+            .journal_mode(SqliteJournalMode::Wal)
+            .read_only(true);
+        let readers = SqlitePoolOptions::new()
+            .max_connections(10)
+            .connect_with(readers_options)
+            .await?;
+
+        Ok(Self { writer, readers })
     }
 }
 
@@ -39,7 +61,7 @@ impl SessionRepository for SqliteSessionRepository {
         .bind(session.user().to_string())
         .bind(session.hash().to_string())
         .bind(session.expire_at())
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map(|_| ())
         .map_err(|_| ())
@@ -49,7 +71,7 @@ impl SessionRepository for SqliteSessionRepository {
     async fn get_all_sessions(&self) -> Vec<HashedSession> {
         let res: Vec<(String, String, DateTime<Utc>)> =
             match sqlx::query_as("SELECT user, token_hash, expire_at FROM t_sessions")
-                .fetch_all(&self.pool)
+                .fetch_all(&self.readers)
                 .await
             {
                 Ok(res) => res,
@@ -74,7 +96,7 @@ impl SessionRepository for SqliteSessionRepository {
     async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()> {
         sqlx::query("DELETE FROM t_sessions WHERE token_hash = ?1;")
             .bind(hash.to_string())
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map(|_| ())
             .map_err(|_| ())
@@ -84,7 +106,7 @@ impl SessionRepository for SqliteSessionRepository {
     async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()> {
         sqlx::query("DELETE FROM t_sessions WHERE expire_at <= ?1;")
             .bind(reference)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map(|_| ())
             .map_err(|_| ())
@@ -112,7 +134,7 @@ mod test_sqlite_session_repository {
             .expect("repo should init");
 
         sqlx::query("select count(*) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
     }
@@ -138,14 +160,14 @@ mod test_sqlite_session_repository {
             .expect("store_session should have succeeded");
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 1);
 
         let res: (String, String, DateTime<Utc>) =
             sqlx::query_as("select user, token_hash, expire_at from t_sessions limit 1;")
-                .fetch_one(&repository.pool)
+                .fetch_one(&repository.readers)
                 .await
                 .unwrap();
 
@@ -190,7 +212,7 @@ mod test_sqlite_session_repository {
             .expect("store_session should have succeeded");
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 2);
@@ -223,7 +245,7 @@ mod test_sqlite_session_repository {
             .expect_err("Should have returned an err");
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 1);
@@ -231,7 +253,7 @@ mod test_sqlite_session_repository {
         // Existing token should not be changed
         let res: (String, String, DateTime<Utc>) =
             sqlx::query_as("select user, token_hash, expire_at from t_sessions limit 1;")
-                .fetch_one(&repository.pool)
+                .fetch_one(&repository.readers)
                 .await
                 .unwrap();
 
@@ -316,7 +338,7 @@ mod test_sqlite_session_repository {
             .expect("store_session should have succeeded");
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 1);
@@ -328,7 +350,7 @@ mod test_sqlite_session_repository {
             .unwrap();
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 0);
@@ -382,7 +404,7 @@ mod test_sqlite_session_repository {
             .unwrap();
 
         let n_rows: u64 = sqlx::query_scalar("select count(user) from t_sessions;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         assert_eq!(n_rows, 0);
