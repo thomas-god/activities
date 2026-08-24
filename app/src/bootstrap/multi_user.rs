@@ -186,9 +186,8 @@ async fn build_user_service(
     ));
 
     let session_db = db_dir.clone().join("session.db");
-    let session_repository = Arc::new(Mutex::new(
-        SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?,
-    ));
+    let session_repository =
+        SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?;
     spawn_expired_sessions_cleanup(
         session_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
