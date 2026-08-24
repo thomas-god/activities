@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use sqlx::{
-    SqlitePool,
+    ConnectOptions, SqlitePool,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
@@ -30,6 +30,10 @@ impl SqlitePreferencesRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
         let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
+            .log_slow_statements(
+                log::LevelFilter::Warn,
+                std::time::Duration::from_millis(100),
+            )
             .journal_mode(SqliteJournalMode::Wal);
 
         let writer = SqlitePoolOptions::new()

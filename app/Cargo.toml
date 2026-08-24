@@ -27,6 +27,7 @@ lettre = { version = "0.11.22", features = [
     "ring",
     "rustls-platform-verifier"
 ], default-features = false }
+log = "0.4.34"
 rand = "0.10.1"
 roxmltree = "0.21.0"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -38,7 +39,7 @@ thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = "0.5.2"
 tower-http = { version = "0.7.0", features = ["cors", "trace"] }
-tracing = "0.1.41"
+tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = "0.3.20"
 uuid = { version = "1.18.1", features = ["v4", "serde"] }
 zip = { version = "8.6.0", features = ["deflate"] }
