@@ -16,7 +16,7 @@ use crate::{
 pub struct UserService<MLS, UR, SS> {
     auth_link_service: Arc<Mutex<MLS>>,
     user_repository: Arc<Mutex<UR>>,
-    session_service: Arc<Mutex<SS>>,
+    session_service: SS,
 }
 
 impl<MLS, UR, SS> IUserService for UserService<MLS, UR, SS>
@@ -102,8 +102,6 @@ where
         };
 
         self.session_service
-            .lock()
-            .await
             .generate_session_token(&user)
             .await
             .map(AuthLinkValidationResult::Success)
@@ -111,16 +109,12 @@ where
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
-        self.session_service
-            .lock()
-            .await
-            .check_session_token(token)
-            .await
+        self.session_service.check_session_token(token).await
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
-        self.session_service.lock().await.logout(token).await
+        self.session_service.logout(token).await
     }
 }
 
@@ -196,7 +190,7 @@ mod test_user_service_register_new_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -221,7 +215,7 @@ mod test_user_service_register_new_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -244,7 +238,7 @@ mod test_user_service_register_new_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -269,7 +263,7 @@ mod test_user_service_register_new_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -290,7 +284,7 @@ mod test_user_service_register_new_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -325,7 +319,7 @@ mod test_user_service_login_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -345,7 +339,7 @@ mod test_user_service_login_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -365,7 +359,7 @@ mod test_user_service_login_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -388,7 +382,7 @@ mod test_user_service_login_user {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(MockSessionService::new())),
+            MockSessionService::new(),
         );
 
         let res = service
@@ -468,7 +462,7 @@ mod test_user_service_validate_auth_link {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service
@@ -500,7 +494,7 @@ mod test_user_service_validate_auth_link {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service
@@ -525,7 +519,7 @@ mod test_user_service_validate_auth_link {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service
@@ -550,7 +544,7 @@ mod test_user_service_validate_auth_link {
         let service = UserService::new(
             Arc::new(Mutex::new(auth_link)),
             Arc::new(Mutex::new(user)),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service
@@ -581,7 +575,7 @@ mod test_user_service_check_session_token {
         let service = UserService::new(
             Arc::new(Mutex::new(MockAuthLinkService::new())),
             Arc::new(Mutex::new(MockUserRepository::new())),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service
@@ -601,7 +595,7 @@ mod test_user_service_check_session_token {
         let service = UserService::new(
             Arc::new(Mutex::new(MockAuthLinkService::new())),
             Arc::new(Mutex::new(MockUserRepository::new())),
-            Arc::new(Mutex::new(session)),
+            session,
         );
 
         let res = service

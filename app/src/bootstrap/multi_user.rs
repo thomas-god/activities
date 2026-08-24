@@ -192,7 +192,7 @@ async fn build_user_service(
         session_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
-    let session_service = Arc::new(Mutex::new(SessionService::new(session_repository)));
+    let session_service = SessionService::new(session_repository);
     let user_service = UserService::new(auth_link_service, user_repository, session_service);
 
     Ok(user_service)
