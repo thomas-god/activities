@@ -17,6 +17,7 @@ pub struct FilesystemRawDataRepository {
 }
 
 impl RawDataRepository for FilesystemRawDataRepository {
+    #[tracing::instrument(skip_all, err)]
     async fn save_raw_data(
         &self,
         activity_id: &ActivityId,
@@ -56,6 +57,7 @@ impl RawDataRepository for FilesystemRawDataRepository {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_raw_data(&self, activity_id: &ActivityId) -> Result<RawContent, GetRawDataError> {
         for ext in [
             SupportedExtension::FIT,

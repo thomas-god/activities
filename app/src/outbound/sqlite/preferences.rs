@@ -59,6 +59,7 @@ impl SqlitePreferencesRepository {
 }
 
 impl PreferencesRepository for SqlitePreferencesRepository {
+    #[tracing::instrument(skip_all, err)]
     async fn get_preference(
         &self,
         user: &UserId,
@@ -85,6 +86,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_all_preferences(&self, user: &UserId) -> Result<Vec<Preference>, anyhow::Error> {
         // Query as raw strings to handle unknown keys gracefully
         let rows = sqlx::query_as::<_, RawPreferenceRow>(
@@ -113,6 +115,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         Ok(preferences)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_preference(
         &self,
         user: &UserId,
@@ -138,6 +141,7 @@ impl PreferencesRepository for SqlitePreferencesRepository {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_preference(
         &self,
         user: &UserId,

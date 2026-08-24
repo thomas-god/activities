@@ -32,6 +32,7 @@ impl SqliteAuthLinkRepository {
 }
 
 impl AuthLinkRepository for SqliteAuthLinkRepository {
+    #[tracing::instrument(skip_all, err)]
     async fn store_auth_link(&self, link: &HashedAuthLink) -> Result<(), AuthLinkRepositoryError> {
         sqlx::query(
             r#"
@@ -48,6 +49,7 @@ impl AuthLinkRepository for SqliteAuthLinkRepository {
         .map_err(|_| AuthLinkRepositoryError::Error)
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_all_auth_links(&self) -> Vec<HashedAuthLink> {
         let res: Vec<(String, String, DateTime<Utc>)> =
             match sqlx::query_as("SELECT user, token_hash, expire_at FROM t_auth_links")
@@ -72,6 +74,7 @@ impl AuthLinkRepository for SqliteAuthLinkRepository {
             .collect()
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_auth_link_by_hash(
         &self,
         hash: &HashedAuthToken,
@@ -84,6 +87,7 @@ impl AuthLinkRepository for SqliteAuthLinkRepository {
             .map_err(|_| AuthLinkRepositoryError::Error)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_expired_auth_links(
         &self,
         reference: DateTime<Utc>,

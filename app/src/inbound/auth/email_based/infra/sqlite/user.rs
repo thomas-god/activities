@@ -27,6 +27,7 @@ impl SqliteUserRepository {
 }
 
 impl UserRepository for SqliteUserRepository {
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn store_user_with_mail(&self, user: &UserId, email: &EmailAddress) -> Result<(), ()> {
         match sqlx::query(
             r#"
@@ -48,6 +49,7 @@ impl UserRepository for SqliteUserRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn get_user_by_email(&self, email: &EmailAddress) -> Result<Option<UserId>, ()> {
         let res: Result<String, Error> =
             sqlx::query_scalar("SELECT user_id FROM t_users WHERE email = ?1")

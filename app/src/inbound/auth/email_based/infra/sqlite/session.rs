@@ -28,6 +28,7 @@ impl SqliteSessionRepository {
 }
 
 impl SessionRepository for SqliteSessionRepository {
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn store_session(&self, session: &HashedSession) -> Result<(), ()> {
         sqlx::query(
             r#"
@@ -44,6 +45,7 @@ impl SessionRepository for SqliteSessionRepository {
         .map_err(|_| ())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_all_sessions(&self) -> Vec<HashedSession> {
         let res: Vec<(String, String, DateTime<Utc>)> =
             match sqlx::query_as("SELECT user, token_hash, expire_at FROM t_sessions")
@@ -68,6 +70,7 @@ impl SessionRepository for SqliteSessionRepository {
             .collect()
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()> {
         sqlx::query("DELETE FROM t_sessions WHERE token_hash = ?1;")
             .bind(hash.to_string())
@@ -77,6 +80,7 @@ impl SessionRepository for SqliteSessionRepository {
             .map_err(|_| ())
     }
 
+    #[tracing::instrument(skip_all, err(Debug))]
     async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()> {
         sqlx::query("DELETE FROM t_sessions WHERE expire_at <= ?1;")
             .bind(reference)

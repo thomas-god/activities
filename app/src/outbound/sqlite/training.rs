@@ -103,6 +103,7 @@ impl SqliteTrainingRepository {
 }
 
 impl TrainingRepository for SqliteTrainingRepository {
+    #[tracing::instrument(skip_all, err)]
     async fn save_metric(&self, metric: TrainingMetric) -> Result<(), SaveTrainingMetricError> {
         let definition = metric.definition();
         sqlx::query(
@@ -147,6 +148,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|_| ())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_metric(
         &self,
         user: &UserId,
@@ -217,6 +219,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_global_metrics(
         &self,
         user: &UserId,
@@ -285,6 +288,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         })
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_period_metrics(
         &self,
         user: &UserId,
@@ -355,6 +359,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         })
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_metric(
         &self,
         user: &UserId,
@@ -382,6 +387,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_metric_name(
         &self,
         user: &UserId,
@@ -405,6 +411,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_training_period(
         &self,
         period: crate::domain::models::training::TrainingPeriod,
@@ -423,6 +430,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .map(|_| ())
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_training_period(
         &self,
         user: &UserId,
@@ -447,6 +455,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_training_periods(
         &self,
         user: &UserId,
@@ -469,6 +478,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .unwrap_or_default()
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_active_training_periods(
         &self,
         user: &UserId,
@@ -495,6 +505,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .unwrap_or_default()
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_training_period(
         &self,
         user: &UserId,
@@ -514,6 +525,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_name(
         &self,
         user: &UserId,
@@ -535,6 +547,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_note(
         &self,
         user: &UserId,
@@ -556,6 +569,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_period_dates(
         &self,
         user: &UserId,
@@ -581,6 +595,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
         sqlx::query(
             "INSERT INTO t_training_notes (id, user_id, title, content, date, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
@@ -597,6 +612,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|_| ())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_note(
         &self,
         user: &UserId,
@@ -625,6 +641,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_notes(
         &self,
         user: &UserId,
@@ -657,6 +674,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .collect()
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_training_note(
         &self,
         user: &UserId,
@@ -679,6 +697,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         .map(|_| ())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_training_note(
         &self,
         user: &UserId,
@@ -693,6 +712,7 @@ impl TrainingRepository for SqliteTrainingRepository {
             .map(|_| ())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_training_metrics_ordering(
         &self,
         user: &UserId,
@@ -734,6 +754,7 @@ impl TrainingRepository for SqliteTrainingRepository {
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn set_training_metrics_ordering(
         &self,
         user: &UserId,

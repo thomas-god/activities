@@ -88,6 +88,7 @@ impl<R, FP> SqliteActivityRepository<R, FP> {
         })
     }
 
+    #[tracing::instrument(skip_all, err)]
     pub async fn metric_rowid(&self, metric: &ActivityMetricV2) -> Result<i64, anyhow::Error> {
         if let Some(rowid) = sqlx::query_scalar::<_, i64>(
             "
@@ -130,6 +131,7 @@ where
     R: RawDataRepository,
     FP: ParseFile,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn load_timeseries(
         &self,
         id: &ActivityId,
@@ -166,6 +168,7 @@ where
     R: RawDataRepository,
     FP: ParseFile,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
         sqlx::query("DELETE FROM t_activities WHERE id = ?1")
@@ -185,6 +188,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
         match sqlx::query_as::<_, ActivityRow>(
             "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
@@ -218,6 +222,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_metrics(
         &self,
         id: &ActivityId,
@@ -263,6 +268,7 @@ where
         )))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_parsed_data(
         &self,
         id: &ActivityId,
@@ -281,6 +287,7 @@ where
         Ok(Some(activity_with_parsed_data))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities(
         &self,
         user: &UserId,
@@ -346,6 +353,7 @@ where
             })
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_raw_activity(
         &self,
         user: &UserId,
@@ -378,6 +386,7 @@ where
         ))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_all_raw_activities(
         &self,
         user: &UserId,
@@ -408,6 +417,7 @@ where
         Ok(files)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn list_activities_with_parsed_data(
         &self,
         user: &UserId,
@@ -427,6 +437,7 @@ where
         Ok(res)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_metric(
         &self,
         activity: &ActivityId,
@@ -466,6 +477,7 @@ where
         })
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_activities_with_metrics(
         &self,
         user: &UserId,
@@ -530,6 +542,7 @@ where
         Ok(res)
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn modify_activity_name(
         &self,
         id: &ActivityId,
@@ -556,6 +569,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_rpe(
         &self,
         id: &ActivityId,
@@ -582,6 +596,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_workout_type(
         &self,
         id: &ActivityId,
@@ -608,6 +623,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_nutrition(
         &self,
         id: &ActivityId,
@@ -634,6 +650,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn update_activity_feedback(
         &self,
         id: &ActivityId,
@@ -660,6 +677,7 @@ where
         tx.commit().await.map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_activity(
         &self,
         activity: &ActivityWithParsedData,
@@ -724,6 +742,7 @@ where
             .map_err(|err| SaveActivityError::Unknown(err.into()))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn similar_activity_exists(
         &self,
         natural_key: &ActivityNaturalKey,
@@ -739,6 +758,7 @@ where
         }
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_user_history_date_range(
         &self,
         user: &UserId,
