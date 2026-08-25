@@ -28,7 +28,7 @@
 			onclick={() => activitiesUploadDialog.showModal()}>+ Add activities</button
 		>
 		<button
-			class="btn w-36 rounded-lg btn-primary btn-sm sm:btn-md"
+			class="btn w-36 rounded-lg btn-outline btn-primary btn-sm sm:btn-md"
 			onclick={() => newTrainingNoteDialog.showModal()}>+ New note</button
 		>
 	</div>
