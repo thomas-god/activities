@@ -9,7 +9,7 @@
 	import NavbarMetrics from '$ui/navigation/NavbarMetrics.svelte';
 	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
 
-	let chartWidth: number = $state(0);
+	let chartWidths: number[] = $state([]);
 
 	let dates = $derived({
 		start: page.url.searchParams.get('start') || dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
@@ -52,14 +52,22 @@
 				<div class="loading loading-bars"></div>
 			</div>
 		{:then metrics}
-			{#each metrics as metric (metric.id)}
-				<div bind:clientWidth={chartWidth} class="rounded-box bg-base-100 pb-3 shadow-md">
-					<div class="relative p-4 text-center">
-						<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
-					</div>
-					<TrainingMetricChart {metric} width={chartWidth} timeDomain={some(dates)} />
+			<div class="@container">
+				<div class="grid grid-cols-1 gap-4 @min-[900px]:grid-cols-2">
+					{#each metrics as metric, idx (metric.id)}
+						<div bind:clientWidth={chartWidths[idx]} class="rounded-box bg-base-100 pb-3 shadow-md">
+							<div class="relative p-4 text-center">
+								<TrainingMetricTitle {metric} onUpdate={setMetricsPromise} />
+							</div>
+							<TrainingMetricChart
+								{metric}
+								width={chartWidths[idx] ?? 300}
+								timeDomain={some(dates)}
+							/>
+						</div>
+					{/each}
 				</div>
-			{/each}
+			</div>
 		{/await}
 	{/if}
 </div>
