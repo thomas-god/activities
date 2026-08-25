@@ -1,6 +1,6 @@
 # Users authentication strategy
 
-_Date:_ 2025-09-18
+_Date:_ 2025-09-18, updated 2026-08-25
 
 ## Context
 
@@ -22,12 +22,45 @@ is fully managed on the server side.
 ## Security Considerations
 
 - Authentication links expire after 15 minutes and are single-use,
-- Session tokens are cryptographically random (192-bit),
+- Session tokens are cryptographically random (192-bit), and are stored as hash,
 - Sessions expire after 30 days of inactivity,
 - Email is assumed to be a reasonably secure channel for our threat model.
 
+### Session token hashing algorithm (added 2026-08-25)
+
+Session tokens were initially hashed with Argon2, the same algorithm one would
+use for user passwords. This turned out to be the wrong tool as Argon2's
+deliberate slowness exists to protect low-entropy secrets (passwords) against
+offline brute force. Our session tokens already carry 192 bits of entropy so
+brute-forcing a leaked token hash is considered infeasible at that entropy
+regardless of hash speed. Thus Argon2 bought no additional security while adding
+significant compute time to every request (plus it scaled linearly with the
+number of session).
+
+Session tokens are now hashed with plain SHA-256. We also considered keying the
+hash (HMAC-SHA256) for extra defense-in-depth against a database-only leak, but
+decided against it: on a single-server deployment, a leak of the session store
+and a leak of an HMAC key are likely to happen together (e.g. a full disk or
+backup compromise), which removes most of HMAC's benefit. On the other hand a
+dedicated key adds real operational cost (provisioning it, keeping it out of
+backups, and rotating it invalidates every active session) to the deployment.
+Sessions also have a finite lifetime, so even a future weakening of SHA-256
+would only expose a bounded window of currently active sessions rather than a
+permanent store — further reducing the value of that extra insurance.
+
 ## Benefits and trade-offs
 
-**Benefits**: No password storage, simple deployment, reduced attack surface
+**Benefits**:
 
-**Trade-offs**: Dependency on email delivery, slight UX friction on first access
+- No password storage,
+- simple deployment,
+- reduced attack surface,
+- fast session verification.
+
+**Trade-offs**:
+
+- Dependency on email delivery,
+- slight UX friction on first access,
+- slightly weaker defense-in-depth against a correlated future compromise (a
+  leaked hashing key combined with a weakened hash algorithm) than a keyed hash
+  would provide.

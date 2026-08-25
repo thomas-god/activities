@@ -29,9 +29,7 @@ where
         let token = SessionToken::new();
         let expire_at = Utc::now() + TimeDelta::days(SESSION_DURATION);
         let session = Session::new(user.clone(), token.clone(), expire_at);
-        let Some(hashed_session) = session.as_hash() else {
-            return Err(());
-        };
+        let hashed_session = session.as_hash();
 
         match self.session_repository.store_session(&hashed_session).await {
             Ok(()) => Ok(GenerateSessionTokenResult::new(token, expire_at)),
@@ -41,26 +39,18 @@ where
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn check_session_token(&self, token: &SessionToken) -> Result<CheckSessionResult, ()> {
-        let sessions = self.session_repository.get_all_sessions().await;
-
-        let mut found = None;
         let now = Utc::now();
-        for session in sessions {
-            if session.is_expired(&now) {
-                let _ = self
-                    .session_repository
-                    .delete_session_by_hash(session.hash())
-                    .await;
-                continue;
-            }
-            if session.hash().verify_token(token) {
-                found = Some(session)
-            }
-        }
 
-        let Some(session) = found else {
+        let Some(session) = self
+            .session_repository
+            .get_session_by_hash(&token.as_hash())
+            .await
+        else {
             return Err(());
         };
+        if session.is_expired(&now) {
+            return Err(());
+        }
         let user = session.user.clone();
 
         let refresh_threshold = *session.expire_at() - TimeDelta::days(SESSION_REFRESH_WINDOW);
@@ -68,9 +58,8 @@ where
             let new_token = SessionToken::new();
             let new_expire_at = now + TimeDelta::days(SESSION_DURATION);
             let new_session = Session::new(user.clone(), new_token.clone(), new_expire_at);
-            if let Some(hashed) = new_session.as_hash()
-                && self.session_repository.store_session(&hashed).await.is_ok()
-            {
+            let hashed = new_session.as_hash();
+            if self.session_repository.store_session(&hashed).await.is_ok() {
                 let _ = self
                     .session_repository
                     .delete_session_by_hash(session.hash())
@@ -88,13 +77,8 @@ where
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn logout(&self, token: &SessionToken) -> Result<(), ()> {
-        let sessions = self.session_repository.get_all_sessions().await;
-        let Some(session) = sessions.into_iter().find(|s| s.hash().verify_token(token)) else {
-            return Ok(());
-        };
-
         self.session_repository
-            .delete_session_by_hash(session.hash())
+            .delete_session_by_hash(&token.as_hash())
             .await
     }
 }
@@ -103,7 +87,10 @@ pub trait SessionRepository: Clone + Send + Sync + 'static {
     fn store_session(&self, session: &HashedSession)
     -> impl Future<Output = Result<(), ()>> + Send;
 
-    fn get_all_sessions(&self) -> impl Future<Output = Vec<HashedSession>> + Send;
+    fn get_session_by_hash(
+        &self,
+        hash: &HashedSessionToken,
+    ) -> impl Future<Output = Option<HashedSession>> + Send;
 
     fn delete_session_by_hash(
         &self,
@@ -151,7 +138,7 @@ mod test_utils {
 
         impl SessionRepository for SessionRepository {
             async fn store_session(&self, session: &HashedSession) -> Result<(), ()>;
-            async fn get_all_sessions(&self) -> Vec<HashedSession>;
+            async fn get_session_by_hash(&self, hash: &HashedSessionToken) -> Option<HashedSession>;
             async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()>;
             async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()>;
         }
@@ -208,15 +195,18 @@ mod test_session_service_check_session_token {
     async fn test_ok_path() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let hashed_token = token.as_hash().unwrap();
-        let cloned_hashed_token = hashed_token.clone();
-        repository.expect_get_all_sessions().returning(move || {
-            vec![HashedSession::new(
-                UserId::test_default(),
-                cloned_hashed_token.clone(),
-                Utc::now() + TimeDelta::days(30),
-            )]
-        });
+        let hashed_token = token.as_hash();
+        let expected_hash = hashed_token.clone();
+        repository
+            .expect_get_session_by_hash()
+            .withf(move |hash| hash == &expected_hash)
+            .returning(move |_| {
+                Some(HashedSession::new(
+                    UserId::test_default(),
+                    hashed_token.clone(),
+                    Utc::now() + TimeDelta::days(30),
+                ))
+            });
         repository.expect_delete_session_by_hash().times(0);
 
         let service = SessionService::new(repository);
@@ -230,7 +220,7 @@ mod test_session_service_check_session_token {
     async fn test_token_does_not_exist() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        repository.expect_get_all_sessions().returning(Vec::new);
+        repository.expect_get_session_by_hash().returning(|_| None);
         repository.expect_delete_session_by_hash().times(0);
 
         let service = SessionService::new(repository);
@@ -244,21 +234,15 @@ mod test_session_service_check_session_token {
     async fn test_token_is_expired() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let hashed_token = token.as_hash().unwrap();
-        let cloned_hashed_token = hashed_token.clone();
-        repository.expect_get_all_sessions().returning(move || {
-            vec![HashedSession::new(
+        let hashed_token = token.as_hash();
+        repository.expect_get_session_by_hash().returning(move |_| {
+            Some(HashedSession::new(
                 UserId::test_default(),
-                cloned_hashed_token.clone(),
+                hashed_token.clone(),
                 Utc::now() - TimeDelta::minutes(5),
-            )]
+            ))
         });
-        let cloned_token = token.clone();
-        repository
-            .expect_delete_session_by_hash()
-            .times(1)
-            .withf(move |hash| hash.verify_token(&cloned_token))
-            .returning(|_| Ok(()));
+        repository.expect_delete_session_by_hash().times(0);
 
         let service = SessionService::new(repository);
 
@@ -278,20 +262,11 @@ mod test_session_service_logout {
     async fn test_deletes_matching_session() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        let hashed_token = token.as_hash().unwrap();
-        let cloned_hashed_token = hashed_token.clone();
-        repository.expect_get_all_sessions().returning(move || {
-            vec![HashedSession::new(
-                UserId::test_default(),
-                cloned_hashed_token.clone(),
-                Utc::now() + TimeDelta::days(30),
-            )]
-        });
-        let cloned_token = token.clone();
+        let expected_hash = token.as_hash();
         repository
             .expect_delete_session_by_hash()
             .times(1)
-            .withf(move |hash| hash.verify_token(&cloned_token))
+            .withf(move |hash| hash == &expected_hash)
             .returning(|_| Ok(()));
 
         let service = SessionService::new(repository);
@@ -305,8 +280,10 @@ mod test_session_service_logout {
     async fn test_ok_when_no_matching_session() {
         let mut repository = MockSessionRepository::new();
         let token = SessionToken::new();
-        repository.expect_get_all_sessions().returning(Vec::new);
-        repository.expect_delete_session_by_hash().times(0);
+        repository
+            .expect_delete_session_by_hash()
+            .times(1)
+            .returning(|_| Ok(()));
 
         let service = SessionService::new(repository);
 

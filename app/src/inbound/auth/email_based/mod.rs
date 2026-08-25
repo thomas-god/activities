@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use derive_more::{Constructor, Display};
 use email_address::EmailAddress as EmailAddressValidator;
 use rand::RngExt;
+use sha2::{Digest, Sha256};
 
 pub mod auth_link;
 pub mod infra;
@@ -185,13 +186,12 @@ impl Session {
         &self.expire_at
     }
 
-    pub fn as_hash(&self) -> Option<HashedSession> {
-        let hash = self.token().as_hash()?;
-        Some(HashedSession::new(
+    pub fn as_hash(&self) -> HashedSession {
+        HashedSession::new(
             self.user().clone(),
-            hash,
+            self.token().as_hash(),
             *self.expire_at(),
-        ))
+        )
     }
 }
 
@@ -233,17 +233,10 @@ impl SessionToken {
         Self(general_purpose::URL_SAFE_NO_PAD.encode(random_bytes))
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-
-    pub fn as_hash(&self) -> Option<HashedSessionToken> {
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        match argon2.hash_password(self.0.as_bytes(), &salt) {
-            Ok(hash) => Some(HashedSessionToken::new(hash.to_string())),
-            Err(_err) => None,
-        }
+    pub fn as_hash(&self) -> HashedSessionToken {
+        let mut hasher = Sha256::new();
+        hasher.update(self.0.as_bytes());
+        HashedSessionToken::new(const_hex::encode(hasher.finalize()))
     }
 }
 
@@ -267,19 +260,6 @@ impl std::fmt::Display for SessionToken {
 
 #[derive(Clone, Debug, Constructor, PartialEq)]
 pub struct HashedSessionToken(String);
-
-impl HashedSessionToken {
-    pub fn verify_token(&self, token: &SessionToken) -> bool {
-        let Ok(hashed_password) = PasswordHash::new(&self.0) else {
-            return false;
-        };
-        let argon2 = Argon2::default();
-
-        argon2
-            .verify_password(token.as_bytes(), &hashed_password)
-            .is_ok()
-    }
-}
 
 impl std::fmt::Display for HashedSessionToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

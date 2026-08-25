@@ -68,28 +68,24 @@ impl SessionRepository for SqliteSessionRepository {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn get_all_sessions(&self) -> Vec<HashedSession> {
-        let res: Vec<(String, String, DateTime<Utc>)> =
-            match sqlx::query_as("SELECT user, token_hash, expire_at FROM t_sessions")
-                .fetch_all(&self.readers)
-                .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    tracing::warn!("Cannot fetch sessions from database");
-                    tracing::warn!("{}", err);
-                    return Vec::new();
-                }
-            };
-        res.iter()
-            .map(|(user, token, expire_at)| {
-                HashedSession::new(
-                    UserId::from(user.clone()),
-                    HashedSessionToken::new(token.clone()),
-                    *expire_at,
-                )
-            })
-            .collect()
+    async fn get_session_by_hash(&self, hash: &HashedSessionToken) -> Option<HashedSession> {
+        let res: Option<(String, String, DateTime<Utc>)> = match sqlx::query_as(
+            "SELECT user, token_hash, expire_at FROM t_sessions WHERE token_hash = ?1",
+        )
+        .bind(hash.to_string())
+        .fetch_optional(&self.readers)
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                tracing::warn!("Cannot fetch session from database");
+                tracing::warn!("{}", err);
+                return None;
+            }
+        };
+        res.map(|(user, token, expire_at)| {
+            HashedSession::new(UserId::from(user), HashedSessionToken::new(token), expire_at)
+        })
     }
 
     #[tracing::instrument(skip_all, err(Debug))]
@@ -152,7 +148,7 @@ mod test_sqlite_session_repository {
             SessionToken::from("test_token".to_string()),
             expire_at,
         );
-        let hashed_session = session.as_hash().unwrap();
+        let hashed_session = session.as_hash();
 
         repository
             .store_session(&hashed_session)
@@ -190,7 +186,7 @@ mod test_sqlite_session_repository {
             SessionToken::from("test_token".to_string()),
             expire_at,
         );
-        let hashed_session = session.as_hash().unwrap();
+        let hashed_session = session.as_hash();
 
         repository
             .store_session(&hashed_session)
@@ -204,7 +200,7 @@ mod test_sqlite_session_repository {
             SessionToken::from("another_test_token".to_string()),
             expire_at,
         );
-        let hashed_session = session.as_hash().unwrap();
+        let hashed_session = session.as_hash();
 
         repository
             .store_session(&hashed_session)
@@ -231,7 +227,7 @@ mod test_sqlite_session_repository {
             SessionToken::from("test_token".to_string()),
             expire_at,
         );
-        let hashed_session = session.as_hash().unwrap();
+        let hashed_session = session.as_hash();
 
         repository
             .store_session(&hashed_session)
@@ -263,30 +259,32 @@ mod test_sqlite_session_repository {
     }
 
     #[tokio::test]
-    async fn test_get_all_tokens_empty() {
+    async fn test_get_session_by_hash_not_found() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteSessionRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
-        assert!(repository.get_all_sessions().await.is_empty());
+        assert!(
+            repository
+                .get_session_by_hash(&HashedSessionToken::new("test_token".to_string()))
+                .await
+                .is_none()
+        );
     }
 
     #[tokio::test]
-    async fn test_get_all_tokens() {
+    async fn test_get_session_by_hash() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteSessionRepository::new(&db_file.path().to_string_lossy())
             .await
             .expect("repo should init");
 
         let expire_at = Utc::now() + TimeDelta::minutes(5);
-        let session = Session::new(
-            UserId::test_default(),
-            SessionToken::from("a_token".to_string()),
-            expire_at,
-        );
+        let token = SessionToken::from("a_token".to_string());
+        let session = Session::new(UserId::test_default(), token.clone(), expire_at);
         repository
-            .store_session(&session.as_hash().unwrap())
+            .store_session(&session.as_hash())
             .await
             .expect("store_session should have succeeded");
 
@@ -297,24 +295,19 @@ mod test_sqlite_session_repository {
                     SessionToken::from("another_token".to_string()),
                     expire_at,
                 )
-                .as_hash()
-                .unwrap(),
+                .as_hash(),
             )
             .await
             .expect("store_session should have succeeded");
 
-        let res = repository.get_all_sessions().await;
+        let found = repository
+            .get_session_by_hash(&token.as_hash())
+            .await
+            .expect("session should be found");
 
-        assert_eq!(res.len(), 2);
-
-        let first_token = res.first().unwrap();
-        assert_eq!(first_token.user(), &UserId::test_default());
-        assert!(
-            first_token
-                .hash()
-                .verify_token(&SessionToken::from("a_token".to_string()))
-        );
-        assert_eq!(first_token.expire_at(), &expire_at);
+        assert_eq!(found.user(), &UserId::test_default());
+        assert_eq!(found.hash(), &token.as_hash());
+        assert_eq!(found.expire_at(), &expire_at);
     }
 
     #[tokio::test]
@@ -330,7 +323,7 @@ mod test_sqlite_session_repository {
             SessionToken::from("test_token".to_string()),
             expire_at,
         );
-        let hashed_session = session.as_hash().unwrap();
+        let hashed_session = session.as_hash();
 
         repository
             .store_session(&hashed_session)
@@ -368,15 +361,13 @@ mod test_sqlite_session_repository {
             SessionToken::from("expired_token".to_string()),
             Utc::now() - TimeDelta::minutes(5),
         )
-        .as_hash()
-        .unwrap();
+        .as_hash();
         let still_valid = Session::new(
             UserId::test_default(),
             SessionToken::from("valid_token".to_string()),
             Utc::now() + TimeDelta::minutes(5),
         )
-        .as_hash()
-        .unwrap();
+        .as_hash();
         repository.store_session(&expired).await.unwrap();
         repository.store_session(&still_valid).await.unwrap();
 
@@ -385,9 +376,18 @@ mod test_sqlite_session_repository {
             .await
             .unwrap();
 
-        let res = repository.get_all_sessions().await;
-        assert_eq!(res.len(), 1);
-        assert_eq!(res.first().unwrap().hash(), still_valid.hash());
+        assert!(
+            repository
+                .get_session_by_hash(expired.hash())
+                .await
+                .is_none()
+        );
+        assert!(
+            repository
+                .get_session_by_hash(still_valid.hash())
+                .await
+                .is_some()
+        );
     }
 
     #[tokio::test]
