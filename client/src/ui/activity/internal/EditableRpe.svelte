@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import AddButton from '$ui/shared/AddButton.svelte';
 	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '$lib/rpe';
 
 	let {
@@ -55,9 +56,7 @@
 			{/if}
 		</div>
 		{#if rpe === null}
-			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
-				Add RPE
-			</button>
+			<AddButton callback={() => (editMode = true)} text="Add RPE" />
 		{:else}
 			<div class="flex items-center gap-2">
 				<span class={`badge ${getRpeColor(rpe)}`}>{getRpeLabelAsScale(rpe)}</span>

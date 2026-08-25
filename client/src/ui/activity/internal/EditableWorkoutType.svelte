@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import AddButton from '$ui/shared/AddButton.svelte';
 	import {
 		WORKOUT_TYPE_LABELS,
 		getWorkoutTypeLabel,
@@ -64,9 +65,7 @@
 			{/if}
 		</div>
 		{#if workoutType === null}
-			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
-				Add workout type
-			</button>
+			<AddButton callback={() => (editMode = true)} text="Add workout type" />
 		{:else}
 			<div class="flex items-center gap-2">
 				<span class={`badge ${getWorkoutTypeClass(workoutType)}`}>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import AddButton from '$ui/shared/AddButton.svelte';
 	import {
 		BONK_STATUS_VALUES,
 		getBonkStatusLabel,
@@ -91,12 +92,7 @@
 				{/if}
 			</div>
 			{#if nutrition === null}
-				<button
-					class="mr-auto link text-sm link-hover opacity-70"
-					onclick={() => (editMode = true)}
-				>
-					Add nutrition
-				</button>
+				<AddButton callback={() => (editMode = true)} text="Add nutrition" />
 			{:else}
 				<div class="flex items-center gap-2">
 					<span class="badge">

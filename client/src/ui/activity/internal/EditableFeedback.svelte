@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SaveButton from '$ui/shared/SaveButton.svelte';
 	import EditButton from '$ui/shared/EditButton.svelte';
+	import AddButton from '$ui/shared/AddButton.svelte';
 
 	let {
 		feedback: initialFeedback,
@@ -62,9 +63,7 @@
 			{/if}
 		</div>
 		{#if feedback === null || feedback === ''}
-			<button class="mr-auto link text-sm link-hover opacity-70" onclick={() => (editMode = true)}>
-				Add note
-			</button>
+			<AddButton callback={() => (editMode = true)} text="Add note" />
 		{:else}
 			<div class="rounded-lg bg-base-200 p-3 text-sm">
 				<p class="whitespace-pre-wrap">{feedback}</p>
