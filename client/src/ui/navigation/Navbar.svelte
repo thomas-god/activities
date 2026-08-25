@@ -37,21 +37,21 @@
 </script>
 
 <div class="flex items-center justify-between gap-2">
-	<div class="flex shrink gap-3 overflow-x-auto sm:gap-6">
+	<div class="flex shrink gap-2 overflow-x-auto xs:gap-3 sm:gap-6">
 		<a
-			class={`btn shrink-0 btn-ghost px-2 text-lg font-bold sm:text-xl ${classExactPath('/')}`}
+			class={`btn shrink-0 btn-ghost px-1 text-[16px] font-bold xs:px-2 xs:text-lg sm:text-xl ${classExactPath('/')}`}
 			href={resolve('/')}>Activities</a
 		>
 		<a
-			class={`btn shrink-0 btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classExactPath('/history')}`}
+			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classExactPath('/history')}`}
 			href={resolve('/history')}>History</a
 		>
 		<a
-			class={`btn shrink-0 btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classPathStartWith('/training/metrics')}`}
+			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/metrics')}`}
 			href={resolve('/training/metrics')}>Metrics</a
 		>
 		<a
-			class={`btn shrink-0 btn-ghost px-2 text-[16px] font-medium sm:text-lg ${classPathStartWith('/training/period')}`}
+			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/period')}`}
 			href={resolve('/training/periods')}>Periods</a
 		>
 	</div>

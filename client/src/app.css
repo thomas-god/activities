@@ -4,6 +4,9 @@
 }
 
 @theme {
+	/* Custome breakpoint */
+	--breakpoint-xs: 30rem;
+
 	/* Metrics colors */
 	--color-heart-rate-chart: #d00000;
 	--color-power-chart: #136f63;
