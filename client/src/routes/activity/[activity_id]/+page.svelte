@@ -11,6 +11,7 @@
 <Navbar />
 
 <div class="mx-auto pt-5 sm:px-4">
+	<button class="btn mb-3 btn-ghost btn-sm" onclick={() => history.back()}>← Back</button>
 	{#await data.activity}
 		<div class="flex w-full flex-col items-center p-4 pt-6">
 			<div class="loading loading-bars"></div>
