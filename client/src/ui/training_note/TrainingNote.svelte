@@ -93,7 +93,7 @@
 		</div>
 	</div>
 	<div
-		class="mx-1 my-1 box-border flex flex-row gap-1 rounded-xl bg-base-300/60 py-2 pl-2 text-sm whitespace-pre-wrap text-gray-600 italic"
+		class="mx-1 my-1 box-border flex flex-row gap-1 rounded-xl bg-base-300/60 py-2 pl-2 text-sm whitespace-pre-wrap text-base-content/70 italic"
 	>
 		<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
 		<div>

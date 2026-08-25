@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { getAuthInfo, logout, type AuthInfo } from '$lib/api/auth';
+	import ThemeToggle from '$ui/shared/ThemeToggle.svelte';
 
 	interface Cta {
 		label: string;
@@ -15,6 +16,24 @@
 	getAuthInfo().then((info) => (authInfo = info));
 
 	let showLogout = $derived(authInfo !== undefined && authInfo !== 'NoAuth');
+
+	let theme = $state<'light' | 'dark'>('light');
+
+	$effect(() => {
+		const stored = localStorage.getItem('theme');
+		theme =
+			stored === 'light' || stored === 'dark'
+				? stored
+				: window.matchMedia('(prefers-color-scheme: dark)').matches
+					? 'dark'
+					: 'light';
+	});
+
+	const toggleTheme = () => {
+		theme = theme === 'dark' ? 'light' : 'dark';
+		localStorage.setItem('theme', theme);
+		document.documentElement.setAttribute('data-theme', theme);
+	};
 
 	const classExactPath = (targetPath: string): string => {
 		return page.url.pathname === targetPath ? 'active' : '';
@@ -29,10 +48,11 @@
 		goto(resolve('/login'));
 	};
 
-	// On mobile, cta buttons and the logout button collapse into a single menu.
+	// On mobile, cta buttons, the logout button, and the theme toggle collapse into a single menu.
 	let mobileMenuItems = $derived([
 		...ctas,
-		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : [])
+		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : []),
+		{ label: theme === 'dark' ? 'Light mode' : 'Dark mode', onClick: toggleTheme }
 	]);
 </script>
 
@@ -70,6 +90,8 @@
 				>Log out</button
 			>
 		{/if}
+		<ThemeToggle {theme} onToggle={toggleTheme} class="hidden min-[850px]:flex" />
+
 		<div class="dropdown dropdown-end min-[850px]:hidden">
 			<button tabindex="0" class="btn btn-outline btn-primary btn-sm" aria-label="Quick actions">
 				<img src="/icons/menu.svg" class="h-5 w-5" alt="Menu icon" />

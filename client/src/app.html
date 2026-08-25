@@ -7,6 +7,16 @@
 		<link rel="manifest" href="/manifest.json" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#f2f2f2" />
+		<script>
+			try {
+				const storedTheme = localStorage.getItem('theme');
+				if (storedTheme === 'light' || storedTheme === 'dark') {
+					document.documentElement.setAttribute('data-theme', storedTheme);
+				}
+			} catch {
+				// localStorage unavailable (private browsing, etc.) — fall back to system preference
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

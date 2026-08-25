@@ -351,7 +351,8 @@
 	<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 	{#if tooltipXOffset}
 		<line
-			stroke="black"
+			stroke="currentColor"
+			opacity="0.6"
 			x1={tooltipXOffset}
 			x2={tooltipXOffset}
 			y1={marginTop}

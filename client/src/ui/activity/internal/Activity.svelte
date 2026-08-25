@@ -141,7 +141,7 @@
 					mx-3 my-1 box-border flex flex-row
 					items-start gap-1 rounded-xl ${isSelected ? 'bg-base-100/60' : 'bg-base-300/60'}
 					p-2
-					text-sm whitespace-pre-wrap text-gray-600 italic`}
+					text-sm whitespace-pre-wrap text-base-content/70 italic`}
 				>
 					<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
 					<div>
@@ -175,7 +175,7 @@
 			border-left-width: 6px;
 		}
 		.selected {
-			background: #e6eef5;
+			background: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100));
 		}
 	}
 

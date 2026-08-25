@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @plugin 'daisyui' {
-	themes: light --default;
+	themes:
+		light --default,
+		dark --prefersdark;
 }
 
 @theme {
@@ -16,11 +18,11 @@
 
 	/* Sport categories colors */
 	--color-cycling: #4299e1;
-	--color-cycling-background: #ebf8ff;
+	--color-cycling-background: color-mix(in oklab, var(--color-cycling) 15%, var(--color-base-100));
 	--color-running: #48bb78;
-	--color-running-background: #c6f6d5;
+	--color-running-background: color-mix(in oklab, var(--color-running) 15%, var(--color-base-100));
 	--color-other: #ed8936;
-	--color-other-background: #feebc8;
+	--color-other-background: color-mix(in oklab, var(--color-other) 15%, var(--color-base-100));
 
 	/* RPE categories colors */
 	--color-rpe-easy: #bfdbfe; /* blue-200 */
@@ -49,4 +51,15 @@
 	--color-workout-cross-training: #ffd6a8; /* orange-200 */
 	--color-workout-cross-training-text: #7e2a0c; /* orange-900 */
 	--color-workout-other: #d18ca3;
+}
+
+/* The static icon set is drawn with hardcoded black strokes, so it disappears
+   against dark backgrounds unless inverted. */
+[data-theme='dark'] img[src^='/icons/'] {
+	filter: invert(1);
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme]) img[src^='/icons/'] {
+		filter: invert(1);
+	}
 }

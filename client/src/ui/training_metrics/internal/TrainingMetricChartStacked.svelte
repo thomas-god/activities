@@ -483,7 +483,7 @@
 				x={marginLeft + 4}
 				y={unwrapOr(averageLegendY, 0)}
 				class="fill-current text-xs"
-				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+				style="paint-order: stroke; stroke: var(--color-base-100); stroke-width: 3px;"
 			>
 				{unwrapOr(averageLegend, '')}
 			</text>
@@ -505,7 +505,7 @@
 				y={unwrapOr(targetLegendY, 0)}
 				text-anchor="end"
 				class="fill-current text-xs"
-				style="paint-order: stroke; stroke: var(--fallback-b1, #ffffff); stroke-width: 3px;"
+				style="paint-order: stroke; stroke: var(--color-base-100); stroke-width: 3px;"
 			>
 				{unwrapOr(targetLegend, '')}
 			</text>
