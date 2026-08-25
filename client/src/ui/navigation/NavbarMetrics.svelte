@@ -13,21 +13,19 @@
 
 	// To prevent the form from loading when the dialog is initialized but hidden
 	let showForm = $state(false);
-</script>
 
-{#snippet cta()}
-	<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
-		<button
-			class="btn w-46 rounded-lg btn-primary btn-sm sm:btn-md"
-			onclick={() => {
+	const ctas = [
+		{
+			label: 'New training metric',
+			onClick: () => {
 				showForm = true;
 				createTrainingMetricDialog.showModal();
-			}}>+ New training metric</button
-		>
-	</div>
-{/snippet}
+			}
+		}
+	];
+</script>
 
-<Navbar {cta} />
+<Navbar {ctas} />
 
 <dialog class="modal" bind:this={createTrainingMetricDialog}>
 	<div class="modal-box max-w-3xl">

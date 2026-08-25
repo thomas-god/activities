@@ -12,18 +12,13 @@
 		createTrainingPeriodDialog.close();
 		invalidateTrainingPeriods();
 	};
+
+	const ctas = [
+		{ label: 'New training period', onClick: () => createTrainingPeriodDialog.showModal() }
+	];
 </script>
 
-{#snippet cta()}
-	<div class="flex w-full flex-row justify-center gap-2 min-[750px]:justify-end">
-		<button
-			class="btn w-46 rounded-lg btn-primary btn-sm sm:btn-md"
-			onclick={() => createTrainingPeriodDialog.showModal()}>+ New training period</button
-		>
-	</div>
-{/snippet}
-
-<Navbar {cta} />
+<Navbar {ctas} />
 
 <dialog class="modal" bind:this={createTrainingPeriodDialog}>
 	<div class="modal-box max-w-3xl">
