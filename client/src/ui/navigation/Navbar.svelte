@@ -15,7 +15,7 @@
 	let authInfo: AuthInfo | undefined = $state(undefined);
 	getAuthInfo().then((info) => (authInfo = info));
 
-	let showLogout = $derived(authInfo !== undefined && authInfo !== 'NoAuth');
+	let showLogout = $derived(authInfo !== undefined && authInfo.strategy !== 'NoAuth');
 
 	let theme = $state<'light' | 'dark'>('light');
 

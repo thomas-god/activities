@@ -31,7 +31,9 @@ mod test {
     use axum::{Router, routing::post};
     use axum_test::TestServer;
 
-    use crate::inbound::auth::email_based::test_utils::MockUserService;
+    use crate::inbound::auth::email_based::{
+        infra::handlers::UserRegistration, test_utils::MockUserService,
+    };
 
     use super::*;
 
@@ -39,6 +41,7 @@ mod test {
         let state = AuthAppState {
             user_service: std::sync::Arc::new(user_service),
             cookie_config: std::sync::Arc::new(crate::inbound::http::CookieConfig::default()),
+            registration_mode: UserRegistration::Allowed,
         };
 
         let app = Router::new()

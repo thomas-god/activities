@@ -18,6 +18,7 @@ const MULTI_USER_MAILER_USERNAME_KEY: &str = "ACTIVITIES_MAILER_USERNAME";
 const MULTI_USER_MAILER_PASSWORD_KEY: &str = "ACTIVITIES_MAILER_PASSWORD";
 const MULTI_USER_MAILER_RELAY_KEY: &str = "ACTIVITIES_MAILER_RELAY";
 const MULTI_USER_MAILER_DOMAIN_KEY: &str = "ACTIVITIES_MAILER_DOMAIN";
+const MULTI_USER_ALLOW_REGISTRATION_KEY: &str = "ACTIVITIES_ALLOW_REGISTRATION";
 
 // Telemetry related keys. Named after the standard OpenTelemetry env var conventions `OTEL_`
 // (rather than prefixed with ACTIVITIES_) so they stay interoperable with collectors/dashboards
@@ -90,6 +91,7 @@ pub struct MultiUserConfig {
     pub mailer_password: String,
     pub mailer_relay: String,
     pub mailer_domain: String,
+    pub allow_registration: bool,
 }
 impl MultiUserConfig {
     pub fn try_from_env<T: Environment>(env: &T) -> Result<Option<MultiUserConfig>, String> {
@@ -98,6 +100,20 @@ impl MultiUserConfig {
         let mailer_password = load_env(env, MULTI_USER_MAILER_PASSWORD_KEY).as_string();
         let mailer_relay = load_env(env, MULTI_USER_MAILER_RELAY_KEY).as_string();
         let mailer_domain = load_env(env, MULTI_USER_MAILER_DOMAIN_KEY).as_string();
+        let allow_registration = load_env(env, MULTI_USER_ALLOW_REGISTRATION_KEY).as_string();
+
+        let allow_registration = match allow_registration {
+            None => true,
+            Some(value) => match value.to_ascii_lowercase().as_str() {
+                "true" | "1" => true,
+                "false" | "0" => false,
+                _ => {
+                    return Err(format!(
+                        "Invalid value for {MULTI_USER_ALLOW_REGISTRATION_KEY}: expected `true` or `false`, got `{value}`"
+                    ))
+                }
+            },
+        };
 
         match [
             mailer_from,
@@ -119,6 +135,7 @@ impl MultiUserConfig {
                 mailer_password,
                 mailer_relay,
                 mailer_domain,
+                allow_registration,
             })),
             [
                 mailer_from,
@@ -416,6 +433,95 @@ mod test_config {
         assert_eq!(config.mailer_password, "mailer-password");
         assert_eq!(config.mailer_relay, "smtp.example.com");
         assert_eq!(config.mailer_domain, "example.com");
+        assert!(config.allow_registration);
+    }
+
+    fn set_full_multi_user_env(env: &mut MockEnvironment) {
+        env.set_var(
+            MULTI_USER_MAILER_FROM_KEY,
+            EnvironmentVariable::Set("noreply@example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_MAILER_USERNAME_KEY,
+            EnvironmentVariable::Set("mailer-user".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_MAILER_PASSWORD_KEY,
+            EnvironmentVariable::Set("mailer-password".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_MAILER_RELAY_KEY,
+            EnvironmentVariable::Set("smtp.example.com".to_string()),
+        );
+        env.set_var(
+            MULTI_USER_MAILER_DOMAIN_KEY,
+            EnvironmentVariable::Set("example.com".to_string()),
+        );
+    }
+
+    #[test]
+    fn test_multi_user_allow_registration_defaults_to_true() {
+        let mut env = MockEnvironment::default();
+        set_full_multi_user_env(&mut env);
+
+        let config = MultiUserConfig::try_from_env(&env).unwrap().unwrap();
+
+        assert!(config.allow_registration);
+    }
+
+    #[test]
+    fn test_multi_user_allow_registration_false() {
+        let mut env = MockEnvironment::default();
+        set_full_multi_user_env(&mut env);
+        env.set_var(
+            MULTI_USER_ALLOW_REGISTRATION_KEY,
+            EnvironmentVariable::Set("false".to_string()),
+        );
+
+        let config = MultiUserConfig::try_from_env(&env).unwrap().unwrap();
+
+        assert!(!config.allow_registration);
+    }
+
+    #[test]
+    fn test_multi_user_allow_registration_accepts_boolean_variants() {
+        for (value, expected) in [
+            ("true", true),
+            ("TRUE", true),
+            ("1", true),
+            ("false", false),
+            ("False", false),
+            ("0", false),
+        ] {
+            let mut env = MockEnvironment::default();
+            set_full_multi_user_env(&mut env);
+            env.set_var(
+                MULTI_USER_ALLOW_REGISTRATION_KEY,
+                EnvironmentVariable::Set(value.to_string()),
+            );
+
+            let config = MultiUserConfig::try_from_env(&env).unwrap().unwrap();
+
+            assert_eq!(
+                config.allow_registration, expected,
+                "unexpected value for `{value}`"
+            );
+        }
+    }
+
+    #[test]
+    fn test_multi_user_allow_registration_invalid_value_errors() {
+        let mut env = MockEnvironment::default();
+        set_full_multi_user_env(&mut env);
+        env.set_var(
+            MULTI_USER_ALLOW_REGISTRATION_KEY,
+            EnvironmentVariable::Set("banana".to_string()),
+        );
+
+        let err = MultiUserConfig::try_from_env(&env).unwrap_err();
+
+        assert!(err.contains(MULTI_USER_ALLOW_REGISTRATION_KEY));
+        assert!(err.contains("banana"));
     }
 
     #[test]

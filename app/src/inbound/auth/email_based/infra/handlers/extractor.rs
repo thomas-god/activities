@@ -125,7 +125,10 @@ mod test {
         inbound::{
             auth::email_based::{
                 CheckSessionResult, GenerateSessionTokenResult, SessionToken,
-                infra::handlers::extractor::{CookieUserExtractor, cookie_auth_middleware},
+                infra::handlers::{
+                    UserRegistration,
+                    extractor::{CookieUserExtractor, cookie_auth_middleware},
+                },
                 test_utils::MockUserService,
             },
             http::CookieConfig,
@@ -138,6 +141,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
+            registration_mode: UserRegistration::Allowed,
         };
 
         async fn test_route(
@@ -199,6 +203,7 @@ mod test {
         let state = AuthAppState {
             user_service: Arc::new(session_service),
             cookie_config: Arc::new(CookieConfig::default()),
+            registration_mode: UserRegistration::Allowed,
         };
 
         async fn test_route(

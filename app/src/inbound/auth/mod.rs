@@ -6,6 +6,7 @@ use subtle::ConstantTimeEq;
 use crate::{
     config::{AppMode, SingleUserConfig},
     domain::models::UserId,
+    inbound::auth::email_based::infra::handlers::UserRegistration,
 };
 
 pub mod email_based;
@@ -47,7 +48,7 @@ impl Debug for SinglePassword {
 pub enum AuthStrategy {
     NoAuth,
     SinglePassword(SinglePassword),
-    EmailBased,
+    EmailBased(UserRegistration),
 }
 
 /// Manual impl of Debug to avoid leaking the value of [AuthStrategy::SinglePassword].
@@ -55,7 +56,7 @@ impl Debug for AuthStrategy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoAuth => write!(f, "NoAuth"),
-            AuthStrategy::EmailBased => write!(f, "EmailBased"),
+            AuthStrategy::EmailBased(_) => write!(f, "EmailBased"),
             AuthStrategy::SinglePassword(_) => write!(f, "SinglePassword"),
         }
     }
@@ -64,7 +65,9 @@ impl Debug for AuthStrategy {
 impl From<&AppMode> for AuthStrategy {
     fn from(value: &AppMode) -> Self {
         match value {
-            AppMode::MultiUser(_) => AuthStrategy::EmailBased,
+            AppMode::MultiUser(config) => {
+                AuthStrategy::EmailBased(UserRegistration::from(config.allow_registration))
+            }
             AppMode::SingleUser(SingleUserConfig {
                 password: Some(pwd),
             }) => AuthStrategy::SinglePassword(SinglePassword::from(pwd.clone())),

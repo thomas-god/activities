@@ -16,7 +16,9 @@ images are available for both `amd64` and `arm64`.
 The application authentication flow can be configured in 3 different ways:
 
 - _multi user_: allows multiple users to use your instance using an email-based,
-  password-less, authentication process. You will need a valid **SMTP server**
+  password-less, authentication process. By default anyone with a valid email
+  address can register; set `ACTIVITIES_ALLOW_REGISTRATION=false` to restrict the
+  instance to already-registered users only. You will need a valid **SMTP server**
   for sending emails to users containing their authentication link and **HTTPS**
   for secure cookies.
 - _single user, main password_: allows a single user to use the instance using a
@@ -146,13 +148,14 @@ from a file
 
 #### Multi-user version
 
-| Variable name              | Required | Purpose                                                                                                                                        | Example                 |
-| -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| ACTIVITIES_MAILER_FROM     | yes      |                                                                                                                                                | no-reply@your.domain    |
-| ACTIVITIES_MAILER_USERNAME | yes      | SMTP username                                                                                                                                  |                         |
-| ACTIVITIES_MAILER_PASSWORD | yes      | SMTP password                                                                                                                                  |                         |
-| ACTIVITIES_MAILER_RELAY    | yes      | SMTP server                                                                                                                                    |                         |
-| ACTIVITIES_MAILER_DOMAIN   | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server. | https://app.your.domain |
+| Variable name                 | Required | Purpose                                                                                                                                                    | Example                 |
+| ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ACTIVITIES_MAILER_FROM        | yes      |                                                                                                                                                            | no-reply@your.domain    |
+| ACTIVITIES_MAILER_USERNAME    | yes      | SMTP username                                                                                                                                              |                         |
+| ACTIVITIES_MAILER_PASSWORD    | yes      | SMTP password                                                                                                                                              |                         |
+| ACTIVITIES_MAILER_RELAY       | yes      | SMTP server                                                                                                                                                |                         |
+| ACTIVITIES_MAILER_DOMAIN      | yes      | The domain on which your instance is hosted. Used to craft the auth link url. Can be a different domain than the one used by your SMTP server.             | https://app.your.domain |
+| ACTIVITIES_ALLOW_REGISTRATION | no       | Wether new users can register a new account. Set to `false` to only allow already-registered users to log in.                                              | false                   |
 
 _Note: if any environment variables for the multi-user version is set but others
 are missing the application will fail to start, even if a valid single user

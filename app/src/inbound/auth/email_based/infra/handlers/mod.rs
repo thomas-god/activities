@@ -21,10 +21,42 @@ pub mod logout;
 pub mod register_user;
 pub mod validate_login;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UserRegistration {
+    Allowed,
+    Closed,
+}
+
+impl From<&bool> for UserRegistration {
+    fn from(value: &bool) -> Self {
+        if *value {
+            Self::Allowed
+        } else {
+            Self::Closed
+        }
+    }
+}
+
+impl From<bool> for UserRegistration {
+    fn from(value: bool) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&UserRegistration> for bool {
+    fn from(value: &UserRegistration) -> Self {
+        match value {
+            UserRegistration::Allowed => true,
+            UserRegistration::Closed => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AuthAppState<UR: IUserService> {
     user_service: Arc<UR>,
     cookie_config: Arc<CookieConfig>,
+    registration_mode: UserRegistration,
 }
 
 impl<US> FromRef<AuthAppState<US>> for Arc<US>
@@ -39,6 +71,7 @@ where
 pub fn email_based_login_routes<US: IUserService, S>(
     mut base_router: Router<S>,
     user_service: US,
+    registration_mode: UserRegistration,
 ) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
@@ -46,6 +79,7 @@ where
     let auth_state = AuthAppState {
         cookie_config: Arc::new(CookieConfig::default()),
         user_service: Arc::new(user_service),
+        registration_mode,
     };
 
     base_router = base_router.route_layer(axum::middleware::from_fn_with_state(
@@ -108,10 +142,14 @@ mod tests {
 
     // Adapted from https://github.com/tokio-rs/axum/discussions/748
     impl TestApp {
-        async fn new(user_service: MockUserService) -> TestApp {
+        async fn new(
+            user_service: MockUserService,
+            registration_mode: UserRegistration,
+        ) -> TestApp {
             let app = email_based_login_routes(
                 Router::new().route("/", get(protected_route)),
                 user_service,
+                registration_mode,
             );
 
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -155,12 +193,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_register_is_rejected_when_registration_is_disabled() {
+        let mut user_service = MockUserService::new();
+        user_service.expect_register_user().times(0);
+        let registration_mode = UserRegistration::Closed;
+        let app = TestApp::new(user_service, registration_mode).await;
+
+        let response = app
+            .post_json(
+                "/api/register",
+                serde_json::json!({"email": "test@mail.test"}),
+            )
+            .send()
+            .await
+            .expect("Should succeed");
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
     async fn test_register_is_rate_limited_after_5_requests_per_minute() {
         let mut user_service = MockUserService::new();
         user_service
             .expect_register_user()
             .returning(|_| UserRegistrationResult::Success);
-        let app = TestApp::new(user_service).await;
+        let registration_mode = UserRegistration::Allowed;
+        let app = TestApp::new(user_service, registration_mode).await;
 
         for i in 0..5 {
             let response = app
@@ -198,7 +256,8 @@ mod tests {
         user_service
             .expect_login_user()
             .returning(|_| UserLoginResult::Success);
-        let app = TestApp::new(user_service).await;
+        let registration_mode = UserRegistration::Allowed;
+        let app = TestApp::new(user_service, registration_mode).await;
 
         for _ in 0..5 {
             app.post_json(
@@ -227,7 +286,8 @@ mod tests {
         user_service
             .expect_validate_auth_link()
             .returning(|_| Ok(AuthLinkValidationResult::Invalid));
-        let app = TestApp::new(user_service).await;
+        let registration_mode = UserRegistration::Allowed;
+        let app = TestApp::new(user_service, registration_mode).await;
 
         // Exhaust the mail-sending endpoints' bucket...
         for _ in 0..5 {
@@ -258,7 +318,8 @@ mod tests {
         user_service
             .expect_validate_auth_link()
             .returning(|_| Ok(AuthLinkValidationResult::Invalid));
-        let app = TestApp::new(user_service).await;
+        let registration_mode = UserRegistration::Allowed;
+        let app = TestApp::new(user_service, registration_mode).await;
 
         for i in 0..30 {
             let response = app

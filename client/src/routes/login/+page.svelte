@@ -41,7 +41,10 @@
 		await fetch(`${PUBLIC_APP_URL}/api/auth_info`, {
 			method: 'GET'
 		})
-	).text()) as 'NoAuth' | 'SinglePassword' | 'EmailBased';
+	).json()) as {
+		strategy: 'NoAuth' | 'SinglePassword' | 'EmailBased';
+		registration: boolean;
+	};
 
 	const callbackPasswordLogin = async () => {
 		if (password.trim().length === 0) {
@@ -115,11 +118,13 @@
 			</div>
 		{/if}
 	{/await}
-{:else if authInfo === 'EmailBased'}
+{:else if authInfo.strategy === 'EmailBased'}
 	{#if emailPromise === undefined}
 		<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
 			<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
-				<legend class="fieldset-legend">Login or register</legend>
+				<legend class="fieldset-legend">
+					{authInfo.registration ? 'Login or register' : 'Login'}
+				</legend>
 
 				<label class="label" for="login-email">Email</label>
 				<input
@@ -137,11 +142,13 @@
 						disabled={!isEmailValid}
 						onclick={callbackEmailLogin}>Login</button
 					>
-					<button
-						class="btn join-item rounded-xs btn-secondary"
-						disabled={!isEmailValid}
-						onclick={callbackRegister}>Register</button
-					>
+					{#if authInfo.registration}
+						<button
+							class="btn join-item rounded-xs btn-secondary"
+							disabled={!isEmailValid}
+							onclick={callbackRegister}>Register</button
+						>
+					{/if}
 				</div>
 			</fieldset>
 		</div>
@@ -156,7 +163,7 @@
 			</div>
 		{/await}
 	{/if}
-{:else if authInfo === 'SinglePassword'}
+{:else if authInfo.strategy === 'SinglePassword'}
 	<div class="mx-2 mb-2 sm:mx-auto sm:w-sm">
 		<fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-4">
 			<legend class="fieldset-legend">Login</legend>
