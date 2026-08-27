@@ -18,6 +18,7 @@ use crate::domain::{
     ports::DateRange,
 };
 
+#[allow(clippy::too_many_arguments)]
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct CreateTrainingMetricRequest {
     user: UserId,
@@ -87,7 +88,7 @@ impl CopyTrainingMetricRequest {
         &self.new_name
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct UpdateTrainingMetricRequest {
     user: UserId,

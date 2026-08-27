@@ -114,7 +114,7 @@ where
             req.window().clone(),
             req.filters().clone().merge_default_sports(&default_sports),
             req.summary().clone(),
-            req.target().clone(),
+            *req.target(),
         );
         let training_metric = TrainingMetric::new(
             id.clone(),

@@ -175,37 +175,30 @@ fn to_body(
             .as_ref()
             .map(|f| SportsResponse::from(&f.sports))
             .unwrap_or_default(),
-        workout_types: request
-            .filters
-            .as_ref()
-            .map(|f| {
-                f.workout_types
-                    .as_ref()
-                    .map(|wt| wt.iter().map(|t| t.to_string()).collect())
-            })
-            .flatten(),
+        workout_types: request.filters.as_ref().and_then(|f| {
+            f.workout_types
+                .as_ref()
+                .map(|wt| wt.iter().map(|t| t.to_string()).collect())
+        }),
         bonked: request
             .filters
             .as_ref()
-            .map(|f| f.bonked.as_ref().map(|b| b.to_string()))
-            .flatten(),
+            .and_then(|f| f.bonked.as_ref().map(|b| b.to_string())),
         rpes: request
             .filters
             .as_ref()
-            .map(|f| f.rpes.as_ref().map(|rs| rs.iter().map(|r| *r).collect()))
-            .flatten(),
+            .and_then(|f| f.rpes.as_ref().map(|rs| rs.to_vec())),
         show_average: request
             .summary
             .average
             .as_ref()
-            .map(|avg| TrainingMetricSummaryAverage::from(avg)),
+            .map(TrainingMetricSummaryAverage::from),
         target,
         values,
         group_by: request
             .window
             .as_ref()
-            .map(|w| w.group_by().as_ref().map(|g| g.to_string()))
-            .flatten(),
+            .and_then(|w| w.group_by().as_ref().map(|g| g.to_string())),
         // Default to Global as not relevant for temporary metric
         scope: APITrainingMetricScope::Global,
         summary,

@@ -303,7 +303,7 @@ impl TryFrom<&APITrainingMetricFilters> for TrainingMetricFilters {
         Ok(Self::new(
             value.sports.clone(),
             value.workout_types.clone(),
-            value.bonked.clone(),
+            value.bonked,
             rpes,
         ))
     }
