@@ -37,6 +37,17 @@ export function none<T>(): Option<T> {
 	};
 }
 
+/**
+ * Sets the inner value of an option inplace, making it a Some<T>.
+ * Useful to avoid breaking Svelte's state reference link when working with contexts,
+ * see https://svelte.dev/docs/svelte/context#Using-context-with-state.
+ */
+export function setInnerValue<T>(value: Option<T>, inner: T): value is Some<T> {
+	value._kind = 'Some';
+	(value as Some<T>).value = inner;
+	return true;
+}
+
 export function map<T, U>(value: Option<T>, closure: (v: T) => U): Option<U> {
 	if (value._kind === 'None') {
 		return none();

@@ -1,17 +1,19 @@
 <script lang="ts">
+	import type { Theme } from '$lib/contexts/theme';
+
 	let {
 		theme,
 		onToggle,
 		class: className = ''
-	}: { theme: 'light' | 'dark'; onToggle: () => void; class?: string } = $props();
+	}: { theme: Theme; onToggle: () => void; class?: string } = $props();
 </script>
 
 <button
 	class={`btn btn-circle btn-ghost btn-sm ${className}`}
 	onclick={onToggle}
-	aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+	aria-label={theme.variant === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
 >
-	{#if theme === 'dark'}
+	{#if theme.variant === 'dark'}
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			viewBox="0 0 24 24"

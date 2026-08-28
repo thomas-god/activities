@@ -1,7 +1,18 @@
 <script lang="ts">
 	import '../app.css';
+	import { loadTheme, setTheme } from '$lib/contexts/theme';
+	import { setAuthInfo } from '$lib/contexts/auth';
+	import { fetchAuthInfo, type AuthInfo } from '$lib/api';
+	import { none, setInnerValue, type Option } from '$lib/Options';
 
 	let { children } = $props();
+
+	// Initialize app-wide contexts
+	let theme = $state(loadTheme());
+	setTheme(theme);
+	let authInfo: Option<AuthInfo> = $state(none());
+	setAuthInfo(authInfo);
+	setInnerValue(authInfo, await fetchAuthInfo());
 </script>
 
 <div class="page-container">

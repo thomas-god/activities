@@ -5,10 +5,10 @@ export type AuthStrategy = 'NoAuth' | 'SinglePassword' | 'EmailBased';
 export interface AuthInfo {
 	strategy: AuthStrategy;
 	/** Whether new users can currently register (only relevant in EmailBased mode). */
-	registration: boolean;
+	registration_open: boolean;
 }
 
-export const getAuthInfo = async (): Promise<AuthInfo> => {
+export const fetchAuthInfo = async (): Promise<AuthInfo> => {
 	const res = await fetch(`${PUBLIC_APP_URL}/api/auth_info`, { method: 'GET' });
 	return (await res.json()) as AuthInfo;
 };

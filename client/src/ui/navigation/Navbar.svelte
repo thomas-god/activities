@@ -2,8 +2,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { getAuthInfo, logout, type AuthInfo } from '$lib/api/auth';
+	import { logout } from '$lib/api/auth';
 	import ThemeToggle from '$ui/shared/ThemeToggle.svelte';
+	import { getTheme, persistTheme } from '$lib/contexts/theme';
+	import { getAuthInfo } from '$lib/contexts/auth';
+	import { isSome } from '$lib/Options';
 
 	interface Cta {
 		label: string;
@@ -12,27 +15,15 @@
 
 	let { ctas = [] }: { ctas?: Cta[] } = $props();
 
-	let authInfo: AuthInfo | undefined = $state(undefined);
-	getAuthInfo().then((info) => (authInfo = info));
+	let authInfo = getAuthInfo();
+	let showLogout = $derived(
+		isSome(authInfo) && authInfo.value !== undefined && authInfo.value.strategy !== 'NoAuth'
+	);
 
-	let showLogout = $derived(authInfo !== undefined && authInfo.strategy !== 'NoAuth');
-
-	let theme = $state<'light' | 'dark'>('light');
-
-	$effect(() => {
-		const stored = localStorage.getItem('theme');
-		theme =
-			stored === 'light' || stored === 'dark'
-				? stored
-				: window.matchMedia('(prefers-color-scheme: dark)').matches
-					? 'dark'
-					: 'light';
-	});
-
+	let theme = getTheme();
 	const toggleTheme = () => {
-		theme = theme === 'dark' ? 'light' : 'dark';
-		localStorage.setItem('theme', theme);
-		document.documentElement.setAttribute('data-theme', theme);
+		theme.variant = theme.variant === 'dark' ? 'light' : 'dark';
+		persistTheme(theme);
 	};
 
 	const classExactPath = (targetPath: string): string => {
@@ -52,7 +43,7 @@
 	let mobileMenuItems = $derived([
 		...ctas,
 		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : []),
-		{ label: theme === 'dark' ? 'Light mode' : 'Dark mode', onClick: toggleTheme }
+		{ label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode', onClick: toggleTheme }
 	]);
 </script>
 
