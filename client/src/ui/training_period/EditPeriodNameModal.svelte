@@ -32,7 +32,7 @@
 </script>
 
 {#if isOpen}
-	<dialog class="modal-open modal">
+	<dialog class="modal modal-open">
 		<div class="modal-box">
 			<form method="dialog">
 				<button

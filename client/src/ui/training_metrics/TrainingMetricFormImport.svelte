@@ -72,7 +72,7 @@
 					{metric.name}
 				</div>
 				<div class="shrink-0">
-					<div class="dropdown-hover dropdown dropdown-end dropdown-bottom">
+					<div class="dropdown dropdown-end dropdown-bottom dropdown-hover">
 						<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">
 							<img src="/icons/info.svg" class="h-5 w-5" alt="Information icon" />
 						</div>

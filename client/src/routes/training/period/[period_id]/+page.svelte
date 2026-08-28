@@ -361,7 +361,7 @@
 								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 								<ul
 									tabindex="0"
-									class="dropdown-content menu z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
+									class="menu dropdown-content z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 								>
 									<li class="w-full">
 										<button onclick={openEditModal}>
