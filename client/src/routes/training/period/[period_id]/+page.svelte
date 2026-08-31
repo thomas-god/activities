@@ -41,6 +41,7 @@
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
+	import { CalendarFold, X } from '@lucide/svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -324,7 +325,7 @@
 				<div class="flex items-center gap-3">
 					<!-- Icon -->
 					<div class="text-2xl leading-none @lg:text-3xl">
-						<img src="/icons/calendar.svg" class="h-8 w-8 @lg:h-10 @lg:w-10" alt="Calendar icon" />
+						<CalendarFold class="size-8 @lg:size-10" />
 					</div>
 
 					<!-- Title and date -->
@@ -370,8 +371,8 @@
 									</li>
 									<li class="w-full">
 										<button onclick={openEditDatesModal}>
-											<img src="/icons/calendar.svg" alt="Calendar icon" class="h-6 w-6" />Edit
-											dates
+											<CalendarFold class="size-5" />
+											Edit dates
 										</button>
 									</li>
 									<li class="w-full">
@@ -468,8 +469,8 @@
 											onclick={() => (selectedActivityId = null)}
 											class="btn join-item btn-sm"
 										>
-											<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
-										>
+											<X class="size-4" />
+										</button>
 									</div>
 									<ActivityDetails
 										activity={selectedActivity}

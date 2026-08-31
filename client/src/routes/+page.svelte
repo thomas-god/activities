@@ -15,6 +15,7 @@
 	import { some } from '$lib/Options';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 	import { resolve } from '$app/paths';
+	import { X } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
 
@@ -147,8 +148,8 @@
 								}}
 								class="btn join-item btn-sm"
 							>
-								<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
-							>
+								<X class="size-4" />
+							</button>
 						</div>
 						<ActivityDetails
 							{activity}

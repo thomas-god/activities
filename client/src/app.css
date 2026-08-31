@@ -52,14 +52,3 @@
 	--color-workout-cross-training-text: #7e2a0c; /* orange-900 */
 	--color-workout-other: #d18ca3;
 }
-
-/* The static icon set is drawn with hardcoded black strokes, so it disappears
-   against dark backgrounds unless inverted. */
-[data-theme='dark'] img[src^='/icons/'] {
-	filter: invert(1);
-}
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme]) img[src^='/icons/'] {
-		filter: invert(1);
-	}
-}

@@ -8,6 +8,7 @@
 		type Sport,
 		type SportCategory
 	} from '$lib/sport';
+	import { CalendarFold } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	let {
@@ -43,7 +44,9 @@
 </script>
 
 <a href={resolve(`/training/period/${period.id}`)} class="item flex flex-1 items-center py-1">
-	<div class="icon"><img src="/icons/calendar.svg" class="h-6 w-6" alt="Calendar icon" /></div>
+	<div class="icon">
+		<CalendarFold class="size-6" />
+	</div>
 	<div class="flex-1">
 		<div class="flex flex-col">
 			<div class=" font-semibold">{period.name}</div>

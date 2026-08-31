@@ -21,6 +21,7 @@
 	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
+	import { CalendarFold, X } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
 
@@ -169,7 +170,7 @@
 							class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
 							onclick={() => setViewMode('calendar')}
 						>
-							<img src="/icons/calendar.svg" class="h-5 w-5" alt="Calendar icon" />
+							<CalendarFold class="size-5" />
 							<span class="ml-1 hidden @sm/main:inline">Calendar</span>
 						</button>
 					</div>
@@ -261,8 +262,8 @@
 								}}
 								class="btn join-item btn-sm"
 							>
-								<img src="/icons/close.svg" alt="Close icon" class="inline h-4 w-4" /></button
-							>
+								<X class="size-4" />
+							</button>
 						</div>
 						<ActivityDetails
 							activity={selectedActivity}

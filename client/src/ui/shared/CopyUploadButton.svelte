@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { isNone, none, some, type Option } from '$lib/Options';
+	import { Check, CopyPlus } from '@lucide/svelte';
 
 	let {
 		onClickCallback,
@@ -12,7 +13,7 @@
 
 {#if isNone(promise)}
 	<button title="Copy" class="btn join-item btn-ghost btn-xs" onclick={setPromise}>
-		<img src="/icons/copy.svg" alt="Copy icon" class="inline h-5 w-5" />
+		<CopyPlus class="size-5" />
 	</button>
 {:else}
 	{#await promise}
@@ -21,7 +22,7 @@
 		</button>
 	{:then _}
 		<button title="Copy" class="btn join-item btn-ghost btn-xs" onclick={() => (promise = none())}>
-			<img src="/icons/check.svg" alt="Check icon" class="inline h-5 w-5" />
+			<Check class="size-5" />
 		</button>
 	{/await}
 {/if}

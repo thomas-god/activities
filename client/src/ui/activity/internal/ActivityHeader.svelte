@@ -5,6 +5,7 @@
 	import type { Activity } from '$lib/api/activities';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { GitCompareArrows } from '@lucide/svelte';
 
 	interface Props {
 		activity: Activity;
@@ -69,7 +70,8 @@
 				<ul tabindex="0" class="menu dropdown-content z-1 w-40 rounded-box bg-base-100 p-2 shadow">
 					<li>
 						<button onclick={() => goto(resolve(`/activities/compare?activities=${activity.id}`))}>
-							<img src="/icons/chart.svg" alt="Chart icon" class="h-6 w-6" /> Compare
+							<GitCompareArrows class="size-5" />
+							Compare
 						</button>
 					</li>
 					<li>

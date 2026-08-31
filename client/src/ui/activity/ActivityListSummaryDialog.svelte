@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ActivityListSummaryItems } from '$lib/api';
 	import { toTitleCase } from '$lib/utils';
+	import { X } from '@lucide/svelte';
 
 	interface SummaryItem {
 		type: 'metric' | 'rpe' | 'workoutType';
@@ -200,7 +201,7 @@
 									onclick={() => removeItem(item)}
 									aria-label={`Remove ${item.displayName}`}
 								>
-									<img src="/icons/close.svg" class="h-4 w-4" alt="Remove icon" />
+									<X class="size-4" />
 								</button>
 							</div>
 						{/each}
