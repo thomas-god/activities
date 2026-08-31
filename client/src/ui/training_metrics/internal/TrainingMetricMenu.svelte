@@ -6,6 +6,7 @@
 	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
 	import { resolve } from '$app/paths';
+	import { Menu, Pencil, Trash2 } from '@lucide/svelte';
 
 	let {
 		metric,
@@ -40,7 +41,7 @@
 
 <div class="dropdown dropdown-end">
 	<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Metric options">
-		<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+		<Menu class="size-5" />
 	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="menu dropdown-content z-1 w-40 rounded-box bg-base-100 p-2 shadow">
@@ -51,12 +52,14 @@
 					editMetricDialog.show();
 				}}
 			>
-				<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" /> Edit metric
+				<Pencil class="size-4" />
+				Edit metric
 			</button>
 		</li>
 		<li>
 			<button onclick={() => (showDeleteModal = true)} class="text-error">
-				<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" /> Delete
+				<Trash2 class="size-4" />
+				Delete
 			</button>
 		</li>
 	</ul>

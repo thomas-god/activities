@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ActivityListSummaryItems } from '$lib/api';
 	import { toTitleCase } from '$lib/utils';
-	import { X } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, List, Plus, X } from '@lucide/svelte';
 
 	interface SummaryItem {
 		type: 'metric' | 'rpe' | 'workoutType';
@@ -167,12 +167,7 @@
 								class:opacity-50={draggedIndex === index}
 							>
 								<!-- Drag handle for desktop -->
-								<img
-									src="/icons/list.svg"
-									class="h-4 w-4 pointer-coarse:hidden"
-									aria-hidden="true"
-									alt="Drag handle"
-								/>
+								<List class="size-4 pointer-coarse:hidden" aria-hidden="true" />
 
 								<!-- Up/down buttons for mobile -->
 								<button
@@ -181,7 +176,7 @@
 									disabled={index === 0}
 									aria-label={`Move ${item.displayName} up`}
 								>
-									<img src="/icons/up.svg" class="h-4 w-4" alt="Up arrow" />
+									<ArrowUp class="size-4" />
 								</button>
 								<button
 									class="btn btn-ghost px-0 btn-xs pointer-fine:hidden"
@@ -189,7 +184,7 @@
 									disabled={index === selectedItems.length - 1}
 									aria-label={`Move ${item.displayName} down`}
 								>
-									<img src="/icons/down.svg" class="h-4 w-4" alt="Down arrow" />
+									<ArrowDown class="size-4" />
 								</button>
 
 								<span class="flex-1 text-sm">{item.displayName}</span>
@@ -231,7 +226,7 @@
 									onclick={() => addItem(item)}
 									aria-label={`Add ${item.displayName}`}
 								>
-									<img src="/icons/plus.svg" class="h-4 w-4" alt="Add icon" />
+									<Plus class="size-4" />
 								</button>
 							</div>
 						{/each}

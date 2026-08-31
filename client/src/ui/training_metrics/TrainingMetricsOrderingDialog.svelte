@@ -8,6 +8,7 @@
 		aggregateFunctionDisplay,
 		type TrainingMetricAggregateFunction
 	} from '$lib/trainingMetric';
+	import { ArrowDown, ArrowUp, List } from '@lucide/svelte';
 
 	interface Props {
 		scope: MetricsOrderingScope;
@@ -170,26 +171,21 @@
 						class="flex cursor-move items-center gap-1 rounded-box bg-base-200 p-3 transition-colors hover:bg-base-300"
 						class:opacity-50={draggedIndex === index}
 					>
-						<img
-							src="/icons/list.svg"
-							class="h-5 w-5 pointer-coarse:hidden"
-							aria-hidden="true"
-							alt="List icon"
-						/>
+						<List class="size-5 pointer-coarse:hidden" aria-hidden="true" />
 
 						<button
 							class="btn btn-ghost px-0 btn-sm pointer-fine:hidden"
 							aria-hidden="true"
 							onclick={() => moveMetricPositionUp(index)}
 						>
-							<img src="/icons/up.svg" class="h-5 w-5" alt="Up arrow icon" />
+							<ArrowUp class="size-5" />
 						</button>
 						<button
 							class="btn btn-ghost px-0 btn-sm pointer-fine:hidden"
 							aria-hidden="true"
 							onclick={() => moveMetricPositionDown(index)}
 						>
-							<img src="/icons/down.svg" class="h-5 w-5" alt="Down arrow icon" />
+							<ArrowDown class="size-5" />
 						</button>
 						<span class="flex-1">{getMetricName(metricId)}</span>
 						<span class="badge badge-sm">{index + 1}</span>

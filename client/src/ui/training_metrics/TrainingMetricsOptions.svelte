@@ -5,6 +5,7 @@
 	import type { TrainingMetricList, TrainingPeriodList } from '$lib/api';
 	import type { MetricsOrderingScope } from '$lib/api/training-metrics-ordering';
 	import { isNone, some, none, unwrapOr, type Option, isSomeAnd } from '$lib/Options';
+	import { ListSortDescending } from '@lucide/svelte';
 
 	interface Props {
 		dates: { start: string; end: string };
@@ -121,7 +122,7 @@
 		{/await}
 	</div>
 	<button onclick={() => trainingMetricsOrderingDialog.open()} class="btn btn-sm">
-		<img src="/icons/order.svg" class="h-4 w-4" alt="List order icon" />
+		<ListSortDescending class="size-4" />
 		Metrics order
 	</button>
 </div>

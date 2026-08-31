@@ -4,6 +4,7 @@
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
 	import { resolve } from '$app/paths';
+	import { MoveLeft } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
 </script>
@@ -11,7 +12,10 @@
 <Navbar />
 
 <div class="mx-auto pt-5 sm:px-4">
-	<button class="btn mb-3 btn-ghost btn-sm" onclick={() => history.back()}>← Back</button>
+	<button class="btn mb-3 btn-ghost btn-sm" onclick={() => history.back()}>
+		<MoveLeft class="size-4" />
+		Back
+	</button>
 	{#await data.activity}
 		<div class="flex w-full flex-col items-center p-4 pt-6">
 			<div class="loading loading-bars"></div>

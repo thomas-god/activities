@@ -5,6 +5,7 @@
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 	import { resolve } from '$app/paths';
+	import { NotebookPen } from '@lucide/svelte';
 
 	let {
 		activity,
@@ -143,7 +144,9 @@
 					p-2
 					text-sm whitespace-pre-wrap text-base-content/70 italic`}
 				>
-					<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
+					<div class="shrink-0">
+						<NotebookPen class="size-5" />
+					</div>
 					<div>
 						{activity.feedback}
 					</div>

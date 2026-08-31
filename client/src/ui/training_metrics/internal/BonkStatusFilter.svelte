@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
 	import { isSome, type Option, none, some } from '$lib/Options';
+	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {
 		bonkStatus = $bindable()
@@ -18,10 +19,10 @@
 			</div>
 			<div class="join shrink-0">
 				<button class="btn join-item btn-xs" onclick={() => (editing = !editing)}>
-					<img src="/icons/edit.svg" alt="Pen editing icon" class="inline h-5 w-5" />
+					<Pencil class="size-4" />
 				</button>
 				<button class="btn join-item btn-xs" onclick={() => (bonkStatus = none())}>
-					<img src="/icons/delete.svg" alt="Bin delete icon" class="inline h-5 w-5" />
+					<Trash2 class="size-4" />
 				</button>
 			</div>
 		</div>

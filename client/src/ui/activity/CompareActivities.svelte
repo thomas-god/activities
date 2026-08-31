@@ -6,6 +6,7 @@
 	import { type ActivityWithTimeseries } from '$lib/api';
 	import type { Metric } from '$lib/colors';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { Settings2 } from '@lucide/svelte';
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
 
@@ -71,7 +72,7 @@
 		<h2 class="pb-1 text-lg">Metrics</h2>
 		<div class="join">
 			<button class="btn join-item btn-sm" onclick={() => offsetsDialogElement.show()}>
-				<img src="/icons/power.svg" alt="Cog icon" class="h-7 w-7" />
+				<Settings2 class="size-5" />
 			</button>
 			{#if zoomDomain !== null}
 				<button class="btn join-item btn-sm" onclick={() => (zoomDomain = null)}>Reset zoom</button>

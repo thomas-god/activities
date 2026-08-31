@@ -41,7 +41,18 @@
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
-	import { CalendarFold, X } from '@lucide/svelte';
+	import {
+		CalendarFold,
+		Import,
+		ListSortDescending,
+		Maximize2,
+		Menu,
+		NotebookPen,
+		Pencil,
+		Plus,
+		Trash2,
+		X
+	} from '@lucide/svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -357,7 +368,7 @@
 							<!-- Action menu dropdown (always inline) -->
 							<div class="dropdown dropdown-end">
 								<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Options">
-									<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+									<Menu class="size-5" />
 								</button>
 								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 								<ul
@@ -366,7 +377,8 @@
 								>
 									<li class="w-full">
 										<button onclick={openEditModal}>
-											<img src="/icons/edit.svg" alt="Edit icon" class="h-6 w-6" />Edit name
+											<Pencil class="size-5" />
+											Edit name
 										</button>
 									</li>
 									<li class="w-full">
@@ -377,7 +389,8 @@
 									</li>
 									<li class="w-full">
 										<button onclick={() => (showDeleteModal = true)} class="text-error">
-											<img src="/icons/delete.svg" alt="Delete icon" class="h-6 w-6" />Delete
+											<Trash2 class="size-6" />
+											Delete
 										</button>
 									</li>
 								</ul>
@@ -407,7 +420,7 @@
 						</div>
 					{:else}
 						<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-							<img src="/icons/note.svg" class="h-4 w-4" alt="Memo icon" />
+							<NotebookPen class="size-4" />
 							<span>Add period description</span>
 						</button>
 					{/if}
@@ -459,12 +472,8 @@
 											onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 											class="btn join-item btn-sm"
 										>
-											<img
-												src="/icons/expand.svg"
-												alt="Close icon"
-												class="inline h-4 w-4"
-											/></button
-										>
+											<Maximize2 class="size-4" />
+										</button>
 										<button
 											onclick={() => (selectedActivityId = null)}
 											class="btn join-item btn-sm"
@@ -627,23 +636,23 @@
 			<div class="join">
 				<div class="tooltip tooltip-bottom" data-tip="New metric">
 					<button onclick={() => newTrainingMetricDialog.show()} class="btn join-item btn-sm">
-						<img src="/icons/plus.svg" class="inline h-5 w-5" alt="Plus sign icon" />
+						<Plus class="size-4" />
 					</button>
 				</div>
 				<div class="tooltip tooltip-bottom" data-tip="Import metric">
 					<button onclick={() => importTrainingMetricDialog.show()} class="btn join-item btn-sm">
-						<img src="/icons/import.svg" class="inline h-5 w-5" alt="Import sign icon" />
+						<Import class="size-4" />
 					</button>
 				</div>
 				<div class="tooltip tooltip-bottom" data-tip="Order metrics">
 					<button onclick={openTrainingMetricsOrderingDialog} class="btn join-item btn-sm">
-						<img src="/icons/order.svg" class="inline h-5 w-5" alt="List order icon" />
+						<ListSortDescending class="size-4" />
 					</button>
 				</div>
 				{#if screenWidth >= 700}
 					<div class="tooltip tooltip-bottom" data-tip="Toggle fullscreen">
 						<button onclick={toggleMetricListFullscreen} class="btn join-item btn-sm">
-							<img src="/icons/expand.svg" class="inline h-4 w-4" alt="Expand/fullscreen icon" />
+							<Maximize2 class="size-4" />
 						</button>
 					</div>
 				{/if}

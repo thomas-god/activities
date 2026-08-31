@@ -11,6 +11,7 @@
 	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
 	import type { RangeFilter } from '$lib/filters';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { Funnel } from '@lucide/svelte';
 
 	let {
 		activities,
@@ -130,7 +131,8 @@
 <button
 	onclick={() => dialogElement.showModal()}
 	class={`btn ${hasActiveFilters ? 'btn-soft btn-info' : 'btn'} join-item btn-sm`}
-	><img src="/icons/filter.svg" alt="Filter icon" class="h-5 w-5" />
+>
+	<Funnel class="size-5" />
 	{#if showLabel}
 		<span class="ml-1 hidden sm:inline">Filters</span>
 	{/if}

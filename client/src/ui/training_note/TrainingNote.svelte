@@ -2,6 +2,7 @@
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
+	import { Menu, NotebookPen, Pencil, Trash2 } from '@lucide/svelte';
 
 	let {
 		note,
@@ -57,7 +58,9 @@
 <div class="item_container @container flex w-full flex-1 flex-col items-stretch p-2 text-left">
 	<!-- Icon + Title and date -->
 	<div class="flex w-full flex-row justify-start">
-		<div class="icon"><img src="/icons/think.svg" class="h-6 w-6" alt="Think buble icon" /></div>
+		<div class="icon">
+			<NotebookPen class="size-6" />
+		</div>
 		<div class="flex flex-1 flex-col">
 			<div class=" font-semibold">Note</div>
 			<div class="flex flex-row items-center gap-2">
@@ -68,7 +71,7 @@
 				</div>
 				<div class="dropdown dropdown-end">
 					<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="More options">
-						<img src="/icons/menu.svg" class="inline h-7 w-7" alt="Menu icon" />
+						<Menu class="size-4" />
 					</button>
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 					<ul
@@ -77,13 +80,13 @@
 					>
 						<li>
 							<button onclick={startEdit}>
-								<img src="/icons/edit.svg" class="h-6 w-6" alt="Edit icon" />
+								<Pencil class="size-4" />
 								<span>Edit</span>
 							</button>
 						</li>
 						<li>
 							<button onclick={confirmDelete} class="text-error">
-								<img src="/icons/delete.svg" class="h-6 w-6" alt="Delete icon" />
+								<Trash2 class="size-4" />
 								<span>Delete</span>
 							</button>
 						</li>
@@ -95,7 +98,9 @@
 	<div
 		class="mx-1 my-1 box-border flex flex-row gap-1 rounded-xl bg-base-300/60 py-2 pl-2 text-sm whitespace-pre-wrap text-base-content/70 italic"
 	>
-		<div class="shrink-0"><img src="/icons/note.svg" class="h-5 w-5" alt="Memo icon" /></div>
+		<div class="shrink-0">
+			<NotebookPen class="size-5" />
+		</div>
 		<div>
 			{note.content}
 		</div>

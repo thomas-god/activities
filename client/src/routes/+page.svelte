@@ -15,7 +15,7 @@
 	import { some } from '$lib/Options';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 	import { resolve } from '$app/paths';
-	import { X } from '@lucide/svelte';
+	import { Maximize2, X } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
 
@@ -139,8 +139,8 @@
 								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 								class="btn join-item btn-sm"
 							>
-								<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button
-							>
+								<Maximize2 class="size-4" />
+							</button>
 							<button
 								onclick={() => {
 									selectedActivityId = null;

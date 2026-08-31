@@ -8,6 +8,7 @@
 	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/trainingMetric';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
+	import { Eye, Info } from '@lucide/svelte';
 
 	let {
 		metrics,
@@ -74,7 +75,7 @@
 				<div class="shrink-0">
 					<div class="dropdown dropdown-end dropdown-bottom dropdown-hover">
 						<div tabindex="0" role="button" class="cursor-help text-xs opacity-50">
-							<img src="/icons/info.svg" class="h-5 w-5" alt="Information icon" />
+							<Info class="size-5" />
 						</div>
 						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 						<div
@@ -98,7 +99,7 @@
 							class="btn join-item btn-ghost btn-xs"
 							onclick={() => (selectedMetric = some(metric))}
 						>
-							<img src="/icons/loop.svg" alt="Magnifying glass icon" class="inline h-5 w-5" />
+							<Eye class="size-5" />
 						</button>
 						<CopyUploadButton
 							onClickCallback={() =>

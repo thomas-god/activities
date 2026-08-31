@@ -21,7 +21,7 @@
 	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
-	import { CalendarFold, X } from '@lucide/svelte';
+	import { ArrowDownToLine, CalendarFold, List, Maximize2, Settings2, X } from '@lucide/svelte';
 
 	let { data }: PageProps = $props();
 
@@ -163,7 +163,7 @@
 							class="btn join-item btn-sm {viewMode === 'list' ? 'btn-active' : 'btn-ghost'}"
 							onclick={() => setViewMode('list')}
 						>
-							<img src="/icons/list.svg" class="h-5 w-5" alt="List icon" />
+							<List class="size-5" />
 							<span class="ml-1 hidden @sm/main:inline">List</span>
 						</button>
 						<button
@@ -192,7 +192,7 @@
 							onclick={openSummaryDialog}
 							title="Customize history view"
 						>
-							<img src="/icons/power.svg" class="h-6 w-6" alt="Gear/customize icon" />
+							<Settings2 class="size-5" />
 							<span class="ml-1 hidden @min-[600px]:inline">Customize</span>
 						</button>
 						<button
@@ -200,7 +200,7 @@
 							onclick={handleDownloadClick}
 							title="Download all activities as ZIP"
 						>
-							<img src="/icons/download.svg" class="h-6 w-6" alt="Download icon" />
+							<ArrowDownToLine class="size-5" />
 							<span class="ml-1 hidden @min-[600px]:inline">Download</span>
 						</button>
 					</div>
@@ -254,8 +254,8 @@
 								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
 								class="btn join-item btn-sm"
 							>
-								<img src="/icons/expand.svg" alt="Close icon" class="inline h-4 w-4" /></button
-							>
+								<Maximize2 class="size-4" />
+							</button>
 							<button
 								onclick={() => {
 									handleActivitySelected(null);

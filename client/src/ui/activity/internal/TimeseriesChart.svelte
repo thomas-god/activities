@@ -5,6 +5,7 @@
 	import { formatMetricValue, matchMetric, textColors } from '$lib/colors';
 	import { untrack } from 'svelte';
 	import type { ActivityWithTimeseries } from '$lib/api';
+	import { RulerDimensionLine, Timer, Undo } from '@lucide/svelte';
 
 	export interface Metric {
 		name: string;
@@ -283,17 +284,13 @@
 <!-- <input type="range" min="1" max="30" bind:value={smoothing} class="range" /> -->
 <div class="flex flex-wrap justify-center pt-2 text-xs sm:text-base">
 	<span class="inline-flex items-center gap-1 px-1.5">
-		<img src="/icons/clock.svg" class="h-4 w-4" alt="Clock icon" />{formatDuration(
-			nearestValues.time
-		)}
+		<Timer class="size-4" />
+		{formatDuration(nearestValues.time)}
 	</span>
 	{#if nearestValues.distance !== undefined && nearestValues.distance !== null}
 		<span class="inline-flex items-center gap-1 px-1.5">
-			<img
-				src="/icons/distance.svg"
-				class="h-4 w-4"
-				alt="Distance icon"
-			/>{nearestValues.distance.toFixed(2)} km
+			<RulerDimensionLine class="size-4" />
+			{nearestValues.distance.toFixed(2)} km
 		</span>
 	{/if}
 	{#each nearestValues.values as value (value.metric)}
@@ -367,30 +364,34 @@
 			<span class="inline-flex overflow-hidden rounded border border-base-300">
 				<button
 					onclick={() => setXAxisMode('time')}
-					class="inline-flex items-center gap-1 px-1.5 py-0.5 {xAxisMode === 'time'
+					class="inline-flex items-center gap-1.5 px-1.5 py-0.5 {xAxisMode === 'time'
 						? 'bg-base-300 font-semibold'
 						: 'opacity-50'}"
 					title="Show by time"
 				>
-					<img src="/icons/clock.svg" class="h-3.5 w-3.5" alt="" />Time
+					<Timer class="size-3.5" />
+					Time
 				</button>
 				<button
 					onclick={() => setXAxisMode('distance')}
-					class="inline-flex items-center gap-1 px-1.5 py-0.5 {xAxisMode === 'distance'
+					class="inline-flex items-center gap-1.5 px-1.5 py-0.5 {xAxisMode === 'distance'
 						? 'bg-base-300 font-semibold'
 						: 'opacity-50'}"
 					title="Show by distance"
 				>
-					<img src="/icons/distance.svg" class="h-3.5 w-3.5" alt="" />Distance
+					<RulerDimensionLine class="size-3.5" />
+					Distance
 				</button>
 			</span>
 		{/if}
 		{#if zoomedIn}
 			<button
 				onclick={resetZoom}
-				class="inline-flex items-center gap-1 opacity-70 hover:opacity-100"
-				><img src="/icons/undo.svg" class="h-4 w-4" alt="Reset zoom" />Reset zoom</button
+				class="inline-flex items-center gap-1.5 opacity-70 hover:opacity-100"
 			>
+				<Undo class="size-4" />
+				Reset zoom
+			</button>
 		{/if}
 	</div>
 {/if}

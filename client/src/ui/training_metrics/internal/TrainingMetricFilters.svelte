@@ -8,6 +8,7 @@
 	import type { WorkoutType } from '$lib/workout-type';
 	import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
 	import SportFilter from '$ui/shared/SportFilter.svelte';
+	import { Plus } from '@lucide/svelte';
 
 	export interface TrainingMetricFiltersType {
 		sports: Option<Sport[]>;
@@ -44,7 +45,7 @@
 			popovertarget={`${uid}-filters-popover`}
 			style="anchor-name:--anchor-1"
 		>
-			<img src="/icons/plus.svg" alt="Plus sign" class="inline h-5 w-5" />
+			<Plus class="size-5" />
 		</button>
 		<ul
 			class="menu dropdown z-1 w-52 rounded-box bg-base-100 p-2 shadow-sm"

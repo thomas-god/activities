@@ -8,6 +8,7 @@
 		type Sport,
 		type SportCategory
 	} from '$lib/sport';
+	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {
 		sports = $bindable(),
@@ -142,7 +143,7 @@
 			</div>
 			<div class="join shrink-0">
 				<button class="btn join-item btn-xs" onclick={() => (editing = !editing)}>
-					<img src="/icons/edit.svg" alt="Pen editing icon" class="inline h-5 w-5" />
+					<Pencil class="size-4" />
 				</button>
 				{#if allowDelete}
 					<button
@@ -152,7 +153,7 @@
 							categories = none();
 						}}
 					>
-						<img src="/icons/delete.svg" alt="Bin delete icon" class="inline h-5 w-5" />
+						<Trash2 class="size-4" />
 					</button>
 				{/if}
 			</div>
