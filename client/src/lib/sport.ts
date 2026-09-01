@@ -14,27 +14,6 @@ export const SportCategories = [
 
 export type SportCategory = (typeof SportCategories)[number];
 
-export const sportCategoryIcons: Record<SportCategory, string> = {
-	Climbing: 'climb.svg',
-	Running: 'run.svg',
-	Cycling: 'bike.svg',
-	Cardio: 'weight.svg',
-	Racket: 'racket.svg',
-	Rowing: 'rowing.svg',
-	Ski: 'ski.svg',
-	Swimming: 'swim.svg',
-	TeamSports: 'teamsports.svg',
-	Walking: 'walk.svg',
-	WaterSports: 'water.svg'
-};
-
-export const getSportCategoryIcon = (category: SportCategory | null): string => {
-	if (category === null) {
-		return 'calories.svg';
-	}
-	return sportCategoryIcons[category];
-};
-
 export const getSportCategoryBgColorClass = (category: SportCategory | null): string => {
 	if (category === 'Running') {
 		return 'bg-running';

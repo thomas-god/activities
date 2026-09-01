@@ -1,13 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { dayjs } from '$lib/duration';
-	import {
-		getSportCategory,
-		SportCategories,
-		sportCategoryIcons,
-		type Sport,
-		type SportCategory
-	} from '$lib/sport';
+	import { getSportCategory, SportCategories, type Sport, type SportCategory } from '$lib/sport';
+	import SportIcon from '$ui/shared/SportIcon.svelte';
 	import { CalendarFold } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -23,23 +18,23 @@
 		};
 	} = $props();
 
-	let sportIcons = $derived.by(() => {
-		const icons: Set<string> = new SvelteSet();
+	let sports = $derived.by(() => {
+		const sports: Set<SportCategory> = new SvelteSet();
 
 		for (const category of period.sports.categories) {
 			if (SportCategories.includes(category)) {
-				icons.add(sportCategoryIcons[category]);
+				sports.add(category);
 			}
 		}
 
 		for (const sport of period.sports.sports) {
 			const category = getSportCategory(sport);
 			if (category !== null) {
-				icons.add(sportCategoryIcons[category]);
+				sports.add(category);
 			}
 		}
 
-		return Array.from(icons);
+		return Array.from(sports).toSorted();
 	});
 </script>
 
@@ -57,8 +52,8 @@
 						: dayjs(period.end).format('MMM D, YYYY')}
 				</div>
 				<div class="flex flex-row items-center gap-2">
-					{#each sportIcons as icon (icon)}
-						<img src={`/icons/${icon}`} class="h-5 w-5" alt={`${icon} icon`} />
+					{#each sports as sport (sport)}
+						<SportIcon {sport} class="size-5" />
 					{:else}
 						<div class="text-sm italic opacity-70">All sports</div>
 					{/each}

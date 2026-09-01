@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { ActivityList } from '$lib/api';
 	import { dayjs } from '$lib/duration';
-	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
+	import { sportDisplay, type SportCategory } from '$lib/sport';
+	import SportIcon from '$ui/shared/SportIcon.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let {
@@ -201,11 +202,7 @@
 							class={`activity-details flex cursor-pointer items-center gap-1 rounded-md rounded-l-none bg-base-200 px-2 py-1 text-xs hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 						>
 							<span class="text-base leading-none">
-								<img
-									src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-									class="h-4 w-4"
-									alt="Sport icon"
-								/>
+								<SportIcon sport={activity.sport_category} class="size-4" />
 							</span>
 							<span class="flex-1 truncate">
 								{activity.name || sportDisplay(activity.sport)}
@@ -246,11 +243,7 @@
 							class={`activity-card flex cursor-pointer items-center gap-3 rounded-lg rounded-l-none bg-base-100 p-3 transition-colors hover:bg-base-300 ${activitySportCategoryClass(activity.sport_category)}`}
 						>
 							<span class="text-2xl leading-none">
-								<img
-									src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-									class="h-6 w-6"
-									alt="Sport icon"
-								/>
+								<SportIcon sport={activity.sport_category} class="size-6" />
 							</span>
 							<div class="flex-1">
 								<div class="font-medium">

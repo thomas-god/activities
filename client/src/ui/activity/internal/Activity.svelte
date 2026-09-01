@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { formatRelativeDuration, dayjs, formatDurationCompactWithUnits } from '$lib/duration';
-	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
+	import { sportDisplay, type SportCategory } from '$lib/sport';
 	import type { Activity, ActivityListSummaryItems } from '$lib/api';
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 	import { resolve } from '$app/paths';
 	import { NotebookPen } from '@lucide/svelte';
+	import SportIcon from '$ui/shared/SportIcon.svelte';
 
 	let {
 		activity,
@@ -74,11 +75,7 @@
 				<div class="flex flex-row items-center" style:min-width="350px" style:flex-basis="350px">
 					<div class={`icon_container ${categoryClass(activity.sport_category)}`}>
 						<div class={`icon ${categoryClass(activity.sport_category)}`}>
-							<img
-								src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-								class="h-6 w-6"
-								alt="Sport icon"
-							/>
+							<SportIcon sport={activity.sport_category} class="size-6" />
 						</div>
 					</div>
 

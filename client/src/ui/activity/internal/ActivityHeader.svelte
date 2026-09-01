@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { localiseDateTime } from '$lib/duration';
 	import EditableActivityName from '$ui/activity/internal/EditableActivityName.svelte';
-	import { getSportCategoryIcon, sportDisplay, type SportCategory } from '$lib/sport';
+	import { sportDisplay, type SportCategory } from '$lib/sport';
 	import type { Activity } from '$lib/api/activities';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, GitCompareArrows, Menu, Trash2 } from '@lucide/svelte';
+	import SportIcon from '$ui/shared/SportIcon.svelte';
 
 	interface Props {
 		activity: Activity;
@@ -47,11 +48,7 @@
 	class={`item flex flex-1 items-center bg-base-100 p-3 ${categoryClass(activity.sport_category)} ${compact ? 'compact' : ''}`}
 >
 	<div class={`icon ${categoryClass(activity.sport_category)}`}>
-		<img
-			src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-			class="h-8 w-8"
-			alt="Sport icon"
-		/>
+		<SportIcon sport={activity.sport_category} class="size-8" />
 	</div>
 	<div class="flex flex-1 flex-col">
 		<div class="mb-1 text-lg font-semibold">

@@ -2,16 +2,12 @@
 	import type { ActivityList } from '$lib/api';
 	import { RPE_VALUES, getRpeColor } from '$lib/rpe';
 	import { WORKOUT_TYPE_LABELS, getWorkoutTypeColor, type WorkoutType } from '$lib/workout-type';
-	import {
-		getSportCategory,
-		sportCategoryDisplay,
-		sportCategoryIcons,
-		type SportCategory
-	} from '$lib/sport';
+	import { getSportCategory, sportCategoryDisplay, type SportCategory } from '$lib/sport';
 	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
 	import type { RangeFilter } from '$lib/filters';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Funnel } from '@lucide/svelte';
+	import SportIcon from './SportIcon.svelte';
 
 	let {
 		activities,
@@ -168,11 +164,7 @@
 									class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
 									onclick={() => toggleSportCategory(category)}
 								>
-									<img
-										src={`/icons/${sportCategoryIcons[category]}`}
-										class="h-6 w-6"
-										alt="Menu icon"
-									/>
+									<SportIcon sport={category} class="size-6" />
 									<span>{sportCategoryDisplay(category)}</span>
 								</button>
 							{/each}

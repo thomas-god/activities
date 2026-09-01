@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dayjs } from '$lib/duration';
-	import { getSportCategory, getSportCategoryIcon, type SportCategory } from '$lib/sport';
+	import { getSportCategory, type SportCategory } from '$lib/sport';
 	import { goto, invalidate } from '$app/navigation';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$env/static/public';
@@ -53,6 +53,7 @@
 		Trash2,
 		X
 	} from '@lucide/svelte';
+	import SportIcon from '$ui/shared/SportIcon.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -194,14 +195,13 @@
 		const categorySet: Set<SportCategory | 'Other'> = new Set(sports.categories);
 		const map = new SvelteMap<
 			string,
-			{ category: SportCategory | 'Other'; icon: string; sports: string[]; showAll: boolean }
+			{ category: SportCategory | 'Other'; sports: string[]; showAll: boolean }
 		>();
 
 		// First, seed with explicit categories (these mean "all sports")
 		for (const category of sports.categories) {
 			map.set(category, {
 				category: category,
-				icon: getSportCategoryIcon(category),
 				sports: [],
 				showAll: true
 			});
@@ -220,7 +220,6 @@
 				if (!map.has(key)) {
 					map.set(key, {
 						category: key,
-						icon: getSportCategoryIcon(category),
 						sports: [],
 						showAll: false
 					});
@@ -233,7 +232,6 @@
 					if (!map.has(other)) {
 						map.set(other, {
 							category: other,
-							icon: getSportCategoryIcon(null),
 							sports: [],
 							showAll: false
 						});
@@ -358,7 +356,7 @@
 												? `${group.category} (all sub-sports)`
 												: `${group.category}: ${group.sports.join(', ')}`}
 										>
-											<img src={`/icons/${group.icon}`} class="h-5 w-5" alt="Sport icon" />
+											<SportIcon sport={group.category} class="size-5" />
 										</div>
 									{/each}
 								</div>

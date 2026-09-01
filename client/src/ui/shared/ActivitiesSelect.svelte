@@ -6,8 +6,8 @@
 	import { onMount } from 'svelte';
 	import ActivitiesFilters from './ActivitiesFilters.svelte';
 	import { emptyFilters } from '$lib/filters';
-	import { getSportCategoryIcon } from '$lib/sport';
 	import { resolve } from '$app/paths';
+	import SportIcon from './SportIcon.svelte';
 
 	let {
 		activities,
@@ -68,11 +68,7 @@
 	{#each selectedActivities as activity (activity.id)}
 		<div class="flex flex-row items-center gap-2 py-0.5">
 			<div class="shrink-0">
-				<img
-					src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-					class="h-6 w-6"
-					alt="Sport icon"
-				/>
+				<SportIcon sport={activity.sport_category} class="size-6" />
 			</div>
 			<button
 				class="btn mr-1 shrink-0 btn-secondary btn-xs"
@@ -122,11 +118,7 @@
 			{#if !selectedIds.includes(activity.id) && activityMatchesSearch(activity)}
 				<div class="flex flex-row items-center gap-2 py-0.5">
 					<div class="shrink-0">
-						<img
-							src={`/icons/${getSportCategoryIcon(activity.sport_category)}`}
-							class="h-6 w-6"
-							alt="Sport icon"
-						/>
+						<SportIcon sport={activity.sport_category} class="size-6" />
 					</div>
 					<button
 						class="btn mr-1 shrink-0 btn-primary btn-xs"
