@@ -1,6 +1,10 @@
 import { browser } from '$app/environment';
 import { createContext } from 'svelte';
 
+// Make sure corresponding themes are enable in `app.css` daisyui's plugin
+const LIGHT_THEME = 'nord';
+const DARK_THEME = 'dim';
+
 export interface Theme {
 	variant: 'dark' | 'light';
 }
@@ -30,6 +34,15 @@ export const loadTheme = (): Theme => {
 export const persistTheme = (newTheme: Theme) => {
 	if (browser) {
 		localStorage.setItem('theme', newTheme.variant);
-		document.documentElement.setAttribute('data-theme', newTheme.variant);
+
+		document.documentElement.setAttribute('data-theme', themeName(newTheme.variant));
+	}
+};
+
+const themeName = (variant: Theme['variant']): string => {
+	if (variant === 'dark') {
+		return DARK_THEME;
+	} else {
+		return LIGHT_THEME;
 	}
 };
