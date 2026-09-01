@@ -2,6 +2,15 @@
 	import type { ActivityWithTimeseries } from '$lib/api';
 	import { formatDuration } from '$lib/duration';
 	import { paceToString } from '$lib/speed';
+	import {
+		Gauge,
+		HeartPulse,
+		Mountain,
+		RulerDimensionLine,
+		Timer,
+		UtensilsCrossed,
+		Zap
+	} from '@lucide/svelte';
 
 	let { activity }: { activity: ActivityWithTimeseries } = $props();
 
@@ -25,8 +34,15 @@
 	let normalizedPower = $derived(metrics.get('NormalizedPower'));
 
 	type StatRow = {
-		icon: string;
-		label: string;
+		label:
+			| 'Duration'
+			| 'Distance'
+			| 'Pace'
+			| 'Speed'
+			| 'Elevation'
+			| 'Heart rate'
+			| 'Power'
+			| 'Calories';
 		value: string | undefined;
 		unit: string;
 		legend?: string;
@@ -37,7 +53,6 @@
 
 		if (duration !== undefined) {
 			rows.push({
-				icon: 'duration.svg',
 				label: 'Duration',
 				value: formatDuration(duration.value),
 				unit: ''
@@ -46,7 +61,6 @@
 
 		if (distance !== undefined) {
 			rows.push({
-				icon: 'distance.svg',
 				label: 'Distance',
 				value: `${distance.toFixed(3)}`,
 				unit: 'km'
@@ -57,7 +71,6 @@
 		if (averageSpeed !== undefined) {
 			if (activity.sport_category === 'Running' && averagePace !== undefined) {
 				rows.push({
-					icon: 'pace.svg',
 					label: 'Pace',
 					value: paceToString((averagePace.value! * 1000) / 60),
 					unit: '/km',
@@ -65,7 +78,6 @@
 				});
 			} else {
 				rows.push({
-					icon: 'pace.svg',
 					label: 'Speed',
 					value: `${(averageSpeed.value * 3.6).toFixed(2)}`,
 					unit: 'km/h',
@@ -76,7 +88,6 @@
 
 		if (elevation !== undefined) {
 			rows.push({
-				icon: 'elevation.svg',
 				label: 'Elevation',
 				value: `${elevation.value.toFixed(0)}`,
 				unit: 'm'
@@ -85,7 +96,6 @@
 
 		if (avgHeartRate !== undefined && maxHeartRate !== undefined) {
 			rows.push({
-				icon: 'cardio.svg',
 				label: 'Heart rate',
 				value: `${avgHeartRate.value.toFixed(0)} / ${maxHeartRate.value.toFixed(0)}`,
 				unit: 'bpm',
@@ -95,7 +105,6 @@
 
 		if (calories !== undefined) {
 			rows.push({
-				icon: 'calories.svg',
 				label: 'Calories',
 				value: `${calories.value.toFixed(0)}`,
 				unit: 'kcal'
@@ -104,7 +113,6 @@
 
 		if (averagePower !== undefined && normalizedPower !== undefined) {
 			rows.push({
-				icon: 'power.svg',
 				label: 'Power',
 				value: `${averagePower.value.toFixed(0)} / ${normalizedPower.value.toFixed(0)}`,
 				unit: 'W',
@@ -120,7 +128,7 @@
 	<div class="hidden @lg:grid @lg:grid-cols-2 @min-[52rem]:grid-cols-3">
 		{#each statRows as row (row.label)}
 			<div class="flex items-center gap-3 border-b border-base-300 p-4 hover:bg-base-200">
-				<img src={`/icons/${row.icon}`} class="h-6 w-6" alt={`${row.label} icon`} />
+				{@render StatisticIcon(row.label)}
 				<div class=" flex-1 font-medium">{row.label}</div>
 				<div class="text-right {row.legend ? '' : 'self-center'}">
 					<div class="text-lg font-semibold">{row.value || '-'} {row.unit}</div>
@@ -157,3 +165,22 @@
 		{/each}
 	</div>
 </div>
+
+{#snippet StatisticIcon(statistic: StatRow['label'])}
+	{@const iconClass = 'size-5'}
+	{#if statistic === 'Calories'}
+		<UtensilsCrossed class={iconClass} />
+	{:else if statistic === 'Distance'}
+		<RulerDimensionLine class={iconClass} />
+	{:else if statistic === 'Duration'}
+		<Timer class={iconClass} />
+	{:else if statistic === 'Elevation'}
+		<Mountain class={iconClass} />
+	{:else if statistic === 'Heart rate'}
+		<HeartPulse class={iconClass} />
+	{:else if statistic === 'Pace' || statistic === 'Speed'}
+		<Gauge class={iconClass} />
+	{:else if statistic === 'Power'}
+		<Zap class={iconClass} />
+	{/if}
+{/snippet}
