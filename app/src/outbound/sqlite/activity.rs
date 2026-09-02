@@ -171,12 +171,6 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
-        sqlx::query("DELETE FROM t_activities WHERE id = ?1")
-            .bind(activity)
-            .execute(&mut *tx)
-            .await
-            .map(|_| ())
-            .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))?;
 
         sqlx::query("DELETE FROM t_activities_v2 WHERE id = ?1")
             .bind(activity)
@@ -550,14 +544,6 @@ where
     ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
 
-        sqlx::query("UPDATE t_activities SET name = ?1 WHERE id = ?2;")
-            .bind(name.clone())
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())?;
-
         sqlx::query("UPDATE t_activities_v2 SET name = ?1 WHERE id = ?2;")
             .bind(name)
             .bind(id)
@@ -576,14 +562,6 @@ where
         rpe: Option<ActivityRpe>,
     ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
-
-        sqlx::query("UPDATE t_activities SET rpe = ?1 WHERE id = ?2;")
-            .bind(rpe)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())?;
 
         sqlx::query("UPDATE t_activities_v2 SET rpe = ?1 WHERE id = ?2;")
             .bind(rpe)
@@ -604,14 +582,6 @@ where
     ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
 
-        sqlx::query("UPDATE t_activities SET workout_type = ?1 WHERE id = ?2;")
-            .bind(workout_type)
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())?;
-
         sqlx::query("UPDATE t_activities_v2 SET workout_type = ?1 WHERE id = ?2;")
             .bind(workout_type)
             .bind(id)
@@ -631,14 +601,6 @@ where
     ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
 
-        sqlx::query("UPDATE t_activities SET nutrition = ?1 WHERE id = ?2;")
-            .bind(nutrition.clone())
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())?;
-
         sqlx::query("UPDATE t_activities_v2 SET nutrition = ?1 WHERE id = ?2;")
             .bind(nutrition)
             .bind(id)
@@ -657,14 +619,6 @@ where
         feedback: Option<ActivityFeedback>,
     ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
-
-        sqlx::query("UPDATE t_activities SET feedback = ?1 WHERE id = ?2;")
-            .bind(feedback.clone())
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|err| anyhow!(err))
-            .map(|_| ())?;
 
         sqlx::query("UPDATE t_activities_v2 SET feedback = ?1 WHERE id = ?2;")
             .bind(feedback)
@@ -687,29 +641,6 @@ where
             .begin()
             .await
             .map_err(|err| SaveActivityError::Unknown(err.into()))?;
-
-        sqlx::query(
-            "INSERT INTO t_activities VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
-            );",
-        )
-        .bind(activity.id())
-        .bind(activity.user())
-        .bind(activity.name())
-        .bind(activity.start_time().datetime())
-        .bind(activity.sport())
-        .bind(activity.statistics())
-        .bind(activity.natural_key())
-        .bind(activity.rpe())
-        .bind(activity.workout_type())
-        .bind(activity.nutrition())
-        .bind(activity.feedback())
-        .execute(&mut *tx)
-        .await
-        .map(|_| ())
-        .map_err(|err| {
-            SaveActivityError::Unknown(anyhow!("Unable to save activity {}. {err}", activity.id()))
-        })?;
 
         sqlx::query(
             "INSERT INTO t_activities_v2 (
@@ -831,69 +762,23 @@ mod test_sqlite_activity_repository {
             .unwrap();
     }
 
-    fn build_activity() -> ActivityWithParsedData {
-        ActivityWithParsedData::new(
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            ),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2, 3]),
-                TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1),
-                    ActiveTime::Running(2),
-                    ActiveTime::Running(3),
-                ]),
-                vec![],
-                vec![Timeseries::new(
-                    TimeseriesMetric::Speed,
-                    vec![
-                        Some(TimeseriesValue::Float(5.5)),
-                        Some(TimeseriesValue::Int(6)),
-                        Some(TimeseriesValue::Float(6.5)),
-                        Some(TimeseriesValue::Int(7)),
-                    ],
-                )],
-            )
-            .unwrap(),
-            ActivityStatistics::default(),
+    fn build_activity() -> Activity {
+        Activity::new_empty(
+            ActivityId::new(),
+            UserId::test_default(),
+            ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+            ActivityDuration::default(),
+            Sport::Cycling,
         )
     }
 
-    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> ActivityWithParsedData {
-        ActivityWithParsedData::new(
-            Activity::new_empty(
-                ActivityId::new(),
-                UserId::test_default(),
-                ActivityStartTime::new(*start),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            ),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2, 3]),
-                TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1),
-                    ActiveTime::Running(2),
-                    ActiveTime::Running(3),
-                ]),
-                vec![],
-                vec![Timeseries::new(
-                    TimeseriesMetric::Speed,
-                    vec![
-                        Some(TimeseriesValue::Float(5.5)),
-                        Some(TimeseriesValue::Int(6)),
-                        Some(TimeseriesValue::Float(6.5)),
-                        Some(TimeseriesValue::Int(7)),
-                    ],
-                )],
-            )
-            .unwrap(),
-            ActivityStatistics::default(),
+    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> Activity {
+        Activity::new_empty(
+            ActivityId::new(),
+            UserId::test_default(),
+            ActivityStartTime::new(*start),
+            ActivityDuration::default(),
+            Sport::Cycling,
         )
     }
 
@@ -913,14 +798,6 @@ mod test_sqlite_activity_repository {
             .save_activity(&activity)
             .await
             .expect("Should have succeed");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            1
-        );
 
         assert_eq!(
             sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
@@ -954,14 +831,6 @@ mod test_sqlite_activity_repository {
             .expect_err("Should have failed");
 
         assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            1
-        );
-
-        assert_eq!(
             sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
                 .fetch_one(&repository.readers)
                 .await
@@ -988,13 +857,6 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            1
-        );
-        assert_eq!(
             sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
                 .fetch_one(&repository.readers)
                 .await
@@ -1007,13 +869,6 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Deletion should have succeeded");
 
-        assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            0
-        );
         assert_eq!(
             sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
                 .fetch_one(&repository.readers)
@@ -1057,14 +912,6 @@ mod test_sqlite_activity_repository {
             .save_activity(&activity)
             .await
             .expect("Insertion should have succeed");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            1
-        );
 
         let res = repository
             .get_activity(activity.id())
@@ -1380,15 +1227,6 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(
             sqlx::query_scalar::<_, u64>(
-                "select count(*) from t_activities where name = 'a new name';"
-            )
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            0
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, u64>(
                 "select count(*) from t_activities_v2 where name = 'a new name';"
             )
             .fetch_one(&repository.readers)
@@ -1405,15 +1243,6 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should not have err");
 
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityName>>(
-                "select name from t_activities where name = 'a new name';"
-            )
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(ActivityName::from("a new name"))
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityName>>(
                 "select name from t_activities_v2 where name = 'a new name';"
@@ -1444,16 +1273,6 @@ mod test_sqlite_activity_repository {
         // Initially, RPE should be NULL
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityRpe>>(
-                "select rpe from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityRpe>>(
                 "select rpe from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1468,17 +1287,6 @@ mod test_sqlite_activity_repository {
             .update_activity_rpe(activity.id(), Some(ActivityRpe::Five))
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityRpe>>(
-                r#"select rpe as "rpe?" from t_activities where id = ?1;"#
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(ActivityRpe::Five)
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityRpe>>(
                 r#"select rpe as "rpe?" from t_activities_v2 where id = ?1;"#
@@ -1495,17 +1303,6 @@ mod test_sqlite_activity_repository {
             .update_activity_rpe(activity.id(), None)
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityRpe>>(
-                "select rpe from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityRpe>>(
                 "select rpe from t_activities_v2 where id = ?1;"
@@ -1537,16 +1334,6 @@ mod test_sqlite_activity_repository {
         // Initially, workout_type should be NULL
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
-                "select workout_type from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1564,17 +1351,6 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
-                "select workout_type from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(WorkoutType::Intervals)
-        );
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1589,17 +1365,6 @@ mod test_sqlite_activity_repository {
             .update_activity_workout_type(activity.id(), Some(WorkoutType::Tempo))
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<WorkoutType>>(
-                "select workout_type from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(WorkoutType::Tempo)
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities_v2 where id = ?1;"
@@ -1616,17 +1381,6 @@ mod test_sqlite_activity_repository {
             .update_activity_workout_type(activity.id(), None)
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<WorkoutType>>(
-                "select workout_type from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<WorkoutType>>(
                 "select workout_type from t_activities_v2 where id = ?1;"
@@ -1658,16 +1412,6 @@ mod test_sqlite_activity_repository {
         // Initially, nutrition should be NULL
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
-                "select nutrition from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1686,17 +1430,6 @@ mod test_sqlite_activity_repository {
             .update_activity_nutrition(activity.id(), Some(nutrition_bonked.clone()))
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
-                "select nutrition from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(nutrition_bonked.clone())
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities_v2 where id = ?1;"
@@ -1717,17 +1450,6 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
-                "select nutrition from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(nutrition_none.clone())
-        );
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1742,17 +1464,6 @@ mod test_sqlite_activity_repository {
             .update_activity_nutrition(activity.id(), None)
             .await
             .expect("Should not have err");
-
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityNutrition>>(
-                "select nutrition from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityNutrition>>(
                 "select nutrition from t_activities_v2 where id = ?1;"
@@ -1784,16 +1495,6 @@ mod test_sqlite_activity_repository {
         // Initially, feedback should be NULL
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
-                "select feedback from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1810,16 +1511,6 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should not have err");
 
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
-                "select feedback from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(feedback_text.clone())
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities_v2 where id = ?1;"
@@ -1840,16 +1531,6 @@ mod test_sqlite_activity_repository {
 
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
-                "select feedback from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            Some(feedback_updated.clone())
-        );
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities_v2 where id = ?1;"
             )
             .bind(activity.id())
@@ -1865,16 +1546,6 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should not have err");
 
-        assert_eq!(
-            sqlx::query_scalar::<_, Option<ActivityFeedback>>(
-                "select feedback from t_activities where id = ?1;"
-            )
-            .bind(activity.id())
-            .fetch_one(&repository.readers)
-            .await
-            .unwrap(),
-            None
-        );
         assert_eq!(
             sqlx::query_scalar::<_, Option<ActivityFeedback>>(
                 "select feedback from t_activities_v2 where id = ?1;"
