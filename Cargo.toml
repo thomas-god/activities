@@ -2,3 +2,6 @@
 resolver = "2"
 members = [ "app", "fit-codegen", "fit-parser"]
 default-members = ["app"]
+
+[profile.dev]
+debug = "line-tables-only"
