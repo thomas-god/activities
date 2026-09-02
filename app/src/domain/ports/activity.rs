@@ -512,8 +512,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn save_activity(
         &self,
-        // TODO: keep `ActivityWithParsedData` until `t_activities` is decommissioned
-        activity: &ActivityWithParsedData,
+        activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
     fn list_activities(

@@ -632,10 +632,7 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn save_activity(
-        &self,
-        activity: &ActivityWithParsedData,
-    ) -> Result<(), SaveActivityError> {
+    async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
         let mut tx = self
             .writer
             .begin()
