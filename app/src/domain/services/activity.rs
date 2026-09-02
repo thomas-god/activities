@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use log::warn;
 
 use crate::domain::{
     models::{
@@ -12,10 +13,11 @@ use crate::domain::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, GetAllActivitiesError, GetAllActivitiesRequest,
         GetRawActivityError, GetRawActivityRequest, IActivityService, ListActivitiesError,
-        ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest, RawActivity,
-        RawDataRepository, UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
-        UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
-        UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
+        ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest, PatchActivityError,
+        PatchActivityRequest, RawActivity, RawDataRepository, UpdateActivityFeedbackError,
+        UpdateActivityFeedbackRequest, UpdateActivityNutritionError,
+        UpdateActivityNutritionRequest, UpdateActivityRpeError, UpdateActivityRpeRequest,
+        UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
     },
 };
 
@@ -242,6 +244,38 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
+    async fn patch_activity(&self, req: PatchActivityRequest) -> Result<(), PatchActivityError> {
+        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
+            return Err(PatchActivityError::ActivityDoesNotExist(
+                req.activity().clone(),
+            ));
+        };
+
+        if activity.user() != req.user() {
+            warn!(
+                "User {} is trying to modify activity {} without owning it",
+                req.user(),
+                req.activity()
+            );
+            return Err(PatchActivityError::UserDoesNotOwnActivity(
+                req.user().clone(),
+                req.activity().clone(),
+            ));
+        }
+
+        let new_activity = activity.apply_patch(req.as_patch());
+
+        self.activity_repository
+            .save_activity(&new_activity)
+            .await
+            .map_err(|err| {
+                anyhow!(err).context(format!("Failed to persist activity {}", new_activity.id()))
+            })?;
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err)]
     async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
         let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(ModifyActivityError::ActivityDoesNotExist(
@@ -428,8 +462,9 @@ pub mod test_utils {
     };
     use crate::domain::ports::activity::{
         DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
-        GetRawActivityRequest, ListActivitiesError, ModifyActivityError, RawActivity,
-        SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
+        GetRawActivityRequest, ListActivitiesError, ModifyActivityError, PatchActivityError,
+        PatchActivityRequest, RawActivity, SaveActivityError, SimilarActivityError,
+        UpdateActivityMetricError,
     };
 
     mock! {
@@ -481,6 +516,11 @@ pub mod test_utils {
                 activity_id: &ActivityId,
                 metrics: &[ActivityMetricV2],
             ) -> Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>;
+
+            async fn patch_activity(
+                &self,
+                req: PatchActivityRequest
+            ) -> Result<(), PatchActivityError>;
 
             async fn modify_activity(
                 &self,
@@ -922,6 +962,147 @@ mod tests_activity_service {
 
         let res = service.modify_activity(req).await;
         assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_ok() {
+        use crate::domain::models::activity::{ActivityFeedback, ActivityPatch, ActivityRpe};
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new(
+                ActivityId::from("test_activity"),
+                UserId::test_default(),
+                Some(ActivityName::from("Long ride")),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+                None,
+                None,
+                None,
+                None,
+            )))
+        });
+        // Only the patched fields should change, the others must be preserved as-is.
+        activity_repository
+            .expect_save_activity()
+            .withf(|activity| {
+                activity.id() == &ActivityId::from("test_activity")
+                    && activity.rpe().as_ref() == Some(&ActivityRpe::Five)
+                    && activity.feedback().as_ref().map(|f| f.as_str()) == Some("Great ride!")
+                    && activity.name().map(|n| n.to_string()) == Some("Long ride".to_string())
+                    && activity.nutrition().is_none()
+            })
+            .returning(|_| Ok(()));
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let service = ActivityService::new(activity_repository, raw_data_repository);
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test_activity"),
+            UserId::test_default(),
+            ActivityPatch::new(
+                None,
+                Some(Some(ActivityRpe::Five)),
+                None,
+                None,
+                Some(Some(ActivityFeedback::from("Great ride!"))),
+            ),
+        );
+
+        let res = service.patch_activity(req).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_not_found() {
+        use crate::domain::models::activity::ActivityPatch;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_| Ok(None));
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let service = ActivityService::new(activity_repository, raw_data_repository);
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test"),
+            UserId::test_default(),
+            ActivityPatch::default(),
+        );
+
+        let Err(PatchActivityError::ActivityDoesNotExist(activity_id)) =
+            service.patch_activity(req).await
+        else {
+            unreachable!("Should have returned an error")
+        };
+        assert_eq!(activity_id, ActivityId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_not_owned_by_user() {
+        use crate::domain::models::activity::ActivityPatch;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new_empty(
+                ActivityId::from("test_activity"),
+                "another_user".into(),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            )))
+        });
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let service = ActivityService::new(activity_repository, raw_data_repository);
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test_activity"),
+            UserId::test_default(),
+            ActivityPatch::default(),
+        );
+
+        let Err(PatchActivityError::UserDoesNotOwnActivity(user, activity_id)) =
+            service.patch_activity(req).await
+        else {
+            unreachable!("Should have returned an error")
+        };
+        assert_eq!(user, UserId::test_default());
+        assert_eq!(activity_id, ActivityId::from("test_activity"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_save_error() {
+        use crate::domain::models::activity::ActivityPatch;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new_empty(
+                ActivityId::from("test_activity"),
+                UserId::test_default(),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            )))
+        });
+        activity_repository
+            .expect_save_activity()
+            .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
+
+        let raw_data_repository = MockRawDataRepository::default();
+        let service = ActivityService::new(activity_repository, raw_data_repository);
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test_activity"),
+            UserId::test_default(),
+            ActivityPatch::default(),
+        );
+
+        let Err(PatchActivityError::Unknown(_)) = service.patch_activity(req).await else {
+            unreachable!("Should have returned an error")
+        };
     }
 
     #[tokio::test]

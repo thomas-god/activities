@@ -9,9 +9,9 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
-            ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-            ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
-            Sport, WorkoutType,
+            ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityPatch,
+            ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+            ActivityWithParsedData, Sport, WorkoutType,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -61,6 +61,11 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         activity_id: &ActivityId,
         metrics: &[ActivityMetricV2],
     ) -> impl Future<Output = Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>> + Send;
+
+    fn patch_activity(
+        &self,
+        req: PatchActivityRequest,
+    ) -> impl Future<Output = Result<(), PatchActivityError>> + Send;
 
     fn modify_activity(
         &self,
@@ -190,6 +195,37 @@ impl RawContent {
     pub fn raw_content(self) -> Vec<u8> {
         self.content
     }
+}
+#[derive(Debug, Clone, Constructor, Default)]
+pub struct PatchActivityRequest {
+    activity: ActivityId,
+    user: UserId,
+    patch: ActivityPatch,
+}
+
+impl PatchActivityRequest {
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn patch(&self) -> &ActivityPatch {
+        &self.patch
+    }
+    pub fn as_patch(self) -> ActivityPatch {
+        self.patch
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum PatchActivityError {
+    #[error("Activity {0} does not exists")]
+    ActivityDoesNotExist(ActivityId),
+    #[error("User {0} does not own activity {1}")]
+    UserDoesNotOwnActivity(UserId, ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Clone, Constructor, Default)]
