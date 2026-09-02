@@ -153,6 +153,23 @@ impl Activity {
         &self.feedback
     }
 
+    pub fn apply_patch(self, patch: ActivityPatch) -> Self {
+        Self {
+            // Immutable fields
+            id: self.id,
+            user: self.user,
+            start_time: self.start_time,
+            duration: self.duration,
+            sport: self.sport,
+            // Fields that can be patched
+            name: patch.name.unwrap_or(self.name),
+            rpe: patch.rpe.unwrap_or(self.rpe),
+            workout_type: patch.workout_type.unwrap_or(self.workout_type),
+            nutrition: patch.nutrition.unwrap_or(self.nutrition),
+            feedback: patch.feedback.unwrap_or(self.feedback),
+        }
+    }
+
     pub fn to_search_document(
         &self,
         event: SearchDocumentEvent,
@@ -179,6 +196,18 @@ impl Activity {
             now,
         )
     }
+}
+
+/// Optionnally patch an activity's fields.
+/// Double Option<Option<...>> to allow partial update, i.e. without needing to specify fields that
+/// are not patched.
+#[derive(Debug, Clone, Constructor, Default)]
+pub struct ActivityPatch {
+    name: Option<Option<ActivityName>>,
+    rpe: Option<Option<ActivityRpe>>,
+    workout_type: Option<Option<WorkoutType>>,
+    nutrition: Option<Option<ActivityNutrition>>,
+    feedback: Option<Option<ActivityFeedback>>,
 }
 
 /// [Activity] enriched with data parsed from the raw file ([ActivityTimeseries], [ActivityStatistics]).
@@ -1626,6 +1655,113 @@ mod tests {
         );
 
         assert_ne!(first_activity.natural_key(), second_activity.natural_key());
+    }
+
+    fn activity_with_all_optional_fields() -> Activity {
+        Activity::new(
+            ActivityId::from("activity-1"),
+            UserId::test_default(),
+            Some(ActivityName::from("Morning Run")),
+            ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
+            Sport::Cycling,
+            Some(ActivityRpe::Five),
+            Some(WorkoutType::Tempo),
+            Some(ActivityNutrition::new(
+                BonkStatus::None,
+                Some("one gel".to_string()),
+            )),
+            Some(ActivityFeedback::from("legs felt good")),
+        )
+    }
+
+    #[test]
+    fn test_apply_patch_updates_patchable_fields() {
+        let activity = activity_with_all_optional_fields();
+        let patch = ActivityPatch::new(
+            Some(Some(ActivityName::from("Interval Session"))),
+            Some(Some(ActivityRpe::Eight)),
+            Some(Some(WorkoutType::Intervals)),
+            Some(Some(ActivityNutrition::new(
+                BonkStatus::Bonked,
+                Some("ran out of glycogen".to_string()),
+            ))),
+            Some(Some(ActivityFeedback::from("good session"))),
+        );
+
+        let patched = activity.apply_patch(patch);
+
+        assert_eq!(patched.name().unwrap().to_string(), "Interval Session");
+        assert_eq!(patched.rpe().unwrap(), ActivityRpe::Eight);
+        assert_eq!(patched.workout_type().unwrap(), WorkoutType::Intervals);
+        let nutrition = patched.nutrition().as_ref().unwrap();
+        assert_eq!(nutrition.bonk_status(), BonkStatus::Bonked);
+        assert_eq!(nutrition.details(), Some("ran out of glycogen"));
+        assert_eq!(
+            patched.feedback().as_ref().unwrap().to_string(),
+            "good session"
+        );
+    }
+
+    #[test]
+    fn test_apply_patch_clears_patchable_fields() {
+        let activity = activity_with_all_optional_fields();
+        let patch = ActivityPatch::new(Some(None), Some(None), Some(None), Some(None), Some(None));
+
+        let patched = activity.apply_patch(patch);
+
+        assert!(patched.name().is_none());
+        assert!(patched.rpe().is_none());
+        assert!(patched.workout_type().is_none());
+        assert!(patched.nutrition().is_none());
+        assert!(patched.feedback().is_none());
+    }
+
+    #[test]
+    fn test_apply_patch_unpatched_fields_are_kept() {
+        let activity = activity_with_all_optional_fields();
+        // Only the feedback is patched, the rest of the patch is `None`.
+        let patch = ActivityPatch::new(
+            None,
+            None,
+            None,
+            None,
+            Some(Some(ActivityFeedback::from("updated note"))),
+        );
+
+        let patched = activity.apply_patch(patch);
+
+        assert_eq!(patched.name().unwrap().to_string(), "Morning Run");
+        assert_eq!(patched.rpe().unwrap(), ActivityRpe::Five);
+        assert_eq!(patched.workout_type().unwrap(), WorkoutType::Tempo);
+        assert_eq!(
+            patched.nutrition().as_ref().unwrap().bonk_status(),
+            BonkStatus::None
+        );
+        assert_eq!(
+            patched.feedback().as_ref().unwrap().to_string(),
+            "updated note"
+        );
+    }
+
+    #[test]
+    fn test_apply_patch_keeps_immutable_fields() {
+        let activity = activity_with_all_optional_fields();
+        let patch = ActivityPatch::new(
+            Some(Some(ActivityName::from("Renamed"))),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let patched = activity.clone().apply_patch(patch);
+
+        assert_eq!(patched.id(), activity.id());
+        assert_eq!(patched.user(), activity.user());
+        assert_eq!(patched.start_time(), activity.start_time());
+        assert_eq!(patched.duration(), activity.duration());
+        assert_eq!(patched.sport(), activity.sport());
     }
 
     #[test]
