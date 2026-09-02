@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::models::UserId;
+use crate::domain::models::{
+    UserId,
+    shared::{SearchDocument, SearchDocumentEvent},
+};
 
 pub const DEFAULT_METRICS: [ActivityMetricV2; 11] = [
     ActivityMetricV2::Calories,
@@ -148,6 +151,33 @@ impl Activity {
 
     pub fn feedback(&self) -> &Option<ActivityFeedback> {
         &self.feedback
+    }
+
+    pub fn to_search_document(
+        &self,
+        event: SearchDocumentEvent,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> SearchDocument {
+        let content = [
+            self.name()
+                .as_ref()
+                .map(|name| name.to_string())
+                .unwrap_or_default(),
+            self.feedback()
+                .as_ref()
+                .map(|feedback| feedback.to_string())
+                .unwrap_or_default(),
+        ]
+        .join(" ")
+        .trim()
+        .to_string();
+        SearchDocument::new(
+            "activity".into(),
+            self.id().to_string(),
+            event,
+            content,
+            now,
+        )
     }
 }
 
@@ -2453,5 +2483,115 @@ mod test_timeseries {
         let result = ActivityMetricV2::ActiveDuration.compute_value(&activity);
 
         assert_eq!(result, Some(3600.0));
+    }
+}
+
+#[cfg(test)]
+mod test_search_document {
+
+    use super::*;
+
+    fn now() -> chrono::DateTime<chrono::Utc> {
+        "2025-09-03T00:00:00Z"
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .unwrap()
+    }
+
+    fn activity(
+        id: ActivityId,
+        name: Option<ActivityName>,
+        feedback: Option<ActivityFeedback>,
+    ) -> Activity {
+        Activity::new(
+            id,
+            UserId::test_default(),
+            name,
+            ActivityStartTime::new(
+                "2025-09-03T00:00:00Z"
+                    .parse::<DateTime<FixedOffset>>()
+                    .unwrap(),
+            ),
+            ActivityDuration::default(),
+            Sport::Cycling,
+            ActivityRpe::empty(),
+            WorkoutType::empty(),
+            ActivityNutrition::empty(),
+            feedback,
+        )
+    }
+
+    #[test]
+    fn test_search_document_is_for_activity() {
+        let id = ActivityId::from("activity-1");
+        let doc = activity(id, None, None).to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.document_type(), "activity");
+    }
+
+    #[test]
+    fn test_search_document_uses_activity_id() {
+        let id = ActivityId::from("activity-42");
+        let doc = activity(id, None, None).to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.document_id(), "activity-42");
+    }
+
+    #[test]
+    fn test_search_document_preserves_event() {
+        let doc_created = activity(ActivityId::new(), None, None)
+            .to_search_document(SearchDocumentEvent::Created, now());
+        let doc_updated = activity(ActivityId::new(), None, None)
+            .to_search_document(SearchDocumentEvent::Updated, now());
+        let doc_deleted = activity(ActivityId::new(), None, None)
+            .to_search_document(SearchDocumentEvent::Deleted, now());
+
+        assert!(matches!(doc_created.event(), SearchDocumentEvent::Created));
+        assert!(matches!(doc_updated.event(), SearchDocumentEvent::Updated));
+        assert!(matches!(doc_deleted.event(), SearchDocumentEvent::Deleted));
+    }
+
+    #[test]
+    fn test_search_document_preserves_occurred_at() {
+        let now = now();
+        let doc = activity(ActivityId::new(), None, None)
+            .to_search_document(SearchDocumentEvent::Created, now);
+
+        assert_eq!(doc.occurred_at(), &now);
+    }
+
+    #[test]
+    fn test_search_document_content_contains_name_and_feedback() {
+        let doc = activity(
+            ActivityId::new(),
+            Some("Morning Ride".into()),
+            Some("Felt strong".into()),
+        )
+        .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "Morning Ride Felt strong");
+    }
+
+    #[test]
+    fn test_search_document_content_with_only_name() {
+        let doc = activity(ActivityId::new(), Some("Morning Ride".into()), None)
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "Morning Ride");
+    }
+
+    #[test]
+    fn test_search_document_content_with_only_feedback() {
+        let doc = activity(ActivityId::new(), None, Some("Felt strong".into()))
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "Felt strong");
+    }
+
+    #[test]
+    fn test_search_document_content_empty_without_name_or_feedback() {
+        let doc = activity(ActivityId::new(), None, None)
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "");
     }
 }

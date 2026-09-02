@@ -17,6 +17,7 @@ use crate::domain::{
             Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
             Sport, SportCategory, Unit, WorkoutType,
         },
+        shared::{SearchDocument, SearchDocumentEvent},
     },
     ports::{DateRange, DateTimeRange},
 };
@@ -1376,6 +1377,30 @@ impl TrainingNote {
 
     pub fn created_at(&self) -> &DateTime<FixedOffset> {
         &self.created_at
+    }
+
+    pub fn to_search_document(
+        &self,
+        event: SearchDocumentEvent,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> SearchDocument {
+        let content = [
+            self.title()
+                .as_ref()
+                .map(|name| name.to_string())
+                .unwrap_or_default(),
+            self.content().to_string(),
+        ]
+        .join(" ")
+        .trim()
+        .to_string();
+        SearchDocument::new(
+            "training_note".into(),
+            self.id().to_string(),
+            event,
+            content,
+            now,
+        )
     }
 }
 
@@ -3627,5 +3652,95 @@ mod test_training_metric_target {
             serde_json::from_str(r#"{"value":3.5,"unit":"parsec"}"#);
 
         assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_training_note_search_document {
+
+    use super::*;
+
+    fn now() -> chrono::DateTime<chrono::Utc> {
+        "2025-09-03T00:00:00Z"
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .unwrap()
+    }
+
+    fn note(
+        id: TrainingNoteId,
+        title: Option<TrainingNoteTitle>,
+        content: TrainingNoteContent,
+    ) -> TrainingNote {
+        TrainingNote::new(
+            id,
+            UserId::test_default(),
+            title,
+            content,
+            TrainingNoteDate::new(NaiveDate::from_ymd_opt(2025, 9, 3).unwrap()),
+            "2025-09-03T00:00:00Z"
+                .parse::<DateTime<FixedOffset>>()
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_search_document_is_for_training_note() {
+        let id = TrainingNoteId::from("note-1");
+        let doc = note(id, None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.document_type(), "training_note");
+    }
+
+    #[test]
+    fn test_search_document_uses_note_id() {
+        let id = TrainingNoteId::from("note-42");
+        let doc = note(id, None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.document_id(), "note-42");
+    }
+
+    #[test]
+    fn test_search_document_preserves_event() {
+        let doc_created = note(TrainingNoteId::new(), None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Created, now());
+        let doc_updated = note(TrainingNoteId::new(), None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Updated, now());
+        let doc_deleted = note(TrainingNoteId::new(), None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Deleted, now());
+
+        assert!(matches!(doc_created.event(), SearchDocumentEvent::Created));
+        assert!(matches!(doc_updated.event(), SearchDocumentEvent::Updated));
+        assert!(matches!(doc_deleted.event(), SearchDocumentEvent::Deleted));
+    }
+
+    #[test]
+    fn test_search_document_preserves_occurred_at() {
+        let now = now();
+        let doc = note(TrainingNoteId::new(), None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Created, now);
+
+        assert_eq!(doc.occurred_at(), &now);
+    }
+
+    #[test]
+    fn test_search_document_content_contains_title_and_content() {
+        let doc = note(
+            TrainingNoteId::new(),
+            Some("Long Run".into()),
+            "Great session".into(),
+        )
+        .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "Long Run Great session");
+    }
+
+    #[test]
+    fn test_search_document_content_without_title() {
+        let doc = note(TrainingNoteId::new(), None, "Great session".into())
+            .to_search_document(SearchDocumentEvent::Created, now());
+
+        assert_eq!(doc.content(), "Great session");
     }
 }
