@@ -8,13 +8,17 @@ use crate::domain::{
             Activity, ActivityId, ActivityMetricV2, ActivityMetricsV2, ActivityWithParsedData,
             DEFAULT_METRICS,
         },
+        search::SearchDocument,
     },
-    ports::activity::{
-        ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
-        DeleteActivityRequest, GetActivityError, GetAllActivitiesError, GetAllActivitiesRequest,
-        GetRawActivityError, GetRawActivityRequest, IActivityService, ListActivitiesError,
-        ListActivitiesFilters, PatchActivityError, PatchActivityRequest, RawActivity,
-        RawDataRepository,
+    ports::{
+        activity::{
+            ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
+            DeleteActivityRequest, GetActivityError, GetAllActivitiesError,
+            GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, IActivityService,
+            ListActivitiesError, ListActivitiesFilters, PatchActivityError, PatchActivityRequest,
+            RawActivity, RawDataRepository,
+        },
+        search::DocumentsForSearch,
     },
 };
 
@@ -313,6 +317,28 @@ where
             .list_all_raw_activities(req.user())
             .await
             .map_err(|err| GetAllActivitiesError::Unknown(anyhow!(err)))
+    }
+}
+
+impl<AR, RDR> DocumentsForSearch for ActivityService<AR, RDR>
+where
+    AR: ActivityRepository,
+    RDR: RawDataRepository,
+{
+    async fn get_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
+        self.activity_repository
+            .get_outbox_documents_to_process()
+            .await
+    }
+
+    async fn mark_document_as_processed(
+        &self,
+        document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        self.activity_repository
+            .mark_outbox_document_as_processed(document, processed_at)
+            .await
     }
 }
 
