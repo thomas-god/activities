@@ -193,7 +193,7 @@ where
         .map(|_| ())
         .map_err(|err| {
             anyhow!(
-                "Unable to save activity search docuement {}. {err}",
+                "Unable to save activity search document {}. {err}",
                 document.document_id()
             )
         })
@@ -2153,7 +2153,7 @@ mod test_sqlite_activity_repository {
         }
 
         #[tokio::test]
-        async fn test_mark_outbox_docuement_as_processed() {
+        async fn test_mark_outbox_document_as_processed() {
             let db_file = NamedTempFile::new().unwrap();
             let now = Utc::now();
             let repo = SqliteActivityRepository::new(

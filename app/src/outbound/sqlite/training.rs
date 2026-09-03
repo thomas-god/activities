@@ -660,7 +660,7 @@ where
         .map(|_| ());
 
         let document = note.to_search_document(SearchDocumentEvent::Updated, self.clock.now());
-        let _ = self.save_search_document(&mut tx, document).await?;
+        self.save_search_document(&mut tx, document).await?;
 
         tx.commit()
             .await
@@ -751,7 +751,7 @@ where
             String::default(),
             self.clock.now(),
         );
-        let _ = self.save_search_document(&mut tx, document).await?;
+        self.save_search_document(&mut tx, document).await?;
 
         tx.commit()
             .await

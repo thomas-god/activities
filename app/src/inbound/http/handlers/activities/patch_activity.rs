@@ -141,7 +141,7 @@ impl TryFrom<PatchActivityBody> for ActivityPatch {
 /// Content-Type: application/json
 /// {"nutrition": null, "feedback": null}
 /// ```
-#[tracing::instrument(skip_all, err(Debug))]
+#[tracing::instrument(skip_all)]
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
@@ -152,35 +152,35 @@ pub async fn patch_activity<
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
     body: Option<Json<PatchActivityBody>>,
-) -> Result<StatusCode, Response> {
+) -> Response {
     let Some(Json(body)) = body else {
-        return Ok(StatusCode::OK);
+        return StatusCode::OK.into_response();
     };
 
     let patch = match ActivityPatch::try_from(body) {
         Ok(patch) => patch,
         Err(err) => {
-            return Err((
+            return (
                 StatusCode::BAD_REQUEST,
                 format!("Invalid patch request: {}", err),
             )
-                .into_response());
+                .into_response();
         }
     };
 
     if patch.is_empty() {
-        return Ok(StatusCode::OK);
+        return StatusCode::OK.into_response();
     }
 
     let req = PatchActivityRequest::new(ActivityId::from(&activity_id), user.user().clone(), patch);
 
     match state.activity_service.patch_activity(req).await {
-        Ok(()) => Ok(StatusCode::OK),
+        Ok(()) => StatusCode::OK.into_response(),
         Err(err) => {
             if let PatchActivityError::Unknown(_) = &err {
                 tracing::error!("Error while patching activity {activity_id}: {err}");
             }
-            Err(StatusCode::from(err).into_response())
+            StatusCode::from(err).into_response()
         }
     }
 }
@@ -237,10 +237,9 @@ mod tests {
         let user = AuthenticatedUser::new(UserId::from(USER_ID));
         let path = Path(ACTIVITY_ID.to_string());
 
-        match patch_activity(Extension(user), State(state), path, body.map(Json)).await {
-            Ok(status) => status,
-            Err(body) => body.status(),
-        }
+        patch_activity(Extension(user), State(state), path, body.map(Json))
+            .await
+            .status()
     }
 
     fn base_activity() -> Activity {
