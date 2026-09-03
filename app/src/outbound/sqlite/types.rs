@@ -12,7 +12,7 @@ use crate::domain::models::{
         WorkoutType,
     },
     preferences::{ActivityListSummary, Preference, PreferenceKey},
-    shared::SearchDocumentEvent,
+    search::SearchDocumentEvent,
     training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSummary,

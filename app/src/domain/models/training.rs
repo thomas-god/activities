@@ -17,7 +17,7 @@ use crate::domain::{
             Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
             Sport, SportCategory, Unit, WorkoutType,
         },
-        shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
     ports::{DateRange, DateTimeRange},
 };

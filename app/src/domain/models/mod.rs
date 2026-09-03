@@ -4,7 +4,7 @@ use derive_more::Constructor;
 
 pub mod activity;
 pub mod preferences;
-pub mod shared;
+pub mod search;
 pub mod training;
 
 #[derive(Debug, Clone, PartialEq, Constructor)]

@@ -330,7 +330,7 @@ pub mod test_utils {
     use crate::domain::models::activity::{
         ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport,
     };
-    use crate::domain::models::shared::SearchDocument;
+    use crate::domain::models::search::SearchDocument;
     use crate::domain::ports::activity::{
         DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
         GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,

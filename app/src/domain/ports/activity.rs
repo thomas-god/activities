@@ -12,7 +12,7 @@ use crate::domain::{
             ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
             ActivityTimeseries, ActivityWithParsedData, Sport,
         },
-        shared::SearchDocument,
+        search::SearchDocument,
     },
     ports::{DateRange, DateTimeRange},
 };

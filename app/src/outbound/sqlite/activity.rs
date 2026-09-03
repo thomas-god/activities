@@ -16,7 +16,7 @@ use crate::{
                 ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition,
                 ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
             },
-            shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+            search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         },
         ports::{
             DateTimeRange, IClock,
@@ -2054,7 +2054,7 @@ mod test_sqlite_activity_repository {
     mod test_t_outbox_activity_search {
         use chrono::Utc;
 
-        use crate::domain::models::shared::{SearchDocumentEvent, SearchDocumentType};
+        use crate::domain::models::search::{SearchDocumentEvent, SearchDocumentType};
 
         use super::*;
 

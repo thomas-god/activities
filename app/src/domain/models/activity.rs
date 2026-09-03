@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::domain::models::{
     UserId,
-    shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+    search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
 };
 
 pub const DEFAULT_METRICS: [ActivityMetricV2; 11] = [
