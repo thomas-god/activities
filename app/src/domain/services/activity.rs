@@ -330,6 +330,7 @@ pub mod test_utils {
     use crate::domain::models::activity::{
         ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport,
     };
+    use crate::domain::models::shared::SearchDocument;
     use crate::domain::ports::activity::{
         DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
         GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,
@@ -518,6 +519,16 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
             ) -> Result<Option<crate::domain::ports::DateTimeRange>, anyhow::Error>;
+
+            async fn get_outbox_documents_to_process(
+                &self,
+            ) -> Result<Vec<SearchDocument>, anyhow::Error>;
+
+            async fn mark_outbox_document_as_processed(
+                &self,
+                document: &SearchDocument,
+                processed_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
         }
 
     }

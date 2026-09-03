@@ -58,6 +58,10 @@ impl DateRange {
     }
 }
 
+pub trait IClock: Clone + Send + Sync + 'static {
+    fn now(&self) -> chrono::DateTime<chrono::Utc>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

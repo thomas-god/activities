@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset};
 use sqlx::{
-    ConnectOptions, Sqlite, SqlitePool,
+    ConnectOptions, Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
@@ -16,9 +16,10 @@ use crate::{
                 ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition,
                 ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
             },
+            shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         },
         ports::{
-            DateTimeRange,
+            DateTimeRange, IClock,
             activity::{
                 ActivityRepository, GetActivityError, GetRawActivityError, ListActivitiesError,
                 ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
@@ -42,19 +43,28 @@ type ActivityRow = (
     Option<ActivityFeedback>,
 );
 
+type SearchDocumentRow = (
+    ActivityId,
+    SearchDocumentEvent,
+    String,
+    chrono::DateTime<chrono::Utc>,
+);
+
 #[derive(Debug, Clone)]
-pub struct SqliteActivityRepository<R, FP> {
+pub struct SqliteActivityRepository<R, FP, C> {
     writer: SqlitePool,
     readers: SqlitePool,
     raw_data_repository: R,
     file_parser: FP,
+    clock: C,
 }
 
-impl<R, FP> SqliteActivityRepository<R, FP> {
+impl<R, FP, C> SqliteActivityRepository<R, FP, C> {
     pub async fn new(
         url: &str,
         raw_data_repository: R,
         file_parser: FP,
+        clock: C,
     ) -> Result<Self, sqlx::Error> {
         let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
@@ -85,6 +95,7 @@ impl<R, FP> SqliteActivityRepository<R, FP> {
             readers,
             raw_data_repository,
             file_parser,
+            clock,
         })
     }
 
@@ -126,10 +137,11 @@ impl<R, FP> SqliteActivityRepository<R, FP> {
     }
 }
 
-impl<R, FP> SqliteActivityRepository<R, FP>
+impl<R, FP, C> SqliteActivityRepository<R, FP, C>
 where
     R: RawDataRepository,
     FP: ParseFile,
+    C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
     async fn load_timeseries(
@@ -161,12 +173,38 @@ where
             parsed_content.statistics().clone(),
         ))
     }
+
+    async fn save_search_document(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        document: SearchDocument,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "
+            INSERT INTO t_outbox_activity_search (activity_id, event, content, occurred_at)
+            VALUES (?1, ?2, ?3, ?4);",
+        )
+        .bind(document.document_id())
+        .bind(document.event().to_string())
+        .bind(document.content())
+        .bind(document.occurred_at())
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to save activity search docuement {}. {err}",
+                document.document_id()
+            )
+        })
+    }
 }
 
-impl<R, FP> ActivityRepository for SqliteActivityRepository<R, FP>
+impl<R, FP, C> ActivityRepository for SqliteActivityRepository<R, FP, C>
 where
     R: RawDataRepository,
     FP: ParseFile,
+    C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
@@ -178,6 +216,16 @@ where
             .await
             .map(|_| ())
             .map_err(|err| anyhow!("Unable to delete activity {}. {err}", activity))?;
+
+        let search_document = SearchDocument::new(
+            SearchDocumentType::Activity,
+            activity.to_string(),
+            SearchDocumentEvent::Deleted,
+            String::default(),
+            self.clock.now(),
+        );
+
+        self.save_search_document(&mut tx, search_document).await?;
 
         tx.commit().await.map_err(|err| anyhow!(err))
     }
@@ -577,6 +625,11 @@ where
             SaveActivityError::Unknown(anyhow!("Unable to save activity {}. {err}", activity.id()))
         })?;
 
+        let search_document =
+            activity.to_search_document(SearchDocumentEvent::Updated, self.clock.now());
+
+        self.save_search_document(&mut tx, search_document).await?;
+
         tx.commit()
             .await
             .map_err(|err| SaveActivityError::Unknown(err.into()))
@@ -623,6 +676,52 @@ where
             )),
         }
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_outbox_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
+        sqlx::query_as::<_, SearchDocumentRow>(
+            "SELECT activity_id, event, content, occurred_at
+            FROM t_outbox_activity_search
+            WHERE processed_at IS NULL;",
+        )
+        .fetch_all(&self.readers)
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(activity, event, content, occurred_at)| {
+                    SearchDocument::new(
+                        SearchDocumentType::Activity,
+                        activity.to_string(),
+                        event,
+                        content,
+                        occurred_at,
+                    )
+                })
+                .collect::<Vec<SearchDocument>>()
+        })
+        .map_err(|err| anyhow!(err))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn mark_outbox_document_as_processed(
+        &self,
+        document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "UPDATE t_outbox_activity_search SET processed_at = ?1
+            WHERE activity_id = ?2 AND event = ?3 AND content = ?4 AND occurred_at = ?5;",
+        )
+        .bind(processed_at)
+        .bind(document.document_id())
+        .bind(document.event())
+        .bind(document.content())
+        .bind(document.occurred_at())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| anyhow!(err))
+    }
 }
 
 #[cfg(test)]
@@ -635,6 +734,7 @@ mod test_sqlite_activity_repository {
     use tempfile::NamedTempFile;
 
     use crate::{
+        clock::{Clock, clock_test_utils::FakeClock},
         domain::{
             models::{
                 UserId,
@@ -661,6 +761,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -698,6 +799,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -724,6 +826,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -767,6 +870,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -806,6 +910,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -824,6 +929,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -854,6 +960,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -878,6 +985,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -908,6 +1016,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -941,6 +1050,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -985,6 +1095,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1019,6 +1130,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1052,6 +1164,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1076,6 +1189,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1142,6 +1256,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1186,6 +1301,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1220,6 +1336,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1253,6 +1370,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1292,6 +1410,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1340,6 +1459,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repo,
             file_parser,
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1371,6 +1491,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1391,6 +1512,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1432,6 +1554,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1451,6 +1574,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             MockRawDataRepository::new(),
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1481,6 +1605,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repository,
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1520,6 +1645,7 @@ mod test_sqlite_activity_repository {
             &db_file.path().to_string_lossy(),
             raw_data_repository,
             MockFileParser::new(),
+            Clock::new(),
         )
         .await
         .expect("repo should init");
@@ -1559,6 +1685,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 raw_data_repository,
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1573,7 +1700,7 @@ mod test_sqlite_activity_repository {
                 .get_raw_activity(activity.user(), activity.id())
                 .await
                 .expect("Should not err");
-            assert_eq!(res.name(), format!("{}.fit", &activity.id()));
+            assert_eq!(res.name(), format!("{}.fit", activity.id()));
             assert_eq!(res.content(), &[0, 1, 2]);
         }
 
@@ -1586,6 +1713,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 raw_data_repository,
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1607,6 +1735,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 raw_data_repository,
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1638,6 +1767,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 raw_data_repository,
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1667,6 +1797,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1737,6 +1868,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1764,6 +1896,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1773,7 +1906,7 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have succeed");
 
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &Some(3.14))
+            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &Some(3.45))
                 .await
                 .expect("Should have succeeded");
 
@@ -1786,7 +1919,7 @@ mod test_sqlite_activity_repository {
             assert_eq!(returned_activity.id(), activity.id());
             assert_eq!(
                 metrics,
-                ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, Some(3.14))]))
+                ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, Some(3.45))]))
             );
         }
 
@@ -1797,6 +1930,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1822,6 +1956,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1847,6 +1982,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1887,6 +2023,7 @@ mod test_sqlite_activity_repository {
                 &db_file.path().to_string_lossy(),
                 MockRawDataRepository::new(),
                 MockFileParser::new(),
+                Clock::new(),
             )
             .await
             .expect("repo should init");
@@ -1910,6 +2047,165 @@ mod test_sqlite_activity_repository {
                 metrics,
                 ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, None)]))
             );
+        }
+    }
+
+    #[cfg(test)]
+    mod test_t_outbox_activity_search {
+        use chrono::Utc;
+
+        use crate::domain::models::shared::{SearchDocumentEvent, SearchDocumentType};
+
+        use super::*;
+
+        #[tokio::test]
+        async fn test_save_activity_inserts_row_to_outbox_as_updated() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let activity = build_activity()
+                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly saved activity
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            assert_eq!(document.document_type(), &SearchDocumentType::Activity);
+            assert_eq!(document.document_id(), activity.id().to_string());
+            assert_eq!(document.event(), &SearchDocumentEvent::Updated);
+            assert_eq!(document.occurred_at(), &now);
+            assert!(
+                document.content().contains(
+                    &activity
+                        .name()
+                        .as_ref()
+                        .map(|n| n.to_string())
+                        .unwrap_or_default()
+                ),
+            )
+        }
+
+        #[tokio::test]
+        async fn test_delete_activity_inserts_row_to_outbox_as_deleted() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let activity = build_activity()
+                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.delete_activity(activity.id())
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly deleted activity
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            assert_eq!(document.document_type(), &SearchDocumentType::Activity);
+            assert_eq!(document.document_id(), activity.id().to_string());
+            assert_eq!(document.event(), &SearchDocumentEvent::Deleted);
+            assert_eq!(document.occurred_at(), &now);
+            assert!(document.content().is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_mark_outbox_docuement_as_processed() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let activity = build_activity()
+                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly deleted activity
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            // Mark document as processed
+            let processed_at = chrono::Utc::now();
+            repo.mark_outbox_document_as_processed(&document, processed_at.clone())
+                .await
+                .expect("Marking document as processes should have succeeded");
+
+            // Outox should be empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            // Marking the same document should be idempotent
+            repo.mark_outbox_document_as_processed(&document, processed_at)
+                .await
+                .expect("Marking document as processes should be idempotent");
         }
     }
 }

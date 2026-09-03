@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::domain::models::{
     UserId,
-    shared::{SearchDocument, SearchDocumentEvent},
+    shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
 };
 
 pub const DEFAULT_METRICS: [ActivityMetricV2; 11] = [
@@ -184,12 +184,16 @@ impl Activity {
                 .as_ref()
                 .map(|feedback| feedback.to_string())
                 .unwrap_or_default(),
+            self.nutrition()
+                .as_ref()
+                .map(|nutrition| nutrition.details.clone().unwrap_or_default())
+                .unwrap_or_default(),
         ]
         .join(" ")
         .trim()
         .to_string();
         SearchDocument::new(
-            "activity".into(),
+            SearchDocumentType::Activity,
             self.id().to_string(),
             event,
             content,
@@ -217,6 +221,41 @@ impl ActivityPatch {
             && self.workout_type.is_none()
             && self.nutrition.is_none()
             && self.feedback.is_none()
+    }
+
+    pub fn name(name: Option<ActivityName>) -> Self {
+        Self {
+            name: Some(name),
+            ..Default::default()
+        }
+    }
+
+    pub fn rpe(rpe: Option<ActivityRpe>) -> Self {
+        Self {
+            rpe: Some(rpe),
+            ..Default::default()
+        }
+    }
+
+    pub fn workout(workout: Option<WorkoutType>) -> Self {
+        Self {
+            workout_type: Some(workout),
+            ..Default::default()
+        }
+    }
+
+    pub fn nutrition(nutrition: Option<ActivityNutrition>) -> Self {
+        Self {
+            nutrition: Some(nutrition),
+            ..Default::default()
+        }
+    }
+
+    pub fn feedback(feedback: Option<ActivityFeedback>) -> Self {
+        Self {
+            feedback: Some(feedback),
+            ..Default::default()
+        }
     }
 }
 
@@ -2643,10 +2682,19 @@ mod test_search_document {
             .unwrap()
     }
 
+    /// Nutrition with a `None` bonk status and the given optional free-form details.
+    fn nutrition(details: Option<&str>) -> Option<ActivityNutrition> {
+        Some(ActivityNutrition::new(
+            BonkStatus::None,
+            details.map(|details| details.to_string()),
+        ))
+    }
+
     fn activity(
         id: ActivityId,
         name: Option<ActivityName>,
         feedback: Option<ActivityFeedback>,
+        nutrition: Option<ActivityNutrition>,
     ) -> Activity {
         Activity::new(
             id,
@@ -2661,7 +2709,7 @@ mod test_search_document {
             Sport::Cycling,
             ActivityRpe::empty(),
             WorkoutType::empty(),
-            ActivityNutrition::empty(),
+            nutrition,
             feedback,
         )
     }
@@ -2669,29 +2717,28 @@ mod test_search_document {
     #[test]
     fn test_search_document_is_for_activity() {
         let id = ActivityId::from("activity-1");
-        let doc = activity(id, None, None).to_search_document(SearchDocumentEvent::Created, now());
+        let doc = activity(id, None, None, ActivityNutrition::empty())
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
-        assert_eq!(doc.document_type(), "activity");
+        assert_eq!(doc.document_type(), &SearchDocumentType::Activity);
     }
 
     #[test]
     fn test_search_document_uses_activity_id() {
         let id = ActivityId::from("activity-42");
-        let doc = activity(id, None, None).to_search_document(SearchDocumentEvent::Created, now());
+        let doc = activity(id, None, None, ActivityNutrition::empty())
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.document_id(), "activity-42");
     }
 
     #[test]
     fn test_search_document_preserves_event() {
-        let doc_created = activity(ActivityId::new(), None, None)
-            .to_search_document(SearchDocumentEvent::Created, now());
-        let doc_updated = activity(ActivityId::new(), None, None)
+        let doc_updated = activity(ActivityId::new(), None, None, ActivityNutrition::empty())
             .to_search_document(SearchDocumentEvent::Updated, now());
-        let doc_deleted = activity(ActivityId::new(), None, None)
+        let doc_deleted = activity(ActivityId::new(), None, None, ActivityNutrition::empty())
             .to_search_document(SearchDocumentEvent::Deleted, now());
 
-        assert!(matches!(doc_created.event(), SearchDocumentEvent::Created));
         assert!(matches!(doc_updated.event(), SearchDocumentEvent::Updated));
         assert!(matches!(doc_deleted.event(), SearchDocumentEvent::Deleted));
     }
@@ -2699,44 +2746,82 @@ mod test_search_document {
     #[test]
     fn test_search_document_preserves_occurred_at() {
         let now = now();
-        let doc = activity(ActivityId::new(), None, None)
-            .to_search_document(SearchDocumentEvent::Created, now);
+        let doc = activity(ActivityId::new(), None, None, ActivityNutrition::empty())
+            .to_search_document(SearchDocumentEvent::Updated, now);
 
         assert_eq!(doc.occurred_at(), &now);
     }
 
     #[test]
-    fn test_search_document_content_contains_name_and_feedback() {
+    fn test_search_document_content_contains_name_feedback_and_nutrition_details() {
         let doc = activity(
             ActivityId::new(),
             Some("Morning Ride".into()),
             Some("Felt strong".into()),
+            nutrition(Some("drank one bottle and ate two gels")),
         )
-        .to_search_document(SearchDocumentEvent::Created, now());
+        .to_search_document(SearchDocumentEvent::Updated, now());
 
-        assert_eq!(doc.content(), "Morning Ride Felt strong");
+        assert_eq!(
+            doc.content(),
+            "Morning Ride Felt strong drank one bottle and ate two gels"
+        );
     }
 
     #[test]
     fn test_search_document_content_with_only_name() {
-        let doc = activity(ActivityId::new(), Some("Morning Ride".into()), None)
-            .to_search_document(SearchDocumentEvent::Created, now());
+        let doc = activity(
+            ActivityId::new(),
+            Some("Morning Ride".into()),
+            None,
+            ActivityNutrition::empty(),
+        )
+        .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Morning Ride");
     }
 
     #[test]
     fn test_search_document_content_with_only_feedback() {
-        let doc = activity(ActivityId::new(), None, Some("Felt strong".into()))
-            .to_search_document(SearchDocumentEvent::Created, now());
+        let doc = activity(
+            ActivityId::new(),
+            None,
+            Some("Felt strong".into()),
+            ActivityNutrition::empty(),
+        )
+        .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Felt strong");
     }
 
     #[test]
-    fn test_search_document_content_empty_without_name_or_feedback() {
-        let doc = activity(ActivityId::new(), None, None)
-            .to_search_document(SearchDocumentEvent::Created, now());
+    fn test_search_document_content_with_only_nutrition_details() {
+        let doc = activity(
+            ActivityId::new(),
+            None,
+            None,
+            nutrition(Some("one gel and two electrolyte tablets")),
+        )
+        .to_search_document(SearchDocumentEvent::Updated, now());
+
+        assert_eq!(doc.content(), "one gel and two electrolyte tablets");
+    }
+
+    #[test]
+    fn test_search_document_content_with_nutrition_but_no_details() {
+        // Only the free-form nutrition details end up in the search content, the
+        // bonk status does not, so an activity with nutrition but no details
+        // contributes nothing.
+        let doc = activity(ActivityId::new(), None, None, nutrition(None))
+            .to_search_document(SearchDocumentEvent::Updated, now());
+
+        assert_eq!(doc.content(), "");
+    }
+
+    #[test]
+    fn test_search_document_content_empty_without_name_feedback_or_nutrition_details() {
+        let doc = activity(ActivityId::new(), None, None, ActivityNutrition::empty())
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "");
     }

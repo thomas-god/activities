@@ -12,6 +12,7 @@ use crate::domain::{
             ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
             ActivityTimeseries, ActivityWithParsedData, Sport,
         },
+        shared::SearchDocument,
     },
     ports::{DateRange, DateTimeRange},
 };
@@ -432,6 +433,16 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
     ) -> impl Future<Output = Result<Option<DateTimeRange>, anyhow::Error>> + Send;
+
+    fn get_outbox_documents_to_process(
+        &self,
+    ) -> impl Future<Output = Result<Vec<SearchDocument>, anyhow::Error>> + Send;
+
+    fn mark_outbox_document_as_processed(
+        &self,
+        document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Error)]

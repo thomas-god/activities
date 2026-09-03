@@ -4,6 +4,7 @@ use anyhow::{Ok, anyhow};
 use tokio::sync::Mutex;
 
 use crate::{
+    clock::Clock,
     config::{AppMode, BaseConfig, MultiUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
@@ -34,14 +35,14 @@ pub async fn bootstrap_multi_user(
 ) -> anyhow::Result<
     HttpServer<
         ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
             FilesystemRawDataRepository,
         >,
         Parser,
         TrainingService<
             SqliteTrainingRepository,
             ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
                 FilesystemRawDataRepository,
             >,
         >,
@@ -99,7 +100,7 @@ async fn build_activity_service(
     config: &BaseConfig,
 ) -> anyhow::Result<(
     ActivityService<
-        SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+        SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
         FilesystemRawDataRepository,
     >,
     Parser,
@@ -107,7 +108,7 @@ async fn build_activity_service(
         TrainingService<
             SqliteTrainingRepository,
             ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
                 FilesystemRawDataRepository,
             >,
         >,
@@ -132,6 +133,7 @@ async fn build_activity_service(
         &format!("sqlite:{}", activity_db.to_string_lossy()),
         raw_data_repository.clone(),
         parser.clone(),
+        Clock::new(),
     )
     .await?;
 

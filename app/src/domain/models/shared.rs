@@ -2,7 +2,6 @@ use derive_more::Constructor;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchDocumentEvent {
-    Created,
     Updated,
     Deleted,
 }
@@ -12,7 +11,6 @@ impl TryFrom<&str> for SearchDocumentEvent {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "created" => Ok(Self::Created),
             "updated" => Ok(Self::Updated),
             "deleted" => Ok(Self::Deleted),
             _ => Err("Invalid enum variant".to_string()),
@@ -23,9 +21,34 @@ impl TryFrom<&str> for SearchDocumentEvent {
 impl std::fmt::Display for SearchDocumentEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Created => f.write_str("created"),
             Self::Updated => f.write_str("updated"),
             Self::Deleted => f.write_str("deleted"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SearchDocumentType {
+    Activity,
+    TrainingNote,
+}
+impl TryFrom<&str> for SearchDocumentType {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "activity" => Ok(Self::Activity),
+            "training_note" => Ok(Self::TrainingNote),
+            _ => Err("Invalid enum variant".to_string()),
+        }
+    }
+}
+
+impl std::fmt::Display for SearchDocumentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Activity => f.write_str("activity"),
+            Self::TrainingNote => f.write_str("training_note"),
         }
     }
 }
@@ -33,7 +56,7 @@ impl std::fmt::Display for SearchDocumentEvent {
 /// Shared struct to a represent a domain-agnostic document to be indexed for search.
 #[derive(Debug, Clone, Constructor)]
 pub struct SearchDocument {
-    document_type: String, // Activity, Training note
+    document_type: SearchDocumentType, // Activity, Training note
     document_id: String,
     event: SearchDocumentEvent,
     content: String,
@@ -41,7 +64,7 @@ pub struct SearchDocument {
 }
 
 impl SearchDocument {
-    pub fn document_type(&self) -> &str {
+    pub fn document_type(&self) -> &SearchDocumentType {
         &self.document_type
     }
     pub fn document_id(&self) -> &str {
@@ -62,14 +85,10 @@ impl SearchDocument {
 mod tests {
     use super::*;
 
-    const CANONICAL_STRINGS: [&str; 3] = ["created", "updated", "deleted"];
+    const CANONICAL_STRINGS: [&str; 2] = ["updated", "deleted"];
 
-    fn variants() -> [SearchDocumentEvent; 3] {
-        [
-            SearchDocumentEvent::Created,
-            SearchDocumentEvent::Updated,
-            SearchDocumentEvent::Deleted,
-        ]
+    fn variants() -> [SearchDocumentEvent; 2] {
+        [SearchDocumentEvent::Updated, SearchDocumentEvent::Deleted]
     }
 
     #[test]
@@ -93,7 +112,7 @@ mod tests {
 
     #[test]
     fn rejects_non_canonical_strings() {
-        for invalid in ["", "Created", "UPDATE", "udpated", "event:updated"] {
+        for invalid in ["", "UPDATE", "udpated", "event:updated"] {
             assert!(
                 SearchDocumentEvent::try_from(invalid).is_err(),
                 "expected {invalid:?} to be rejected"

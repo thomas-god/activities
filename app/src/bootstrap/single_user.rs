@@ -3,6 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::anyhow;
 
 use crate::{
+    clock::Clock,
     config::{AppMode, BaseConfig, SingleUserConfig, StdEnvironment},
     domain::services::{
         activity::ActivityService, preferences::PreferencesService, training::TrainingService,
@@ -26,14 +27,14 @@ pub async fn bootstrap_single_user(
 ) -> anyhow::Result<
     HttpServer<
         ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+            SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
             FilesystemRawDataRepository,
         >,
         Parser,
         TrainingService<
             SqliteTrainingRepository,
             ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser>,
+                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
                 FilesystemRawDataRepository,
             >,
         >,
@@ -63,6 +64,7 @@ pub async fn bootstrap_single_user(
         &format!("sqlite:{}", activity_db.to_string_lossy()),
         raw_data_repository.clone(),
         parser.clone(),
+        Clock::new(),
     )
     .await?;
     let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);

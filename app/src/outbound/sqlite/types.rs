@@ -12,6 +12,7 @@ use crate::domain::models::{
         WorkoutType,
     },
     preferences::{ActivityListSummary, Preference, PreferenceKey},
+    shared::SearchDocumentEvent,
     training::{
         TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSummary,
@@ -942,5 +943,36 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricTarget {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(serde_json::from_slice(bytes)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for SearchDocumentEvent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for SearchDocumentEvent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Updated => "updated",
+            Self::Deleted => "deleted",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SearchDocumentEvent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "updated" => Ok(Self::Updated),
+            "deleted" => Ok(Self::Deleted),
+            _ => Err(format!("Unknown SearchDocumentEvent: {}", s).into()),
+        }
     }
 }

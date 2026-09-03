@@ -17,7 +17,7 @@ use crate::domain::{
             Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
             Sport, SportCategory, Unit, WorkoutType,
         },
-        shared::{SearchDocument, SearchDocumentEvent},
+        shared::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
     ports::{DateRange, DateTimeRange},
 };
@@ -1395,7 +1395,7 @@ impl TrainingNote {
         .trim()
         .to_string();
         SearchDocument::new(
-            "training_note".into(),
+            SearchDocumentType::TrainingNote,
             self.id().to_string(),
             event,
             content,
@@ -3687,30 +3687,27 @@ mod test_training_note_search_document {
     fn test_search_document_is_for_training_note() {
         let id = TrainingNoteId::from("note-1");
         let doc = note(id, None, "Great session".into())
-            .to_search_document(SearchDocumentEvent::Created, now());
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
-        assert_eq!(doc.document_type(), "training_note");
+        assert_eq!(doc.document_type(), &SearchDocumentType::TrainingNote);
     }
 
     #[test]
     fn test_search_document_uses_note_id() {
         let id = TrainingNoteId::from("note-42");
         let doc = note(id, None, "Great session".into())
-            .to_search_document(SearchDocumentEvent::Created, now());
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.document_id(), "note-42");
     }
 
     #[test]
     fn test_search_document_preserves_event() {
-        let doc_created = note(TrainingNoteId::new(), None, "Great session".into())
-            .to_search_document(SearchDocumentEvent::Created, now());
         let doc_updated = note(TrainingNoteId::new(), None, "Great session".into())
             .to_search_document(SearchDocumentEvent::Updated, now());
         let doc_deleted = note(TrainingNoteId::new(), None, "Great session".into())
             .to_search_document(SearchDocumentEvent::Deleted, now());
 
-        assert!(matches!(doc_created.event(), SearchDocumentEvent::Created));
         assert!(matches!(doc_updated.event(), SearchDocumentEvent::Updated));
         assert!(matches!(doc_deleted.event(), SearchDocumentEvent::Deleted));
     }
@@ -3719,7 +3716,7 @@ mod test_training_note_search_document {
     fn test_search_document_preserves_occurred_at() {
         let now = now();
         let doc = note(TrainingNoteId::new(), None, "Great session".into())
-            .to_search_document(SearchDocumentEvent::Created, now);
+            .to_search_document(SearchDocumentEvent::Updated, now);
 
         assert_eq!(doc.occurred_at(), &now);
     }
@@ -3731,7 +3728,7 @@ mod test_training_note_search_document {
             Some("Long Run".into()),
             "Great session".into(),
         )
-        .to_search_document(SearchDocumentEvent::Created, now());
+        .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Long Run Great session");
     }
@@ -3739,7 +3736,7 @@ mod test_training_note_search_document {
     #[test]
     fn test_search_document_content_without_title() {
         let doc = note(TrainingNoteId::new(), None, "Great session".into())
-            .to_search_document(SearchDocumentEvent::Created, now());
+            .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Great session");
     }
