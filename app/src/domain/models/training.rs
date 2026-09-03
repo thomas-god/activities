@@ -1402,6 +1402,24 @@ impl TrainingNote {
             now,
         )
     }
+
+    pub fn update(
+        self,
+        title: Option<TrainingNoteTitle>,
+        content: TrainingNoteContent,
+        date: TrainingNoteDate,
+    ) -> Self {
+        Self {
+            // Immutable fields
+            id: self.id,
+            user: self.user,
+            created_at: self.created_at,
+            // Mutable fields
+            title,
+            content,
+            date,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Default)]

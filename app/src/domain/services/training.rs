@@ -16,6 +16,7 @@ use crate::domain::{
     ports::{
         DateRange,
         activity::{IActivityService, ListActivitiesFilters},
+        search::DocumentsForSearch,
         training::{
             ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
@@ -501,24 +502,20 @@ where
         content: TrainingNoteContent,
         date: TrainingNoteDate,
     ) -> Result<(), UpdateTrainingNoteError> {
-        // Verify the note exists and belongs to the user
-        let note = self
+        let Some(existing_note) = self
             .training_repository
             .get_training_note(user, note_id)
             .await
-            .map_err(|err| UpdateTrainingNoteError::Unknown(err.into()))?;
+            .map_err(|err| UpdateTrainingNoteError::Unknown(err.into()))?
+        else {
+            return Ok(());
+        };
 
-        match note {
-            Some(n) if n.user() == user => {
-                self.training_repository
-                    .update_training_note(user, note_id, title, content, date)
-                    .await?;
-                Ok(())
-            }
-            _ => Err(UpdateTrainingNoteError::Unknown(anyhow::anyhow!(
-                "Training note not found or unauthorized"
-            ))),
-        }
+        let updated_note = existing_note.update(title, content, date);
+        self.training_repository
+            .save_training_note(updated_note)
+            .await
+            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -639,6 +636,29 @@ where
             .await
     }
 }
+impl<TMR, AS> DocumentsForSearch for TrainingService<TMR, AS>
+where
+    TMR: TrainingRepository,
+    AS: IActivityService,
+{
+    async fn get_documents_to_process(
+        &self,
+    ) -> Result<Vec<crate::domain::models::search::SearchDocument>, anyhow::Error> {
+        self.training_repository
+            .get_outbox_documents_to_process()
+            .await
+    }
+
+    async fn mark_document_as_processed(
+        &self,
+        document: &crate::domain::models::search::SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        self.training_repository
+            .mark_outbox_document_as_processed(document, processed_at)
+            .await
+    }
+}
 
 /// Make sure the input [`DateRange`] is compatible with the scope and window, potentially extending
 /// it to match. Also make sure the range's end is included by extending it of one day.
@@ -666,9 +686,12 @@ pub mod test_utils {
     use mockall::mock;
 
     use crate::domain::{
-        models::training::{
-            TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
-            TrainingPeriodWithActivities,
+        models::{
+            search::SearchDocument,
+            training::{
+                TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
+                TrainingPeriodWithActivities,
+            },
         },
         ports::training::{
             CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
@@ -961,15 +984,6 @@ pub mod test_utils {
                 date_range: &Option<DateRange>,
             ) -> Result<Vec<TrainingNote>, GetTrainingNoteError>;
 
-            async fn update_training_note(
-                &self,
-                user: &UserId,
-                note_id: &TrainingNoteId,
-                title: Option<TrainingNoteTitle>,
-                content: TrainingNoteContent,
-                date: TrainingNoteDate,
-            ) -> Result<(), UpdateTrainingNoteError>;
-
             async fn delete_training_note(
                 &self,
                 user: &UserId,
@@ -988,6 +1002,16 @@ pub mod test_utils {
                 scope: &TrainingMetricScope,
                 ordering: TrainingMetricsOrdering,
             ) -> Result<(), SetTrainingMetricsOrderingError>;
+
+            async fn get_outbox_documents_to_process(
+                &self,
+            ) -> Result<Vec<SearchDocument>, anyhow::Error>;
+
+            async fn mark_outbox_document_as_processed(
+                &self,
+                document: &SearchDocument,
+                processed_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
         }
     }
 }

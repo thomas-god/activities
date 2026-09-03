@@ -6,6 +6,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
+        search::SearchDocument,
         training::{
             TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricFilters, TrainingMetricId,
             TrainingMetricName, TrainingMetricPatch, TrainingMetricScope, TrainingMetricSummary,
@@ -852,15 +853,6 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         date_range: &Option<DateRange>,
     ) -> impl Future<Output = Result<Vec<TrainingNote>, GetTrainingNoteError>> + Send;
 
-    fn update_training_note(
-        &self,
-        user: &UserId,
-        note_id: &TrainingNoteId,
-        title: Option<TrainingNoteTitle>,
-        content: TrainingNoteContent,
-        date: TrainingNoteDate,
-    ) -> impl Future<Output = Result<(), UpdateTrainingNoteError>> + Send;
-
     fn delete_training_note(
         &self,
         user: &UserId,
@@ -879,6 +871,16 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         scope: &TrainingMetricScope,
         ordering: TrainingMetricsOrdering,
     ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
+
+    fn get_outbox_documents_to_process(
+        &self,
+    ) -> impl Future<Output = Result<Vec<SearchDocument>, anyhow::Error>> + Send;
+
+    fn mark_outbox_document_as_processed(
+        &self,
+        document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[cfg(test)]

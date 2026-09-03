@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use sqlx::{
-    ConnectOptions, QueryBuilder, Sqlite, SqlitePool,
+    ConnectOptions, QueryBuilder, Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 
@@ -11,6 +11,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{ActivityMetricSource, ActivityMetricV2},
+        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         training::{
             TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
@@ -21,15 +22,14 @@ use crate::domain::{
         },
     },
     ports::{
-        DateRange,
+        DateRange, IClock,
         training::{
             DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
             GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
             GetTrainingMetricsOrderingError, GetTrainingNoteError, SaveTrainingMetricError,
             SaveTrainingNoteError, SaveTrainingPeriodError, SetTrainingMetricsOrderingError,
-            TrainingRepository, UpdateTrainingMetricNameError, UpdateTrainingNoteError,
-            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodNameError,
-            UpdateTrainingPeriodNoteError,
+            TrainingRepository, UpdateTrainingMetricNameError, UpdateTrainingPeriodDatesError,
+            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNoteError,
         },
     },
 };
@@ -66,14 +66,22 @@ type TrainingNoteRow = (
     DateTime<FixedOffset>,
 );
 
+type SearchDocumentRow = (
+    TrainingNoteId,
+    SearchDocumentEvent,
+    String,
+    chrono::DateTime<chrono::Utc>,
+);
+
 #[derive(Debug, Clone)]
-pub struct SqliteTrainingRepository {
+pub struct SqliteTrainingRepository<C> {
     writer: SqlitePool,
     readers: SqlitePool,
+    clock: C,
 }
 
-impl SqliteTrainingRepository {
-    pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
+impl<C> SqliteTrainingRepository<C> {
+    pub async fn new(url: &str, clock: C) -> Result<Self, sqlx::Error> {
         let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
             .log_slow_statements(
@@ -98,11 +106,43 @@ impl SqliteTrainingRepository {
             .connect_with(readers_options)
             .await?;
 
-        Ok(Self { writer, readers })
+        Ok(Self {
+            writer,
+            readers,
+            clock,
+        })
+    }
+
+    async fn save_search_document(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        document: SearchDocument,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "
+              INSERT INTO t_outbox_training_search (note_id, event, content, occurred_at)
+              VALUES (?1, ?2, ?3, ?4);",
+        )
+        .bind(document.document_id())
+        .bind(document.event().to_string())
+        .bind(document.content())
+        .bind(document.occurred_at())
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to save training note search document {}. {err}",
+                document.document_id()
+            )
+        })
     }
 }
 
-impl TrainingRepository for SqliteTrainingRepository {
+impl<C> TrainingRepository for SqliteTrainingRepository<C>
+where
+    C: IClock,
+{
     #[tracing::instrument(skip_all, err)]
     async fn save_metric(&self, metric: TrainingMetric) -> Result<(), SaveTrainingMetricError> {
         let definition = metric.definition();
@@ -597,8 +637,16 @@ impl TrainingRepository for SqliteTrainingRepository {
 
     #[tracing::instrument(skip_all, err)]
     async fn save_training_note(&self, note: TrainingNote) -> Result<(), SaveTrainingNoteError> {
-        sqlx::query(
-            "INSERT INTO t_training_notes (id, user_id, title, content, date, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
+        let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
+
+        let _ = sqlx::query(
+            "INSERT INTO t_training_notes (id, user_id, title, content, date, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            ON CONFLICT (id)
+            DO UPDATE SET
+                title=excluded.title,
+                content=excluded.content,
+                date=excluded.date;",
         )
         .bind(note.id().to_string())
         .bind(note.user().to_string())
@@ -606,10 +654,17 @@ impl TrainingRepository for SqliteTrainingRepository {
         .bind(note.content().to_string())
         .bind(note.date().to_string())
         .bind(note.created_at().to_rfc3339())
-        .execute(&self.writer)
+        .execute(&mut *tx)
         .await
         .map_err(|err| SaveTrainingNoteError::Unknown(anyhow!(err)))
-        .map(|_| ())
+        .map(|_| ());
+
+        let document = note.to_search_document(SearchDocumentEvent::Updated, self.clock.now());
+        let _ = self.save_search_document(&mut tx, document).await?;
+
+        tx.commit()
+            .await
+            .map_err(|err| SaveTrainingNoteError::Unknown(anyhow!(err)))
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -675,41 +730,32 @@ impl TrainingRepository for SqliteTrainingRepository {
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn update_training_note(
-        &self,
-        user: &UserId,
-        note_id: &TrainingNoteId,
-        title: Option<TrainingNoteTitle>,
-        content: TrainingNoteContent,
-        date: TrainingNoteDate,
-    ) -> Result<(), UpdateTrainingNoteError> {
-        sqlx::query(
-            "UPDATE t_training_notes SET title = ?1, content = ?2, date = ?3 WHERE id = ?4 AND user_id = ?5;",
-        )
-        .bind(title.as_ref().map(|t| t.to_string()))
-        .bind(content.to_string())
-        .bind(date.to_string())
-        .bind(note_id.to_string())
-        .bind(user)
-        .execute(&self.writer)
-        .await
-        .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
-        .map(|_| ())
-    }
-
-    #[tracing::instrument(skip_all, err)]
     async fn delete_training_note(
         &self,
         user: &UserId,
         note_id: &TrainingNoteId,
     ) -> Result<(), DeleteTrainingNoteError> {
-        sqlx::query("DELETE FROM t_training_notes WHERE id = ?1 AND user_id = ?2;")
+        let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
+        let _ = sqlx::query("DELETE FROM t_training_notes WHERE id = ?1 AND user_id = ?2;")
             .bind(note_id.to_string())
             .bind(user)
-            .execute(&self.writer)
+            .execute(&mut *tx)
             .await
             .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
-            .map(|_| ())
+            .map(|_| ());
+
+        let document = SearchDocument::new(
+            SearchDocumentType::TrainingNote,
+            note_id.to_string(),
+            SearchDocumentEvent::Deleted,
+            String::default(),
+            self.clock.now(),
+        );
+        let _ = self.save_search_document(&mut tx, document).await?;
+
+        tx.commit()
+            .await
+            .map_err(|err| DeleteTrainingNoteError::Unknown(anyhow!(err)))
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -808,6 +854,52 @@ impl TrainingRepository for SqliteTrainingRepository {
 
         Ok(())
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_outbox_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
+        sqlx::query_as::<_, SearchDocumentRow>(
+            "SELECT note_id, event, content, occurred_at
+            FROM t_outbox_training_search
+            WHERE processed_at IS NULL;",
+        )
+        .fetch_all(&self.readers)
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(note, event, content, occurred_at)| {
+                    SearchDocument::new(
+                        SearchDocumentType::TrainingNote,
+                        note.to_string(),
+                        event,
+                        content,
+                        occurred_at,
+                    )
+                })
+                .collect::<Vec<SearchDocument>>()
+        })
+        .map_err(|err| anyhow!(err))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn mark_outbox_document_as_processed(
+        &self,
+        document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "UPDATE t_outbox_training_search SET processed_at = ?1
+            WHERE note_id = ?2 AND event = ?3 AND content = ?4 AND occurred_at = ?5;",
+        )
+        .bind(processed_at)
+        .bind(document.document_id())
+        .bind(document.event())
+        .bind(document.content())
+        .bind(document.occurred_at())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| anyhow!(err))
+    }
 }
 
 fn parse_definition_row_metric(
@@ -824,17 +916,22 @@ fn parse_definition_row_metric(
 #[cfg(test)]
 mod test_sqlite_training_repository {
 
-    use chrono::{NaiveDate, Utc};
+    use std::ops::Add;
+
+    use chrono::{Days, NaiveDate, Utc};
     use tempfile::NamedTempFile;
 
-    use crate::domain::models::{
-        activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric, Unit},
-        training::{
-            SportFilter, TrainingMetricAggregate, TrainingMetricDefinitionPatch,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricPatch,
-            TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingNote, TrainingNoteContent,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+    use crate::{
+        clock::Clock,
+        domain::models::{
+            activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric, Unit},
+            training::{
+                SportFilter, TrainingMetricAggregate, TrainingMetricDefinitionPatch,
+                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricPatch,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingNote,
+                TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
+                TrainingPeriodId, TrainingPeriodSports,
+            },
         },
     };
 
@@ -843,9 +940,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_init_table() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         sqlx::query("select count(*) from t_training_metrics_definitions;")
             .fetch_one(&repository.readers)
@@ -999,9 +1097,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_scope_global() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_global_metric();
 
@@ -1014,9 +1113,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_without_window_round_trip() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = TrainingMetric::new(
             TrainingMetricId::new(),
@@ -1054,9 +1154,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_scope_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         let definition = build_metric_scoped_to_period(period.id());
@@ -1075,9 +1176,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_scope_period_fails_if_period_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition =
             build_metric_scoped_to_period(&TrainingPeriodId::from("non-existing-period"));
@@ -1094,9 +1196,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metrics_with_group_by() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_metric_definition_with_group_by();
 
@@ -1119,9 +1222,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_summary() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_metric_definition_with_summary();
 
@@ -1142,9 +1246,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_metric_definition_target() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_metric_definition_with_target();
 
@@ -1174,9 +1279,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_existing_metric() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_global_metric();
 
@@ -1213,9 +1319,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metric() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_global_metric();
 
@@ -1236,9 +1343,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metric_with_filters() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_metric_definition_with_filters();
 
@@ -1259,9 +1367,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metric_with_group_by() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_metric_definition_with_group_by();
 
@@ -1282,9 +1391,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metric_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let res = repository
             .get_metric(&UserId::test_default(), &TrainingMetricId::new())
@@ -1296,9 +1406,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_for_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_global_metric();
         repository
@@ -1324,9 +1435,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_for_user_only() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_global_metric();
         repository
@@ -1345,9 +1457,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_with_filters() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_metric_definition_with_filters();
 
@@ -1367,9 +1480,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_with_group_by() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let definition = build_metric_definition_with_group_by();
 
@@ -1389,9 +1503,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_definition_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_global_metric();
         repository
@@ -1408,9 +1523,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_definition_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let id = TrainingMetricId::new();
         let err = repository.delete_metric(&UserId::test_default(), &id).await;
@@ -1424,9 +1540,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metric_name_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a metric
         let metric = build_global_metric();
@@ -1469,9 +1586,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metric_name_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Try to update a non-existent metric
         let metric_id = TrainingMetricId::new();
@@ -1493,9 +1611,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metric_name_only_updates_specified_metric() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create two metrics
         let metric1 = TrainingMetric::new(
@@ -1566,9 +1685,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_backward_compatibility_null_training_period_id() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Manually insert a metric with NULL training_period_id (testing backward compatibility for existing metrics)
         let metric_id = TrainingMetricId::new();
@@ -1619,9 +1739,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_training_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -1642,9 +1763,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_period_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let expected_period = build_training_period();
         repository
@@ -1663,9 +1785,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_period_does_not_exist() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         assert!(
             repository
@@ -1678,9 +1801,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_period_does_not_match_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let initial_period = build_training_period();
         repository
@@ -1702,9 +1826,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_periods_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let expected_period = build_training_period();
         repository
@@ -1722,9 +1847,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_periods_empty() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let periods = repository
             .get_training_periods(&UserId::test_default())
@@ -1736,9 +1862,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_periods_exclude_periods_from_other_users() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let expected_period = build_training_period();
         repository
@@ -1756,9 +1883,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_active_training_periods_with_both_start_and_end() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period from 2025-10-01 to 2025-12-31
         let period = TrainingPeriod::new(
@@ -1816,9 +1944,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_active_training_periods_with_no_end_date() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period starting 2025-10-01 with no end date
         let period = TrainingPeriod::new(
@@ -1862,9 +1991,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_active_training_periods_multiple_periods() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create multiple periods with different date ranges
         let period1 = TrainingPeriod::new(
@@ -1945,9 +2075,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_active_training_periods_exclude_other_users() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = TrainingPeriod::new(
             TrainingPeriodId::new(),
@@ -1976,9 +2107,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_active_training_periods_empty() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Test with no periods saved
         let ref_date = "2025-11-15".parse::<NaiveDate>().unwrap();
@@ -1991,9 +2123,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_training_period_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -2023,9 +2156,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_training_period_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period_id = TrainingPeriodId::new();
 
@@ -2044,9 +2178,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_training_period_only_deletes_specified_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create two periods for the same user
         let period1 = build_training_period();
@@ -2093,9 +2228,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_name_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period
         let period = build_training_period();
@@ -2128,9 +2264,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_name_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Try to update a non-existent period
         let period_id = TrainingPeriodId::new();
@@ -2152,9 +2289,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_name_only_updates_specified_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create two periods
         let period1 = build_training_period();
@@ -2203,9 +2341,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_note_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period with an initial note
         let period = build_training_period();
@@ -2239,9 +2378,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_note_clear_note() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period with an initial note
         let mut period = build_training_period();
@@ -2279,9 +2419,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_note_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Try to update a non-existent period
         let period_id = TrainingPeriodId::new();
@@ -2303,9 +2444,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_note_only_updates_specified_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create two periods with notes
         let period1 = TrainingPeriod::new(
@@ -2364,9 +2506,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_ok() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period
         let period = build_training_period();
@@ -2401,9 +2544,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_clear_end_date() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period with an end date
         let period = build_training_period();
@@ -2435,9 +2579,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_only_start() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create a period
         let period = build_training_period();
@@ -2467,9 +2612,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Try to update a non-existent period
         let period_id = TrainingPeriodId::new();
@@ -2489,9 +2635,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_only_updates_specified_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         // Create two periods
         let period1 = build_training_period();
@@ -2559,83 +2706,72 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_save_training_note_without_period() {
+    async fn test_save_training_note() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
-
-        let note = build_training_note();
-        repository
-            .save_training_note(note.clone())
-            .await
-            .expect("Should save note");
-
-        // Verify note was saved
-        assert_eq!(
-            sqlx::query_scalar::<_, i64>("select count(*) from t_training_notes where id = ?1")
-                .bind(note.id().to_string())
-                .fetch_one(&repository.readers)
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
                 .await
-                .unwrap(),
-            1
-        );
-    }
-
-    #[tokio::test]
-    async fn test_save_training_note_stores_all_fields() {
-        let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
-
+                .expect("repo should init");
         let note = build_training_note();
+
         repository
             .save_training_note(note.clone())
             .await
             .expect("Should save note");
 
-        // Verify all fields were stored correctly
-        let (stored_id, stored_user, stored_content, _stored_created_at) =
-            sqlx::query_as::<_, (String, String, String, String)>(
-                "select id, user_id, content, created_at from t_training_notes where id = ?1",
-            )
-            .bind(note.id().to_string())
-            .fetch_one(&repository.readers)
+        let saved_note = repository
+            .get_training_note(note.user(), note.id())
             .await
-            .unwrap();
-
-        assert_eq!(stored_id, note.id().to_string());
-        assert_eq!(stored_user, note.user().to_string());
-        assert_eq!(stored_content, note.content().to_string());
+            .expect("Get should succeed")
+            .expect("Note should be found");
+        assert_eq!(note, saved_note);
     }
 
     #[tokio::test]
-    async fn test_save_training_note_duplicate_fails() {
+    async fn test_save_training_note_update_fields_if_existing() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
+        // Initial note
         let note = build_training_note();
-
-        // First save should succeed
         repository
             .save_training_note(note.clone())
             .await
             .expect("First save should succeed");
 
-        // Second save with same ID should fail
-        let result = repository.save_training_note(note.clone()).await;
-        assert!(result.is_err());
+        // Upsert existing note
+        let updated_note = TrainingNote::new(
+            note.id().clone(),
+            note.user().clone(),
+            Some(TrainingNoteTitle::from("new title")),
+            TrainingNoteContent::from("new content"),
+            TrainingNoteDate::new(Utc::now().date_naive().add(Days::new(2))),
+            note.created_at().clone(),
+        );
+
+        repository
+            .save_training_note(updated_note.clone())
+            .await
+            .expect("Upsert should succeed");
+
+        let saved_note = repository
+            .get_training_note(note.user(), note.id())
+            .await
+            .expect("Get should succeed")
+            .expect("Note should be found");
+        assert_eq!(updated_note, saved_note);
     }
 
     #[tokio::test]
     async fn test_get_training_note_returns_note() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let note = build_training_note();
         repository
@@ -2657,9 +2793,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_note_returns_none_when_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let result = repository
             .get_training_note(&UserId::test_default(), &TrainingNoteId::new())
@@ -2672,9 +2809,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_notes_returns_all_user_notes() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let user_id = UserId::test_default();
         let other_user_id = UserId::new();
@@ -2727,9 +2865,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_notes_returns_empty_when_no_notes() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let notes = repository
             .get_training_notes(&UserId::new(), &None)
@@ -2742,9 +2881,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_notes_orders_by_created_at_desc() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let user_id = UserId::test_default();
 
@@ -2792,9 +2932,10 @@ mod test_sqlite_training_repository {
         use crate::domain::ports::DateRange;
 
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let user_id = UserId::test_default();
 
@@ -2874,9 +3015,10 @@ mod test_sqlite_training_repository {
         use crate::domain::ports::DateRange;
 
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let user_id = UserId::test_default();
 
@@ -2925,73 +3067,12 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_update_training_note_updates_content() {
-        let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
-
-        let note = build_training_note();
-        repository
-            .save_training_note(note.clone())
-            .await
-            .expect("Should save note");
-
-        let new_title = Some(TrainingNoteTitle::from("Updated title"));
-        let new_content = TrainingNoteContent::from("Updated content");
-        let new_date = TrainingNoteDate::try_from("2025-01-15").unwrap();
-        repository
-            .update_training_note(
-                note.user(),
-                note.id(),
-                new_title.clone(),
-                new_content.clone(),
-                new_date.clone(),
-            )
-            .await
-            .expect("Should update note");
-
-        // Verify content, title, and date were updated
-        let updated_note = repository
-            .get_training_note(note.user(), note.id())
-            .await
-            .expect("Should retrieve note")
-            .expect("Note should exist");
-
-        assert_eq!(updated_note.content(), &new_content);
-        assert_eq!(updated_note.title(), &new_title);
-        assert_eq!(updated_note.date(), &new_date);
-        assert_eq!(updated_note.id(), note.id());
-        assert_eq!(updated_note.user(), note.user());
-    }
-
-    #[tokio::test]
-    async fn test_update_training_note_does_not_fail_when_not_found() {
-        let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
-
-        let result = repository
-            .update_training_note(
-                &UserId::test_default(),
-                &TrainingNoteId::new(),
-                None,
-                TrainingNoteContent::from("Content"),
-                TrainingNoteDate::today(),
-            )
-            .await;
-
-        // Should not fail even if note doesn't exist
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_delete_training_note_removes_note() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let note = build_training_note();
         repository
@@ -3015,9 +3096,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_training_note_does_not_fail_when_not_found() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let result = repository
             .delete_training_note(&UserId::test_default(), &TrainingNoteId::new())
@@ -3030,9 +3112,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_and_retrieve_metric_with_name() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric_with_name = TrainingMetric::new(
             TrainingMetricId::new(),
@@ -3062,9 +3145,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_save_and_retrieve_metric_without_name() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric_without_name = build_global_metric(); // None for name
 
@@ -3085,9 +3169,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_with_global_scope_filter() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
 
         // Create a global metric
@@ -3160,9 +3245,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_with_training_period_scope_filter() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
 
         // Create a global metric
@@ -3288,9 +3374,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_metrics_without_scope_filter_returns_all() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
 
         // Create a global metric
@@ -3374,9 +3461,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_metrics_ordering_returns_empty_when_not_set() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let scope = TrainingMetricScope::Global;
 
@@ -3391,9 +3479,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_set_and_get_training_metrics_ordering_global_scope() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let scope = TrainingMetricScope::Global;
 
@@ -3426,9 +3515,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_set_and_get_training_metrics_ordering_period_scope() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let period_id = TrainingPeriodId::new();
         let scope = TrainingMetricScope::TrainingPeriod(period_id);
@@ -3459,9 +3549,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metrics_ordering_scope_global() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let scope = TrainingMetricScope::Global;
 
@@ -3500,9 +3591,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metrics_ordering_scope_period() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let period_id = TrainingPeriodId::new();
         let scope = TrainingMetricScope::TrainingPeriod(period_id);
@@ -3542,9 +3634,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_training_metrics_ordering_scopes_are_independent() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let period_id = TrainingPeriodId::new();
 
@@ -3602,9 +3695,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_training_metrics_ordering_users_are_isolated() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user1_id = UserId::test_default();
         let user2_id = UserId::new();
         let scope = TrainingMetricScope::Global;
@@ -3651,9 +3745,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_set_empty_training_metrics_ordering() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
         let user_id = UserId::test_default();
         let scope = TrainingMetricScope::Global;
 
@@ -3739,9 +3834,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_get_training_note_returns_none_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let note = build_training_note();
         repository
@@ -3758,45 +3854,12 @@ mod test_sqlite_training_repository {
     }
 
     #[tokio::test]
-    async fn test_update_training_note_does_not_update_for_wrong_user() {
-        let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
-
-        let note = build_training_note();
-        repository
-            .save_training_note(note.clone())
-            .await
-            .expect("Should save note");
-
-        repository
-            .update_training_note(
-                &UserId::from("another_user".to_string()),
-                note.id(),
-                Some(TrainingNoteTitle::from("Updated title")),
-                TrainingNoteContent::from("Updated content"),
-                TrainingNoteDate::today(),
-            )
-            .await
-            .expect("Should not fail");
-
-        let retrieved = repository
-            .get_training_note(note.user(), note.id())
-            .await
-            .expect("Should not error")
-            .expect("Note should still exist");
-
-        assert_eq!(retrieved.content(), note.content());
-        assert_eq!(retrieved.title(), note.title());
-    }
-
-    #[tokio::test]
     async fn test_delete_training_note_does_not_delete_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let note = build_training_note();
         repository
@@ -3819,9 +3882,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_definition_does_not_delete_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = build_global_metric();
         repository
@@ -3847,9 +3911,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_metric_name_does_not_update_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let metric = TrainingMetric::new(
             TrainingMetricId::new(),
@@ -3887,9 +3952,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_delete_training_period_does_not_delete_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -3916,9 +3982,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_name_does_not_update_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -3950,9 +4017,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_note_does_not_update_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -3984,9 +4052,10 @@ mod test_sqlite_training_repository {
     #[tokio::test]
     async fn test_update_training_period_dates_does_not_update_for_wrong_user() {
         let db_file = NamedTempFile::new().unwrap();
-        let repository = SqliteTrainingRepository::new(&db_file.path().to_string_lossy())
-            .await
-            .expect("repo should init");
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
 
         let period = build_training_period();
         repository
@@ -4017,5 +4086,154 @@ mod test_sqlite_training_repository {
             .expect("Period should still exist");
         assert_eq!(fetched.start(), period.start());
         assert_eq!(fetched.end(), period.end());
+    }
+
+    #[cfg(test)]
+    mod test_t_outbox_training_search {
+        use chrono::Utc;
+
+        use crate::{
+            clock::clock_test_utils::FakeClock,
+            domain::models::search::{SearchDocumentEvent, SearchDocumentType},
+        };
+
+        use super::*;
+
+        #[tokio::test]
+        async fn test_save_training_note_inserts_row_to_outbox_as_updated() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteTrainingRepository::new(
+                &db_file.path().to_string_lossy(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let training_note = build_training_note();
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.save_training_note(training_note.clone())
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly saved note
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            assert_eq!(document.document_type(), &SearchDocumentType::TrainingNote);
+            assert_eq!(document.document_id(), training_note.id().to_string());
+            assert_eq!(document.event(), &SearchDocumentEvent::Updated);
+            assert_eq!(document.occurred_at(), &now);
+            assert!(
+                document
+                    .content()
+                    .contains(&training_note.content().to_string())
+            )
+        }
+
+        #[tokio::test]
+        async fn test_delete_training_note_inserts_row_to_outbox_as_deleted() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteTrainingRepository::new(
+                &db_file.path().to_string_lossy(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let training_note = build_training_note();
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.delete_training_note(training_note.user(), training_note.id())
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly deleted training note
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            assert_eq!(document.document_type(), &SearchDocumentType::TrainingNote);
+            assert_eq!(document.document_id(), training_note.id().to_string());
+            assert_eq!(document.event(), &SearchDocumentEvent::Deleted);
+            assert_eq!(document.occurred_at(), &now);
+            assert!(document.content().is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_mark_outbox_document_as_processed() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repo = SqliteTrainingRepository::new(
+                &db_file.path().to_string_lossy(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+            let training_note = build_training_note();
+
+            // Outbox initially empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            repo.save_training_note(training_note.clone())
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains row for the newly saved training note
+            let document = repo
+                .get_outbox_documents_to_process()
+                .await
+                .expect("Get outbox documents should have succeeded")
+                .first()
+                .cloned()
+                .expect("Should contain at least one document");
+
+            // Mark document as processed
+            let processed_at = chrono::Utc::now();
+            repo.mark_outbox_document_as_processed(&document, processed_at.clone())
+                .await
+                .expect("Marking document as processes should have succeeded");
+
+            // Outox should be empty
+            assert!(
+                repo.get_outbox_documents_to_process()
+                    .await
+                    .expect("Get outbox documents should have succeeded")
+                    .is_empty()
+            );
+
+            // Marking the same document should be idempotent
+            repo.mark_outbox_document_as_processed(&document, processed_at)
+                .await
+                .expect("Marking document as processes should be idempotent");
+        }
     }
 }
