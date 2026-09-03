@@ -39,7 +39,7 @@
 				details: null
 			};
 		} else {
-			nutrition.bonk_status = newStatus;
+			nutrition = { ...nutrition, bonk_status: newStatus };
 		}
 	};
 </script>
@@ -86,7 +86,7 @@
 	<div class="flex flex-col gap-2">
 		<div class="flex flex-col gap-2">
 			<div class="flex flex-row items-center text-sm font-medium">
-				<span class="pr-0.5">Nutrition</span>
+				<span class="pr-0.5">Nutrition & Hydration</span>
 				{#if nutrition !== null}
 					<EditButton callback={() => (editMode = true)} />
 				{/if}

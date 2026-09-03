@@ -21,7 +21,6 @@
 	import type { ActivityWithTimeseries } from '$lib/api/activities';
 	import { isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
 	import { resolve } from '$app/paths';
-	import { SvelteURLSearchParams } from 'svelte/reactivity';
 
 	interface Props {
 		activity: ActivityWithTimeseries;
