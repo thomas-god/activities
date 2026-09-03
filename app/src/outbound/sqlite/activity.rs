@@ -45,6 +45,7 @@ type ActivityRow = (
 
 type SearchDocumentRow = (
     ActivityId,
+    UserId,
     SearchDocumentEvent,
     String,
     chrono::DateTime<chrono::Utc>,
@@ -181,10 +182,11 @@ where
     ) -> Result<(), anyhow::Error> {
         sqlx::query(
             "
-            INSERT INTO t_outbox_activity_search (activity_id, event, content, occurred_at)
-            VALUES (?1, ?2, ?3, ?4);",
+            INSERT INTO t_outbox_activity_search (activity_id, user, event, content, occurred_at)
+            VALUES (?1, ?2, ?3, ?4, ?5);",
         )
         .bind(document.document_id())
+        .bind(document.user())
         .bind(document.event().to_string())
         .bind(document.content())
         .bind(document.occurred_at())
@@ -207,7 +209,11 @@ where
     C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
-    async fn delete_activity(&self, activity: &ActivityId) -> Result<(), anyhow::Error> {
+    async fn delete_activity(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+    ) -> Result<(), anyhow::Error> {
         let mut tx = self.writer.begin().await.map_err(|err| anyhow!(err))?;
 
         sqlx::query("DELETE FROM t_activities_v2 WHERE id = ?1")
@@ -220,6 +226,7 @@ where
         let search_document = SearchDocument::new(
             SearchDocumentType::Activity,
             activity.to_string(),
+            user.clone(),
             SearchDocumentEvent::Deleted,
             String::default(),
             self.clock.now(),
@@ -680,7 +687,7 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_outbox_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
         sqlx::query_as::<_, SearchDocumentRow>(
-            "SELECT activity_id, event, content, occurred_at
+            "SELECT activity_id, user, event, content, occurred_at
             FROM t_outbox_activity_search
             WHERE processed_at IS NULL;",
         )
@@ -688,10 +695,11 @@ where
         .await
         .map(|rows| {
             rows.into_iter()
-                .map(|(activity, event, content, occurred_at)| {
+                .map(|(activity, user, event, content, occurred_at)| {
                     SearchDocument::new(
                         SearchDocumentType::Activity,
                         activity.to_string(),
+                        user,
                         event,
                         content,
                         occurred_at,
@@ -890,7 +898,7 @@ mod test_sqlite_activity_repository {
         );
 
         repository
-            .delete_activity(activity.id())
+            .delete_activity(activity.user(), activity.id())
             .await
             .expect("Deletion should have succeeded");
 
@@ -917,7 +925,7 @@ mod test_sqlite_activity_repository {
         let activity = build_activity();
 
         repository
-            .delete_activity(activity.id())
+            .delete_activity(activity.user(), activity.id())
             .await
             .expect("Should have returned ok");
     }
@@ -2132,7 +2140,7 @@ mod test_sqlite_activity_repository {
                     .is_empty()
             );
 
-            repo.delete_activity(activity.id())
+            repo.delete_activity(activity.user(), activity.id())
                 .await
                 .expect("Should have succeeded");
 

@@ -16,7 +16,7 @@ use crate::domain::{
     ports::{
         DateRange,
         activity::{IActivityService, ListActivitiesFilters},
-        search::DocumentsForSearch,
+        search::IDocumentsForSearch,
         training::{
             ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
@@ -636,7 +636,7 @@ where
             .await
     }
 }
-impl<TMR, AS> DocumentsForSearch for TrainingService<TMR, AS>
+impl<TMR, AS> IDocumentsForSearch for TrainingService<TMR, AS>
 where
     TMR: TrainingRepository,
     AS: IActivityService,

@@ -195,6 +195,7 @@ impl Activity {
         SearchDocument::new(
             SearchDocumentType::Activity,
             self.id().to_string(),
+            self.user.clone(),
             event,
             content,
             now,

@@ -1,6 +1,6 @@
 use crate::domain::models::search::SearchDocument;
 
-pub trait DocumentsForSearch {
+pub trait IDocumentsForSearch {
     fn get_documents_to_process(
         &self,
     ) -> impl Future<Output = Result<Vec<SearchDocument>, anyhow::Error>> + Send;

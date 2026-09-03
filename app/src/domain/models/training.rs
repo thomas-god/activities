@@ -1397,6 +1397,7 @@ impl TrainingNote {
         SearchDocument::new(
             SearchDocumentType::TrainingNote,
             self.id().to_string(),
+            self.user.clone(),
             event,
             content,
             now,

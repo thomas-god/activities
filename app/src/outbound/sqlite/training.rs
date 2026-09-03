@@ -68,6 +68,7 @@ type TrainingNoteRow = (
 
 type SearchDocumentRow = (
     TrainingNoteId,
+    UserId,
     SearchDocumentEvent,
     String,
     chrono::DateTime<chrono::Utc>,
@@ -120,10 +121,11 @@ impl<C> SqliteTrainingRepository<C> {
     ) -> Result<(), anyhow::Error> {
         sqlx::query(
             "
-              INSERT INTO t_outbox_training_search (note_id, event, content, occurred_at)
-              VALUES (?1, ?2, ?3, ?4);",
+              INSERT INTO t_outbox_training_search (note_id, user, event, content, occurred_at)
+              VALUES (?1, ?2, ?3, ?4, ?5);",
         )
         .bind(document.document_id())
+        .bind(document.user())
         .bind(document.event().to_string())
         .bind(document.content())
         .bind(document.occurred_at())
@@ -747,6 +749,7 @@ where
         let document = SearchDocument::new(
             SearchDocumentType::TrainingNote,
             note_id.to_string(),
+            user.clone(),
             SearchDocumentEvent::Deleted,
             String::default(),
             self.clock.now(),
@@ -858,7 +861,7 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_outbox_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
         sqlx::query_as::<_, SearchDocumentRow>(
-            "SELECT note_id, event, content, occurred_at
+            "SELECT note_id, user, event, content, occurred_at
             FROM t_outbox_training_search
             WHERE processed_at IS NULL;",
         )
@@ -866,10 +869,11 @@ where
         .await
         .map(|rows| {
             rows.into_iter()
-                .map(|(note, event, content, occurred_at)| {
+                .map(|(note, user, event, content, occurred_at)| {
                     SearchDocument::new(
                         SearchDocumentType::TrainingNote,
                         note.to_string(),
+                        user,
                         event,
                         content,
                         occurred_at,

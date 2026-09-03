@@ -18,7 +18,7 @@ use crate::domain::{
             ListActivitiesError, ListActivitiesFilters, PatchActivityError, PatchActivityRequest,
             RawActivity, RawDataRepository,
         },
-        search::DocumentsForSearch,
+        search::IDocumentsForSearch,
     },
 };
 
@@ -292,7 +292,7 @@ where
         }
 
         self.activity_repository
-            .delete_activity(req.activity())
+            .delete_activity(req.user(), req.activity())
             .await?;
 
         Ok(())
@@ -320,7 +320,7 @@ where
     }
 }
 
-impl<AR, RDR> DocumentsForSearch for ActivityService<AR, RDR>
+impl<AR, RDR> IDocumentsForSearch for ActivityService<AR, RDR>
 where
     AR: ActivityRepository,
     RDR: RawDataRepository,
@@ -538,6 +538,7 @@ pub mod test_utils {
 
             async fn delete_activity(
                 &self,
+                user: &UserId,
                 activity: &ActivityId,
             ) -> Result<(), anyhow::Error>;
 
@@ -924,8 +925,10 @@ mod tests_activity_service {
         });
         activity_repository
             .expect_delete_activity()
-            .withf(|id| *id == ActivityId::from("test_activity"))
-            .returning(|_| Ok(()));
+            .withf(|user, id| {
+                *user == UserId::from("test_user") && *id == ActivityId::from("test_activity")
+            })
+            .returning(|_, _| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
 

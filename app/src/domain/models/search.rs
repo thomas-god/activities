@@ -1,5 +1,7 @@
 use derive_more::Constructor;
 
+use crate::domain::models::UserId;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SearchDocumentEvent {
     Updated,
@@ -58,6 +60,7 @@ impl std::fmt::Display for SearchDocumentType {
 pub struct SearchDocument {
     document_type: SearchDocumentType, // Activity, Training note
     document_id: String,
+    user: UserId,
     event: SearchDocumentEvent,
     content: String,
     occurred_at: chrono::DateTime<chrono::Utc>,
@@ -69,6 +72,9 @@ impl SearchDocument {
     }
     pub fn document_id(&self) -> &str {
         &self.document_id
+    }
+    pub fn user(&self) -> &UserId {
+        &self.user
     }
     pub fn event(&self) -> &SearchDocumentEvent {
         &self.event

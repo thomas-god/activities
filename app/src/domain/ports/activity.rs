@@ -426,6 +426,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn delete_activity(
         &self,
+        user: &UserId,
         activity: &ActivityId,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
