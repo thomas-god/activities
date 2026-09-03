@@ -13,11 +13,8 @@ use crate::domain::{
         ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
         DeleteActivityRequest, GetActivityError, GetAllActivitiesError, GetAllActivitiesRequest,
         GetRawActivityError, GetRawActivityRequest, IActivityService, ListActivitiesError,
-        ListActivitiesFilters, ModifyActivityError, ModifyActivityRequest, PatchActivityError,
-        PatchActivityRequest, RawActivity, RawDataRepository, UpdateActivityFeedbackError,
-        UpdateActivityFeedbackRequest, UpdateActivityNutritionError,
-        UpdateActivityNutritionRequest, UpdateActivityRpeError, UpdateActivityRpeRequest,
-        UpdateActivityWorkoutTypeError, UpdateActivityWorkoutTypeRequest,
+        ListActivitiesFilters, PatchActivityError, PatchActivityRequest, RawActivity,
+        RawDataRepository,
     },
 };
 
@@ -276,133 +273,6 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn modify_activity(&self, req: ModifyActivityRequest) -> Result<(), ModifyActivityError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
-            return Err(ModifyActivityError::ActivityDoesNotExist(
-                req.activity().clone(),
-            ));
-        };
-
-        if activity.user() != req.user() {
-            return Err(ModifyActivityError::UserDoesNotOwnActivity(
-                req.user().clone(),
-                req.activity().clone(),
-            ));
-        }
-
-        let _ = self
-            .activity_repository
-            .modify_activity_name(req.activity(), req.name().cloned())
-            .await;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn update_activity_rpe(
-        &self,
-        req: UpdateActivityRpeRequest,
-    ) -> Result<(), UpdateActivityRpeError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
-            return Err(UpdateActivityRpeError::ActivityDoesNotExist(
-                req.activity().clone(),
-            ));
-        };
-
-        if activity.user() != req.user() {
-            return Err(UpdateActivityRpeError::UserDoesNotOwnActivity(
-                req.user().clone(),
-                req.activity().clone(),
-            ));
-        }
-
-        let _ = self
-            .activity_repository
-            .update_activity_rpe(req.activity(), req.rpe().cloned())
-            .await;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn update_activity_workout_type(
-        &self,
-        req: UpdateActivityWorkoutTypeRequest,
-    ) -> Result<(), UpdateActivityWorkoutTypeError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
-            return Err(UpdateActivityWorkoutTypeError::ActivityDoesNotExist(
-                req.activity().clone(),
-            ));
-        };
-
-        if activity.user() != req.user() {
-            return Err(UpdateActivityWorkoutTypeError::UserDoesNotOwnActivity(
-                req.user().clone(),
-                req.activity().clone(),
-            ));
-        }
-
-        let _ = self
-            .activity_repository
-            .update_activity_workout_type(req.activity(), req.workout_type().cloned())
-            .await;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn update_activity_nutrition(
-        &self,
-        req: UpdateActivityNutritionRequest,
-    ) -> Result<(), UpdateActivityNutritionError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
-            return Err(UpdateActivityNutritionError::ActivityDoesNotExist(
-                req.activity().clone(),
-            ));
-        };
-
-        if activity.user() != req.user() {
-            return Err(UpdateActivityNutritionError::UserDoesNotOwnActivity(
-                req.user().clone(),
-                req.activity().clone(),
-            ));
-        }
-
-        let _ = self
-            .activity_repository
-            .update_activity_nutrition(req.activity(), req.nutrition().clone())
-            .await;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn update_activity_feedback(
-        &self,
-        req: UpdateActivityFeedbackRequest,
-    ) -> Result<(), UpdateActivityFeedbackError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
-            return Err(UpdateActivityFeedbackError::ActivityDoesNotExist(
-                req.activity().clone(),
-            ));
-        };
-
-        if activity.user() != req.user() {
-            return Err(UpdateActivityFeedbackError::UserDoesNotOwnActivity(
-                req.user().clone(),
-                req.activity().clone(),
-            ));
-        }
-
-        let _ = self
-            .activity_repository
-            .update_activity_feedback(req.activity(), req.feedback().as_ref().cloned())
-            .await;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
         let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
             return Err(DeleteActivityError::ActivityDoesNotExist(
@@ -458,13 +328,12 @@ pub mod test_utils {
     use super::*;
 
     use crate::domain::models::activity::{
-        ActivityDuration, ActivityName, ActivityNaturalKey, ActivityStartTime, Sport,
+        ActivityDuration, ActivityNaturalKey, ActivityStartTime, Sport,
     };
     use crate::domain::ports::activity::{
         DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
-        GetRawActivityRequest, ListActivitiesError, ModifyActivityError, PatchActivityError,
-        PatchActivityRequest, RawActivity, SaveActivityError, SimilarActivityError,
-        UpdateActivityMetricError,
+        GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,
+        RawActivity, SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
 
     mock! {
@@ -522,31 +391,6 @@ pub mod test_utils {
                 req: PatchActivityRequest
             ) -> Result<(), PatchActivityError>;
 
-            async fn modify_activity(
-                &self,
-                req: ModifyActivityRequest,
-            ) -> Result<(), ModifyActivityError>;
-
-            async fn update_activity_rpe(
-                &self,
-                req: UpdateActivityRpeRequest,
-            ) -> Result<(), UpdateActivityRpeError>;
-
-            async fn update_activity_workout_type(
-                &self,
-                _req: UpdateActivityWorkoutTypeRequest,
-            ) -> Result<(), UpdateActivityWorkoutTypeError>;
-
-            async fn update_activity_nutrition(
-                &self,
-                _req: UpdateActivityNutritionRequest,
-            ) -> Result<(), UpdateActivityNutritionError>;
-
-            async fn update_activity_feedback(
-                &self,
-                _req: UpdateActivityFeedbackRequest,
-            ) -> Result<(), UpdateActivityFeedbackError>;
-
             async fn delete_activity(
                 &self,
                 req: DeleteActivityRequest,
@@ -569,8 +413,6 @@ pub mod test_utils {
             let mut mock = Self::new();
             mock.default_create_activity();
             mock.default_list_activities();
-            mock.default_modify_activity();
-            mock.default_update_activity_rpe();
             mock.default_delete_activity();
 
             mock
@@ -589,18 +431,6 @@ pub mod test_utils {
         }
         pub fn default_list_activities(&mut self) {
             self.expect_list_activities().returning(|_, _| Ok(vec![]));
-        }
-
-        pub fn default_modify_activity(&mut self) {
-            self.expect_modify_activity().returning(|_| Ok(()));
-        }
-
-        pub fn default_update_activity_rpe(&mut self) {
-            self.expect_update_activity_rpe().returning(|_| Ok(()));
-        }
-
-        pub fn default_update_activity_feedback(&mut self) {
-            self.expect_update_activity_feedback().returning(|_| Ok(()));
         }
 
         pub fn default_delete_activity(&mut self) {
@@ -679,36 +509,6 @@ pub mod test_utils {
                 id: &ActivityId,
             ) -> Result<Option<ActivityWithParsedData>, GetActivityError>;
 
-            async fn modify_activity_name(
-                &self,
-                id: &ActivityId,
-                name: Option<ActivityName>,
-            ) -> Result<(), anyhow::Error>;
-
-            async fn update_activity_rpe(
-                &self,
-                id: &ActivityId,
-                rpe: Option<crate::domain::models::activity::ActivityRpe>,
-            ) -> Result<(), anyhow::Error>;
-
-            async fn update_activity_workout_type(
-                &self,
-                id: &ActivityId,
-                workout_type: Option<crate::domain::models::activity::WorkoutType>,
-            ) ->Result<(), anyhow::Error>;
-
-            async fn update_activity_nutrition(
-                &self,
-                id: &ActivityId,
-                nutrition: Option<crate::domain::models::activity::ActivityNutrition>,
-            ) -> Result<(), anyhow::Error>;
-
-            async fn update_activity_feedback(
-                &self,
-                id: &ActivityId,
-                feedback: Option<crate::domain::models::activity::ActivityFeedback>,
-            ) -> Result<(), anyhow::Error>;
-
             async fn delete_activity(
                 &self,
                 activity: &ActivityId,
@@ -739,8 +539,8 @@ mod tests_activity_service {
             },
         },
         ports::activity::{
-            DeleteActivityError, DeleteActivityRequest, GetRawDataError, ModifyActivityError,
-            ModifyActivityRequest, RawContent, SaveActivityError, SaveRawDataError,
+            DeleteActivityError, DeleteActivityRequest, GetRawDataError, RawContent,
+            SaveActivityError, SaveRawDataError,
         },
         services::activity::test_utils::MockActivityRepository,
     };
@@ -883,88 +683,6 @@ mod tests_activity_service {
     }
 
     #[tokio::test]
-    async fn test_activity_service_modify_activity_not_found() {
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository
-            .expect_get_activity()
-            .returning(|_| Ok(None));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req =
-            ModifyActivityRequest::new(UserId::test_default(), ActivityId::from("test"), None);
-
-        let Err(ModifyActivityError::ActivityDoesNotExist(activity)) =
-            service.modify_activity(req).await
-        else {
-            unreachable!("Should have returned an err")
-        };
-        assert_eq!(activity, ActivityId::from("test"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_modify_activity_not_owned_by_user() {
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::from("another_user".to_string()),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req =
-            ModifyActivityRequest::new("test_user".into(), ActivityId::from("test_activity"), None);
-
-        let Err(ModifyActivityError::UserDoesNotOwnActivity(user, activity)) =
-            service.modify_activity(req).await
-        else {
-            unreachable!("Should have returned an err")
-        };
-        assert_eq!(user, "test_user".to_string().into());
-        assert_eq!(activity, ActivityId::from("test_activity"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_modify_activity_ok() {
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-        activity_repository
-            .expect_modify_activity_name()
-            .withf(|id, name| {
-                *id == ActivityId::from("test")
-                    && *name == Some(ActivityName::new("new name".to_string()))
-            })
-            .returning(|_, __| Ok(()));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = ModifyActivityRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(ActivityName::new("new name".to_string())),
-        );
-
-        let res = service.modify_activity(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_activity_service_patch_activity_ok() {
         use crate::domain::models::activity::{ActivityFeedback, ActivityPatch, ActivityRpe};
 
@@ -1103,377 +821,6 @@ mod tests_activity_service {
         let Err(PatchActivityError::Unknown(_)) = service.patch_activity(req).await else {
             unreachable!("Should have returned an error")
         };
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_rpe_ok() {
-        use crate::domain::models::activity::ActivityRpe;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-        activity_repository
-            .expect_update_activity_rpe()
-            .withf(|id, rpe| *id == ActivityId::from("test") && *rpe == Some(ActivityRpe::Five))
-            .returning(|_, _| Ok(()));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityRpeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(ActivityRpe::Five),
-        );
-
-        let res = service.update_activity_rpe(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_rpe_not_found() {
-        use crate::domain::models::activity::ActivityRpe;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository
-            .expect_get_activity()
-            .return_once(|_| Ok(None));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityRpeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(ActivityRpe::Five),
-        );
-
-        let Err(UpdateActivityRpeError::ActivityDoesNotExist(activity_id)) =
-            service.update_activity_rpe(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(activity_id, ActivityId::from("test"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_rpe_wrong_user() {
-        use crate::domain::models::activity::ActivityRpe;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                "other_user".into(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityRpeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(ActivityRpe::Five),
-        );
-
-        let Err(UpdateActivityRpeError::UserDoesNotOwnActivity(user, activity)) =
-            service.update_activity_rpe(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(user, UserId::test_default());
-        assert_eq!(activity, ActivityId::from("test_activity"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_feedback_ok() {
-        use crate::domain::models::activity::ActivityFeedback;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-        activity_repository
-            .expect_update_activity_feedback()
-            .withf(|id, feedback| {
-                *id == ActivityId::from("test")
-                    && *feedback == Some(ActivityFeedback::from("Great ride!"))
-            })
-            .returning(|_, _| Ok(()));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityFeedbackRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(ActivityFeedback::from("Great ride!")),
-        );
-
-        let res = service.update_activity_feedback(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_feedback_not_found() {
-        use crate::domain::models::activity::ActivityFeedback;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository
-            .expect_get_activity()
-            .return_once(|_| Ok(None));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityFeedbackRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(ActivityFeedback::from("Great ride!")),
-        );
-
-        let Err(UpdateActivityFeedbackError::ActivityDoesNotExist(activity_id)) =
-            service.update_activity_feedback(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(activity_id, ActivityId::from("test"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_feedback_wrong_user() {
-        use crate::domain::models::activity::ActivityFeedback;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                "other_user".into(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityFeedbackRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(ActivityFeedback::from("Great ride!")),
-        );
-
-        let Err(UpdateActivityFeedbackError::UserDoesNotOwnActivity(user, activity)) =
-            service.update_activity_feedback(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(user, UserId::test_default());
-        assert_eq!(activity, ActivityId::from("test_activity"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_workout_type_ok() {
-        use crate::domain::models::activity::WorkoutType;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-            )))
-        });
-        activity_repository
-            .expect_update_activity_workout_type()
-            .withf(|id, wt| *id == ActivityId::from("test") && *wt == Some(WorkoutType::Intervals))
-            .returning(|_, _| Ok(()));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityWorkoutTypeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(WorkoutType::Intervals),
-        );
-
-        let res = service.update_activity_workout_type(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_workout_type_not_found() {
-        use crate::domain::models::activity::WorkoutType;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository
-            .expect_get_activity()
-            .return_once(|_| Ok(None));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityWorkoutTypeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test"),
-            Some(WorkoutType::Tempo),
-        );
-
-        let Err(UpdateActivityWorkoutTypeError::ActivityDoesNotExist(activity_id)) =
-            service.update_activity_workout_type(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(activity_id, ActivityId::from("test"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_workout_type_wrong_user() {
-        use crate::domain::models::activity::WorkoutType;
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                "other_user".into(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-            )))
-        });
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let req = UpdateActivityWorkoutTypeRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(WorkoutType::LongRun),
-        );
-
-        let Err(UpdateActivityWorkoutTypeError::UserDoesNotOwnActivity(user, activity)) =
-            service.update_activity_workout_type(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(user, UserId::test_default());
-        assert_eq!(activity, ActivityId::from("test_activity"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_nutrition_ok() {
-        use crate::domain::models::activity::{ActivityNutrition, BonkStatus};
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::test_default(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-            )))
-        });
-        activity_repository
-            .expect_update_activity_nutrition()
-            .returning(|_, _| Ok(()));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let nutrition =
-            ActivityNutrition::new(BonkStatus::Bonked, Some("2 gels, 500ml water".to_string()));
-        let req = UpdateActivityNutritionRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(nutrition),
-        );
-
-        let res = service.update_activity_nutrition(req).await;
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_nutrition_not_found() {
-        use crate::domain::models::activity::{ActivityNutrition, BonkStatus};
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository
-            .expect_get_activity()
-            .return_once(|_| Ok(None));
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let nutrition = ActivityNutrition::new(BonkStatus::None, None);
-        let req = UpdateActivityNutritionRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(nutrition),
-        );
-
-        let Err(UpdateActivityNutritionError::ActivityDoesNotExist(activity)) =
-            service.update_activity_nutrition(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(activity, ActivityId::from("test_activity"));
-    }
-
-    #[tokio::test]
-    async fn test_activity_service_update_activity_nutrition_wrong_user() {
-        use crate::domain::models::activity::{ActivityNutrition, BonkStatus};
-
-        let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                "other_user".into(),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Running,
-            )))
-        });
-
-        let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
-
-        let nutrition =
-            ActivityNutrition::new(BonkStatus::Bonked, Some("Forgot to eat".to_string()));
-        let req = UpdateActivityNutritionRequest::new(
-            UserId::test_default(),
-            ActivityId::from("test_activity"),
-            Some(nutrition),
-        );
-
-        let Err(UpdateActivityNutritionError::UserDoesNotOwnActivity(user, activity)) =
-            service.update_activity_nutrition(req).await
-        else {
-            unreachable!("Should have returned an error")
-        };
-        assert_eq!(user, UserId::test_default());
-        assert_eq!(activity, ActivityId::from("test_activity"));
     }
 
     #[tokio::test]

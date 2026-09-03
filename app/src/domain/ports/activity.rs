@@ -8,10 +8,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
-            ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityPatch,
-            ActivityRpe, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
-            ActivityWithParsedData, Sport, WorkoutType,
+            Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
+            ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
+            ActivityTimeseries, ActivityWithParsedData, Sport,
         },
     },
     ports::{DateRange, DateTimeRange},
@@ -66,31 +65,6 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: PatchActivityRequest,
     ) -> impl Future<Output = Result<(), PatchActivityError>> + Send;
-
-    fn modify_activity(
-        &self,
-        req: ModifyActivityRequest,
-    ) -> impl Future<Output = Result<(), ModifyActivityError>> + Send;
-
-    fn update_activity_rpe(
-        &self,
-        req: UpdateActivityRpeRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityRpeError>> + Send;
-
-    fn update_activity_workout_type(
-        &self,
-        req: UpdateActivityWorkoutTypeRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityWorkoutTypeError>> + Send;
-
-    fn update_activity_nutrition(
-        &self,
-        req: UpdateActivityNutritionRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityNutritionError>> + Send;
-
-    fn update_activity_feedback(
-        &self,
-        req: UpdateActivityFeedbackRequest,
-    ) -> impl Future<Output = Result<(), UpdateActivityFeedbackError>> + Send;
 
     fn delete_activity(
         &self,
@@ -220,161 +194,6 @@ impl PatchActivityRequest {
 
 #[derive(Debug, Error)]
 pub enum PatchActivityError {
-    #[error("Activity {0} does not exists")]
-    ActivityDoesNotExist(ActivityId),
-    #[error("User {0} does not own activity {1}")]
-    UserDoesNotOwnActivity(UserId, ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Clone, Constructor, Default)]
-pub struct ModifyActivityRequest {
-    user: UserId,
-    activity: ActivityId,
-    name: Option<ActivityName>,
-}
-
-impl ModifyActivityRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn activity(&self) -> &ActivityId {
-        &self.activity
-    }
-
-    pub fn name(&self) -> Option<&ActivityName> {
-        self.name.as_ref()
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum ModifyActivityError {
-    #[error("Activity {0} does not exists")]
-    ActivityDoesNotExist(ActivityId),
-    #[error("User {0} does not own activity {1}")]
-    UserDoesNotOwnActivity(UserId, ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct UpdateActivityRpeRequest {
-    user: UserId,
-    activity: ActivityId,
-    rpe: Option<ActivityRpe>,
-}
-
-impl UpdateActivityRpeRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn activity(&self) -> &ActivityId {
-        &self.activity
-    }
-
-    pub fn rpe(&self) -> Option<&ActivityRpe> {
-        self.rpe.as_ref()
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateActivityRpeError {
-    #[error("Activity {0} does not exists")]
-    ActivityDoesNotExist(ActivityId),
-    #[error("User {0} does not own activity {1}")]
-    UserDoesNotOwnActivity(UserId, ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct UpdateActivityWorkoutTypeRequest {
-    user: UserId,
-    activity: ActivityId,
-    workout_type: Option<WorkoutType>,
-}
-
-impl UpdateActivityWorkoutTypeRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn activity(&self) -> &ActivityId {
-        &self.activity
-    }
-
-    pub fn workout_type(&self) -> Option<&WorkoutType> {
-        self.workout_type.as_ref()
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateActivityWorkoutTypeError {
-    #[error("Activity {0} does not exists")]
-    ActivityDoesNotExist(ActivityId),
-    #[error("User {0} does not own activity {1}")]
-    UserDoesNotOwnActivity(UserId, ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct UpdateActivityNutritionRequest {
-    user: UserId,
-    activity: ActivityId,
-    nutrition: Option<ActivityNutrition>,
-}
-
-impl UpdateActivityNutritionRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn activity(&self) -> &ActivityId {
-        &self.activity
-    }
-
-    pub fn nutrition(&self) -> &Option<ActivityNutrition> {
-        &self.nutrition
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateActivityNutritionError {
-    #[error("Activity {0} does not exists")]
-    ActivityDoesNotExist(ActivityId),
-    #[error("User {0} does not own activity {1}")]
-    UserDoesNotOwnActivity(UserId, ActivityId),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct UpdateActivityFeedbackRequest {
-    user: UserId,
-    activity: ActivityId,
-    feedback: Option<ActivityFeedback>,
-}
-
-impl UpdateActivityFeedbackRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-
-    pub fn activity(&self) -> &ActivityId {
-        &self.activity
-    }
-
-    pub fn feedback(&self) -> &Option<ActivityFeedback> {
-        &self.feedback
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum UpdateActivityFeedbackError {
     #[error("Activity {0} does not exists")]
     ActivityDoesNotExist(ActivityId),
     #[error("User {0} does not own activity {1}")]
@@ -603,36 +422,6 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, GetActivityError>> + Send;
-
-    fn modify_activity_name(
-        &self,
-        id: &ActivityId,
-        name: Option<ActivityName>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-
-    fn update_activity_rpe(
-        &self,
-        id: &ActivityId,
-        rpe: Option<ActivityRpe>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-
-    fn update_activity_workout_type(
-        &self,
-        id: &ActivityId,
-        workout_type: Option<WorkoutType>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-
-    fn update_activity_nutrition(
-        &self,
-        id: &ActivityId,
-        nutrition: Option<ActivityNutrition>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
-
-    fn update_activity_feedback(
-        &self,
-        id: &ActivityId,
-        feedback: Option<ActivityFeedback>,
-    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 
     fn delete_activity(
         &self,
