@@ -210,6 +210,16 @@ pub struct ActivityPatch {
     feedback: Option<Option<ActivityFeedback>>,
 }
 
+impl ActivityPatch {
+    pub fn is_empty(&self) -> bool {
+        self.name.is_none()
+            && self.rpe.is_none()
+            && self.workout_type.is_none()
+            && self.nutrition.is_none()
+            && self.feedback.is_none()
+    }
+}
+
 /// [Activity] enriched with data parsed from the raw file ([ActivityTimeseries], [ActivityStatistics]).
 #[derive(Clone, Debug, Constructor)]
 pub struct ActivityWithParsedData {

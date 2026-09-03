@@ -645,7 +645,14 @@ where
             )
             VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
-            );",
+            )
+            ON CONFLICT (id)
+            DO UPDATE SET
+                name=excluded.name,
+                rpe=excluded.rpe,
+                workout_type=excluded.workout_type,
+                nutrition=excluded.nutrition,
+                feedback=excluded.feedback;",
         )
         .bind(activity.id())
         .bind(activity.user())
@@ -806,7 +813,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_does_not_save_duplicated_activity_id() {
+    async fn test_save_existing_activity_id_updates_optional_fields() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),
@@ -822,18 +829,30 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have succeed");
 
-        repository
-            .save_activity(&activity)
-            .await
-            .expect_err("Should have failed");
+        let patched_activity = activity.apply_patch(ActivityPatch::new(
+            Some(Some(ActivityName::from("Another name"))),
+            Some(Some(ActivityRpe::Eight)),
+            Some(Some(WorkoutType::CrossTraining)),
+            Some(Some(ActivityNutrition::new(BonkStatus::None, None))),
+            Some(Some(ActivityFeedback::from("Another feedback"))),
+        ));
 
-        assert_eq!(
-            sqlx::query_scalar::<_, u64>("select count(*) from t_activities_v2;")
-                .fetch_one(&repository.readers)
-                .await
-                .unwrap(),
-            1
-        );
+        repository
+            .save_activity(&patched_activity)
+            .await
+            .expect("Should have succeeded");
+
+        let activity = repository
+            .get_activity(patched_activity.id())
+            .await
+            .expect("Should have returned the activity")
+            .expect("Activity should be some");
+
+        assert_eq!(activity.feedback(), patched_activity.feedback());
+        assert_eq!(activity.name(), patched_activity.name());
+        assert_eq!(activity.rpe(), patched_activity.rpe());
+        assert_eq!(activity.workout_type(), patched_activity.workout_type());
+        assert_eq!(activity.nutrition(), patched_activity.nutrition());
     }
 
     #[tokio::test]

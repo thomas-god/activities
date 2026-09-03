@@ -52,6 +52,7 @@ pub use crate::inbound::auth::email_based::{
 
 mod handlers;
 pub mod middlewares;
+mod shared;
 
 #[derive(Debug, Clone)]
 pub struct CookieConfig {

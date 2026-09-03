@@ -167,13 +167,12 @@
 	};
 
 	const updateActivityNameCallback = async (newName: string) => {
-		const res = await fetch(
-			`${PUBLIC_APP_URL}/api/activity/${activity.id}?name=${encodeURIComponent(newName)}`,
-			{
-				method: 'PATCH',
-				credentials: 'include'
-			}
-		);
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			body: JSON.stringify({ name: newName }),
+			headers: { 'Content-Type': 'application/json' }
+		});
 
 		if (res.status === 401) {
 			goto(resolve('/login'));
@@ -187,10 +186,12 @@
 	};
 
 	const updateActivityRpeCallback = async (newRpe: number | null) => {
-		const rpeParam = newRpe === null ? '0' : newRpe.toString();
-		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}?rpe=${rpeParam}`, {
+		const rpeParam = newRpe === null ? 0 : newRpe;
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}`, {
 			method: 'PATCH',
-			credentials: 'include'
+			credentials: 'include',
+			body: JSON.stringify({ rpe: rpeParam }),
+			headers: { 'Content-Type': 'application/json' }
 		});
 
 		if (res.status === 401) {
@@ -206,13 +207,12 @@
 
 	const updateActivityWorkoutTypeCallback = async (newWorkoutType: WorkoutType | null) => {
 		const workoutTypeParam = newWorkoutType === null ? '' : newWorkoutType;
-		const res = await fetch(
-			`${PUBLIC_APP_URL}/api/activity/${activity?.id}?workout_type=${encodeURIComponent(workoutTypeParam)}`,
-			{
-				method: 'PATCH',
-				credentials: 'include'
-			}
-		);
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}`, {
+			method: 'PATCH',
+			credentials: 'include',
+			body: JSON.stringify({ workout_type: workoutTypeParam }),
+			headers: { 'Content-Type': 'application/json' }
+		});
 
 		if (res.status === 401) {
 			goto(resolve('/login'));
@@ -226,20 +226,11 @@
 	};
 
 	const updateActivityNutritionCallback = async (newNutrition: Nutrition | null) => {
-		const params = new SvelteURLSearchParams();
-
-		if (newNutrition === null) {
-			params.set('bonk_status', '');
-		} else {
-			params.set('bonk_status', newNutrition.bonk_status);
-			if (newNutrition.details) {
-				params.set('nutrition_details', newNutrition.details);
-			}
-		}
-
-		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}?${params.toString()}`, {
+		const res = await fetch(`${PUBLIC_APP_URL}/api/activity/${activity?.id}`, {
 			method: 'PATCH',
-			credentials: 'include'
+			credentials: 'include',
+			body: JSON.stringify({ nutrition: newNutrition }),
+			headers: { 'Content-Type': 'application/json' }
 		});
 
 		if (res.status === 401) {

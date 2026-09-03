@@ -1,125 +1,147 @@
 use axum::{
     Extension, Json,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
+    response::{IntoResponse, Response},
 };
-use serde::Deserialize;
+use derive_more::Display;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
         models::activity::{
-            ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityRpe, BonkStatus,
-            WorkoutType,
+            ActivityFeedback, ActivityId, ActivityName, ActivityNutrition, ActivityPatch,
+            ActivityRpe, BonkStatus, WorkoutType,
         },
-        ports::activity::{
-            IActivityService, ModifyActivityError, ModifyActivityRequest,
-            UpdateActivityFeedbackError, UpdateActivityFeedbackRequest,
-            UpdateActivityNutritionError, UpdateActivityNutritionRequest, UpdateActivityRpeError,
-            UpdateActivityRpeRequest, UpdateActivityWorkoutTypeError,
-            UpdateActivityWorkoutTypeRequest,
+        ports::{
+            activity::{IActivityService, PatchActivityError, PatchActivityRequest},
+            preferences::IPreferencesService,
+            training::ITrainingService,
         },
-        ports::preferences::IPreferencesService,
-        ports::training::ITrainingService,
     },
-    inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
+    inbound::{
+        auth::AuthenticatedUser,
+        http::{AppState, shared::PatchField},
+        parser::ParseFile,
+    },
 };
 
-impl From<ModifyActivityError> for StatusCode {
-    fn from(value: ModifyActivityError) -> Self {
+impl From<PatchActivityError> for StatusCode {
+    fn from(value: PatchActivityError) -> Self {
         match value {
-            ModifyActivityError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
+            PatchActivityError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
+            PatchActivityError::UserDoesNotOwnActivity(_, _) => Self::FORBIDDEN,
             _ => Self::UNPROCESSABLE_ENTITY,
         }
     }
 }
 
-impl From<UpdateActivityRpeError> for StatusCode {
-    fn from(value: UpdateActivityRpeError) -> Self {
-        match value {
-            UpdateActivityRpeError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            _ => Self::UNPROCESSABLE_ENTITY,
-        }
-    }
+/// Nutrition part of a patch request. Unlike the top-level fields, `details` is a
+/// plain `Option`: it is either provided (or `null`/absent => no details).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct PatchNutrition {
+    bonk_status: String,
+    details: Option<String>,
 }
 
-impl From<UpdateActivityWorkoutTypeError> for StatusCode {
-    fn from(value: UpdateActivityWorkoutTypeError) -> Self {
-        match value {
-            UpdateActivityWorkoutTypeError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            _ => Self::UNPROCESSABLE_ENTITY,
-        }
-    }
-}
-
-impl From<UpdateActivityNutritionError> for StatusCode {
-    fn from(value: UpdateActivityNutritionError) -> Self {
-        match value {
-            UpdateActivityNutritionError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            _ => Self::UNPROCESSABLE_ENTITY,
-        }
-    }
-}
-
-impl From<UpdateActivityFeedbackError> for StatusCode {
-    fn from(value: UpdateActivityFeedbackError) -> Self {
-        match value {
-            UpdateActivityFeedbackError::ActivityDoesNotExist(_) => Self::NOT_FOUND,
-            _ => Self::UNPROCESSABLE_ENTITY,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PatchActivityQuery {
-    /// Optional new name for the activity
-    name: Option<String>,
-    /// Optional RPE (Rate of Perceived Exertion) value from 1-10
-    /// Use 0 to clear/remove the RPE value
-    rpe: Option<u8>,
-    /// Optional workout type: easy, tempo, intervals, long_run, or race
-    /// Use empty string to clear/remove the workout type
-    workout_type: Option<String>,
-    /// Optional bonk status: none or bonked
-    /// Use empty string to clear/remove the nutrition info
-    bonk_status: Option<String>,
-    /// Optional nutrition details/notes
-    nutrition_details: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Default)]
+/// Body of the PATCH /api/activity/{activity_id} request.
+///
+/// It mirrors the domain [`ActivityPatch`] (double `Option` convention):
+/// - a field **absent** from the body leaves the current value untouched,
+/// - a field set to **`null`** clears/removes the current value,
+/// - a field with a **value** sets it.
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct PatchActivityBody {
-    /// Optional feedback/notes about the activity
-    /// Use empty string or null to clear/remove the feedback
-    feedback: Option<String>,
+    #[serde(default)]
+    name: PatchField<String>,
+    #[serde(default)]
+    rpe: PatchField<u8>,
+    #[serde(default)]
+    workout_type: PatchField<String>,
+    #[serde(default)]
+    nutrition: PatchField<PatchNutrition>,
+    #[serde(default)]
+    feedback: PatchField<String>,
+}
+
+impl TryFrom<PatchActivityBody> for ActivityPatch {
+    type Error = String;
+
+    fn try_from(value: PatchActivityBody) -> Result<ActivityPatch, Self::Error> {
+        let name = match value.name {
+            PatchField::Absent => None,
+            PatchField::Clear => Some(None),
+            PatchField::Set(name) => Some(Some(ActivityName::from(name.as_str()))),
+        };
+
+        let rpe = match value.rpe {
+            PatchField::Absent => None,
+            PatchField::Clear => Some(None),
+            PatchField::Set(value) => Some(Some(ActivityRpe::try_from(value)?)),
+        };
+
+        let workout_type = match value.workout_type {
+            PatchField::Absent => None,
+            PatchField::Clear => Some(None),
+            PatchField::Set(value) => Some(Some(value.parse::<WorkoutType>()?)),
+        };
+
+        let nutrition = match value.nutrition {
+            PatchField::Absent => None,
+            PatchField::Clear => Some(None),
+            PatchField::Set(nutrition) => {
+                let bonk_status = nutrition.bonk_status.parse::<BonkStatus>()?;
+                Some(Some(ActivityNutrition::new(bonk_status, nutrition.details)))
+            }
+        };
+
+        let feedback = match value.feedback {
+            PatchField::Absent => None,
+            PatchField::Clear => Some(None),
+            PatchField::Set(feedback) => Some(Some(ActivityFeedback::from(feedback))),
+        };
+
+        Ok(ActivityPatch::new(
+            name,
+            rpe,
+            workout_type,
+            nutrition,
+            feedback,
+        ))
+    }
 }
 
 /// Handler for PATCH /api/activity/{activity_id}
 ///
-/// Updates an activity's metadata. Currently supports:
-/// - `name`: Change the activity name (query parameter)
-/// - `rpe`: Set RPE from 1-10, or use 0 to clear it (query parameter)
-/// - `workout_type`: Set workout type (easy, tempo, intervals, long_run, race), or empty string to clear (query parameter)
-/// - `bonk_status`: Set bonk status (none, bonked), or empty string to clear nutrition info (query parameter)
-/// - `nutrition_details`: Optional details about nutrition/hydration (query parameter)
-/// - `feedback`: Optional feedback/notes about the activity (request body, JSON)
+/// Updates an activity's mutable optional fields using the same double `Option` semantics
+/// as the domain `ActivityPatch`:
+/// - omitted field   => left untouched
+/// - `null`          => cleared/set to None
+/// - a value         => set
 ///
-/// # Example
-/// PATCH /api/activity/123?rpe=7
-/// PATCH /api/activity/123?name=Morning%20Run&rpe=8
-/// PATCH /api/activity/123?rpe=0  // Clear RPE
-/// PATCH /api/activity/123?workout_type=intervals
-/// PATCH /api/activity/123?workout_type=  // Clear workout type
-/// PATCH /api/activity/123?bonk_status=bonked&nutrition_details=Forgot%20to%20eat
-/// PATCH /api/activity/123?bonk_status=none
-/// PATCH /api/activity/123?bonk_status=  // Clear nutrition info
-///
-/// With request body for feedback:
+/// # Examples
+/// ```json
+/// // Set name and RPE
 /// PATCH /api/activity/123
-/// Body: {"feedback": "Great run, felt strong throughout!"}
+/// Content-Type: application/json
+/// {"name": "Morning Run", "rpe": 7}
 ///
-/// To clear feedback:
-/// Body: {"feedback": ""} or {"feedback": null}
-#[tracing::instrument(skip_all, err)]
+/// // Clear RPE and workout type
+/// PATCH /api/activity/123
+/// Content-Type: application/json
+/// {"rpe": null, "workout_type": null}
+///
+/// // Set nutrition
+/// PATCH /api/activity/123
+/// Content-Type: application/json
+/// {"nutrition": {"bonk_status": "bonked", "details": "Forgot to eat"}}
+///
+/// // Clear nutrition and feedback
+/// PATCH /api/activity/123
+/// Content-Type: application/json
+/// {"nutrition": null, "feedback": null}
+/// ```
+#[tracing::instrument(skip_all, err(Debug))]
 pub async fn patch_activity<
     AS: IActivityService,
     PF: ParseFile,
@@ -129,285 +151,55 @@ pub async fn patch_activity<
     Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
-    Query(query): Query<PatchActivityQuery>,
     body: Option<Json<PatchActivityBody>>,
-) -> Result<StatusCode, StatusCode> {
-    if let Some(name) = query.name {
-        let req = ModifyActivityRequest::new(
-            user.user().clone(),
-            ActivityId::from(&activity_id),
-            Some(ActivityName::new(name)),
-        );
+) -> Result<StatusCode, Response> {
+    let Some(Json(body)) = body else {
+        return Ok(StatusCode::OK);
+    };
 
-        if let Err(err) = state.activity_service.modify_activity(req).await {
-            if matches!(err, ModifyActivityError::Unknown(_)) {
-                tracing::error!(
-                    "Error while updating name of activity {}: {}",
-                    activity_id,
-                    err.to_string()
-                );
-            }
-            return Err(StatusCode::from(err));
-        };
-    }
-
-    if let Some(rpe_value) = query.rpe {
-        let rpe = if rpe_value == 0 {
-            None
-        } else {
-            Some(ActivityRpe::try_from(rpe_value).map_err(|_| StatusCode::BAD_REQUEST)?)
-        };
-
-        let req =
-            UpdateActivityRpeRequest::new(user.user().clone(), ActivityId::from(&activity_id), rpe);
-
-        if let Err(err) = state.activity_service.update_activity_rpe(req).await {
-            if matches!(err, UpdateActivityRpeError::Unknown(_)) {
-                tracing::error!(
-                    "Error while updating rpe of activity {}: {}",
-                    activity_id,
-                    err.to_string()
-                );
-            }
-            return Err(StatusCode::from(err));
-        };
-    }
-
-    if let Some(workout_type_str) = query.workout_type {
-        let workout_type = if workout_type_str.is_empty() {
-            None
-        } else {
-            Some(
-                workout_type_str
-                    .parse::<WorkoutType>()
-                    .map_err(|_| StatusCode::BAD_REQUEST)?,
+    let patch = match ActivityPatch::try_from(body) {
+        Ok(patch) => patch,
+        Err(err) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Invalid patch request: {}", err),
             )
-        };
+                .into_response());
+        }
+    };
 
-        let req = UpdateActivityWorkoutTypeRequest::new(
-            user.user().clone(),
-            ActivityId::from(&activity_id),
-            workout_type,
-        );
-
-        if let Err(err) = state
-            .activity_service
-            .update_activity_workout_type(req)
-            .await
-        {
-            if matches!(err, UpdateActivityWorkoutTypeError::Unknown(_)) {
-                tracing::error!(
-                    "Error while updating workout type of activity {}: {}",
-                    activity_id,
-                    err.to_string()
-                );
-            }
-            return Err(StatusCode::from(err));
-        };
+    if patch.is_empty() {
+        return Ok(StatusCode::OK);
     }
 
-    if let Some(bonk_status_str) = query.bonk_status {
-        let nutrition = if bonk_status_str.is_empty() {
-            None
-        } else {
-            let bonk_status = bonk_status_str
-                .parse::<BonkStatus>()
-                .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let req = PatchActivityRequest::new(ActivityId::from(&activity_id), user.user().clone(), patch);
 
-            // If nutrition_details is provided and not empty, use it; otherwise None
-            let details = query.nutrition_details.filter(|d| !d.is_empty());
-
-            Some(ActivityNutrition::new(bonk_status, details))
-        };
-
-        let req = UpdateActivityNutritionRequest::new(
-            user.user().clone(),
-            ActivityId::from(&activity_id),
-            nutrition,
-        );
-
-        if let Err(err) = state.activity_service.update_activity_nutrition(req).await {
-            if matches!(err, UpdateActivityNutritionError::Unknown(_)) {
-                tracing::error!(
-                    "Error while updating nutrition of activity {}: {}",
-                    activity_id,
-                    err.to_string()
-                );
+    match state.activity_service.patch_activity(req).await {
+        Ok(()) => Ok(StatusCode::OK),
+        Err(err) => {
+            if let PatchActivityError::Unknown(_) = &err {
+                tracing::error!("Error while patching activity {activity_id}: {err}");
             }
-            return Err(StatusCode::from(err));
-        };
+            Err(StatusCode::from(err).into_response())
+        }
     }
-
-    if let Some(Json(body)) = body
-        && let Some(feedback_str) = body.feedback
-    {
-        let feedback = if feedback_str.is_empty() {
-            None
-        } else {
-            Some(ActivityFeedback::from(feedback_str))
-        };
-
-        let req = UpdateActivityFeedbackRequest::new(
-            user.user().clone(),
-            ActivityId::from(&activity_id),
-            feedback,
-        );
-
-        if let Err(err) = state.activity_service.update_activity_feedback(req).await {
-            if matches!(err, UpdateActivityFeedbackError::Unknown(_)) {
-                tracing::error!(
-                    "Error while updating feedback of activity {}: {}",
-                    activity_id,
-                    err.to_string()
-                );
-            }
-            return Err(StatusCode::from(err));
-        };
-    }
-
-    Ok(StatusCode::OK)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn test_rpe_value_0_converts_to_none() {
-        // Test that RPE value 0 is treated as "clear RPE" (None)
-        let query = PatchActivityQuery {
-            name: None,
-            rpe: Some(0),
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        };
-        assert_eq!(query.rpe, Some(0));
-    }
-
-    #[test]
-    fn test_rpe_valid_values() {
-        // Test that valid RPE values (1-10) can be parsed
-        for i in 1..=10 {
-            let result = ActivityRpe::try_from(i);
-            assert!(result.is_ok(), "RPE value {} should be valid", i);
-        }
-    }
-
-    #[test]
-    fn test_rpe_invalid_values() {
-        // Test that invalid RPE values are rejected
-        for i in [11, 12, 100, 255] {
-            let result = ActivityRpe::try_from(i);
-            assert!(result.is_err(), "RPE value {} should be invalid", i);
-        }
-    }
-
-    #[test]
-    fn test_workout_type_valid_values() {
-        // Test that valid workout type values can be parsed
-        let valid_types = ["easy", "tempo", "intervals", "long_run", "race"];
-        for workout_type in valid_types {
-            let result = workout_type.parse::<WorkoutType>();
-            assert!(
-                result.is_ok(),
-                "Workout type '{}' should be valid",
-                workout_type
-            );
-        }
-    }
-
-    #[test]
-    fn test_workout_type_invalid_values() {
-        // Test that invalid workout type values are rejected
-        let invalid_types = ["invalid", "sprint", "recovery", "123"];
-        for workout_type in invalid_types {
-            let result = workout_type.parse::<WorkoutType>();
-            assert!(
-                result.is_err(),
-                "Workout type '{}' should be invalid",
-                workout_type
-            );
-        }
-    }
-
-    #[test]
-    fn test_workout_type_empty_string() {
-        // Test that empty string is handled (should clear workout type)
-        let query = PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: Some(String::new()),
-            bonk_status: None,
-            nutrition_details: None,
-        };
-        assert_eq!(query.workout_type, Some(String::new()));
-    }
-
-    #[test]
-    fn test_bonk_status_valid_values() {
-        // Test that valid bonk status values can be parsed
-        let valid_statuses = ["none", "bonked"];
-        for status in valid_statuses {
-            let result = status.parse::<BonkStatus>();
-            assert!(result.is_ok(), "Bonk status '{}' should be valid", status);
-        }
-    }
-
-    #[test]
-    fn test_bonk_status_invalid_values() {
-        // Test that invalid bonk status values are rejected
-        let invalid_statuses = ["invalid", "mild", "severe", "123"];
-        for status in invalid_statuses {
-            let result = status.parse::<BonkStatus>();
-            assert!(
-                result.is_err(),
-                "Bonk status '{}' should be invalid",
-                status
-            );
-        }
-    }
-
-    #[test]
-    fn test_bonk_status_empty_string() {
-        // Test that empty string is handled (should clear nutrition)
-        let query = PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: Some(String::new()),
-            nutrition_details: None,
-        };
-        assert_eq!(query.bonk_status, Some(String::new()));
-    }
-
-    #[test]
-    fn test_feedback_body_parsing() {
-        // Test that feedback body can be parsed
-        let body = PatchActivityBody {
-            feedback: Some("Great run!".to_string()),
-        };
-        assert_eq!(body.feedback, Some("Great run!".to_string()));
-
-        // Test empty feedback (to clear)
-        let body = PatchActivityBody {
-            feedback: Some(String::new()),
-        };
-        assert_eq!(body.feedback, Some(String::new()));
-
-        // Test null feedback
-        let body = PatchActivityBody { feedback: None };
-        assert_eq!(body.feedback, None);
-    }
-
-    // Integration tests for the handler
     use std::sync::Arc;
+
+    use anyhow::anyhow;
+    use mockall::predicate::*;
+    use serde_json::json;
+
+    use super::*;
 
     use crate::{
         domain::{
             models::{
                 UserId,
-                activity::{Activity, ActivityStartTime, ActivityStatistics, Sport},
+                activity::{Activity, ActivityDuration, ActivityStartTime, Sport},
             },
             services::{
                 activity::test_utils::MockActivityService,
@@ -417,7 +209,13 @@ mod tests {
         },
         inbound::parser::test_utils::MockFileParser,
     };
-    use mockall::predicate::*;
+
+    const USER_ID: &str = "test_user";
+    const ACTIVITY_ID: &str = "test_activity_id";
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     fn create_test_state(
         activity_service: MockActivityService,
@@ -431,288 +229,459 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_patch_activity_update_feedback_ok() {
-        let activity_id = "test_activity_id".to_string();
-        let activity_id_clone = activity_id.clone();
-        let user_id = UserId::from("test_user");
+    async fn call_patch(
+        body: Option<PatchActivityBody>,
+        activity_service: MockActivityService,
+    ) -> StatusCode {
+        let state = create_test_state(activity_service);
+        let user = AuthenticatedUser::new(UserId::from(USER_ID));
+        let path = Path(ACTIVITY_ID.to_string());
 
+        match patch_activity(Extension(user), State(state), path, body.map(Json)).await {
+            Ok(status) => status,
+            Err(body) => body.status(),
+        }
+    }
+
+    fn base_activity() -> Activity {
+        Activity::new(
+            ActivityId::from(ACTIVITY_ID),
+            UserId::from(USER_ID),
+            Some(ActivityName::from("Long ride")),
+            ActivityStartTime::from_timestamp(0).unwrap(),
+            ActivityDuration::default(),
+            Sport::Cycling,
+            Some(ActivityRpe::Five),
+            Some(WorkoutType::Tempo),
+            Some(ActivityNutrition::new(
+                BonkStatus::None,
+                Some("one gel".to_string()),
+            )),
+            Some(ActivityFeedback::from("legs felt good")),
+        )
+    }
+
+    /// A comparable snapshot of an activity's mutable fields.
+    type ActivitySummary = (
+        Option<String>,                       // name
+        Option<u8>,                           // rpe
+        Option<String>,                       // workout_type
+        Option<(BonkStatus, Option<String>)>, // nutrition
+        Option<String>,                       // feedback
+    );
+
+    fn summary(activity: &Activity) -> ActivitySummary {
+        (
+            activity.name().map(|name| name.to_string()),
+            activity.rpe().as_ref().map(|rpe| rpe.value()),
+            activity
+                .workout_type()
+                .as_ref()
+                .map(|workout| workout.to_string()),
+            activity.nutrition().as_ref().map(|nutrition| {
+                (
+                    nutrition.bonk_status(),
+                    nutrition.details().map(|details| details.to_string()),
+                )
+            }),
+            activity
+                .feedback()
+                .as_ref()
+                .map(|feedback| feedback.to_string()),
+        )
+    }
+
+    /// Creates a mock that expects a single `patch_activity` call and checks that
+    /// the forwarded patch, applied to [base_activity], yields `expected`.
+    fn mock_ok(expected: ActivitySummary) -> MockActivityService {
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_update_activity_feedback()
-            .with(function(move |req: &UpdateActivityFeedbackRequest| {
-                req.user() == &user_id
-                    && req.activity() == &ActivityId::from(&activity_id_clone)
-                    && req.feedback() == &Some(ActivityFeedback::from("Great session today!"))
+            .expect_patch_activity()
+            .with(function(move |req: &PatchActivityRequest| {
+                let patched = base_activity().apply_patch(req.patch().clone());
+                req.user() == &UserId::from(USER_ID)
+                    && req.activity() == &ActivityId::from(ACTIVITY_ID)
+                    && summary(&patched) == expected
             }))
             .times(1)
             .returning(|_| Ok(()));
+        activity_service
+    }
 
-        let state = create_test_state(activity_service);
+    // =========================================================================
+    // Unit tests: body (de)serialization & conversion to ActivityPatch
+    // =========================================================================
 
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some("Great session today!".to_string()),
-        }));
+    #[test]
+    fn test_body_field_semantics_absent_null_value() {
+        // Absent field => untouched
+        let body: PatchActivityBody = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(body.name, PatchField::Absent);
+        assert_eq!(body.rpe, PatchField::Absent);
+        assert_eq!(body.workout_type, PatchField::Absent);
+        assert_eq!(body.nutrition, PatchField::Absent);
+        assert_eq!(body.feedback, PatchField::Absent);
 
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
+        // Null => clear
+        let body: PatchActivityBody = serde_json::from_value(json!({
+            "name": null, "rpe": null, "workout_type": null,
+            "nutrition": null, "feedback": null
+        }))
+        .unwrap();
+        assert_eq!(body.name, PatchField::Clear);
+        assert_eq!(body.rpe, PatchField::Clear);
+        assert_eq!(body.workout_type, PatchField::Clear);
+        assert_eq!(body.nutrition, PatchField::Clear);
+        assert_eq!(body.feedback, PatchField::Clear);
 
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
+        // Value => set
+        let body: PatchActivityBody = serde_json::from_value(json!({
+            "name": "Morning Run",
+            "rpe": 7,
+            "workout_type": "intervals",
+            "nutrition": {"bonk_status": "bonked", "details": "Forgot to eat"},
+            "feedback": "great session"
+        }))
+        .unwrap();
+        assert_eq!(body.name, PatchField::Set("Morning Run".to_string()));
+        assert_eq!(body.rpe, PatchField::Set(7));
+        assert_eq!(body.workout_type, PatchField::Set("intervals".to_string()));
+        assert_eq!(
+            body.nutrition,
+            PatchField::Set(PatchNutrition {
+                bonk_status: "bonked".to_string(),
+                details: Some("Forgot to eat".to_string()),
+            })
+        );
+        assert_eq!(body.feedback, PatchField::Set("great session".to_string()));
+    }
+
+    #[test]
+    fn test_body_nutrition_details_is_optional() {
+        // details absent and null both map to no details
+        let body: PatchActivityBody = serde_json::from_value(json!({
+            "nutrition": {"bonk_status": "none"}
+        }))
+        .unwrap();
+        assert_eq!(
+            body.nutrition,
+            PatchField::Set(PatchNutrition {
+                bonk_status: "none".to_string(),
+                details: None,
+            })
+        );
+
+        let body: PatchActivityBody = serde_json::from_value(json!({
+            "nutrition": {"bonk_status": "none", "details": null}
+        }))
+        .unwrap();
+        assert_eq!(
+            body.nutrition,
+            PatchField::Set(PatchNutrition {
+                bonk_status: "none".to_string(),
+                details: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_to_activity_patch_sets_all_fields() {
+        let body = PatchActivityBody {
+            name: PatchField::Set("Morning Run".to_string()),
+            rpe: PatchField::Set(7),
+            workout_type: PatchField::Set("intervals".to_string()),
+            nutrition: PatchField::Set(PatchNutrition {
+                bonk_status: "bonked".to_string(),
+                details: Some("forgot to eat".to_string()),
+            }),
+            feedback: PatchField::Set("great session".to_string()),
+        };
+
+        let patch = ActivityPatch::try_from(body).unwrap();
+        let patched = base_activity().apply_patch(patch);
+
+        assert_eq!(
+            summary(&patched),
+            (
+                Some("Morning Run".to_string()),
+                Some(7),
+                Some("intervals".to_string()),
+                Some((BonkStatus::Bonked, Some("forgot to eat".to_string()))),
+                Some("great session".to_string()),
+            )
+        );
+    }
+
+    #[test]
+    fn test_to_activity_patch_clears_fields_with_null() {
+        let body = PatchActivityBody {
+            name: PatchField::Clear,
+            rpe: PatchField::Clear,
+            workout_type: PatchField::Clear,
+            nutrition: PatchField::Clear,
+            feedback: PatchField::Clear,
+        };
+
+        let patch = ActivityPatch::try_from(body).unwrap();
+        let patched = base_activity().apply_patch(patch);
+
+        assert_eq!(summary(&patched), (None, None, None, None, None));
+    }
+
+    #[test]
+    fn test_to_activity_patch_leaves_absent_fields_untouched() {
+        let body = PatchActivityBody {
+            rpe: PatchField::Set(8),
+            ..PatchActivityBody::default()
+        };
+
+        let patch = ActivityPatch::try_from(body).unwrap();
+        let patched = base_activity().apply_patch(patch);
+
+        // Only RPE changes, everything else keeps its current value.
+        assert_eq!(
+            summary(&patched),
+            (
+                Some("Long ride".to_string()),
+                Some(8),
+                Some("tempo".to_string()),
+                Some((BonkStatus::None, Some("one gel".to_string()))),
+                Some("legs felt good".to_string()),
+            )
+        );
+    }
+
+    #[test]
+    fn test_to_activity_patch_rejects_invalid_values() {
+        // 0 is not a valid RPE: clearing is expressed with `null`, not a magic value.
+        let body = PatchActivityBody {
+            rpe: PatchField::Set(0),
+            ..PatchActivityBody::default()
+        };
+        assert!(ActivityPatch::try_from(body).is_err());
+
+        let body = PatchActivityBody {
+            rpe: PatchField::Set(11),
+            ..PatchActivityBody::default()
+        };
+        assert!(ActivityPatch::try_from(body).is_err());
+
+        let body = PatchActivityBody {
+            workout_type: PatchField::Set("sprint".to_string()),
+            ..PatchActivityBody::default()
+        };
+        assert!(ActivityPatch::try_from(body).is_err());
+
+        let body = PatchActivityBody {
+            nutrition: PatchField::Set(PatchNutrition {
+                bonk_status: "mild".to_string(),
+                details: None,
+            }),
+            ..PatchActivityBody::default()
+        };
+        assert!(ActivityPatch::try_from(body).is_err());
+    }
+
+    // =========================================================================
+    // Integration tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_patch_activity_sets_fields() {
+        let body = PatchActivityBody {
+            name: PatchField::Set("Morning Run".to_string()),
+            rpe: PatchField::Set(7),
+            workout_type: PatchField::Set("intervals".to_string()),
+            nutrition: PatchField::Set(PatchNutrition {
+                bonk_status: "bonked".to_string(),
+                details: Some("forgot to eat".to_string()),
+            }),
+            feedback: PatchField::Set("great session".to_string()),
+        };
+
+        let status = call_patch(
+            Some(body),
+            mock_ok((
+                Some("Morning Run".to_string()),
+                Some(7),
+                Some("intervals".to_string()),
+                Some((BonkStatus::Bonked, Some("forgot to eat".to_string()))),
+                Some("great session".to_string()),
+            )),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_patch_activity_clear_feedback() {
-        let activity_id = "test_activity_id".to_string();
-        let activity_id_clone = activity_id.clone();
-        let user_id = UserId::from("test_user");
+    async fn test_patch_activity_clears_fields_with_null() {
+        let body = PatchActivityBody {
+            name: PatchField::Clear,
+            rpe: PatchField::Clear,
+            workout_type: PatchField::Clear,
+            nutrition: PatchField::Clear,
+            feedback: PatchField::Clear,
+        };
+
+        let status = call_patch(Some(body), mock_ok((None, None, None, None, None))).await;
+
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_partial_update() {
+        // Clear the name and update the RPE, leave everything else untouched.
+        let body = PatchActivityBody {
+            name: PatchField::Clear,
+            rpe: PatchField::Set(8),
+            ..PatchActivityBody::default()
+        };
+
+        let status = call_patch(
+            Some(body),
+            mock_ok((
+                None,
+                Some(8),
+                Some("tempo".to_string()),
+                Some((BonkStatus::None, Some("one gel".to_string()))),
+                Some("legs felt good".to_string()),
+            )),
+        )
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_no_body_is_noop() {
+        let mut activity_service = MockActivityService::new();
+        activity_service.expect_patch_activity().times(0);
+
+        let status = call_patch(None, activity_service).await;
+
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_empty_body_is_noop() {
+        let mut activity_service = MockActivityService::new();
+        activity_service.expect_patch_activity().times(0);
+
+        let status = call_patch(Some(PatchActivityBody::default()), activity_service).await;
+
+        assert_eq!(status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_invalid_rpe_is_bad_request() {
+        // rpe = 0 is not a sentinel for clearing anymore: it is an invalid value.
+        let body = PatchActivityBody {
+            rpe: PatchField::Set(0),
+            ..PatchActivityBody::default()
+        };
+
+        let mut activity_service = MockActivityService::new();
+        activity_service.expect_patch_activity().times(0);
+
+        let status = call_patch(Some(body), activity_service).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_invalid_workout_type_is_bad_request() {
+        let body = PatchActivityBody {
+            workout_type: PatchField::Set("sprint".to_string()),
+            ..PatchActivityBody::default()
+        };
+
+        let mut activity_service = MockActivityService::new();
+        activity_service.expect_patch_activity().times(0);
+
+        let status = call_patch(Some(body), activity_service).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_invalid_bonk_status_is_bad_request() {
+        let body = PatchActivityBody {
+            nutrition: PatchField::Set(PatchNutrition {
+                bonk_status: "mild".to_string(),
+                details: None,
+            }),
+            ..PatchActivityBody::default()
+        };
+
+        let mut activity_service = MockActivityService::new();
+        activity_service.expect_patch_activity().times(0);
+
+        let status = call_patch(Some(body), activity_service).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_patch_activity_activity_not_found() {
+        let body = PatchActivityBody {
+            feedback: PatchField::Set("This won't work".to_string()),
+            ..PatchActivityBody::default()
+        };
 
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_update_activity_feedback()
-            .with(function(move |req: &UpdateActivityFeedbackRequest| {
-                req.user() == &user_id
-                    && req.activity() == &ActivityId::from(&activity_id_clone)
-                    && req.feedback().is_none()
-            }))
-            .times(1)
-            .returning(|_| Ok(()));
-
-        let state = create_test_state(activity_service);
-
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some(String::new()), // Empty string clears feedback
-        }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_patch_activity_no_feedback_in_body() {
-        let activity_id = "test_activity_id".to_string();
-
-        let mut activity_service = MockActivityService::new();
-        // Should not call update_activity_feedback when body has feedback: None
-        activity_service.expect_update_activity_feedback().times(0);
-
-        let state = create_test_state(activity_service);
-
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody { feedback: None }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_patch_activity_no_body() {
-        let activity_id = "test_activity_id".to_string();
-
-        let mut activity_service = MockActivityService::new();
-        // Should not call update_activity_feedback when no body is provided
-        activity_service.expect_update_activity_feedback().times(0);
-
-        let state = create_test_state(activity_service);
-
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-
-        let body = None;
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_patch_activity_feedback_activity_not_found() {
-        let activity_id = "nonexistent_activity".to_string();
-
-        let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_update_activity_feedback()
+            .expect_patch_activity()
             .times(1)
             .returning(|req| {
-                Err(UpdateActivityFeedbackError::ActivityDoesNotExist(
+                Err(PatchActivityError::ActivityDoesNotExist(
                     req.activity().clone(),
                 ))
             });
 
-        let state = create_test_state(activity_service);
+        let status = call_patch(Some(body), activity_service).await;
 
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some("This won't work".to_string()),
-        }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), StatusCode::NOT_FOUND);
+        assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
-    async fn test_patch_activity_feedback_wrong_user() {
-        let activity_id = "test_activity_id".to_string();
-        let user_id = UserId::from("test_user");
+    async fn test_patch_activity_not_owned_by_user() {
+        let body = PatchActivityBody {
+            feedback: PatchField::Set("Wrong user feedback".to_string()),
+            ..PatchActivityBody::default()
+        };
 
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_update_activity_feedback()
+            .expect_patch_activity()
             .times(1)
-            .returning(move |req| {
-                Err(UpdateActivityFeedbackError::UserDoesNotOwnActivity(
-                    user_id.clone(),
+            .returning(|req| {
+                Err(PatchActivityError::UserDoesNotOwnActivity(
+                    req.user().clone(),
                     req.activity().clone(),
                 ))
             });
 
-        let state = create_test_state(activity_service);
+        let status = call_patch(Some(body), activity_service).await;
 
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some("Wrong user feedback".to_string()),
-        }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(status, StatusCode::FORBIDDEN);
     }
 
     #[tokio::test]
-    async fn test_patch_activity_long_feedback() {
-        let activity_id = "test_activity_id".to_string();
-        let activity_id_clone = activity_id.clone();
-        let user_id = UserId::from("test_user");
-        let long_feedback = "This is a very long feedback message. ".repeat(100); // ~3800 chars
+    async fn test_patch_activity_unknown_error() {
+        let body = PatchActivityBody {
+            feedback: PatchField::Set("any".to_string()),
+            ..PatchActivityBody::default()
+        };
 
         let mut activity_service = MockActivityService::new();
         activity_service
-            .expect_update_activity_feedback()
-            .with(function(move |req: &UpdateActivityFeedbackRequest| {
-                req.user() == &user_id
-                    && req.activity() == &ActivityId::from(&activity_id_clone)
-                    && req.feedback().is_some()
-            }))
+            .expect_patch_activity()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|_| Err(PatchActivityError::Unknown(anyhow!("an error occured"))));
 
-        let state = create_test_state(activity_service);
+        let status = call_patch(Some(body), activity_service).await;
 
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: None,
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some(long_feedback),
-        }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_patch_activity_combine_rpe_and_feedback() {
-        let activity_id = "test_activity_id".to_string();
-        let activity_id_clone = activity_id.clone();
-        let user_id = UserId::from("test_user");
-
-        let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_update_activity_rpe()
-            .times(1)
-            .returning(|_| Ok(()));
-
-        activity_service
-            .expect_update_activity_feedback()
-            .with(function(move |req: &UpdateActivityFeedbackRequest| {
-                req.user() == &user_id
-                    && req.activity() == &ActivityId::from(&activity_id_clone)
-                    && req.feedback() == &Some(ActivityFeedback::from("Hard session"))
-            }))
-            .times(1)
-            .returning(|_| Ok(()));
-
-        let state = create_test_state(activity_service);
-
-        let user = AuthenticatedUser::new(UserId::from("test_user"));
-        let path = Path(activity_id);
-        let query = Query(PatchActivityQuery {
-            name: None,
-            rpe: Some(9),
-            workout_type: None,
-            bonk_status: None,
-            nutrition_details: None,
-        });
-        let body = Some(Json(PatchActivityBody {
-            feedback: Some("Hard session".to_string()),
-        }));
-
-        let result = patch_activity(Extension(user), State(state), path, query, body).await;
-
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), StatusCode::OK);
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     }
 }
