@@ -7,7 +7,8 @@ use crate::{
     clock::Clock,
     config::{AppMode, BaseConfig, MultiUserConfig, StdEnvironment},
     domain::services::{
-        activity::ActivityService, preferences::PreferencesService, training::TrainingService,
+        activity::ActivityService, preferences::PreferencesService, search::SearchService,
+        training::TrainingService,
     },
     inbound::{
         http::{
@@ -21,10 +22,27 @@ use crate::{
         fs::FilesystemRawDataRepository,
         sqlite::{
             activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-            training::SqliteTrainingRepository,
+            search::SearchRepository, training::SqliteTrainingRepository,
         },
     },
 };
+
+type ActualActivityService = ActivityService<
+    SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
+    FilesystemRawDataRepository,
+>;
+type ActualTrainingService = TrainingService<
+    SqliteTrainingRepository<Clock>,
+    ActivityService<
+        SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
+        FilesystemRawDataRepository,
+    >,
+>;
+type ActualUserService = UserService<
+    AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
+    SqliteUserRepository,
+    SessionService<SqliteSessionRepository>,
+>;
 
 const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(3600 * 24);
@@ -34,29 +52,19 @@ pub async fn bootstrap_multi_user(
     mode: AppMode,
 ) -> anyhow::Result<
     HttpServer<
-        ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-            FilesystemRawDataRepository,
-        >,
+        ActualActivityService,
         Parser,
-        TrainingService<
-            SqliteTrainingRepository<Clock>,
-            ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-                FilesystemRawDataRepository,
-            >,
-        >,
-        UserService<
-            AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
-            SqliteUserRepository,
-            SessionService<SqliteSessionRepository>,
-        >,
+        ActualTrainingService,
+        ActualUserService,
         PreferencesService<SqlitePreferencesRepository>,
     >,
 > {
     tracing::info!("Starting multi-user app");
 
     let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
+
+    let activity_notify = Arc::new(tokio::sync::Notify::new());
+    let training_notify = Arc::new(tokio::sync::Notify::new());
 
     let (activity_service, parser, training_metrics_service) =
         build_activity_service(&config).await?;
@@ -65,6 +73,15 @@ pub async fn bootstrap_multi_user(
 
     let preferences_service = build_preferences_service(&config).await?;
 
+    let search_service = build_search_service(
+        &config,
+        activity_service.clone(),
+        activity_notify,
+        training_metrics_service.as_ref().clone(),
+        training_notify,
+    )
+    .await?;
+
     let http_server = HttpServer::new(
         &mode,
         activity_service,
@@ -72,6 +89,7 @@ pub async fn bootstrap_multi_user(
         training_metrics_service,
         user_service,
         preferences_service,
+        search_service,
         config,
     )
     .await?;
@@ -219,4 +237,32 @@ async fn build_preferences_service(
     let preference_service = PreferencesService::new(preferences_repository);
 
     anyhow::Ok(preference_service)
+}
+
+async fn build_search_service(
+    config: &BaseConfig,
+    activity_service: ActualActivityService,
+    activity_notify: Arc<tokio::sync::Notify>,
+    training_service: ActualTrainingService,
+    training_notify: Arc<tokio::sync::Notify>,
+) -> anyhow::Result<
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>,
+> {
+    let search_db = PathBuf::from(config.activities_data_path.clone())
+        .join("db/")
+        .join("search.db");
+    let search_repository = SearchRepository::new(
+        &format!("sqlite:{}", search_db.to_string_lossy()),
+        Clock::new(),
+    )
+    .await?;
+
+    anyhow::Ok(SearchService::new(
+        search_repository,
+        activity_notify,
+        activity_service,
+        training_notify,
+        training_service,
+        tokio_util::sync::CancellationToken::new(),
+    ))
 }

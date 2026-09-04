@@ -16,7 +16,8 @@ use tower_http::cors::CorsLayer;
 
 use crate::config::{AppMode, BaseConfig};
 use crate::domain::ports::{
-    activity::IActivityService, preferences::IPreferencesService, training::ITrainingService,
+    activity::IActivityService, preferences::IPreferencesService, search::ISearchService,
+    training::ITrainingService,
 };
 
 use crate::inbound::auth::AuthStrategy;
@@ -31,7 +32,7 @@ use handlers::{
     get_active_training_periods, get_activity, get_all_preferences, get_all_raw_activities,
     get_preference, get_raw_activity, get_training_metrics, get_training_metrics_ordering,
     get_training_note, get_training_notes, get_training_period, get_training_period_metrics,
-    get_training_period_notes, get_training_periods, list_activities, patch_activity,
+    get_training_period_notes, get_training_periods, list_activities, patch_activity, search,
     set_preference, set_training_metrics_ordering, update_training_metric, update_training_note,
     update_training_period, upload_activities,
 };
@@ -117,13 +118,14 @@ impl<
     PS: IPreferencesService,
 > HttpServer<AS, PF, TMS, US, PS>
 {
-    pub async fn new(
+    pub async fn new<SS: ISearchService>(
         mode: &AppMode,
         activity_service: AS,
         file_parser: PF,
         training_metric_service: Arc<TMS>,
         user_service: US,
         preferences_service: PS,
+        search_service: SS,
         config: BaseConfig,
     ) -> anyhow::Result<Self> {
         let trace_layer = tower_http::trace::TraceLayer::new_for_http().make_span_with(
@@ -145,7 +147,8 @@ impl<
             .parse::<HeaderValue>()
             .with_context(|| format!("Not a valid origin {}", config.allow_origin))?;
 
-        let router = axum::Router::new().nest("/api", core_routes(state.clone()));
+        let api_routes = core_routes(state.clone()).merge(search_routes(search_service));
+        let router = axum::Router::new().nest("/api", api_routes);
 
         let auth_strategy = AuthStrategy::from(mode);
         tracing::info!(
@@ -204,6 +207,12 @@ impl<
 /// validates the reverse-proxy wiring.
 async fn health() -> impl IntoResponse {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
+}
+
+fn search_routes<SS: ISearchService>(search_service: SS) -> Router<()> {
+    Router::new()
+        .route("/search", get(search::<SS>))
+        .with_state(Arc::new(search_service))
 }
 
 fn core_routes<
@@ -348,10 +357,14 @@ mod tests {
     use super::*;
     use axum_test::TestServer;
 
-    use crate::domain::services::{
-        activity::test_utils::MockActivityService,
-        preferences::tests_utils::MockPreferencesService,
-        training::test_utils::MockTrainingService,
+    use crate::domain::{
+        models::{UserId, activity::ActivityId},
+        ports::search::{SearchResult, search_test_utils::MockSearchService},
+        services::{
+            activity::test_utils::MockActivityService,
+            preferences::tests_utils::MockPreferencesService,
+            training::test_utils::MockTrainingService,
+        },
     };
     use crate::inbound::{
         auth::{SinglePassword, email_based::test_utils::MockUserService},
@@ -366,6 +379,68 @@ mod tests {
         let response = server.get("/health").await;
         response.assert_status(StatusCode::OK);
         assert_eq!(response.json::<serde_json::Value>()["status"], "ok");
+    }
+
+    #[tokio::test]
+    async fn search_route_is_mounted_and_protected() {
+        let state = AppState {
+            activity_service: Arc::new(MockActivityService::test_default()),
+            file_parser: Arc::new(MockFileParser::test_default()),
+            training_metrics_service: Arc::new(MockTrainingService::test_default()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+        };
+
+        let router = add_auth_router(
+            AuthStrategy::SinglePassword(SinglePassword::from("secret")),
+            Router::new().nest(
+                "/api",
+                core_routes(state).merge(search_routes(MockSearchService::new())),
+            ),
+            MockUserService::new(),
+        );
+        let app = router.route("/health", get(health));
+        let server = TestServer::new(app);
+
+        server
+            .get("/api/search?pattern=ride")
+            .await
+            .assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn search_route_returns_results() {
+        let state = AppState {
+            activity_service: Arc::new(MockActivityService::test_default()),
+            file_parser: Arc::new(MockFileParser::test_default()),
+            training_metrics_service: Arc::new(MockTrainingService::test_default()),
+            preferences_service: Arc::new(MockPreferencesService::new()),
+        };
+
+        let mut search_service = MockSearchService::new();
+        search_service
+            .expect_search()
+            .times(1)
+            .withf(|user, pattern| user == &UserId::default() && pattern == "ride")
+            .returning(|_, _| Ok(vec![SearchResult::Activity(ActivityId::from("activity-1"))]));
+
+        let router = add_auth_router(
+            AuthStrategy::NoAuth,
+            Router::new().nest(
+                "/api",
+                core_routes(state).merge(search_routes(search_service)),
+            ),
+            MockUserService::new(),
+        );
+        let app = router.route("/health", get(health));
+        let server = TestServer::new(app);
+
+        let response = server.get("/api/search?pattern=ride").await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(
+            response.json::<serde_json::Value>(),
+            serde_json::json!([{ "kind": "activity", "id": "activity-1" }])
+        );
     }
 
     /// Regression test: /health must be mounted *after* the auth router so the

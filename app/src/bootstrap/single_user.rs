@@ -6,7 +6,8 @@ use crate::{
     clock::Clock,
     config::{AppMode, BaseConfig, SingleUserConfig, StdEnvironment},
     domain::services::{
-        activity::ActivityService, preferences::PreferencesService, training::TrainingService,
+        activity::ActivityService, preferences::PreferencesService, search::SearchService,
+        training::TrainingService,
     },
     inbound::{
         http::{DisabledUserService, HttpServer},
@@ -16,28 +17,32 @@ use crate::{
         fs::FilesystemRawDataRepository,
         sqlite::{
             activity::SqliteActivityRepository, preferences::SqlitePreferencesRepository,
-            training::SqliteTrainingRepository,
+            search::SearchRepository, training::SqliteTrainingRepository,
         },
     },
 };
+
+type ActualActivityService = ActivityService<
+    SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
+    FilesystemRawDataRepository,
+>;
+
+type ActualTrainingService = TrainingService<
+    SqliteTrainingRepository<Clock>,
+    ActivityService<
+        SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
+        FilesystemRawDataRepository,
+    >,
+>;
 
 pub async fn bootstrap_single_user(
     _mode_config: SingleUserConfig,
     mode: AppMode,
 ) -> anyhow::Result<
     HttpServer<
-        ActivityService<
-            SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-            FilesystemRawDataRepository,
-        >,
+        ActualActivityService,
         Parser,
-        TrainingService<
-            SqliteTrainingRepository<Clock>,
-            ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-                FilesystemRawDataRepository,
-            >,
-        >,
+        ActualTrainingService,
         DisabledUserService,
         PreferencesService<SqlitePreferencesRepository>,
     >,
@@ -58,6 +63,9 @@ pub async fn bootstrap_single_user(
     let parser = Parser {};
 
     let raw_data_repository = FilesystemRawDataRepository::new(raw_data_dir);
+
+    let activity_notify = Arc::new(tokio::sync::Notify::new());
+    let training_notify = Arc::new(tokio::sync::Notify::new());
 
     let activity_db = db_dir.clone().join("activities.db");
     let activity_repository = SqliteActivityRepository::new(
@@ -84,6 +92,15 @@ pub async fn bootstrap_single_user(
     let user_service = DisabledUserService {};
     let preferences_service = build_preferences_service(&config).await?;
 
+    let search_service = build_search_service(
+        &config,
+        activity_service.clone(),
+        activity_notify,
+        training_metrics_service.as_ref().clone(),
+        training_notify,
+    )
+    .await?;
+
     let http_server = HttpServer::new(
         &mode,
         activity_service,
@@ -91,6 +108,7 @@ pub async fn bootstrap_single_user(
         training_metrics_service,
         user_service,
         preferences_service,
+        search_service,
         config,
     )
     .await?;
@@ -115,4 +133,32 @@ async fn build_preferences_service(
     let preference_service = PreferencesService::new(preferences_repository);
 
     anyhow::Ok(preference_service)
+}
+
+async fn build_search_service(
+    config: &BaseConfig,
+    activity_service: ActualActivityService,
+    activity_notify: Arc<tokio::sync::Notify>,
+    training_service: ActualTrainingService,
+    training_notify: Arc<tokio::sync::Notify>,
+) -> anyhow::Result<
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>,
+> {
+    let search_db = PathBuf::from(config.activities_data_path.clone())
+        .join("db/")
+        .join("search.db");
+    let search_repository = SearchRepository::new(
+        &format!("sqlite:{}", search_db.to_string_lossy()),
+        Clock::new(),
+    )
+    .await?;
+
+    anyhow::Ok(SearchService::new(
+        search_repository,
+        activity_notify,
+        activity_service,
+        training_notify,
+        training_service,
+        tokio_util::sync::CancellationToken::new(),
+    ))
 }

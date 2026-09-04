@@ -2,6 +2,7 @@
 
 mod activities;
 mod preferences;
+mod search;
 mod training;
 
 pub(super) use activities::{
@@ -12,6 +13,7 @@ pub(super) use activities::{
 pub(super) use preferences::{
     delete_preference, get_all_preferences, get_preference, set_preference,
 };
+pub(super) use search::search;
 pub(super) use training::{
     compute_training_metric_values, copy_training_metric, create_training_metric,
     create_training_note, create_training_period, delete_training_metric, delete_training_note,

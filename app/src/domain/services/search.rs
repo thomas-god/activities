@@ -9,26 +9,27 @@ use crate::domain::{
 };
 
 #[derive(Debug, Clone)]
-pub struct SearchService<SR, DS> {
+pub struct SearchService<SR, ADS, TDS> {
     repository: SR,
     activity_notify: Arc<Notify>,
-    activity_service: DS,
+    activity_service: ADS,
     training_notify: Arc<Notify>,
-    training_service: DS,
+    training_service: TDS,
     shutdown: CancellationToken,
 }
 
-impl<SR, DS> SearchService<SR, DS>
+impl<SR, ADS, TDS> SearchService<SR, ADS, TDS>
 where
     SR: ISearchRepository,
-    DS: IDocumentsForSearch,
+    ADS: IDocumentsForSearch,
+    TDS: IDocumentsForSearch,
 {
     pub fn new(
         repository: SR,
         activity_notify: Arc<Notify>,
-        activity_service: DS,
+        activity_service: ADS,
         training_notify: Arc<Notify>,
-        training_service: DS,
+        training_service: TDS,
         shutdown: CancellationToken,
     ) -> Self {
         Self {
@@ -63,7 +64,7 @@ where
     }
 
     #[tracing::instrument(skip_all)]
-    async fn process_pending_outbox(&self, service: DS) {
+    async fn process_pending_outbox<DS: IDocumentsForSearch>(&self, service: DS) {
         let kind = service.service_kind();
         let documents = match service.get_documents_to_process().await {
             Ok(documents) => documents,
@@ -99,10 +100,11 @@ where
     }
 }
 
-impl<SR, DS> ISearchService for SearchService<SR, DS>
+impl<SR, ADS, TDS> ISearchService for SearchService<SR, ADS, TDS>
 where
     SR: ISearchRepository,
-    DS: IDocumentsForSearch,
+    ADS: IDocumentsForSearch,
+    TDS: IDocumentsForSearch,
 {
     #[tracing::instrument(skip_all, err)]
     async fn search(
@@ -170,7 +172,7 @@ mod tests_search_service {
         repository: MockSearchRepository,
         activity_service: MockDocumentsForSearch,
         training_service: MockDocumentsForSearch,
-    ) -> SearchService<MockSearchRepository, MockDocumentsForSearch> {
+    ) -> SearchService<MockSearchRepository, MockDocumentsForSearch, MockDocumentsForSearch> {
         SearchService::new(
             repository,
             std::sync::Arc::new(tokio::sync::Notify::new()),
