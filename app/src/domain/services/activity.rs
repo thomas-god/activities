@@ -338,6 +338,7 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn snapshot_documents(
         &self,
         batch_size: i64,
@@ -348,12 +349,14 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_pending_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
         self.activity_repository
             .get_outbox_documents_to_process()
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn mark_document_as_processed(
         &self,
         document: &SearchDocument,
