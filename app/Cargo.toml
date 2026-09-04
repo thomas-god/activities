@@ -45,6 +45,7 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls-ring-native
 subtle = "2.6.1"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
+tokio-util = "0.7.18"
 tower = "0.5.2"
 tower-http = { version = "0.7.0", features = ["cors", "trace"] }
 tracing = { version = "0.1.41", features = ["log"] }

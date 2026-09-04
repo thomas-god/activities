@@ -6,6 +6,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::ActivityMetricV2,
+        search::SearchDocumentType,
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
             TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
@@ -657,6 +658,10 @@ where
         self.training_repository
             .mark_outbox_document_as_processed(document, processed_at)
             .await
+    }
+
+    fn service_kind(&self) -> SearchDocumentType {
+        SearchDocumentType::TrainingNote
     }
 }
 

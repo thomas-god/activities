@@ -8,7 +8,7 @@ use crate::domain::{
             Activity, ActivityId, ActivityMetricV2, ActivityMetricsV2, ActivityWithParsedData,
             DEFAULT_METRICS,
         },
-        search::SearchDocument,
+        search::{SearchDocument, SearchDocumentType},
     },
     ports::{
         activity::{
@@ -339,6 +339,10 @@ where
         self.activity_repository
             .mark_outbox_document_as_processed(document, processed_at)
             .await
+    }
+
+    fn service_kind(&self) -> SearchDocumentType {
+        SearchDocumentType::Activity
     }
 }
 
