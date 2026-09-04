@@ -5,8 +5,23 @@ use crate::domain::models::{
     training::TrainingNoteId,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentsRemaining(bool);
+
+impl From<bool> for DocumentsRemaining {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}
+
 pub trait IDocumentsForSearch: Clone + Send + Sync + 'static {
-    fn get_documents_to_process(
+    fn snapshot_documents(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> impl Future<Output = Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>> + Send;
+
+    fn get_pending_documents_to_process(
         &self,
     ) -> impl Future<Output = Result<Vec<SearchDocument>, anyhow::Error>> + Send;
 
@@ -97,7 +112,13 @@ pub mod search_test_utils {
         }
 
         impl IDocumentsForSearch for DocumentsForSearch {
-            async fn get_documents_to_process(
+            async fn snapshot_documents(
+                  &self,
+                  batch_size: i64,
+                  offset: i64,
+            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
+
+            async fn get_pending_documents_to_process(
                 &self,
             ) -> Result<Vec<SearchDocument>, anyhow::Error>;
 

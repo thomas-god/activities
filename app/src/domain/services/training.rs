@@ -652,7 +652,21 @@ where
     TMR: TrainingRepository,
     AS: IActivityService,
 {
-    async fn get_documents_to_process(
+    async fn snapshot_documents(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> Result<
+        (
+            Vec<crate::domain::models::search::SearchDocument>,
+            crate::domain::ports::search::DocumentsRemaining,
+        ),
+        anyhow::Error,
+    > {
+        todo!()
+    }
+
+    async fn get_pending_documents_to_process(
         &self,
     ) -> Result<Vec<crate::domain::models::search::SearchDocument>, anyhow::Error> {
         self.training_repository
@@ -3727,11 +3741,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -3755,11 +3766,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -3795,11 +3803,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let result = service
             .update_training_note(
@@ -3829,11 +3834,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         // A missing note is silently treated as a no-op (returns Ok).
         let result = service
@@ -3877,11 +3879,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let result = service
             .update_training_note(
@@ -3924,11 +3923,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_ok());
@@ -3950,11 +3946,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_err());
@@ -3985,11 +3978,8 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service = TrainingService::new(
-            training_repository,
-            activity_service,
-            Arc::clone(&notify),
-        );
+        let service =
+            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_err());

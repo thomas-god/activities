@@ -14,7 +14,7 @@ use crate::domain::{
         },
         search::SearchDocument,
     },
-    ports::{DateRange, DateTimeRange},
+    ports::{DateRange, DateTimeRange, search::DocumentsRemaining},
 };
 
 pub trait IActivityService: Clone + Send + Sync + 'static {
@@ -372,6 +372,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
     fn list_activities(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> impl Future<Output = Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>> + Send;
+
+    fn list_user_activities(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,

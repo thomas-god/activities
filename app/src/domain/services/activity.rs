@@ -20,7 +20,7 @@ use crate::domain::{
             ListActivitiesError, ListActivitiesFilters, PatchActivityError, PatchActivityRequest,
             RawActivity, RawDataRepository,
         },
-        search::IDocumentsForSearch,
+        search::{DocumentsRemaining, IDocumentsForSearch},
     },
 };
 
@@ -124,7 +124,7 @@ where
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
         self.activity_repository
-            .list_activities(user, filters)
+            .list_user_activities(user, filters)
             .await
     }
 
@@ -338,7 +338,17 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    async fn get_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
+    async fn snapshot_documents(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        self.activity_repository
+            .list_activities(batch_size, offset)
+            .await
+    }
+
+    async fn get_pending_documents_to_process(&self) -> Result<Vec<SearchDocument>, anyhow::Error> {
         self.activity_repository
             .get_outbox_documents_to_process()
             .await
@@ -379,6 +389,7 @@ pub mod test_utils {
         GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,
         RawActivity, SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
+    use crate::domain::ports::search::DocumentsRemaining;
 
     mock! {
         pub ActivityService {}
@@ -501,6 +512,12 @@ pub mod test_utils {
             ) -> Result<(), SaveActivityError>;
 
             async fn list_activities(
+                &self,
+                batch_size: i64,
+                offset: i64,
+            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
+
+            async fn list_user_activities(
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters

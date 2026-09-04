@@ -66,7 +66,7 @@ where
     #[tracing::instrument(skip_all)]
     async fn process_pending_outbox<DS: IDocumentsForSearch>(&self, service: DS) {
         let kind = service.service_kind();
-        let documents = match service.get_documents_to_process().await {
+        let documents = match service.get_pending_documents_to_process().await {
             Ok(documents) => documents,
             Err(err) => {
                 tracing::warn!("Error getting pending documents form {kind} outbox: {err}");
@@ -195,7 +195,7 @@ mod tests_search_service {
             .expect_service_kind()
             .returning(|| SearchDocumentType::Activity);
         documents
-            .expect_get_documents_to_process()
+            .expect_get_pending_documents_to_process()
             .return_once(|| Ok(vec![]));
 
         // Expect no side effects
@@ -219,7 +219,7 @@ mod tests_search_service {
             .expect_service_kind()
             .returning(|| SearchDocumentType::Activity);
         documents
-            .expect_get_documents_to_process()
+            .expect_get_pending_documents_to_process()
             .return_once(|| Err(anyhow!("failed to fetch documents")));
 
         // Expect no side effects
@@ -253,7 +253,7 @@ mod tests_search_service {
             .expect_service_kind()
             .returning(|| SearchDocumentType::Activity);
         documents
-            .expect_get_documents_to_process()
+            .expect_get_pending_documents_to_process()
             .return_once(move || Ok(vec![doc_a, doc_b]));
         documents
             .expect_mark_document_as_processed()
@@ -297,7 +297,7 @@ mod tests_search_service {
             .expect_service_kind()
             .returning(|| SearchDocumentType::Activity);
         documents
-            .expect_get_documents_to_process()
+            .expect_get_pending_documents_to_process()
             .return_once(move || Ok(vec![doc_a, doc_b]));
         documents
             .expect_mark_document_as_processed()
@@ -332,7 +332,7 @@ mod tests_search_service {
             .expect_service_kind()
             .returning(|| SearchDocumentType::Activity);
         documents
-            .expect_get_documents_to_process()
+            .expect_get_pending_documents_to_process()
             .return_once(move || Ok(vec![doc_a, doc_b]));
         documents
             .expect_mark_document_as_processed()
@@ -391,7 +391,7 @@ mod tests_search_service {
                 .expect_service_kind()
                 .returning(|| SearchDocumentType::Activity);
             cloned
-                .expect_get_documents_to_process()
+                .expect_get_pending_documents_to_process()
                 .return_once(|| Ok(vec![document("doc-a")]));
             let done_clone = done_clone.clone();
             cloned
@@ -484,7 +484,7 @@ mod tests_search_service {
                 .expect_service_kind()
                 .returning(|| SearchDocumentType::TrainingNote);
             cloned
-                .expect_get_documents_to_process()
+                .expect_get_pending_documents_to_process()
                 .return_once(|| Ok(vec![training_document("doc-training")]));
             let done_clone = done_clone.clone();
             cloned
@@ -532,7 +532,7 @@ mod tests_search_service {
                 .expect_service_kind()
                 .returning(|| SearchDocumentType::Activity);
             cloned
-                .expect_get_documents_to_process()
+                .expect_get_pending_documents_to_process()
                 .return_once(|| Ok(vec![document("doc-a")]));
             let done_clone = done_clone.clone();
             cloned

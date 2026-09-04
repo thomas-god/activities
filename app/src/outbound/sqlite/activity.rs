@@ -25,6 +25,7 @@ use crate::{
                 ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
                 SimilarActivityError, UpdateActivityMetricError,
             },
+            search::DocumentsRemaining,
         },
     },
     inbound::parser::ParseFile,
@@ -339,6 +340,65 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn list_activities(
         &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        let limit = batch_size + 1; // Extra sentinal row to detect if there is another page after
+        let offset = offset * batch_size;
+        let rows = sqlx::query_as::<_, ActivityRow>("
+            SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
+            FROM t_activities_v2
+            ORDER BY rowid
+            LIMIT ?1 OFFSET ?2;"
+        )
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.readers)
+            .await?;
+
+        let documents_remaining = DocumentsRemaining::from(rows.len() as i64 > batch_size);
+
+        // The extra row was only fetched to detect whether more documents remain: it is not part
+        // of this page.
+        let documents = rows
+            .into_iter()
+            .take(batch_size as usize)
+            .map(
+                |(
+                    id,
+                    user_id,
+                    name,
+                    start_time,
+                    duration,
+                    sport,
+                    rpe,
+                    workout_type,
+                    nutrition,
+                    feedback,
+                )| {
+                    Activity::new(
+                        id,
+                        user_id,
+                        name,
+                        start_time,
+                        duration.unwrap_or_default(),
+                        sport,
+                        rpe,
+                        workout_type,
+                        nutrition,
+                        feedback,
+                    )
+                    .to_search_document(SearchDocumentEvent::Updated, self.clock.now())
+                },
+            )
+            .collect();
+
+        Ok((documents, documents_remaining))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn list_user_activities(
+        &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<Activity>, ListActivitiesError> {
@@ -472,7 +532,7 @@ where
         user: &UserId,
         filters: &ListActivitiesFilters,
     ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError> {
-        let activities = self.list_activities(user, filters).await?;
+        let activities = self.list_user_activities(user, filters).await?;
 
         let mut res = vec![];
         for activity in activities.into_iter() {
@@ -580,7 +640,7 @@ where
         }
 
         let mut res = vec![];
-        for activity in self.list_activities(user, filters).await? {
+        for activity in self.list_user_activities(user, filters).await? {
             let metrics = metrics_values.remove(activity.id()).unwrap_or_default();
             res.push((
                 activity,
@@ -1010,7 +1070,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(&UserId::test_default(), &ListActivitiesFilters::empty())
+            .list_user_activities(&UserId::test_default(), &ListActivitiesFilters::empty())
             .await
             .expect("Get should have succeeded");
 
@@ -1041,7 +1101,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(
+            .list_user_activities(
                 &UserId::test_default(),
                 &ListActivitiesFilters::empty().set_limit(Some(1)),
             )
@@ -1083,7 +1143,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(
+            .list_user_activities(
                 &UserId::test_default(),
                 &ListActivitiesFilters::empty().set_date_range(Some(DateRange::new(
                     "2025-09-10".parse::<NaiveDate>().unwrap(),
@@ -1118,7 +1178,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(
+            .list_user_activities(
                 &UserId::test_default(),
                 &ListActivitiesFilters::empty().set_date_range(Some(DateRange::new(
                     "2025-09-10".parse::<NaiveDate>().unwrap(),
@@ -1155,7 +1215,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .list_activities(
+            .list_user_activities(
                 &UserId::from("another_user"),
                 &ListActivitiesFilters::empty(),
             )
@@ -1676,6 +1736,372 @@ mod test_sqlite_activity_repository {
             res.first().unwrap().name(),
             format!("{}.fit", activity_1.id())
         )
+    }
+
+    mod test_list_activities {
+        use chrono::Utc;
+
+        use super::*;
+
+        fn build_activity_with_name(name: &str) -> Activity {
+            build_activity().apply_patch(ActivityPatch::name(Some(ActivityName::from(name))))
+        }
+
+        fn build_activity_for(user: UserId) -> Activity {
+            Activity::new_empty(
+                ActivityId::new(),
+                user,
+                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            )
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_when_empty_db() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let (documents, remaining) = repository
+                .list_activities(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert!(documents.is_empty());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_returns_all_activities_in_insertion_order() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+
+            let activities = [
+                build_activity_with_name("first"),
+                build_activity_with_name("second"),
+                build_activity_with_name("third"),
+            ];
+            for activity in &activities {
+                repository
+                    .save_activity(activity)
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            let (documents, remaining) = repository
+                .list_activities(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), activities.len());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+
+            // Documents are ordered by rowid, i.e. insertion order, and each activity is
+            // turned into an "updated" search document.
+            for (document, activity) in documents.iter().zip(activities.iter()) {
+                assert_eq!(document.document_type(), &SearchDocumentType::Activity);
+                assert_eq!(document.document_id(), activity.id().to_string());
+                assert_eq!(document.user(), activity.user());
+                assert_eq!(document.event(), &SearchDocumentEvent::Updated);
+                assert_eq!(document.occurred_at(), &now);
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_documents_include_activity_details() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = build_activity()
+                .apply_patch(ActivityPatch::name(Some(ActivityName::from("Epic ride"))))
+                .apply_patch(ActivityPatch::feedback(Some(ActivityFeedback::from(
+                    "Felt great",
+                ))))
+                .apply_patch(ActivityPatch::nutrition(Some(ActivityNutrition::new(
+                    BonkStatus::None,
+                    Some("Drank early".to_string()),
+                ))));
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Insertion should have succeeded");
+
+            let (documents, _remaining) = repository
+                .list_activities(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            let document = documents.first().expect("Should contain one document");
+            assert_eq!(document.document_id(), activity.id().to_string());
+            assert!(document.content().contains("Epic ride"));
+            assert!(document.content().contains("Felt great"));
+            assert!(document.content().contains("Drank early"));
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_includes_activities_from_all_users() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let default_user_activity = build_activity_with_name("default user ride");
+            let other_user_activity = build_activity_for(UserId::from("another_user"));
+            repository
+                .save_activity(&default_user_activity)
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .save_activity(&other_user_activity)
+                .await
+                .expect("Insertion should have succeeded");
+
+            // Unlike `list_user_activities`, the snapshot spans every user's activities.
+            let (documents, remaining) = repository
+                .list_activities(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 2);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            let document_ids: Vec<String> = documents
+                .iter()
+                .map(|document| document.document_id().to_string())
+                .collect();
+            assert!(document_ids.contains(&default_user_activity.id().to_string()));
+            assert!(document_ids.contains(&other_user_activity.id().to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_skips_deleted_activities() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let kept = build_activity_with_name("kept ride");
+            let deleted = build_activity_with_name("deleted ride");
+            repository
+                .save_activity(&kept)
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .save_activity(&deleted)
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .delete_activity(deleted.user(), deleted.id())
+                .await
+                .expect("Deletion should have succeeded");
+
+            let (documents, remaining) = repository
+                .list_activities(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 1);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(
+                documents
+                    .first()
+                    .expect("Should contain one document")
+                    .document_id(),
+                kept.id().to_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_page_with_more_remaining_returns_batch_size_documents() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activities = [
+                build_activity_with_name("activity-1"),
+                build_activity_with_name("activity-2"),
+                build_activity_with_name("activity-3"),
+            ];
+            for activity in &activities {
+                repository
+                    .save_activity(activity)
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // The repository fetches batch_size + 1 rows to detect a next page, but only
+            // returns `batch_size` documents: the extra sentinel row is dropped.
+            let (documents, remaining) = repository
+                .list_activities(2, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 2);
+            assert_eq!(remaining, DocumentsRemaining::from(true));
+            for (document, activity) in documents.iter().zip(activities.iter().take(2)) {
+                assert_eq!(document.document_id(), activity.id().to_string());
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_on_last_page_no_more_remaining() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activities = [
+                build_activity_with_name("activity-1"),
+                build_activity_with_name("activity-2"),
+                build_activity_with_name("activity-3"),
+            ];
+            for activity in &activities {
+                repository
+                    .save_activity(activity)
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // offset 1 with batch_size 2 skips the first 2 rows and only the last activity remains.
+            let (documents, remaining) = repository
+                .list_activities(2, 1)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 1);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(
+                documents
+                    .first()
+                    .expect("Should contain one document")
+                    .document_id(),
+                activities[2].id().to_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_pages_partition_all_activities_without_overlap() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activities = [
+                build_activity_with_name("activity-1"),
+                build_activity_with_name("activity-2"),
+                build_activity_with_name("activity-3"),
+                build_activity_with_name("activity-4"),
+                build_activity_with_name("activity-5"),
+            ];
+            for activity in &activities {
+                repository
+                    .save_activity(activity)
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // Walking through every page (incrementing the offset until none remain) must
+            // return each activity exactly once, in insertion order: pages do not overlap.
+            let mut page_ids = Vec::new();
+            let mut offset = 0;
+            loop {
+                let (documents, remaining) = repository
+                    .list_activities(2, offset)
+                    .await
+                    .expect("Should have succeeded");
+                assert!(documents.len() <= 2);
+                page_ids.extend(
+                    documents
+                        .iter()
+                        .map(|document| document.document_id().to_string()),
+                );
+                if remaining == DocumentsRemaining::from(false) {
+                    break;
+                }
+                offset += 1;
+            }
+
+            let expected_ids: Vec<String> = activities
+                .iter()
+                .map(|activity| activity.id().to_string())
+                .collect();
+            assert_eq!(page_ids, expected_ids);
+        }
+
+        #[tokio::test]
+        async fn test_list_activities_offset_beyond_last_page_is_empty() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                Clock::new(),
+            )
+            .await
+            .expect("repo should init");
+
+            let activity = build_activity_with_name("activity-1");
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Insertion should have succeeded");
+
+            // offset 10 with batch_size 2 skips 20 rows: nothing should be returned.
+            let (documents, remaining) = repository
+                .list_activities(2, 10)
+                .await
+                .expect("Should have succeeded");
+
+            assert!(documents.is_empty());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+        }
     }
 
     mod test_sqlite_activity_repository_get_raw_activity {
