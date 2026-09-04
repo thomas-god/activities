@@ -43,6 +43,8 @@ type ActualUserService = UserService<
     SqliteUserRepository,
     SessionService<SqliteSessionRepository>,
 >;
+type ActualSearchService =
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>;
 
 const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(3600 * 24);
@@ -50,7 +52,7 @@ const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
 pub async fn bootstrap_multi_user(
     mode_config: MultiUserConfig,
     mode: AppMode,
-) -> anyhow::Result<
+) -> anyhow::Result<(
     HttpServer<
         ActualActivityService,
         Parser,
@@ -58,7 +60,8 @@ pub async fn bootstrap_multi_user(
         ActualUserService,
         PreferencesService<SqlitePreferencesRepository>,
     >,
-> {
+    ActualSearchService,
+)> {
     tracing::info!("Starting multi-user app");
 
     let config = BaseConfig::from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
@@ -89,11 +92,11 @@ pub async fn bootstrap_multi_user(
         training_metrics_service,
         user_service,
         preferences_service,
-        search_service,
+        search_service.clone(),
         config,
     )
     .await?;
-    Ok(http_server)
+    Ok((http_server, search_service))
 }
 
 async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
