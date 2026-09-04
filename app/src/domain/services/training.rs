@@ -8,7 +8,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::ActivityMetricV2,
-        search::SearchDocumentType,
+        search::{SearchDocument, SearchDocumentType},
         training::{
             TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
             TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
@@ -19,7 +19,7 @@ use crate::domain::{
     ports::{
         DateRange,
         activity::{IActivityService, ListActivitiesFilters},
-        search::IDocumentsForSearch,
+        search::{DocumentsRemaining, IDocumentsForSearch},
         training::{
             ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
@@ -652,20 +652,18 @@ where
     TMR: TrainingRepository,
     AS: IActivityService,
 {
+    #[tracing::instrument(skip_all, err)]
     async fn snapshot_documents(
         &self,
         batch_size: i64,
         offset: i64,
-    ) -> Result<
-        (
-            Vec<crate::domain::models::search::SearchDocument>,
-            crate::domain::ports::search::DocumentsRemaining,
-        ),
-        anyhow::Error,
-    > {
-        todo!()
+    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        self.training_repository
+            .list_training_note_documents(batch_size, offset)
+            .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_pending_documents_to_process(
         &self,
     ) -> Result<Vec<crate::domain::models::search::SearchDocument>, anyhow::Error> {
@@ -674,6 +672,7 @@ where
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn mark_document_as_processed(
         &self,
         document: &crate::domain::models::search::SearchDocument,
@@ -1006,6 +1005,12 @@ pub mod test_utils {
                 user: &UserId,
                 note_id: &TrainingNoteId,
             ) -> Result<Option<TrainingNote>, GetTrainingNoteError>;
+
+            async fn list_training_note_documents(
+                &self,
+                batch_size: i64,
+                offset: i64,
+            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
 
             async fn get_training_notes(
                 &self,

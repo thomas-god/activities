@@ -23,6 +23,7 @@ use crate::domain::{
     },
     ports::{
         DateRange, IClock,
+        search::DocumentsRemaining,
         training::{
             DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
             GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
@@ -697,6 +698,42 @@ where
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(err) => Err(GetTrainingNoteError::Unknown(anyhow!(err))),
         }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn list_training_note_documents(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
+        let offset = offset * batch_size;
+        let rows = sqlx::query_as::<_, TrainingNoteRow>(
+            "
+            SELECT id, user_id, title, content, date, created_at
+            FROM t_training_notes
+            ORDER BY rowid
+            LIMIT ?1 OFFSET ?2;",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.readers)
+        .await?;
+
+        let documents_remaining = DocumentsRemaining::from(rows.len() as i64 > batch_size);
+
+        // The extra row was only fetched to detect whether more documents remain: it is not part
+        // of this page.
+        let documents = rows
+            .into_iter()
+            .take(batch_size as usize)
+            .map(|(id, user_id, title, content, date, created_at)| {
+                TrainingNote::new(id, user_id, title, content, date, created_at)
+                    .to_search_document(SearchDocumentEvent::Updated, self.clock.now())
+            })
+            .collect();
+
+        Ok((documents, documents_remaining))
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -3112,6 +3149,338 @@ mod test_sqlite_training_repository {
 
         // Should not fail even if note doesn't exist
         assert!(result.is_ok());
+    }
+
+    mod test_list_training_note_documents {
+        use chrono::Utc;
+
+        use crate::clock::clock_test_utils::FakeClock;
+
+        use super::*;
+
+        fn build_training_note_with(title: &str, content: &str) -> TrainingNote {
+            TrainingNote::new(
+                TrainingNoteId::new(),
+                UserId::test_default(),
+                Some(TrainingNoteTitle::from(title)),
+                TrainingNoteContent::from(content),
+                TrainingNoteDate::today(),
+                Utc::now().into(),
+            )
+        }
+
+        fn build_training_note_for(user: UserId) -> TrainingNote {
+            TrainingNote::new(
+                TrainingNoteId::new(),
+                user,
+                Some(TrainingNoteTitle::from("note title")),
+                TrainingNoteContent::from("A note from another user"),
+                TrainingNoteDate::today(),
+                Utc::now().into(),
+            )
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_when_empty_db() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let (documents, remaining) = repository
+                .list_training_note_documents(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert!(documents.is_empty());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_returns_all_notes_in_insertion_order() {
+            let db_file = NamedTempFile::new().unwrap();
+            let now = Utc::now();
+            let repository = SqliteTrainingRepository::new(
+                &db_file.path().to_string_lossy(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+
+            let notes = [
+                build_training_note_with("first", "first note content"),
+                build_training_note_with("second", "second note content"),
+                build_training_note_with("third", "third note content"),
+            ];
+            for note in &notes {
+                repository
+                    .save_training_note(note.clone())
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            let (documents, remaining) = repository
+                .list_training_note_documents(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), notes.len());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+
+            // Documents are ordered by rowid, i.e. insertion order, and each note is turned
+            // into an "updated" search document.
+            for (document, note) in documents.iter().zip(notes.iter()) {
+                assert_eq!(document.document_type(), &SearchDocumentType::TrainingNote);
+                assert_eq!(document.document_id(), note.id().to_string());
+                assert_eq!(document.user(), note.user());
+                assert_eq!(document.event(), &SearchDocumentEvent::Updated);
+                assert_eq!(document.occurred_at(), &now);
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_include_title_and_content() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let note = build_training_note_with("Epic ride", "Felt great legs");
+            repository
+                .save_training_note(note.clone())
+                .await
+                .expect("Insertion should have succeeded");
+
+            let (documents, _remaining) = repository
+                .list_training_note_documents(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            let document = documents.first().expect("Should contain one document");
+            assert_eq!(document.document_id(), note.id().to_string());
+            assert!(document.content().contains("Epic ride"));
+            assert!(document.content().contains("Felt great legs"));
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_includes_notes_from_all_users() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let default_user_note = build_training_note_with("default user note", "content");
+            let other_user_note = build_training_note_for(UserId::new());
+            repository
+                .save_training_note(default_user_note.clone())
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .save_training_note(other_user_note.clone())
+                .await
+                .expect("Insertion should have succeeded");
+
+            // Unlike `get_training_notes`, the snapshot spans every user's notes.
+            let (documents, remaining) = repository
+                .list_training_note_documents(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 2);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            let document_ids: Vec<String> = documents
+                .iter()
+                .map(|document| document.document_id().to_string())
+                .collect();
+            assert!(document_ids.contains(&default_user_note.id().to_string()));
+            assert!(document_ids.contains(&other_user_note.id().to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_skips_deleted_notes() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let kept = build_training_note_with("kept note", "content");
+            let deleted = build_training_note_with("deleted note", "content");
+            repository
+                .save_training_note(kept.clone())
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .save_training_note(deleted.clone())
+                .await
+                .expect("Insertion should have succeeded");
+            repository
+                .delete_training_note(deleted.user(), deleted.id())
+                .await
+                .expect("Deletion should have succeeded");
+
+            let (documents, remaining) = repository
+                .list_training_note_documents(10, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 1);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(
+                documents
+                    .first()
+                    .expect("Should contain one document")
+                    .document_id(),
+                kept.id().to_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_page_with_more_remaining_returns_batch_size_documents()
+         {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let notes = [
+                build_training_note_with("note-1", "content-1"),
+                build_training_note_with("note-2", "content-2"),
+                build_training_note_with("note-3", "content-3"),
+            ];
+            for note in &notes {
+                repository
+                    .save_training_note(note.clone())
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // The repository fetches batch_size + 1 rows to detect a next page, but only
+            // returns `batch_size` documents: the extra sentinel row is dropped.
+            let (documents, remaining) = repository
+                .list_training_note_documents(2, 0)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 2);
+            assert_eq!(remaining, DocumentsRemaining::from(true));
+            for (document, note) in documents.iter().zip(notes.iter().take(2)) {
+                assert_eq!(document.document_id(), note.id().to_string());
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_pages_partition_all_notes_without_overlap() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let notes = [
+                build_training_note_with("note-1", "content-1"),
+                build_training_note_with("note-2", "content-2"),
+                build_training_note_with("note-3", "content-3"),
+                build_training_note_with("note-4", "content-4"),
+                build_training_note_with("note-5", "content-5"),
+            ];
+            for note in &notes {
+                repository
+                    .save_training_note(note.clone())
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // Walking through every page (incrementing the offset until none remain) must
+            // return each note exactly once, in insertion order: pages do not overlap.
+            let mut page_ids = Vec::new();
+            let mut offset = 0;
+            loop {
+                let (documents, remaining) = repository
+                    .list_training_note_documents(2, offset)
+                    .await
+                    .expect("Should have succeeded");
+                assert!(documents.len() <= 2);
+                page_ids.extend(
+                    documents
+                        .iter()
+                        .map(|document| document.document_id().to_string()),
+                );
+                if remaining == DocumentsRemaining::from(false) {
+                    break;
+                }
+                offset += 1;
+            }
+
+            let expected_ids: Vec<String> =
+                notes.iter().map(|note| note.id().to_string()).collect();
+            assert_eq!(page_ids, expected_ids);
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_on_last_page_no_more_remaining() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let notes = [
+                build_training_note_with("note-1", "content-1"),
+                build_training_note_with("note-2", "content-2"),
+                build_training_note_with("note-3", "content-3"),
+            ];
+            for note in &notes {
+                repository
+                    .save_training_note(note.clone())
+                    .await
+                    .expect("Insertion should have succeeded");
+            }
+
+            // offset 1 with batch_size 2 skips the first 2 rows and only the last note remains.
+            let (documents, remaining) = repository
+                .list_training_note_documents(2, 1)
+                .await
+                .expect("Should have succeeded");
+
+            assert_eq!(documents.len(), 1);
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(
+                documents
+                    .first()
+                    .expect("Should contain one document")
+                    .document_id(),
+                notes[2].id().to_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_training_note_documents_offset_beyond_last_page_is_empty() {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+
+            let note = build_training_note_with("note-1", "content-1");
+            repository
+                .save_training_note(note.clone())
+                .await
+                .expect("Insertion should have succeeded");
+
+            // offset 10 with batch_size 2 skips 20 rows: nothing should be returned.
+            let (documents, remaining) = repository
+                .list_training_note_documents(2, 10)
+                .await
+                .expect("Should have succeeded");
+
+            assert!(documents.is_empty());
+            assert_eq!(remaining, DocumentsRemaining::from(false));
+        }
     }
 
     #[tokio::test]

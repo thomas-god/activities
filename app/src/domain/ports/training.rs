@@ -16,7 +16,7 @@ use crate::domain::{
             TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
         },
     },
-    ports::DateRange,
+    ports::{DateRange, search::DocumentsRemaining},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -846,6 +846,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         note_id: &TrainingNoteId,
     ) -> impl Future<Output = Result<Option<TrainingNote>, GetTrainingNoteError>> + Send;
+
+    fn list_training_note_documents(
+        &self,
+        batch_size: i64,
+        offset: i64,
+    ) -> impl Future<Output = Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>> + Send;
 
     fn get_training_notes(
         &self,
