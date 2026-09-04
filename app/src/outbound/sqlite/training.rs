@@ -114,6 +114,7 @@ impl<C> SqliteTrainingRepository<C> {
         })
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_search_document(
         &self,
         tx: &mut Transaction<'_, Sqlite>,
