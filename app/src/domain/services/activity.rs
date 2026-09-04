@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use log::warn;
 
@@ -30,6 +32,7 @@ where
 {
     activity_repository: AR,
     raw_data_repository: RDR,
+    notify_new_document: Arc<tokio::sync::Notify>,
 }
 
 impl<AR, RDR> ActivityService<AR, RDR>
@@ -37,10 +40,15 @@ where
     AR: ActivityRepository,
     RDR: RawDataRepository,
 {
-    pub fn new(activity_repository: AR, raw_data_repository: RDR) -> Self {
+    pub fn new(
+        activity_repository: AR,
+        raw_data_repository: RDR,
+        notify_new_document: Arc<tokio::sync::Notify>,
+    ) -> Self {
         Self {
             activity_repository,
             raw_data_repository,
+            notify_new_document,
         }
     }
 }
@@ -95,6 +103,7 @@ where
             .save_activity(&activity)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
+        self.notify_new_document.notify_one();
 
         // Pre-compute base metrics for the new activity
         for ref metric in DEFAULT_METRICS {
@@ -273,6 +282,8 @@ where
                 anyhow!(err).context(format!("Failed to persist activity {}", new_activity.id()))
             })?;
 
+        self.notify_new_document.notify_one();
+
         Ok(())
     }
 
@@ -294,6 +305,8 @@ where
         self.activity_repository
             .delete_activity(req.user(), req.activity())
             .await?;
+
+        self.notify_new_document.notify_one();
 
         Ok(())
     }
@@ -568,6 +581,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests_activity_service {
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     use anyhow::anyhow;
     use mockall::mock;
@@ -628,6 +642,46 @@ mod tests_activity_service {
         )
     }
 
+    ///////////////////////////////////////////////////////////////////
+    // Helpers to observe the `notify_new_document` notifications
+    ///////////////////////////////////////////////////////////////////
+
+    /// Registers a waiter on the given notify and asserts that the service
+    /// called `notify_one` (fails if no notification arrives in time).
+    async fn expect_notified(notify: &Arc<tokio::sync::Notify>) {
+        let notify = Arc::clone(notify);
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        tokio::spawn(async move {
+            notify.notified().await;
+            let _ = tx.send(());
+        });
+
+        tokio::time::timeout(tokio::time::Duration::from_millis(500), rx)
+            .await
+            .expect("expected the activity service to trigger notify_one")
+            .expect("the notify waiter task failed");
+    }
+
+    /// Asserts that the given notify has NOT been triggered, leaving the
+    /// waiter enough time to register and catch any spurious notification.
+    async fn expect_not_notified(notify: &Arc<tokio::sync::Notify>) {
+        let was_notified = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&was_notified);
+        let notify = Arc::clone(notify);
+        tokio::spawn(async move {
+            notify.notified().await;
+            flag.store(true, Ordering::SeqCst);
+        });
+
+        // Let the waiter register and any (unexpected) notify fire.
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        assert!(
+            !was_notified.load(Ordering::SeqCst),
+            "expected the activity service NOT to trigger notify_one"
+        );
+    }
+
     #[tokio::test]
     async fn test_service_create_activity_err_if_similar_activity_exists() {
         let mut activity_repository = MockActivityRepository::new();
@@ -637,7 +691,11 @@ mod tests_activity_service {
 
         let raw_data_repository = MockRawDataRepository::new();
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = default_activity_request();
 
@@ -670,7 +728,11 @@ mod tests_activity_service {
             .expect_save_raw_data()
             .returning(|_, __| Ok(()));
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = default_activity_request();
 
@@ -693,7 +755,11 @@ mod tests_activity_service {
         raw_data_repository
             .expect_save_raw_data()
             .returning(|_, _| Ok(()));
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = default_activity_request();
 
@@ -715,13 +781,72 @@ mod tests_activity_service {
             .expect_save_raw_data()
             .returning(|_, _| Err(SaveRawDataError::Unknown));
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = default_activity_request();
 
         let res = service.create_activity(req).await;
 
         assert!(res.is_err())
+    }
+
+    #[tokio::test]
+    async fn test_service_create_activity_triggers_notify() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(false));
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Ok(()));
+        activity_repository
+            .expect_update_activity_metric()
+            .times(DEFAULT_METRICS.len())
+            .returning(|_, _, _| Ok(()));
+
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_save_raw_data()
+            .returning(|_, _| Ok(()));
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let res = service.create_activity(default_activity_request()).await;
+        assert!(res.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_service_create_activity_similar_exists_does_not_trigger_notify() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(true));
+
+        let raw_data_repository = MockRawDataRepository::new();
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let res = service.create_activity(default_activity_request()).await;
+        assert!(res.is_err());
+
+        expect_not_notified(&notify).await;
     }
 
     #[tokio::test]
@@ -756,7 +881,11 @@ mod tests_activity_service {
             .returning(|_| Ok(()));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = PatchActivityRequest::new(
             ActivityId::from("test_activity"),
@@ -784,7 +913,11 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = PatchActivityRequest::new(
             ActivityId::from("test"),
@@ -798,6 +931,76 @@ mod tests_activity_service {
             unreachable!("Should have returned an error")
         };
         assert_eq!(activity_id, ActivityId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_triggers_notify() {
+        use crate::domain::models::activity::ActivityPatch;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new_empty(
+                ActivityId::from("test_activity"),
+                UserId::test_default(),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            )))
+        });
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test_activity"),
+            UserId::test_default(),
+            ActivityPatch::default(),
+        );
+
+        let res = service.patch_activity(req).await;
+        assert!(res.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_patch_activity_not_found_does_not_trigger_notify() {
+        use crate::domain::models::activity::ActivityPatch;
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_| Ok(None));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let req = PatchActivityRequest::new(
+            ActivityId::from("test"),
+            UserId::test_default(),
+            ActivityPatch::default(),
+        );
+
+        let res = service.patch_activity(req).await;
+        assert!(res.is_err());
+
+        expect_not_notified(&notify).await;
     }
 
     #[tokio::test]
@@ -816,7 +1019,11 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = PatchActivityRequest::new(
             ActivityId::from("test_activity"),
@@ -852,7 +1059,11 @@ mod tests_activity_service {
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = PatchActivityRequest::new(
             ActivityId::from("test_activity"),
@@ -873,7 +1084,11 @@ mod tests_activity_service {
             .return_once(|_| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteActivityRequest::new(UserId::test_default(), ActivityId::from("test"));
 
@@ -883,6 +1098,67 @@ mod tests_activity_service {
             unreachable!("Should have returned an err")
         };
         assert_eq!(activity, ActivityId::from("test"));
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_triggers_notify() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository.expect_get_activity().returning(|_| {
+            Ok(Some(Activity::new_empty(
+                ActivityId::from("test_activity"),
+                UserId::from("test_user".to_string()),
+                ActivityStartTime::from_timestamp(0).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            )))
+        });
+        activity_repository
+            .expect_delete_activity()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let req = DeleteActivityRequest::new(
+            "test_user".to_string().into(),
+            ActivityId::from("test_activity"),
+        );
+
+        let res = service.delete_activity(req).await;
+        assert!(res.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_activity_service_delete_activity_not_found_does_not_trigger_notify() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_| Ok(None));
+
+        let raw_data_repository = MockRawDataRepository::default();
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::clone(&notify),
+        );
+
+        let req = DeleteActivityRequest::new(UserId::test_default(), ActivityId::from("test"));
+
+        let res = service.delete_activity(req).await;
+        assert!(res.is_err());
+
+        expect_not_notified(&notify).await;
     }
 
     #[tokio::test]
@@ -899,7 +1175,11 @@ mod tests_activity_service {
         });
 
         let raw_data_repository = MockRawDataRepository::default();
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteActivityRequest::new(
             "test_user".to_string().into(),
@@ -936,7 +1216,11 @@ mod tests_activity_service {
 
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteActivityRequest::new(
             "test_user".to_string().into(),
@@ -959,7 +1243,11 @@ mod tests_activity_service {
             .return_once(move |_| Ok(None));
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteActivityRequest::new(user_id.clone(), activity_id.clone());
 
@@ -978,7 +1266,11 @@ mod tests_activity_service {
             .returning(|_| Ok(Vec::new()));
         let raw_data_repository = MockRawDataRepository::default();
 
-        let service = ActivityService::new(activity_repository, raw_data_repository);
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let user = UserId::test_default();
 
@@ -1039,7 +1331,11 @@ mod tests_activity_service {
                 .returning(|_, _, _| Ok(vec![]));
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
@@ -1069,7 +1365,11 @@ mod tests_activity_service {
                 });
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
@@ -1105,7 +1405,11 @@ mod tests_activity_service {
                 });
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
@@ -1152,7 +1456,11 @@ mod tests_activity_service {
                 .returning(|_, _, _| Ok(()));
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
@@ -1199,7 +1507,11 @@ mod tests_activity_service {
                 .returning(|_, _, _| Ok(()));
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
@@ -1241,7 +1553,11 @@ mod tests_activity_service {
             activity_repository.expect_update_activity_metric().times(0);
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
@@ -1280,7 +1596,11 @@ mod tests_activity_service {
             activity_repository.expect_update_activity_metric().times(0);
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
@@ -1301,7 +1621,11 @@ mod tests_activity_service {
 
             let raw_data_repository = MockRawDataRepository::default();
 
-            let service = ActivityService::new(activity_repository, raw_data_repository);
+            let service = ActivityService::new(
+                activity_repository,
+                raw_data_repository,
+                Arc::new(tokio::sync::Notify::new()),
+            );
             let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
             let res = service
                 .list_activities_with_metrics(

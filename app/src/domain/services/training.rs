@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use chrono::{Days, NaiveDate};
 use derive_more::Constructor;
@@ -47,6 +49,7 @@ where
 {
     training_repository: TR,
     activity_service: AS,
+    notify_new_document: Arc<tokio::sync::Notify>,
 }
 
 impl<TR, AS> TrainingService<TR, AS>
@@ -459,6 +462,8 @@ where
             .await
             .map_err(|err| CreateTrainingNoteError::Unknown(err.into()))?;
 
+        self.notify_new_document.notify_one();
+
         Ok(note_id)
     }
 
@@ -516,7 +521,11 @@ where
         self.training_repository
             .save_training_note(updated_note)
             .await
-            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))
+            .map_err(|err| UpdateTrainingNoteError::Unknown(anyhow!(err)))?;
+
+        self.notify_new_document.notify_one();
+
+        Ok(())
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -537,6 +546,7 @@ where
                 self.training_repository
                     .delete_training_note(user, note_id)
                     .await?;
+                self.notify_new_document.notify_one();
                 Ok(())
             }
             _ => Err(DeleteTrainingNoteError::Unknown(anyhow::anyhow!(
@@ -1025,6 +1035,7 @@ pub mod test_utils {
 mod tests_training_metrics_service {
 
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     use anyhow::anyhow;
 
@@ -1056,7 +1067,8 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service = TrainingService::new(repository, activities);
+        let service =
+            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1091,7 +1103,8 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service = TrainingService::new(repository, activities);
+        let service =
+            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1143,7 +1156,8 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service = TrainingService::new(repository, activities);
+        let service =
+            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1176,7 +1190,8 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().times(0);
         let activities = MockActivityService::new();
 
-        let service = TrainingService::new(repository, activities);
+        let service =
+            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1209,7 +1224,8 @@ mod tests_training_metrics_service {
             .expect_save_metric()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         let activities = MockActivityService::new();
-        let service = TrainingService::new(repository, activities);
+        let service =
+            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1242,7 +1258,11 @@ mod tests_training_metrics_service {
         });
 
         let activity_service = MockActivityService::new();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let err = service
             .get_training_metrics_values(
@@ -1293,7 +1313,11 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
 
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1367,7 +1391,11 @@ mod tests_training_metrics_service {
                 Ok(vec![])
             });
 
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1448,7 +1476,11 @@ mod tests_training_metrics_service {
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let date_range = DateRange::new(
             NaiveDate::from_ymd_opt(2025, 9, 24).unwrap(),
@@ -1528,7 +1560,11 @@ mod tests_training_metrics_service {
             });
 
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         // Input date range: Wednesday to Thursday (mid-week)
         let date_range = DateRange::new(
@@ -1579,7 +1615,11 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1651,7 +1691,11 @@ mod tests_training_metrics_service {
             .expect_list_activities_with_metrics()
             .returning(|_, _, _| Ok(vec![]));
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1706,7 +1750,11 @@ mod tests_training_metrics_service {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let err = service
             .get_training_metrics_values(
@@ -1787,7 +1835,11 @@ mod tests_training_metrics_service {
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -1898,7 +1950,11 @@ mod tests_training_metrics_service {
             .returning(|_, _, _| Ok(vec![]));
 
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -2018,7 +2074,11 @@ mod tests_training_metrics_service {
             });
 
         let activity_service = activity_service;
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let res = service
             .get_training_metrics_values(
@@ -2058,7 +2118,11 @@ mod tests_training_metrics_service {
         });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2108,7 +2172,11 @@ mod tests_training_metrics_service {
             .returning(|_, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2130,7 +2198,11 @@ mod tests_training_metrics_service {
         });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricNameRequest::new(
             "user".to_string().into(),
@@ -2163,7 +2235,11 @@ mod tests_training_metrics_service {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricNameRequest::new(
             "user".to_string().into(),
@@ -2189,7 +2265,11 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2221,7 +2301,11 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().times(0);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2255,7 +2339,11 @@ mod tests_training_metrics_service {
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2288,7 +2376,11 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().times(0);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingMetricRequest::new(
             "user".to_string().into(),
@@ -2311,6 +2403,8 @@ mod tests_training_metrics_service {
 
 #[cfg(test)]
 mod test_training_service_period {
+    use std::sync::Arc;
+
     use anyhow::anyhow;
     use chrono::NaiveDate;
 
@@ -2338,7 +2432,11 @@ mod test_training_service_period {
             .times(1)
             .returning(|_| Ok(()));
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CreateTrainingPeriodRequest::new(
             UserId::test_default(),
@@ -2362,7 +2460,11 @@ mod test_training_service_period {
             .times(1)
             .returning(|_| Err(SaveTrainingPeriodError::Unknown(anyhow!("repo error"))));
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CreateTrainingPeriodRequest::new(
             UserId::test_default(),
@@ -2386,7 +2488,11 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _| None);
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2485,7 +2591,11 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _, _| Ok(activities_clone.clone()));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2588,7 +2698,11 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _, _| Ok(activities_clone.clone()));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2700,7 +2814,11 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _, _| Ok(activities_clone.clone()));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2817,7 +2935,11 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _, _| Ok(activities_clone.clone()));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2912,7 +3034,11 @@ mod test_training_service_period {
             .times(1)
             .returning(move |_, _, _| Ok(activities_clone.clone()));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2968,7 +3094,11 @@ mod test_training_service_period {
             .times(1)
             .returning(|_, _, _| Err(ListActivitiesError::Unknown(anyhow!("database error"))));
 
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_with_activities_with_metrics(
@@ -2994,7 +3124,11 @@ mod test_training_service_period {
             .returning(|_, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
         let result = service.delete_training_period(req).await;
@@ -3019,7 +3153,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteTrainingPeriodRequest::new(user_id.clone(), period_id.clone());
         let result = service.delete_training_period(req).await;
@@ -3049,7 +3187,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
         let result = service.delete_training_period(req).await;
@@ -3080,7 +3222,11 @@ mod test_training_service_period {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
         let result = service.update_training_period_name(req).await;
@@ -3106,7 +3252,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id.clone(), new_name);
         let result = service.update_training_period_name(req).await;
@@ -3137,7 +3287,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
         let result = service.update_training_period_name(req).await;
@@ -3168,7 +3322,11 @@ mod test_training_service_period {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
         let result = service.update_training_period_note(req).await;
@@ -3193,7 +3351,11 @@ mod test_training_service_period {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
         let result = service.update_training_period_note(req).await;
@@ -3219,7 +3381,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id.clone(), new_note);
         let result = service.update_training_period_note(req).await;
@@ -3250,7 +3416,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
         let result = service.update_training_period_note(req).await;
@@ -3286,7 +3456,11 @@ mod test_training_service_period {
             .returning(|_, _, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
         let result = service.update_training_period_dates(req).await;
@@ -3317,7 +3491,11 @@ mod test_training_service_period {
             .returning(|_, _, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
         let result = service.update_training_period_dates(req).await;
@@ -3335,7 +3513,11 @@ mod test_training_service_period {
         let training_repository = MockTrainingRepository::new();
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
         let result = service.update_training_period_dates(req).await;
@@ -3366,7 +3548,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req =
             UpdateTrainingPeriodDatesRequest::new(user_id, period_id.clone(), new_start, new_end);
@@ -3399,7 +3585,11 @@ mod test_training_service_period {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
         let result = service.update_training_period_dates(req).await;
@@ -3414,6 +3604,9 @@ mod test_training_service_period {
 
 #[cfg(test)]
 mod test_training_service_training_note {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use super::*;
     use crate::domain::models::training::TrainingNoteContent;
     use crate::domain::ports::training::{
@@ -3422,6 +3615,46 @@ mod test_training_service_training_note {
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use anyhow::anyhow;
+
+    ///////////////////////////////////////////////////////////////////
+    // Helpers to observe the `notify_new_document` notifications
+    ///////////////////////////////////////////////////////////////////
+
+    /// Registers a waiter on the given notify and asserts that the service
+    /// called `notify_one` (fails if no notification arrives in time).
+    async fn expect_notified(notify: &Arc<tokio::sync::Notify>) {
+        let notify = Arc::clone(notify);
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        tokio::spawn(async move {
+            notify.notified().await;
+            let _ = tx.send(());
+        });
+
+        tokio::time::timeout(tokio::time::Duration::from_millis(500), rx)
+            .await
+            .expect("expected the training service to trigger notify_one")
+            .expect("the notify waiter task failed");
+    }
+
+    /// Asserts that the given notify has NOT been triggered, leaving the
+    /// waiter enough time to register and catch any spurious notification.
+    async fn expect_not_notified(notify: &Arc<tokio::sync::Notify>) {
+        let was_notified = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&was_notified);
+        let notify = Arc::clone(notify);
+        tokio::spawn(async move {
+            notify.notified().await;
+            flag.store(true, Ordering::SeqCst);
+        });
+
+        // Let the waiter register and any (unexpected) notify fire.
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        assert!(
+            !was_notified.load(Ordering::SeqCst),
+            "expected the training service NOT to trigger notify_one"
+        );
+    }
 
     #[tokio::test]
     async fn test_create_training_note_ok() {
@@ -3437,7 +3670,11 @@ mod test_training_service_training_note {
             .returning(|_| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -3459,7 +3696,11 @@ mod test_training_service_training_note {
             .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -3469,6 +3710,291 @@ mod test_training_service_training_note {
             Err(CreateTrainingNoteError::Unknown(_)) => {}
             _ => panic!("Expected Unknown error"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("This is a test note");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_training_note_repository_error_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let title = None;
+        let content = TrainingNoteContent::from("Note that fails to save");
+        let date = TrainingNoteDate::today();
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
+        let result = service.create_training_note(req).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Original content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_not_found_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        training_repository.expect_save_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        // A missing note is silently treated as a no-op (returns Ok).
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_ok());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_training_note_save_error_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Original content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_save_training_note()
+            .times(1)
+            .returning(|_| Err(SaveTrainingNoteError::Unknown(anyhow!("database error"))));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let result = service
+            .update_training_note(
+                &user_id,
+                &note_id,
+                None,
+                TrainingNoteContent::from("Updated content"),
+                TrainingNoteDate::today(),
+            )
+            .await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_triggers_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        let note_user = user_id.clone();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(move |_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    note_user.clone(),
+                    None,
+                    TrainingNoteContent::from("Some content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository
+            .expect_delete_training_note()
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_ok());
+
+        expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_not_found_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        training_repository.expect_delete_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_delete_training_note_not_owned_does_not_trigger_notify() {
+        let user_id = UserId::from("user1");
+        let note_id = TrainingNoteId::from("note1");
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_training_note()
+            .times(1)
+            .returning(|_, _| {
+                Ok(Some(TrainingNote::new(
+                    TrainingNoteId::from("note1"),
+                    UserId::from("someone_else"),
+                    None,
+                    TrainingNoteContent::from("Some content"),
+                    TrainingNoteDate::today(),
+                    chrono::Utc::now().into(),
+                )))
+            });
+        training_repository.expect_delete_training_note().times(0);
+
+        let activity_service = MockActivityService::default();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+        );
+
+        let result = service.delete_training_note(&user_id, &note_id).await;
+        assert!(result.is_err());
+
+        expect_not_notified(&notify).await;
     }
 
     #[tokio::test]
@@ -3518,7 +4044,11 @@ mod test_training_service_training_note {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_notes(&user_id, &period_id)
@@ -3543,7 +4073,11 @@ mod test_training_service_training_note {
             .returning(|_, _| None);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_notes(&user_id, &period_id)
@@ -3594,7 +4128,11 @@ mod test_training_service_training_note {
             .returning(|_, _| Ok(TrainingMetricsOrdering::default()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_period_metrics_values(&user_id, &period_id)
@@ -3618,7 +4156,11 @@ mod test_training_service_training_note {
             .returning(|_, _| None);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let err = service
             .get_training_period_metrics_values(&user_id, &period_id)
@@ -3649,6 +4191,7 @@ mod test_training_service_metric_values {
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_get_training_metric_values_metric_not_found() {
@@ -3666,7 +4209,11 @@ mod test_training_service_metric_values {
             .return_once(move |_, _| Ok(None));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req =
             GetTrainingMetricValuesRequest::ByTrainingMetricId(user_id.clone(), metric_id.clone());
@@ -3709,7 +4256,11 @@ mod test_training_service_metric_values {
 
         let training_repository = MockTrainingRepository::new();
         let activity_service = activity_service;
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .compute_training_metric_values(&definition, &date_range)
@@ -3764,7 +4315,11 @@ mod test_training_service_metric_values {
 
         let training_repository = MockTrainingRepository::new();
         let activity_service = activity_service;
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .compute_training_metric_values(&definition, &date_range)
@@ -3779,6 +4334,8 @@ mod test_training_service_metric_values {
 
 #[cfg(test)]
 mod test_training_service_metrics_ordering {
+    use std::sync::Arc;
+
     use super::*;
     use crate::domain::models::training::{
         TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
@@ -3808,7 +4365,11 @@ mod test_training_service_metrics_ordering {
             .returning(move |_, _| Ok(ordering.clone()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_metrics_ordering(&user_id, &scope)
@@ -3856,7 +4417,11 @@ mod test_training_service_metrics_ordering {
             .returning(move |_, _| Ok(ordering.clone()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_metrics_ordering(&user_id, &scope)
@@ -3878,7 +4443,11 @@ mod test_training_service_metrics_ordering {
             .returning(|_, _| None);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_metrics_ordering(&user_id, &scope)
@@ -3909,7 +4478,11 @@ mod test_training_service_metrics_ordering {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .get_training_metrics_ordering(&user_id, &scope)
@@ -3939,7 +4512,11 @@ mod test_training_service_metrics_ordering {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .set_training_metrics_ordering(&user_id, &scope, ordering)
@@ -3978,7 +4555,11 @@ mod test_training_service_metrics_ordering {
             .returning(|_, _, _| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .set_training_metrics_ordering(&user_id, &scope, ordering)
@@ -4002,7 +4583,11 @@ mod test_training_service_metrics_ordering {
             .returning(|_, _| None);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .set_training_metrics_ordering(&user_id, &scope, ordering)
@@ -4035,7 +4620,11 @@ mod test_training_service_metrics_ordering {
             });
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(training_repository, activity_service);
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let result = service
             .set_training_metrics_ordering(&user_id, &scope, ordering)
@@ -4051,6 +4640,8 @@ mod test_training_service_metrics_ordering {
 
 #[cfg(test)]
 mod test_training_service_copy_metric {
+    use std::sync::Arc;
+
     use super::*;
     use crate::domain::models::activity::ActivityMetricV2;
     use crate::domain::models::training::{
@@ -4128,7 +4719,11 @@ mod test_training_service_copy_metric {
             .returning(|_| Ok(()));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CopyTrainingMetricRequest::new(
             UserId::test_default(),
@@ -4153,7 +4748,11 @@ mod test_training_service_copy_metric {
             .returning(|_, _| Ok(None));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req = CopyTrainingMetricRequest::new(
             UserId::test_default(),
@@ -4182,7 +4781,11 @@ mod test_training_service_copy_metric {
             .returning(|_, _| Err(GetTrainingMetricError::Unknown(anyhow!("db error"))));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req =
             CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
@@ -4213,7 +4816,11 @@ mod test_training_service_copy_metric {
             .returning(|_, _| None);
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req =
             CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);
@@ -4262,7 +4869,11 @@ mod test_training_service_copy_metric {
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("save error"))));
 
         let activity_service = MockActivityService::default();
-        let service = TrainingService::new(repository, activity_service);
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
 
         let req =
             CopyTrainingMetricRequest::new(UserId::test_default(), source_id, period_id, None);

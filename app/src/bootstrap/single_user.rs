@@ -75,7 +75,11 @@ pub async fn bootstrap_single_user(
         Clock::new(),
     )
     .await?;
-    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
+    let activity_service = ActivityService::new(
+        activity_repository.clone(),
+        raw_data_repository,
+        activity_notify.clone(),
+    );
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository = SqliteTrainingRepository::new(
@@ -87,6 +91,7 @@ pub async fn bootstrap_single_user(
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
         activity_service.clone(),
+        training_notify.clone(),
     ));
 
     let user_service = DisabledUserService {};

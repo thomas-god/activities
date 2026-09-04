@@ -67,7 +67,7 @@ pub async fn bootstrap_multi_user(
     let training_notify = Arc::new(tokio::sync::Notify::new());
 
     let (activity_service, parser, training_metrics_service) =
-        build_activity_service(&config).await?;
+        build_activity_service(&config, activity_notify.clone(), training_notify.clone()).await?;
 
     let user_service = build_user_service(&config, &mode_config).await?;
 
@@ -116,22 +116,9 @@ async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvi
 
 async fn build_activity_service(
     config: &BaseConfig,
-) -> anyhow::Result<(
-    ActivityService<
-        SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-        FilesystemRawDataRepository,
-    >,
-    Parser,
-    Arc<
-        TrainingService<
-            SqliteTrainingRepository<Clock>,
-            ActivityService<
-                SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
-                FilesystemRawDataRepository,
-            >,
-        >,
-    >,
-)> {
+    activity_notify: Arc<tokio::sync::Notify>,
+    training_notify: Arc<tokio::sync::Notify>,
+) -> anyhow::Result<(ActualActivityService, Parser, Arc<ActualTrainingService>)> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
@@ -155,7 +142,11 @@ async fn build_activity_service(
     )
     .await?;
 
-    let activity_service = ActivityService::new(activity_repository.clone(), raw_data_repository);
+    let activity_service = ActivityService::new(
+        activity_repository.clone(),
+        raw_data_repository,
+        activity_notify,
+    );
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository = SqliteTrainingRepository::new(
@@ -167,6 +158,7 @@ async fn build_activity_service(
     let training_metrics_service = Arc::new(TrainingService::new(
         training_metrics_repository,
         activity_service.clone(),
+        training_notify,
     ));
 
     anyhow::Ok((activity_service, parser, training_metrics_service))
