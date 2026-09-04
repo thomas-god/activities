@@ -371,7 +371,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
-    fn list_activities(
+    fn list_activity_documents(
         &self,
         batch_size: i64,
         offset: i64,

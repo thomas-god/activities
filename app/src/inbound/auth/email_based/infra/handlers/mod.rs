@@ -29,11 +29,7 @@ pub enum UserRegistration {
 
 impl From<&bool> for UserRegistration {
     fn from(value: &bool) -> Self {
-        if *value {
-            Self::Allowed
-        } else {
-            Self::Closed
-        }
+        if *value { Self::Allowed } else { Self::Closed }
     }
 }
 

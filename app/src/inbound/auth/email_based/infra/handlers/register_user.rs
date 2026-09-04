@@ -37,8 +37,8 @@ mod test {
     use serde_json::json;
 
     use crate::inbound::auth::email_based::{
-        EmailAddress, UserRegistrationResult,
-        infra::handlers::UserRegistration, test_utils::MockUserService,
+        EmailAddress, UserRegistrationResult, infra::handlers::UserRegistration,
+        test_utils::MockUserService,
     };
 
     use super::*;

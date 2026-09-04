@@ -344,7 +344,7 @@ where
         offset: i64,
     ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
         self.activity_repository
-            .list_activities(batch_size, offset)
+            .list_activity_documents(batch_size, offset)
             .await
     }
 
@@ -511,7 +511,7 @@ pub mod test_utils {
                 activity: &Activity,
             ) -> Result<(), SaveActivityError>;
 
-            async fn list_activities(
+            async fn list_activity_documents(
                 &self,
                 batch_size: i64,
                 offset: i64,

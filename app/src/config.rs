@@ -110,7 +110,7 @@ impl MultiUserConfig {
                 _ => {
                     return Err(format!(
                         "Invalid value for {MULTI_USER_ALLOW_REGISTRATION_KEY}: expected `true` or `false`, got `{value}`"
-                    ))
+                    ));
                 }
             },
         };

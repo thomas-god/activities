@@ -84,7 +84,11 @@ impl SessionRepository for SqliteSessionRepository {
             }
         };
         res.map(|(user, token, expire_at)| {
-            HashedSession::new(UserId::from(user), HashedSessionToken::new(token), expire_at)
+            HashedSession::new(
+                UserId::from(user),
+                HashedSessionToken::new(token),
+                expire_at,
+            )
         })
     }
 

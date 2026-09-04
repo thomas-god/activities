@@ -338,12 +338,12 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn list_activities(
+    async fn list_activity_documents(
         &self,
         batch_size: i64,
         offset: i64,
     ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
-        let limit = batch_size + 1; // Extra sentinal row to detect if there is another page after
+        let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
         let offset = offset * batch_size;
         let rows = sqlx::query_as::<_, ActivityRow>("
             SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
@@ -1770,7 +1770,7 @@ mod test_sqlite_activity_repository {
             .expect("repo should init");
 
             let (documents, remaining) = repository
-                .list_activities(10, 0)
+                .list_activity_documents(10, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -1804,7 +1804,7 @@ mod test_sqlite_activity_repository {
             }
 
             let (documents, remaining) = repository
-                .list_activities(10, 0)
+                .list_activity_documents(10, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -1849,7 +1849,7 @@ mod test_sqlite_activity_repository {
                 .expect("Insertion should have succeeded");
 
             let (documents, _remaining) = repository
-                .list_activities(10, 0)
+                .list_activity_documents(10, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -1885,7 +1885,7 @@ mod test_sqlite_activity_repository {
 
             // Unlike `list_user_activities`, the snapshot spans every user's activities.
             let (documents, remaining) = repository
-                .list_activities(10, 0)
+                .list_activity_documents(10, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -1927,7 +1927,7 @@ mod test_sqlite_activity_repository {
                 .expect("Deletion should have succeeded");
 
             let (documents, remaining) = repository
-                .list_activities(10, 0)
+                .list_activity_documents(10, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -1969,7 +1969,7 @@ mod test_sqlite_activity_repository {
             // The repository fetches batch_size + 1 rows to detect a next page, but only
             // returns `batch_size` documents: the extra sentinel row is dropped.
             let (documents, remaining) = repository
-                .list_activities(2, 0)
+                .list_activity_documents(2, 0)
                 .await
                 .expect("Should have succeeded");
 
@@ -2006,7 +2006,7 @@ mod test_sqlite_activity_repository {
 
             // offset 1 with batch_size 2 skips the first 2 rows and only the last activity remains.
             let (documents, remaining) = repository
-                .list_activities(2, 1)
+                .list_activity_documents(2, 1)
                 .await
                 .expect("Should have succeeded");
 
@@ -2053,7 +2053,7 @@ mod test_sqlite_activity_repository {
             let mut offset = 0;
             loop {
                 let (documents, remaining) = repository
-                    .list_activities(2, offset)
+                    .list_activity_documents(2, offset)
                     .await
                     .expect("Should have succeeded");
                 assert!(documents.len() <= 2);
@@ -2095,7 +2095,7 @@ mod test_sqlite_activity_repository {
 
             // offset 10 with batch_size 2 skips 20 rows: nothing should be returned.
             let (documents, remaining) = repository
-                .list_activities(2, 10)
+                .list_activity_documents(2, 10)
                 .await
                 .expect("Should have succeeded");
 
