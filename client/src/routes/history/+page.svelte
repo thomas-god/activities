@@ -22,6 +22,9 @@
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, CalendarFold, List, Maximize2, Settings2, X } from '@lucide/svelte';
+	import { none, type Option } from '$lib/Options';
+	import type { SearchResult } from '$ui/shared/SearchField.svelte';
+	import SearchField from '$ui/shared/SearchField.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -42,6 +45,7 @@
 	});
 	let filteredActivities: ActivityList = $state([]);
 	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
+	let searchResults: Option<SearchResult[]> = $state(none());
 
 	// Current month from URL parameter, default to current month
 	let currentMonth = $derived.by(() => {
@@ -203,6 +207,9 @@
 							<ArrowDownToLine class="size-5" />
 							<span class="ml-1 hidden @min-[600px]:inline">Download</span>
 						</button>
+						<div>
+							<SearchField bind:searchResults />
+						</div>
 					</div>
 				</div>
 			</div>
@@ -217,6 +224,7 @@
 					<Timeline
 						activities={filteredActivities}
 						{notes}
+						{searchResults}
 						{selectedActivityId}
 						selectActivityCallback={handleActivitySelected}
 						{activityListFormat}

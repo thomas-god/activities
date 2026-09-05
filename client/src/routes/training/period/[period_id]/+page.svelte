@@ -54,6 +54,7 @@
 		X
 	} from '@lucide/svelte';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SearchField, { type SearchResult } from '$ui/shared/SearchField.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -100,6 +101,7 @@
 	});
 	let filters = $derived(filtersFromSearchParams(page.url.searchParams));
 	let filteredActivities: ActivityList = $state([]);
+	let searchResults: Option<SearchResult[]> = $state(none());
 
 	const handleFilterChange = (filters: ActivitiesFilters) => {
 		const url = new URL(page.url);
@@ -512,23 +514,27 @@
 						<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
 							<div class="mb-4 flex items-center justify-between">
 								<h2 class="text-lg font-semibold">Activities & Notes</h2>
-								<ActivitiesFiltersComponent
-									{activities}
-									bind:filteredActivities
-									showLabel={false}
-									bind:filters={
-										() => filters,
-										(f) => {
-											handleFilterChange(f);
+								<div class="flex flex-row items-center">
+									<ActivitiesFiltersComponent
+										{activities}
+										bind:filteredActivities
+										showLabel={false}
+										bind:filters={
+											() => filters,
+											(f) => {
+												handleFilterChange(f);
+											}
 										}
-									}
-								/>
+									/>
+									<SearchField bind:searchResults />
+								</div>
 							</div>
 
 							<Timeline
 								activities={filteredActivities}
 								{notes}
 								{selectedActivityId}
+								{searchResults}
 								{selectActivityCallback}
 								endDate={periodDetails.end}
 								{activityListFormat}
