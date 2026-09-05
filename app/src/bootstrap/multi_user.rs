@@ -44,7 +44,7 @@ type ActualUserService = UserService<
     SessionService<SqliteSessionRepository>,
 >;
 type ActualSearchService =
-    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>;
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
 
 const EXPIRED_AUTH_STATE_CLEANUP_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(3600 * 24);
@@ -241,7 +241,7 @@ async fn build_search_service(
     training_service: ActualTrainingService,
     training_notify: Arc<tokio::sync::Notify>,
 ) -> anyhow::Result<
-    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>,
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>,
 > {
     let search_db = PathBuf::from(config.activities_data_path.clone())
         .join("db/")
@@ -259,5 +259,6 @@ async fn build_search_service(
         training_notify,
         training_service,
         tokio_util::sync::CancellationToken::new(),
+        Clock::new(),
     ))
 }

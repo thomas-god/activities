@@ -5,24 +5,34 @@ use tokio_util::sync::CancellationToken;
 
 use crate::domain::{
     models::UserId,
-    ports::search::{IDocumentsForSearch, ISearchRepository, ISearchService, SearchResult},
+    ports::{
+        IClock,
+        search::{
+            IDocumentsForSearch, ISearchRepository, ISearchService, RemainingDocuments,
+            SearchResult,
+        },
+    },
 };
 
+const BATCH_SIZE: i64 = 100;
+
 #[derive(Debug, Clone)]
-pub struct SearchService<SR, ADS, TDS> {
+pub struct SearchService<SR, ADS, TDS, C> {
     repository: SR,
     activity_notify: Arc<Notify>,
     activity_service: ADS,
     training_notify: Arc<Notify>,
     training_service: TDS,
     shutdown: CancellationToken,
+    clock: C,
 }
 
-impl<SR, ADS, TDS> SearchService<SR, ADS, TDS>
+impl<SR, ADS, TDS, C> SearchService<SR, ADS, TDS, C>
 where
     SR: ISearchRepository,
     ADS: IDocumentsForSearch,
     TDS: IDocumentsForSearch,
+    C: IClock,
 {
     pub fn new(
         repository: SR,
@@ -31,6 +41,7 @@ where
         training_notify: Arc<Notify>,
         training_service: TDS,
         shutdown: CancellationToken,
+        clock: C,
     ) -> Self {
         Self {
             repository,
@@ -39,10 +50,13 @@ where
             training_notify,
             training_service,
             shutdown,
+            clock,
         }
     }
 
     pub async fn run(&self) {
+        let _ = self.import_existing_documents().await;
+
         let activity_notified = self.activity_notify.notified();
         let training_notified = self.training_notify.notified();
         let shutdown = self.shutdown.cancelled();
@@ -98,13 +112,79 @@ where
             }
         }
     }
+
+    #[tracing::instrument(skip_all)]
+    async fn import_existing_documents(&self) -> anyhow::Result<()> {
+        if let Some(last_import) = self.repository.get_last_import_value().await? {
+            tracing::info!("Skipping import of search documents, last done {last_import}");
+            return anyhow::Ok(());
+        }
+
+        let cloned_self = self.clone();
+        tokio::spawn(async move {
+            // Activity documents
+            if let Err(err) = cloned_self
+                .import_existing_documents_for_service(cloned_self.activity_service.clone())
+                .await
+            {
+                tracing::error!("Error while importing activity documents: {err}");
+            }
+
+            // Training documents
+            if let Err(err) = cloned_self
+                .import_existing_documents_for_service(cloned_self.training_service.clone())
+                .await
+            {
+                tracing::error!("Error while importing training documents: {err}");
+            }
+        });
+        anyhow::Ok(())
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn import_existing_documents_for_service<DS: IDocumentsForSearch>(
+        &self,
+        service: DS,
+    ) -> Result<(), anyhow::Error> {
+        tracing::info!(
+            "Starting importing existing documents for {}",
+            service.service_kind()
+        );
+        let start = std::time::Instant::now();
+        let mut remaining_documents = RemainingDocuments::from(true);
+        let mut page = 0;
+        let mut imported_count = 0;
+
+        while remaining_documents.remaining() {
+            let (documents, flag) = service.snapshot_documents(BATCH_SIZE, page).await?;
+            page += 1;
+            remaining_documents = flag;
+
+            for document in documents {
+                if self.repository.save_document(&document).await.is_ok() {
+                    imported_count += 1;
+                };
+            }
+        }
+
+        tracing::info!(
+            "Finished importing existing documents for {}: {imported_count} documents in {}ms",
+            service.service_kind(),
+            start.elapsed().as_millis()
+        );
+        self.repository
+            .set_last_import_value(self.clock.now())
+            .await?;
+        Ok(())
+    }
 }
 
-impl<SR, ADS, TDS> ISearchService for SearchService<SR, ADS, TDS>
+impl<SR, ADS, TDS, C> ISearchService for SearchService<SR, ADS, TDS, C>
 where
     SR: ISearchRepository,
     ADS: IDocumentsForSearch,
     TDS: IDocumentsForSearch,
+    C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
     async fn search(
@@ -133,16 +213,19 @@ mod tests_search_service {
 
     use anyhow::anyhow;
 
-    use super::SearchService;
-    use crate::domain::{
-        models::{
-            UserId,
-            activity::ActivityId,
-            search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-        },
-        ports::search::{
-            ISearchService, SearchResult,
-            search_test_utils::{MockDocumentsForSearch, MockSearchRepository},
+    use super::{BATCH_SIZE, SearchService};
+    use crate::{
+        clock::clock_test_utils::FakeClock,
+        domain::{
+            models::{
+                UserId,
+                activity::ActivityId,
+                search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+            },
+            ports::search::{
+                ISearchService, RemainingDocuments, SearchResult,
+                search_test_utils::{MockDocumentsForSearch, MockSearchRepository},
+            },
         },
     };
 
@@ -168,11 +251,19 @@ mod tests_search_service {
         )
     }
 
-    fn build_service(
-        repository: MockSearchRepository,
+    fn build_service_skip_import(
+        mut repository: MockSearchRepository,
         activity_service: MockDocumentsForSearch,
         training_service: MockDocumentsForSearch,
-    ) -> SearchService<MockSearchRepository, MockDocumentsForSearch, MockDocumentsForSearch> {
+    ) -> SearchService<
+        MockSearchRepository,
+        MockDocumentsForSearch,
+        MockDocumentsForSearch,
+        FakeClock,
+    > {
+        repository
+            .expect_get_last_import_value()
+            .returning(|| Ok(Some(chrono::Utc::now())));
         SearchService::new(
             repository,
             std::sync::Arc::new(tokio::sync::Notify::new()),
@@ -180,6 +271,7 @@ mod tests_search_service {
             std::sync::Arc::new(tokio::sync::Notify::new()),
             training_service,
             tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         )
     }
 
@@ -202,7 +294,7 @@ mod tests_search_service {
         repository.expect_save_document().times(0);
         documents.expect_mark_document_as_processed().times(0);
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -226,7 +318,7 @@ mod tests_search_service {
         repository.expect_save_document().times(0);
         documents.expect_mark_document_as_processed().times(0);
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -264,7 +356,7 @@ mod tests_search_service {
             })
             .returning(|_, _| Ok(()));
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -306,7 +398,7 @@ mod tests_search_service {
             .withf(move |doc, at| doc.document_id() == "doc-b" && *at == expected_processed_at)
             .returning(|_, _| Ok(()));
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -345,7 +437,7 @@ mod tests_search_service {
                 }
             });
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -356,7 +448,7 @@ mod tests_search_service {
 
     #[tokio::test]
     async fn test_run_returns_when_shutdown_is_cancelled() {
-        let service = build_service(
+        let service = build_service_skip_import(
             MockSearchRepository::new(),
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -378,6 +470,12 @@ mod tests_search_service {
         let done = std::sync::Arc::new(tokio::sync::Notify::new());
 
         let mut repository = MockSearchRepository::new();
+        repository.expect_clone().returning(|| {
+            let mut repo = MockSearchRepository::new();
+            repo.expect_get_last_import_value()
+                .returning(|| Ok(Some(chrono::Utc::now())));
+            return repo;
+        });
         repository
             .expect_save_document()
             .times(1)
@@ -404,7 +502,8 @@ mod tests_search_service {
             cloned
         });
 
-        let service = build_service(repository, activity, MockDocumentsForSearch::new());
+        let service =
+            build_service_skip_import(repository, activity, MockDocumentsForSearch::new());
         let activity_notify = service.activity_notify.clone();
         let shutdown = service.shutdown.clone();
 
@@ -428,13 +527,19 @@ mod tests_search_service {
         let expected = vec![SearchResult::Activity(ActivityId::from("activity-1"))];
 
         let mut repository = MockSearchRepository::new();
+        repository.expect_clone().returning(|| {
+            let mut repo = MockSearchRepository::new();
+            repo.expect_get_last_import_value()
+                .returning(|| Ok(Some(chrono::Utc::now())));
+            return repo;
+        });
         repository
             .expect_search()
             .times(1)
             .withf(move |u, pattern| u == &expected_user && pattern == "long ride")
             .returning(|_, _| Ok(vec![SearchResult::Activity(ActivityId::from("activity-1"))]));
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -450,11 +555,17 @@ mod tests_search_service {
     #[tokio::test]
     async fn test_search_propagates_repository_error() {
         let mut repository = MockSearchRepository::new();
+        repository.expect_clone().returning(|| {
+            let mut repo = MockSearchRepository::new();
+            repo.expect_get_last_import_value()
+                .returning(|| Ok(Some(chrono::Utc::now())));
+            return repo;
+        });
         repository
             .expect_search()
             .returning(|_, _| Err(anyhow!("failed to search")));
 
-        let service = build_service(
+        let service = build_service_skip_import(
             repository,
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -471,6 +582,12 @@ mod tests_search_service {
         let done = std::sync::Arc::new(tokio::sync::Notify::new());
 
         let mut repository = MockSearchRepository::new();
+        repository.expect_clone().returning(|| {
+            let mut repo = MockSearchRepository::new();
+            repo.expect_get_last_import_value()
+                .returning(|| Ok(Some(chrono::Utc::now())));
+            return repo;
+        });
         repository
             .expect_save_document()
             .times(1)
@@ -497,7 +614,8 @@ mod tests_search_service {
             cloned
         });
 
-        let service = build_service(repository, MockDocumentsForSearch::new(), training);
+        let service =
+            build_service_skip_import(repository, MockDocumentsForSearch::new(), training);
         let training_notify = service.training_notify.clone();
         let shutdown = service.shutdown.clone();
 
@@ -519,6 +637,12 @@ mod tests_search_service {
         let done = std::sync::Arc::new(tokio::sync::Notify::new());
 
         let mut repository = MockSearchRepository::new();
+        repository.expect_clone().returning(|| {
+            let mut repo = MockSearchRepository::new();
+            repo.expect_get_last_import_value()
+                .returning(|| Ok(Some(chrono::Utc::now())));
+            return repo;
+        });
         repository
             .expect_save_document()
             .times(2)
@@ -545,7 +669,8 @@ mod tests_search_service {
             cloned
         });
 
-        let service = build_service(repository, activity, MockDocumentsForSearch::new());
+        let service =
+            build_service_skip_import(repository, activity, MockDocumentsForSearch::new());
         let activity_notify = service.activity_notify.clone();
         let shutdown = service.shutdown.clone();
 
@@ -567,7 +692,7 @@ mod tests_search_service {
 
     #[tokio::test]
     async fn test_run_returns_immediately_when_shutdown_is_already_cancelled() {
-        let service = build_service(
+        let service = build_service_skip_import(
             MockSearchRepository::new(),
             MockDocumentsForSearch::new(),
             MockDocumentsForSearch::new(),
@@ -583,5 +708,269 @@ mod tests_search_service {
         handle
             .await
             .expect("run should return immediately when shutdown is already cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_imports_documents_from_all_pages() {
+        let doc_a = document("doc-a");
+        let doc_b = document("doc-b");
+        let doc_c = document("doc-c");
+
+        let mut repository = MockSearchRepository::new();
+        repository
+            .expect_save_document()
+            .times(3)
+            .returning(|_| Ok(processed_at()));
+        repository
+            .expect_set_last_import_value()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(move |_, _| Ok((vec![doc_a, doc_b], RemainingDocuments::from(true))));
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 1)
+            .return_once(move |_, _| Ok((vec![doc_c], RemainingDocuments::from(false))));
+
+        let service = build_service_skip_import(
+            repository,
+            MockDocumentsForSearch::new(),
+            MockDocumentsForSearch::new(),
+        );
+
+        service
+            .import_existing_documents_for_service(documents)
+            .await
+            .expect("snapshot should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_imports_nothing_when_first_page_has_no_more() {
+        let mut repository = MockSearchRepository::new();
+        repository.expect_save_document().times(0);
+        repository
+            .expect_set_last_import_value()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(|_, _| Ok((vec![], RemainingDocuments::from(false))));
+
+        let service = build_service_skip_import(
+            repository,
+            MockDocumentsForSearch::new(),
+            MockDocumentsForSearch::new(),
+        );
+
+        service
+            .import_existing_documents_for_service(documents)
+            .await
+            .expect("snapshot should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_propagates_error_from_first_page() {
+        let mut repository = MockSearchRepository::new();
+        repository.expect_save_document().times(0);
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(|_, _| Err(anyhow!("failed to fetch snapshot")));
+
+        let service = build_service_skip_import(
+            repository,
+            MockDocumentsForSearch::new(),
+            MockDocumentsForSearch::new(),
+        );
+
+        let res = service
+            .import_existing_documents_for_service(documents)
+            .await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_stops_paginating_when_fetching_a_page_fails() {
+        let doc_a = document("doc-a");
+
+        let mut repository = MockSearchRepository::new();
+        repository
+            .expect_save_document()
+            .times(1)
+            .returning(|_| Ok(processed_at()));
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(move |_, _| Ok((vec![doc_a], RemainingDocuments::from(true))));
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 1)
+            .return_once(|_, _| Err(anyhow!("failed to fetch snapshot")));
+        // The error on page 1 must stop pagination: no page 2 is requested and
+        // the whole snapshot is reported as failed.
+        documents
+            .expect_snapshot_documents()
+            .times(0)
+            .withf(|_, page| *page == 2);
+
+        let service = build_service_skip_import(
+            repository,
+            MockDocumentsForSearch::new(),
+            MockDocumentsForSearch::new(),
+        );
+
+        let res = service
+            .import_existing_documents_for_service(documents)
+            .await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_continues_when_saving_a_document_fails() {
+        let doc_a = document("doc-a");
+        let doc_b = document("doc-b");
+        let doc_c = document("doc-c");
+
+        let mut repository = MockSearchRepository::new();
+        repository.expect_save_document().times(3).returning(|doc| {
+            if doc.document_id() == "doc-a" {
+                Err(anyhow!("failed to save document"))
+            } else {
+                Ok(processed_at())
+            }
+        });
+        repository
+            .expect_set_last_import_value()
+            .times(1)
+            .returning(|_| Ok(()));
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(move |_, _| Ok((vec![doc_a, doc_b], RemainingDocuments::from(true))));
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 1)
+            .return_once(move |_, _| Ok((vec![doc_c], RemainingDocuments::from(false))));
+
+        let service = build_service_skip_import(
+            repository,
+            MockDocumentsForSearch::new(),
+            MockDocumentsForSearch::new(),
+        );
+
+        // Save failures for individual documents are tolerated: the snapshot
+        // keeps importing the remaining documents (including later pages).
+        service
+            .import_existing_documents_for_service(documents)
+            .await
+            .expect("snapshot should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_import_existing_documents_skips_import_when_last_import_value_is_set() {
+        let mut repository = MockSearchRepository::new();
+        repository.expect_clone().times(0);
+        repository.expect_save_document().times(0);
+
+        // The repository reports that an import already happened, so the
+        // background import must never be spawned: no document source is
+        // cloned and no snapshot is taken.
+        let mut activity = MockDocumentsForSearch::new();
+        activity.expect_clone().times(0);
+        activity.expect_snapshot_documents().times(0);
+
+        let mut training = MockDocumentsForSearch::new();
+        training.expect_clone().times(0);
+        training.expect_snapshot_documents().times(0);
+
+        let service = build_service_skip_import(repository, activity, training);
+
+        service
+            .import_existing_documents()
+            .await
+            .expect("skipping an already-done import should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_import_existing_documents_propagates_error_from_get_last_import_value() {
+        let mut repository = MockSearchRepository::new();
+        repository
+            .expect_get_last_import_value()
+            .returning(|| Err(anyhow!("failed to read last import value")));
+
+        let service = SearchService::new(
+            repository,
+            std::sync::Arc::new(tokio::sync::Notify::new()),
+            MockDocumentsForSearch::new(),
+            std::sync::Arc::new(tokio::sync::Notify::new()),
+            MockDocumentsForSearch::new(),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let res = service.import_existing_documents().await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_existing_documents_sets_last_import_value_after_successful_import() {
+        let doc_a = document("doc-a");
+        let doc_b = document("doc-b");
+
+        let mut repository = MockSearchRepository::new();
+        repository
+            .expect_save_document()
+            .times(2)
+            .returning(|_| Ok(processed_at()));
+        // Once every page has been imported, the repository records the import
+        // date from the service clock so future startups skip the import.
+        repository
+            .expect_set_last_import_value()
+            .times(1)
+            .withf(|at| *at == processed_at())
+            .returning(|_| Ok(()));
+
+        let mut documents = MockDocumentsForSearch::new();
+        documents
+            .expect_snapshot_documents()
+            .times(1)
+            .withf(|batch_size, page| *batch_size == BATCH_SIZE && *page == 0)
+            .return_once(move |_, _| Ok((vec![doc_a, doc_b], RemainingDocuments::from(false))));
+
+        let service = SearchService::new(
+            repository,
+            std::sync::Arc::new(tokio::sync::Notify::new()),
+            MockDocumentsForSearch::new(),
+            std::sync::Arc::new(tokio::sync::Notify::new()),
+            MockDocumentsForSearch::new(),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::new(processed_at()),
+        );
+
+        service
+            .import_existing_documents_for_service(documents)
+            .await
+            .expect("snapshot should succeed");
     }
 }

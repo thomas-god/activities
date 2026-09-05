@@ -25,7 +25,7 @@ use crate::{
                 ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
                 SimilarActivityError, UpdateActivityMetricError,
             },
-            search::DocumentsRemaining,
+            search::RemainingDocuments,
         },
     },
     inbound::parser::ParseFile,
@@ -341,10 +341,10 @@ where
     async fn list_activity_documents(
         &self,
         batch_size: i64,
-        offset: i64,
-    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        page: i64,
+    ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error> {
         let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
-        let offset = offset * batch_size;
+        let offset = page * batch_size;
         let rows = sqlx::query_as::<_, ActivityRow>("
             SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
             FROM t_activities_v2
@@ -356,7 +356,7 @@ where
             .fetch_all(&self.readers)
             .await?;
 
-        let documents_remaining = DocumentsRemaining::from(rows.len() as i64 > batch_size);
+        let documents_remaining = RemainingDocuments::from(rows.len() as i64 > batch_size);
 
         // The extra row was only fetched to detect whether more documents remain: it is not part
         // of this page.
@@ -1775,7 +1775,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert!(documents.is_empty());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
         }
 
         #[tokio::test]
@@ -1809,7 +1809,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), activities.len());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
 
             // Documents are ordered by rowid, i.e. insertion order, and each activity is
             // turned into an "updated" search document.
@@ -1890,7 +1890,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 2);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             let document_ids: Vec<String> = documents
                 .iter()
                 .map(|document| document.document_id().to_string())
@@ -1932,7 +1932,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 1);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             assert_eq!(
                 documents
                     .first()
@@ -1974,7 +1974,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 2);
-            assert_eq!(remaining, DocumentsRemaining::from(true));
+            assert_eq!(remaining, RemainingDocuments::from(true));
             for (document, activity) in documents.iter().zip(activities.iter().take(2)) {
                 assert_eq!(document.document_id(), activity.id().to_string());
             }
@@ -2004,14 +2004,14 @@ mod test_sqlite_activity_repository {
                     .expect("Insertion should have succeeded");
             }
 
-            // offset 1 with batch_size 2 skips the first 2 rows and only the last activity remains.
+            // page 1 with batch_size 2 skips the first 2 rows and only the last activity remains.
             let (documents, remaining) = repository
                 .list_activity_documents(2, 1)
                 .await
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 1);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             assert_eq!(
                 documents
                     .first()
@@ -2047,13 +2047,13 @@ mod test_sqlite_activity_repository {
                     .expect("Insertion should have succeeded");
             }
 
-            // Walking through every page (incrementing the offset until none remain) must
+            // Walking through every page (incrementing the page until none remain) must
             // return each activity exactly once, in insertion order: pages do not overlap.
             let mut page_ids = Vec::new();
-            let mut offset = 0;
+            let mut page = 0;
             loop {
                 let (documents, remaining) = repository
-                    .list_activity_documents(2, offset)
+                    .list_activity_documents(2, page)
                     .await
                     .expect("Should have succeeded");
                 assert!(documents.len() <= 2);
@@ -2062,10 +2062,10 @@ mod test_sqlite_activity_repository {
                         .iter()
                         .map(|document| document.document_id().to_string()),
                 );
-                if remaining == DocumentsRemaining::from(false) {
+                if remaining == RemainingDocuments::from(false) {
                     break;
                 }
-                offset += 1;
+                page += 1;
             }
 
             let expected_ids: Vec<String> = activities
@@ -2100,7 +2100,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             assert!(documents.is_empty());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
         }
     }
 

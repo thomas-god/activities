@@ -35,7 +35,7 @@ type ActualTrainingService = TrainingService<
     >,
 >;
 type ActualSearchService =
-    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>;
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
 
 pub async fn bootstrap_single_user(
     _mode_config: SingleUserConfig,
@@ -150,7 +150,7 @@ async fn build_search_service(
     training_service: ActualTrainingService,
     training_notify: Arc<tokio::sync::Notify>,
 ) -> anyhow::Result<
-    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService>,
+    SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>,
 > {
     let search_db = PathBuf::from(config.activities_data_path.clone())
         .join("db/")
@@ -168,5 +168,6 @@ async fn build_search_service(
         training_notify,
         training_service,
         tokio_util::sync::CancellationToken::new(),
+        Clock::new(),
     ))
 }

@@ -6,11 +6,17 @@ use crate::domain::models::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentsRemaining(bool);
+pub struct RemainingDocuments(bool);
 
-impl From<bool> for DocumentsRemaining {
+impl From<bool> for RemainingDocuments {
     fn from(value: bool) -> Self {
         Self(value)
+    }
+}
+
+impl RemainingDocuments {
+    pub fn remaining(&self) -> bool {
+        self.0
     }
 }
 
@@ -18,8 +24,8 @@ pub trait IDocumentsForSearch: Clone + Send + Sync + 'static {
     fn snapshot_documents(
         &self,
         batch_size: i64,
-        offset: i64,
-    ) -> impl Future<Output = Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>> + Send;
+        page: i64,
+    ) -> impl Future<Output = Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>> + Send;
 
     fn get_pending_documents_to_process(
         &self,
@@ -59,6 +65,15 @@ pub trait ISearchRepository: Clone + Send + Sync + 'static {
         &self,
         document: &SearchDocument,
     ) -> impl Future<Output = Result<chrono::DateTime<chrono::Utc>, anyhow::Error>> + Send;
+
+    fn get_last_import_value(
+        &self,
+    ) -> impl Future<Output = Result<Option<chrono::DateTime<chrono::Utc>>, anyhow::Error>> + Send;
+
+    fn set_last_import_value(
+        &self,
+        imported_at: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[cfg(test)]
@@ -101,6 +116,15 @@ pub mod search_test_utils {
                 &self,
                 document: &SearchDocument,
             ) -> Result<chrono::DateTime<chrono::Utc>, anyhow::Error>;
+
+            async fn get_last_import_value(
+                &self,
+            ) -> Result<Option<chrono::DateTime<chrono::Utc>>, anyhow::Error>;
+
+            async fn set_last_import_value(
+                &self,
+                imported_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
         }
     }
 
@@ -115,8 +139,8 @@ pub mod search_test_utils {
             async fn snapshot_documents(
                   &self,
                   batch_size: i64,
-                  offset: i64,
-            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
+                  page: i64,
+            ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>;
 
             async fn get_pending_documents_to_process(
                 &self,

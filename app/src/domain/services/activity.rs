@@ -20,7 +20,7 @@ use crate::domain::{
             ListActivitiesError, ListActivitiesFilters, PatchActivityError, PatchActivityRequest,
             RawActivity, RawDataRepository,
         },
-        search::{DocumentsRemaining, IDocumentsForSearch},
+        search::{IDocumentsForSearch, RemainingDocuments},
     },
 };
 
@@ -342,10 +342,10 @@ where
     async fn snapshot_documents(
         &self,
         batch_size: i64,
-        offset: i64,
-    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        page: i64,
+    ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error> {
         self.activity_repository
-            .list_activity_documents(batch_size, offset)
+            .list_activity_documents(batch_size, page)
             .await
     }
 
@@ -392,7 +392,7 @@ pub mod test_utils {
         GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,
         RawActivity, SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
-    use crate::domain::ports::search::DocumentsRemaining;
+    use crate::domain::ports::search::RemainingDocuments;
 
     mock! {
         pub ActivityService {}
@@ -517,8 +517,8 @@ pub mod test_utils {
             async fn list_activity_documents(
                 &self,
                 batch_size: i64,
-                offset: i64,
-            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
+                page: i64,
+            ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>;
 
             async fn list_user_activities(
                 &self,

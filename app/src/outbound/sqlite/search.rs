@@ -19,6 +19,8 @@ use crate::domain::{
     },
 };
 
+const KEY_LAST_IMPORT_DATE: &str = "last_import_date";
+
 #[derive(Debug, Clone)]
 pub struct SearchRepository<C> {
     writer: SqlitePool,
@@ -144,6 +146,36 @@ where
                 }
             })
             .collect()
+    }
+
+    async fn get_last_import_value(
+        &self,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, anyhow::Error> {
+        sqlx::query_as::<_, (chrono::DateTime<chrono::Utc>,)>(
+            "SELECT value FROM t_metadata WHERE key = ?1 LIMIT 1;",
+        )
+        .bind(KEY_LAST_IMPORT_DATE)
+        .fetch_optional(&self.readers)
+        .await
+        .map(|row| row.map(|(import_date,)| import_date))
+        .map_err(|err| anyhow!(err))
+    }
+
+    async fn set_last_import_value(
+        &self,
+        imported_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "INSERT INTO t_metadata (key, value)
+                VALUES (?1, ?2)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+        )
+        .bind(KEY_LAST_IMPORT_DATE)
+        .bind(imported_at)
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| anyhow!(err))
     }
 }
 
@@ -610,5 +642,84 @@ mod tests {
             results,
             vec![SearchResult::Activity(ActivityId::from("activity-3"))]
         );
+    }
+
+    async fn fetch_metadata_keys(repo: &SearchRepository<FakeClock>) -> Vec<String> {
+        sqlx::query_as::<_, (String,)>("SELECT key FROM t_metadata ORDER BY key;")
+            .fetch_all(&repo.readers)
+            .await
+            .expect("querying t_metadata should succeed")
+            .into_iter()
+            .map(|(key,)| key)
+            .collect()
+    }
+
+    fn utc_datetime(rfc3339: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(rfc3339)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    }
+
+    #[tokio::test]
+    async fn get_last_import_value_returns_none_when_never_set() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+            .await
+            .expect("Failed to create test repository");
+
+        let value = repo
+            .get_last_import_value()
+            .await
+            .expect("get_last_import_value should succeed");
+
+        assert!(value.is_none());
+        assert!(fetch_metadata_keys(&repo).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn set_last_import_value_persists_value_readable_by_get() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+            .await
+            .expect("Failed to create test repository");
+        let imported_at = utc_datetime("2024-03-15T10:30:45.123456789Z");
+
+        repo.set_last_import_value(imported_at)
+            .await
+            .expect("set_last_import_value should succeed");
+
+        assert_eq!(
+            repo.get_last_import_value()
+                .await
+                .expect("get_last_import_value should succeed"),
+            Some(imported_at)
+        );
+        assert_eq!(fetch_metadata_keys(&repo).await, vec![KEY_LAST_IMPORT_DATE]);
+    }
+
+    #[tokio::test]
+    async fn set_last_import_value_overwrites_previous_value() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+            .await
+            .expect("Failed to create test repository");
+        let first = utc_datetime("2024-03-15T10:00:00Z");
+        let second = utc_datetime("2024-03-16T08:00:00Z");
+
+        repo.set_last_import_value(first)
+            .await
+            .expect("first set should succeed");
+        repo.set_last_import_value(second)
+            .await
+            .expect("second set should succeed");
+
+        assert_eq!(
+            repo.get_last_import_value()
+                .await
+                .expect("get_last_import_value should succeed"),
+            Some(second)
+        );
+        // The upsert must not leave duplicate rows behind.
+        assert_eq!(fetch_metadata_keys(&repo).await, vec![KEY_LAST_IMPORT_DATE]);
     }
 }

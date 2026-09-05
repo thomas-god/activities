@@ -19,7 +19,7 @@ use crate::domain::{
     ports::{
         DateRange,
         activity::{IActivityService, ListActivitiesFilters},
-        search::{DocumentsRemaining, IDocumentsForSearch},
+        search::{IDocumentsForSearch, RemainingDocuments},
         training::{
             ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
@@ -656,10 +656,10 @@ where
     async fn snapshot_documents(
         &self,
         batch_size: i64,
-        offset: i64,
-    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        page: i64,
+    ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error> {
         self.training_repository
-            .list_training_note_documents(batch_size, offset)
+            .list_training_note_documents(batch_size, page)
             .await
     }
 
@@ -1009,8 +1009,8 @@ pub mod test_utils {
             async fn list_training_note_documents(
                 &self,
                 batch_size: i64,
-                offset: i64,
-            ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error>;
+                page: i64,
+            ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>;
 
             async fn get_training_notes(
                 &self,

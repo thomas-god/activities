@@ -23,7 +23,7 @@ use crate::domain::{
     },
     ports::{
         DateRange, IClock,
-        search::DocumentsRemaining,
+        search::RemainingDocuments,
         training::{
             DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
             GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
@@ -704,10 +704,10 @@ where
     async fn list_training_note_documents(
         &self,
         batch_size: i64,
-        offset: i64,
-    ) -> Result<(Vec<SearchDocument>, DocumentsRemaining), anyhow::Error> {
+        page: i64,
+    ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error> {
         let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
-        let offset = offset * batch_size;
+        let offset = page * batch_size;
         let rows = sqlx::query_as::<_, TrainingNoteRow>(
             "
             SELECT id, user_id, title, content, date, created_at
@@ -720,7 +720,7 @@ where
         .fetch_all(&self.readers)
         .await?;
 
-        let documents_remaining = DocumentsRemaining::from(rows.len() as i64 > batch_size);
+        let documents_remaining = RemainingDocuments::from(rows.len() as i64 > batch_size);
 
         // The extra row was only fetched to detect whether more documents remain: it is not part
         // of this page.
@@ -3194,7 +3194,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert!(documents.is_empty());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
         }
 
         #[tokio::test]
@@ -3226,7 +3226,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), notes.len());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
 
             // Documents are ordered by rowid, i.e. insertion order, and each note is turned
             // into an "updated" search document.
@@ -3290,7 +3290,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 2);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             let document_ids: Vec<String> = documents
                 .iter()
                 .map(|document| document.document_id().to_string())
@@ -3328,7 +3328,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 1);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             assert_eq!(
                 documents
                     .first()
@@ -3367,7 +3367,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 2);
-            assert_eq!(remaining, DocumentsRemaining::from(true));
+            assert_eq!(remaining, RemainingDocuments::from(true));
             for (document, note) in documents.iter().zip(notes.iter().take(2)) {
                 assert_eq!(document.document_id(), note.id().to_string());
             }
@@ -3395,13 +3395,13 @@ mod test_sqlite_training_repository {
                     .expect("Insertion should have succeeded");
             }
 
-            // Walking through every page (incrementing the offset until none remain) must
+            // Walking through every page (incrementing the page until none remain) must
             // return each note exactly once, in insertion order: pages do not overlap.
             let mut page_ids = Vec::new();
-            let mut offset = 0;
+            let mut page = 0;
             loop {
                 let (documents, remaining) = repository
-                    .list_training_note_documents(2, offset)
+                    .list_training_note_documents(2, page)
                     .await
                     .expect("Should have succeeded");
                 assert!(documents.len() <= 2);
@@ -3410,10 +3410,10 @@ mod test_sqlite_training_repository {
                         .iter()
                         .map(|document| document.document_id().to_string()),
                 );
-                if remaining == DocumentsRemaining::from(false) {
+                if remaining == RemainingDocuments::from(false) {
                     break;
                 }
-                offset += 1;
+                page += 1;
             }
 
             let expected_ids: Vec<String> =
@@ -3448,7 +3448,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert_eq!(documents.len(), 1);
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
             assert_eq!(
                 documents
                     .first()
@@ -3479,7 +3479,7 @@ mod test_sqlite_training_repository {
                 .expect("Should have succeeded");
 
             assert!(documents.is_empty());
-            assert_eq!(remaining, DocumentsRemaining::from(false));
+            assert_eq!(remaining, RemainingDocuments::from(false));
         }
     }
 
