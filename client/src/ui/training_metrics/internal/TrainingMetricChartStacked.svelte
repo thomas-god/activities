@@ -294,7 +294,7 @@
 		if (format === 'pace') {
 			return `${paceInSecondToString(value)} /km`;
 		}
-		return `${value.toFixed(1)} ${unit}`;
+		return `${value.toFixed(0)} ${unit}`;
 	};
 
 	// Hide tooltip on scroll

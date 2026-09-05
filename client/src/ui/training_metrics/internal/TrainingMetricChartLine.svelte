@@ -211,14 +211,15 @@
 		d3.select(gDots).call((sel) =>
 			sel
 				.attr('stroke', 'steelblue')
-				.attr('stroke-width', 1.5)
-				.attr('fill', 'none')
+				.attr('stroke-width', 1)
+				.attr('fill', 'steelblue')
+				.attr('fill-opacity', 0.6)
 				.selectAll('circle')
 				.data(valuesAsTime)
 				.join('circle')
 				.attr('cx', (d) => x(d.time))
 				.attr('cy', (d) => y(d.value))
-				.attr('r', 5)
+				.attr('r', 4)
 
 				.on('mouseenter', function (event: MouseEvent, point: { time: number; value: number }) {
 					// Show tooltip
@@ -263,7 +264,7 @@
 					d3.select(event.target as SVGRectElement)
 						.attr('stroke-width', 2.5)
 						.attr('fill', 'steelblue')
-						.attr('fill-opacity', 0.6);
+						.attr('fill-opacity', 0.8);
 				})
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
@@ -272,8 +273,8 @@
 					// Remove highlight
 					d3.select(event.target as SVGRectElement)
 						.attr('stroke-width', 1.5)
-						.attr('fill', 'none')
-						.attr('fill-opacity', 1);
+						.attr('fill', 'steelblue')
+						.attr('fill-opacity', 0.6);
 				})
 		);
 
@@ -317,6 +318,8 @@
 			opacity="0.3"
 		/>
 
+		<g bind:this={gDots} />
+
 		{#if isSome(average)}
 			<line
 				x1={marginLeft}
@@ -358,8 +361,6 @@
 				{unwrapOr(targetLegend, '')}
 			</text>
 		{/if}
-
-		<g bind:this={gDots} />
 
 		<g bind:this={gx} transform="translate(0 {height - marginBottom})" />
 		<g bind:this={gy} transform="translate({marginLeft} 0)" />
