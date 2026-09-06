@@ -114,7 +114,8 @@ where
         user: &UserId,
         pattern: String,
     ) -> Result<Vec<SearchResult>, anyhow::Error> {
-        if pattern.trim().is_empty() {
+        let query = to_fts5_query(&normalize_for_search(&pattern));
+        if query.is_empty() {
             return Ok(Vec::new());
         }
 
@@ -124,7 +125,7 @@ where
              WHERE user = ?2
              ORDER BY rank, document_id;",
         )
-        .bind(to_fts5_query(&normalize_for_search(&pattern)))
+        .bind(query)
         .bind(user)
         .fetch_all(&self.readers)
         .await?;
@@ -185,9 +186,14 @@ where
 /// as a literal phrase, and terms are combined with `AND`. This avoids FTS5
 /// operator injection (e.g. `OR`, `-`, `*`) while still letting multi-word
 /// searches match documents that contain every term.
+///
+/// Terms of fewer than 3 characters are dropped: the trigram tokenizer needs at
+/// least 3 characters to form a trigram, so shorter terms could never match
+/// anything in the index.
 fn to_fts5_query(pattern: &str) -> String {
     pattern
         .split_whitespace()
+        .filter(|w| w.chars().count() >= 3)
         .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
         .collect::<Vec<_>>()
         .join(" AND ")
@@ -290,10 +296,9 @@ mod tests {
 
     #[test]
     fn to_fts5_query_neutralizes_fts5_boolean_operators() {
-        assert_eq!(
-            to_fts5_query("ride OR tempo"),
-            "\"ride\" AND \"OR\" AND \"tempo\""
-        );
+        // AND/NOT are at least 3 characters long, so they survive the trigram
+        // filter and must be quoted to be treated as literal terms rather than
+        // operators.
         assert_eq!(
             to_fts5_query("ride AND tempo"),
             "\"ride\" AND \"AND\" AND \"tempo\""
@@ -302,6 +307,23 @@ mod tests {
             to_fts5_query("ride NOT tempo"),
             "\"ride\" AND \"NOT\" AND \"tempo\""
         );
+    }
+
+    #[test]
+    fn to_fts5_query_drops_terms_shorter_than_a_trigram() {
+        // The trigram tokenizer can only match substrings of at least 3
+        // characters, so shorter terms (including the operator "OR") are
+        // dropped instead of being sent to FTS5.
+        assert_eq!(to_fts5_query("a"), "");
+        assert_eq!(to_fts5_query("ri"), "");
+        // Characters are counted, not bytes: 中文 is 2 chars but 6 bytes.
+        assert_eq!(to_fts5_query("中文"), "");
+        // A 3-character term is the smallest that can still match.
+        assert_eq!(to_fts5_query("abc"), "\"abc\"");
+        // Short terms are dropped individually, longer ones are kept.
+        assert_eq!(to_fts5_query("go ride"), "\"ride\"");
+        assert_eq!(to_fts5_query("on a long ride"), "\"long\" AND \"ride\"");
+        assert_eq!(to_fts5_query("ride OR tempo"), "\"ride\" AND \"tempo\"");
     }
 
     #[test]
@@ -575,7 +597,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn search_returns_no_results_for_blank_pattern() {
+    async fn search_returns_no_results_for_blank_or_too_short_pattern() {
         let db_file = NamedTempFile::new().unwrap();
         let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
             .await
@@ -591,7 +613,9 @@ mod tests {
         )
         .await;
 
-        for pattern in ["", "   "] {
+        // "l" and "lo" are too short for the trigram tokenizer to match,
+        // even though the indexed content starts with them.
+        for pattern in ["", "   ", "l", "lo"] {
             let results = repo
                 .search(&user, pattern.to_string())
                 .await
