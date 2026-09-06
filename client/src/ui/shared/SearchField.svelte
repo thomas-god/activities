@@ -8,6 +8,8 @@
 		kind: 'activity' | 'training_note';
 		id: string;
 	}
+
+	/* eslint-disable no-useless-assignment*/
 	let { searchResults = $bindable() }: { searchResults: Option<SearchResult[]> } = $props();
 
 	let searchPattern: string | null = $state(null);
