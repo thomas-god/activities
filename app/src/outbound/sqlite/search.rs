@@ -10,7 +10,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::ActivityId,
-        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType, normalize_for_search},
         training::TrainingNoteId,
     },
     ports::{
@@ -88,7 +88,7 @@ where
                 sqlx::query(
                     "INSERT INTO t_search (content, type, user, document_id) VALUES (?1, ?2, ?3, ?4);",
                 )
-                .bind(document.content())
+                .bind(normalize_for_search(document.content()))
                 .bind(document.document_type().to_string())
                 .bind(document.user())
                 .bind(document.document_id())
@@ -120,11 +120,11 @@ where
 
         let rows = sqlx::query_as::<_, (String, String)>(
             "SELECT type, document_id
-             FROM t_search
-             WHERE t_search MATCH ?1 AND user = ?2
+             FROM t_search(?1)
+             WHERE user = ?2
              ORDER BY rank, document_id;",
         )
-        .bind(to_fts5_query(&pattern))
+        .bind(to_fts5_query(&normalize_for_search(&pattern)))
         .bind(user)
         .fetch_all(&self.readers)
         .await?;

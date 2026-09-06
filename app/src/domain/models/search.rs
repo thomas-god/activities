@@ -1,4 +1,6 @@
 use derive_more::Constructor;
+use unicode_categories::UnicodeCategories;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::domain::models::UserId;
 
@@ -87,6 +89,14 @@ impl SearchDocument {
     }
 }
 
+pub fn normalize_for_search(input: &str) -> String {
+    input
+        .trim()
+        .nfd()
+        .filter(|c| !c.is_mark_nonspacing())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +133,82 @@ mod tests {
                 SearchDocumentEvent::try_from(invalid).is_err(),
                 "expected {invalid:?} to be rejected"
             );
+        }
+    }
+
+    #[test]
+    fn empty_and_whitespace_only_input_normalize_to_empty() {
+        assert_eq!(normalize_for_search(""), "");
+        assert_eq!(normalize_for_search("   "), "");
+        assert_eq!(normalize_for_search("\t\r\n "), "");
+    }
+
+    #[test]
+    fn trims_surrounding_whitespace() {
+        assert_eq!(normalize_for_search("  Hello  "), "Hello");
+        assert_eq!(normalize_for_search("\n\t World \r\n"), "World");
+    }
+
+    #[test]
+    fn preserves_inner_whitespace() {
+        assert_eq!(normalize_for_search("  a   b  "), "a   b");
+    }
+
+    #[test]
+    fn strips_diacritics_from_precomposed_input() {
+        assert_eq!(normalize_for_search("Café"), "Cafe");
+        assert_eq!(normalize_for_search("Crème brûlée"), "Creme brulee");
+        assert_eq!(normalize_for_search("Déjà vu"), "Deja vu");
+    }
+
+    #[test]
+    fn strips_diacritics_from_already_decomposed_input() {
+        // "e\u{301}" (e + combining acute) is the NFD form of "é"; both must normalize the same.
+        assert_eq!(normalize_for_search("e\u{0301}"), "e");
+        assert_eq!(normalize_for_search("e\u{0301}"), normalize_for_search("é"));
+        // "ế" decomposes as e + combining circumflex + combining acute.
+        assert_eq!(normalize_for_search("ế"), "e");
+        // "Å" decomposes as A + combining ring above.
+        assert_eq!(normalize_for_search("A\u{030A}"), "A");
+        assert_eq!(normalize_for_search("Ångström"), "Angstrom");
+    }
+
+    #[test]
+    fn preserves_letter_case() {
+        assert_eq!(normalize_for_search("Éléphant"), "Elephant");
+        assert_eq!(normalize_for_search("Über"), "Uber");
+    }
+
+    #[test]
+    fn keeps_characters_without_decomposable_diacritics() {
+        // ß and ø have no canonical decomposition, so they survive NFD untouched.
+        assert_eq!(normalize_for_search("Straße"), "Straße");
+        assert_eq!(normalize_for_search("øre"), "øre");
+        // Scripts without marks are passed through unchanged.
+        assert_eq!(normalize_for_search("中文"), "中文");
+        assert_eq!(normalize_for_search("Привет"), "Привет");
+    }
+
+    #[test]
+    fn preserves_digits_and_punctuation() {
+        assert_eq!(
+            normalize_for_search("  Hello, world! #123.  "),
+            "Hello, world! #123."
+        );
+    }
+
+    #[test]
+    fn handles_mark_only_and_leading_marks() {
+        assert_eq!(normalize_for_search("\u{0301}"), "");
+        assert_eq!(normalize_for_search("\u{0301}a\u{0301}"), "a");
+    }
+
+    #[test]
+    fn normalization_is_idempotent() {
+        let samples = ["Café déjà vu", "  Ångström  ", "Straße", "中文"];
+        for sample in samples {
+            let once = normalize_for_search(sample);
+            assert_eq!(normalize_for_search(&once), once, "{sample:?}");
         }
     }
 }
