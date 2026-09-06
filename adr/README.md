@@ -1,9 +1,8 @@
 # Architecture decision records
 
-This folder contains architecture decision records (ADR) that detail some key
-design decisions taken during the development of _activities_. They usually
-describe the context of the decision, the alternative options considered and the
-resulting trade-offs.
+This folder contains architecture decision records (ADR) that detail some key design decisions taken
+during the development of _activities_. They usually describe the context of the decision, the
+alternative options considered and the resulting trade-offs.
 
 - [User authentication](20250918-authentication.md)
 - [Activity storage](20250924-activities-storage.md)
@@ -11,3 +10,4 @@ resulting trade-offs.
 - [Maintaining feature availability and user experience across screen widths and platforms](20251121-screen-width-and-user-experienc.md)
 - [Computation of activity metrics derived from timeseries](20260216-activity-timeseries-metrics-computation.md)
 - [Client Component Organization Strategy](20260808-client-component-organization.md)
+- [Search feature](20260906-search.md)
