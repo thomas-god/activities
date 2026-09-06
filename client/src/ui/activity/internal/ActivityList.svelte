@@ -34,6 +34,9 @@
 	let flattenTimeline = $derived.by(() => {
 		const flattenTimeline = [];
 		for (const [group, items] of timeline) {
+			if (items.length === 0) {
+				continue;
+			}
 			flattenTimeline.push({ type: 'header' as const, group });
 			for (const item of items) {
 				flattenTimeline.push({ type: 'row' as const, item });
