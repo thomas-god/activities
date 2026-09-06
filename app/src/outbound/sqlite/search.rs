@@ -5,12 +5,14 @@ use sqlx::{
     ConnectOptions, SqlitePool,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
+use unicode_categories::UnicodeCategories;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::domain::{
     models::{
         UserId,
         activity::ActivityId,
-        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType, normalize_for_search},
+        search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         training::TrainingNoteId,
     },
     ports::{
@@ -85,15 +87,18 @@ where
                     .execute(&mut *tx)
                     .await?;
 
-                sqlx::query(
+                let content = normalize_for_search(document.content());
+                if non_empty_tokens(&content) {
+                    sqlx::query(
                     "INSERT INTO t_search (content, type, user, document_id) VALUES (?1, ?2, ?3, ?4);",
                 )
-                .bind(normalize_for_search(document.content()))
+                .bind(&content)
                 .bind(document.document_type().to_string())
                 .bind(document.user())
                 .bind(document.document_id())
                 .execute(&mut *tx)
                 .await?;
+                }
             }
             SearchDocumentEvent::Deleted => {
                 sqlx::query("DELETE FROM t_search WHERE document_id = ?1;")
@@ -180,6 +185,26 @@ where
     }
 }
 
+/// Normalizes a string of its diacritics.
+fn normalize_for_search(input: &str) -> String {
+    input
+        .trim()
+        .nfd()
+        .filter(|c| !c.is_mark_nonspacing())
+        .collect()
+}
+
+const TOKENIZER_TOKEN_MIN_LEN: usize = 3;
+
+/// Checks if a an input &str will result in an non-empty list of tokens
+fn non_empty_tokens(input: &str) -> bool {
+    input
+        .split_whitespace()
+        .filter(|w| w.chars().count() >= TOKENIZER_TOKEN_MIN_LEN)
+        .count()
+        > 0
+}
+
 /// Builds a safe FTS5 MATCH expression from free-form user input.
 ///
 /// Each whitespace-separated term is wrapped in double quotes so FTS5 treats it
@@ -187,86 +212,125 @@ where
 /// operator injection (e.g. `OR`, `-`, `*`) while still letting multi-word
 /// searches match documents that contain every term.
 ///
-/// Terms of fewer than 3 characters are dropped: the trigram tokenizer needs at
-/// least 3 characters to form a trigram, so shorter terms could never match
+/// Terms of fewer than `TOKEN_MIN_LEN` characters are dropped: the trigram tokenizer needs at
+/// least `TOKEN_MIN_LEN` characters to form a trigram, so shorter terms could never match
 /// anything in the index.
 fn to_fts5_query(pattern: &str) -> String {
     pattern
         .split_whitespace()
-        .filter(|w| w.chars().count() >= 3)
+        .filter(|w| w.chars().count() >= TOKENIZER_TOKEN_MIN_LEN)
         .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
         .collect::<Vec<_>>()
         .join(" AND ")
 }
 
 #[cfg(test)]
-mod tests {
-    use tempfile::NamedTempFile;
-
+mod test_search_tokenizing {
     use super::*;
-    use crate::{
-        clock::clock_test_utils::FakeClock,
-        domain::{
-            models::{
-                UserId,
-                activity::ActivityId,
-                search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
-                training::TrainingNoteId,
-            },
-            ports::search::SearchResult,
-        },
-    };
 
-    const DOCUMENT_ID: &str = "activity-1";
-
-    fn test_clock() -> FakeClock {
-        FakeClock::new(
-            chrono::DateTime::parse_from_rfc3339("2024-03-15T12:00:00Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-        )
+    #[test]
+    fn empty_and_whitespace_only_input_normalize_to_empty() {
+        assert_eq!(normalize_for_search(""), "");
+        assert_eq!(normalize_for_search("   "), "");
+        assert_eq!(normalize_for_search("\t\r\n "), "");
     }
 
-    fn test_document(event: SearchDocumentEvent) -> SearchDocument {
-        test_document_with_content(event, "Test document content")
+    #[test]
+    fn trims_surrounding_whitespace() {
+        assert_eq!(normalize_for_search("  Hello  "), "Hello");
+        assert_eq!(normalize_for_search("\n\t World \r\n"), "World");
     }
 
-    fn test_document_with_content(event: SearchDocumentEvent, content: &str) -> SearchDocument {
-        SearchDocument::new(
-            SearchDocumentType::Activity,
-            DOCUMENT_ID.to_string(),
-            UserId::test_default(),
-            event,
-            content.to_string(),
-            chrono::DateTime::parse_from_rfc3339("2024-03-15T10:00:00Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-        )
+    #[test]
+    fn preserves_inner_whitespace() {
+        assert_eq!(normalize_for_search("  a   b  "), "a   b");
     }
 
-    async fn fetch_document_row(
-        repo: &SearchRepository<FakeClock>,
-    ) -> Option<(String, String, String, String)> {
-        sqlx::query_as::<_, (String, String, String, String)>(
-            "SELECT content, type, document_id, user FROM t_search WHERE document_id = ?1;",
-        )
-        .bind(DOCUMENT_ID)
-        .fetch_optional(&repo.readers)
-        .await
-        .expect("querying t_search should succeed")
+    #[test]
+    fn strips_diacritics_from_precomposed_input() {
+        assert_eq!(normalize_for_search("Café"), "Cafe");
+        assert_eq!(normalize_for_search("Crème brûlée"), "Creme brulee");
+        assert_eq!(normalize_for_search("Déjà vu"), "Deja vu");
     }
 
-    async fn fetch_document_rows(
-        repo: &SearchRepository<FakeClock>,
-    ) -> Vec<(String, String, String, String)> {
-        sqlx::query_as::<_, (String, String, String, String)>(
-            "SELECT content, type, document_id, user FROM t_search WHERE document_id = ?1;",
-        )
-        .bind(DOCUMENT_ID)
-        .fetch_all(&repo.readers)
-        .await
-        .expect("querying t_search should succeed")
+    #[test]
+    fn strips_diacritics_from_already_decomposed_input() {
+        // "e\u{301}" (e + combining acute) is the NFD form of "é"; both must normalize the same.
+        assert_eq!(normalize_for_search("e\u{0301}"), "e");
+        assert_eq!(normalize_for_search("e\u{0301}"), normalize_for_search("é"));
+        // "ế" decomposes as e + combining circumflex + combining acute.
+        assert_eq!(normalize_for_search("ế"), "e");
+        // "Å" decomposes as A + combining ring above.
+        assert_eq!(normalize_for_search("A\u{030A}"), "A");
+        assert_eq!(normalize_for_search("Ångström"), "Angstrom");
     }
+
+    #[test]
+    fn preserves_letter_case() {
+        assert_eq!(normalize_for_search("Éléphant"), "Elephant");
+        assert_eq!(normalize_for_search("Über"), "Uber");
+    }
+
+    #[test]
+    fn keeps_characters_without_decomposable_diacritics() {
+        // ß and ø have no canonical decomposition, so they survive NFD untouched.
+        assert_eq!(normalize_for_search("Straße"), "Straße");
+        assert_eq!(normalize_for_search("øre"), "øre");
+        // Scripts without marks are passed through unchanged.
+        assert_eq!(normalize_for_search("中文"), "中文");
+        assert_eq!(normalize_for_search("Привет"), "Привет");
+    }
+
+    #[test]
+    fn preserves_digits_and_punctuation() {
+        assert_eq!(
+            normalize_for_search("  Hello, world! #123.  "),
+            "Hello, world! #123."
+        );
+    }
+
+    #[test]
+    fn handles_mark_only_and_leading_marks() {
+        assert_eq!(normalize_for_search("\u{0301}"), "");
+        assert_eq!(normalize_for_search("\u{0301}a\u{0301}"), "a");
+    }
+
+    #[test]
+    fn normalization_is_idempotent() {
+        let samples = ["Café déjà vu", "  Ångström  ", "Straße", "中文"];
+        for sample in samples {
+            let once = normalize_for_search(sample);
+            assert_eq!(normalize_for_search(&once), once, "{sample:?}");
+        }
+    }
+
+    #[test]
+    fn non_empty_tokens_is_false_when_no_token_reaches_min_length() {
+        assert!(!non_empty_tokens(""));
+        assert!(!non_empty_tokens("   "));
+        assert!(!non_empty_tokens("a"));
+        assert!(!non_empty_tokens("ab"));
+        assert!(!non_empty_tokens("lo"));
+        assert!(!non_empty_tokens("ab cd"));
+        // Characters are counted, not bytes: 中文 is 2 chars but 6 bytes.
+        assert!(!non_empty_tokens("中文"));
+    }
+
+    #[test]
+    fn non_empty_tokens_is_true_when_a_token_reaches_min_length() {
+        // Exactly TOKENIZER_TOKEN_MIN_LEN characters is the smallest matchable token.
+        assert!(non_empty_tokens("abc"));
+        assert!(non_empty_tokens("ride"));
+        // A single long token is enough, the shorter ones are simply dropped.
+        assert!(non_empty_tokens("ab ride"));
+        assert!(non_empty_tokens("long   ride"));
+        assert!(non_empty_tokens("Привет"));
+    }
+}
+
+#[cfg(test)]
+mod test_search_prepare_query {
+    use super::*;
 
     #[test]
     fn to_fts5_query_wraps_single_term_in_quotes() {
@@ -338,6 +402,76 @@ mod tests {
             to_fts5_query("NEAR(ride tempo)"),
             "\"NEAR(ride\" AND \"tempo)\""
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_sqlite_search_repository {
+    use tempfile::NamedTempFile;
+
+    use super::*;
+    use crate::{
+        clock::clock_test_utils::FakeClock,
+        domain::{
+            models::{
+                UserId,
+                activity::ActivityId,
+                search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
+                training::TrainingNoteId,
+            },
+            ports::search::SearchResult,
+        },
+    };
+
+    const DOCUMENT_ID: &str = "activity-1";
+
+    fn test_clock() -> FakeClock {
+        FakeClock::new(
+            chrono::DateTime::parse_from_rfc3339("2024-03-15T12:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        )
+    }
+
+    fn test_document(event: SearchDocumentEvent) -> SearchDocument {
+        test_document_with_content(event, "Test document content")
+    }
+
+    fn test_document_with_content(event: SearchDocumentEvent, content: &str) -> SearchDocument {
+        SearchDocument::new(
+            SearchDocumentType::Activity,
+            DOCUMENT_ID.to_string(),
+            UserId::test_default(),
+            event,
+            content.to_string(),
+            chrono::DateTime::parse_from_rfc3339("2024-03-15T10:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        )
+    }
+
+    async fn fetch_document_row(
+        repo: &SearchRepository<FakeClock>,
+    ) -> Option<(String, String, String, String)> {
+        sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT content, type, document_id, user FROM t_search WHERE document_id = ?1;",
+        )
+        .bind(DOCUMENT_ID)
+        .fetch_optional(&repo.readers)
+        .await
+        .expect("querying t_search should succeed")
+    }
+
+    async fn fetch_document_rows(
+        repo: &SearchRepository<FakeClock>,
+    ) -> Vec<(String, String, String, String)> {
+        sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT content, type, document_id, user FROM t_search WHERE document_id = ?1;",
+        )
+        .bind(DOCUMENT_ID)
+        .fetch_all(&repo.readers)
+        .await
+        .expect("querying t_search should succeed")
     }
 
     #[tokio::test]
@@ -420,6 +554,97 @@ mod tests {
                 DOCUMENT_ID.to_string(),
                 "test_user".to_string(),
             )]
+        );
+    }
+
+    #[tokio::test]
+    async fn save_document_updated_skips_insert_when_content_has_no_indexable_token() {
+        // "ab cd" only has 2-char tokens, "éé à" normalizes to "ee a", and
+        // whitespace normalizes to empty: none can ever match a trigram search.
+        for content in ["ab cd", "   ", "éé à"] {
+            let db_file = NamedTempFile::new().unwrap();
+            let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+                .await
+                .expect("Failed to create test repository");
+
+            repo.save_document(&test_document_with_content(
+                SearchDocumentEvent::Updated,
+                content,
+            ))
+            .await
+            .expect("save_document should succeed");
+
+            assert!(
+                fetch_document_row(&repo).await.is_none(),
+                "expected no row to be indexed for {content:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn save_document_updated_indexes_content_with_at_least_one_long_token() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+            .await
+            .expect("Failed to create test repository");
+
+        // Short tokens are dropped for matching, but the document still holds a
+        // searchable "ride" token, so the whole normalized content is stored.
+        repo.save_document(&test_document_with_content(
+            SearchDocumentEvent::Updated,
+            "ab ride",
+        ))
+        .await
+        .expect("save_document should succeed");
+
+        assert_eq!(
+            fetch_document_row(&repo).await.expect("row should exist"),
+            (
+                "ab ride".to_string(),
+                "activity".to_string(),
+                DOCUMENT_ID.to_string(),
+                "test_user".to_string(),
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn save_document_updated_removes_row_when_content_becomes_unindexable() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repo = SearchRepository::new(&db_file.path().to_string_lossy(), test_clock())
+            .await
+            .expect("Failed to create test repository");
+        let user = UserId::test_default();
+
+        repo.save_document(&test_document_with_content(
+            SearchDocumentEvent::Updated,
+            "long ride",
+        ))
+        .await
+        .expect("first save should succeed");
+
+        assert_eq!(
+            repo.search(&user, "ride".to_string())
+                .await
+                .expect("search should succeed"),
+            vec![SearchResult::Activity(ActivityId::from(DOCUMENT_ID))]
+        );
+
+        // The delete always runs first, so re-saving with unindexable content
+        // removes the previously indexed row instead of leaving it stale.
+        repo.save_document(&test_document_with_content(
+            SearchDocumentEvent::Updated,
+            "ab cd",
+        ))
+        .await
+        .expect("second save should succeed");
+
+        assert!(fetch_document_row(&repo).await.is_none());
+        assert!(
+            repo.search(&user, "ride".to_string())
+                .await
+                .expect("search should succeed")
+                .is_empty()
         );
     }
 
