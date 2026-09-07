@@ -8,6 +8,7 @@
 	import { emptyFilters } from '$lib/filters';
 	import { resolve } from '$app/paths';
 	import SportIcon from './SportIcon.svelte';
+	import { Minus, Plus } from '@lucide/svelte';
 
 	let {
 		activities,
@@ -74,8 +75,10 @@
 				class="btn mr-1 shrink-0 btn-secondary btn-xs"
 				onclick={() => {
 					removeActivity(activity);
-				}}>-</button
+				}}
 			>
+				<Minus class="size-3" />
+			</button>
 			<div class="shrink-0">
 				<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
 					{activity.name || activity.sport}
@@ -121,11 +124,13 @@
 						<SportIcon sport={activity.sport_category} class="size-6" />
 					</div>
 					<button
-						class="btn mr-1 shrink-0 btn-primary btn-xs"
+						class="btn mr-1 shrink-0 btn-secondary btn-xs"
 						onclick={() => {
 							selectActivity(activity);
-						}}>+</button
+						}}
 					>
+						<Plus class="size-3" />
+					</button>
 					<div class="shrink-0">
 						<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
 							{activity.name || activity.sport}
