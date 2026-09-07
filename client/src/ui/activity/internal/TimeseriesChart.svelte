@@ -2,7 +2,7 @@
 	import * as d3 from 'd3';
 	import { formatDuration } from '$lib/duration';
 	import TimeseriesLine, { type LineOrder } from './TimeseriesLine.svelte';
-	import { formatMetricValue, matchMetric, textColors } from '$lib/colors';
+	import { formatMetricValue, matchMetric, metricClass } from '$lib/colors';
 	import { untrack } from 'svelte';
 	import type { ActivityWithTimeseries } from '$lib/api';
 	import { RulerDimensionLine, Timer, Undo } from '@lucide/svelte';
@@ -294,9 +294,10 @@
 		</span>
 	{/if}
 	{#each nearestValues.values as value (value.metric)}
-		<span class={`px-1.5 ${textColors[value.metric]}`}>
-			{value.metric}: {formatMetricValue(value.value, value.metric)}
-			{value.unit}
+		{@const { value: fmtValue, unit } = formatMetricValue(value.value, value.metric, value.unit)}
+		<span class={`px-1.5 legend-${metricClass[value.metric]}`}>
+			{value.metric}: {fmtValue}
+			{unit}
 		</span>
 	{/each}
 </div>
@@ -395,3 +396,21 @@
 		{/if}
 	</div>
 {/if}
+
+<style>
+	.legend-heart-rate {
+		color: var(--color-heart-rate-chart);
+	}
+	.legend-speed {
+		color: var(--color-speed-chart);
+	}
+	.legend-power {
+		color: var(--color-power-chart);
+	}
+	.legend-elevation {
+		color: var(--color-elevation-chart);
+	}
+	.legend-cadence {
+		color: var(--color-cadence-chart);
+	}
+</style>

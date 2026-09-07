@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { strokeColors, textColors, type Metric } from '$lib/colors';
+	import { metricClass, type Metric } from '$lib/colors';
 	import * as d3 from 'd3';
 
 	export type LineOrder = 'first' | 'second' | 'third';
@@ -71,11 +71,45 @@
 	});
 </script>
 
-<g bind:this={gy} transform={axisTranslate} class={textColors[metric]} fill={null} />
+<g bind:this={gy} transform={axisTranslate} class={`axis-${metricClass[metric]}`} fill={null} />
 <path
 	bind:this={path}
 	clip-path="url(#clip-path)"
 	fill="none"
-	class={strokeColors[metric]}
+	class={metricClass[metric]}
 	stroke-width="1.5"
 />
+
+<style>
+	path.heart-rate {
+		stroke: var(--color-heart-rate-chart);
+	}
+	path.power {
+		stroke: var(--color-power-chart);
+	}
+	path.speed {
+		stroke: var(--color-speed-chart);
+	}
+	path.elevation {
+		stroke: var(--color-elevation-chart);
+	}
+	path.cadence {
+		stroke: var(--color-cadence-chart);
+	}
+
+	.axis-heart-rate {
+		color: var(--color-heart-rate-chart);
+	}
+	.axis-speed {
+		color: var(--color-speed-chart);
+	}
+	.axis-power {
+		color: var(--color-power-chart);
+	}
+	.axis-elevation {
+		color: var(--color-elevation-chart);
+	}
+	.axis-cadence {
+		color: var(--color-cadence-chart);
+	}
+</style>

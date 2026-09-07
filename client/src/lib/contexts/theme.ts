@@ -12,6 +12,16 @@ export interface Theme {
 export const [getTheme, setTheme] = createContext<Theme>();
 
 export const loadTheme = (): Theme => {
+	const theme = _loadTheme();
+
+	if (window !== undefined) {
+		document.documentElement.setAttribute('data-theme', themeName(theme.variant));
+	}
+
+	return theme;
+};
+
+export const _loadTheme = (): Theme => {
 	if (!browser) {
 		return { variant: 'light' };
 	}
