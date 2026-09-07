@@ -5,6 +5,7 @@
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
+	import { formatTooltipValue } from './chart';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number>>;
@@ -238,13 +239,17 @@
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
+	let averageLegend = $derived(
+		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
+	);
 
 	let targetLineY = $derived(map(target, (t) => y(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(map(target, (t) => `Target = ${formatTooltipValue(t)}`));
+	let targetLegend = $derived(
+		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
+	);
 
 	const colors = $derived.by(() => {
 		const scale = d3.scaleOrdinal(d3.schemeObservable10);
@@ -282,20 +287,6 @@
 		value: 0,
 		total: 0
 	});
-
-	// Format tooltip value based on format type
-	const formatTooltipValue = (value: number): string => {
-		if (format === 'duration') {
-			return formatDurationCompactWithUnits(value);
-		}
-		if (unit === 'activities') {
-			return `${Math.round(value)} ${unit}`;
-		}
-		if (format === 'pace') {
-			return `${paceInSecondToString(value)} /km`;
-		}
-		return `${value.toFixed(0)} ${unit}`;
-	};
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -532,13 +523,13 @@
 									<span>{tooltip.group}</span>
 									<span>•</span>
 								{/if}
-								<span>{formatTooltipValue(tooltip.value)}</span>
+								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>
 							</div>
 							{#if showGroup && tooltip.total !== tooltip.value && stacked}
 								<div class="text-xs opacity-60">
 									<span>Total</span>
 									<span>•</span>
-									<span>{formatTooltipValue(tooltip.total)}</span>
+									<span>{formatTooltipValue(tooltip.total, format, unit)}</span>
 								</div>
 							{/if}
 						</div>

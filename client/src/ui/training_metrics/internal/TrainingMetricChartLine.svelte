@@ -4,6 +4,7 @@
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { formatTooltipValue } from './chart';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number>>;
@@ -152,13 +153,17 @@
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(map(average, (avg) => `Average = ${formatTooltipValue(avg)}`));
+	let averageLegend = $derived(
+		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
+	);
 
 	let targetLineY = $derived(map(target, (t) => y(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(map(target, (t) => `Target = ${formatTooltipValue(t)}`));
+	let targetLegend = $derived(
+		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
+	);
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -176,20 +181,6 @@
 		time: 0,
 		value: 0
 	});
-
-	// Format tooltip value based on format type
-	const formatTooltipValue = (value: number): string => {
-		if (format === 'duration') {
-			return formatDurationCompactWithUnits(value);
-		}
-		if (unit === 'activities') {
-			return `${Math.round(value)} ${unit}`;
-		}
-		if (format === 'pace') {
-			return `${paceInSecondToString(value)} /km`;
-		}
-		return `${value.toFixed(1)} ${unit}`;
-	};
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -380,7 +371,7 @@
 							<div class="font-semibold">{dayjs.unix(tooltip.time.valueOf()).format('MMM D')}</div>
 							<div class="font-italic text-xs">{dayjs.unix(tooltip.time).format('H[h]mm')}</div>
 							<div class="text-xs opacity-80">
-								<span>{formatTooltipValue(tooltip.value)}</span>
+								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>
 							</div>
 						</div>
 					</div>
