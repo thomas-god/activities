@@ -126,7 +126,7 @@
 
 <button
 	onclick={() => dialogElement.showModal()}
-	class={`btn ${hasActiveFilters ? 'btn-soft btn-info' : 'btn'} join-item btn-sm`}
+	class={`btn ${hasActiveFilters ? 'btn-accent' : 'btn'} join-item rounded btn-sm`}
 >
 	<Funnel class="size-5" />
 	{#if showLabel}
@@ -161,7 +161,7 @@
 						<div class="flex flex-wrap gap-2">
 							{#each availableSportCategories as category (category)}
 								<button
-									class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-primary' : 'btn-ghost'}`}
+									class={`btn btn-sm ${filters.sportCategories.includes(category) ? 'btn-secondary' : ''}`}
 									onclick={() => toggleSportCategory(category)}
 								>
 									<SportIcon sport={category} class="size-6" />
@@ -178,7 +178,7 @@
 					<div class="flex flex-wrap gap-2">
 						{#each WORKOUT_TYPE_LABELS as { value, label } (label)}
 							<button
-								class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : 'btn-ghost'}`}
+								class={`btn btn-sm ${filters.workoutTypes.includes(value) ? getWorkoutTypeColor(value) : ''}`}
 								onclick={() => toggleWorkoutType(value)}
 							>
 								{label}
@@ -189,11 +189,11 @@
 
 				<!-- RPE Filter -->
 				<div>
-					<div class="mb-2 text-sm font-medium">RPE (Rate of Perceived Exertion)</div>
+					<div class="">RPE (Rate of Perceived Exertion)</div>
 					<div class="flex flex-wrap gap-2">
 						{#each RPE_VALUES as rpe (rpe)}
 							<button
-								class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : 'btn-ghost'}`}
+								class={`btn btn-sm ${filters.rpe.includes(rpe) ? getRpeColor(rpe) : ''}`}
 								onclick={() => toggleRpe(rpe)}
 							>
 								{rpe}
@@ -331,7 +331,7 @@
 				{#if hasActiveFilters}
 					<div>
 						<button
-							class="btn btn-sm"
+							class="btn btn-error btn-sm"
 							onclick={(e) => {
 								e.preventDefault();
 								clearFilters();
