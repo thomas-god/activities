@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import { X } from '@lucide/svelte';
 
 	let {
 		name: initialName,
@@ -29,26 +30,31 @@
 </script>
 
 {#if editMode}
-	<div class="flex flex-col gap-2">
-		<div class="text-sm font-medium">Activity Name</div>
+	<div class="join mt-3">
 		<!-- svelte-ignore a11y_autofocus -->
 		<input
 			type="text"
-			class="input-bordered input input-sm"
+			class="input-bordered input join-item input-sm"
 			autofocus
 			bind:value={editingValue}
 			placeholder="Leave empty to use sport name"
+			onkeydown={(e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					handleSave();
+				}
+			}}
 		/>
-		<div class="flex gap-2">
-			<SaveButton callback={handleSave} text="Save" />
-			<button class="btn btn-ghost btn-sm" onclick={handleCancel}>Cancel</button>
-		</div>
+		<SaveButton callback={handleSave} class="join-item" />
+		<button class="btn join-item btn-sm" onclick={handleCancel}>
+			<X class="size-4" />
+		</button>
 	</div>
 {:else}
-	<div class="flex flex-row items-center">
+	<div class="flex flex-row items-center gap-0.5">
 		<span class="pr-0.5">
 			{displayName}
+			<EditButton callback={startEditing} />
 		</span>
-		<EditButton callback={startEditing} />
 	</div>
 {/if}

@@ -257,20 +257,20 @@
 					</div>
 				{:then selectedActivity}
 					{#if selectedActivity}
-						<div class="absolute right-3 join">
+						<div class="absolute -top-1.5 right-3 join">
 							<button
 								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
-								class="btn join-item btn-sm"
+								class="btn join-item btn-xs"
 							>
-								<Maximize2 class="size-4" />
+								<Maximize2 class="size-3.5" />
 							</button>
 							<button
 								onclick={() => {
 									handleActivitySelected(null);
 								}}
-								class="btn join-item btn-sm"
+								class="btn join-item btn-xs"
 							>
-								<X class="size-4" />
+								<X class="size-3.5" />
 							</button>
 						</div>
 						<ActivityDetails

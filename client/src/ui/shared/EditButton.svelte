@@ -4,10 +4,13 @@
 	let {
 		callback,
 		text = '',
-		size = 'small'
-	}: { callback: () => void; text?: string; size?: 'small' | 'normal' } = $props();
+		size = 'small',
+		class: extraClass = ''
+	}: { callback: () => void; text?: string; size?: 'small' | 'normal'; class?: string } = $props();
+
+	let actualClass = $derived(
+		`btn btn-circle btn-ghost ${size === 'small' ? 'btn-xs' : ''} ${extraClass}`
+	);
 </script>
 
-<button class={`btn btn-ghost ${size === 'small' ? 'btn-xs' : ''}`} onclick={callback}>
-	<Pencil class="size-4" />{text}</button
->
+<button class={actualClass} onclick={callback}> <Pencil class="size-3.5 " />{text}</button>
