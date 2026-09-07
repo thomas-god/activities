@@ -282,28 +282,23 @@ def update_activity(
     feedback: str | None = None,
 ) -> bool:
     """Update activity metadata using PATCH endpoint."""
-    # Build query parameters
-    params = {}
+    body = {}
     if name is not None:
-        params["name"] = name
+        body["name"] = name
     if rpe is not None:
-        params["rpe"] = rpe
+        body["rpe"] = rpe
     if workout_type is not None:
-        params["workout_type"] = workout_type
+        body["workout_type"] = workout_type
     if bonk_status is not None:
-        params["bonk_status"] = bonk_status
+        body["bonk_status"] = bonk_status
     if nutrition_details is not None:
-        params["nutrition_details"] = nutrition_details
-
-    # Build request body for feedback
-    body = None
+        body["nutrition_details"] = nutrition_details
     if feedback is not None:
-        body = {"feedback": feedback}
+        body["feedback"] =  feedback
 
     # Make PATCH request
     response = requests.patch(
         f"{API_URL}/activity/{activity_id}",
-        params=params,
         json=body if body else None,
         headers={"Content-Type": "application/json"} if body else None,
     )
