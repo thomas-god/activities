@@ -30,7 +30,7 @@ describe('WorkoutTypeFilterV2', () => {
 		expect(screen.getByText('Workout types: Easy, Tempo')).toBeTruthy();
 		expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		const tempoCheckbox = screen.getByLabelText('Tempo');
 		expect(tempoCheckbox).toBeTruthy();
@@ -48,7 +48,7 @@ describe('WorkoutTypeFilterV2', () => {
 			props: { workoutTypes: some<WorkoutType[]>(['race']) }
 		});
 
-		await user.click(screen.getByRole('button', { name: 'Bin delete icon' }));
+		await user.click(screen.getByTestId('delete'));
 
 		expect(container.childElementCount).toBe(0);
 		expect(screen.queryByText(/Workout types:/)).toBeNull();

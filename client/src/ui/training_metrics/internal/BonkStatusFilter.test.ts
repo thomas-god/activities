@@ -30,7 +30,7 @@ describe('BonkStatusFilterV2', () => {
 		expect(screen.getByText('Bonk status: No bonk')).toBeTruthy();
 		expect(screen.queryAllByRole('radio')).toHaveLength(0);
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		const bonkedRadio = screen.getByLabelText('Bonked');
 		expect(screen.getByLabelText('No bonk')).toBeChecked();
@@ -48,7 +48,7 @@ describe('BonkStatusFilterV2', () => {
 			props: { bonkStatus: some<BonkStatus>('bonked') as Option<BonkStatus> }
 		});
 
-		await user.click(screen.getByRole('button', { name: 'Bin delete icon' }));
+		await user.click(screen.getByTestId('delete'));
 
 		expect(container.childElementCount).toBe(0);
 		expect(screen.queryByText(/Bonk status:/)).toBeNull();

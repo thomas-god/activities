@@ -29,10 +29,18 @@
 				Workout types: {workoutTypes.value.toSorted().map(workoutTypeDisplay).join(', ')}
 			</div>
 			<div class="join shrink-0">
-				<button class="btn join-item btn-xs" onclick={() => (editing = !editing)}>
+				<button
+					class="btn join-item btn-xs"
+					onclick={() => (editing = !editing)}
+					data-testid="edit"
+				>
 					<Pencil class="size-4" />
 				</button>
-				<button class="btn join-item btn-xs" onclick={() => (workoutTypes = none())}>
+				<button
+					class="btn join-item btn-xs"
+					onclick={() => (workoutTypes = none())}
+					data-testid="delete"
+				>
 					<Trash2 class="size-4" />
 				</button>
 			</div>

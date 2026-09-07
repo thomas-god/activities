@@ -30,7 +30,7 @@ describe('RpeFilterV2', () => {
 		expect(screen.getByText('RPEs: 3, 8')).toBeTruthy();
 		expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		const threeCheckbox = screen.getByLabelText('3');
 		expect(threeCheckbox).toBeChecked();
@@ -47,7 +47,7 @@ describe('RpeFilterV2', () => {
 			props: { rpes: some<RPEValue[]>([5]) as Option<RPEValue[]> }
 		});
 
-		await user.click(screen.getByRole('button', { name: 'Bin delete icon' }));
+		await user.click(screen.getByTestId('delete'));
 
 		expect(container.childElementCount).toBe(0);
 		expect(screen.queryByText(/RPEs:/)).toBeNull();

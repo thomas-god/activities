@@ -39,7 +39,7 @@ describe('SportFilterV2', () => {
 
 		expect(getSummaryText(container)).toBe('Sports: Running');
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		const runningCheckbox = screen.getByLabelText('Running');
 		expect(runningCheckbox).toBeChecked();
@@ -62,7 +62,7 @@ describe('SportFilterV2', () => {
 
 		expect(getSummaryText(container)).toBe('Sports: Yoga');
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		const cardioSection = screen.getByText('Gym & Fitness sports').closest('div');
 		const categoryCheckbox = cardioSection?.querySelector(
@@ -98,7 +98,7 @@ describe('SportFilterV2', () => {
 
 		expect(getSummaryText(container)).toBe('Sports: Running, Gym & Fitness');
 
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 
 		expect(screen.getByText('Gym & Fitness sports')).toBeInTheDocument();
 		expect(screen.getByText('Running sports')).toBeInTheDocument();
@@ -120,8 +120,7 @@ describe('SportFilterV2', () => {
 		});
 
 		expect(getSummaryText(container)).toBe('Sports: Gym & Fitness');
-
-		await user.click(screen.getByRole('button', { name: 'Pen editing icon' }));
+		await user.click(screen.getByTestId('edit'));
 		await user.click(screen.getByLabelText('Yoga'));
 
 		expect(getSummaryText(container)).toBe(
@@ -142,7 +141,7 @@ describe('SportFilterV2', () => {
 
 		expect(getSummaryText(container)).toBe('Sports: Running, Gym & Fitness');
 
-		await user.click(screen.getByRole('button', { name: 'Bin delete icon' }));
+		await user.click(screen.getByTestId('delete'));
 
 		expect(container.childElementCount).toBe(0);
 		expect(screen.queryByText(/Sports:/)).toBeNull();
