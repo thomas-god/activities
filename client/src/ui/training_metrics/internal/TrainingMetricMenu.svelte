@@ -6,7 +6,7 @@
 	import type { TrainingMetric } from '$lib/api';
 	import { none } from '$lib/Options';
 	import { resolve } from '$app/paths';
-	import { Menu, Pencil, Trash2 } from '@lucide/svelte';
+	import { Pencil, Settings, Trash2 } from '@lucide/svelte';
 
 	let {
 		metric,
@@ -40,8 +40,8 @@
 </script>
 
 <div class="dropdown dropdown-end">
-	<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Metric options">
-		<Menu class="size-5" />
+	<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="Metric options">
+		<Settings class="size-3.5" />
 	</button>
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<ul tabindex="0" class="menu dropdown-content z-1 w-40 rounded-box bg-base-100 p-2 shadow">

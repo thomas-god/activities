@@ -5,7 +5,7 @@
 	import type { Activity } from '$lib/api/activities';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ArrowDownToLine, GitCompareArrows, Menu, Trash2 } from '@lucide/svelte';
+	import { ArrowDownToLine, GitCompareArrows, Settings, Trash2 } from '@lucide/svelte';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
 
 	interface Props {
@@ -60,8 +60,8 @@
 			{sportDisplay(activity.sport)}
 
 			<div class="dropdown dropdown-end ml-0.5">
-				<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="More options">
-					<Menu class="size-5" />
+				<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="More options">
+					<Settings class="size-3.5" />
 				</button>
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<ul tabindex="0" class="menu dropdown-content z-1 w-40 rounded-box bg-base-100 p-2 shadow">

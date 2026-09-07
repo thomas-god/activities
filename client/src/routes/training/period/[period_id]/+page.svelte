@@ -46,10 +46,10 @@
 		Import,
 		ListSortDescending,
 		Maximize2,
-		Menu,
 		NotebookPen,
 		Pencil,
 		Plus,
+		Settings,
 		Trash2,
 		X
 	} from '@lucide/svelte';
@@ -367,8 +367,8 @@
 							{/if}
 							<!-- Action menu dropdown (always inline) -->
 							<div class="dropdown dropdown-end">
-								<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="Options">
-									<Menu class="size-5" />
+								<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="Options">
+									<Settings class="size-3.5" />
 								</button>
 								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 								<ul

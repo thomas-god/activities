@@ -85,7 +85,7 @@
 		<ThemeToggle {theme} onToggle={toggleTheme} class="hidden min-[850px]:flex" />
 
 		<div class="dropdown dropdown-end min-[850px]:hidden">
-			<button tabindex="0" class="btn btn-outline btn-primary btn-sm" aria-label="Quick actions">
+			<button tabindex="0" class="btn btn-ghost btn-primary btn-sm" aria-label="Quick actions">
 				<Menu class="size-5" />
 			</button>
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->

@@ -2,7 +2,7 @@
 	import { dayjs, formatRelativeDuration } from '$lib/duration';
 	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
 	import DeleteModal from '$ui/shared/DeleteModal.svelte';
-	import { Menu, NotebookPen, Pencil, Trash2 } from '@lucide/svelte';
+	import { NotebookPen, Pencil, Settings, Trash2 } from '@lucide/svelte';
 
 	let {
 		note,
@@ -70,8 +70,8 @@
 					)}
 				</div>
 				<div class="dropdown dropdown-end">
-					<button tabindex="0" class="btn px-0.5 btn-xs" aria-label="More options">
-						<Menu class="size-4" />
+					<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="More options">
+						<Settings class="size-3.5" />
 					</button>
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 					<ul
