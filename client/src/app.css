@@ -6,7 +6,7 @@
 }
 
 @theme {
-	/* Custome breakpoint */
+	/* Custom breakpoints */
 	--breakpoint-xs: 30rem;
 
 	/* Metrics colors */
@@ -16,13 +16,19 @@
 	--color-elevation-chart: #032b43;
 	--color-cadence-chart: #754f2f;
 
-	/* Sport categories colors */
+	/* Sport categories and training note colors */
 	--color-cycling: #4299e1;
 	--color-cycling-background: color-mix(in oklab, var(--color-cycling) 15%, var(--color-base-100));
 	--color-running: #48bb78;
 	--color-running-background: color-mix(in oklab, var(--color-running) 15%, var(--color-base-100));
 	--color-other: #ed8936;
 	--color-other-background: color-mix(in oklab, var(--color-other) 15%, var(--color-base-100));
+	--color-training-note: #ff6368;
+	--color-training-note-background: color-mix(
+		in oklab,
+		var(--color-training-note) 15%,
+		var(--color-base-100)
+	);
 
 	/* RPE categories colors */
 	--color-rpe-easy: #bfdbfe; /* blue-200 */

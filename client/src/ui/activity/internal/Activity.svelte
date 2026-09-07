@@ -5,7 +5,6 @@
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
 	import { getRpeClass } from '$lib/rpe';
 	import { resolve } from '$app/paths';
-	import { NotebookPen } from '@lucide/svelte';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
 
 	let {
@@ -141,9 +140,6 @@
 					p-2
 					text-sm whitespace-pre-wrap text-base-content/70 italic`}
 				>
-					<div class="shrink-0">
-						<NotebookPen class="size-5" />
-					</div>
 					<div>
 						{activity.feedback}
 					</div>

@@ -98,9 +98,6 @@
 	<div
 		class="mx-1 my-1 box-border flex flex-row gap-1 rounded-xl bg-base-300/60 py-2 pl-2 text-sm whitespace-pre-wrap text-base-content/70 italic"
 	>
-		<div class="shrink-0">
-			<NotebookPen class="size-5" />
-		</div>
 		<div>
 			{note.content}
 		</div>
@@ -171,7 +168,7 @@
 		box-sizing: border-box;
 		border-left: 4px solid transparent;
 		border-radius: 0px;
-		border-color: var(--color-orange-300);
+		border-color: var(--color-training-note);
 	}
 
 	.icon {
@@ -184,6 +181,7 @@
 		margin-right: 16px;
 		font-size: 20px;
 		flex-shrink: 0;
-		background-color: color-mix(in oklab, var(--color-orange-200) 60%, transparent);
+		color: var(--color-training-note);
+		background-color: color-mix(in oklab, var(--color-training-note-background) 60%, transparent);
 	}
 </style>

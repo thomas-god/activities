@@ -3,7 +3,7 @@
 	import { dayjs } from '$lib/duration';
 	import { getSportCategory, SportCategories, type Sport, type SportCategory } from '$lib/sport';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
-	import { CalendarFold } from '@lucide/svelte';
+	import { CalendarRange } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	let {
@@ -40,7 +40,7 @@
 
 <a href={resolve(`/training/period/${period.id}`)} class="item flex flex-1 items-center py-1">
 	<div class="icon">
-		<CalendarFold class="size-6" />
+		<CalendarRange class="size-8 stroke-1" />
 	</div>
 	<div class="flex-1">
 		<div class="flex flex-col">
@@ -53,7 +53,7 @@
 				</div>
 				<div class="flex flex-row items-center gap-2">
 					{#each sports as sport (sport)}
-						<SportIcon {sport} class="size-5" />
+						<SportIcon {sport} class="size-4.5" />
 					{:else}
 						<div class="text-sm italic opacity-70">All sports</div>
 					{/each}
