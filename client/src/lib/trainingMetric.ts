@@ -389,16 +389,18 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		source: 'default',
 		base: {
 			metric: 'Distance',
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' }
+			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			summary: { average: { include_zeros: false } }
 		}
 	},
 	{
 		key: 'default:weekly-active-duration',
-		label: 'Weekly active duration',
+		label: 'Weekly duration',
 		source: 'default',
 		base: {
 			metric: 'ActiveDuration',
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' }
+			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			summary: { average: { include_zeros: false } }
 		}
 	},
 	{
@@ -407,7 +409,19 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		source: 'default',
 		base: {
 			metric: 'Elevation',
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' }
+			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			summary: { average: { include_zeros: false } }
+		}
+	},
+
+	{
+		key: 'default:weekly-calories',
+		label: 'Weekly calories',
+		source: 'default',
+		base: {
+			metric: 'Calories',
+			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			summary: { average: { include_zeros: false } }
 		}
 	}
 ];
