@@ -331,295 +331,14 @@
 		</div>
 	{:then periodDetails}
 		{#if periodDetails !== null}
-			<div class="item period-title @container mt-5 rounded-box bg-base-100 p-4 shadow-md">
-				<!-- Top row: Icon and Title/Date/Actions -->
-				<div class="flex items-center gap-3">
-					<!-- Icon -->
-					<div class="text-2xl leading-none @lg:text-3xl">
-						<CalendarFold class="size-8 @lg:size-10" />
-					</div>
-
-					<!-- Title and date -->
-					<div class="flex-1">
-						<div class="text-lg font-semibold @lg:text-xl">{periodDetails.name}</div>
-						<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
-							<div class="opacity-70">
-								{dayjs(periodDetails.start).format('MMM D, YYYY')} · {periodDetails.end === null
-									? 'Ongoing'
-									: dayjs(periodDetails.end).format('MMM D, YYYY')}
-							</div>
-							{#if sportsByCategory(periodDetails.sports).length > 0}
-								<div class="flex items-center gap-1.5">
-									<span class="opacity-50">·</span>
-									{#each sportsByCategory(periodDetails.sports) as group (group.category)}
-										<div
-											class="tooltip tooltip-bottom text-base"
-											data-tip={group.showAll
-												? `${group.category} (all sub-sports)`
-												: `${group.category}: ${group.sports.join(', ')}`}
-										>
-											<SportIcon sport={group.category} class="size-5" />
-										</div>
-									{/each}
-								</div>
-							{:else}
-								<div class="opacity-50">· All sports</div>
-							{/if}
-							<!-- Action menu dropdown (always inline) -->
-							<div class="dropdown dropdown-end">
-								<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="Options">
-									<Settings class="size-3.5" />
-								</button>
-								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-								<ul
-									tabindex="0"
-									class="menu dropdown-content z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
-								>
-									<li class="w-full">
-										<button onclick={openEditModal}>
-											<Pencil class="size-5" />
-											Edit name
-										</button>
-									</li>
-									<li class="w-full">
-										<button onclick={openEditDatesModal}>
-											<CalendarFold class="size-5" />
-											Edit dates
-										</button>
-									</li>
-									<li class="w-full">
-										<button onclick={() => (showDeleteModal = true)} class="text-error">
-											<Trash2 class="size-6" />
-											Delete
-										</button>
-									</li>
-								</ul>
-							</div>
-						</div>
-						<div class="text-xs opacity-70">
-							{formatPeriodDuration(periodDetails.start, periodDetails.end)}
-						</div>
-					</div>
-				</div>
-
-				<!-- Period note section -->
-
-				<div class="my-4">
-					{#if periodDetails.note}
-						<div class="flex items-start gap-2">
-							<div class="flex-1 rounded bg-base-200 p-3">
-								<div class=" flex flex-row items-center italic">
-									<span class="pr-0.5 text-sm"> Period description </span>
-
-									<EditButton callback={openEditNoteModal} />
-								</div>
-								<div class="text-sm whitespace-pre-wrap">
-									{periodDetails.note}
-								</div>
-							</div>
-						</div>
-					{:else}
-						<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
-							<NotebookPen class="size-4" />
-							<span>Add period description</span>
-						</button>
-					{/if}
-				</div>
-
-				<div class="rounded bg-base-200 p-4">
-					<TrainingPeriodStatistics period={periodDetails} />
-				</div>
-			</div>
-
+			{@render periodDetailsSnippet(periodDetails)}
 			<div class="period_container">
-				{#if isSome(metricsPromise)}
-					{#await metricsPromise.value}
-						<div class="flex w-full flex-col items-center p-4 pt-6">
-							<div class="loading loading-bars"></div>
-						</div>
-					{:then metrics}
-						<div
-							class={`item metrics flex-col rounded-box bg-base-100 pb-3 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
-						>
-							{@render metricList(periodDetails, metrics)}
-						</div>
-						<dialog class="modal" bind:this={metricListDialog}>
-							<div class="modal-box w-full max-w-full">
-								{@render metricList(periodDetails, metrics)}
-							</div>
-							<form method="dialog" class="modal-backdrop">
-								<button>close</button>
-							</form>
-						</dialog>
-					{/await}
-				{/if}
-
-				<div
-					class={`activity-details rounded-box bg-base-100 pt-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
-				>
-					{#if selectedActivityPromise}
-						{#await selectedActivityPromise}
-							<div
-								class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md"
-							>
-								<span class="loading loading-lg loading-spinner"></span>
-							</div>
-						{:then selectedActivity}
-							{#if selectedActivity}
-								<div class="relative w-full">
-									<div class="absolute -top-1.5 right-3 join">
-										<button
-											onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
-											class="btn join-item btn-xs"
-										>
-											<Maximize2 class="size-3.5" />
-										</button>
-										<button
-											onclick={() => (selectedActivityId = null)}
-											class="btn join-item btn-xs"
-										>
-											<X class="size-3.5" />
-										</button>
-									</div>
-									<ActivityDetails
-										activity={selectedActivity}
-										onActivityUpdated={handleActivityUpdated}
-										onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
-										compact={true}
-									/>
-								</div>
-							{:else}
-								<div
-									class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-								>
-									Failed to load activity
-								</div>
-							{/if}
-						{:catch error}
-							<div
-								class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
-							>
-								Failed to load activity: {error.message}
-							</div>
-						{/await}
-					{/if}
-				</div>
-				{#if isSome(trainingNotesPromise)}
-					{#await Promise.all([trainingNotesPromise.value, fetchActivityListSummary(fetch)])}
-						<div class="flex w-full flex-col items-center p-4 pt-6">
-							<div class="loading loading-bars"></div>
-						</div>
-					{:then [notes, activityListFormat]}
-						<!-- Activities section -->
-						<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
-							<div class="mb-4 flex items-center justify-between">
-								<h2 class="text-lg font-semibold">Activities & Notes</h2>
-								<div class="flex flex-row items-center">
-									<ActivitiesFiltersComponent
-										{activities}
-										bind:filteredActivities
-										showLabel={false}
-										bind:filters={
-											() => filters,
-											(f) => {
-												handleFilterChange(f);
-											}
-										}
-									/>
-									<SearchField bind:searchResults />
-								</div>
-							</div>
-
-							<Timeline
-								activities={filteredActivities}
-								{notes}
-								{selectedActivityId}
-								{searchResults}
-								{selectActivityCallback}
-								endDate={periodDetails.end}
-								{activityListFormat}
-								noteChangedCallback={updateTrainingNotesPromise}
-								renderByChunk={false}
-							/>
-						</div>
-					{/await}
-				{/if}
+				{@render metricListSnippet(periodDetails)}
+				{@render activityDetailsSnippet()}
+				{@render timeline(periodDetails)}
 			</div>
 
-			<EditPeriodNameModal
-				bind:isOpen={showEditModal}
-				currentName={periodDetails.name}
-				onConfirm={(name) => handleUpdate(periodDetails.id, name)}
-			/>
-
-			<!-- Delete confirmation modal -->
-			<DeleteModal
-				bind:isOpen={showDeleteModal}
-				title="Delete Training Period"
-				description="Are you sure you want to delete this training period ? "
-				itemPreview={periodDetails.name}
-				onConfirm={() => handleDelete(periodDetails.id)}
-			/>
-
-			<EditPeriodDatesModal
-				bind:isOpen={showEditDatesModal}
-				currentStart={periodDetails.start}
-				currentEnd={periodDetails.end}
-				onConfirm={(start, end) => handleUpdateDates(periodDetails.id, start, end)}
-			/>
-
-			<EditPeriodNoteModal
-				bind:isOpen={showEditNoteModal}
-				currentNote={periodDetails.note}
-				onConfirm={(content) => handleUpdateNote(periodDetails.id, content)}
-			/>
-
-			<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
-				<div class="modal-box max-w-3xl">
-					<form method="dialog">
-						<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-					</form>
-					<TrainingMetricFormCreate
-						callback={() => {
-							newTrainingMetricDialog.close();
-							updateMetricsPromise();
-						}}
-						scope={{ kind: 'period', periodId: periodDetails.id }}
-						existingSportsConstraints={periodDetails.sports.sports.length === 0 &&
-						periodDetails.sports.categories.length === 0
-							? none() // All sports/categories, i.e. no constraints
-							: some(periodDetails.sports)}
-					/>
-				</div>
-				<form method="dialog" class="modal-backdrop">
-					<button>close</button>
-				</form>
-			</dialog>
-
-			<dialog
-				class="modal"
-				id="import-training-metric-dialog"
-				bind:this={importTrainingMetricDialog}
-			>
-				<div class="modal-box max-w-3xl">
-					<form method="dialog">
-						<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-					</form>
-					{#await getGlobalMetricsPromise}
-						<div class="loading"></div>
-					{:then globalMetrics}
-						<TrainingMetricImportForm
-							metrics={globalMetrics}
-							period_id={periodDetails.id}
-							metricCopiedCallback={updateMetricsPromise}
-							timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
-						/>
-					{/await}
-				</div>
-				<form method="dialog" class="modal-backdrop">
-					<button>close</button>
-				</form>
-			</dialog>
+			{@render modalsAndDialogSnippet(periodDetails)}
 		{:else}
 			<p class="pt-4 pl-4 text-sm tracking-wide italic opacity-80">
 				Error while loading training period's details. <a
@@ -632,6 +351,132 @@
 		{/if}
 	{/await}
 {/if}
+
+{#snippet periodDetailsSnippet(periodDetails: TrainingPeriodDetails)}
+	<div class="item period-title @container mt-5 rounded-box bg-base-100 p-4 shadow-md">
+		<!-- Top row: Icon and Title/Date/Actions -->
+		<div class="flex items-center gap-3">
+			<!-- Icon -->
+			<div class="text-2xl leading-none @lg:text-3xl">
+				<CalendarFold class="size-8 @lg:size-10" />
+			</div>
+
+			<!-- Title and date -->
+			<div class="flex-1">
+				<div class="text-lg font-semibold @lg:text-xl">{periodDetails.name}</div>
+				<div class="flex flex-wrap items-center gap-2 text-xs @lg:text-sm">
+					<div class="opacity-70">
+						{dayjs(periodDetails.start).format('MMM D, YYYY')} · {periodDetails.end === null
+							? 'Ongoing'
+							: dayjs(periodDetails.end).format('MMM D, YYYY')}
+					</div>
+					{#if sportsByCategory(periodDetails.sports).length > 0}
+						<div class="flex items-center gap-1.5">
+							<span class="opacity-50">·</span>
+							{#each sportsByCategory(periodDetails.sports) as group (group.category)}
+								<div
+									class="tooltip tooltip-bottom text-base"
+									data-tip={group.showAll
+										? `${group.category} (all sub-sports)`
+										: `${group.category}: ${group.sports.join(', ')}`}
+								>
+									<SportIcon sport={group.category} class="size-5" />
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="opacity-50">· All sports</div>
+					{/if}
+					<!-- Action menu dropdown (always inline) -->
+					<div class="dropdown dropdown-end">
+						<button tabindex="0" class="btn btn-ghost px-0.5 btn-xs" aria-label="Options">
+							<Settings class="size-3.5" />
+						</button>
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<ul
+							tabindex="0"
+							class="menu dropdown-content z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
+						>
+							<li class="w-full">
+								<button onclick={openEditModal}>
+									<Pencil class="size-5" />
+									Edit name
+								</button>
+							</li>
+							<li class="w-full">
+								<button onclick={openEditDatesModal}>
+									<CalendarFold class="size-5" />
+									Edit dates
+								</button>
+							</li>
+							<li class="w-full">
+								<button onclick={() => (showDeleteModal = true)} class="text-error">
+									<Trash2 class="size-6" />
+									Delete
+								</button>
+							</li>
+						</ul>
+					</div>
+				</div>
+				<div class="text-xs opacity-70">
+					{formatPeriodDuration(periodDetails.start, periodDetails.end)}
+				</div>
+			</div>
+		</div>
+
+		<!-- Period note section -->
+
+		<div class="my-4">
+			{#if periodDetails.note}
+				<div class="flex items-start gap-2">
+					<div class="flex-1 rounded bg-base-200 p-3">
+						<div class=" flex flex-row items-center italic">
+							<span class="pr-0.5 text-sm"> Period description </span>
+
+							<EditButton callback={openEditNoteModal} />
+						</div>
+						<div class="text-sm whitespace-pre-wrap">
+							{periodDetails.note}
+						</div>
+					</div>
+				</div>
+			{:else}
+				<button class="btn gap-2 btn-ghost btn-sm" onclick={openEditNoteModal}>
+					<NotebookPen class="size-4" />
+					<span>Add period description</span>
+				</button>
+			{/if}
+		</div>
+
+		<div class="rounded bg-base-200 p-4">
+			<TrainingPeriodStatistics period={periodDetails} />
+		</div>
+	</div>
+{/snippet}
+
+{#snippet metricListSnippet(periodDetails: TrainingPeriodDetails)}
+	{#if isSome(metricsPromise)}
+		{#await metricsPromise.value}
+			<div class="flex w-full flex-col items-center p-4 pt-6">
+				<div class="loading loading-bars"></div>
+			</div>
+		{:then metrics}
+			<div
+				class={`item metrics flex-col rounded-box bg-base-100 pb-3 shadow-md ${selectedActivityId === null ? 'flex' : 'hidden!'}`}
+			>
+				{@render metricList(periodDetails, metrics)}
+			</div>
+			<dialog class="modal" bind:this={metricListDialog}>
+				<div class="modal-box w-full max-w-full">
+					{@render metricList(periodDetails, metrics)}
+				</div>
+				<form method="dialog" class="modal-backdrop">
+					<button>close</button>
+				</form>
+			</dialog>
+		{/await}
+	{/if}
+{/snippet}
 
 {#snippet metricList(periodDetails: TrainingPeriodDetails, metrics: TrainingMetricList)}
 	<div bind:clientWidth={chartWidth}>
@@ -680,7 +525,172 @@
 	/>
 {/snippet}
 
+{#snippet timeline(periodDetails: TrainingPeriodDetails)}
+	{#if isSome(trainingNotesPromise)}
+		{#await Promise.all([trainingNotesPromise.value, fetchActivityListSummary(fetch)])}
+			<div class="flex w-full flex-col items-center p-4 pt-6">
+				<div class="loading loading-bars"></div>
+			</div>
+		{:then [notes, activityListFormat]}
+			<!-- Activities section -->
+			<div class="item activities rounded-box bg-base-100 p-4 shadow-md">
+				<div class="mb-4 flex items-center justify-between">
+					<h2 class="text-lg font-semibold">Activities & Notes</h2>
+					<div class="flex flex-row items-center">
+						<ActivitiesFiltersComponent
+							{activities}
+							bind:filteredActivities
+							showLabel={false}
+							bind:filters={
+								() => filters,
+								(f) => {
+									handleFilterChange(f);
+								}
+							}
+						/>
+						<SearchField bind:searchResults />
+					</div>
+				</div>
+
+				<Timeline
+					activities={filteredActivities}
+					{notes}
+					{selectedActivityId}
+					{searchResults}
+					{selectActivityCallback}
+					endDate={periodDetails.end}
+					{activityListFormat}
+					noteChangedCallback={updateTrainingNotesPromise}
+					renderByChunk={false}
+				/>
+			</div>
+		{/await}
+	{/if}
+{/snippet}
+
+{#snippet activityDetailsSnippet()}
+	<div
+		class={`activity-details rounded-box bg-base-100 pt-4 shadow-md ${selectedActivityId !== null ? 'flex' : 'hidden!'}`}
+	>
+		{#if selectedActivityPromise}
+			{#await selectedActivityPromise}
+				<div class="flex w-full items-center justify-center rounded-box bg-base-100 p-8 shadow-md">
+					<span class="loading loading-lg loading-spinner"></span>
+				</div>
+			{:then selectedActivity}
+				{#if selectedActivity}
+					<div class="relative w-full">
+						<div class="absolute -top-1.5 right-3 join">
+							<button
+								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
+								class="btn join-item btn-xs"
+							>
+								<Maximize2 class="size-3.5" />
+							</button>
+							<button onclick={() => (selectedActivityId = null)} class="btn join-item btn-xs">
+								<X class="size-3.5" />
+							</button>
+						</div>
+						<ActivityDetails
+							activity={selectedActivity}
+							onActivityUpdated={handleActivityUpdated}
+							onActivityDeleted={() => handleActivityDeleted(selectedActivity.id)}
+							compact={true}
+						/>
+					</div>
+				{:else}
+					<div
+						class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+					>
+						Failed to load activity
+					</div>
+				{/if}
+			{:catch error}
+				<div
+					class="flex items-center justify-center rounded-box bg-base-100 p-8 text-error shadow-md"
+				>
+					Failed to load activity: {error.message}
+				</div>
+			{/await}
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet modalsAndDialogSnippet(periodDetails: TrainingPeriodDetails)}
+	<EditPeriodNameModal
+		bind:isOpen={showEditModal}
+		currentName={periodDetails.name}
+		onConfirm={(name) => handleUpdate(periodDetails.id, name)}
+	/>
+
+	<!-- Delete confirmation modal -->
+	<DeleteModal
+		bind:isOpen={showDeleteModal}
+		title="Delete Training Period"
+		description="Are you sure you want to delete this training period ? "
+		itemPreview={periodDetails.name}
+		onConfirm={() => handleDelete(periodDetails.id)}
+	/>
+
+	<EditPeriodDatesModal
+		bind:isOpen={showEditDatesModal}
+		currentStart={periodDetails.start}
+		currentEnd={periodDetails.end}
+		onConfirm={(start, end) => handleUpdateDates(periodDetails.id, start, end)}
+	/>
+
+	<EditPeriodNoteModal
+		bind:isOpen={showEditNoteModal}
+		currentNote={periodDetails.note}
+		onConfirm={(content) => handleUpdateNote(periodDetails.id, content)}
+	/>
+
+	<dialog class="modal" id="create-training-metric-dialog" bind:this={newTrainingMetricDialog}>
+		<div class="modal-box max-w-3xl">
+			<form method="dialog">
+				<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+			</form>
+			<TrainingMetricFormCreate
+				callback={() => {
+					newTrainingMetricDialog.close();
+					updateMetricsPromise();
+				}}
+				scope={{ kind: 'period', periodId: periodDetails.id }}
+				existingSportsConstraints={periodDetails.sports.sports.length === 0 &&
+				periodDetails.sports.categories.length === 0
+					? none() // All sports/categories, i.e. no constraints
+					: some(periodDetails.sports)}
+			/>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
+	<dialog class="modal" id="import-training-metric-dialog" bind:this={importTrainingMetricDialog}>
+		<div class="modal-box max-w-3xl">
+			<form method="dialog">
+				<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+			</form>
+			{#await getGlobalMetricsPromise}
+				<div class="loading"></div>
+			{:then globalMetrics}
+				<TrainingMetricImportForm
+					metrics={globalMetrics}
+					period_id={periodDetails.id}
+					metricCopiedCallback={updateMetricsPromise}
+					timeDomain={some({ start: periodDetails.start, end: periodDetails.end })}
+				/>
+			{/await}
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+{/snippet}
+
 <style>
+	/* main container: flex on small widths, and grid on larger ones */
 	.period_container {
 		width: 100%;
 		display: flex;
