@@ -1,28 +1,44 @@
 <script lang="ts">
 	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
-	import { displayGroupName, type TrainingMetricGroupByClause } from '$lib/trainingMetric';
+	import {
+		bucketOffset,
+		displayGroupName,
+		relativeBucketLabel,
+		type TrainingMetricGranularity,
+		type TrainingMetricGroupByClause
+	} from '$lib/trainingMetric';
 	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
 	import { formatTooltipValue, getGroupColor } from './chart';
 
-	export interface TimeseriesChartProps {
+	export interface CompareMetricChartBarsProps {
 		values: Record<string, Record<string, number>>;
+		/** Date the chart's buckets are aligned to (the compared period's anchor). */
+		anchor: string;
+		/** Shared x-axis domain of the comparison (union of both periods' bucket offsets). */
+		bucketDomain: number[];
+		yDomain: number[];
 		width: number;
 		height: number;
 		unit: string;
-		granularity: string;
+		granularity: TrainingMetricGranularity;
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
 		groupBy: TrainingMetricGroupByClause | null;
 		stacked?: boolean;
 		average: Option<number>;
 		target: Option<number>;
+		/** Bucket offset currently hovered, shared between the compared charts. */
+		hovered?: number | null;
 	}
 
 	let {
 		values,
+		anchor,
+		bucketDomain,
+		yDomain,
 		height,
 		width,
 		unit,
@@ -32,8 +48,10 @@
 		average,
 		target,
 		showGroup = true,
-		stacked = true
-	}: TimeseriesChartProps = $props();
+		stacked = true,
+		hovered = $bindable(null)
+	}: CompareMetricChartBarsProps = $props();
+
 	let marginTop = 20;
 	let marginRight = 20;
 	let marginBottom = 20;
@@ -45,34 +63,55 @@
 	let gBars: SVGGElement;
 	let svgElement: SVGElement;
 
-	type FormattedValue = { time: string; group: string; value: number };
-	type SeriesDatum = [string, d3.InternMap<string, FormattedValue>];
+	type FormattedValue = { time: string; offset: number; group: string; value: number };
+	type SeriesDatum = [number, d3.InternMap<string, FormattedValue>];
 	type StackedDataPoint = d3.SeriesPoint<SeriesDatum> & { key: string };
 
 	let formatedValues = $derived.by(() => {
 		const _values: FormattedValue[] = [];
 		for (const [group, granuleValues] of Object.entries(values)) {
 			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
-				_values.push({ time, group, value });
+				_values.push({ time, offset: bucketOffset(time, anchor, granularity), group, value });
 			}
 		}
 		return _values;
 	});
 
+	// Calendar date of each aligned bucket, used for the axis tick labels: the
+	// aligned axis is relative to the anchor but each period keeps its own dates.
+	let offsetDates = $derived.by(() => {
+		const dates: Record<number, string> = {};
+		for (const value of [...formatedValues].toSorted((a, b) => (a.time < b.time ? -1 : 1))) {
+			if (!(value.offset in dates)) {
+				dates[value.offset] = value.time;
+			}
+		}
+		return dates;
+	});
+
+	// Axis ticks use the shared domain's ordinal positions so both compared
+	// charts display the same labels at the same positions: "Week 3" is the
+	// third timeslot of the comparison for each period.
 	let timeAxisTickFormater = $derived.by(() => {
-		if (granularity === 'Monthly') {
-			return (date: string, _idx: number) => {
+		return (offset: number, _idx: number) =>
+			relativeBucketLabel(offset, bucketDomain[0] ?? 0, granularity);
+	});
+
+	// Calendar date of a bucket, shown as context next to the relative label.
+	let calendarTickFormater = $derived.by(() => {
+		return (offset: number, _idx: number) => {
+			const date = offsetDates[offset];
+			if (date === undefined) {
+				return '';
+			}
+			if (granularity === 'Monthly') {
 				return dayjs(date).format('MMM YYYY');
-			};
-		}
-
-		if (granularity === 'Weekly') {
-			return (date: string) => {
+			}
+			if (granularity === 'Weekly') {
 				return formatWeekInterval(date);
-			};
-		}
-
-		return (date: string, _idx: number) => dayjs(date).format('MMM D');
+			}
+			return dayjs(date).format('MMM D');
+		};
 	});
 
 	let yAxisTickFormater = $derived.by(() => {
@@ -95,21 +134,8 @@
 		if (formatedValues.length === 0) {
 			return [];
 		}
-		const maxGroupValue = stacked
-			? formatedValues
-					.reduce<Map<string, number>>((groupValues, value) => {
-						if (groupValues.has(value.time)) {
-							groupValues.set(value.time, groupValues.get(value.time)! + value.value);
-						} else {
-							groupValues.set(value.time, value.value);
-						}
 
-						return groupValues;
-					}, new Map<string, number>())
-					.entries()
-					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-			: (d3.max(formatedValues, (v) => v.value) ?? 0);
-		return d3.ticks(0, Math.max(maxGroupValue, unwrapOr(target, 0)), 6);
+		return d3.ticks(0, yDomain[1], 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
@@ -118,20 +144,7 @@
 		}
 		if (format === 'duration') {
 			const dt = 600;
-			const maxDuration = stacked
-				? formatedValues
-						.reduce<Map<string, number>>((times, value) => {
-							if (times.has(value.time)) {
-								times.set(value.time, times.get(value.time)! + value.value);
-							} else {
-								times.set(value.time, value.value);
-							}
-
-							return times;
-						}, new Map<string, number>())
-						.entries()
-						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-				: (d3.max(formatedValues, (v) => v.value) ?? 0);
+			const maxDuration = yDomain[1];
 			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
 			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
@@ -165,7 +178,7 @@
 			.value(([, groupMap], groupKey) => groupMap.get(groupKey)!.value)(
 			d3.index(
 				formatedValues,
-				(value) => value.time,
+				(value) => value.offset,
 				(value) => displayGroupName(value.group, groupBy)
 			)
 		)
@@ -173,31 +186,16 @@
 
 	let x = $derived(
 		d3
-			.scaleBand()
-			.domain(
-				d3.groupSort(
-					formatedValues,
-					(a, b) => (a.at(0)!.time < b.at(0)!.time ? -1 : 1),
-					(value) => value.time
-				)
-			)
+			.scaleBand<number>()
+			.domain(bucketDomain)
 			.range([marginLeft, width - marginRight])
 			.padding(0.6)
-	);
-
-	let maxValue = $derived(
-		Math.max(
-			stacked
-				? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
-				: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
-			unwrapOr(target, 0)
-		)
 	);
 
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([0, maxValue])
+			.domain(yDomain)
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
@@ -235,26 +233,33 @@
 
 	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 
-	// Tooltip state
+	// Tooltip state; `segment` distinguishes the rich per-bar tooltip (local
+	// pointer over a rect) from the total-only tooltip shown when the compared
+	// sibling chart hovers the same bucket.
 	let tooltip = $state<{
 		visible: boolean;
 		x: number;
 		y: number;
 		showBelow: boolean;
-		time: string;
+		offset: number;
 		group: string;
 		value: number;
 		total: number;
+		segment: boolean;
 	}>({
 		visible: false,
 		x: 0,
 		y: 0,
 		showBelow: false,
-		time: '',
+		offset: 0,
 		group: '',
 		value: 0,
-		total: 0
+		total: 0,
+		segment: false
 	});
+
+	let pointerOver = $state(false);
+	let segmentTooltip = $state(false);
 
 	// Hide tooltip on scroll
 	const handleScroll = () => {
@@ -271,6 +276,114 @@
 			window.removeEventListener('scroll', handleScroll, true);
 		};
 	});
+
+	const TOOLTIP_HEIGHT = 100;
+	const TOOLTIP_WIDTH = 100;
+
+	const tooltipXFor = (xPos: number): number => {
+		const tooltipHalfWidth = TOOLTIP_WIDTH / 2;
+		const spaceLeft = xPos - marginLeft;
+		const spaceRight = width - marginRight - xPos;
+
+		// Center by default, clamped to the plot area
+		let tooltipX = xPos - tooltipHalfWidth;
+		if (spaceLeft < tooltipHalfWidth) {
+			// Not enough space on the left, align to left edge
+			tooltipX += tooltipHalfWidth;
+		} else if (spaceRight < tooltipHalfWidth) {
+			// Not enough space on the right, align to right edge
+			tooltipX -= tooltipHalfWidth;
+		}
+		return tooltipX;
+	};
+
+	const showBelowFor = (yPos: number): boolean => yPos - marginTop < TOOLTIP_HEIGHT;
+
+	const showTotalTooltip = (offset: number) => {
+		const bucketValues = formatedValues.filter((value) => value.offset === offset);
+		const total = bucketValues.reduce((sum, value) => sum + value.value, 0);
+		const topValue =
+			bucketValues.length === 0
+				? 0
+				: stacked
+					? d3.sum(bucketValues, (value) => value.value)
+					: (d3.max(bucketValues, (value) => value.value) ?? 0);
+		const xPos = x(offset)! + x.bandwidth() / 2;
+		const yPos = y(topValue);
+
+		tooltip = {
+			visible: true,
+			x: tooltipXFor(xPos),
+			y: yPos,
+			showBelow: showBelowFor(yPos),
+			offset,
+			group: '',
+			value: total,
+			total,
+			segment: false
+		};
+	};
+
+	// Synced tooltip: when the hovered bucket is set by the compared sibling
+	// chart, show this chart's total for the same bucket.
+	$effect(() => {
+		if (pointerOver) {
+			return;
+		}
+		if (hovered !== null && x.domain().includes(hovered)) {
+			if (!tooltip.visible || tooltip.segment || tooltip.offset !== hovered) {
+				showTotalTooltip(hovered);
+			}
+		} else if (tooltip.visible) {
+			tooltip = { ...tooltip, visible: false };
+		}
+	});
+
+	const pointerPosition = (event: PointerEvent): { x: number; y: number } | null => {
+		const rect = svgElement.getBoundingClientRect();
+		if (rect.width === 0 || rect.height === 0) {
+			return null;
+		}
+		return {
+			x: ((event.clientX - rect.left) / rect.width) * width,
+			y: ((event.clientY - rect.top) / rect.height) * height
+		};
+	};
+
+	const offsetAt = (px: number): number | null => {
+		const step = x.step();
+		if (step === 0) {
+			return null;
+		}
+		const idx = Math.floor((px - marginLeft) / step);
+		return x.domain()[idx] ?? null;
+	};
+
+	const handlePointerMove = (event: PointerEvent) => {
+		const position = pointerPosition(event);
+		if (position === null) {
+			return;
+		}
+		pointerOver = true;
+		const offset = offsetAt(position.x);
+		hovered = offset;
+		if (offset === null) {
+			if (!segmentTooltip && tooltip.visible) {
+				tooltip = { ...tooltip, visible: false };
+			}
+		} else if (!segmentTooltip) {
+			showTotalTooltip(offset);
+		}
+	};
+
+	const handlePointerLeave = () => {
+		pointerOver = false;
+		segmentTooltip = false;
+		hovered = null;
+		if (tooltip.visible) {
+			tooltip = { ...tooltip, visible: false };
+		}
+	};
 
 	$effect(() => {
 		d3.select(gBars).call((sel) =>
@@ -308,11 +421,11 @@
 					// Show tooltip
 					const rect = event.target as SVGRectElement;
 					const value = stackedDataPoint[1] - stackedDataPoint[0]; // Height of this segment
-					const time = stackedDataPoint.data[0];
+					const offset = stackedDataPoint.data[0];
 
-					// Calculate total for this time across all groups
+					// Calculate total for this offset across all groups
 					const total = formatedValues
-						.filter((v) => v.time === time)
+						.filter((v) => v.offset === offset)
 						.reduce((sum, v) => sum + v.value, 0);
 
 					// Use SVG coordinates directly
@@ -323,37 +436,18 @@
 						? y(stackedDataPoint[1])
 						: y(stackedDataPoint[1] - stackedDataPoint[0]);
 
-					// Check if there's enough space above the bar for tooltip (need ~100px)
-					const tooltipHeight = 100;
-					const spaceAbove = yPos - marginTop;
-					const showBelow = spaceAbove < tooltipHeight;
-
-					// Check horizontal space for tooltip (tooltip width is 200px)
-					const tooltipWidth = 100;
-					const tooltipHalfWidth = tooltipWidth / 2;
-					const spaceLeft = xPos - marginLeft;
-					const spaceRight = width - marginRight - xPos;
-
-					// Determine tooltip x position
-					let tooltipX = xPos - tooltipHalfWidth; // Center by default
-					if (spaceLeft < tooltipHalfWidth) {
-						// Not enough space on the left, align to left edge
-						tooltipX += tooltipHalfWidth;
-					} else if (spaceRight < tooltipHalfWidth) {
-						// Not enough space on the right, align to right edge
-						tooltipX -= tooltipHalfWidth;
-					}
-
 					tooltip = {
 						visible: true,
-						x: tooltipX,
+						x: tooltipXFor(xPos),
 						y: yPos,
-						showBelow: showBelow,
-						time: time,
+						showBelow: showBelowFor(yPos),
+						offset: offset,
 						group: stackedDataPoint.key,
 						value: value,
-						total: total
+						total: total,
+						segment: true
 					};
+					segmentTooltip = true;
 
 					// Highlight the bar with a border using the group's color
 					d3.select(rect)
@@ -368,6 +462,7 @@
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
 					tooltip = { ...tooltip, visible: false };
+					segmentTooltip = false;
 
 					// Remove highlight
 					d3.select(event.target as SVGRectElement).attr('stroke', 'none');
@@ -418,6 +513,8 @@
 		role="img"
 		class="h-full w-full p-1 select-none"
 		bind:this={svgElement}
+		onpointermove={handlePointerMove}
+		onpointerleave={handlePointerLeave}
 	>
 		<g
 			bind:this={gyGrid}
@@ -427,6 +524,21 @@
 		/>
 
 		<g bind:this={gBars} />
+
+		{#if hovered !== null && x.domain().includes(hovered)}
+			<!-- Synced crosshair: `hovered` is also set by the compared sibling chart -->
+			<line
+				x1={x(hovered)! + x.bandwidth() / 2}
+				x2={x(hovered)! + x.bandwidth() / 2}
+				y1={marginTop}
+				y2={height - marginBottom}
+				stroke="currentColor"
+				stroke-width="1"
+				stroke-dasharray="4 4"
+				opacity="0.5"
+				pointer-events="none"
+			/>
+		{/if}
 
 		{#if isSome(average)}
 			<line
@@ -485,15 +597,24 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{timeAxisTickFormater(tooltip.time, 0)}</div>
+							<div class="font-semibold">
+								{relativeBucketLabel(tooltip.offset, bucketDomain[0] ?? 0, granularity)}
+								<span class="font-normal opacity-70">
+									· {calendarTickFormater(tooltip.offset, 0)}
+								</span>
+							</div>
 							<div class="text-xs opacity-80">
-								{#if showGroup}
+								{#if showGroup && tooltip.segment}
 									<span>{tooltip.group}</span>
+									<span>•</span>
+								{/if}
+								{#if showGroup && !tooltip.segment && stacked}
+									<span class="opacity-60">Total</span>
 									<span>•</span>
 								{/if}
 								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>
 							</div>
-							{#if showGroup && tooltip.total !== tooltip.value && stacked}
+							{#if tooltip.segment && showGroup && tooltip.total !== tooltip.value && stacked}
 								<div class="text-xs opacity-60">
 									<span>Total</span>
 									<span>•</span>

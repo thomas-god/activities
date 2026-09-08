@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ComparePeriodsSummary from '$ui/training_period/ComparePeriodsSummary.svelte';
+	import CompareTrainingMetrics from '$ui/training_period/CompareTrainingMetrics.svelte';
 	import NavbarPeriods from '$ui/navigation/NavbarPeriods.svelte';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
@@ -114,7 +115,7 @@
 				<h2 class="pb-1 text-lg font-semibold">Summary</h2>
 				<ComparePeriodsSummary periods={loaded} />
 			</div>
-			{@render metricsPlaceholderSnippet()}
+			<CompareTrainingMetrics firstPeriod={loaded[0]} secondPeriod={loaded[1]} />
 		{:else}
 			<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
 				<p class="text-sm tracking-wide italic opacity-80">
@@ -124,17 +125,4 @@
 			</div>
 		{/if}
 	{/await}
-{/snippet}
-
-{#snippet metricsPlaceholderSnippet()}
-	<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
-		<h2 class="pb-1 text-lg font-semibold">Training metrics</h2>
-		<div
-			class="flex min-h-32 items-center justify-center rounded-box border-2 border-dashed border-base-300 p-6"
-		>
-			<p class="text-sm tracking-wide italic opacity-60">
-				Training metric comparison charts coming soon
-			</p>
-		</div>
-	</div>
 {/snippet}
