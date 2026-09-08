@@ -16,8 +16,7 @@
 		metricDefinitionKey,
 		extractBaseDefinitionFromMetric,
 		type CompareAlignment,
-		type CompareMetricDefinition,
-		type CompareMetricSource
+		type CompareMetricDefinition
 	} from '$lib/trainingMetric';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
 
@@ -92,27 +91,29 @@
 	type PickerEntry = { definition: CompareMetricDefinition; added: boolean };
 
 	const pickerEntries = (
-		firstMetrics: TrainingMetricList,
-		secondMetrics: TrainingMetricList
+		firstPeriodMetrics: TrainingMetricList,
+		firstPeriodName: string,
+		secondPeriodMetrics: TrainingMetricList,
+		secondPeriodName: string
 	): PickerEntry[] => {
 		const picked: {
 			key: string;
-			source: Exclude<CompareMetricSource, 'default'>;
+			source: string;
 			metric: TrainingMetric;
 		}[] = [];
 
-		for (const metric of firstMetrics) {
+		for (const metric of firstPeriodMetrics) {
 			if (metric.granularity === null) continue;
-			picked.push({ key: metricDefinitionKey(metric), source: 'first', metric });
+			picked.push({ key: metricDefinitionKey(metric), source: firstPeriodName, metric });
 		}
-		for (const metric of secondMetrics) {
+		for (const metric of secondPeriodMetrics) {
 			if (metric.granularity === null) continue;
 			const key = metricDefinitionKey(metric);
 			const existing = picked.find((entry) => entry.key === key);
 			if (existing !== undefined) {
 				existing.source = 'both';
 			} else {
-				picked.push({ key, source: 'second', metric });
+				picked.push({ key, source: secondPeriodName, metric });
 			}
 		}
 
@@ -130,15 +131,6 @@
 				definitionLabel(a.definition).localeCompare(definitionLabel(b.definition))
 			);
 	};
-
-	const sourceLabels: Record<Exclude<CompareMetricSource, 'default'>, string> = {
-		first: 'first period',
-		second: 'second period',
-		both: 'both periods'
-	};
-
-	const sourceLabel = (source: CompareMetricSource): string | null =>
-		source === 'default' ? null : sourceLabels[source];
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
@@ -205,18 +197,15 @@
 			<div class="flex justify-center p-4">
 				<div class="loading loading-bars"></div>
 			</div>
-		{:then [firstMetrics, secondMetrics]}
+		{:then [firstPeriodMetrics, secondPeriodMetrics]}
 			<ul class="menu w-full rounded-box bg-base-200 p-2">
-				{#each pickerEntries(firstMetrics, secondMetrics) as entry (entry.definition.key)}
-					{@const source = sourceLabel(entry.definition.source)}
+				{#each pickerEntries(firstPeriodMetrics, firstPeriod.name, secondPeriodMetrics, secondPeriod.name) as entry (entry.definition.key)}
 					<li class="w-full" class:disabled={entry.added}>
 						<button disabled={entry.added} onclick={() => addDefinition(entry.definition)}>
 							<div class="flex w-full flex-col items-start gap-0.5">
 								<span>
 									{definitionLabel(entry.definition)}
-									{#if source !== null}
-										<span class="badge badge-ghost badge-xs">{source}</span>
-									{/if}
+									<span class="badge badge-ghost badge-xs">{entry.definition.source}</span>
 								</span>
 								<span class="text-xs opacity-60">
 									{entry.definition.base.metric}

@@ -141,7 +141,7 @@ export type CompareMetricSource = 'default' | 'first' | 'second' | 'both';
 export type CompareMetricDefinition = {
 	key: string;
 	label: string | null;
-	source: CompareMetricSource;
+	source: string;
 	base: TrainingMetricBasePayload;
 };
 

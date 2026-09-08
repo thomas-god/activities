@@ -9,8 +9,7 @@
 		definitionLabel,
 		yDomain as extractYDomain,
 		type CompareAlignment,
-		type CompareMetricDefinition,
-		type CompareMetricSource
+		type CompareMetricDefinition
 	} from '$lib/trainingMetric';
 	import CompareMetricChart from '$ui/training_metrics/CompareMetricChart.svelte';
 
@@ -37,12 +36,6 @@
 	let chartWidths: number[] = $state([300, 300]);
 
 	const heightFor = (width: number): number => Math.max(150, Math.min(300, width * 0.6));
-
-	const sourceLabels: Record<Exclude<CompareMetricSource, 'default'>, string> = {
-		first: 'first period',
-		second: 'second period',
-		both: 'both periods'
-	};
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
@@ -50,9 +43,7 @@
 		<h3 class="text-base font-semibold">
 			{definitionLabel(definition)}
 			{#if definition.source !== 'default'}
-				<span class="badge badge-ghost align-middle badge-sm"
-					>{sourceLabels[definition.source]}</span
-				>
+				<span class="badge badge-ghost align-middle badge-sm">from: {definition.source}</span>
 			{/if}
 		</h3>
 		<button class="btn btn-ghost btn-xs" aria-label="Remove metric comparison" onclick={onRemove}>

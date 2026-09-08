@@ -130,7 +130,7 @@
 	<div class="flex flex-wrap justify-center pt-2 text-xs sm:text-base">
 		{#if tooltipData}
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData[0])}</span>
-			<span class="px-1.5 font-semibold text-power-chart">{Math.round(tooltipData[1])} W</span>
+			<span class="text-power-chart px-1.5 font-semibold">{Math.round(tooltipData[1])} W</span>
 		{:else}
 			<span class="invisible px-1.5">Interval: –</span>
 		{/if}
