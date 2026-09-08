@@ -43,6 +43,7 @@
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 	import {
 		CalendarFold,
+		GitCompareArrows,
 		Import,
 		ListSortDescending,
 		Maximize2,
@@ -53,6 +54,7 @@
 		Trash2,
 		X
 	} from '@lucide/svelte';
+	import { formatPeriodDuration } from '$lib/trainingPeriod';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
 	import SearchField, { type SearchResult } from '$ui/shared/SearchField.svelte';
 
@@ -78,9 +80,7 @@
 	let showEditNoteModal = $state(false);
 	let showEditDatesModal = $state(false);
 
-	// svelte-ignore non_reactive_update
 	let newTrainingMetricDialog: HTMLDialogElement;
-	// svelte-ignore non_reactive_update
 	let importTrainingMetricDialog: HTMLDialogElement;
 	let metricsOrderingDialog: TrainingMetricsOrderingDialog;
 	// svelte-ignore non_reactive_update
@@ -246,27 +246,6 @@
 		return Array.from(map.values());
 	};
 
-	const formatPeriodDuration = (start: string, end: string | null): string => {
-		const startDate = dayjs(start);
-		const endDate = end ? dayjs(end) : dayjs();
-		// Add 1 to include the last day (end date is inclusive)
-		const days = endDate.diff(startDate, 'day') + 1;
-
-		if (days === 1) return '1 day';
-		if (days < 7) return `${days} days`;
-
-		const weeks = Math.floor(days / 7);
-		const remainingDays = days % 7;
-
-		if (remainingDays === 0) {
-			return weeks === 1 ? '1 week' : `${weeks} weeks`;
-		}
-
-		const weeksText = weeks === 1 ? '1 week' : `${weeks} weeks`;
-		const daysText = remainingDays === 1 ? '1 day' : `${remainingDays} days`;
-		return `${weeksText} ${daysText}`;
-	};
-
 	const selectActivityCallback = (activityId: string) => {
 		if (screenWidth < 700) {
 			goto(resolve(`/activity/${activityId}`));
@@ -407,6 +386,14 @@
 								<button onclick={openEditDatesModal}>
 									<CalendarFold class="size-5" />
 									Edit dates
+								</button>
+							</li>
+							<li class="w-full">
+								<button
+									onclick={() => goto(resolve(`/training/periods/compare?periods=${period_id}`))}
+								>
+									<GitCompareArrows class="size-5" />
+									Compare
 								</button>
 							</li>
 							<li class="w-full">

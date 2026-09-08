@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TrainingPeriodDetails } from '$lib/api';
 	import { formatDurationHoursMinutes } from '$lib/duration';
+	import { formatDistance, formatElevation, periodActivitiesSummary } from '$lib/trainingPeriod';
 
 	interface Props {
 		period: TrainingPeriodDetails;
@@ -8,41 +9,7 @@
 
 	let { period }: Props = $props();
 
-	const summary = $derived.by(() => {
-		const total = {
-			count: period.activities.length,
-			duration: 0,
-			distance: 0,
-			elevation: 0
-		};
-
-		for (const activity of period.activities) {
-			total.duration += getMetricValue(activity.metrics, 'ActiveDuration');
-			total.distance += getMetricValue(activity.metrics, 'Distance');
-			total.elevation += getMetricValue(activity.metrics, 'Elevation');
-		}
-
-		return total;
-	});
-
-	const getMetricValue = (metrics: Record<string, { value: number }>, key: string): number => {
-		const metric = metrics[key];
-		if (metric === undefined) {
-			return 0;
-		}
-		return metric.value;
-	};
-
-	const formatDistance = (meters: number): string => {
-		if (meters === 0) return '0 km';
-		const km = meters / 1000;
-		return `${Math.round(km).toLocaleString('fr-fr')} km`;
-	};
-
-	const formatElevation = (meters: number): string => {
-		if (meters === 0) return '0 m';
-		return `${Math.round(meters).toLocaleString('fr-fr')} m`;
-	};
+	const summary = $derived(periodActivitiesSummary(period.activities));
 </script>
 
 <div class="flex flex-wrap gap-6 sm:gap-8">
