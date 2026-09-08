@@ -180,14 +180,14 @@
 					onclick={() => setViewMode('list')}
 				>
 					<List class="size-5" />
-					<span class="ml-1 hidden @sm/main:inline">List</span>
+					<span class="ml-1 hidden @[500px]/main:inline">List</span>
 				</button>
 				<button
 					class="btn join-item btn-sm {viewMode === 'calendar' ? 'btn-active' : 'btn-ghost'}"
 					onclick={() => setViewMode('calendar')}
 				>
 					<CalendarFold class="size-5" />
-					<span class="ml-1 hidden @sm/main:inline">Calendar</span>
+					<span class="ml-1 hidden @[500px]/main:inline">Calendar</span>
 				</button>
 			</div>
 			<div class="join">
@@ -195,6 +195,7 @@
 					<ActivitiesFiltersComponent
 						{activities}
 						bind:filteredActivities
+						showLabel={false}
 						bind:filters={
 							() => filters,
 							(f) => {
@@ -209,7 +210,6 @@
 					title="Customize history view"
 				>
 					<Settings2 class="size-5" />
-					<span class="ml-1 hidden @min-[600px]:inline">Customize</span>
 				</button>
 				<button
 					class="btn join-item btn-sm"
@@ -217,7 +217,6 @@
 					title="Download all activities as ZIP"
 				>
 					<ArrowDownToLine class="size-5" />
-					<span class="ml-1 hidden @min-[600px]:inline">Download</span>
 				</button>
 				<div>
 					<SearchField bind:searchResults />
