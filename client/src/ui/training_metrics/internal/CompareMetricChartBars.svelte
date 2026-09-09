@@ -20,6 +20,7 @@
 		/** Shared x-axis domain of the comparison (union of both periods' bucket offsets). */
 		bucketDomain: number[];
 		yDomain: number[];
+		yScaleFactor: number;
 		width: number;
 		height: number;
 		unit: string;
@@ -39,6 +40,7 @@
 		anchor,
 		bucketDomain,
 		yDomain,
+		yScaleFactor,
 		height,
 		width,
 		unit,
@@ -71,7 +73,12 @@
 		const _values: FormattedValue[] = [];
 		for (const [group, granuleValues] of Object.entries(values)) {
 			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
-				_values.push({ time, offset: bucketOffset(time, anchor, granularity), group, value });
+				_values.push({
+					time,
+					offset: bucketOffset(time, anchor, granularity),
+					group,
+					value: value * yScaleFactor
+				});
 			}
 		}
 		return _values;
@@ -114,6 +121,10 @@
 		};
 	});
 
+	let scaledYDomain = $derived(yDomain.map((y) => y * yScaleFactor));
+	let scaledAverage = $derived(map(average, (a) => a * yScaleFactor));
+	let scaledTarget = $derived(map(target, (t) => t * yScaleFactor));
+
 	let yAxisTickFormater = $derived.by(() => {
 		if (format === 'duration') {
 			return (value: d3.NumberValue, _idx: number) => {
@@ -135,7 +146,7 @@
 			return [];
 		}
 
-		return d3.ticks(0, yDomain[1], 6);
+		return d3.ticks(0, scaledYDomain[1], 6);
 	};
 
 	let yAxisTickValues = (): number[] => {
@@ -144,7 +155,7 @@
 		}
 		if (format === 'duration') {
 			const dt = 600;
-			const maxDuration = yDomain[1];
+			const maxDuration = scaledYDomain[1];
 			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
 			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
@@ -195,26 +206,26 @@
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain(yDomain)
+			.domain(scaledYDomain)
 			.rangeRound([height - marginBottom, marginTop])
 	);
 
-	let averageLineY = $derived(map(average, (avg) => y(avg)));
+	let averageLineY = $derived(map(scaledAverage, (avg) => y(avg)));
 	let averageLegendY = $derived(
 		map(averageLineY, (avg) =>
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
 	let averageLegend = $derived(
-		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
+		map(scaledAverage, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
 	);
 
-	let targetLineY = $derived(map(target, (t) => y(t)));
+	let targetLineY = $derived(map(scaledTarget, (t) => y(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
 	let targetLegend = $derived(
-		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
+		map(scaledTarget, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
 	);
 
 	const colors = $derived.by(() => {
