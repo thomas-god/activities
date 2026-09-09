@@ -10,7 +10,7 @@
 		type PreviewTrainingMetricPayload,
 		type TrainingMetric
 	} from '$lib/api';
-	import TrainingMetricForm from './internal/TrainingMetricForm.svelte';
+	import TrainingMetricForm from './TrainingMetricForm.svelte';
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
 

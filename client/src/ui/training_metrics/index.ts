@@ -20,6 +20,28 @@ export interface TrainingMetricFields {
 	target: Option<number>;
 }
 
+export const emptyTrainingMetricFields = (): TrainingMetricFields => {
+	return {
+		name: '',
+		selectedTemplate: none(),
+		granularity: none(),
+		groupBy: none(),
+		filters: {
+			sports: none(),
+			sportCategories: none(),
+			rpes: none(),
+			workoutTypes: none(),
+			bonked: none()
+		},
+		showAverage: false,
+		target: none()
+	};
+};
+
+export const fieldsAreEmpty = (fields: TrainingMetricFields): boolean => {
+	return fields.name === '' || isNone(fields.selectedTemplate);
+};
+
 export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 
 const fieldsActiveFilters = (fields: TrainingMetricFields) => {

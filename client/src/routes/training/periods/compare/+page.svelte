@@ -115,7 +115,9 @@
 				<h2 class="pb-1 text-lg font-semibold">Summary</h2>
 				<ComparePeriodsSummary periods={loaded} />
 			</div>
-			<ComparePeriodsMetrics firstPeriod={loaded[0]} secondPeriod={loaded[1]} />
+			<div class="mt-5">
+				<ComparePeriodsMetrics firstPeriod={loaded[0]} secondPeriod={loaded[1]} />
+			</div>
 		{:else}
 			<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
 				<p class="text-sm tracking-wide italic opacity-80">

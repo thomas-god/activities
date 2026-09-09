@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { Plus } from '@lucide/svelte';
+	import { Import, Plus } from '@lucide/svelte';
 	import { untrack } from 'svelte';
 	import {
+		fetchTrainingMetricTemplates,
 		fetchTrainingPeriodMetrics,
 		getTrainingMetricPreview,
 		type TrainingMetric,
 		type TrainingMetricList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
-	import { type Option } from '$lib/Options';
+	import { isSome, map, type Option } from '$lib/Options';
 	import {
 		definitionLabel,
 		metricPreviewPayload,
@@ -19,6 +20,13 @@
 		type CompareMetricDefinition
 	} from '$lib/trainingMetric';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
+	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
+	import {
+		emptyTrainingMetricFields,
+		fieldsAreEmpty,
+		fieldsAsPayload,
+		type TrainingMetricFields
+	} from '$ui/training_metrics';
 
 	let {
 		firstPeriod,
@@ -65,6 +73,7 @@
 		});
 	});
 
+	let importMetricDialog: HTMLDialogElement;
 	let addMetricDialog: HTMLDialogElement;
 
 	let firstPeriodMetricsPromise = $derived(fetchTrainingPeriodMetrics(fetch, firstPeriod.id));
@@ -131,6 +140,21 @@
 				definitionLabel(a.definition).localeCompare(definitionLabel(b.definition))
 			);
 	};
+	const buildPromise = async () => {
+		const templates = await fetchTrainingMetricTemplates();
+		return templates;
+	};
+	let metricTemplatesPromise = $state(buildPromise());
+	let temporaryMetricFields: TrainingMetricFields = $state(emptyTrainingMetricFields());
+	const fieldsToDefinition = (fields: TrainingMetricFields): Option<CompareMetricDefinition> => {
+		const base = fieldsAsPayload(fields);
+		return map(base, (b) => ({
+			key: `custom:${fields.name}`,
+			label: fields.name,
+			source: 'default',
+			base: b
+		}));
+	};
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
@@ -158,6 +182,10 @@
 					>
 				</div>
 			</div>
+			<button class="btn btn-sm" onclick={() => importMetricDialog.show()}>
+				<Import class="size-4" />
+				Import metric
+			</button>
 			<button class="btn btn-sm" onclick={() => addMetricDialog.show()}>
 				<Plus class="size-4" />
 				Add metric
@@ -184,14 +212,14 @@
 	</div>
 {/each}
 
-<dialog class="modal" bind:this={addMetricDialog}>
+<dialog class="modal" bind:this={importMetricDialog}>
 	<div class="modal-box max-w-2xl">
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<h3 class="mb-3 text-lg font-semibold">Add a metric comparison</h3>
+		<h3 class="mb-3 text-lg font-semibold">Import a metric from a period</h3>
 		<p class="mb-3 text-sm opacity-70">
-			Each metric is computed over each period's own date range for the comparison.
+			Each metric is computed over each period's own date range.
 		</p>
 		{#await Promise.all([firstPeriodMetricsPromise, secondPeriodMetricsPromise])}
 			<div class="flex justify-center p-4">
@@ -228,6 +256,42 @@
 				{/each}
 			</ul>
 		{/await}
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={addMetricDialog}>
+	<div class="modal-box max-w-2xl">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<h3 class="mb-3 text-lg font-semibold">Create custom training metric</h3>
+		<p class="mb-3 text-sm opacity-70">
+			Each metric is computed over each period's own date range.
+		</p>
+		<fieldset class="fieldset rounded-box bg-base-100 p-2">
+			{#await metricTemplatesPromise then metricTemplates}
+				<TrainingMetricForm templates={metricTemplates} bind:fields={temporaryMetricFields} />
+				<div class="mt-4">
+					<button
+						class="btn w-full btn-neutral"
+						onclick={() => {
+							const definition = fieldsToDefinition(temporaryMetricFields);
+							if (isSome(definition)) {
+								addDefinition(definition.value);
+								temporaryMetricFields = emptyTrainingMetricFields();
+								addMetricDialog.close();
+							}
+						}}
+						disabled={fieldsAreEmpty(temporaryMetricFields)}
+					>
+						Add metric
+					</button>
+				</div>
+			{/await}
+		</fieldset>
 	</div>
 	<form method="dialog" class="modal-backdrop">
 		<button>close</button>
