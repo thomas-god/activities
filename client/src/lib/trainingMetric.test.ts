@@ -14,6 +14,7 @@ import {
 	relativeBucketLabel,
 	type CompareMetricDefinition
 } from './trainingMetric';
+import dayjs from 'dayjs';
 
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
@@ -43,10 +44,6 @@ const makePeriod = (overrides: Partial<{ start: string; end: string | null }> = 
 	end: '2026-04-30' as string | null,
 	sports: { sports: ['TrailRunning'] as 'TrailRunning'[], categories: ['Cycling'] as 'Cycling'[] },
 	...overrides
-});
-
-afterEach(() => {
-	vi.useRealTimers();
 });
 
 describe('metricDefinitionKey', () => {
@@ -169,7 +166,7 @@ describe('compareMetricPreviewPayload', () => {
 	});
 
 	it('uses tomorrow for an ongoing period', () => {
-		vi.useFakeTimers({ now: new Date('2026-09-08T15:00:00+02:00') });
+		const now = () => dayjs('2026-09-08T15:00:00+02:00');
 
 		const definition: CompareMetricDefinition = {
 			key: 'key',
@@ -178,7 +175,7 @@ describe('compareMetricPreviewPayload', () => {
 			base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
 		};
 
-		const payload = metricPreviewPayload(definition, makePeriod({ end: null }));
+		const payload = metricPreviewPayload(definition, makePeriod({ end: null }), now);
 
 		expect(payload.end).toBe('2026-09-09T15:00:00+02:00');
 	});

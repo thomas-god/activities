@@ -2,7 +2,7 @@ import { getBonkStatusLabel, bonkStatusToAPI, type BonkStatus } from './nutritio
 import { sportCategoryDisplay, sportDisplay, type Sport, type SportCategory } from './sport';
 import { workoutTypeDisplay, workoutTypeToAPI, type WorkoutType } from './workout-type';
 import type { RPEValue } from './rpe';
-import { dayjs } from './duration';
+import { dayjs, now as dayjsNow } from './duration';
 import type {
 	TrainingMetric,
 	TrainingMetricBasePayload,
@@ -251,7 +251,8 @@ export const extractBaseDefinitionFromMetric = (
  */
 export const metricPreviewPayload = (
 	definition: CompareMetricDefinition,
-	period: Pick<TrainingPeriodDetails, 'start' | 'end' | 'sports'>
+	period: Pick<TrainingPeriodDetails, 'start' | 'end' | 'sports'>,
+	now = dayjsNow
 ): PreviewTrainingMetricPayload => {
 	const filters =
 		definition.base.filters !== undefined && definition.base.filters.sports !== undefined
@@ -261,7 +262,7 @@ export const metricPreviewPayload = (
 	return {
 		...definition.base,
 		filters,
-		...periodMetricRange(period)
+		...periodMetricRange(period, now)
 	};
 };
 
@@ -271,10 +272,11 @@ export const metricPreviewPayload = (
  * period is ongoing).
  */
 export const periodMetricRange = (
-	period: Pick<TrainingPeriodDetails, 'start' | 'end'>
+	period: Pick<TrainingPeriodDetails, 'start' | 'end'>,
+	now = dayjsNow
 ): { start: string; end: string } => ({
 	start: dayjs(period.start).format('YYYY-MM-DDTHH:mm:ssZ'),
-	end: (period.end === null ? dayjs() : dayjs(period.end))
+	end: (period.end === null ? now() : dayjs(period.end))
 		.add(1, 'day')
 		.format('YYYY-MM-DDTHH:mm:ssZ')
 });

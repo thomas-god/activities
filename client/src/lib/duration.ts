@@ -117,3 +117,5 @@ export const formatWeekInterval = (start: number | string): string => {
 
 	return `${startDate.format('MMM D')}-${endDate.format('MMM D')}`;
 };
+
+export const now = (): dayjs.Dayjs => dayjs();
