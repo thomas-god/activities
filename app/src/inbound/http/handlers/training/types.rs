@@ -15,10 +15,10 @@ use crate::{
             TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
         },
         training::{
-            SportFilter, TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
-            TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSummary,
-            TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
-            TrainingPeriodId, TrainingPeriodSports,
+            SportFilter, TrainingMetricActivityFilters, TrainingMetricAggregate,
+            TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope,
+            TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
+            TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     inbound::http::handlers::training::utils::GranuleValues,
@@ -285,7 +285,7 @@ pub struct APITrainingMetricFilters {
     pub rpes: Option<Vec<u8>>,
 }
 
-impl TryFrom<&APITrainingMetricFilters> for TrainingMetricFilters {
+impl TryFrom<&APITrainingMetricFilters> for TrainingMetricActivityFilters {
     type Error = String;
 
     fn try_from(value: &APITrainingMetricFilters) -> Result<Self, Self::Error> {
@@ -309,7 +309,7 @@ impl TryFrom<&APITrainingMetricFilters> for TrainingMetricFilters {
     }
 }
 
-impl TryFrom<APITrainingMetricFilters> for TrainingMetricFilters {
+impl TryFrom<APITrainingMetricFilters> for TrainingMetricActivityFilters {
     type Error = String;
     fn try_from(value: APITrainingMetricFilters) -> Result<Self, Self::Error> {
         Self::try_from(&value)

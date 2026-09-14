@@ -9,7 +9,7 @@ use crate::{
         models::{
             activity::{ActivityMetric, ActivityMetricSource, Unit},
             training::{
-                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
+                TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricDefinition,
                 TrainingMetricGranularity, TrainingMetricSummary, TrainingMetricSummaryAverage,
                 TrainingMetricTarget, TrainingMetricWindow,
             },
@@ -91,10 +91,10 @@ pub async fn compute_training_metric_values<
     let filters = request
         .filters
         .as_ref()
-        .map(TrainingMetricFilters::try_from)
+        .map(TrainingMetricActivityFilters::try_from)
         .transpose()
         .map_err(|_| StatusCode::BAD_REQUEST)?
-        .unwrap_or_else(TrainingMetricFilters::empty);
+        .unwrap_or_else(TrainingMetricActivityFilters::empty);
 
     let target = request
         .target

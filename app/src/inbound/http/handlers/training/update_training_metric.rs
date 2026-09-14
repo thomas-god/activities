@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::domain::models::UserId;
 use crate::domain::models::activity::ActivityMetric;
 use crate::domain::models::training::{
-    TrainingMetricFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
+    TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
     TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
 };
 use crate::domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
@@ -80,10 +80,10 @@ fn build_request(
     let name = TrainingMetricName::from(body.name);
     let filters = body
         .filters
-        .map(TrainingMetricFilters::try_from)
+        .map(TrainingMetricActivityFilters::try_from)
         .transpose()
         .map_err(|_| "Invalid fitlers".to_string())?
-        .unwrap_or_else(TrainingMetricFilters::empty);
+        .unwrap_or_else(TrainingMetricActivityFilters::empty);
 
     let target = body
         .target

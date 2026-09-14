@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
-        models::{UserId, training::TrainingMetricFilters},
+        models::{UserId, training::TrainingMetricActivityFilters},
         ports::{
             activity::IActivityService,
             preferences::IPreferencesService,

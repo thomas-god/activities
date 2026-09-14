@@ -13,8 +13,8 @@ use crate::domain::{
         activity::{ActivityMetric, ActivityMetricSource},
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         training::{
-            TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
-            TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricGroupBy,
+            TrainingMetric, TrainingMetricActivityFilters, TrainingMetricAggregate,
+            TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricGroupBy,
             TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSummary,
             TrainingMetricTarget, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
             TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
@@ -43,7 +43,7 @@ type DefinitionRow = (
     Option<ActivityMetric>,
     Option<TrainingMetricGranularity>,
     Option<TrainingMetricAggregate>,
-    TrainingMetricFilters,
+    TrainingMetricActivityFilters,
     Option<TrainingMetricGroupBy>,
     Option<TrainingPeriodId>,
     Option<TrainingMetricSummary>,
@@ -968,8 +968,8 @@ mod test_sqlite_training_repository {
         domain::models::{
             activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric, Unit},
             training::{
-                SportFilter, TrainingMetricAggregate, TrainingMetricDefinitionPatch,
-                TrainingMetricFilters, TrainingMetricGranularity, TrainingMetricPatch,
+                SportFilter, TrainingMetricActivityFilters, TrainingMetricAggregate,
+                TrainingMetricDefinitionPatch, TrainingMetricGranularity, TrainingMetricPatch,
                 TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingNote,
                 TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
                 TrainingPeriodId, TrainingPeriodSports,
@@ -1016,7 +1016,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1036,7 +1036,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1056,7 +1056,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::new(
+                TrainingMetricActivityFilters::new(
                     Some(vec![SportFilter::Sport(Sport::Running)]),
                     None,
                     None,
@@ -1081,7 +1081,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     Some(TrainingMetricGroupBy::Sport),
                 )),
-                TrainingMetricFilters::new(
+                TrainingMetricActivityFilters::new(
                     Some(vec![SportFilter::Sport(Sport::Running)]),
                     None,
                     None,
@@ -1105,7 +1105,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     None,
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             ),
@@ -1124,7 +1124,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     Some(TrainingMetricGroupBy::Sport),
                 )),
-                TrainingMetricFilters::new(
+                TrainingMetricActivityFilters::new(
                     Some(vec![SportFilter::Sport(Sport::Running)]),
                     None,
                     None,
@@ -1168,7 +1168,7 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 ActivityMetric::Distance,
                 None,
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1338,7 +1338,7 @@ mod test_sqlite_training_repository {
             TrainingMetricDefinitionPatch::new(
                 ActivityMetric::AvgPace,
                 None,
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1671,7 +1671,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Max,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1688,7 +1688,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1746,7 +1746,7 @@ mod test_sqlite_training_repository {
         )))
         .bind(TrainingMetricGranularity::Daily)
         .bind(TrainingMetricAggregate::Max)
-        .bind(TrainingMetricFilters::empty())
+        .bind(TrainingMetricActivityFilters::empty())
         .bind(TrainingMetricGroupBy::none())
         .bind::<Option<String>>(None)
         .execute(&repository.writer)
@@ -3562,7 +3562,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3582,7 +3582,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3638,7 +3638,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3658,7 +3658,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3678,7 +3678,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3767,7 +3767,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3787,7 +3787,7 @@ mod test_sqlite_training_repository {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),

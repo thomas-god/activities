@@ -14,7 +14,7 @@ use crate::domain::models::{
     preferences::{ActivityListSummary, Preference, PreferenceKey},
     search::SearchDocumentEvent,
     training::{
-        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSummary,
         TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
         TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
@@ -383,13 +383,13 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricValue {
     }
 }
 
-impl sqlx::Type<sqlx::Sqlite> for TrainingMetricFilters {
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricActivityFilters {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
         <Vec<u8> as sqlx::Type<sqlx::Sqlite>>::type_info()
     }
 }
 
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricFilters {
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricActivityFilters {
     fn encode_by_ref(
         &self,
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
@@ -400,7 +400,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricFilters {
     }
 }
 
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricFilters {
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricActivityFilters {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let bytes = <&[u8] as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(serde_json::from_slice(bytes)?)

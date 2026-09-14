@@ -104,14 +104,14 @@ impl SportFilter {
 }
 
 #[derive(Debug, Clone, PartialEq, Constructor, Serialize, Deserialize)]
-pub struct TrainingMetricFilters {
+pub struct TrainingMetricActivityFilters {
     sports: Option<Vec<SportFilter>>,
     workout_types: Option<Vec<WorkoutType>>,
     bonked: Option<BonkStatus>,
     rpes: Option<Vec<ActivityRpe>>,
 }
 
-impl TrainingMetricFilters {
+impl TrainingMetricActivityFilters {
     pub fn empty() -> Self {
         Self {
             sports: None,
@@ -481,7 +481,7 @@ pub struct TrainingMetricDefinition {
     user: UserId,
     metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
-    filters: TrainingMetricFilters,
+    filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
     target: Option<TrainingMetricTarget>,
 }
@@ -511,7 +511,7 @@ impl TrainingMetricWindow {
 pub struct TrainingMetricDefinitionPatch {
     metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
-    filters: TrainingMetricFilters,
+    filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
     target: Option<TrainingMetricTarget>,
 }
@@ -525,7 +525,7 @@ impl TrainingMetricDefinitionPatch {
         &self.window
     }
 
-    pub fn filters(&self) -> &TrainingMetricFilters {
+    pub fn filters(&self) -> &TrainingMetricActivityFilters {
         &self.filters
     }
 
@@ -551,7 +551,7 @@ impl TrainingMetricDefinition {
         &self.window
     }
 
-    pub fn filters(&self) -> &TrainingMetricFilters {
+    pub fn filters(&self) -> &TrainingMetricActivityFilters {
         &self.filters
     }
 
@@ -592,20 +592,18 @@ impl TrainingMetricDefinition {
         }
     }
 
-    pub fn compute_values(&self, activities: &[(Activity, f64)]) -> TrainingMetricValues {
-        let values = match self.window.as_ref() {
-            None => HashMap::from_iter(activities.iter().filter_map(|(activity, value)| {
-                if self.filters().matches(activity) {
-                    Some((
-                        TrainingMetricBin::new(activity.start_time().datetime().to_rfc3339(), None),
-                        TrainingMetricValue::SingleValue(*value),
-                    ))
-                } else {
-                    None
-                }
-            })),
+    /// Compute training metric values from a list of activities.
+    pub fn compute_values_from_activities(
+        &self,
+        activities_with_metric: Vec<(Activity, f64)>,
+    ) -> TrainingMetricValues {
+        let filtered_activities = activities_with_metric
+            .iter()
+            .filter(|(activity, _metric_value)| self.filters().matches(activity));
 
-            Some(window) => group_and_aggregate_metrics(activities, self.filters(), window),
+        let values = match self.window.as_ref() {
+            None => process_activities_without_window(filtered_activities),
+            Some(window) => group_and_aggregate_metrics(filtered_activities, window),
         };
         let summary = self.summary.compute(&values);
 
@@ -613,29 +611,34 @@ impl TrainingMetricDefinition {
     }
 }
 
-fn group_and_aggregate_metrics(
-    activities: &[(Activity, f64)],
-    filters: &TrainingMetricFilters,
+fn process_activities_without_window<'a>(
+    activities: impl Iterator<Item = &'a (Activity, f64)>,
+) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
+    HashMap::from_iter(activities.map(|(activity, metric_value)| {
+        (
+            TrainingMetricBin::new(activity.start_time().datetime().to_rfc3339(), None),
+            TrainingMetricValue::SingleValue(*metric_value),
+        )
+    }))
+}
+
+fn group_and_aggregate_metrics<'a>(
+    activities: impl Iterator<Item = &'a (Activity, f64)>,
     window: &TrainingMetricWindow,
 ) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
     let metrics = activities
-        .iter()
-        .filter_map(|(activity, metric_value)| {
-            if filters.matches(activity) {
-                Some((
-                    window
-                        .group_by()
-                        .as_ref()
-                        .and_then(|group_by| group_by.extract_group(activity)),
-                    ActivityMetricValue::new(
-                        *metric_value,
-                        *activity.start_time(),
-                        *activity.duration(),
-                    ),
-                ))
-            } else {
-                None
-            }
+        .map(|(activity, metric_value)| {
+            (
+                window
+                    .group_by()
+                    .as_ref()
+                    .and_then(|group_by| group_by.extract_group(activity)),
+                ActivityMetricValue::new(
+                    *metric_value,
+                    *activity.start_time(),
+                    *activity.duration(),
+                ),
+            )
         })
         .collect();
 
@@ -1717,7 +1720,7 @@ mod test_training_metrics {
                 TrainingMetricAggregate::Max,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::new(
+            TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 None,
                 None,
@@ -1727,7 +1730,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values(&activities);
+        let metrics = metric_definition.compute_values_from_activities(activities);
 
         assert!(metrics.is_empty());
     }
@@ -1746,12 +1749,12 @@ mod test_training_metrics {
                 TrainingMetricAggregate::Max,
                 Some(TrainingMetricGroupBy::Sport),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
 
-        let metrics = metric_definition.compute_values(&activities);
+        let metrics = metric_definition.compute_values_from_activities(activities);
 
         assert!(
             metrics
@@ -1787,12 +1790,12 @@ mod test_training_metrics {
             UserId::test_default(),
             ActivityMetric::Calories,
             window,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
 
-        let metrics = metric_definition.compute_values(&activities);
+        let metrics = metric_definition.compute_values_from_activities(activities);
 
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics.unit(), Unit::KiloCalorie);
@@ -1829,7 +1832,7 @@ mod test_training_metrics {
             UserId::test_default(),
             ActivityMetric::Calories,
             window,
-            TrainingMetricFilters::new(
+            TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Cycling)]),
                 None,
                 None,
@@ -1839,7 +1842,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values(&activities);
+        let metrics = metric_definition.compute_values_from_activities(activities);
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics.unit(), Unit::KiloCalorie);
@@ -2456,20 +2459,22 @@ mod test_training_metric_filters {
         )
     }
 
-    fn create_filter_with_sports(sports: Vec<SportFilter>) -> TrainingMetricFilters {
-        TrainingMetricFilters::new(Some(sports), None, None, None)
+    fn create_filter_with_sports(sports: Vec<SportFilter>) -> TrainingMetricActivityFilters {
+        TrainingMetricActivityFilters::new(Some(sports), None, None, None)
     }
 
-    fn create_filter_with_workout_types(workout_types: Vec<WorkoutType>) -> TrainingMetricFilters {
-        TrainingMetricFilters::new(None, Some(workout_types), None, None)
+    fn create_filter_with_workout_types(
+        workout_types: Vec<WorkoutType>,
+    ) -> TrainingMetricActivityFilters {
+        TrainingMetricActivityFilters::new(None, Some(workout_types), None, None)
     }
 
-    fn create_filter_with_bonk_status(bonk_status: BonkStatus) -> TrainingMetricFilters {
-        TrainingMetricFilters::new(None, None, Some(bonk_status), None)
+    fn create_filter_with_bonk_status(bonk_status: BonkStatus) -> TrainingMetricActivityFilters {
+        TrainingMetricActivityFilters::new(None, None, Some(bonk_status), None)
     }
 
-    fn create_filter_with_rpes(rpes: Vec<ActivityRpe>) -> TrainingMetricFilters {
-        TrainingMetricFilters::new(None, None, None, Some(rpes))
+    fn create_filter_with_rpes(rpes: Vec<ActivityRpe>) -> TrainingMetricActivityFilters {
+        TrainingMetricActivityFilters::new(None, None, None, Some(rpes))
     }
 
     #[test]
@@ -2651,7 +2656,7 @@ mod test_training_metric_filters {
 
         // Should match when all filters match
         assert!(
-            TrainingMetricFilters::new(
+            TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 Some(vec![WorkoutType::Tempo]),
                 Some(BonkStatus::Bonked),
@@ -2662,7 +2667,7 @@ mod test_training_metric_filters {
 
         // Should not match when sport doesn't match
         assert!(
-            !TrainingMetricFilters::new(
+            !TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Cycling)]),
                 Some(vec![WorkoutType::Tempo]),
                 Some(BonkStatus::Bonked),
@@ -2673,7 +2678,7 @@ mod test_training_metric_filters {
 
         // Should not match when workout type doesn't match
         assert!(
-            !TrainingMetricFilters::new(
+            !TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 Some(vec![WorkoutType::Easy]),
                 Some(BonkStatus::Bonked),
@@ -2684,7 +2689,7 @@ mod test_training_metric_filters {
 
         // Should not match when bonk status doesn't match
         assert!(
-            !TrainingMetricFilters::new(
+            !TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 Some(vec![WorkoutType::Tempo]),
                 Some(BonkStatus::None),
@@ -2695,7 +2700,7 @@ mod test_training_metric_filters {
 
         // Should not match when RPE doesn't match
         assert!(
-            !TrainingMetricFilters::new(
+            !TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Running)]),
                 Some(vec![WorkoutType::Tempo]),
                 Some(BonkStatus::None),
@@ -2715,12 +2720,12 @@ mod test_training_metric_filters {
         let activity_minimal = create_activity_without_optional_fields();
 
         // When sports filter is None, should match any sport
-        let filter_no_sport = TrainingMetricFilters::new(None, None, None, None);
+        let filter_no_sport = TrainingMetricActivityFilters::new(None, None, None, None);
         assert!(filter_no_sport.matches(&activity_cycling));
         assert!(filter_no_sport.matches(&activity_running));
 
         // When workout_types filter is None, should match any workout type
-        let filter_no_workout = TrainingMetricFilters::new(
+        let filter_no_workout = TrainingMetricActivityFilters::new(
             Some(vec![SportFilter::Sport(Sport::Running)]),
             None,
             None,
@@ -2730,7 +2735,7 @@ mod test_training_metric_filters {
         assert!(filter_no_workout.matches(&activity_minimal));
 
         // When bonked filter is None, should match any bonk status
-        let filter_no_bonk = TrainingMetricFilters::new(
+        let filter_no_bonk = TrainingMetricActivityFilters::new(
             Some(vec![SportFilter::Sport(Sport::Running)]),
             None,
             None,
@@ -2740,7 +2745,7 @@ mod test_training_metric_filters {
         assert!(filter_no_bonk.matches(&activity_minimal));
 
         // When rpe filter is None, should match any RPE
-        let filter_no_rpe = TrainingMetricFilters::new(
+        let filter_no_rpe = TrainingMetricActivityFilters::new(
             Some(vec![SportFilter::Sport(Sport::Running)]),
             None,
             None,
@@ -2750,7 +2755,7 @@ mod test_training_metric_filters {
         assert!(filter_no_rpe.matches(&activity_minimal));
 
         // Empty filter (all None) should match any activity
-        let empty_filter = TrainingMetricFilters::empty();
+        let empty_filter = TrainingMetricActivityFilters::empty();
         assert!(empty_filter.matches(&activity_cycling));
         assert!(empty_filter.matches(&activity_running));
         assert!(empty_filter.matches(&activity_with_workout));
@@ -2761,7 +2766,7 @@ mod test_training_metric_filters {
 
     #[test]
     fn test_merge_none_default_sports_to_none_sport_filter() {
-        let filter = TrainingMetricFilters::empty();
+        let filter = TrainingMetricActivityFilters::empty();
         let default_sports = None;
 
         let new_filter = filter.merge_default_sports(&default_sports);
@@ -2784,7 +2789,7 @@ mod test_training_metric_filters {
 
     #[test]
     fn test_merge_default_sports_to_none_sport_filter() {
-        let filter = TrainingMetricFilters::empty();
+        let filter = TrainingMetricActivityFilters::empty();
         let default_sports = Some(vec![
             SportFilter::Sport(Sport::AlpineSki),
             SportFilter::Sport(Sport::Running),
@@ -3298,7 +3303,7 @@ mod test_training_metrics_ordering {
                 TrainingMetricAggregate::Sum,
                 None,
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -3548,7 +3553,7 @@ mod test_training_metric_target {
             UserId::test_default(),
             ActivityMetric::Distance,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
         )
@@ -3577,7 +3582,7 @@ mod test_training_metric_target {
             UserId::test_default(),
             ActivityMetric::Distance,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -3591,7 +3596,7 @@ mod test_training_metric_target {
         let patch = TrainingMetricDefinitionPatch::new(
             ActivityMetric::Calories,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             Some(TrainingMetricTarget::new(2000.0, Unit::KiloCalorie)),
         );
@@ -3610,7 +3615,7 @@ mod test_training_metric_target {
         let patch = TrainingMetricDefinitionPatch::new(
             ActivityMetric::Calories,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );

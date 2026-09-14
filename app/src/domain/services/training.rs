@@ -64,7 +64,7 @@ where
         definition: &TrainingMetricDefinition,
         date_range: &DateRange,
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
-        let activities = self
+        let activities_with_metrics = self
             .activity_service
             .list_activities_with_metrics(
                 definition.user(),
@@ -83,7 +83,7 @@ where
             })
             .collect::<Vec<_>>();
 
-        Ok(definition.compute_values(&activities))
+        Ok(definition.compute_values_from_activities(activities_with_metrics))
     }
 }
 
@@ -1072,7 +1072,7 @@ mod tests_training_metrics_service {
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::{
         models::training::{
-            TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
+            TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricDefinition,
             TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
         },
         ports::training::{GetTrainingMetricsDefinitionsError, SaveTrainingMetricError},
@@ -1098,7 +1098,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
             None,
@@ -1134,7 +1134,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
             Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
@@ -1187,7 +1187,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty()
+            TrainingMetricActivityFilters::empty()
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
@@ -1221,7 +1221,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty()
+            TrainingMetricActivityFilters::empty()
                 .merge_default_sports(&Some(vec![SportFilter::Sport(Sport::AlpineSki)])),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
@@ -1255,7 +1255,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Average,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
             None,
@@ -1316,7 +1316,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Average,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1366,7 +1366,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Average,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1391,7 +1391,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Sum,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1444,7 +1444,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Sum,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1470,7 +1470,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Average,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1534,7 +1534,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Sum,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1619,7 +1619,7 @@ mod tests_training_metrics_service {
                         TrainingMetricAggregate::Sum,
                         TrainingMetricGroupBy::none(),
                     )),
-                    TrainingMetricFilters::empty(),
+                    TrainingMetricActivityFilters::empty(),
                     TrainingMetricSummary::empty(),
                     None,
                 ),
@@ -1698,7 +1698,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Average,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -1814,7 +1814,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Sum,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -1831,7 +1831,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Sum,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -1909,7 +1909,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Sum,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -1926,7 +1926,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Sum,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -1943,7 +1943,7 @@ mod tests_training_metrics_service {
                             TrainingMetricAggregate::Sum,
                             TrainingMetricGroupBy::none(),
                         )),
-                        TrainingMetricFilters::empty(),
+                        TrainingMetricActivityFilters::empty(),
                         TrainingMetricSummary::empty(),
                         None,
                     ),
@@ -2029,9 +2029,9 @@ mod tests_training_metrics_service {
                                 TrainingMetricAggregate::Sum,
                                 TrainingMetricGroupBy::none(),
                             )),
-                            TrainingMetricFilters::empty().merge_default_sports(&Some(vec![
-                                SportFilter::Sport(Sport::AlpineSki),
-                            ])),
+                            TrainingMetricActivityFilters::empty().merge_default_sports(&Some(
+                                vec![SportFilter::Sport(Sport::AlpineSki)],
+                            )),
                             TrainingMetricSummary::empty(),
                             None,
                         ),
@@ -2048,7 +2048,7 @@ mod tests_training_metrics_service {
                                 TrainingMetricAggregate::Sum,
                                 TrainingMetricGroupBy::none(),
                             )),
-                            TrainingMetricFilters::empty(),
+                            TrainingMetricActivityFilters::empty(),
                             TrainingMetricSummary::empty(),
                             None,
                         ),
@@ -2166,7 +2166,7 @@ mod tests_training_metrics_service {
                     TrainingMetricAggregate::Average,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -2297,7 +2297,7 @@ mod tests_training_metrics_service {
                 TrainingMetricAggregate::Sum,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -2329,7 +2329,7 @@ mod tests_training_metrics_service {
             TrainingMetricName::from("Updated Metric"),
             ActivityMetric::Calories,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -2367,7 +2367,7 @@ mod tests_training_metrics_service {
             TrainingMetricName::from("Updated Metric"),
             ActivityMetric::Calories,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -2404,7 +2404,7 @@ mod tests_training_metrics_service {
             TrainingMetricName::from("Updated Metric"),
             ActivityMetric::Calories,
             None,
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -4176,7 +4176,7 @@ mod test_training_service_metric_values {
         Sport,
     };
     use crate::domain::models::training::{
-        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricSummary, TrainingMetricWindow,
     };
     use crate::domain::ports::training::GetTrainingMetricValuesError;
@@ -4235,7 +4235,7 @@ mod test_training_service_metric_values {
                 TrainingMetricAggregate::Sum,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -4277,7 +4277,7 @@ mod test_training_service_metric_values {
                 TrainingMetricAggregate::Sum,
                 TrainingMetricGroupBy::none(),
             )),
-            TrainingMetricFilters::empty(),
+            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );
@@ -4637,7 +4637,7 @@ mod test_training_service_copy_metric {
     use super::*;
     use crate::domain::models::activity::ActivityMetric;
     use crate::domain::models::training::{
-        TrainingMetricAggregate, TrainingMetricFilters, TrainingMetricGranularity,
+        TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
         TrainingMetricGroupBy, TrainingMetricName, TrainingMetricSummary, TrainingMetricWindow,
         TrainingPeriod, TrainingPeriodSports,
     };
@@ -4659,7 +4659,7 @@ mod test_training_service_copy_metric {
                     TrainingMetricAggregate::Sum,
                     TrainingMetricGroupBy::none(),
                 )),
-                TrainingMetricFilters::empty(),
+                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),

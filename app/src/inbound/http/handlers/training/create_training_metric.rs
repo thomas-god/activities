@@ -7,7 +7,7 @@ use crate::{
             UserId,
             activity::ActivityMetric,
             training::{
-                TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName,
+                TrainingMetricActivityFilters, TrainingMetricGroupBy, TrainingMetricName,
                 TrainingMetricTarget, TrainingMetricWindow,
             },
         },
@@ -54,10 +54,10 @@ fn build_request(
     }
     let filters = body
         .filters
-        .map(TrainingMetricFilters::try_from)
+        .map(TrainingMetricActivityFilters::try_from)
         .transpose()
         .map_err(|_| "Invalid fitlers".to_string())?
-        .unwrap_or_else(TrainingMetricFilters::empty);
+        .unwrap_or_else(TrainingMetricActivityFilters::empty);
 
     let target = body
         .target
