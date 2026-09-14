@@ -221,22 +221,8 @@ pub async fn get_training_period_metrics<
 
     let date_range_domain = period.range_default_tomorrow();
     let date_range = MetricsDateRange {
-        start: date_range_domain
-            .start()
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_local_timezone(Local)
-            .unwrap()
-            .fixed_offset(),
-        end: Some(
-            date_range_domain
-                .end()
-                .and_hms_opt(23, 59, 59)
-                .unwrap()
-                .and_local_timezone(Local)
-                .unwrap()
-                .fixed_offset(),
-        ),
+        start: *date_range_domain.start(),
+        end: Some(*date_range_domain.end()),
     };
 
     let res = state
@@ -285,7 +271,7 @@ mod tests {
     fn test_metrics_query_scope_global_when_no_period_id() {
         let query = MetricsQuery::Global {
             date_range: MetricsDateRange {
-                start: "2025-01-01T00:00:00+00:00".parse().unwrap(),
+                start: "2025-01-01".parse().unwrap(),
                 end: None,
             },
         };
@@ -298,7 +284,7 @@ mod tests {
         let period_id = "test-period-123";
         let query = MetricsQuery::Period {
             date_range: MetricsDateRange {
-                start: "2025-01-01T00:00:00+00:00".parse().unwrap(),
+                start: "2025-01-01".parse().unwrap(),
                 end: None,
             },
             period_id: period_id.to_string(),

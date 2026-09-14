@@ -218,10 +218,10 @@ export async function fetchTrainingMetrics(
 ): Promise<TrainingMetricList> {
 	const params = new URLSearchParams();
 
-	const startDate = dayjs(start).format('YYYY-MM-DDTHH:mm:ssZ');
+	const startDate = dayjs(start).format('YYYY-MM-DD');
 	params.set('start', startDate);
 
-	const endDate = dayjs(end).format('YYYY-MM-DDTHH:mm:ssZ');
+	const endDate = dayjs(end).format('YYYY-MM-DD');
 	params.set('end', endDate);
 
 	// Add scope parameters
@@ -587,7 +587,11 @@ export const updateTrainingMetric = async (
 export const getTrainingMetricPreview = async (
 	payload: PreviewTrainingMetricPayload
 ): Promise<Option<TrainingMetric>> => {
-	const body = JSON.stringify(payload);
+	const body = JSON.stringify({
+		...payload,
+		start: dayjs(payload.start).format('YYYY-MM-DD'),
+		end: dayjs(payload.end).format('YYYY-MM-DD')
+	});
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/values`, {
 		body,
 		method: 'POST',

@@ -698,11 +698,7 @@ impl TrainingMetricGranularity {
 
     /// Computes the bins' keys for the [TrainingMetricGranularity] over the given range [start,
     /// end].
-    pub fn bins_keys(
-        &self,
-        start: &DateTime<FixedOffset>,
-        end: &DateTime<FixedOffset>,
-    ) -> Vec<String> {
+    pub fn bins_keys(&self, start: &chrono::NaiveDate, end: &chrono::NaiveDate) -> Vec<String> {
         let mut dates = vec![];
 
         #[allow(clippy::type_complexity)]
@@ -712,18 +708,18 @@ impl TrainingMetricGranularity {
             Box<dyn Fn(NaiveDate) -> Option<NaiveDate>>,
         ) = match self {
             Self::Daily => (
-                start.date_naive(),
-                end.date_naive(),
+                *start,
+                *end,
                 Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(1))),
             ),
             Self::Weekly => (
-                start.date_naive().week(chrono::Weekday::Mon).first_day(),
-                end.date_naive().week(chrono::Weekday::Mon).first_day(),
+                start.week(chrono::Weekday::Mon).first_day(),
+                end.week(chrono::Weekday::Mon).first_day(),
                 Box::new(|dt: NaiveDate| dt.checked_add_days(Days::new(7))),
             ),
             Self::Monthly => (
-                start.date_naive().with_day(1).unwrap(),
-                end.date_naive().with_day(1).unwrap(),
+                start.with_day(1).unwrap(),
+                end.with_day(1).unwrap(),
                 Box::new(|dt: NaiveDate| dt.checked_add_months(Months::new(1))),
             ),
         };
@@ -1855,12 +1851,8 @@ mod test_training_metrics {
 
     #[test]
     fn test_granularity_bins_daily() {
-        let start = "2025-09-03T12:03:00+02:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
-        let end = "2025-09-06T12:03:00+10:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
+        let start = "2025-09-03".parse::<chrono::NaiveDate>().unwrap();
+        let end = "2025-09-06".parse::<chrono::NaiveDate>().unwrap();
         let granularity = TrainingMetricGranularity::Daily;
 
         let res = granularity.bins_keys(&start, &end);
@@ -1878,12 +1870,8 @@ mod test_training_metrics {
 
     #[test]
     fn test_granularity_bins_weekly() {
-        let start = "2025-08-23T12:03:00+02:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
-        let end = "2025-09-09T12:03:00+10:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
+        let start = "2025-08-23".parse::<chrono::NaiveDate>().unwrap();
+        let end = "2025-09-09".parse::<chrono::NaiveDate>().unwrap();
         let granularity = TrainingMetricGranularity::Weekly;
 
         let res = granularity.bins_keys(&start, &end);
@@ -1901,12 +1889,8 @@ mod test_training_metrics {
 
     #[test]
     fn test_granularity_bins_monthly() {
-        let start = "2025-07-23T12:03:00+02:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
-        let end = "2025-09-09T12:03:00+10:00"
-            .parse::<DateTime<FixedOffset>>()
-            .unwrap();
+        let start = "2025-07-23".parse::<chrono::NaiveDate>().unwrap();
+        let end = "2025-09-09".parse::<chrono::NaiveDate>().unwrap();
         let granularity = TrainingMetricGranularity::Monthly;
 
         let res = granularity.bins_keys(&start, &end);

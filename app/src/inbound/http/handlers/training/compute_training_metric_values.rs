@@ -56,18 +56,14 @@ pub struct ComputeMetricValuesRequest {
     summary: APITrainingMetricSummary,
     #[serde(default)]
     target: Option<APITrainingMetricTarget>,
-    start: DateTime<FixedOffset>,
-    end: Option<DateTime<FixedOffset>>,
+    start: chrono::NaiveDate,
+    end: Option<chrono::NaiveDate>,
 }
 
 impl From<&ComputeMetricValuesRequest> for DateRange {
     fn from(value: &ComputeMetricValuesRequest) -> Self {
-        let start_date = value.start.date_naive();
-        let end_date = value
-            .end
-            .map(|e| e.date_naive())
-            .unwrap_or_else(|| Local::now().date_naive());
-        Self::new(start_date, end_date)
+        let end_date = value.end.unwrap_or_else(|| Local::now().date_naive());
+        Self::new(value.start, end_date)
     }
 }
 
@@ -226,7 +222,7 @@ mod tests {
                 "granularity": "Daily",
                 "aggregate": "Sum"
             },
-            "start": "2024-01-01T00:00:00+00:00"
+            "start": "2024-01-01"
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
 
@@ -259,8 +255,8 @@ mod tests {
                 "aggregate": "Sum",
                 "group_by": "Sport"
             },
-            "start": "2024-01-01T00:00:00+00:00",
-            "end": "2024-12-31T23:59:59+00:00",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
             "filters": {"sports": [{"Sport": "Running"}]}
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
@@ -284,7 +280,7 @@ mod tests {
         let json = r#"{
             "metric": "Calories",
             "target": {"value": 100.0, "unit": "km"},
-            "start": "2024-01-01T00:00:00+00:00"
+            "start": "2024-01-01"
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
 
@@ -304,7 +300,7 @@ mod tests {
             filters: None,
             summary: APITrainingMetricSummary::default(),
             target: None,
-            start: DateTime::parse_from_rfc3339("2024-01-01T00:00:00+00:00").unwrap(),
+            start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
             end: None,
         };
 
@@ -361,8 +357,8 @@ mod tests {
                 true,
             ))),
             target: Some(APITrainingMetricTarget::new(100.0, "km".to_string())),
-            start: DateTime::parse_from_rfc3339("2024-01-01T00:00:00+00:00").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2024-12-31T23:59:59+00:00").unwrap()),
+            start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
+            end: Some("2024-12-31".parse::<chrono::NaiveDate>().unwrap()),
         };
 
         let values = HashMap::from([
@@ -432,7 +428,7 @@ mod tests {
             }),
             summary: APITrainingMetricSummary::default(),
             target: None,
-            start: DateTime::parse_from_rfc3339("2024-01-01T00:00:00+00:00").unwrap(),
+            start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
             end: None,
         };
 
@@ -471,7 +467,7 @@ mod tests {
             filters: None,
             summary: APITrainingMetricSummary::default(),
             target: None,
-            start: DateTime::parse_from_rfc3339("2024-01-01T00:00:00+00:00").unwrap(),
+            start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
             end: None,
         };
 
@@ -507,7 +503,7 @@ mod tests {
             }),
             summary: APITrainingMetricSummary::default(),
             target: None,
-            start: DateTime::parse_from_rfc3339("2024-01-01T00:00:00+00:00").unwrap(),
+            start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
             end: None,
         };
 

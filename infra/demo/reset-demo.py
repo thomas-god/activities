@@ -96,7 +96,7 @@ def delete_all_global_metrics() -> None:
     print("Deleting all existing training metrics...")
     try:
         response = requests.get(
-            f"{API_URL}/training/metrics?start=2020-01-01T00:00:00%2B00:00&scope=global"
+            f"{API_URL}/training/metrics?start=2020-01-01&scope=global"
         )
         if response.status_code != 200:
             print(f"Failed to fetch metrics: {response.status_code}")

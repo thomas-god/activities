@@ -56,8 +56,8 @@
 	let metricDefinitionPayload = $derived(fieldsAsPayload(fields));
 
 	let dates = {
-		start: dayjs().subtract(4, 'weeks').format('YYYY-MM-DDTHH:mm:ssZ'),
-		end: dayjs().add(1, 'day').format('YYYY-MM-DDTHH:mm:ssZ')
+		start: dayjs().subtract(4, 'weeks').format('YYYY-MM-DD'),
+		end: dayjs().add(1, 'day').format('YYYY-MM-DD')
 	};
 
 	let previewRequest: Option<PreviewTrainingMetricPayload> = $derived.by(() => {

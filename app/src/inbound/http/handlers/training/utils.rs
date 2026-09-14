@@ -84,18 +84,14 @@ impl GroupedMetricValues {
 
 #[derive(Debug, Deserialize)]
 pub struct MetricsDateRange {
-    pub start: DateTime<FixedOffset>,
-    pub end: Option<DateTime<FixedOffset>>,
+    pub start: chrono::NaiveDate,
+    pub end: Option<chrono::NaiveDate>,
 }
 
 impl From<&MetricsDateRange> for DateRange {
     fn from(value: &MetricsDateRange) -> Self {
-        let start_date = value.start.date_naive();
-        let end_date = value
-            .end
-            .map(|e| e.date_naive())
-            .unwrap_or_else(|| Local::now().date_naive());
-        Self::new(start_date, end_date)
+        let end_date = value.end.unwrap_or_else(|| Local::now().date_naive());
+        Self::new(value.start, end_date)
     }
 }
 
@@ -124,7 +120,7 @@ pub fn fill_missing_granules(
         .granularity()
         .bins_keys(
             &range.start,
-            &range.end.unwrap_or(Local::now().fixed_offset()),
+            &range.end.unwrap_or(Local::now().date_naive()),
         )
         .iter()
         .map(|granule| granule.to_string())
@@ -767,8 +763,8 @@ mod test_fill_grouped_metric_values {
             TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-26T00:00:00Z").unwrap()),
+            start: "2025-09-24".parse::<chrono::NaiveDate>().unwrap(),
+            end: Some("2025-09-26".parse::<chrono::NaiveDate>().unwrap()),
         };
         let values = GroupedMetricValues::new(
             HashMap::from([(
@@ -810,8 +806,8 @@ mod test_fill_grouped_metric_values {
             TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-23T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-09-27T00:00:00Z").unwrap()),
+            start: "2025-09-23".parse::<chrono::NaiveDate>().unwrap(),
+            end: Some("2025-09-27".parse::<chrono::NaiveDate>().unwrap()),
         };
         let values = GroupedMetricValues::new(
             HashMap::from([(
@@ -854,8 +850,8 @@ mod test_fill_grouped_metric_values {
             TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-24T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-10-08T00:00:00Z").unwrap()),
+            start: "2025-09-24".parse::<chrono::NaiveDate>().unwrap(),
+            end: Some("2025-10-08".parse::<chrono::NaiveDate>().unwrap()),
         };
         let values = GroupedMetricValues::new(
             HashMap::from([(
@@ -896,8 +892,8 @@ mod test_fill_grouped_metric_values {
             TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
-            start: DateTime::parse_from_rfc3339("2025-09-14T00:00:00Z").unwrap(),
-            end: Some(DateTime::parse_from_rfc3339("2025-11-02T00:00:00Z").unwrap()),
+            start: "2025-09-14".parse::<chrono::NaiveDate>().unwrap(),
+            end: Some("2025-11-02".parse::<chrono::NaiveDate>().unwrap()),
         };
         let values = GroupedMetricValues::new(
             HashMap::from([(
