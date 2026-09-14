@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::models::UserId;
-use crate::domain::models::activity::ActivityMetricV2;
+use crate::domain::models::activity::ActivityMetric;
 use crate::domain::models::training::{
     TrainingMetricFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
     TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
@@ -28,7 +28,7 @@ use crate::inbound::parser::ParseFile;
 #[derive(Deserialize)]
 pub struct UpdateTrainingMetricBody {
     name: String,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
@@ -114,7 +114,7 @@ mod tests {
         let json = r#"{"name": "New Metric Name", "metric": "Calories"}"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
         assert_eq!(body.name, "New Metric Name".to_string());
-        assert_eq!(body.metric, ActivityMetricV2::Calories);
+        assert_eq!(body.metric, ActivityMetric::Calories);
         assert!(body.window.is_none());
         assert!(body.filters.is_none());
     }

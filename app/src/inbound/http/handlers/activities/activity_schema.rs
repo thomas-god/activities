@@ -5,7 +5,7 @@ use derive_more::Constructor;
 use serde::Serialize;
 
 use crate::domain::models::activity::{
-    Activity, ActivityMetricV2, ActivityMetricsV2, ActivityNutrition, ActivityTimeseries,
+    Activity, ActivityMetric, ActivityMetrics, ActivityNutrition, ActivityTimeseries,
     ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
 };
 
@@ -172,7 +172,7 @@ pub struct PublicActivity {
 }
 
 impl PublicActivity {
-    pub fn from(activity: &Activity, metrics: &ActivityMetricsV2) -> Self {
+    pub fn from(activity: &Activity, metrics: &ActivityMetrics) -> Self {
         Self {
             id: activity.id().to_string(),
             sport: activity.sport().to_string(),
@@ -220,7 +220,7 @@ pub struct PublicActivityWithTimeseries {
 }
 
 impl PublicActivityWithTimeseries {
-    pub fn from(activity: &ActivityWithParsedData, metrics: &ActivityMetricsV2) -> Self {
+    pub fn from(activity: &ActivityWithParsedData, metrics: &ActivityMetrics) -> Self {
         Self {
             activity: PublicActivity::from(activity.activity(), metrics),
             timeseries: activity.timeseries().into(),

@@ -8,7 +8,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityDuration, ActivityId, ActivityMetricV2, ActivityMetricsV2,
+            Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics,
             ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
             ActivityTimeseries, ActivityWithParsedData, Sport,
         },
@@ -39,16 +39,16 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
-    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>> + Send;
+        metrics: &[ActivityMetric],
+    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>> + Send;
 
     fn list_activities_with_metrics_and_parsed_data(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
+        metrics: &[ActivityMetric],
     ) -> impl Future<
-        Output = Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError>,
+        Output = Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError>,
     > + Send;
 
     fn get_activity_with_parsed_data(
@@ -59,8 +59,8 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
     fn get_activity_with_metrics_and_parsed_data(
         &self,
         activity_id: &ActivityId,
-        metrics: &[ActivityMetricV2],
-    ) -> impl Future<Output = Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>> + Send;
+        metrics: &[ActivityMetric],
+    ) -> impl Future<Output = Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError>> + Send;
 
     fn patch_activity(
         &self,
@@ -403,7 +403,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn update_activity_metric(
         &self,
         activity: &ActivityId,
-        metric: &ActivityMetricV2,
+        metric: &ActivityMetric,
         value: &Option<f64>,
     ) -> impl Future<Output = Result<(), UpdateActivityMetricError>> + Send;
 
@@ -411,8 +411,8 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
-    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>> + Send;
+        metrics: &[ActivityMetric],
+    ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>> + Send;
 
     fn get_activity(
         &self,
@@ -422,8 +422,8 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn get_activity_with_metrics(
         &self,
         id: &ActivityId,
-        metrics: &[ActivityMetricV2],
-    ) -> impl Future<Output = Result<Option<(Activity, ActivityMetricsV2)>, GetActivityError>> + Send;
+        metrics: &[ActivityMetric],
+    ) -> impl Future<Output = Result<Option<(Activity, ActivityMetrics)>, GetActivityError>> + Send;
 
     fn get_activity_with_parsed_data(
         &self,

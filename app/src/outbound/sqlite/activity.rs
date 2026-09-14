@@ -12,9 +12,9 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricV2,
-                ActivityMetricsV2, ActivityName, ActivityNaturalKey, ActivityNutrition,
-                ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
+                Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric,
+                ActivityMetrics, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
+                ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
             },
             search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         },
@@ -102,7 +102,7 @@ impl<R, FP, C> SqliteActivityRepository<R, FP, C> {
     }
 
     #[tracing::instrument(skip_all, err)]
-    pub async fn metric_rowid(&self, metric: &ActivityMetricV2) -> Result<i64, anyhow::Error> {
+    pub async fn metric_rowid(&self, metric: &ActivityMetric) -> Result<i64, anyhow::Error> {
         if let Some(rowid) = sqlx::query_scalar::<_, i64>(
             "
             SELECT rowid FROM t_activities_metrics WHERE metric = ?1 LIMIT 1;
@@ -276,8 +276,8 @@ where
     async fn get_activity_with_metrics(
         &self,
         id: &ActivityId,
-        metrics: &[ActivityMetricV2],
-    ) -> Result<Option<(Activity, ActivityMetricsV2)>, GetActivityError> {
+        metrics: &[ActivityMetric],
+    ) -> Result<Option<(Activity, ActivityMetrics)>, GetActivityError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new("
         SELECT
             t_activities_v2.id,
@@ -298,8 +298,8 @@ where
         }
         builder.push(") ");
 
-        let query = builder.build_query_as::<'_, (ActivityId, ActivityMetricV2, Option<f64>)>();
-        let mut metrics_values: Vec<(ActivityMetricV2, Option<f64>)> = Vec::new();
+        let query = builder.build_query_as::<'_, (ActivityId, ActivityMetric, Option<f64>)>();
+        let mut metrics_values: Vec<(ActivityMetric, Option<f64>)> = Vec::new();
         for (_activity, metric, value) in query
             .fetch_all(&self.readers)
             .await
@@ -314,7 +314,7 @@ where
 
         Ok(Some((
             activity,
-            ActivityMetricsV2::new(HashMap::from_iter(metrics_values)),
+            ActivityMetrics::new(HashMap::from_iter(metrics_values)),
         )))
     }
 
@@ -550,7 +550,7 @@ where
     async fn update_activity_metric(
         &self,
         activity: &ActivityId,
-        metric: &ActivityMetricV2,
+        metric: &ActivityMetric,
         value: &Option<f64>,
     ) -> Result<(), UpdateActivityMetricError> {
         let activity_rowid = sqlx::query_scalar::<_, i64>(
@@ -591,8 +591,8 @@ where
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
-    ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError> {
+        metrics: &[ActivityMetric],
+    ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError> {
         let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new("
         SELECT
             t_activities_v2.id,
@@ -623,8 +623,8 @@ where
             }
         }
         builder.push(") ");
-        let query = builder.build_query_as::<'_, (ActivityId, ActivityMetricV2, Option<f64>)>();
-        let mut metrics_values: HashMap<ActivityId, Vec<(ActivityMetricV2, Option<f64>)>> =
+        let query = builder.build_query_as::<'_, (ActivityId, ActivityMetric, Option<f64>)>();
+        let mut metrics_values: HashMap<ActivityId, Vec<(ActivityMetric, Option<f64>)>> =
             HashMap::new();
         for (activity, metric, value) in query
             .fetch_all(&self.readers)
@@ -642,10 +642,7 @@ where
         let mut res = vec![];
         for activity in self.list_user_activities(user, filters).await? {
             let metrics = metrics_values.remove(activity.id()).unwrap_or_default();
-            res.push((
-                activity,
-                ActivityMetricsV2::new(HashMap::from_iter(metrics)),
-            ));
+            res.push((activity, ActivityMetrics::new(HashMap::from_iter(metrics))));
         }
 
         Ok(res)
@@ -2246,7 +2243,7 @@ mod test_sqlite_activity_repository {
                 .get_activities_with_metrics(
                     activity.user(),
                     &ListActivitiesFilters::empty(),
-                    &[ActivityMetricV2::AvgPower],
+                    &[ActivityMetric::AvgPower],
                 )
                 .await
                 .unwrap();
@@ -2255,7 +2252,7 @@ mod test_sqlite_activity_repository {
             assert!(metrics.is_empty(),);
 
             // Insert a metric value
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &Some(1.2))
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgPower, &Some(1.2))
                 .await
                 .expect("Should have succeeded");
 
@@ -2263,7 +2260,7 @@ mod test_sqlite_activity_repository {
                 .get_activities_with_metrics(
                     activity.user(),
                     &ListActivitiesFilters::empty(),
-                    &[ActivityMetricV2::AvgPower],
+                    &[ActivityMetric::AvgPower],
                 )
                 .await
                 .unwrap();
@@ -2271,11 +2268,11 @@ mod test_sqlite_activity_repository {
             let (_actvity, metrics) = res.first().unwrap();
             assert_eq!(
                 metrics,
-                &ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, Some(1.2))]))
+                &ActivityMetrics::new(HashMap::from([(ActivityMetric::AvgPower, Some(1.2))]))
             );
 
             // Update a metric value
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &None)
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgPower, &None)
                 .await
                 .expect("Should have succeeded");
 
@@ -2283,7 +2280,7 @@ mod test_sqlite_activity_repository {
                 .get_activities_with_metrics(
                     activity.user(),
                     &ListActivitiesFilters::empty(),
-                    &[ActivityMetricV2::AvgPower],
+                    &[ActivityMetric::AvgPower],
                 )
                 .await
                 .unwrap();
@@ -2291,7 +2288,7 @@ mod test_sqlite_activity_repository {
             let (_actvity, metrics) = res.first().unwrap();
             assert_eq!(
                 metrics,
-                &ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, None)]))
+                &ActivityMetrics::new(HashMap::from([(ActivityMetric::AvgPower, None)]))
             );
         }
 
@@ -2310,7 +2307,7 @@ mod test_sqlite_activity_repository {
             let UpdateActivityMetricError::ActivityDoesNotExist(id) = repository
                 .update_activity_metric(
                     &ActivityId::from("non-existing-activity"),
-                    &ActivityMetricV2::AvgPower,
+                    &ActivityMetric::AvgPower,
                     &Some(1.2),
                 )
                 .await
@@ -2340,12 +2337,12 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have succeed");
 
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &Some(3.45))
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgPower, &Some(3.45))
                 .await
                 .expect("Should have succeeded");
 
             let (returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetricV2::AvgPower])
+                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
@@ -2353,7 +2350,7 @@ mod test_sqlite_activity_repository {
             assert_eq!(returned_activity.id(), activity.id());
             assert_eq!(
                 metrics,
-                ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, Some(3.45))]))
+                ActivityMetrics::new(HashMap::from([(ActivityMetric::AvgPower, Some(3.45))]))
             );
         }
 
@@ -2375,7 +2372,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeed");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetricV2::AvgPower])
+                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
@@ -2398,7 +2395,7 @@ mod test_sqlite_activity_repository {
             let err = repo
                 .get_activity_with_metrics(
                     &ActivityId::from("non-existing-activity"),
-                    &[ActivityMetricV2::AvgPower],
+                    &[ActivityMetric::AvgPower],
                 )
                 .await
                 .unwrap_err();
@@ -2426,28 +2423,24 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have succeed");
 
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &Some(1.0))
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgPower, &Some(1.0))
                 .await
                 .expect("Should have succeeded");
-            repo.update_activity_metric(
-                activity.id(),
-                &ActivityMetricV2::AvgHeartRate,
-                &Some(150.0),
-            )
-            .await
-            .expect("Should have succeeded");
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgHeartRate, &Some(150.0))
+                .await
+                .expect("Should have succeeded");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetricV2::AvgPower])
+                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
 
             assert_eq!(
                 metrics,
-                ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, Some(1.0))]))
+                ActivityMetrics::new(HashMap::from([(ActivityMetric::AvgPower, Some(1.0))]))
             );
-            assert!(!metrics.contains_key(&ActivityMetricV2::AvgHeartRate));
+            assert!(!metrics.contains_key(&ActivityMetric::AvgHeartRate));
         }
 
         #[tokio::test]
@@ -2467,19 +2460,19 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have succeed");
 
-            repo.update_activity_metric(activity.id(), &ActivityMetricV2::AvgPower, &None)
+            repo.update_activity_metric(activity.id(), &ActivityMetric::AvgPower, &None)
                 .await
                 .expect("Should have succeeded");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetricV2::AvgPower])
+                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
 
             assert_eq!(
                 metrics,
-                ActivityMetricsV2::new(HashMap::from([(ActivityMetricV2::AvgPower, None)]))
+                ActivityMetrics::new(HashMap::from([(ActivityMetric::AvgPower, None)]))
             );
         }
     }

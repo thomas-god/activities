@@ -17,18 +17,18 @@ use crate::domain::models::{
     search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
 };
 
-pub const DEFAULT_METRICS: [ActivityMetricV2; 11] = [
-    ActivityMetricV2::Calories,
-    ActivityMetricV2::Duration,
-    ActivityMetricV2::Elevation,
-    ActivityMetricV2::Distance,
-    ActivityMetricV2::ActiveDuration,
-    ActivityMetricV2::AvgSpeed,
-    ActivityMetricV2::AvgPace,
-    ActivityMetricV2::AvgHeartRate,
-    ActivityMetricV2::MaxHeartRate,
-    ActivityMetricV2::AvgPower,
-    ActivityMetricV2::NormalizedPower,
+pub const DEFAULT_METRICS: [ActivityMetric; 11] = [
+    ActivityMetric::Calories,
+    ActivityMetric::Duration,
+    ActivityMetric::Elevation,
+    ActivityMetric::Distance,
+    ActivityMetric::ActiveDuration,
+    ActivityMetric::AvgSpeed,
+    ActivityMetric::AvgPace,
+    ActivityMetric::AvgHeartRate,
+    ActivityMetric::MaxHeartRate,
+    ActivityMetric::AvgPower,
+    ActivityMetric::NormalizedPower,
 ];
 
 ///////////////////////////////////////////////////////////////////
@@ -1033,7 +1033,7 @@ impl FromStr for Unit {
 ///////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, Serialize, Deserialize)]
-pub enum ActivityMetricV2 {
+pub enum ActivityMetric {
     // Raw stats
     Duration,
     Calories,
@@ -1072,7 +1072,7 @@ pub enum ActivityMetricV2 {
     NumberOfActivity,
 }
 
-impl ActivityMetricV2 {
+impl ActivityMetric {
     pub fn compute_value(&self, activity: &ActivityWithParsedData) -> Option<f64> {
         match self.source() {
             ActivityMetricSource::Statistic(stat) => activity.statistics().get(&stat).cloned(),
@@ -1185,10 +1185,10 @@ impl ActivityMetricV2 {
 }
 
 #[derive(Debug, Clone, Constructor, Default, PartialEq)]
-pub struct ActivityMetricsV2(HashMap<ActivityMetricV2, Option<f64>>);
+pub struct ActivityMetrics(HashMap<ActivityMetric, Option<f64>>);
 
-impl ActivityMetricsV2 {
-    pub fn contains_key(&self, metric: &ActivityMetricV2) -> bool {
+impl ActivityMetrics {
+    pub fn contains_key(&self, metric: &ActivityMetric) -> bool {
         self.0.contains_key(metric)
     }
 
@@ -1196,15 +1196,15 @@ impl ActivityMetricsV2 {
         self.0.is_empty()
     }
 
-    pub fn insert(&mut self, metric: ActivityMetricV2, value: Option<f64>) {
+    pub fn insert(&mut self, metric: ActivityMetric, value: Option<f64>) {
         let _ = self.0.insert(metric, value);
     }
 
-    pub fn get(&self, metric: &ActivityMetricV2) -> Option<&Option<f64>> {
+    pub fn get(&self, metric: &ActivityMetric) -> Option<&Option<f64>> {
         self.0.get(metric)
     }
 
-    pub fn iter(&self) -> Iter<'_, ActivityMetricV2, Option<f64>> {
+    pub fn iter(&self) -> Iter<'_, ActivityMetric, Option<f64>> {
         self.0.iter()
     }
 }
@@ -1228,87 +1228,79 @@ impl ToUnit for ActivityMetricSource {
     }
 }
 
-impl TryFrom<&ActivityMetricSource> for ActivityMetricV2 {
+impl TryFrom<&ActivityMetricSource> for ActivityMetric {
     type Error = String;
 
     fn try_from(value: &ActivityMetricSource) -> Result<Self, Self::Error> {
         match value {
             ActivityMetricSource::Statistic(statistic) => Ok(match statistic {
-                ActivityStatistic::Calories => ActivityMetricV2::Calories,
-                ActivityStatistic::Distance => ActivityMetricV2::Distance,
-                ActivityStatistic::Duration => ActivityMetricV2::Duration,
-                ActivityStatistic::NormalizedPower => ActivityMetricV2::NormalizedPower,
-                ActivityStatistic::Elevation => ActivityMetricV2::Elevation,
+                ActivityStatistic::Calories => ActivityMetric::Calories,
+                ActivityStatistic::Distance => ActivityMetric::Distance,
+                ActivityStatistic::Duration => ActivityMetric::Duration,
+                ActivityStatistic::NormalizedPower => ActivityMetric::NormalizedPower,
+                ActivityStatistic::Elevation => ActivityMetric::Elevation,
             }),
             ActivityMetricSource::Timeseries((metric, aggregate)) => match (metric, aggregate) {
                 (TimeseriesMetric::Speed, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgSpeed)
+                    Ok(ActivityMetric::AvgSpeed)
                 }
-                (TimeseriesMetric::Speed, TimeseriesAggregate::Min) => {
-                    Ok(ActivityMetricV2::MinSpeed)
-                }
-                (TimeseriesMetric::Speed, TimeseriesAggregate::Max) => {
-                    Ok(ActivityMetricV2::MaxSpeed)
-                }
+                (TimeseriesMetric::Speed, TimeseriesAggregate::Min) => Ok(ActivityMetric::MinSpeed),
+                (TimeseriesMetric::Speed, TimeseriesAggregate::Max) => Ok(ActivityMetric::MaxSpeed),
 
                 (TimeseriesMetric::Power, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgPower)
+                    Ok(ActivityMetric::AvgPower)
                 }
-                (TimeseriesMetric::Power, TimeseriesAggregate::Min) => {
-                    Ok(ActivityMetricV2::MinPower)
-                }
-                (TimeseriesMetric::Power, TimeseriesAggregate::Max) => {
-                    Ok(ActivityMetricV2::MaxPower)
-                }
+                (TimeseriesMetric::Power, TimeseriesAggregate::Min) => Ok(ActivityMetric::MinPower),
+                (TimeseriesMetric::Power, TimeseriesAggregate::Max) => Ok(ActivityMetric::MaxPower),
 
                 (TimeseriesMetric::HeartRate, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgHeartRate)
+                    Ok(ActivityMetric::AvgHeartRate)
                 }
                 (TimeseriesMetric::HeartRate, TimeseriesAggregate::Min) => {
-                    Ok(ActivityMetricV2::MinHeartRate)
+                    Ok(ActivityMetric::MinHeartRate)
                 }
                 (TimeseriesMetric::HeartRate, TimeseriesAggregate::Max) => {
-                    Ok(ActivityMetricV2::MaxHeartRate)
+                    Ok(ActivityMetric::MaxHeartRate)
                 }
 
                 (TimeseriesMetric::Cadence, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgCadence)
+                    Ok(ActivityMetric::AvgCadence)
                 }
                 (TimeseriesMetric::Cadence, TimeseriesAggregate::Min) => {
-                    Ok(ActivityMetricV2::MinCadence)
+                    Ok(ActivityMetric::MinCadence)
                 }
                 (TimeseriesMetric::Cadence, TimeseriesAggregate::Max) => {
-                    Ok(ActivityMetricV2::MaxCadence)
+                    Ok(ActivityMetric::MaxCadence)
                 }
 
                 (TimeseriesMetric::Altitude, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgAltitude)
+                    Ok(ActivityMetric::AvgAltitude)
                 }
                 (TimeseriesMetric::Altitude, TimeseriesAggregate::Min) => {
-                    Ok(ActivityMetricV2::MinAltitude)
+                    Ok(ActivityMetric::MinAltitude)
                 }
                 (TimeseriesMetric::Altitude, TimeseriesAggregate::Max) => {
-                    Ok(ActivityMetricV2::MaxAltitude)
+                    Ok(ActivityMetric::MaxAltitude)
                 }
 
                 (TimeseriesMetric::Pace, TimeseriesAggregate::Average) => {
-                    Ok(ActivityMetricV2::AvgPace)
+                    Ok(ActivityMetric::AvgPace)
                 }
-                (TimeseriesMetric::Pace, TimeseriesAggregate::Min) => Ok(ActivityMetricV2::MinPace),
-                (TimeseriesMetric::Pace, TimeseriesAggregate::Max) => Ok(ActivityMetricV2::MaxPace),
+                (TimeseriesMetric::Pace, TimeseriesAggregate::Min) => Ok(ActivityMetric::MinPace),
+                (TimeseriesMetric::Pace, TimeseriesAggregate::Max) => Ok(ActivityMetric::MaxPace),
 
                 (metric, aggregate) => Err(format!(
                     "({},{}) cannot be parsed into an ActivityMetricV2",
                     metric, aggregate
                 )),
             },
-            ActivityMetricSource::ActiveDuration => Ok(ActivityMetricV2::ActiveDuration),
-            ActivityMetricSource::NumberOfActivities => Ok(ActivityMetricV2::NumberOfActivity),
+            ActivityMetricSource::ActiveDuration => Ok(ActivityMetric::ActiveDuration),
+            ActivityMetricSource::NumberOfActivities => Ok(ActivityMetric::NumberOfActivity),
         }
     }
 }
 
-impl TryFrom<ActivityMetricSource> for ActivityMetricV2 {
+impl TryFrom<ActivityMetricSource> for ActivityMetric {
     type Error = String;
 
     fn try_from(value: ActivityMetricSource) -> Result<Self, Self::Error> {
@@ -1320,7 +1312,7 @@ impl TryFrom<ActivityMetricSource> for ActivityMetricV2 {
 // TIMESERIES
 ///////////////////////////////////////////////////////////////////
 
-/// An [ActivityTimeseries] is a coherent set of time dependant [TimeseriesMetric] (plural)
+/// An [ActivityTimeseries] is a coherent set of time dependent [TimeseriesMetric]s (plural)
 /// from the same [Activity].
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ActivityTimeseries {
@@ -1618,17 +1610,17 @@ impl TimeseriesAggregate {
     }
 }
 
-/// An [ActivityMetric] represents the value of an [ActivityMetricSource] extracted from
-/// a single [ActivityWithTimeseries]. On top of the metric value, it contains metadata like
-/// the activity start time and duration that can be used in later computations.
+/// An [ActivityMetricValue] represents the value of an [ActivityMetricSource] extracted from
+/// a single [ActivityWithTimeseries]. It contains metadata like the activity start time and
+/// duration that can be used in later computations.
 #[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct ActivityMetric {
+pub struct ActivityMetricValue {
     value: f64,
     activity_start_time: ActivityStartTime,
     activity_duration: ActivityDuration,
 }
 
-impl ActivityMetric {
+impl ActivityMetricValue {
     pub fn value(&self) -> &f64 {
         &self.value
     }
@@ -2666,7 +2658,7 @@ mod test_timeseries {
             ActivityStatistics::default(),
         );
 
-        let result = ActivityMetricV2::ActiveDuration.compute_value(&activity);
+        let result = ActivityMetric::ActiveDuration.compute_value(&activity);
 
         assert_eq!(result, Some(3600.0));
     }

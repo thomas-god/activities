@@ -14,8 +14,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetricV2, ActivityMetricsV2, ActivityRpe, BonkStatus,
-            Sport, SportCategory, Unit, WorkoutType,
+            Activity, ActivityMetric, ActivityMetricValue, ActivityMetrics, ActivityRpe,
+            BonkStatus, Sport, SportCategory, Unit, WorkoutType,
         },
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
@@ -479,7 +479,7 @@ impl TrainingMetricTarget {
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinition {
     user: UserId,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
@@ -509,7 +509,7 @@ impl TrainingMetricWindow {
 
 #[derive(Debug, Clone, PartialEq, Constructor)]
 pub struct TrainingMetricDefinitionPatch {
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
@@ -517,7 +517,7 @@ pub struct TrainingMetricDefinitionPatch {
 }
 
 impl TrainingMetricDefinitionPatch {
-    pub fn metric(&self) -> &ActivityMetricV2 {
+    pub fn metric(&self) -> &ActivityMetric {
         &self.metric
     }
 
@@ -543,7 +543,7 @@ impl TrainingMetricDefinition {
         &self.user
     }
 
-    pub fn metric(&self) -> &ActivityMetricV2 {
+    pub fn metric(&self) -> &ActivityMetric {
         &self.metric
     }
 
@@ -627,7 +627,7 @@ fn group_and_aggregate_metrics(
                         .group_by()
                         .as_ref()
                         .and_then(|group_by| group_by.extract_group(activity)),
-                    ActivityMetric::new(
+                    ActivityMetricValue::new(
                         *metric_value,
                         *activity.start_time(),
                         *activity.duration(),
@@ -647,9 +647,9 @@ fn group_and_aggregate_metrics(
 
 fn group_metrics_by_bin(
     granularity: &TrainingMetricGranularity,
-    metrics: Vec<(Option<String>, ActivityMetric)>,
-) -> HashMap<TrainingMetricBin, Vec<ActivityMetric>> {
-    let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetric>> = HashMap::new();
+    metrics: Vec<(Option<String>, ActivityMetricValue)>,
+) -> HashMap<TrainingMetricBin, Vec<ActivityMetricValue>> {
+    let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetricValue>> = HashMap::new();
     for (group, value) in metrics {
         let bin = TrainingMetricBin::new(
             granularity.datetime_key(value.activity_start_time().datetime()),
@@ -662,7 +662,7 @@ fn group_metrics_by_bin(
 
 fn aggregate_metrics(
     aggregate: &TrainingMetricAggregate,
-    metrics: HashMap<TrainingMetricBin, Vec<ActivityMetric>>,
+    metrics: HashMap<TrainingMetricBin, Vec<ActivityMetricValue>>,
 ) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
     let mut res = HashMap::new();
 
@@ -796,7 +796,7 @@ pub enum TrainingMetricAggregate {
 }
 
 impl TrainingMetricAggregate {
-    fn aggregate(&self, activity_metrics: Vec<ActivityMetric>) -> Option<TrainingMetricValue> {
+    fn aggregate(&self, activity_metrics: Vec<ActivityMetricValue>) -> Option<TrainingMetricValue> {
         if activity_metrics.is_empty() {
             return None;
         }
@@ -834,7 +834,7 @@ impl TrainingMetricAggregate {
         })
     }
 
-    pub fn initial_value(&self, new_metric: &ActivityMetric) -> Option<TrainingMetricValue> {
+    pub fn initial_value(&self, new_metric: &ActivityMetricValue) -> Option<TrainingMetricValue> {
         Some(match self {
             Self::Max => TrainingMetricValue::Max(*new_metric.value()),
             Self::Min => TrainingMetricValue::Min(*new_metric.value()),
@@ -851,7 +851,7 @@ impl TrainingMetricAggregate {
     pub fn update_value(
         &self,
         previous_value: &TrainingMetricValue,
-        new_metric: &ActivityMetric,
+        new_metric: &ActivityMetricValue,
     ) -> Option<TrainingMetricValue> {
         match self {
             Self::Min => {
@@ -1168,11 +1168,11 @@ impl TrainingPeriod {
 #[derive(Debug, Clone)]
 pub struct TrainingPeriodWithActivities {
     period: TrainingPeriod,
-    activities: Vec<(Activity, ActivityMetricsV2)>,
+    activities: Vec<(Activity, ActivityMetrics)>,
 }
 
 impl TrainingPeriodWithActivities {
-    pub fn new(period: TrainingPeriod, activities: Vec<(Activity, ActivityMetricsV2)>) -> Self {
+    pub fn new(period: TrainingPeriod, activities: Vec<(Activity, ActivityMetrics)>) -> Self {
         Self { period, activities }
     }
 
@@ -1180,7 +1180,7 @@ impl TrainingPeriodWithActivities {
         &self.period
     }
 
-    pub fn activities(&self) -> &[(Activity, ActivityMetricsV2)] {
+    pub fn activities(&self) -> &[(Activity, ActivityMetrics)] {
         &self.activities
     }
 }
@@ -1518,7 +1518,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_daily() {
-        let metric_1 = ActivityMetric::new(
+        let metric_1 = ActivityMetricValue::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -1527,7 +1527,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::from(120.),
         );
-        let metric_2 = ActivityMetric::new(
+        let metric_2 = ActivityMetricValue::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-03T02:00:00+03:00"
@@ -1537,7 +1537,7 @@ mod test_training_metrics {
             ActivityDuration::from(120.),
         );
 
-        let metric_3 = ActivityMetric::new(
+        let metric_3 = ActivityMetricValue::new(
             67.1,
             ActivityStartTime::new(
                 "2025-09-04T02:00:00Z"
@@ -1569,7 +1569,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_weekly() {
-        let metric_1 = ActivityMetric::new(
+        let metric_1 = ActivityMetricValue::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -1578,7 +1578,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::from(12.),
         );
-        let metric_2 = ActivityMetric::new(
+        let metric_2 = ActivityMetricValue::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-05T02:00:00+03:00"
@@ -1587,7 +1587,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::from(12.),
         );
-        let metric_3 = ActivityMetric::new(
+        let metric_3 = ActivityMetricValue::new(
             67.1,
             ActivityStartTime::new(
                 "2025-09-14T02:00:00Z"
@@ -1619,7 +1619,7 @@ mod test_training_metrics {
 
     #[test]
     fn test_group_metric_by_granularity_monthly() {
-        let metric_1 = ActivityMetric::new(
+        let metric_1 = ActivityMetricValue::new(
             12.3,
             ActivityStartTime::new(
                 "2025-09-03T00:00:00Z"
@@ -1628,7 +1628,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::default(),
         );
-        let metric_2 = ActivityMetric::new(
+        let metric_2 = ActivityMetricValue::new(
             18.1,
             ActivityStartTime::new(
                 "2025-09-05T02:00:00+03:00"
@@ -1637,7 +1637,7 @@ mod test_training_metrics {
             ),
             ActivityDuration::default(),
         );
-        let metric_3 = ActivityMetric::new(
+        let metric_3 = ActivityMetricValue::new(
             67.1,
             ActivityStartTime::new(
                 "2025-08-14T02:00:00Z"
@@ -1672,7 +1672,7 @@ mod test_training_metrics {
         let metrics = HashMap::from([(
             TrainingMetricBin::from_granule("2025-09-01"),
             vec![
-                ActivityMetric::new(
+                ActivityMetricValue::new(
                     12.3,
                     ActivityStartTime::new(
                         "2025-09-03T00:00:00Z"
@@ -1681,7 +1681,7 @@ mod test_training_metrics {
                     ),
                     ActivityDuration::default(),
                 ),
-                ActivityMetric::new(
+                ActivityMetricValue::new(
                     1.3,
                     ActivityStartTime::new(
                         "2025-09-03T00:00:00Z"
@@ -1711,7 +1711,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Max,
@@ -1740,7 +1740,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Max,
@@ -1785,7 +1785,7 @@ mod test_training_metrics {
         let window = None;
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             window,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -1827,7 +1827,7 @@ mod test_training_metrics {
         let window = None;
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             window,
             TrainingMetricFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Cycling)]),
@@ -1916,7 +1916,7 @@ mod test_training_metric_aggregate_initial_value {
     #[test]
     fn test_min_value() {
         let aggregate = TrainingMetricAggregate::Min;
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -1931,7 +1931,7 @@ mod test_training_metric_aggregate_initial_value {
     #[test]
     fn test_max_value() {
         let aggregate = TrainingMetricAggregate::Max;
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -1946,7 +1946,7 @@ mod test_training_metric_aggregate_initial_value {
     #[test]
     fn test_sum_value() {
         let aggregate = TrainingMetricAggregate::Sum;
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -1961,7 +1961,7 @@ mod test_training_metric_aggregate_initial_value {
     #[test]
     fn test_average_value() {
         let aggregate = TrainingMetricAggregate::Average;
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -1991,7 +1991,7 @@ mod test_training_metric_aggregate_update_value {
     fn test_update_min_value() {
         let aggregate = TrainingMetricAggregate::Min;
         let previous = TrainingMetricValue::Min(12.2);
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2007,7 +2007,7 @@ mod test_training_metric_aggregate_update_value {
     fn test_do_not_update_min_value() {
         let aggregate = TrainingMetricAggregate::Min;
         let previous = TrainingMetricValue::Min(12.2);
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2030,7 +2030,7 @@ mod test_training_metric_aggregate_update_value {
                 number_of_elements: 2,
             },
         ];
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2047,7 +2047,7 @@ mod test_training_metric_aggregate_update_value {
     fn test_update_max_value() {
         let aggregate = TrainingMetricAggregate::Max;
         let previous = TrainingMetricValue::Max(12.2);
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2063,7 +2063,7 @@ mod test_training_metric_aggregate_update_value {
     fn test_do_not_update_max_value() {
         let aggregate = TrainingMetricAggregate::Max;
         let previous = TrainingMetricValue::Max(12.2);
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2087,7 +2087,7 @@ mod test_training_metric_aggregate_update_value {
                 number_of_elements: 2,
             },
         ];
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2102,7 +2102,7 @@ mod test_training_metric_aggregate_update_value {
     fn test_update_sum_value() {
         let aggregate = TrainingMetricAggregate::Sum;
         let previous = TrainingMetricValue::Sum(12.2);
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2127,7 +2127,7 @@ mod test_training_metric_aggregate_update_value {
                 number_of_elements: 2,
             },
         ];
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2146,7 +2146,7 @@ mod test_training_metric_aggregate_update_value {
             sum: 12.,
             number_of_elements: 2,
         };
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             13.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -2173,7 +2173,7 @@ mod test_training_metric_aggregate_update_value {
             TrainingMetricValue::Max(12.),
             TrainingMetricValue::Sum(12.),
         ];
-        let new_metric = ActivityMetric::new(
+        let new_metric = ActivityMetricValue::new(
             10.1,
             ActivityStartTime::from_timestamp(1200).unwrap(),
             ActivityDuration::from(1200.),
@@ -3292,7 +3292,7 @@ mod test_training_metrics_ordering {
     fn generate_test_metrics() -> Vec<TrainingMetric> {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Distance,
+            ActivityMetric::Distance,
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Sum,
@@ -3546,7 +3546,7 @@ mod test_training_metric_target {
     fn definition_with_target() -> TrainingMetricDefinition {
         TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Distance,
+            ActivityMetric::Distance,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3575,7 +3575,7 @@ mod test_training_metric_target {
     fn test_definition_target_is_none_when_not_set() {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            ActivityMetricV2::Distance,
+            ActivityMetric::Distance,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3589,7 +3589,7 @@ mod test_training_metric_target {
     fn test_apply_patch_updates_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3601,14 +3601,14 @@ mod test_training_metric_target {
         let target = patched.target().expect("target should be set");
         assert_eq!(target.value(), 2000.0);
         assert_eq!(target.unit(), Unit::KiloCalorie);
-        assert_eq!(*patched.metric(), ActivityMetricV2::Calories);
+        assert_eq!(*patched.metric(), ActivityMetric::Calories);
     }
 
     #[test]
     fn test_apply_patch_clears_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),

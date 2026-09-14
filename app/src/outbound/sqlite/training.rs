@@ -10,7 +10,7 @@ use sqlx::{
 use crate::domain::{
     models::{
         UserId,
-        activity::{ActivityMetricSource, ActivityMetricV2},
+        activity::{ActivityMetric, ActivityMetricSource},
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         training::{
             TrainingMetric, TrainingMetricAggregate, TrainingMetricDefinition,
@@ -40,7 +40,7 @@ type DefinitionRow = (
     Option<TrainingMetricName>,
     UserId,
     Option<ActivityMetricSource>,
-    Option<ActivityMetricV2>,
+    Option<ActivityMetric>,
     Option<TrainingMetricGranularity>,
     Option<TrainingMetricAggregate>,
     TrainingMetricFilters,
@@ -945,10 +945,10 @@ where
 }
 
 fn parse_definition_row_metric(
-    metric: Option<ActivityMetricV2>,
+    metric: Option<ActivityMetric>,
     source: Option<ActivityMetricSource>,
-) -> Option<ActivityMetricV2> {
-    match (metric, source.map(ActivityMetricV2::try_from)) {
+) -> Option<ActivityMetric> {
+    match (metric, source.map(ActivityMetric::try_from)) {
         (Some(metric), _) => Some(metric),
         (None, Some(Ok(metric))) => Some(metric),
         _ => None,
@@ -1010,7 +1010,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1030,7 +1030,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::TrainingPeriod(period.clone()),
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1050,7 +1050,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1075,7 +1075,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1099,7 +1099,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -1118,7 +1118,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1166,7 +1166,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 None,
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
@@ -1336,7 +1336,7 @@ mod test_sqlite_training_repository {
         let new_metric = metric.apply_patch(TrainingMetricPatch::new(
             TrainingMetricName::from("another-name"),
             TrainingMetricDefinitionPatch::new(
-                ActivityMetricV2::AvgPace,
+                ActivityMetric::AvgPace,
                 None,
                 TrainingMetricFilters::empty(),
                 TrainingMetricSummary::empty(),
@@ -1665,7 +1665,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::MaxAltitude,
+                ActivityMetric::MaxAltitude,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
@@ -1682,7 +1682,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3556,7 +3556,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3576,7 +3576,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::TrainingPeriod(period.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3632,7 +3632,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3652,7 +3652,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::TrainingPeriod(period_1.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3672,7 +3672,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::TrainingPeriod(period_2.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3761,7 +3761,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -3781,7 +3781,7 @@ mod test_sqlite_training_repository {
             TrainingMetricScope::TrainingPeriod(period.id().clone()),
             TrainingMetricDefinition::new(
                 user_id.clone(),
-                ActivityMetricV2::Distance,
+                ActivityMetric::Distance,
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
@@ -4156,20 +4156,20 @@ mod test_sqlite_training_repository {
 
     #[test]
     fn test_parse_definition_row_metric_returns_metric_when_some() {
-        let metric = Some(ActivityMetricV2::Distance);
+        let metric = Some(ActivityMetric::Distance);
         let result = parse_definition_row_metric(metric, None);
-        assert_eq!(result, Some(ActivityMetricV2::Distance));
+        assert_eq!(result, Some(ActivityMetric::Distance));
     }
 
     #[test]
     fn test_parse_definition_row_metric_metric_takes_priority_over_source() {
-        let metric = Some(ActivityMetricV2::Distance);
+        let metric = Some(ActivityMetric::Distance);
         let source = Some(ActivityMetricSource::Timeseries((
             TimeseriesMetric::Altitude,
             TimeseriesAggregate::Max,
         )));
         let result = parse_definition_row_metric(metric, source);
-        assert_eq!(result, Some(ActivityMetricV2::Distance));
+        assert_eq!(result, Some(ActivityMetric::Distance));
     }
 
     #[test]
@@ -4180,7 +4180,7 @@ mod test_sqlite_training_repository {
             TimeseriesAggregate::Max,
         )));
         let result = parse_definition_row_metric(metric, source);
-        assert_eq!(result, Some(ActivityMetricV2::MaxAltitude));
+        assert_eq!(result, Some(ActivityMetric::MaxAltitude));
     }
 
     #[test]

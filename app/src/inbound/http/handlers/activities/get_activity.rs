@@ -65,8 +65,8 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetricV2,
-                    ActivityMetricsV2, ActivityStartTime, ActivityStatistic, ActivityStatistics,
+                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetric,
+                    ActivityMetrics, ActivityStartTime, ActivityStatistic, ActivityStatistics,
                     ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
                     TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
@@ -132,10 +132,7 @@ mod tests {
                             1200.,
                         )])),
                     ),
-                    ActivityMetricsV2::new(HashMap::from([(
-                        ActivityMetricV2::Duration,
-                        Some(1200.),
-                    )])),
+                    ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });
         let file_parser = MockFileParser::test_default();

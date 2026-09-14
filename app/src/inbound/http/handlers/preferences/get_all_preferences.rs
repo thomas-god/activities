@@ -53,7 +53,7 @@ mod tests {
         domain::{
             models::{
                 UserId,
-                activity::ActivityMetricV2,
+                activity::ActivityMetric,
                 preferences::{ActivityListSummary, ActivityListSummaryItem, Preference},
                 training::{TrainingMetricId, TrainingMetricScope},
             },
@@ -87,7 +87,7 @@ mod tests {
         let preferences = vec![Preference::ActivityListSummary(ActivityListSummary::new(
             TrainingMetricScope::Global,
             vec![
-                ActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                ActivityListSummaryItem::Metric(ActivityMetric::Distance),
                 ActivityListSummaryItem::RPE,
             ],
         ))];

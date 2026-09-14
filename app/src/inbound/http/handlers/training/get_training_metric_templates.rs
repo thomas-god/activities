@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{
     domain::{
         models::{
-            activity::{ActivityMetricV2, ToUnit, Unit},
+            activity::{ActivityMetric, ToUnit, Unit},
             training::TrainingMetricAggregate,
         },
         ports::{
@@ -32,7 +32,7 @@ pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);
 #[derive(Debug, Clone, Serialize)]
 pub struct TrainingMetricTemplate {
     display_name: String,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
 }
@@ -40,7 +40,7 @@ pub struct TrainingMetricTemplate {
 #[derive(Debug, Clone, Serialize)]
 pub struct TrainingMetricTemplateBody {
     display_name: String,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     unit: String,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
@@ -78,10 +78,10 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
 
     // Sum and average
     for metric in [
-        ActivityMetricV2::ActiveDuration,
-        ActivityMetricV2::Calories,
-        ActivityMetricV2::Elevation,
-        ActivityMetricV2::Distance,
+        ActivityMetric::ActiveDuration,
+        ActivityMetric::Calories,
+        ActivityMetric::Elevation,
+        ActivityMetric::Distance,
     ] {
         for aggregate in [
             TrainingMetricAggregate::Sum,
@@ -103,12 +103,12 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     // Min metrics
     let aggregate = TrainingMetricAggregate::Min;
     for metric in [
-        ActivityMetricV2::MinSpeed,
-        ActivityMetricV2::MinPower,
-        ActivityMetricV2::MinHeartRate,
-        ActivityMetricV2::MinCadence,
-        ActivityMetricV2::MinAltitude,
-        ActivityMetricV2::MinPace,
+        ActivityMetric::MinSpeed,
+        ActivityMetric::MinPower,
+        ActivityMetric::MinHeartRate,
+        ActivityMetric::MinCadence,
+        ActivityMetric::MinAltitude,
+        ActivityMetric::MinPace,
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
@@ -121,12 +121,12 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     // Max metrics
     let aggregate = TrainingMetricAggregate::Max;
     for metric in [
-        ActivityMetricV2::MaxSpeed,
-        ActivityMetricV2::MaxPower,
-        ActivityMetricV2::MaxHeartRate,
-        ActivityMetricV2::MaxCadence,
-        ActivityMetricV2::MaxAltitude,
-        ActivityMetricV2::MaxPace,
+        ActivityMetric::MaxSpeed,
+        ActivityMetric::MaxPower,
+        ActivityMetric::MaxHeartRate,
+        ActivityMetric::MaxCadence,
+        ActivityMetric::MaxAltitude,
+        ActivityMetric::MaxPace,
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
@@ -139,12 +139,12 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     // Average metrics
     let aggregate = TrainingMetricAggregate::Average;
     for metric in [
-        ActivityMetricV2::AvgSpeed,
-        ActivityMetricV2::AvgPower,
-        ActivityMetricV2::AvgHeartRate,
-        ActivityMetricV2::AvgCadence,
-        ActivityMetricV2::AvgAltitude,
-        ActivityMetricV2::AvgPace,
+        ActivityMetric::AvgSpeed,
+        ActivityMetric::AvgPower,
+        ActivityMetric::AvgHeartRate,
+        ActivityMetric::AvgCadence,
+        ActivityMetric::AvgAltitude,
+        ActivityMetric::AvgPace,
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
@@ -155,7 +155,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     }
 
     // Normalized power
-    let metric = ActivityMetricV2::NormalizedPower;
+    let metric = ActivityMetric::NormalizedPower;
     for aggregate in [
         TrainingMetricAggregate::Min,
         TrainingMetricAggregate::Max,
@@ -174,7 +174,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     }
 
     // Number of activities
-    let metric = ActivityMetricV2::NumberOfActivity;
+    let metric = ActivityMetric::NumberOfActivity;
     let aggregate = TrainingMetricAggregate::Sum;
     templates.push(TrainingMetricTemplate {
         display_name: format_metric(&metric),
@@ -198,72 +198,72 @@ pub async fn get_training_metric_templates() -> Result<impl IntoResponse, Status
     Ok(serde_json::json!(body).to_string())
 }
 
-fn metric_category(metric: &ActivityMetricV2) -> TrainingMetricTemplateCategory {
+fn metric_category(metric: &ActivityMetric) -> TrainingMetricTemplateCategory {
     match metric {
-        ActivityMetricV2::Duration | ActivityMetricV2::ActiveDuration => {
+        ActivityMetric::Duration | ActivityMetric::ActiveDuration => {
             TrainingMetricTemplateCategory::Duration
         }
-        ActivityMetricV2::Elevation => TrainingMetricTemplateCategory::Elevation,
-        ActivityMetricV2::Calories => TrainingMetricTemplateCategory::Calories,
-        ActivityMetricV2::Distance => TrainingMetricTemplateCategory::Distance,
-        ActivityMetricV2::MaxSpeed | ActivityMetricV2::MinSpeed | ActivityMetricV2::AvgSpeed => {
+        ActivityMetric::Elevation => TrainingMetricTemplateCategory::Elevation,
+        ActivityMetric::Calories => TrainingMetricTemplateCategory::Calories,
+        ActivityMetric::Distance => TrainingMetricTemplateCategory::Distance,
+        ActivityMetric::MaxSpeed | ActivityMetric::MinSpeed | ActivityMetric::AvgSpeed => {
             TrainingMetricTemplateCategory::Speed
         }
-        ActivityMetricV2::MaxHeartRate
-        | ActivityMetricV2::MinHeartRate
-        | ActivityMetricV2::AvgHeartRate => TrainingMetricTemplateCategory::HeartRate,
-        ActivityMetricV2::MaxCadence
-        | ActivityMetricV2::MinCadence
-        | ActivityMetricV2::AvgCadence => TrainingMetricTemplateCategory::Cadence,
-        ActivityMetricV2::MaxAltitude
-        | ActivityMetricV2::MinAltitude
-        | ActivityMetricV2::AvgAltitude => TrainingMetricTemplateCategory::Altitude,
-        ActivityMetricV2::MaxPace | ActivityMetricV2::MinPace | ActivityMetricV2::AvgPace => {
+        ActivityMetric::MaxHeartRate
+        | ActivityMetric::MinHeartRate
+        | ActivityMetric::AvgHeartRate => TrainingMetricTemplateCategory::HeartRate,
+        ActivityMetric::MaxCadence | ActivityMetric::MinCadence | ActivityMetric::AvgCadence => {
+            TrainingMetricTemplateCategory::Cadence
+        }
+        ActivityMetric::MaxAltitude | ActivityMetric::MinAltitude | ActivityMetric::AvgAltitude => {
+            TrainingMetricTemplateCategory::Altitude
+        }
+        ActivityMetric::MaxPace | ActivityMetric::MinPace | ActivityMetric::AvgPace => {
             TrainingMetricTemplateCategory::Pace
         }
-        ActivityMetricV2::MaxPower
-        | ActivityMetricV2::MinPower
-        | ActivityMetricV2::AvgPower
-        | ActivityMetricV2::NormalizedPower => TrainingMetricTemplateCategory::Power,
-        ActivityMetricV2::NumberOfActivity => TrainingMetricTemplateCategory::Other,
+        ActivityMetric::MaxPower
+        | ActivityMetric::MinPower
+        | ActivityMetric::AvgPower
+        | ActivityMetric::NormalizedPower => TrainingMetricTemplateCategory::Power,
+        ActivityMetric::NumberOfActivity => TrainingMetricTemplateCategory::Other,
     }
 }
 
-fn format_metric(metric: &ActivityMetricV2) -> String {
+fn format_metric(metric: &ActivityMetric) -> String {
     match metric {
-        ActivityMetricV2::Duration => "duration",
-        ActivityMetricV2::Calories => "calories",
-        ActivityMetricV2::Elevation => "elevation",
-        ActivityMetricV2::Distance => "distance",
-        ActivityMetricV2::NormalizedPower => "normalized power",
+        ActivityMetric::Duration => "duration",
+        ActivityMetric::Calories => "calories",
+        ActivityMetric::Elevation => "elevation",
+        ActivityMetric::Distance => "distance",
+        ActivityMetric::NormalizedPower => "normalized power",
 
-        ActivityMetricV2::ActiveDuration => "active duration",
+        ActivityMetric::ActiveDuration => "active duration",
 
-        ActivityMetricV2::MaxSpeed => "Maximum speed",
-        ActivityMetricV2::MinSpeed => "Minimum speed",
-        ActivityMetricV2::AvgSpeed => "Average speed",
+        ActivityMetric::MaxSpeed => "Maximum speed",
+        ActivityMetric::MinSpeed => "Minimum speed",
+        ActivityMetric::AvgSpeed => "Average speed",
 
-        ActivityMetricV2::MaxPower => "Maximum power",
-        ActivityMetricV2::MinPower => "Minimum power",
-        ActivityMetricV2::AvgPower => "Average power",
+        ActivityMetric::MaxPower => "Maximum power",
+        ActivityMetric::MinPower => "Minimum power",
+        ActivityMetric::AvgPower => "Average power",
 
-        ActivityMetricV2::MaxHeartRate => "Maximum heart rate",
-        ActivityMetricV2::MinHeartRate => "Minimum heart rate",
-        ActivityMetricV2::AvgHeartRate => "Average heart rate",
+        ActivityMetric::MaxHeartRate => "Maximum heart rate",
+        ActivityMetric::MinHeartRate => "Minimum heart rate",
+        ActivityMetric::AvgHeartRate => "Average heart rate",
 
-        ActivityMetricV2::MaxCadence => "Maximum cadence",
-        ActivityMetricV2::MinCadence => "Minimum cadence",
-        ActivityMetricV2::AvgCadence => "Average cadence",
+        ActivityMetric::MaxCadence => "Maximum cadence",
+        ActivityMetric::MinCadence => "Minimum cadence",
+        ActivityMetric::AvgCadence => "Average cadence",
 
-        ActivityMetricV2::MaxAltitude => "Maximum altitude",
-        ActivityMetricV2::MinAltitude => "Minimum altitude",
-        ActivityMetricV2::AvgAltitude => "Average altitude",
+        ActivityMetric::MaxAltitude => "Maximum altitude",
+        ActivityMetric::MinAltitude => "Minimum altitude",
+        ActivityMetric::AvgAltitude => "Average altitude",
 
-        ActivityMetricV2::MaxPace => "Maximum pace",
-        ActivityMetricV2::MinPace => "Minimum pace",
-        ActivityMetricV2::AvgPace => "Average pace",
+        ActivityMetric::MaxPace => "Maximum pace",
+        ActivityMetric::MinPace => "Minimum pace",
+        ActivityMetric::AvgPace => "Average pace",
 
-        ActivityMetricV2::NumberOfActivity => "Number of activities",
+        ActivityMetric::NumberOfActivity => "Number of activities",
     }
     .to_string()
 }

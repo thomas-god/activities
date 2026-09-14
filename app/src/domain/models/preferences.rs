@@ -1,7 +1,7 @@
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::models::{activity::ActivityMetricV2, training::TrainingMetricScope};
+use crate::domain::models::{activity::ActivityMetric, training::TrainingMetricScope};
 
 ///////////////////////////////////////////////////////////////////
 /// PREFERENCE ENUM AND KEY
@@ -49,7 +49,7 @@ impl ActivityListSummary {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ActivityListSummaryItem {
-    Metric(ActivityMetricV2),
+    Metric(ActivityMetric),
     RPE,
     WorkoutType,
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         models::{
-            activity::{ActivityMetricSource, ActivityMetricV2, Unit},
+            activity::{ActivityMetric, ActivityMetricSource, Unit},
             training::{
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricFilters,
                 TrainingMetricGranularity, TrainingMetricSummary, TrainingMetricSummaryAverage,
@@ -48,7 +48,7 @@ use crate::{
 /// Request body for computing training metric values
 #[derive(Debug, Deserialize)]
 pub struct ComputeMetricValuesRequest {
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn test_to_body_minimal_request_uses_defaults() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetricV2::Calories,
+            metric: ActivityMetric::Calories,
             window: None,
             filters: None,
             summary: APITrainingMetricSummary::default(),
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn test_to_body_full_request_maps_all_fields() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetricV2::Calories,
+            metric: ActivityMetric::Calories,
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Weekly,
                 APITrainingMetricAggregate::Sum,
@@ -414,7 +414,7 @@ mod tests {
     #[test]
     fn test_to_body_timeseries_metric_and_sport_category_filter() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetricV2::AvgSpeed,
+            metric: ActivityMetric::AvgSpeed,
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Average,
@@ -458,7 +458,7 @@ mod tests {
     #[test]
     fn test_to_body_window_without_filters_keeps_sports_default() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetricV2::Distance,
+            metric: ActivityMetric::Distance,
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Monthly,
                 APITrainingMetricAggregate::Sum,
@@ -493,7 +493,7 @@ mod tests {
     #[test]
     fn test_to_body_empty_filter_lists_are_preserved() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetricV2::Calories,
+            metric: ActivityMetric::Calories,
             window: None,
             filters: Some(APITrainingMetricFilters {
                 sports: Some(vec![]),

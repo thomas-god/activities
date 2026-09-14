@@ -5,7 +5,7 @@ use crate::{
     domain::{
         models::{
             UserId,
-            activity::ActivityMetricV2,
+            activity::ActivityMetric,
             training::{
                 TrainingMetricFilters, TrainingMetricGroupBy, TrainingMetricName,
                 TrainingMetricTarget, TrainingMetricWindow,
@@ -34,7 +34,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingMetricBody {
     name: String,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,

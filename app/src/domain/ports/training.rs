@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetricV2, ActivityWithParsedData},
+        activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData},
         search::SearchDocument,
         training::{
             TrainingMetric, TrainingMetricDefinitionPatch, TrainingMetricFilters, TrainingMetricId,
@@ -24,7 +24,7 @@ use crate::domain::{
 pub struct CreateTrainingMetricRequest {
     user: UserId,
     name: TrainingMetricName,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
@@ -41,7 +41,7 @@ impl CreateTrainingMetricRequest {
         &self.name
     }
 
-    pub fn metric(&self) -> &ActivityMetricV2 {
+    pub fn metric(&self) -> &ActivityMetric {
         &self.metric
     }
 
@@ -95,7 +95,7 @@ pub struct UpdateTrainingMetricRequest {
     user: UserId,
     id: TrainingMetricId,
     name: TrainingMetricName,
-    metric: ActivityMetricV2,
+    metric: ActivityMetric,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricFilters,
     summary: TrainingMetricSummary,
@@ -152,7 +152,7 @@ pub enum GetTrainingMetricValuesRequest {
     ByTrainingMetricId(UserId, TrainingMetricId),
     ByDefinition {
         user: UserId,
-        metric: ActivityMetricV2,
+        metric: ActivityMetric,
         window: Option<TrainingMetricWindow>,
         filters: TrainingMetricFilters,
         summary: TrainingMetricSummary,
@@ -345,7 +345,7 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
         period: &TrainingPeriodId,
-        metrics: &[ActivityMetricV2],
+        metrics: &[ActivityMetric],
     ) -> impl Future<Output = Option<TrainingPeriodWithActivities>> + Send;
 
     fn delete_training_period(
@@ -905,7 +905,7 @@ mod tests {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Metric"),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -922,7 +922,7 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -940,7 +940,7 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            ActivityMetricV2::Calories,
+            ActivityMetric::Calories,
             None,
             TrainingMetricFilters::empty(),
             TrainingMetricSummary::empty(),

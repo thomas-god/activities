@@ -6,7 +6,7 @@ use sqlx::{Database, encode::IsNull, error::BoxDynError};
 use crate::domain::models::{
     UserId,
     activity::{
-        ActivityDuration, ActivityFeedback, ActivityId, ActivityMetricSource, ActivityMetricV2,
+        ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
         ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
         ActivityStatistic, ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric,
         WorkoutType,
@@ -781,13 +781,13 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TimeseriesAggregate {
     }
 }
 
-impl sqlx::Type<sqlx::Sqlite> for ActivityMetricV2 {
+impl sqlx::Type<sqlx::Sqlite> for ActivityMetric {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
         <String as sqlx::Type<sqlx::Sqlite>>::type_info()
     }
 }
 
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricV2 {
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetric {
     fn encode_by_ref(
         &self,
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
@@ -832,7 +832,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for ActivityMetricV2 {
     }
 }
 
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetricV2 {
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetric {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         match s {

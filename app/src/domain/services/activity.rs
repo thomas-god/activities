@@ -7,7 +7,7 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityId, ActivityMetricV2, ActivityMetricsV2, ActivityWithParsedData,
+            Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithParsedData,
             DEFAULT_METRICS,
         },
         search::{SearchDocument, SearchDocumentType},
@@ -144,8 +144,8 @@ where
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
-    ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError> {
+        metrics: &[ActivityMetric],
+    ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError> {
         let mut activities = self
             .activity_repository
             .get_activities_with_metrics(user, filters, metrics)
@@ -189,8 +189,8 @@ where
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetricV2],
-    ) -> Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError> {
+        metrics: &[ActivityMetric],
+    ) -> Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError> {
         let activities = self
             .list_activities_with_metrics(user, filters, metrics)
             .await?;
@@ -228,8 +228,8 @@ where
     async fn get_activity_with_metrics_and_parsed_data(
         &self,
         activity_id: &ActivityId,
-        metrics: &[ActivityMetricV2],
-    ) -> Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError> {
+        metrics: &[ActivityMetric],
+    ) -> Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError> {
         let (activity, metrics) = match self
             .activity_repository
             .get_activity_with_metrics(activity_id, metrics)
@@ -423,15 +423,15 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters,
-                metrics: &[ActivityMetricV2],
-            ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>;
+                metrics: &[ActivityMetric],
+            ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>;
 
             async fn list_activities_with_metrics_and_parsed_data(
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters,
-                metrics: &[ActivityMetricV2],
-            ) -> Result<Vec<(ActivityWithParsedData, ActivityMetricsV2)>, ListActivitiesError>;
+                metrics: &[ActivityMetric],
+            ) -> Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError>;
 
             async fn get_activity_with_parsed_data(
                 &self,
@@ -441,8 +441,8 @@ pub mod test_utils {
             async fn get_activity_with_metrics_and_parsed_data(
                 &self,
                 activity_id: &ActivityId,
-                metrics: &[ActivityMetricV2],
-            ) -> Result<(ActivityWithParsedData, ActivityMetricsV2), GetActivityError>;
+                metrics: &[ActivityMetric],
+            ) -> Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError>;
 
             async fn patch_activity(
                 &self,
@@ -546,7 +546,7 @@ pub mod test_utils {
             async fn update_activity_metric(
                 &self,
                 activity: &ActivityId,
-                metric: &ActivityMetricV2,
+                metric: &ActivityMetric,
                 value: &Option<f64>,
             ) -> Result<(), UpdateActivityMetricError>;
 
@@ -554,8 +554,8 @@ pub mod test_utils {
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters,
-                metrics: &[ActivityMetricV2],
-            ) -> Result<Vec<(Activity, ActivityMetricsV2)>, ListActivitiesError>;
+                metrics: &[ActivityMetric],
+            ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>;
 
             async fn get_activity(
                 &self,
@@ -565,8 +565,8 @@ pub mod test_utils {
             async fn get_activity_with_metrics(
                 &self,
                 id: &ActivityId,
-                metrics: &[ActivityMetricV2],
-            ) -> Result<Option<(Activity, ActivityMetricsV2)>, GetActivityError>;
+                metrics: &[ActivityMetric],
+            ) -> Result<Option<(Activity, ActivityMetrics)>, GetActivityError>;
 
             async fn get_activity_with_parsed_data(
                 &self,
@@ -1356,7 +1356,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1377,9 +1377,9 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
-                            (ActivityMetricV2::AvgHeartRate, Some(12.3)),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
+                            (ActivityMetric::AvgHeartRate, Some(12.3)),
                         ])),
                     )])
                 });
@@ -1390,7 +1390,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1402,9 +1402,9 @@ mod tests_activity_service {
 
             assert_eq!(res.len(), 1);
             let (_activity, metrics) = res.first().unwrap();
-            assert_eq!(metrics.get(&ActivityMetricV2::Calories).unwrap(), &Some(1.));
+            assert_eq!(metrics.get(&ActivityMetric::Calories).unwrap(), &Some(1.));
             assert_eq!(
-                metrics.get(&ActivityMetricV2::AvgHeartRate).unwrap(),
+                metrics.get(&ActivityMetric::AvgHeartRate).unwrap(),
                 &Some(12.3)
             );
         }
@@ -1417,9 +1417,9 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
-                            (ActivityMetricV2::AvgHeartRate, None),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
+                            (ActivityMetric::AvgHeartRate, None),
                         ])),
                     )])
                 });
@@ -1430,7 +1430,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1442,8 +1442,8 @@ mod tests_activity_service {
 
             assert_eq!(res.len(), 1);
             let (_activity, metrics) = res.first().unwrap();
-            assert_eq!(metrics.get(&ActivityMetricV2::Calories).unwrap(), &Some(1.));
-            assert_eq!(metrics.get(&ActivityMetricV2::AvgHeartRate).unwrap(), &None);
+            assert_eq!(metrics.get(&ActivityMetric::Calories).unwrap(), &Some(1.));
+            assert_eq!(metrics.get(&ActivityMetric::AvgHeartRate).unwrap(), &None);
         }
 
         #[tokio::test]
@@ -1454,8 +1454,8 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
                             // ActivityMetricV2::AvgHeartRate is missing and no HR values in timeseries
                         ])),
                     )])
@@ -1470,7 +1470,7 @@ mod tests_activity_service {
                 .times(1)
                 .with(
                     eq(ActivityId::from("test_activity")),
-                    eq(ActivityMetricV2::AvgHeartRate),
+                    eq(ActivityMetric::AvgHeartRate),
                     eq(None),
                 )
                 .returning(|_, _, _| Ok(()));
@@ -1481,7 +1481,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::AvgHeartRate];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::AvgHeartRate];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1493,8 +1493,8 @@ mod tests_activity_service {
 
             assert_eq!(res.len(), 1);
             let (_activity, metrics) = res.first().unwrap();
-            assert_eq!(metrics.get(&ActivityMetricV2::Calories).unwrap(), &Some(1.));
-            assert_eq!(metrics.get(&ActivityMetricV2::AvgHeartRate).unwrap(), &None);
+            assert_eq!(metrics.get(&ActivityMetric::Calories).unwrap(), &Some(1.));
+            assert_eq!(metrics.get(&ActivityMetric::AvgHeartRate).unwrap(), &None);
         }
 
         #[tokio::test]
@@ -1505,8 +1505,8 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing with cadence values in timeseries
                         ])),
                     )])
@@ -1521,7 +1521,7 @@ mod tests_activity_service {
                 .times(1)
                 .with(
                     eq(ActivityId::from("test_activity")),
-                    eq(ActivityMetricV2::MaxCadence),
+                    eq(ActivityMetric::MaxCadence),
                     eq(Some(30.)),
                 )
                 .returning(|_, _, _| Ok(()));
@@ -1532,7 +1532,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1544,9 +1544,9 @@ mod tests_activity_service {
 
             assert_eq!(res.len(), 1);
             let (_activity, metrics) = res.first().unwrap();
-            assert_eq!(metrics.get(&ActivityMetricV2::Calories).unwrap(), &Some(1.));
+            assert_eq!(metrics.get(&ActivityMetric::Calories).unwrap(), &Some(1.));
             assert_eq!(
-                metrics.get(&ActivityMetricV2::MaxCadence).unwrap(),
+                metrics.get(&ActivityMetric::MaxCadence).unwrap(),
                 &Some(30.)
             );
         }
@@ -1559,8 +1559,8 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing and we can't find the activity's timeseries
                         ])),
                     )])
@@ -1578,7 +1578,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1590,8 +1590,8 @@ mod tests_activity_service {
 
             assert_eq!(res.len(), 1);
             let (_activity, metrics) = res.first().unwrap();
-            assert_eq!(metrics.get(&ActivityMetricV2::Calories).unwrap(), &Some(1.));
-            assert!(metrics.get(&ActivityMetricV2::MaxCadence).is_none(),);
+            assert_eq!(metrics.get(&ActivityMetric::Calories).unwrap(), &Some(1.));
+            assert!(metrics.get(&ActivityMetric::MaxCadence).is_none(),);
         }
 
         #[tokio::test]
@@ -1602,8 +1602,8 @@ mod tests_activity_service {
                 .returning(|_, _, _| {
                     Ok(vec![(
                         default_activity().activity().clone(),
-                        ActivityMetricsV2::new(HashMap::from([
-                            (ActivityMetricV2::Calories, Some(1.)),
+                        ActivityMetrics::new(HashMap::from([
+                            (ActivityMetric::Calories, Some(1.)),
                             // ActivityMetricV2::MaxCadence is missing
                         ])),
                     )])
@@ -1621,7 +1621,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),
@@ -1646,7 +1646,7 @@ mod tests_activity_service {
                 raw_data_repository,
                 Arc::new(tokio::sync::Notify::new()),
             );
-            let metrics = vec![ActivityMetricV2::Calories, ActivityMetricV2::MaxCadence];
+            let metrics = vec![ActivityMetric::Calories, ActivityMetric::MaxCadence];
             let res = service
                 .list_activities_with_metrics(
                     &UserId::test_default(),

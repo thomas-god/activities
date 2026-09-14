@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         models::{
-            activity::ActivityMetricV2,
+            activity::ActivityMetric,
             preferences::{ActivityListSummary, ActivityListSummaryItem, Preference},
             training::{TrainingMetricId, TrainingMetricScope},
         },
@@ -45,7 +45,7 @@ impl TryFrom<Preference> for PreferencePayload {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase", content = "value")]
 pub enum APIActivityListSummaryItem {
-    Metric(ActivityMetricV2),
+    Metric(ActivityMetric),
     #[serde(rename = "rpe")]
     #[allow(clippy::upper_case_acronyms)]
     RPE,
@@ -147,7 +147,7 @@ mod test_http_preferences {
                     training_period_id: "test-id".to_string()
                 },
                 items: vec![
-                    APIActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                    APIActivityListSummaryItem::Metric(ActivityMetric::Distance),
                     APIActivityListSummaryItem::RPE,
                     APIActivityListSummaryItem::WorkoutType,
                 ]
@@ -179,7 +179,7 @@ mod test_http_preferences {
                     training_period_id: "test-id".to_string()
                 },
                 items: vec![
-                    APIActivityListSummaryItem::Metric(ActivityMetricV2::Distance),
+                    APIActivityListSummaryItem::Metric(ActivityMetric::Distance),
                     APIActivityListSummaryItem::RPE,
                     APIActivityListSummaryItem::WorkoutType,
                 ]
