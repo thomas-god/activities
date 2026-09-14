@@ -15,9 +15,10 @@ use crate::domain::models::{
     search::SearchDocumentEvent,
     training::{
         TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSummary,
-        TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
-        TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
+        TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSource,
+        TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent,
+        TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+        TrainingPeriodSports,
     },
 };
 
@@ -869,6 +870,102 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetric {
             "avg-pace" => Ok(Self::AvgPace),
 
             "number-of-activities" => Ok(Self::NumberOfActivity),
+
+            _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricSource {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricSource {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Activity(source) => match source {
+                ActivityMetric::Duration => "duration",
+                ActivityMetric::Calories => "calories",
+                ActivityMetric::Elevation => "elevation",
+                ActivityMetric::Distance => "distance",
+                ActivityMetric::NormalizedPower => "normalized-power",
+
+                ActivityMetric::ActiveDuration => "active-duration",
+
+                ActivityMetric::MaxSpeed => "max-speed",
+                ActivityMetric::MinSpeed => "min-speed",
+                ActivityMetric::AvgSpeed => "avg-speed",
+
+                ActivityMetric::MaxPower => "max-power",
+                ActivityMetric::MinPower => "min-power",
+                ActivityMetric::AvgPower => "avg-power",
+
+                ActivityMetric::MaxHeartRate => "max-hr",
+                ActivityMetric::MinHeartRate => "min-hr",
+                ActivityMetric::AvgHeartRate => "avg-hr",
+
+                ActivityMetric::MaxCadence => "max-cadence",
+                ActivityMetric::MinCadence => "min-cadence",
+                ActivityMetric::AvgCadence => "avg-cadence",
+
+                ActivityMetric::MaxAltitude => "max-altitude",
+                ActivityMetric::MinAltitude => "min-altitude",
+                ActivityMetric::AvgAltitude => "avg-altitude",
+
+                ActivityMetric::MaxPace => "max-pace",
+                ActivityMetric::MinPace => "min-pace",
+                ActivityMetric::AvgPace => "avg-pace",
+
+                ActivityMetric::NumberOfActivity => "number-of-activities",
+            },
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricSource {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "duration" => Ok(Self::Activity(ActivityMetric::Duration)),
+            "calories" => Ok(Self::Activity(ActivityMetric::Calories)),
+            "elevation" => Ok(Self::Activity(ActivityMetric::Elevation)),
+            "distance" => Ok(Self::Activity(ActivityMetric::Distance)),
+            "normalized-power" => Ok(Self::Activity(ActivityMetric::NormalizedPower)),
+
+            "active-duration" => Ok(Self::Activity(ActivityMetric::ActiveDuration)),
+
+            "max-speed" => Ok(Self::Activity(ActivityMetric::MaxSpeed)),
+            "min-speed" => Ok(Self::Activity(ActivityMetric::MinSpeed)),
+            "avg-speed" => Ok(Self::Activity(ActivityMetric::AvgSpeed)),
+
+            "max-power" => Ok(Self::Activity(ActivityMetric::MaxPower)),
+            "min-power" => Ok(Self::Activity(ActivityMetric::MinPower)),
+            "avg-power" => Ok(Self::Activity(ActivityMetric::AvgPower)),
+
+            "max-hr" => Ok(Self::Activity(ActivityMetric::MaxHeartRate)),
+            "min-hr" => Ok(Self::Activity(ActivityMetric::MinHeartRate)),
+            "avg-hr" => Ok(Self::Activity(ActivityMetric::AvgHeartRate)),
+
+            "max-cadence" => Ok(Self::Activity(ActivityMetric::MaxCadence)),
+            "min-cadence" => Ok(Self::Activity(ActivityMetric::MinCadence)),
+            "avg-cadence" => Ok(Self::Activity(ActivityMetric::AvgCadence)),
+
+            "max-altitude" => Ok(Self::Activity(ActivityMetric::MaxAltitude)),
+            "min-altitude" => Ok(Self::Activity(ActivityMetric::MinAltitude)),
+            "avg-altitude" => Ok(Self::Activity(ActivityMetric::AvgAltitude)),
+
+            "max-pace" => Ok(Self::Activity(ActivityMetric::MaxPace)),
+            "min-pace" => Ok(Self::Activity(ActivityMetric::MinPace)),
+            "avg-pace" => Ok(Self::Activity(ActivityMetric::AvgPace)),
+
+            "number-of-activities" => Ok(Self::Activity(ActivityMetric::NumberOfActivity)),
 
             _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }

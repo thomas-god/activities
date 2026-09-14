@@ -8,7 +8,7 @@ use crate::{
             activity::ActivityMetric,
             training::{
                 TrainingMetricActivityFilters, TrainingMetricGroupBy, TrainingMetricName,
-                TrainingMetricTarget, TrainingMetricWindow,
+                TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow,
             },
         },
         ports::{
@@ -22,9 +22,10 @@ use crate::{
         http::{
             AppState,
             handlers::training::types::{
-                APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
-                APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricScope,
-                APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
+                APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
+                APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricGroupBy,
+                APITrainingMetricScope, APITrainingMetricSource, APITrainingMetricSummary,
+                APITrainingMetricTarget,
             },
         },
         parser::ParseFile,
@@ -34,7 +35,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub struct CreateTrainingMetricBody {
     name: String,
-    metric: ActivityMetric,
+    source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
@@ -68,7 +69,7 @@ fn build_request(
     Ok(CreateTrainingMetricRequest::new(
         user.clone(),
         TrainingMetricName::from(body.name),
-        body.metric,
+        TrainingMetricSource::from(&body.source),
         body.window.map(TrainingMetricWindow::from),
         filters,
         body.summary.into(),
@@ -128,7 +129,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -142,7 +143,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "metric": "MinSpeed",
+            "source": {"type": "activity", "metric": "MinSpeed"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -156,7 +157,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "metric": "MinSpeed",
+            "source": {"type": "activity", "metric": "MinSpeed"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] },
@@ -170,7 +171,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -185,7 +186,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -200,7 +201,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "My Custom Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -214,7 +215,7 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "My Custom Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {
@@ -234,7 +235,7 @@ mod tests_create_training_metric {
         let body: CreateTrainingMetricBody = serde_json::from_str(
             r#"{
             "name": "Test Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},
@@ -255,7 +256,7 @@ mod tests_create_training_metric {
         let body: CreateTrainingMetricBody = serde_json::from_str(
             r#"{
             "name": "Test Metric",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "granularity": "Weekly",
             "aggregate": "Min",
             "filters": {},

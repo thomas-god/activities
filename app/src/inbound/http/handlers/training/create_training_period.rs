@@ -16,8 +16,8 @@ use crate::{
         http::{
             AppState,
             handlers::training::types::{
-                APITrainingMetricAggregate, APITrainingMetricFilters, APITrainingMetricGranularity,
-                APITrainingMetricSource, APITrainingPeriodSports,
+                APIActivityMetricSource, APITrainingMetricAggregate, APITrainingMetricFilters,
+                APITrainingMetricGranularity, APITrainingPeriodSports,
             },
         },
         parser::ParseFile,

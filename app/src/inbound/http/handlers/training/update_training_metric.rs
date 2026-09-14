@@ -9,7 +9,7 @@ use crate::domain::models::UserId;
 use crate::domain::models::activity::ActivityMetric;
 use crate::domain::models::training::{
     TrainingMetricActivityFilters, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
-    TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
+    TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId,
 };
 use crate::domain::ports::training::{UpdateTrainingMetricError, UpdateTrainingMetricRequest};
 use crate::domain::ports::{
@@ -20,7 +20,7 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthenticatedUser;
 use crate::inbound::http::AppState;
 use crate::inbound::http::handlers::training::types::{
-    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope,
+    APITimeseriesWindow, APITrainingMetricFilters, APITrainingMetricScope, APITrainingMetricSource,
     APITrainingMetricSummary, APITrainingMetricTarget,
 };
 use crate::inbound::parser::ParseFile;
@@ -28,7 +28,7 @@ use crate::inbound::parser::ParseFile;
 #[derive(Deserialize)]
 pub struct UpdateTrainingMetricBody {
     name: String,
-    metric: ActivityMetric,
+    source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
@@ -95,7 +95,7 @@ fn build_request(
         user,
         metric,
         name,
-        body.metric,
+        TrainingMetricSource::from(&body.source),
         body.window.map(TrainingMetricWindow::from),
         filters,
         body.summary.into(),
@@ -105,16 +105,22 @@ fn build_request(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     use crate::domain::models::activity::Unit;
 
     #[test]
     fn test_deserialize_required_fields_only() {
-        let json = r#"{"name": "New Metric Name", "metric": "Calories"}"#;
+        let json =
+            r#"{"name": "New Metric Name", "source": {"type": "activity", "metric": "Calories"}}"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
         assert_eq!(body.name, "New Metric Name".to_string());
-        assert_eq!(body.metric, ActivityMetric::Calories);
+        assert_eq!(
+            body.source,
+            APITrainingMetricSource::Activity(ActivityMetric::Calories)
+        );
         assert!(body.window.is_none());
         assert!(body.filters.is_none());
     }
@@ -137,7 +143,7 @@ mod tests {
     fn test_build_request_with_target() {
         let json = r#"{
             "name": "New Metric Name",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "target": {"value": 2000.0, "unit": "kcal"}
         }"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
@@ -158,7 +164,7 @@ mod tests {
     fn test_build_request_with_invalid_target_unit_rejected() {
         let json = r#"{
             "name": "New Metric Name",
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "target": {"value": 2000.0, "unit": "parsec"}
         }"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();

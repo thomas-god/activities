@@ -10,8 +10,8 @@ use crate::{
             activity::{ActivityMetric, ActivityMetricSource, Unit},
             training::{
                 TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricSummary, TrainingMetricSummaryAverage,
-                TrainingMetricTarget, TrainingMetricWindow,
+                TrainingMetricGranularity, TrainingMetricSource, TrainingMetricSummary,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
             },
         },
         ports::{
@@ -30,10 +30,11 @@ use crate::{
             AppState,
             handlers::training::{
                 types::{
-                    APITimeseriesWindow, APITrainingMetricAggregate, APITrainingMetricFilters,
-                    APITrainingMetricGranularity, APITrainingMetricGroupBy, APITrainingMetricScope,
-                    APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
-                    SportsResponse, TrainingMetricBody, format_source_metric,
+                    APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
+                    APITrainingMetricFilters, APITrainingMetricGranularity,
+                    APITrainingMetricGroupBy, APITrainingMetricScope, APITrainingMetricSource,
+                    APITrainingMetricSummary, APITrainingMetricTarget, SportsResponse,
+                    TrainingMetricBody, format_source_metric,
                 },
                 utils::{
                     GranuleValues, MetricsDateRange, convert_metric_target_unit,
@@ -48,7 +49,7 @@ use crate::{
 /// Request body for computing training metric values
 #[derive(Debug, Deserialize)]
 pub struct ComputeMetricValuesRequest {
-    metric: ActivityMetric,
+    source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
     filters: Option<APITrainingMetricFilters>,
@@ -111,7 +112,7 @@ pub async fn compute_training_metric_values<
 
     let req = GetTrainingMetricValuesRequest::ByDefinition {
         user: user.user().clone(),
-        metric: request.metric,
+        source: TrainingMetricSource::from(&request.source),
         window: window.clone(),
         filters,
         summary: TrainingMetricSummary::from(&request.summary),
@@ -161,8 +162,8 @@ fn to_body(
         // ID not relevant for temporary metric values
         id: "temporary-metric".to_string(),
         name: None,
-        metric: request.metric.to_string(),
-        metric_formated: format_source_metric(&request.metric.source()),
+        metric: request.source.to_string(),
+        metric_formated: format_source_metric(&TrainingMetricSource::from(&request.source)),
         unit: unit.to_string(),
         granularity: request.window.as_ref().map(|w| w.granularity().to_string()),
         aggregate: request.window.as_ref().map(|w| w.aggregate().to_string()),
@@ -217,7 +218,7 @@ mod tests {
         // Test with only required fields
         // Demonstrates basic JSON format for the request
         let json = r#"{
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "window": {
                 "granularity": "Daily",
                 "aggregate": "Sum"
@@ -249,7 +250,7 @@ mod tests {
         // - Optional group_by (values: Sport, SportCategory, WorkoutType, RpeRange, Bonked)
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
-            "metric": "AvgSpeed",
+            "source": {"type": "activity", "metric": "AvgSpeed"},
             "window": {
                 "granularity": "Daily",
                 "aggregate": "Sum",
@@ -278,7 +279,7 @@ mod tests {
     #[test]
     fn test_request_deserialize_with_target() {
         let json = r#"{
-            "metric": "Calories",
+            "source": {"type": "activity", "metric": "Calories"},
             "target": {"value": 100.0, "unit": "km"},
             "start": "2024-01-01"
         }"#;
@@ -295,7 +296,7 @@ mod tests {
     #[test]
     fn test_to_body_minimal_request_uses_defaults() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetric::Calories,
+            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
             window: None,
             filters: None,
             summary: APITrainingMetricSummary::default(),
@@ -341,7 +342,7 @@ mod tests {
     #[test]
     fn test_to_body_full_request_maps_all_fields() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetric::Calories,
+            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Weekly,
                 APITrainingMetricAggregate::Sum,
@@ -414,7 +415,7 @@ mod tests {
     #[test]
     fn test_to_body_timeseries_metric_and_sport_category_filter() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetric::AvgSpeed,
+            source: APITrainingMetricSource::Activity(ActivityMetric::AvgSpeed),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Average,
@@ -458,7 +459,7 @@ mod tests {
     #[test]
     fn test_to_body_window_without_filters_keeps_sports_default() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetric::Distance,
+            source: APITrainingMetricSource::Activity(ActivityMetric::Distance),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Monthly,
                 APITrainingMetricAggregate::Sum,
@@ -493,7 +494,7 @@ mod tests {
     #[test]
     fn test_to_body_empty_filter_lists_are_preserved() {
         let request = ComputeMetricValuesRequest {
-            metric: ActivityMetric::Calories,
+            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
             window: None,
             filters: Some(APITrainingMetricFilters {
                 sports: Some(vec![]),

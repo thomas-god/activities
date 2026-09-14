@@ -10,10 +10,10 @@ use crate::domain::{
         training::{
             TrainingMetric, TrainingMetricActivityFilters, TrainingMetricDefinitionPatch,
             TrainingMetricId, TrainingMetricName, TrainingMetricPatch, TrainingMetricScope,
-            TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValues,
-            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-            TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+            TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
+            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
             TrainingPeriodWithActivities,
         },
     },
@@ -25,7 +25,7 @@ use crate::domain::{
 pub struct CreateTrainingMetricRequest {
     user: UserId,
     name: TrainingMetricName,
-    metric: ActivityMetric,
+    source: TrainingMetricSource,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
@@ -42,8 +42,8 @@ impl CreateTrainingMetricRequest {
         &self.name
     }
 
-    pub fn metric(&self) -> &ActivityMetric {
-        &self.metric
+    pub fn source(&self) -> &TrainingMetricSource {
+        &self.source
     }
 
     pub fn window(&self) -> &Option<TrainingMetricWindow> {
@@ -96,7 +96,7 @@ pub struct UpdateTrainingMetricRequest {
     user: UserId,
     id: TrainingMetricId,
     name: TrainingMetricName,
-    metric: ActivityMetric,
+    source: TrainingMetricSource,
     window: Option<TrainingMetricWindow>,
     filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
@@ -117,7 +117,7 @@ impl UpdateTrainingMetricRequest {
         TrainingMetricPatch::new(
             self.name,
             TrainingMetricDefinitionPatch::new(
-                self.metric,
+                self.source,
                 self.window,
                 self.filters,
                 self.summary,
@@ -153,7 +153,7 @@ pub enum GetTrainingMetricValuesRequest {
     ByTrainingMetricId(UserId, TrainingMetricId),
     ByDefinition {
         user: UserId,
-        metric: ActivityMetric,
+        source: TrainingMetricSource,
         window: Option<TrainingMetricWindow>,
         filters: TrainingMetricActivityFilters,
         summary: TrainingMetricSummary,
@@ -906,7 +906,7 @@ mod tests {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Metric"),
-            ActivityMetric::Calories,
+            TrainingMetricSource::Activity(ActivityMetric::Calories),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -923,7 +923,7 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            ActivityMetric::Calories,
+            TrainingMetricSource::Activity(ActivityMetric::Calories),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -941,7 +941,7 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            ActivityMetric::Calories,
+            TrainingMetricSource::Activity(ActivityMetric::Calories),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),

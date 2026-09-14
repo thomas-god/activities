@@ -5,20 +5,19 @@ use std::{
 };
 
 use derive_more::Constructor;
-/// Mappings between domain types and types part of the HTTP API
 use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::models::{
         activity::{
-            ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus, Sport,
-            TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+            ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus,
+            Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
         },
         training::{
             SportFilter, TrainingMetricActivityFilters, TrainingMetricAggregate,
             TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope,
-            TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
-            TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
+            TrainingMetricSource, TrainingMetricSummary, TrainingMetricSummaryAverage,
+            TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
         },
     },
     inbound::http::handlers::training::utils::GranuleValues,
@@ -71,18 +70,18 @@ impl From<APITimeseriesMetric> for TimeseriesMetric {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub enum APITrainingMetricSource {
+pub enum APIActivityMetricSource {
     Statistic(APIActivityStatistic),
     Timeseries((APITimeseriesMetric, APITimeseriesAggregate)),
 }
 
-impl From<APITrainingMetricSource> for ActivityMetricSource {
-    fn from(value: APITrainingMetricSource) -> Self {
+impl From<APIActivityMetricSource> for ActivityMetricSource {
+    fn from(value: APIActivityMetricSource) -> Self {
         match value {
-            APITrainingMetricSource::Statistic(stat) => {
+            APIActivityMetricSource::Statistic(stat) => {
                 ActivityMetricSource::Statistic(ActivityStatistic::from(stat))
             }
-            APITrainingMetricSource::Timeseries((metric, aggregate)) => {
+            APIActivityMetricSource::Timeseries((metric, aggregate)) => {
                 ActivityMetricSource::Timeseries((
                     TimeseriesMetric::from(metric),
                     TimeseriesAggregate::from(aggregate),
@@ -396,6 +395,28 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type", content = "metric", rename_all = "camelCase")]
+pub enum APITrainingMetricSource {
+    Activity(ActivityMetric),
+}
+
+impl Display for APITrainingMetricSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Activity(source) => f.write_str(&source.to_string()),
+        }
+    }
+}
+
+impl From<&APITrainingMetricSource> for TrainingMetricSource {
+    fn from(value: &APITrainingMetricSource) -> Self {
+        match value {
+            APITrainingMetricSource::Activity(source) => Self::Activity(*source),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct SportsResponse {
     pub categories: Vec<String>,
@@ -469,7 +490,13 @@ pub struct TrainingMetricBody {
     pub summary: HashMap<String, f64>,
 }
 
-pub fn format_source_metric(source: &ActivityMetricSource) -> String {
+pub fn format_source_metric(source: &TrainingMetricSource) -> String {
+    match source {
+        TrainingMetricSource::Activity(source) => format_activity_source_metric(source.source()),
+    }
+}
+
+fn format_activity_source_metric(source: ActivityMetricSource) -> String {
     match source {
         ActivityMetricSource::Statistic(stat) => stat.to_string(),
         ActivityMetricSource::Timeseries((metric, aggregate)) => {
@@ -611,5 +638,17 @@ mod tests {
 
         assert!(response.sports.is_empty());
         assert!(response.categories.is_empty());
+    }
+
+    #[test]
+    fn test_format_source_metric() {
+        assert_eq!(
+            format_source_metric(&TrainingMetricSource::Activity(ActivityMetric::Calories)),
+            "Calories".to_string()
+        );
+        assert_eq!(
+            format_source_metric(&TrainingMetricSource::Activity(ActivityMetric::MaxCadence)),
+            "Activity Max Cadence".to_string()
+        );
     }
 }

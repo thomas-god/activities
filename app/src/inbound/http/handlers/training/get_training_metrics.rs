@@ -119,8 +119,8 @@ fn to_response_body_item(
     TrainingMetricBody {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
-        metric: metric.definition().metric().to_string(),
-        metric_formated: format_source_metric(&definition.metric().source()),
+        metric: metric.definition().source().to_string(),
+        metric_formated: format_source_metric(definition.source()),
         unit: unit.to_string(),
         granularity: definition
             .window()
@@ -249,23 +249,6 @@ mod tests {
     use crate::domain::models::training::TrainingMetricTarget;
 
     use super::*;
-
-    #[test]
-    fn test_format_definition_source() {
-        assert_eq!(
-            format_source_metric(&ActivityMetricSource::Statistic(
-                ActivityStatistic::Calories
-            )),
-            "Calories".to_string()
-        );
-        assert_eq!(
-            format_source_metric(&ActivityMetricSource::Timeseries((
-                TimeseriesMetric::Distance,
-                TimeseriesAggregate::Max
-            ))),
-            "Activity Max Distance".to_string()
-        );
-    }
 
     #[test]
     fn test_metrics_query_scope_global_when_no_period_id() {

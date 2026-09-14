@@ -980,6 +980,7 @@ pub enum Unit {
     Second,
     NumberOfActivities,
     Degree,
+    Null,
 }
 
 impl fmt::Display for Unit {
@@ -999,6 +1000,7 @@ impl fmt::Display for Unit {
             Self::Second => "s",
             Self::NumberOfActivities => "activities",
             Self::Degree => "°",
+            Self::Null => "",
         };
 
         write!(f, "{}", unit)
@@ -1023,6 +1025,7 @@ impl FromStr for Unit {
             "s" => Ok(Self::Second),
             "activities" => Ok(Self::NumberOfActivities),
             "°" => Ok(Self::Degree),
+            "" => Ok(Self::Null),
             _ => Err(format!("Unknown Unit: {s}")),
         }
     }
@@ -1034,14 +1037,14 @@ impl FromStr for Unit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, Serialize, Deserialize)]
 pub enum ActivityMetric {
-    // Raw stats
+    // From activity's raw stats
     Duration,
     Calories,
     Elevation,
     Distance,
     NormalizedPower,
 
-    // Derived from timeseries
+    // Derived from activity's timeseries
     ActiveDuration,
 
     MaxSpeed,
