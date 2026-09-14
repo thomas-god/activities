@@ -128,9 +128,8 @@ describe('compareMetricPreviewPayload', () => {
 		const payload = metricPreviewPayload(definition, makePeriod());
 
 		expect(payload.metric).toBe('Distance');
-		expect(payload.start).toBe('2026-02-02T00:00:00+01:00');
-		// May crosses into DST, hence the +02:00 offset
-		expect(payload.end).toBe('2026-05-01T00:00:00+02:00');
+		expect(payload.start).toBe('2026-02-02');
+		expect(payload.end).toBe('2026-05-01');
 	});
 
 	it('defaults sports filters to the period sports', () => {
@@ -177,15 +176,15 @@ describe('compareMetricPreviewPayload', () => {
 
 		const payload = metricPreviewPayload(definition, makePeriod({ end: null }), now);
 
-		expect(payload.end).toBe('2026-09-09T15:00:00+02:00');
+		expect(payload.end).toBe('2026-09-09');
 	});
 });
 
 describe('periodMetricRange', () => {
 	it('extends the end by one day', () => {
 		expect(periodMetricRange({ start: '2026-02-02', end: '2026-04-30' })).toEqual({
-			start: '2026-02-02T00:00:00+01:00',
-			end: '2026-05-01T00:00:00+02:00'
+			start: '2026-02-02',
+			end: '2026-05-01'
 		});
 	});
 });

@@ -275,10 +275,8 @@ export const periodMetricRange = (
 	period: Pick<TrainingPeriodDetails, 'start' | 'end'>,
 	now = dayjsNow
 ): { start: string; end: string } => ({
-	start: dayjs(period.start).format('YYYY-MM-DDTHH:mm:ssZ'),
-	end: (period.end === null ? now() : dayjs(period.end))
-		.add(1, 'day')
-		.format('YYYY-MM-DDTHH:mm:ssZ')
+	start: dayjs(period.start).format('YYYY-MM-DD'),
+	end: (period.end === null ? now() : dayjs(period.end)).add(1, 'day').format('YYYY-MM-DD')
 });
 
 /**
