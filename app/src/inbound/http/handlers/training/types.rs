@@ -4,23 +4,28 @@ use std::{
     str::FromStr,
 };
 
+use axum::http::StatusCode;
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    domain::models::{
-        activity::{
-            ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus,
-            Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+    domain::{
+        models::{
+            activity::{
+                ActivityMetric, ActivityMetricSource, ActivityRpe, ActivityStatistic, BonkStatus,
+                Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
+            },
+            training::{
+                HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale,
+                TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
+                TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSource,
+                TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
+                TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
+            },
         },
-        training::{
-            SportFilter, TrainingMetricActivityFilters, TrainingMetricAggregate,
-            TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope,
-            TrainingMetricSource, TrainingMetricSummary, TrainingMetricSummaryAverage,
-            TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
-        },
+        ports::training::HooperIndexError,
     },
-    inbound::http::handlers::training::utils::GranuleValues,
+    inbound::http::{handlers::training::utils::GranuleValues, shared::PatchField},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
@@ -507,13 +512,86 @@ fn format_activity_source_metric(source: ActivityMetricSource) -> String {
     }
 }
 
+/// Hooper's index values as received from the API. Every measure is optional, and each provided
+/// value must be in the `1..=10` range.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+pub struct APIHooperIndex {
+    pub fatigue: Option<u8>,
+    pub sleep: Option<u8>,
+    pub pain: Option<u8>,
+    pub stress: Option<u8>,
+    pub mood: Option<u8>,
+}
+
+impl TryFrom<APIHooperIndex> for HooperIndex {
+    type Error = String;
+
+    fn try_from(value: APIHooperIndex) -> Result<Self, Self::Error> {
+        Ok(HooperIndex::new(
+            value.fatigue.map(SubjectiveScale::try_from).transpose()?,
+            value.sleep.map(SubjectiveScale::try_from).transpose()?,
+            value.pain.map(SubjectiveScale::try_from).transpose()?,
+            value.stress.map(SubjectiveScale::try_from).transpose()?,
+            value.mood.map(SubjectiveScale::try_from).transpose()?,
+        ))
+    }
+}
+
+/// Patch of Hooper's index values. Mirrors the domain `HooperIndexPatch` (double `Option`
+/// convention):
+/// - a field **absent** from the body leaves the current value untouched,
+/// - a field set to **`null`** clears/removes the current value,
+/// - a field with a **value** sets it (and must be in the `1..=10` range).
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+pub struct APIHooperIndexPatch {
+    #[serde(default)]
+    pub fatigue: PatchField<u8>,
+    #[serde(default)]
+    pub sleep: PatchField<u8>,
+    #[serde(default)]
+    pub pain: PatchField<u8>,
+    #[serde(default)]
+    pub stress: PatchField<u8>,
+    #[serde(default)]
+    pub mood: PatchField<u8>,
+}
+
+fn patch_field_to_domain(field: PatchField<u8>) -> Result<Option<Option<SubjectiveScale>>, String> {
+    match field {
+        PatchField::Absent => Ok(None),
+        PatchField::Clear => Ok(Some(None)),
+        PatchField::Set(value) => Ok(Some(Some(SubjectiveScale::try_from(value)?))),
+    }
+}
+
+impl TryFrom<APIHooperIndexPatch> for HooperIndexPatch {
+    type Error = String;
+
+    fn try_from(value: APIHooperIndexPatch) -> Result<Self, Self::Error> {
+        Ok(HooperIndexPatch::new(
+            patch_field_to_domain(value.fatigue)?,
+            patch_field_to_domain(value.sleep)?,
+            patch_field_to_domain(value.pain)?,
+            patch_field_to_domain(value.stress)?,
+            patch_field_to_domain(value.mood)?,
+        ))
+    }
+}
+
+impl From<HooperIndexError> for StatusCode {
+    fn from(_value: HooperIndexError) -> Self {
+        Self::UNPROCESSABLE_ENTITY
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::domain::models::activity::{Sport, SportCategory, Unit};
     use crate::domain::models::training::{
-        SportFilter, TrainingMetricTarget, TrainingPeriodSports,
+        HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale, TrainingMetricTarget,
+        TrainingPeriodSports,
     };
 
     #[test]
@@ -650,5 +728,75 @@ mod tests {
             format_source_metric(&TrainingMetricSource::Activity(ActivityMetric::MaxCadence)),
             "Activity Max Cadence".to_string()
         );
+    }
+
+    #[test]
+    fn test_api_hooper_index_converts_all_values() {
+        let api = APIHooperIndex {
+            fatigue: Some(1),
+            sleep: Some(2),
+            pain: Some(3),
+            stress: Some(4),
+            mood: Some(5),
+        };
+
+        let index = HooperIndex::try_from(api).unwrap();
+
+        assert_eq!(
+            index.fatigue(),
+            &Some(SubjectiveScale::try_from(1).unwrap())
+        );
+        assert_eq!(index.sleep(), &Some(SubjectiveScale::try_from(2).unwrap()));
+        assert_eq!(index.pain(), &Some(SubjectiveScale::try_from(3).unwrap()));
+        assert_eq!(index.stress(), &Some(SubjectiveScale::try_from(4).unwrap()));
+        assert_eq!(index.mood(), &Some(SubjectiveScale::try_from(5).unwrap()));
+    }
+
+    #[test]
+    fn test_api_hooper_index_rejects_out_of_range_values() {
+        for invalid in [0u8, 11, 255] {
+            let api = APIHooperIndex {
+                fatigue: Some(invalid),
+                ..Default::default()
+            };
+
+            assert!(HooperIndex::try_from(api).is_err());
+        }
+    }
+
+    #[test]
+    fn test_api_hooper_index_patch_semantics() {
+        let body: APIHooperIndexPatch =
+            serde_json::from_str(r#"{ "fatigue": 9, "sleep": null }"#).unwrap();
+        let patch = HooperIndexPatch::try_from(body).unwrap();
+
+        let existing = HooperIndex::new(
+            Some(SubjectiveScale::try_from(1).unwrap()),
+            Some(SubjectiveScale::try_from(2).unwrap()),
+            Some(SubjectiveScale::try_from(3).unwrap()),
+            Some(SubjectiveScale::try_from(4).unwrap()),
+            Some(SubjectiveScale::try_from(5).unwrap()),
+        );
+
+        let patched = existing.patch(patch);
+
+        assert_eq!(
+            patched.fatigue(),
+            &Some(SubjectiveScale::try_from(9).unwrap())
+        );
+        assert_eq!(patched.sleep(), &None);
+        assert_eq!(patched.pain(), &Some(SubjectiveScale::try_from(3).unwrap()));
+        assert_eq!(
+            patched.stress(),
+            &Some(SubjectiveScale::try_from(4).unwrap())
+        );
+        assert_eq!(patched.mood(), &Some(SubjectiveScale::try_from(5).unwrap()));
+    }
+
+    #[test]
+    fn test_api_hooper_index_patch_rejects_out_of_range_values() {
+        let body: APIHooperIndexPatch = serde_json::from_str(r#"{ "mood": 0 }"#).unwrap();
+
+        assert!(HooperIndexPatch::try_from(body).is_err());
     }
 }
