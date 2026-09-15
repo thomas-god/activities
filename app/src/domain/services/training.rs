@@ -66,10 +66,20 @@ where
         definition: &TrainingMetricDefinition,
         date_range: &DateRange,
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
-        let TrainingMetricSource::Activity(source) = *definition.source() else {
-            return Ok(TrainingMetricValues::empty(Unit::Null));
-        };
+        match *definition.source() {
+            TrainingMetricSource::Activity(source) => {
+                self.compute_training_metric_values_for_activity(definition, source, date_range)
+                    .await
+            }
+        }
+    }
 
+    async fn compute_training_metric_values_for_activity(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: ActivityMetric,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
         let activities_with_metrics = self
             .activity_service
             .list_activities_with_metrics(
@@ -86,8 +96,7 @@ where
                 } else {
                     None
                 }
-            })
-            .collect::<Vec<_>>();
+            });
 
         Ok(definition.compute_values_from_activities(activities_with_metrics))
     }

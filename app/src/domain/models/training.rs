@@ -6,6 +6,7 @@ use std::{
 
 use chrono::{DateTime, Datelike, Days, FixedOffset, Months, NaiveDate, Utc};
 use derive_more::{AsRef, Constructor, Display};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -14,8 +15,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetricValue, ActivityMetrics, ActivityRpe,
-            BonkStatus, Sport, SportCategory, ToUnit, Unit, WorkoutType,
+            Activity, ActivityMetric, ActivityMetrics, ActivityRpe, BonkStatus, Sport,
+            SportCategory, ToUnit, Unit, WorkoutType,
         },
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
@@ -607,88 +608,78 @@ impl TrainingMetricDefinition {
     /// Compute training metric values from a list of activities.
     pub fn compute_values_from_activities(
         &self,
-        activities_with_metric: Vec<(Activity, f64)>,
+        activities_with_metric: impl Iterator<Item = (Activity, f64)>,
     ) -> TrainingMetricValues {
         let filtered_activities = activities_with_metric
-            .iter()
             .filter(|(activity, _metric_value)| self.filters().matches(activity));
 
-        let values = match self.window.as_ref() {
-            None => process_activities_without_window(filtered_activities),
-            Some(window) => group_and_aggregate_metrics(filtered_activities, window),
-        };
+        let values_by_bin = filtered_activities
+            .map(|(activity, metric)| {
+                let bin = match &self.window {
+                    None => TrainingMetricBin::new_without_group(
+                        activity.start_time().datetime().to_rfc3339(),
+                    ),
+                    Some(window) => {
+                        let granule = window
+                            .granularity()
+                            .datetime_key(activity.start_time().datetime());
+
+                        let group = window
+                            .group_by()
+                            .as_ref()
+                            .and_then(|group_by| group_by.extract_group(&activity));
+
+                        TrainingMetricBin::new(granule, group)
+                    }
+                };
+
+                (bin, IndividualValue::new(metric))
+            })
+            .into_group_map();
+
+        self.compute_training_metric_values(values_by_bin)
+    }
+
+    /// Compute for each bin the corresponding training metric value based on the window/aggregate
+    /// of the definition and return the final `TrainingMetricValues`.
+    fn compute_training_metric_values(
+        &self,
+        values: HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+    ) -> TrainingMetricValues {
+        let aggregate = self.window().as_ref().map(|w| *w.aggregate());
+        let values = values
+            .into_iter()
+            .filter_map(|(key, values)| {
+                let value = match aggregate {
+                    None => {
+                        // Skip empty bins
+                        let Some(value) = values.first() else {
+                            return None;
+                        };
+                        TrainingMetricValue::SingleValue(value.value())
+                    }
+                    Some(aggregate) => aggregate.aggregate_values(&values)?,
+                };
+
+                Some((key, value))
+            })
+            .collect();
+
         let summary = self.summary.compute(&values);
 
         TrainingMetricValues::new(values, summary, self.unit())
     }
 }
 
-fn process_activities_without_window<'a>(
-    activities: impl Iterator<Item = &'a (Activity, f64)>,
-) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
-    HashMap::from_iter(activities.map(|(activity, metric_value)| {
-        (
-            TrainingMetricBin::new(activity.start_time().datetime().to_rfc3339(), None),
-            TrainingMetricValue::SingleValue(*metric_value),
-        )
-    }))
-}
+/// Intermediate, source-agnostic, struct holding the value and metadata necessary to compute
+/// a training metric values. Sources (activity, hooper index) should map/convert to this struct.
+#[derive(Debug, Clone, Copy, Constructor)]
+pub(self) struct IndividualValue(f64);
 
-fn group_and_aggregate_metrics<'a>(
-    activities: impl Iterator<Item = &'a (Activity, f64)>,
-    window: &TrainingMetricWindow,
-) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
-    let metrics = activities
-        .map(|(activity, metric_value)| {
-            (
-                window
-                    .group_by()
-                    .as_ref()
-                    .and_then(|group_by| group_by.extract_group(activity)),
-                ActivityMetricValue::new(
-                    *metric_value,
-                    *activity.start_time(),
-                    *activity.duration(),
-                ),
-            )
-        })
-        .collect();
-
-    aggregate_metrics(
-        window.aggregate(),
-        group_metrics_by_bin(window.granularity(), metrics),
-    )
-}
-
-fn group_metrics_by_bin(
-    granularity: &TrainingMetricGranularity,
-    metrics: Vec<(Option<String>, ActivityMetricValue)>,
-) -> HashMap<TrainingMetricBin, Vec<ActivityMetricValue>> {
-    let mut grouped_values: HashMap<TrainingMetricBin, Vec<ActivityMetricValue>> = HashMap::new();
-    for (group, value) in metrics {
-        let bin = TrainingMetricBin::new(
-            granularity.datetime_key(value.activity_start_time().datetime()),
-            group,
-        );
-        grouped_values.entry(bin).or_default().push(value);
+impl IndividualValue {
+    fn value(&self) -> f64 {
+        self.0
     }
-    grouped_values
-}
-
-fn aggregate_metrics(
-    aggregate: &TrainingMetricAggregate,
-    metrics: HashMap<TrainingMetricBin, Vec<ActivityMetricValue>>,
-) -> HashMap<TrainingMetricBin, TrainingMetricValue> {
-    let mut res = HashMap::new();
-
-    for (key, values) in metrics.into_iter() {
-        let Some(training_metric_value) = aggregate.aggregate(values) else {
-            continue;
-        };
-        res.insert(key, training_metric_value);
-    }
-
-    res
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]
@@ -699,16 +690,17 @@ pub enum TrainingMetricGranularity {
 }
 
 impl TrainingMetricGranularity {
-    pub fn datetime_key(&self, dt: &DateTime<FixedOffset>) -> String {
+    pub fn date_key(&self, date: &chrono::NaiveDate) -> String {
         match self {
-            TrainingMetricGranularity::Daily => dt.date_naive().to_string(),
-            TrainingMetricGranularity::Weekly => dt
-                .date_naive()
-                .week(chrono::Weekday::Mon)
-                .first_day()
-                .to_string(),
-            TrainingMetricGranularity::Monthly => dt.date_naive().with_day(1).unwrap().to_string(),
+            TrainingMetricGranularity::Daily => date.to_string(),
+            TrainingMetricGranularity::Weekly => {
+                date.week(chrono::Weekday::Mon).first_day().to_string()
+            }
+            TrainingMetricGranularity::Monthly => date.with_day(1).unwrap().to_string(),
         }
+    }
+    pub fn datetime_key(&self, dt: &DateTime<FixedOffset>) -> String {
+        self.date_key(&dt.date_naive())
     }
 
     /// Computes the bins' keys for the [TrainingMetricGranularity] over the given range [start,
@@ -811,104 +803,34 @@ pub enum TrainingMetricAggregate {
 }
 
 impl TrainingMetricAggregate {
-    fn aggregate(&self, activity_metrics: Vec<ActivityMetricValue>) -> Option<TrainingMetricValue> {
-        if activity_metrics.is_empty() {
+    fn aggregate_values(&self, values: &[IndividualValue]) -> Option<TrainingMetricValue> {
+        if values.is_empty() {
             return None;
         }
         Some(match self {
             TrainingMetricAggregate::Min => TrainingMetricValue::Min(
-                activity_metrics
-                    .into_iter()
-                    .fold(f64::MAX, |min, metric| min.min(*metric.value())),
+                values
+                    .iter()
+                    .fold(f64::MAX, |min, metric| min.min(metric.value())),
             ),
             TrainingMetricAggregate::Max => TrainingMetricValue::Max(
-                activity_metrics
-                    .into_iter()
-                    .fold(f64::MIN, |max, metric| max.max(*metric.value())),
+                values
+                    .iter()
+                    .fold(f64::MIN, |max, metric| max.max(metric.value())),
             ),
             TrainingMetricAggregate::Average => {
-                let number_of_metrics = activity_metrics.len();
-                let sum = activity_metrics
-                    .into_iter()
-                    .fold(0., |sum, metric| sum + *metric.value());
+                let number_of_metrics = values.len();
+                let sum = values.iter().fold(0., |sum, metric| sum + metric.value());
 
-                TrainingMetricValue::Average {
-                    value: sum / number_of_metrics as f64,
-                    sum,
-                    number_of_elements: number_of_metrics,
-                }
+                TrainingMetricValue::Average(sum / number_of_metrics as f64)
             }
-            TrainingMetricAggregate::Sum => TrainingMetricValue::Sum(
-                activity_metrics
-                    .into_iter()
-                    .fold(0., |sum, metric| sum + *metric.value()),
-            ),
+            TrainingMetricAggregate::Sum => {
+                TrainingMetricValue::Sum(values.iter().fold(0., |sum, metric| sum + metric.value()))
+            }
             TrainingMetricAggregate::NumberOfActivities => {
-                TrainingMetricValue::NumberOfActivities(activity_metrics.len())
+                TrainingMetricValue::NumberOfActivities(values.len())
             }
         })
-    }
-
-    pub fn initial_value(&self, new_metric: &ActivityMetricValue) -> Option<TrainingMetricValue> {
-        Some(match self {
-            Self::Max => TrainingMetricValue::Max(*new_metric.value()),
-            Self::Min => TrainingMetricValue::Min(*new_metric.value()),
-            Self::Sum => TrainingMetricValue::Sum(*new_metric.value()),
-            Self::Average => TrainingMetricValue::Average {
-                value: *new_metric.value(),
-                sum: *new_metric.value(),
-                number_of_elements: 1,
-            },
-            Self::NumberOfActivities => TrainingMetricValue::NumberOfActivities(1),
-        })
-    }
-
-    pub fn update_value(
-        &self,
-        previous_value: &TrainingMetricValue,
-        new_metric: &ActivityMetricValue,
-    ) -> Option<TrainingMetricValue> {
-        match self {
-            Self::Min => {
-                let TrainingMetricValue::Min(min) = previous_value else {
-                    return None;
-                };
-                Some(TrainingMetricValue::Min(min.min(*new_metric.value())))
-            }
-            Self::Max => {
-                let TrainingMetricValue::Max(max) = previous_value else {
-                    return None;
-                };
-                Some(TrainingMetricValue::Max(max.max(*new_metric.value())))
-            }
-            Self::Sum => {
-                let TrainingMetricValue::Sum(sum) = previous_value else {
-                    return None;
-                };
-                Some(TrainingMetricValue::Sum(sum + *new_metric.value()))
-            }
-            Self::Average => {
-                let TrainingMetricValue::Average {
-                    sum,
-                    value: _,
-                    number_of_elements,
-                } = previous_value
-                else {
-                    return None;
-                };
-                Some(TrainingMetricValue::Average {
-                    sum: *sum + *new_metric.value(),
-                    number_of_elements: *number_of_elements + 1,
-                    value: (*sum + *new_metric.value()) / (*number_of_elements as f64 + 1.),
-                })
-            }
-            Self::NumberOfActivities => {
-                let TrainingMetricValue::NumberOfActivities(count) = previous_value else {
-                    return None;
-                };
-                Some(TrainingMetricValue::NumberOfActivities(count + 1))
-            }
-        }
     }
 }
 
@@ -918,11 +840,7 @@ pub enum TrainingMetricValue {
     Min(f64),
     Max(f64),
     Sum(f64),
-    Average {
-        value: f64,
-        sum: f64,
-        number_of_elements: usize,
-    },
+    Average(f64),
     NumberOfActivities(usize),
 }
 
@@ -933,11 +851,7 @@ impl TrainingMetricValue {
             Self::Max(max) => *max,
             Self::Min(min) => *min,
             Self::Sum(sum) => *sum,
-            Self::Average {
-                value,
-                sum: _,
-                number_of_elements: _,
-            } => *value,
+            Self::Average(avg) => *avg,
             Self::NumberOfActivities(count) => *count as f64,
         }
     }
@@ -950,6 +864,13 @@ pub struct TrainingMetricBin {
 }
 
 impl TrainingMetricBin {
+    pub fn new_without_group(granule: String) -> Self {
+        Self {
+            granule,
+            group: None,
+        }
+    }
+
     pub fn granule(&self) -> &str {
         &self.granule
     }
@@ -1621,193 +1542,6 @@ mod test_training_metrics {
     }
 
     #[test]
-    fn test_group_metric_by_granularity_daily() {
-        let metric_1 = ActivityMetricValue::new(
-            12.3,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(120.),
-        );
-        let metric_2 = ActivityMetricValue::new(
-            18.1,
-            ActivityStartTime::new(
-                "2025-09-03T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(120.),
-        );
-
-        let metric_3 = ActivityMetricValue::new(
-            67.1,
-            ActivityStartTime::new(
-                "2025-09-04T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(120.),
-        );
-        let metrics = vec![
-            (None, metric_1.clone()),
-            (None, metric_2.clone()),
-            (None, metric_3.clone()),
-        ];
-        let granularity = TrainingMetricGranularity::Daily;
-
-        let res = group_metrics_by_bin(&granularity, metrics);
-        assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-09-03"))
-                .unwrap(),
-            &vec![metric_1, metric_2]
-        );
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-09-04"))
-                .unwrap(),
-            &vec![metric_3]
-        );
-    }
-
-    #[test]
-    fn test_group_metric_by_granularity_weekly() {
-        let metric_1 = ActivityMetricValue::new(
-            12.3,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(12.),
-        );
-        let metric_2 = ActivityMetricValue::new(
-            18.1,
-            ActivityStartTime::new(
-                "2025-09-05T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(12.),
-        );
-        let metric_3 = ActivityMetricValue::new(
-            67.1,
-            ActivityStartTime::new(
-                "2025-09-14T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::from(12.),
-        );
-        let metrics = vec![
-            (None, metric_1.clone()),
-            (None, metric_2.clone()),
-            (None, metric_3.clone()),
-        ];
-        let granularity = TrainingMetricGranularity::Weekly;
-
-        let res = group_metrics_by_bin(&granularity, metrics);
-        assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-09-01"))
-                .unwrap(),
-            &vec![metric_1, metric_2]
-        );
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-09-08"))
-                .unwrap(),
-            &vec![metric_3]
-        );
-    }
-
-    #[test]
-    fn test_group_metric_by_granularity_monthly() {
-        let metric_1 = ActivityMetricValue::new(
-            12.3,
-            ActivityStartTime::new(
-                "2025-09-03T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::default(),
-        );
-        let metric_2 = ActivityMetricValue::new(
-            18.1,
-            ActivityStartTime::new(
-                "2025-09-05T02:00:00+03:00"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::default(),
-        );
-        let metric_3 = ActivityMetricValue::new(
-            67.1,
-            ActivityStartTime::new(
-                "2025-08-14T02:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::default(),
-        );
-        let metrics = vec![
-            (None, metric_1.clone()),
-            (None, metric_2.clone()),
-            (None, metric_3.clone()),
-        ];
-        let granularity = TrainingMetricGranularity::Monthly;
-
-        let res = group_metrics_by_bin(&granularity, metrics);
-        assert_eq!(res.len(), 2);
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-09-01"))
-                .unwrap(),
-            &vec![metric_1, metric_2]
-        );
-        assert_eq!(
-            res.get(&TrainingMetricBin::from_granule("2025-08-01"))
-                .unwrap(),
-            &vec![metric_3]
-        );
-    }
-
-    #[test]
-    fn test_aggregate_metrics_min() {
-        let metrics = HashMap::from([(
-            TrainingMetricBin::from_granule("2025-09-01"),
-            vec![
-                ActivityMetricValue::new(
-                    12.3,
-                    ActivityStartTime::new(
-                        "2025-09-03T00:00:00Z"
-                            .parse::<DateTime<FixedOffset>>()
-                            .unwrap(),
-                    ),
-                    ActivityDuration::default(),
-                ),
-                ActivityMetricValue::new(
-                    1.3,
-                    ActivityStartTime::new(
-                        "2025-09-03T00:00:00Z"
-                            .parse::<DateTime<FixedOffset>>()
-                            .unwrap(),
-                    ),
-                    ActivityDuration::default(),
-                ),
-            ],
-        )]);
-        let aggregate = TrainingMetricAggregate::Min;
-
-        let res = aggregate_metrics(&aggregate, metrics);
-
-        assert_eq!(
-            *res.get(&TrainingMetricBin::from_granule("2025-09-01"))
-                .unwrap(),
-            TrainingMetricValue::Min(1.3)
-        );
-    }
-
-    #[test]
     fn test_compute_training_metrics_with_filters() {
         let activities: Vec<(Activity, f64)> = [default_activity()]
             .iter()
@@ -1831,7 +1565,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values_from_activities(activities);
+        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
 
         assert!(metrics.is_empty());
     }
@@ -1855,7 +1589,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values_from_activities(activities);
+        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
 
         assert!(
             metrics
@@ -1896,7 +1630,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values_from_activities(activities);
+        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
 
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics.unit(), Unit::KiloCalorie);
@@ -1943,7 +1677,7 @@ mod test_training_metrics {
             None,
         );
 
-        let metrics = metric_definition.compute_values_from_activities(activities);
+        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics.unit(), Unit::KiloCalorie);
@@ -2011,281 +1745,133 @@ mod test_training_metrics {
 }
 
 #[cfg(test)]
-mod test_training_metric_aggregate_initial_value {
-
-    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime};
-
+mod test_training_metric_aggregate_values {
     use super::*;
 
+    fn values(values: &[f64]) -> Vec<IndividualValue> {
+        values
+            .iter()
+            .map(|value| IndividualValue::new(*value))
+            .collect()
+    }
+
     #[test]
-    fn test_min_value() {
+    fn test_returns_none_for_empty_values() {
+        for aggregate in [
+            TrainingMetricAggregate::Min,
+            TrainingMetricAggregate::Max,
+            TrainingMetricAggregate::Average,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricAggregate::NumberOfActivities,
+        ] {
+            assert_eq!(
+                aggregate.aggregate_values(&[]),
+                None,
+                "{aggregate} should return None for empty input"
+            );
+        }
+    }
+
+    #[test]
+    fn test_min_returns_smallest_value() {
         let aggregate = TrainingMetricAggregate::Min;
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
 
         assert_eq!(
-            aggregate.initial_value(&new_metric),
-            Some(TrainingMetricValue::Min(10.1))
+            aggregate.aggregate_values(&values(&[3.0, 1.0, 2.0])),
+            Some(TrainingMetricValue::Min(1.0))
         );
     }
 
     #[test]
-    fn test_max_value() {
+    fn test_max_returns_largest_value() {
         let aggregate = TrainingMetricAggregate::Max;
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
 
         assert_eq!(
-            aggregate.initial_value(&new_metric),
-            Some(TrainingMetricValue::Max(10.1))
+            aggregate.aggregate_values(&values(&[3.0, 1.0, 2.0])),
+            Some(TrainingMetricValue::Max(3.0))
         );
     }
 
     #[test]
-    fn test_sum_value() {
+    fn test_min_and_max_handle_negative_values() {
+        assert_eq!(
+            TrainingMetricAggregate::Min.aggregate_values(&values(&[-5.0, 3.0, 0.0])),
+            Some(TrainingMetricValue::Min(-5.0))
+        );
+        assert_eq!(
+            TrainingMetricAggregate::Max.aggregate_values(&values(&[-5.0, 3.0, 0.0])),
+            Some(TrainingMetricValue::Max(3.0))
+        );
+    }
+
+    #[test]
+    fn test_sum_adds_all_values() {
         let aggregate = TrainingMetricAggregate::Sum;
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
 
         assert_eq!(
-            aggregate.initial_value(&new_metric),
-            Some(TrainingMetricValue::Sum(10.1))
+            aggregate.aggregate_values(&values(&[1.0, 2.0, 3.0, 4.0])),
+            Some(TrainingMetricValue::Sum(10.0))
         );
     }
 
     #[test]
-    fn test_average_value() {
+    fn test_average_returns_value_sum_and_element_count() {
         let aggregate = TrainingMetricAggregate::Average;
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
 
         assert_eq!(
-            aggregate.initial_value(&new_metric),
-            Some(TrainingMetricValue::Average {
-                value: 10.1,
-                sum: 10.1,
-                number_of_elements: 1
-            })
+            aggregate.aggregate_values(&values(&[1.0, 2.0, 3.0, 4.0])),
+            Some(TrainingMetricValue::Average(2.5))
         );
     }
-}
-
-#[cfg(test)]
-mod test_training_metric_aggregate_update_value {
-
-    use crate::domain::models::activity::{ActivityDuration, ActivityStartTime};
-
-    use super::*;
-
-    use assert_approx_eq::assert_approx_eq;
 
     #[test]
-    fn test_update_min_value() {
-        let aggregate = TrainingMetricAggregate::Min;
-        let previous = TrainingMetricValue::Min(12.2);
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
+    fn test_number_of_activities_counts_values() {
+        let aggregate = TrainingMetricAggregate::NumberOfActivities;
 
         assert_eq!(
-            aggregate.update_value(&previous, &new_metric),
-            Some(TrainingMetricValue::Min(10.1))
+            aggregate.aggregate_values(&values(&[1.0, 2.0, 3.0])),
+            Some(TrainingMetricValue::NumberOfActivities(3))
         );
     }
 
     #[test]
-    fn test_do_not_update_min_value() {
-        let aggregate = TrainingMetricAggregate::Min;
-        let previous = TrainingMetricValue::Min(12.2);
-        let new_metric = ActivityMetricValue::new(
-            13.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
+    fn test_single_value_is_handled_by_every_aggregate() {
+        let single = values(&[7.5]);
 
         assert_eq!(
-            aggregate.update_value(&previous, &new_metric),
-            Some(TrainingMetricValue::Min(12.2))
+            TrainingMetricAggregate::Min.aggregate_values(&single),
+            Some(TrainingMetricValue::Min(7.5))
+        );
+        assert_eq!(
+            TrainingMetricAggregate::Max.aggregate_values(&single),
+            Some(TrainingMetricValue::Max(7.5))
+        );
+        assert_eq!(
+            TrainingMetricAggregate::Sum.aggregate_values(&single),
+            Some(TrainingMetricValue::Sum(7.5))
+        );
+        assert_eq!(
+            TrainingMetricAggregate::Average.aggregate_values(&single),
+            Some(TrainingMetricValue::Average(7.5))
+        );
+        assert_eq!(
+            TrainingMetricAggregate::NumberOfActivities.aggregate_values(&single),
+            Some(TrainingMetricValue::NumberOfActivities(1))
         );
     }
 
     #[test]
-    fn test_update_min_value_wrong_previous_value_variant() {
-        let previous_values_wrong_variant = vec![
-            TrainingMetricValue::Max(12.),
-            TrainingMetricValue::Sum(12.),
-            TrainingMetricValue::Average {
-                value: 12.,
-                sum: 12.,
-                number_of_elements: 2,
-            },
-        ];
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        let aggregate = TrainingMetricAggregate::Min;
-
-        for previous in previous_values_wrong_variant {
-            assert!(aggregate.update_value(&previous, &new_metric).is_none());
-        }
-    }
-
-    #[test]
-    fn test_update_max_value() {
-        let aggregate = TrainingMetricAggregate::Max;
-        let previous = TrainingMetricValue::Max(12.2);
-        let new_metric = ActivityMetricValue::new(
-            13.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
+    fn test_duplicate_values_are_all_included() {
+        let duplicates = values(&[2.0, 2.0, 2.0]);
 
         assert_eq!(
-            aggregate.update_value(&previous, &new_metric),
-            Some(TrainingMetricValue::Max(13.1))
+            TrainingMetricAggregate::Sum.aggregate_values(&duplicates),
+            Some(TrainingMetricValue::Sum(6.0))
         );
-    }
-
-    #[test]
-    fn test_do_not_update_max_value() {
-        let aggregate = TrainingMetricAggregate::Max;
-        let previous = TrainingMetricValue::Max(12.2);
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
         assert_eq!(
-            aggregate.update_value(&previous, &new_metric),
-            Some(TrainingMetricValue::Max(12.2))
+            TrainingMetricAggregate::Average.aggregate_values(&duplicates),
+            Some(TrainingMetricValue::Average(2.0))
         );
-    }
-
-    #[test]
-    fn test_update_max_value_wrong_previous_value_variant() {
-        let aggregate = TrainingMetricAggregate::Max;
-        let previous_values_wrong_variant = vec![
-            TrainingMetricValue::Min(12.),
-            TrainingMetricValue::Sum(12.),
-            TrainingMetricValue::Average {
-                value: 12.,
-                sum: 12.,
-                number_of_elements: 2,
-            },
-        ];
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        for previous in previous_values_wrong_variant {
-            assert!(aggregate.update_value(&previous, &new_metric).is_none());
-        }
-    }
-
-    #[test]
-    fn test_update_sum_value() {
-        let aggregate = TrainingMetricAggregate::Sum;
-        let previous = TrainingMetricValue::Sum(12.2);
-        let new_metric = ActivityMetricValue::new(
-            13.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        let Some(TrainingMetricValue::Sum(sum)) = aggregate.update_value(&previous, &new_metric)
-        else {
-            unreachable!("Should have returned Some(TrainingMetricValue::Sum(sum))");
-        };
-        assert_approx_eq!(sum, 25.3);
-    }
-
-    #[test]
-    fn test_update_sum_value_wrong_previous_value_variant() {
-        let aggregate = TrainingMetricAggregate::Sum;
-        let previous_values_wrong_variant = vec![
-            TrainingMetricValue::Min(12.),
-            TrainingMetricValue::Max(12.),
-            TrainingMetricValue::Average {
-                value: 12.,
-                sum: 12.,
-                number_of_elements: 2,
-            },
-        ];
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        for previous in previous_values_wrong_variant {
-            assert!(aggregate.update_value(&previous, &new_metric).is_none());
-        }
-    }
-
-    #[test]
-    fn test_update_average_value() {
-        let aggregate = TrainingMetricAggregate::Average;
-        let previous = TrainingMetricValue::Average {
-            value: 12.,
-            sum: 12.,
-            number_of_elements: 2,
-        };
-        let new_metric = ActivityMetricValue::new(
-            13.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        let Some(TrainingMetricValue::Average {
-            sum,
-            value,
-            number_of_elements,
-        }) = aggregate.update_value(&previous, &new_metric)
-        else {
-            unreachable!("Should have returned Some(TrainingMetricValue::Average)");
-        };
-        assert_approx_eq!(sum, 25.1);
-        assert_approx_eq!(value, 25.1 / 3.);
-        assert_eq!(number_of_elements, 3);
-    }
-
-    #[test]
-    fn test_update_average_value_wrong_previous_value_variant() {
-        let aggregate = TrainingMetricAggregate::Average;
-        let previous_values_wrong_variant = vec![
-            TrainingMetricValue::Min(12.),
-            TrainingMetricValue::Max(12.),
-            TrainingMetricValue::Sum(12.),
-        ];
-        let new_metric = ActivityMetricValue::new(
-            10.1,
-            ActivityStartTime::from_timestamp(1200).unwrap(),
-            ActivityDuration::from(1200.),
-        );
-
-        for previous in previous_values_wrong_variant {
-            assert!(aggregate.update_value(&previous, &new_metric).is_none());
-        }
     }
 }
 
@@ -2455,6 +2041,120 @@ mod test_granularity_bins {
                 "2025-11-01".parse::<NaiveDate>().unwrap(),
             ),]
         );
+    }
+}
+
+#[cfg(test)]
+mod test_granularity_key {
+    use super::*;
+
+    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    #[test]
+    fn test_daily_date_key_is_the_date_itself() {
+        assert_eq!(
+            TrainingMetricGranularity::Daily.date_key(&date(2025, 10, 1)),
+            "2025-10-01"
+        );
+        assert_eq!(
+            TrainingMetricGranularity::Daily.date_key(&date(2025, 10, 5)),
+            "2025-10-05"
+        );
+    }
+
+    #[test]
+    fn test_weekly_date_key_on_monday_is_the_same_day() {
+        // 2025-09-29 is a Monday.
+        assert_eq!(
+            TrainingMetricGranularity::Weekly.date_key(&date(2025, 9, 29)),
+            "2025-09-29"
+        );
+    }
+
+    #[test]
+    fn test_weekly_date_key_mid_week_returns_monday() {
+        // 2025-10-01 is a Wednesday of the week starting 2025-09-29.
+        assert_eq!(
+            TrainingMetricGranularity::Weekly.date_key(&date(2025, 10, 1)),
+            "2025-09-29"
+        );
+    }
+
+    #[test]
+    fn test_weekly_date_key_on_sunday_returns_preceding_monday() {
+        // 2025-10-05 is a Sunday of the week starting 2025-09-29.
+        assert_eq!(
+            TrainingMetricGranularity::Weekly.date_key(&date(2025, 10, 5)),
+            "2025-09-29"
+        );
+    }
+
+    #[test]
+    fn test_weekly_date_key_spans_month_and_year_boundaries() {
+        // 2026-01-01 is a Thursday of the week starting 2025-12-29.
+        assert_eq!(
+            TrainingMetricGranularity::Weekly.date_key(&date(2026, 1, 1)),
+            "2025-12-29"
+        );
+    }
+
+    #[test]
+    fn test_monthly_date_key_returns_first_day_of_month() {
+        assert_eq!(
+            TrainingMetricGranularity::Monthly.date_key(&date(2025, 9, 14)),
+            "2025-09-01"
+        );
+        assert_eq!(
+            TrainingMetricGranularity::Monthly.date_key(&date(2025, 9, 30)),
+            "2025-09-01"
+        );
+    }
+
+    #[test]
+    fn test_monthly_date_key_on_first_is_the_same_day() {
+        assert_eq!(
+            TrainingMetricGranularity::Monthly.date_key(&date(2025, 10, 1)),
+            "2025-10-01"
+        );
+    }
+
+    #[test]
+    fn test_datetime_key_uses_the_datetime_date_portion() {
+        // The naive date is 2025-10-01 even though the instant is 2025-10-02 UTC.
+        let dt = "2025-10-01T23:30:00-05:00"
+            .parse::<DateTime<FixedOffset>>()
+            .unwrap();
+
+        assert_eq!(
+            TrainingMetricGranularity::Daily.datetime_key(&dt),
+            "2025-10-01"
+        );
+        assert_eq!(
+            TrainingMetricGranularity::Weekly.datetime_key(&dt),
+            "2025-09-29"
+        );
+        assert_eq!(
+            TrainingMetricGranularity::Monthly.datetime_key(&dt),
+            "2025-10-01"
+        );
+    }
+
+    #[test]
+    fn test_datetime_key_matches_date_key_for_the_same_date() {
+        let dt = "2025-10-05T08:00:00+02:00"
+            .parse::<DateTime<FixedOffset>>()
+            .unwrap();
+        let naive = date(2025, 10, 5);
+
+        for granularity in [
+            TrainingMetricGranularity::Daily,
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricGranularity::Monthly,
+        ] {
+            assert_eq!(granularity.datetime_key(&dt), granularity.date_key(&naive));
+        }
     }
 }
 

@@ -1613,30 +1613,6 @@ impl TimeseriesAggregate {
     }
 }
 
-/// An [ActivityMetricValue] represents the value of an [ActivityMetricSource] extracted from
-/// a single [ActivityWithTimeseries]. It contains metadata like the activity start time and
-/// duration that can be used in later computations.
-#[derive(Debug, Clone, PartialEq, Constructor)]
-pub struct ActivityMetricValue {
-    value: f64,
-    activity_start_time: ActivityStartTime,
-    activity_duration: ActivityDuration,
-}
-
-impl ActivityMetricValue {
-    pub fn value(&self) -> &f64 {
-        &self.value
-    }
-
-    pub fn activity_start_time(&self) -> &ActivityStartTime {
-        &self.activity_start_time
-    }
-
-    pub fn activity_duration(&self) -> &ActivityDuration {
-        &self.activity_duration
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
