@@ -498,6 +498,7 @@ pub struct TrainingMetricBody {
 pub fn format_source_metric(source: &TrainingMetricSource) -> String {
     match source {
         TrainingMetricSource::Activity(source) => format_activity_source_metric(source.source()),
+        TrainingMetricSource::HooperIndex(source) => source.to_string(),
     }
 }
 

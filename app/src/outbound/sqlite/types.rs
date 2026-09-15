@@ -14,7 +14,7 @@ use crate::domain::models::{
     preferences::{ActivityListSummary, Preference, PreferenceKey},
     search::SearchDocumentEvent,
     training::{
-        SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
+        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
         TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
         TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue,
         TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
@@ -923,6 +923,13 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricSource {
 
                 ActivityMetric::NumberOfActivity => "number-of-activities",
             },
+            Self::HooperIndex(source) => match source {
+                HooperIndexSource::Fatigue => "subjective-fatigue",
+                HooperIndexSource::Mood => "subjective-mood",
+                HooperIndexSource::Pain => "subjective-pain",
+                HooperIndexSource::Sleep => "subjective-sleep",
+                HooperIndexSource::Stress => "subjective-stress",
+            },
         };
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
@@ -966,6 +973,12 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricSource {
             "avg-pace" => Ok(Self::Activity(ActivityMetric::AvgPace)),
 
             "number-of-activities" => Ok(Self::Activity(ActivityMetric::NumberOfActivity)),
+
+            "subjective-fatigue" => Ok(Self::HooperIndex(HooperIndexSource::Fatigue)),
+            "subjective-pain" => Ok(Self::HooperIndex(HooperIndexSource::Pain)),
+            "subjective-mood" => Ok(Self::HooperIndex(HooperIndexSource::Mood)),
+            "subjective-sleep" => Ok(Self::HooperIndex(HooperIndexSource::Sleep)),
+            "subjective-stress" => Ok(Self::HooperIndex(HooperIndexSource::Stress)),
 
             _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }

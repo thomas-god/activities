@@ -7,11 +7,11 @@ use derive_more::Constructor;
 use crate::domain::{
     models::{
         UserId,
-        activity::{ActivityMetric, Unit},
+        activity::ActivityMetric,
         search::{SearchDocument, SearchDocumentType},
         training::{
-            TrainingMetric, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
-            TrainingMetricSource, TrainingMetricValues, TrainingMetricWindow,
+            HooperIndexSource, TrainingMetric, TrainingMetricDefinition, TrainingMetricId,
+            TrainingMetricScope, TrainingMetricSource, TrainingMetricValues, TrainingMetricWindow,
             TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
             TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
@@ -71,6 +71,10 @@ where
                 self.compute_training_metric_values_for_activity(definition, source, date_range)
                     .await
             }
+            TrainingMetricSource::HooperIndex(source) => {
+                self.compute_training_metric_values_for_hooper_index(definition, source, date_range)
+                    .await
+            }
         }
     }
 
@@ -99,6 +103,23 @@ where
             });
 
         Ok(definition.compute_values_from_activities(activities_with_metrics))
+    }
+
+    async fn compute_training_metric_values_for_hooper_index(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: HooperIndexSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let values = self
+            .training_repository
+            .get_hooper_indexes(definition.user(), date_range)
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter()
+            .map(|(date, hooper_index)| (date, *hooper_index.value(&source)));
+
+        Ok(definition.compute_values_from_hooper_indexes(values))
     }
 }
 
@@ -1127,6 +1148,12 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
             ) -> Result<Option<HooperIndex>, HooperIndexError>;
+
+            async fn get_hooper_indexes(
+                &self,
+                user: &UserId,
+                range: &DateRange,
+            ) -> Result<Vec<(chrono::NaiveDate, HooperIndex)>, HooperIndexError>;
 
             async fn delete_hooper_index(
                 &self,

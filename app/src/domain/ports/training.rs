@@ -976,6 +976,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         date: chrono::NaiveDate,
     ) -> impl Future<Output = Result<Option<HooperIndex>, HooperIndexError>> + Send;
 
+    fn get_hooper_indexes(
+        &self,
+        user: &UserId,
+        range: &DateRange,
+    ) -> impl Future<Output = Result<Vec<(chrono::NaiveDate, HooperIndex)>, HooperIndexError>> + Send;
+
     fn delete_hooper_index(
         &self,
         user: &UserId,

@@ -1005,6 +1005,42 @@ where
         }))
     }
 
+    async fn get_hooper_indexes(
+        &self,
+        user: &UserId,
+        range: &DateRange,
+    ) -> Result<Vec<(chrono::NaiveDate, HooperIndex)>, HooperIndexError> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                chrono::NaiveDate,
+                Option<SubjectiveScale>,
+                Option<SubjectiveScale>,
+                Option<SubjectiveScale>,
+                Option<SubjectiveScale>,
+                Option<SubjectiveScale>,
+            ),
+        >(
+            "
+              SELECT date, fatigue, sleep, pain, stress, mood FROM t_hooper_index
+              WHERE user=?1 AND date >= ?2 AND date < ?3
+              ORDER BY date ASC;",
+        )
+        .bind(user)
+        .bind(range.start())
+        .bind(range.end())
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(date, fatigue, sleep, pain, stress, mood)| {
+                (date, HooperIndex::new(fatigue, sleep, pain, stress, mood))
+            })
+            .collect())
+    }
+
     async fn delete_hooper_index(
         &self,
         user: &UserId,
@@ -4929,6 +4965,207 @@ mod test_sqlite_training_repository {
             assert_eq!(saved.pain(), &Some(scale(3)));
             assert_eq!(saved.stress(), &Some(scale(4)));
             assert_eq!(saved.mood(), &Some(scale(5)));
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_returns_empty_when_no_rows() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let range = DateRange::new(
+                NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+            );
+
+            let result = repository
+                .get_hooper_indexes(&user, &range)
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_returns_all_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(
+                        Some(scale(1)),
+                        Some(scale(2)),
+                        Some(scale(3)),
+                        Some(scale(4)),
+                        Some(scale(5)),
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_hooper_indexes(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            let (returned_date, value) = &result[0];
+            assert_eq!(*returned_date, date);
+            assert_eq!(value.fatigue(), &Some(scale(1)));
+            assert_eq!(value.sleep(), &Some(scale(2)));
+            assert_eq!(value.pain(), &Some(scale(3)));
+            assert_eq!(value.stress(), &Some(scale(4)));
+            assert_eq!(value.mood(), &Some(scale(5)));
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_returns_rows_ordered_ascending() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let earlier = NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+            let later = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+
+            // Save out of order to make sure the repository sorts the result.
+            repository
+                .save_hooper_index(
+                    &user,
+                    later,
+                    &HooperIndex::new(Some(scale(5)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_hooper_index(
+                    &user,
+                    earlier,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_hooper_indexes(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            let dates: Vec<NaiveDate> = result.iter().map(|(date, _)| *date).collect();
+            assert_eq!(dates, vec![earlier, later]);
+            assert_eq!(result[0].1.fatigue(), &Some(scale(1)));
+            assert_eq!(result[1].1.fatigue(), &Some(scale(5)));
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_range_is_start_inclusive_end_exclusive() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let start = NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+            let end = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+            let before = start.pred_opt().unwrap();
+            let inside = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+            let after = end.succ_opt().unwrap();
+
+            for date in [before, start, inside, end, after] {
+                repository
+                    .save_hooper_index(
+                        &user,
+                        date,
+                        &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                    )
+                    .await
+                    .expect("Save should succeed");
+            }
+
+            let result = repository
+                .get_hooper_indexes(&user, &DateRange::new(start, end))
+                .await
+                .expect("Get should succeed");
+
+            let dates: Vec<NaiveDate> = result.iter().map(|(date, _)| *date).collect();
+            assert_eq!(dates, vec![start, inside]);
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_is_scoped_by_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_hooper_index(
+                    &other_user,
+                    date,
+                    &HooperIndex::new(Some(scale(2)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_hooper_indexes(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].1.fatigue(), &Some(scale(1)));
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_indexes_handles_missing_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(&user, date, &HooperIndex::default())
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_hooper_indexes(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            let (_, value) = &result[0];
+            assert_eq!(value.fatigue(), &None);
+            assert_eq!(value.sleep(), &None);
+            assert_eq!(value.pain(), &None);
+            assert_eq!(value.stress(), &None);
+            assert_eq!(value.mood(), &None);
         }
 
         #[tokio::test]

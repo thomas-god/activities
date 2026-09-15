@@ -532,12 +532,14 @@ impl TrainingMetricDefinitionPatch {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TrainingMetricSource {
     Activity(ActivityMetric),
+    HooperIndex(HooperIndexSource),
 }
 
 impl Display for TrainingMetricSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Activity(source) => f.write_str(&source.to_string()),
+            Self::HooperIndex(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -580,6 +582,7 @@ impl TrainingMetricDefinition {
     pub fn unit(&self) -> Unit {
         match self.source() {
             TrainingMetricSource::Activity(metric) => metric.source().unit(),
+            TrainingMetricSource::HooperIndex(_) => Unit::Null,
         }
     }
 
@@ -605,7 +608,34 @@ impl TrainingMetricDefinition {
         }
     }
 
-    /// Compute training metric values from a list of activities.
+    /// Compute training metric values from a list of `SubjectiveScale` values from an
+    /// `HooperIndex`.
+    pub fn compute_values_from_hooper_indexes(
+        &self,
+        values: impl Iterator<Item = (chrono::NaiveDate, Option<SubjectiveScale>)>,
+    ) -> TrainingMetricValues {
+        let values_by_bin = values
+            .filter_map(|(date, value)| {
+                let Some(value) = value else { return None };
+
+                // Hooper index values have no intrinsic group
+                Some(match &self.window {
+                    Some(window) => (
+                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
+                        IndividualValue::new(value.value() as f64),
+                    ),
+                    None => (
+                        TrainingMetricBin::new_without_group(date.to_string()),
+                        IndividualValue::new(value.value() as f64),
+                    ),
+                })
+            })
+            .into_group_map();
+
+        self.compute_training_metric_values(values_by_bin)
+    }
+
+    /// Compute training metric values from a list of activities with their extracted metric value.
     pub fn compute_values_from_activities(
         &self,
         activities_with_metric: impl Iterator<Item = (Activity, f64)>,
@@ -1190,6 +1220,16 @@ impl HooperIndex {
         &self.mood
     }
 
+    pub fn value(&self, source: &HooperIndexSource) -> &Option<SubjectiveScale> {
+        match source {
+            HooperIndexSource::Fatigue => &self.fatigue,
+            HooperIndexSource::Sleep => &self.sleep,
+            HooperIndexSource::Mood => &self.mood,
+            HooperIndexSource::Pain => &self.pain,
+            HooperIndexSource::Stress => &self.stress,
+        }
+    }
+
     pub fn patch(self, patch: HooperIndexPatch) -> Self {
         Self {
             fatigue: patch.fatigue.unwrap_or(self.fatigue),
@@ -1199,6 +1239,15 @@ impl HooperIndex {
             mood: patch.mood.unwrap_or(self.mood),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
+pub enum HooperIndexSource {
+    Fatigue,
+    Sleep,
+    Pain,
+    Stress,
+    Mood,
 }
 
 #[derive(Debug, Clone, Copy, Constructor, Default)]
@@ -3551,5 +3600,227 @@ mod test_training_note_search_document {
             .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Great session");
+    }
+}
+
+#[cfg(test)]
+mod test_compute_values_from_hooper_indexes {
+    use super::*;
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
+
+    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    fn definition(window: Option<TrainingMetricWindow>) -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            UserId::test_default(),
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            window,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        )
+    }
+
+    fn bin(granule: &str) -> TrainingMetricBin {
+        TrainingMetricBin::new_without_group(granule.to_string())
+    }
+
+    #[test]
+    fn test_empty_input_returns_empty_values() {
+        let metrics = definition(None).compute_values_from_hooper_indexes(std::iter::empty());
+
+        assert!(metrics.is_empty());
+        assert_eq!(metrics.unit(), Unit::Null);
+    }
+
+    #[test]
+    fn test_without_window_uses_date_as_bin_and_single_value() {
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition(None).compute_values_from_hooper_indexes(
+            vec![(d1, Some(scale(5))), (d2, Some(scale(7)))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics.unit(), Unit::Null);
+        assert_eq!(
+            metrics.get(&bin(&d1.to_string())),
+            Some(&TrainingMetricValue::SingleValue(5.0))
+        );
+        assert_eq!(
+            metrics.get(&bin(&d2.to_string())),
+            Some(&TrainingMetricValue::SingleValue(7.0))
+        );
+    }
+
+    #[test]
+    fn test_without_window_skips_none_values() {
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition(None)
+            .compute_values_from_hooper_indexes(vec![(d1, None), (d2, Some(scale(4)))].into_iter());
+
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics.get(&bin(&d1.to_string())).is_none());
+        assert_eq!(
+            metrics.get(&bin(&d2.to_string())),
+            Some(&TrainingMetricValue::SingleValue(4.0))
+        );
+    }
+
+    #[test]
+    fn test_without_window_keeps_first_value_for_duplicate_dates() {
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(None).compute_values_from_hooper_indexes(
+            vec![(d, Some(scale(2))), (d, Some(scale(9)))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&bin(&d.to_string())),
+            Some(&TrainingMetricValue::SingleValue(2.0))
+        );
+    }
+
+    #[test]
+    fn test_with_daily_window_aggregates_values_in_same_day() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricGroupBy::none(),
+        );
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
+            vec![(d, Some(scale(2))), (d, Some(scale(3)))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&bin(&d.to_string())),
+            Some(&TrainingMetricValue::Sum(5.0))
+        );
+    }
+
+    #[test]
+    fn test_with_weekly_window_aggregates_values_in_same_week() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricGroupBy::none(),
+        );
+        // 2025-10-01 (Wed) and 2025-10-03 (Fri) share the week starting 2025-09-29.
+        let d1 = date(2025, 10, 1);
+        let d2 = date(2025, 10, 3);
+        // 2025-10-07 falls in the following week.
+        let d3 = date(2025, 10, 7);
+
+        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
+            vec![
+                (d1, Some(scale(3))),
+                (d2, Some(scale(4))),
+                (d3, Some(scale(5))),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(
+            metrics.get(&bin("2025-09-29")),
+            Some(&TrainingMetricValue::Sum(7.0))
+        );
+        assert_eq!(
+            metrics.get(&bin("2025-10-06")),
+            Some(&TrainingMetricValue::Sum(5.0))
+        );
+    }
+
+    #[test]
+    fn test_with_monthly_window_uses_max_aggregate() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Max,
+            TrainingMetricGroupBy::none(),
+        );
+        let d1 = date(2025, 9, 14);
+        let d2 = date(2025, 9, 20);
+        let d3 = date(2025, 10, 1);
+
+        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
+            vec![
+                (d1, Some(scale(6))),
+                (d2, Some(scale(2))),
+                (d3, Some(scale(8))),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(
+            metrics.get(&bin("2025-09-01")),
+            Some(&TrainingMetricValue::Max(6.0))
+        );
+        assert_eq!(
+            metrics.get(&bin("2025-10-01")),
+            Some(&TrainingMetricValue::Max(8.0))
+        );
+    }
+
+    #[test]
+    fn test_hooper_values_are_never_grouped() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Max,
+            Some(TrainingMetricGroupBy::Sport),
+        );
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(Some(window))
+            .compute_values_from_hooper_indexes(vec![(d, Some(scale(5)))].into_iter());
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&TrainingMetricBin::new(d.to_string(), None)),
+            Some(&TrainingMetricValue::Max(5.0))
+        );
+        assert!(
+            metrics
+                .get(&TrainingMetricBin::new(
+                    d.to_string(),
+                    Some("Cycling".to_string())
+                ))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_summary_average_is_computed_from_hooper_values() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
+            None,
+        );
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition.compute_values_from_hooper_indexes(
+            vec![(d1, Some(scale(2))), (d2, Some(scale(4)))].into_iter(),
+        );
+
+        assert_eq!(
+            metrics.summary_values().as_hash_map().get("average"),
+            Some(&3.0)
+        );
     }
 }
