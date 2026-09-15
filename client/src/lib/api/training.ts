@@ -100,6 +100,35 @@ const TrainingMetricTemplatesSchema = z.array(
 	})
 );
 
+/** A subjective Hooper index measure, constrained to the 1..=10 range. */
+const SubjectiveScaleSchema = z.number().int().min(1).max(10);
+
+export const HooperIndexSchema = z.object({
+	fatigue: SubjectiveScaleSchema.nullable(),
+	sleep: SubjectiveScaleSchema.nullable(),
+	pain: SubjectiveScaleSchema.nullable(),
+	stress: SubjectiveScaleSchema.nullable(),
+	mood: SubjectiveScaleSchema.nullable()
+});
+
+export const CreateHooperIndexSchema = HooperIndexSchema.extend({
+	date: z.string()
+});
+
+/**
+ * Patch body for a Hooper index. Mirrors the API patch semantics:
+ * - an omitted field leaves the current value untouched,
+ * - `null` clears the value,
+ * - a number sets it.
+ */
+export const UpdateHooperIndexSchema = z.object({
+	fatigue: SubjectiveScaleSchema.nullable().optional(),
+	sleep: SubjectiveScaleSchema.nullable().optional(),
+	pain: SubjectiveScaleSchema.nullable().optional(),
+	stress: SubjectiveScaleSchema.nullable().optional(),
+	mood: SubjectiveScaleSchema.nullable().optional()
+});
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -112,6 +141,9 @@ export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
 export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchema>[number];
+export type HooperIndex = z.infer<typeof HooperIndexSchema>;
+export type CreateHooperIndexBody = z.infer<typeof CreateHooperIndexSchema>;
+export type UpdateHooperIndexPatch = z.infer<typeof UpdateHooperIndexSchema>;
 
 // =============================================================================
 // API Functions
@@ -613,3 +645,89 @@ export const getTrainingMetricPreview = async (
 
 	return some(TrainingMetricSchema.parse(await res.json()));
 };
+
+// =============================================================================
+// Hooper index
+// =============================================================================
+
+/**
+ * Create (or replace) the Hooper index for a given date.
+ * @param date - The date the index applies to
+ * @param values - The subjective measures (use `null` for measures that were not reported)
+ * @returns true if the index was saved, false otherwise
+ */
+export async function createHooperIndex(
+	date: Date | string,
+	values: HooperIndex
+): Promise<boolean> {
+	const body: CreateHooperIndexBody = CreateHooperIndexSchema.parse({
+		date: dayjs(date).format('YYYY-MM-DD'),
+		...values
+	});
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index`, {
+		method: 'POST',
+		mode: 'cors',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return false;
+	}
+
+	return res.status === 201;
+}
+
+/**
+ * Update the Hooper index for a given date.
+ * @param date - The date the index applies to
+ * @param patch - The measures to change: omitted fields are left untouched, `null` clears them
+ * @returns true if the index was updated, false otherwise
+ */
+export async function updateHooperIndex(
+	date: Date | string,
+	patch: UpdateHooperIndexPatch
+): Promise<boolean> {
+	const body = UpdateHooperIndexSchema.parse(patch);
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index/${formattedDate}`, {
+		method: 'PATCH',
+		mode: 'cors',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return false;
+	}
+
+	return res.status === 204;
+}
+
+/**
+ * Delete the Hooper index for a given date.
+ * @param date - The date the index applies to
+ * @returns true if the index was deleted, false otherwise
+ */
+export async function deleteHooperIndex(date: Date | string): Promise<boolean> {
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index/${formattedDate}`, {
+		method: 'DELETE',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return false;
+	}
+
+	return res.status === 204;
+}
