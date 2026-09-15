@@ -16,7 +16,7 @@ use crate::{
                 Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
             },
             training::{
-                HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale,
+                HooperIndex, HooperIndexPatch, HooperIndexSource, SportFilter, SubjectiveScale,
                 TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
                 TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSource,
                 TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
@@ -400,16 +400,18 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type", content = "metric", rename_all = "camelCase")]
 pub enum APITrainingMetricSource {
     Activity(ActivityMetric),
+    HooperIndex(HooperIndexSource),
 }
 
 impl Display for APITrainingMetricSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Activity(source) => f.write_str(&source.to_string()),
+            Self::HooperIndex(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -418,6 +420,16 @@ impl From<&APITrainingMetricSource> for TrainingMetricSource {
     fn from(value: &APITrainingMetricSource) -> Self {
         match value {
             APITrainingMetricSource::Activity(source) => Self::Activity(*source),
+            APITrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
+        }
+    }
+}
+
+impl From<&TrainingMetricSource> for APITrainingMetricSource {
+    fn from(value: &TrainingMetricSource) -> Self {
+        match value {
+            TrainingMetricSource::Activity(source) => Self::Activity(*source),
+            TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
         }
     }
 }
@@ -478,7 +490,7 @@ impl From<&Option<Vec<SportFilter>>> for SportsResponse {
 pub struct TrainingMetricBody {
     pub id: String,
     pub name: Option<String>,
-    pub metric: String,
+    pub source: APITrainingMetricSource,
     pub metric_formated: String,
     pub unit: String,
     pub granularity: Option<String>,

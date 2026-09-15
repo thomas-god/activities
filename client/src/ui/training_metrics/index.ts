@@ -91,7 +91,7 @@ export const fieldsAsPayload = (
 		return none();
 	}
 	let payload: Omit<TrainingMetricBasePayload, 'name'> = {
-		metric: fields.selectedTemplate.value.metric
+		source: fields.selectedTemplate.value.source
 	};
 
 	// Optional window
@@ -139,7 +139,8 @@ export const matchMetricToFormFields = (
 ): TrainingMetricFields => {
 	const selectedTemplate = templates.find(
 		(template) =>
-			metric.metric === template.metric &&
+			metric.source.metric === template.source.metric &&
+			metric.source.type === template.source.type &&
 			(metric.aggregate === null ? true : metric.aggregate === template.aggregate)
 	);
 

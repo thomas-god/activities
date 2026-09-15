@@ -17,7 +17,7 @@
 			name: string | null;
 			granularity: string | null;
 			aggregate: TrainingMetricAggregateFunction | null;
-			metric: string;
+			source: { type: string; metric: string };
 		}>;
 		onSaved?: () => void;
 	}
@@ -137,7 +137,7 @@
 		}
 
 		if (metric.aggregate !== 'NumberOfActivities') {
-			parts.push(metric.metric.toLowerCase());
+			parts.push(metric.source.metric.toLowerCase());
 		}
 
 		return parts.join(' ');

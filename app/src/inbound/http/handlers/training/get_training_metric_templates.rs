@@ -12,7 +12,7 @@ use crate::{
     domain::{
         models::{
             activity::{ActivityMetric, ToUnit, Unit},
-            training::TrainingMetricAggregate,
+            training::{HooperIndexSource, TrainingMetricAggregate, TrainingMetricSource},
         },
         ports::{
             activity::IActivityService, preferences::IPreferencesService,
@@ -21,7 +21,7 @@ use crate::{
     },
     inbound::{
         auth::{AuthenticatedUser, email_based::IUserService},
-        http::AppState,
+        http::{AppState, handlers::training::types::APITrainingMetricSource},
         parser::ParseFile,
     },
 };
@@ -29,10 +29,10 @@ use crate::{
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct TrainingMetricTemplate {
     display_name: String,
-    metric: ActivityMetric,
+    source: TrainingMetricSource,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
 }
@@ -40,7 +40,7 @@ pub struct TrainingMetricTemplate {
 #[derive(Debug, Clone, Serialize)]
 pub struct TrainingMetricTemplateBody {
     display_name: String,
-    metric: ActivityMetric,
+    source: APITrainingMetricSource,
     unit: String,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
@@ -65,8 +65,8 @@ impl From<&TrainingMetricTemplate> for TrainingMetricTemplateBody {
     fn from(value: &TrainingMetricTemplate) -> Self {
         Self {
             display_name: value.display_name.to_string(),
-            metric: value.metric,
-            unit: value.metric.source().unit().to_string(),
+            source: APITrainingMetricSource::from(&value.source),
+            unit: value.source.unit().to_string(),
             aggregate: value.aggregate,
             category: value.category,
         }
@@ -93,7 +93,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
                     format_aggregate(&aggregate),
                     format_metric(&metric)
                 ),
-                metric,
+                source: TrainingMetricSource::Activity(metric),
                 aggregate,
                 category: metric_category(&metric),
             });
@@ -112,7 +112,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            metric,
+            source: TrainingMetricSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -130,7 +130,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            metric,
+            source: TrainingMetricSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -148,7 +148,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            metric,
+            source: TrainingMetricSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -167,7 +167,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
                 format_aggregate(&aggregate),
                 format_metric(&metric)
             ),
-            metric,
+            source: TrainingMetricSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -178,7 +178,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     let aggregate = TrainingMetricAggregate::Sum;
     templates.push(TrainingMetricTemplate {
         display_name: format_metric(&metric),
-        metric,
+        source: TrainingMetricSource::Activity(metric),
         aggregate,
         category: metric_category(&metric),
     });

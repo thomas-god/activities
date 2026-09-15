@@ -34,8 +34,8 @@ use crate::{
             AppState,
             handlers::training::{
                 types::{
-                    APITrainingMetricScope, SportsResponse, TrainingMetricBody,
-                    format_source_metric,
+                    APITrainingMetricScope, APITrainingMetricSource, SportsResponse,
+                    TrainingMetricBody, format_source_metric,
                 },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
@@ -119,7 +119,7 @@ fn to_response_body_item(
     TrainingMetricBody {
         id: metric.id().to_string(),
         name: metric.name().as_ref().map(|n| n.as_str().to_string()),
-        metric: metric.definition().source().to_string(),
+        source: APITrainingMetricSource::from(definition.source()),
         metric_formated: format_source_metric(definition.source()),
         unit: unit.to_string(),
         granularity: definition
@@ -244,7 +244,7 @@ mod tests {
     use serde_json::json;
 
     use crate::domain::models::activity::{
-        ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
+        ActivityMetric, ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
     };
     use crate::domain::models::training::TrainingMetricTarget;
 
@@ -286,7 +286,7 @@ mod tests {
         let body = ResponseBody(vec![TrainingMetricBody {
             id: "metric-id-1".to_string(),
             name: Some("My Metric".to_string()),
-            metric: "Calories".to_string(),
+            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
             metric_formated: "Activity average calories".to_string(),
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),

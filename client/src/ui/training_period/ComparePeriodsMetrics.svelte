@@ -236,7 +236,7 @@
 									<span class="badge badge-ghost badge-xs">{entry.definition.source}</span>
 								</span>
 								<span class="text-xs opacity-60">
-									{entry.definition.base.metric}
+									{entry.definition.base.source.metric}
 									· {entry.definition.base.window?.granularity}
 									{entry.definition.base.window?.aggregate}
 									{#if entry.definition.base.window?.group_by}

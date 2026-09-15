@@ -535,6 +535,15 @@ pub enum TrainingMetricSource {
     HooperIndex(HooperIndexSource),
 }
 
+impl TrainingMetricSource {
+    pub fn unit(&self) -> Unit {
+        match self {
+            Self::Activity(source) => source.unit(),
+            Self::HooperIndex(source) => source.unit(),
+        }
+    }
+}
+
 impl Display for TrainingMetricSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1241,13 +1250,19 @@ impl HooperIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum HooperIndexSource {
     Fatigue,
     Sleep,
     Pain,
     Stress,
     Mood,
+}
+
+impl HooperIndexSource {
+    pub fn unit(&self) -> Unit {
+        Unit::Null
+    }
 }
 
 #[derive(Debug, Clone, Copy, Constructor, Default)]

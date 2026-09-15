@@ -54,7 +54,10 @@ const TrainingPeriodDetailsSchema = z.object({
 const TrainingMetricSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
-	metric: z.string(),
+	source: z.object({
+		type: z.enum(['activity', 'hooperIndex'] as const),
+		metric: z.string()
+	}),
 	unit: z.string(),
 	scope: z.discriminatedUnion('type', [
 		z.object({ type: z.literal('global') }),
@@ -93,7 +96,10 @@ const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 const TrainingMetricTemplatesSchema = z.array(
 	z.object({
 		display_name: z.string(),
-		metric: z.string(),
+		source: z.object({
+			type: z.enum(['activity', 'hooperIndex'] as const),
+			metric: z.string()
+		}),
 		aggregate: z.enum(trainingMetricAggregateFunctions),
 		unit: z.string(),
 		category: z.enum(trainingMetricTemplateCategories)
@@ -543,7 +549,10 @@ export const fetchTrainingMetricTemplates = async () => {
 };
 
 export interface TrainingMetricBasePayload {
-	metric: string;
+	source: {
+		type: 'activity' | 'hooperIndex';
+		metric: string;
+	};
 	window?: {
 		granularity: TrainingMetricGranularity;
 		aggregate: TrainingMetricAggregateFunction;
@@ -586,9 +595,8 @@ export interface CreateTrainingMetricPayload extends TrainingMetricBasePayload {
 }
 
 export const createTrainingMetric = async (payload: CreateTrainingMetricPayload) => {
-	const body = { ...payload, source: { type: 'activity', metric: payload.metric } };
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric`, {
-		body: JSON.stringify(body),
+		body: JSON.stringify(payload),
 		method: 'POST',
 		credentials: 'include',
 		mode: 'cors',
@@ -604,9 +612,8 @@ export const updateTrainingMetric = async (
 	metric: string,
 	payload: UpdateTrainingMetricPayload
 ) => {
-	const body = { ...payload, source: { type: 'activity', metric: payload.metric } };
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/metric/${metric}`, {
-		body: JSON.stringify(body),
+		body: JSON.stringify(payload),
 		method: 'PATCH',
 		credentials: 'include',
 		mode: 'cors',
@@ -623,7 +630,6 @@ export const getTrainingMetricPreview = async (
 ): Promise<Option<TrainingMetric>> => {
 	const body = JSON.stringify({
 		...payload,
-		source: { type: 'activity', metric: payload.metric },
 		start: dayjs(payload.start).format('YYYY-MM-DD'),
 		end: dayjs(payload.end).format('YYYY-MM-DD')
 	});

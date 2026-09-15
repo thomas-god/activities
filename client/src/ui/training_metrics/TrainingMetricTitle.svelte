@@ -20,7 +20,7 @@
 				{aggregateFunctionDisplay[metric.aggregate]}
 			{/if}
 			{#if metric.aggregate !== 'NumberOfActivities'}
-				{metric.metric.toLowerCase()}
+				{metric.source.metric.toLowerCase()}
 			{/if}
 		{/if}
 	</div>

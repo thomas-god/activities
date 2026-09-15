@@ -162,7 +162,7 @@ fn to_body(
         // ID not relevant for temporary metric values
         id: "temporary-metric".to_string(),
         name: None,
-        metric: request.source.to_string(),
+        source: request.source.clone(),
         metric_formated: format_source_metric(&TrainingMetricSource::from(&request.source)),
         unit: unit.to_string(),
         granularity: request.window.as_ref().map(|w| w.granularity().to_string()),
@@ -321,7 +321,6 @@ mod tests {
 
         assert_eq!(body.id, "temporary-metric");
         assert_eq!(body.name, None);
-        assert_eq!(body.metric, "Calories");
         assert_eq!(body.metric_formated, "Calories");
         assert_eq!(body.unit, "kcal");
         assert_eq!(body.granularity, None);
@@ -388,7 +387,6 @@ mod tests {
 
         assert_eq!(body.id, "temporary-metric");
         assert_eq!(body.name, None);
-        assert_eq!(body.metric, "Calories");
         assert_eq!(body.metric_formated, "Calories");
         assert_eq!(body.unit, "kcal");
         assert_eq!(body.granularity, Some("Weekly".to_string()));
@@ -441,7 +439,6 @@ mod tests {
             None,
         );
 
-        assert_eq!(body.metric, "AvgSpeed");
         assert_eq!(body.metric_formated, "Activity Average Speed");
         assert_eq!(body.unit, "m/s");
         assert_eq!(body.granularity, Some("Daily".to_string()));
@@ -474,7 +471,6 @@ mod tests {
 
         let body = to_body(&request, HashMap::new(), Unit::Meter, HashMap::new(), None);
 
-        assert_eq!(body.metric, "Distance");
         assert_eq!(body.metric_formated, "Distance");
         assert_eq!(body.unit, "m");
         assert_eq!(body.granularity, Some("Monthly".to_string()));

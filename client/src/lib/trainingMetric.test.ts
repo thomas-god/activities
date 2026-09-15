@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { TrainingMetric } from '$lib/api';
 
@@ -19,7 +19,7 @@ import dayjs from 'dayjs';
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	metric: 'Distance',
+	source: { type: 'activity', metric: 'Distance' },
 	unit: 'm',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
@@ -68,7 +68,7 @@ describe('metricToPreviewBase', () => {
 	it('carries window, filters, summary and target', () => {
 		const base = extractBaseDefinitionFromMetric(makeMetric());
 
-		expect(base.metric).toBe('Distance');
+		expect(base.source).toStrictEqual({ type: 'activity', metric: 'Distance' });
 		expect(base.window).toEqual({
 			granularity: 'Weekly',
 			aggregate: 'Sum',
@@ -122,12 +122,15 @@ describe('compareMetricPreviewPayload', () => {
 			key: 'default:weekly-distance',
 			label: 'Weekly distance',
 			source: 'default',
-			base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
+			base: {
+				source: { type: 'activity', metric: 'Distance' },
+				window: { granularity: 'Weekly', aggregate: 'Sum' }
+			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
 
-		expect(payload.metric).toBe('Distance');
+		expect(payload.source).toStrictEqual({ type: 'activity', metric: 'Distance' });
 		expect(payload.start).toBe('2026-02-02');
 		expect(payload.end).toBe('2026-05-01');
 	});
@@ -137,7 +140,10 @@ describe('compareMetricPreviewPayload', () => {
 			key: 'default:weekly-distance',
 			label: null,
 			source: 'default',
-			base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
+			base: {
+				source: { type: 'activity', metric: 'Distance' },
+				window: { granularity: 'Weekly', aggregate: 'Sum' }
+			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
@@ -153,7 +159,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'first',
 			base: {
-				metric: 'Distance',
+				source: { type: 'activity', metric: 'Distance' },
 				window: { granularity: 'Weekly', aggregate: 'Sum' },
 				filters: { sports: [{ Sport: 'Cycling' }] }
 			}
@@ -171,7 +177,10 @@ describe('compareMetricPreviewPayload', () => {
 			key: 'key',
 			label: null,
 			source: 'default',
-			base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
+			base: {
+				source: { type: 'activity', metric: 'Distance' },
+				window: { granularity: 'Weekly', aggregate: 'Sum' }
+			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod({ end: null }), now);
@@ -267,7 +276,10 @@ describe('compareDefinitionLabel', () => {
 			key: 'key',
 			label: 'Weekly distance',
 			source: 'default',
-			base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
+			base: {
+				source: { type: 'activity', metric: 'Distance' },
+				window: { granularity: 'Weekly', aggregate: 'Sum' }
+			}
 		};
 
 		expect(definitionLabel(definition)).toBe('Weekly distance');
@@ -279,7 +291,10 @@ describe('compareDefinitionLabel', () => {
 				key: 'key',
 				label: null,
 				source: 'first',
-				base: { metric: 'Distance', window: { granularity: 'Weekly', aggregate: 'Sum' } }
+				base: {
+					source: { type: 'activity', metric: 'Distance' },
+					window: { granularity: 'Weekly', aggregate: 'Sum' }
+				}
 			})
 		).toBe('weekly total distance');
 
@@ -288,7 +303,10 @@ describe('compareDefinitionLabel', () => {
 				key: 'key',
 				label: null,
 				source: 'first',
-				base: { metric: 'ActiveDuration', window: { granularity: 'Daily', aggregate: 'Max' } }
+				base: {
+					source: { type: 'activity', metric: 'ActiveDuration' },
+					window: { granularity: 'Daily', aggregate: 'Max' }
+				}
 			})
 		).toBe('daily maximum activeduration');
 	});

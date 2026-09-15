@@ -7,7 +7,7 @@ import { fieldsAsPayload, matchMetricToFormFields, type TrainingMetricFields } f
 
 const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): TrainingMetricTemplate => ({
 	display_name: 'Total Duration',
-	metric: 'ActiveDuration',
+	source: { type: 'activity', metric: 'ActiveDuration' },
 	aggregate: 'Sum',
 	unit: 's',
 	category: 'Duration',
@@ -17,7 +17,7 @@ const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): Training
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	metric: 'ActiveDuration',
+	source: { type: 'activity', metric: 'ActiveDuration' },
 	unit: 's',
 	scope: { type: 'global' },
 	granularity: 'Weekly',

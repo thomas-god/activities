@@ -151,7 +151,7 @@ export type CompareMetricDefinition = {
  */
 export const metricDefinitionKey = (metric: TrainingMetric): string =>
 	JSON.stringify({
-		metric: metric.metric,
+		source: metric.source,
 		granularity: metric.granularity,
 		aggregate: metric.aggregate,
 		group_by: metric.group_by,
@@ -183,7 +183,7 @@ const periodSportFilters = (
 export const extractBaseDefinitionFromMetric = (
 	metric: TrainingMetric
 ): TrainingMetricBasePayload => {
-	const payload: TrainingMetricBasePayload = { metric: metric.metric };
+	const payload: TrainingMetricBasePayload = { source: metric.source };
 
 	if (metric.granularity !== null && metric.aggregate !== null) {
 		payload.window = {
@@ -388,7 +388,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly distance',
 		source: 'default',
 		base: {
-			metric: 'Distance',
+			source: { type: 'activity', metric: 'Distance' },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -398,7 +398,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly duration',
 		source: 'default',
 		base: {
-			metric: 'ActiveDuration',
+			source: { type: 'activity', metric: 'ActiveDuration' },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -408,7 +408,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly elevation',
 		source: 'default',
 		base: {
-			metric: 'Elevation',
+			source: { type: 'activity', metric: 'Elevation' },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -419,7 +419,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly calories',
 		source: 'default',
 		base: {
-			metric: 'Calories',
+			source: { type: 'activity', metric: 'Calories' },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -436,8 +436,8 @@ export const definitionLabel = (definition: CompareMetricDefinition): string => 
 	const aggregate = definition.base.window?.aggregate ?? 'Sum';
 	const metricName =
 		aggregate === 'NumberOfActivities'
-			? definition.base.metric
-			: definition.base.metric.toLowerCase();
+			? definition.base.source.metric
+			: definition.base.source.metric.toLowerCase();
 
 	return [
 		granularity === undefined ? null : granularity.toLowerCase(),

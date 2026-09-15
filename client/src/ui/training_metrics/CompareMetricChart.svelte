@@ -31,7 +31,7 @@
 	let target = $derived(metric.target === null ? none<number>() : some(metric.target.value));
 
 	let yScale = $derived.by(() => {
-		if (metric.metric === 'Elevation' && metric.unit === 'km') {
+		if (metric.source.metric === 'Elevation' && metric.unit === 'km') {
 			return { factor: 1000, unit: 'm' };
 		}
 		return { factor: 1, unit: metric.unit };

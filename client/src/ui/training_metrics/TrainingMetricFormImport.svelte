@@ -28,7 +28,7 @@
 		const lines = [];
 
 		// Source metric
-		lines.push({ label: 'Source', value: metric.metric.toLocaleLowerCase() });
+		lines.push({ label: 'Source', value: metric.source.metric.toLocaleLowerCase() });
 
 		// Granularity
 		if (metric.granularity !== null) {

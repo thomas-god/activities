@@ -48,7 +48,7 @@
 			{#if currentMetric.name}
 				{currentMetric.name}
 			{:else}
-				{currentMetric.metric.toLowerCase()}
+				{currentMetric.source.metric.toLowerCase()}
 			{/if}
 		</div>
 
