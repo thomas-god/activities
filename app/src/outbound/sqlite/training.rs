@@ -13,12 +13,12 @@ use crate::domain::{
         activity::{ActivityMetric, ActivityMetricSource},
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         training::{
-            TrainingMetric, TrainingMetricActivityFilters, TrainingMetricAggregate,
-            TrainingMetricDefinition, TrainingMetricGranularity, TrainingMetricGroupBy,
-            TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSource,
-            TrainingMetricSummary, TrainingMetricTarget, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
+            HooperIndex, SubjectiveScale, TrainingMetric, TrainingMetricActivityFilters,
+            TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
+            TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricScope,
+            TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
+            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
             TrainingPeriodSports,
         },
     },
@@ -28,10 +28,11 @@ use crate::domain::{
         training::{
             DeleteTrainingMetricError, DeleteTrainingNoteError, DeleteTrainingPeriodError,
             GetTrainingMetricError, GetTrainingMetricsDefinitionsError,
-            GetTrainingMetricsOrderingError, GetTrainingNoteError, SaveTrainingMetricError,
-            SaveTrainingNoteError, SaveTrainingPeriodError, SetTrainingMetricsOrderingError,
-            TrainingRepository, UpdateTrainingMetricNameError, UpdateTrainingPeriodDatesError,
-            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNoteError,
+            GetTrainingMetricsOrderingError, GetTrainingNoteError, HooperIndexError,
+            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+            SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
+            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodNameError,
+            UpdateTrainingPeriodNoteError,
         },
     },
 };
@@ -74,6 +75,14 @@ type SearchDocumentRow = (
     SearchDocumentEvent,
     String,
     chrono::DateTime<chrono::Utc>,
+);
+
+type HooperIndexRow = (
+    Option<SubjectiveScale>,
+    Option<SubjectiveScale>,
+    Option<SubjectiveScale>,
+    Option<SubjectiveScale>,
+    Option<SubjectiveScale>,
 );
 
 #[derive(Debug, Clone)]
@@ -942,6 +951,76 @@ where
         .await
         .map(|_| ())
         .map_err(|err| anyhow!(err))
+    }
+
+    async fn save_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+        value: &HooperIndex,
+    ) -> Result<(), HooperIndexError> {
+        sqlx::query(
+            "
+            INSERT INTO t_hooper_index (user, date, fatigue, pain, sleep, stress, mood)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT (user, date)
+            DO UPDATE SET
+                fatigue=excluded.fatigue,
+                pain=excluded.pain,
+                sleep=excluded.sleep,
+                stress=excluded.stress,
+                mood=excluded.mood",
+        )
+        .bind(user)
+        .bind(date)
+        .bind(value.fatigue())
+        .bind(value.pain())
+        .bind(value.sleep())
+        .bind(value.stress())
+        .bind(value.mood())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))
+    }
+
+    async fn get_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> Result<Option<HooperIndex>, HooperIndexError> {
+        let row = sqlx::query_as::<_, HooperIndexRow>(
+            "
+            SELECT fatigue, sleep, pain, stress, mood FROM t_hooper_index
+            WHERE user=?1 AND date=?2;",
+        )
+        .bind(user)
+        .bind(date)
+        .fetch_optional(&self.readers)
+        .await
+        .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))?;
+
+        Ok(row.map(|(fatigue, sleep, pain, stress, mood)| {
+            HooperIndex::new(fatigue, sleep, pain, stress, mood)
+        }))
+    }
+
+    async fn delete_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> Result<(), HooperIndexError> {
+        sqlx::query(
+            "
+            DELETE FROM t_hooper_index
+            WHERE user=?1 AND date=?2",
+        )
+        .bind(user)
+        .bind(date)
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))
     }
 }
 
@@ -4618,6 +4697,360 @@ mod test_sqlite_training_repository {
             repo.mark_outbox_document_as_processed(&document, processed_at)
                 .await
                 .expect("Marking document as processes should be idempotent");
+        }
+    }
+
+    #[cfg(test)]
+    mod test_hooper_index {
+        use super::*;
+
+        fn scale(value: u8) -> SubjectiveScale {
+            SubjectiveScale::try_from(value).unwrap()
+        }
+
+        fn test_date() -> NaiveDate {
+            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+        }
+
+        async fn setup() -> (NamedTempFile, SqliteTrainingRepository<Clock>) {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+            (db_file, repository)
+        }
+
+        async fn count_rows(
+            repository: &SqliteTrainingRepository<Clock>,
+            user: &UserId,
+            date: NaiveDate,
+        ) -> i64 {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM t_hooper_index WHERE user=?1 AND date=?2",
+            )
+            .bind(user)
+            .bind(date)
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_save_hooper_index_round_trip() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+            let value = HooperIndex::new(
+                Some(scale(1)),
+                Some(scale(2)),
+                Some(scale(3)),
+                Some(scale(4)),
+                Some(scale(5)),
+            );
+
+            repository
+                .save_hooper_index(&user, date, &value)
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_hooper_index(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Hooper index should exist");
+
+            assert_eq!(saved.fatigue(), &Some(scale(1)));
+            assert_eq!(saved.sleep(), &Some(scale(2)));
+            assert_eq!(saved.pain(), &Some(scale(3)));
+            assert_eq!(saved.stress(), &Some(scale(4)));
+            assert_eq!(saved.mood(), &Some(scale(5)));
+        }
+
+        #[tokio::test]
+        async fn test_save_hooper_index_upserts_existing_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            let initial = HooperIndex::new(
+                Some(scale(1)),
+                Some(scale(2)),
+                Some(scale(3)),
+                Some(scale(4)),
+                Some(scale(5)),
+            );
+            repository
+                .save_hooper_index(&user, date, &initial)
+                .await
+                .expect("Initial save should succeed");
+
+            let updated = HooperIndex::new(
+                Some(scale(6)),
+                Some(scale(7)),
+                Some(scale(8)),
+                Some(scale(9)),
+                Some(scale(10)),
+            );
+            repository
+                .save_hooper_index(&user, date, &updated)
+                .await
+                .expect("Upsert should succeed");
+
+            // Only one row should exist for the (user, date) pair.
+            assert_eq!(count_rows(&repository, &user, date).await, 1);
+
+            let saved = repository
+                .get_hooper_index(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Hooper index should exist");
+
+            assert_eq!(saved.fatigue(), &Some(scale(6)));
+            assert_eq!(saved.sleep(), &Some(scale(7)));
+            assert_eq!(saved.pain(), &Some(scale(8)));
+            assert_eq!(saved.stress(), &Some(scale(9)));
+            assert_eq!(saved.mood(), &Some(scale(10)));
+        }
+
+        #[tokio::test]
+        async fn test_save_hooper_index_allows_missing_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(&user, date, &HooperIndex::default())
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_hooper_index(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Hooper index should exist");
+
+            assert_eq!(saved.fatigue(), &None);
+            assert_eq!(saved.sleep(), &None);
+            assert_eq!(saved.pain(), &None);
+            assert_eq!(saved.stress(), &None);
+            assert_eq!(saved.mood(), &None);
+        }
+
+        #[tokio::test]
+        async fn test_save_hooper_index_is_scoped_by_user_and_date() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            assert!(
+                repository
+                    .get_hooper_index(&other_user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            assert!(
+                repository
+                    .get_hooper_index(&user, other_date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_index_returns_none_when_not_found() {
+            let (_db_file, repository) = setup().await;
+
+            let result = repository
+                .get_hooper_index(&UserId::from("user1"), test_date())
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_hooper_index_returns_matching_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(
+                        Some(scale(1)),
+                        Some(scale(2)),
+                        Some(scale(3)),
+                        Some(scale(4)),
+                        Some(scale(5)),
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_hooper_index(
+                    &user,
+                    other_date,
+                    &HooperIndex::new(
+                        Some(scale(6)),
+                        Some(scale(7)),
+                        Some(scale(8)),
+                        Some(scale(9)),
+                        Some(scale(10)),
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_hooper_index(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Hooper index should exist");
+
+            assert_eq!(saved.fatigue(), &Some(scale(1)));
+            assert_eq!(saved.sleep(), &Some(scale(2)));
+            assert_eq!(saved.pain(), &Some(scale(3)));
+            assert_eq!(saved.stress(), &Some(scale(4)));
+            assert_eq!(saved.mood(), &Some(scale(5)));
+        }
+
+        #[tokio::test]
+        async fn test_delete_hooper_index_removes_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_hooper_index(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            assert!(
+                repository
+                    .get_hooper_index(&user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            assert_eq!(count_rows(&repository, &user, date).await, 0);
+        }
+
+        #[tokio::test]
+        async fn test_delete_hooper_index_is_ok_when_not_found() {
+            let (_db_file, repository) = setup().await;
+
+            let result = repository
+                .delete_hooper_index(&UserId::from("user1"), test_date())
+                .await;
+
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn test_delete_hooper_index_only_deletes_matching_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_hooper_index(
+                    &user,
+                    other_date,
+                    &HooperIndex::new(Some(scale(2)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_hooper_index(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            assert!(
+                repository
+                    .get_hooper_index(&user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            let kept = repository
+                .get_hooper_index(&user, other_date)
+                .await
+                .expect("Get should succeed")
+                .expect("Other date should be kept");
+            assert_eq!(kept.fatigue(), &Some(scale(2)));
+        }
+
+        #[tokio::test]
+        async fn test_delete_hooper_index_does_not_delete_other_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+
+            repository
+                .save_hooper_index(
+                    &user,
+                    date,
+                    &HooperIndex::new(Some(scale(1)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_hooper_index(
+                    &other_user,
+                    date,
+                    &HooperIndex::new(Some(scale(2)), None, None, None, None),
+                )
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_hooper_index(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            let kept = repository
+                .get_hooper_index(&other_user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Other user row should be kept");
+            assert_eq!(kept.fatigue(), &Some(scale(2)));
         }
     }
 }

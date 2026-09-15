@@ -14,10 +14,10 @@ use crate::domain::models::{
     preferences::{ActivityListSummary, Preference, PreferenceKey},
     search::SearchDocumentEvent,
     training::{
-        TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName, TrainingMetricSource,
-        TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent,
-        TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+        SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
+        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
+        TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue,
+        TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         TrainingPeriodSports,
     },
 };
@@ -1071,5 +1071,29 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SearchDocumentEvent {
             "deleted" => Ok(Self::Deleted),
             _ => Err(format!("Unknown SearchDocumentEvent: {}", s).into()),
         }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for SubjectiveScale {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <u64 as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for SubjectiveScale {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let value = self.value();
+        args.push(sqlx::sqlite::SqliteArgumentValue::Int(value.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SubjectiveScale {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <u64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Ok(Self::try_from(u8::try_from(s)?)?)
     }
 }

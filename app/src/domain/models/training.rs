@@ -1199,6 +1199,95 @@ impl TrainingPeriodWithActivities {
         &self.activities
     }
 }
+// =============================================================================
+// Hooper's Index
+// =============================================================================
+
+/// Subjective scale with value in [1, 10]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SubjectiveScale(u8);
+
+impl TryFrom<u8> for SubjectiveScale {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value == 0 || value > 10 {
+            return Err("subjective scale must be in [1, 10]".to_string());
+        }
+
+        return Ok(Self(value));
+    }
+}
+
+impl SubjectiveScale {
+    pub fn value(&self) -> u8 {
+        self.0
+    }
+}
+
+/// Hooper's index is a collection of self-reported subjective measures about one's state and
+/// well-being.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct HooperIndex {
+    fatigue: Option<SubjectiveScale>,
+    sleep: Option<SubjectiveScale>,
+    pain: Option<SubjectiveScale>,
+    stress: Option<SubjectiveScale>,
+    mood: Option<SubjectiveScale>,
+}
+
+impl HooperIndex {
+    pub fn new(
+        fatigue: Option<SubjectiveScale>,
+        sleep: Option<SubjectiveScale>,
+        pain: Option<SubjectiveScale>,
+        stress: Option<SubjectiveScale>,
+        mood: Option<SubjectiveScale>,
+    ) -> Self {
+        Self {
+            fatigue,
+            sleep,
+            pain,
+            stress,
+            mood,
+        }
+    }
+
+    pub fn fatigue(&self) -> &Option<SubjectiveScale> {
+        &self.fatigue
+    }
+    pub fn sleep(&self) -> &Option<SubjectiveScale> {
+        &self.sleep
+    }
+    pub fn pain(&self) -> &Option<SubjectiveScale> {
+        &self.pain
+    }
+    pub fn stress(&self) -> &Option<SubjectiveScale> {
+        &self.stress
+    }
+    pub fn mood(&self) -> &Option<SubjectiveScale> {
+        &self.mood
+    }
+
+    pub fn patch(self, patch: HooperIndexPatch) -> Self {
+        Self {
+            fatigue: patch.fatigue.unwrap_or(self.fatigue),
+            sleep: patch.sleep.unwrap_or(self.sleep),
+            pain: patch.pain.unwrap_or(self.pain),
+            stress: patch.stress.unwrap_or(self.stress),
+            mood: patch.mood.unwrap_or(self.mood),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Constructor, Default)]
+pub struct HooperIndexPatch {
+    fatigue: Option<Option<SubjectiveScale>>,
+    sleep: Option<Option<SubjectiveScale>>,
+    pain: Option<Option<SubjectiveScale>>,
+    stress: Option<Option<SubjectiveScale>>,
+    mood: Option<Option<SubjectiveScale>>,
+}
 
 // =============================================================================
 // Training Notes

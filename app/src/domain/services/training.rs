@@ -21,18 +21,20 @@ use crate::domain::{
         activity::{IActivityService, ListActivitiesFilters},
         search::{IDocumentsForSearch, RemainingDocuments},
         training::{
-            ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
-            CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
-            CreateTrainingNoteRequest, CreateTrainingPeriodError, CreateTrainingPeriodRequest,
-            DeleteTrainingMetricError, DeleteTrainingMetricRequest, DeleteTrainingNoteError,
-            DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
+            AddHooperIndexRequest, ComputeTrainingMetricValuesError, CopyTrainingMetricError,
+            CopyTrainingMetricRequest, CreateTrainingMetricError, CreateTrainingMetricRequest,
+            CreateTrainingNoteError, CreateTrainingNoteRequest, CreateTrainingPeriodError,
+            CreateTrainingPeriodRequest, DeleteHooperIndexRequest, DeleteTrainingMetricError,
+            DeleteTrainingMetricRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
+            DeleteTrainingPeriodRequest, GetTrainingMetricValuesError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
-            ITrainingService, SetTrainingMetricsOrderingError, TrainingRepository,
-            UpdateTrainingMetricError, UpdateTrainingMetricNameError,
-            UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
-            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
-            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
-            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+            HooperIndexError, ITrainingService, SetTrainingMetricsOrderingError,
+            TrainingRepository, UpdateHooperIndexRequest, UpdateTrainingMetricError,
+            UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
+            UpdateTrainingMetricRequest, UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
+            UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
+            UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
+            UpdateTrainingPeriodNoteRequest,
         },
     },
 };
@@ -648,6 +650,44 @@ where
             .set_training_metrics_ordering(user, scope, ordering)
             .await
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn create_hooper_index(
+        &self,
+        req: AddHooperIndexRequest,
+    ) -> Result<(), HooperIndexError> {
+        self.training_repository
+            .save_hooper_index(req.user(), *req.date(), req.value())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_hooper_index(
+        &self,
+        req: DeleteHooperIndexRequest,
+    ) -> Result<(), HooperIndexError> {
+        self.training_repository
+            .delete_hooper_index(req.user(), *req.date())
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_hooper_index(
+        &self,
+        req: UpdateHooperIndexRequest,
+    ) -> Result<(), HooperIndexError> {
+        let existing = self
+            .training_repository
+            .get_hooper_index(req.user(), *req.date())
+            .await?
+            .unwrap_or_default();
+
+        let new = existing.patch(*req.patch());
+
+        self.training_repository
+            .save_hooper_index(req.user(), *req.date(), &new)
+            .await
+    }
 }
 impl<TMR, AS> IDocumentsForSearch for TrainingService<TMR, AS>
 where
@@ -719,17 +759,19 @@ pub mod test_utils {
         models::{
             search::SearchDocument,
             training::{
-                TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
+                HooperIndex, TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
                 TrainingPeriodWithActivities,
             },
         },
         ports::training::{
-            CopyTrainingMetricError, CopyTrainingMetricRequest, CreateTrainingPeriodError,
-            CreateTrainingPeriodRequest, DeleteTrainingNoteError, DeleteTrainingPeriodError,
-            DeleteTrainingPeriodRequest, GetTrainingMetricError, GetTrainingMetricValuesRequest,
-            GetTrainingMetricsDefinitionsError, GetTrainingNoteError, SaveTrainingMetricError,
-            SaveTrainingNoteError, SaveTrainingPeriodError, UpdateTrainingMetricError,
-            UpdateTrainingMetricRequest, UpdateTrainingNoteError,
+            AddHooperIndexRequest, CopyTrainingMetricError, CopyTrainingMetricRequest,
+            CreateTrainingPeriodError, CreateTrainingPeriodRequest, DeleteHooperIndexRequest,
+            DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
+            GetTrainingMetricError, GetTrainingMetricValuesRequest,
+            GetTrainingMetricsDefinitionsError, GetTrainingNoteError, HooperIndexError,
+            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
+            UpdateHooperIndexRequest, UpdateTrainingMetricError, UpdateTrainingMetricRequest,
+            UpdateTrainingNoteError,
         },
     };
 
@@ -887,6 +929,21 @@ pub mod test_utils {
                 req: GetTrainingMetricValuesRequest,
                 date_range: &DateRange,
             ) -> Result<TrainingMetricValues, GetTrainingMetricValuesError>;
+
+            async fn create_hooper_index(
+                &self,
+                req: AddHooperIndexRequest,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn update_hooper_index(
+                &self,
+                req: UpdateHooperIndexRequest,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn delete_hooper_index(
+                &self,
+                req: DeleteHooperIndexRequest,
+            ) -> Result<(), HooperIndexError>;
         }
     }
 
@@ -1048,6 +1105,25 @@ pub mod test_utils {
                 document: &SearchDocument,
                 processed_at: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), anyhow::Error>;
+
+            async fn save_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+                value: &HooperIndex,
+            ) -> Result<(), HooperIndexError>;
+
+            async fn get_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<HooperIndex>, HooperIndexError>;
+
+            async fn delete_hooper_index(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<(), HooperIndexError>;
         }
     }
 }
@@ -4878,6 +4954,254 @@ mod test_training_service_copy_metric {
             CopyTrainingMetricError::SaveMetricError(_) => {}
             _ => panic!("Expected SaveMetricError"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_hooper_index {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::domain::models::training::{HooperIndex, HooperIndexPatch, SubjectiveScale};
+    use crate::domain::services::activity::test_utils::MockActivityService;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use chrono::NaiveDate;
+
+    fn test_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+    }
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService> {
+        TrainingService::new(
+            repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_create_hooper_index_saves_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+        let value = HooperIndex::new(
+            Some(scale(3)),
+            Some(scale(4)),
+            Some(scale(5)),
+            Some(scale(6)),
+            Some(scale(7)),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.fatigue() == &Some(scale(3))
+                    && v.sleep() == &Some(scale(4))
+                    && v.pain() == &Some(scale(5))
+                    && v.stress() == &Some(scale(6))
+                    && v.mood() == &Some(scale(7))
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = AddHooperIndexRequest::new(user, date, value);
+        let result = service.create_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_hooper_index_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .returning(|_, _, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req =
+            AddHooperIndexRequest::new(UserId::test_default(), test_date(), HooperIndex::default());
+        let result = service.create_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_delete_hooper_index_deletes_on_date() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_delete_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = DeleteHooperIndexRequest::new(user, date);
+        let result = service.delete_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_hooper_index_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = DeleteHooperIndexRequest::new(UserId::test_default(), test_date());
+        let result = service.delete_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_patches_existing_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let existing = HooperIndex::new(
+            Some(scale(1)),
+            Some(scale(2)),
+            Some(scale(3)),
+            Some(scale(4)),
+            Some(scale(5)),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(move |_, _| Ok(Some(existing)));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.fatigue() == &Some(scale(9))
+                    && v.sleep() == &Some(scale(2))
+                    && v.pain() == &None
+                    && v.stress() == &Some(scale(4))
+                    && v.mood() == &Some(scale(5))
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        // Override fatigue, clear pain, leave sleep/stress/mood untouched.
+        let patch = HooperIndexPatch::new(Some(Some(scale(9))), None, Some(None), None, None);
+
+        let req = UpdateHooperIndexRequest::new(user, date, patch);
+        let result = service.update_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_without_existing_value_starts_from_default() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.fatigue() == &Some(scale(7))
+                    && v.sleep() == &None
+                    && v.pain() == &None
+                    && v.stress() == &None
+                    && v.mood() == &None
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patch = HooperIndexPatch::new(Some(Some(scale(7))), None, None, None, None);
+        let req = UpdateHooperIndexRequest::new(user, date, patch);
+        let result = service.update_hooper_index(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+        repository.expect_save_hooper_index().times(0);
+
+        let service = build_service(repository);
+
+        let req = UpdateHooperIndexRequest::new(
+            UserId::test_default(),
+            test_date(),
+            HooperIndexPatch::default(),
+        );
+        let result = service.update_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_hooper_index_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_save_hooper_index()
+            .times(1)
+            .returning(|_, _, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = UpdateHooperIndexRequest::new(
+            UserId::test_default(),
+            test_date(),
+            HooperIndexPatch::default(),
+        );
+        let result = service.update_hooper_index(req).await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
     }
 }
 

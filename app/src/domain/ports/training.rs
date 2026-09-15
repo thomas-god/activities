@@ -8,13 +8,13 @@ use crate::domain::{
         activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData},
         search::SearchDocument,
         training::{
-            TrainingMetric, TrainingMetricActivityFilters, TrainingMetricDefinitionPatch,
-            TrainingMetricId, TrainingMetricName, TrainingMetricPatch, TrainingMetricScope,
-            TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
-            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-            TrainingPeriodWithActivities,
+            HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricActivityFilters,
+            TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
+            TrainingMetricPatch, TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
+            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
         },
     },
     ports::{DateRange, search::RemainingDocuments},
@@ -276,6 +276,65 @@ pub enum UpdateTrainingMetricNameError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct AddHooperIndexRequest {
+    user: UserId,
+    date: chrono::NaiveDate,
+    value: HooperIndex,
+}
+
+impl AddHooperIndexRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn date(&self) -> &chrono::NaiveDate {
+        &self.date
+    }
+    pub fn value(&self) -> &HooperIndex {
+        &self.value
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct UpdateHooperIndexRequest {
+    user: UserId,
+    date: chrono::NaiveDate,
+    patch: HooperIndexPatch,
+}
+
+impl UpdateHooperIndexRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn date(&self) -> &chrono::NaiveDate {
+        &self.date
+    }
+    pub fn patch(&self) -> &HooperIndexPatch {
+        &self.patch
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct DeleteHooperIndexRequest {
+    user: UserId,
+    date: chrono::NaiveDate,
+}
+
+impl DeleteHooperIndexRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn date(&self) -> &chrono::NaiveDate {
+        &self.date
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum HooperIndexError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 ///////////////////////////////////////////////////////////////////
 /// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
@@ -427,6 +486,21 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         scope: &TrainingMetricScope,
         ordering: TrainingMetricsOrdering,
     ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
+
+    fn create_hooper_index(
+        &self,
+        req: AddHooperIndexRequest,
+    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
+
+    fn update_hooper_index(
+        &self,
+        req: UpdateHooperIndexRequest,
+    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
+
+    fn delete_hooper_index(
+        &self,
+        req: DeleteHooperIndexRequest,
+    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -888,6 +962,25 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         document: &SearchDocument,
         processed_at: chrono::DateTime<chrono::Utc>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn save_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+        value: &HooperIndex,
+    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
+
+    fn get_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<Option<HooperIndex>, HooperIndexError>> + Send;
+
+    fn delete_hooper_index(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
 }
 
 #[cfg(test)]
