@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::{borrow::Cow, sync::LazyLock};
 
 use axum::{
@@ -58,6 +59,11 @@ pub enum TrainingMetricTemplateCategory {
     Cadence,
     Altitude,
     Pace,
+    Fatigue,
+    Mood,
+    Stress,
+    Sleep,
+    Pain,
     Other,
 }
 
@@ -183,6 +189,29 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         category: metric_category(&metric),
     });
 
+    // Subjective measures/Hooper index
+    let aggregates = [
+        TrainingMetricAggregate::Min,
+        TrainingMetricAggregate::Max,
+        TrainingMetricAggregate::Average,
+    ];
+    let metrics = [
+        HooperIndexSource::Fatigue,
+        HooperIndexSource::Sleep,
+        HooperIndexSource::Stress,
+        HooperIndexSource::Mood,
+        HooperIndexSource::Pain,
+    ];
+
+    for (source, aggregate) in metrics.iter().cartesian_product(aggregates.iter()) {
+        templates.push(TrainingMetricTemplate {
+            display_name: format!("{} {}", format_aggregate(aggregate), source),
+            source: TrainingMetricSource::HooperIndex(*source),
+            aggregate: *aggregate,
+            category: hooper_category(source),
+        })
+    }
+
     templates
 });
 
@@ -226,6 +255,16 @@ fn metric_category(metric: &ActivityMetric) -> TrainingMetricTemplateCategory {
         | ActivityMetric::AvgPower
         | ActivityMetric::NormalizedPower => TrainingMetricTemplateCategory::Power,
         ActivityMetric::NumberOfActivity => TrainingMetricTemplateCategory::Other,
+    }
+}
+
+fn hooper_category(source: &HooperIndexSource) -> TrainingMetricTemplateCategory {
+    match source {
+        HooperIndexSource::Fatigue => TrainingMetricTemplateCategory::Fatigue,
+        HooperIndexSource::Mood => TrainingMetricTemplateCategory::Mood,
+        HooperIndexSource::Sleep => TrainingMetricTemplateCategory::Sleep,
+        HooperIndexSource::Stress => TrainingMetricTemplateCategory::Stress,
+        HooperIndexSource::Pain => TrainingMetricTemplateCategory::Pain,
     }
 }
 

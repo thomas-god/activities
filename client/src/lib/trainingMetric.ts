@@ -24,6 +24,11 @@ export const trainingMetricTemplateCategories = [
 	'Cadence',
 	'Altitude',
 	'Pace',
+	'Sleep',
+	'Stress',
+	'Fatigue',
+	'Pain',
+	'Mood',
 	'Other'
 ] as const;
 export type TrainingMetricTemplateCategory = (typeof trainingMetricTemplateCategories)[number];

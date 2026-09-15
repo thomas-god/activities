@@ -26,6 +26,14 @@
 		}
 		return groupedMetrics;
 	});
+
+	let metricSourceIsActivity = $derived.by(() => {
+		if (isNone(fields.selectedTemplate)) {
+			return false;
+		}
+
+		return fields.selectedTemplate.value.source.type === 'activity';
+	});
 </script>
 
 <label class="label" for="metric-source"> Metric to extract from each activity </label>
@@ -73,7 +81,7 @@
 	<option value="Monthly">Month</option>
 </select>
 
-{#if isSome(fields.granularity)}
+{#if isSome(fields.granularity) && metricSourceIsActivity}
 	<label class="label" for="metric-group-by">Additionally group activities by</label>
 	<select
 		class="select w-full"
@@ -92,10 +100,12 @@
 	</select>
 {/if}
 
-<TrainingMetricFilters
-	bind:filters={() => fields.filters, (f) => (fields = { ...fields, filters: f })}
-	{existingSportsConstraints}
-/>
+{#if metricSourceIsActivity}
+	<TrainingMetricFilters
+		bind:filters={() => fields.filters, (f) => (fields = { ...fields, filters: f })}
+		{existingSportsConstraints}
+	/>
+{/if}
 
 <label class="label" for="show-metric-average">
 	Display metric average
