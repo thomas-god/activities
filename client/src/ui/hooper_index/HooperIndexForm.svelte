@@ -13,10 +13,13 @@
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>
 		fetchHooperIndex(date).then((loaded) => {
-			values = loaded;
+			values = { ...loaded };
+			baseline = { ...loaded };
 		});
 	let loadPromise = $derived(setLoadPromise());
 	let values = $state<HooperIndex>(emptyHooperIndex());
+	let baseline = $state<HooperIndex>(emptyHooperIndex());
+	const isDirty = $derived(hooperMeasures.some((measure) => values[measure] !== baseline[measure]));
 
 	let savePromise: Option<Promise<void>> = $state(none());
 	const save = () =>
@@ -26,6 +29,7 @@
 	};
 
 	const clear = () => (values = emptyHooperIndex());
+	const reset = () => (values = { ...baseline });
 </script>
 
 <fieldset class="fieldset rounded-box border-base-300 bg-base-100">
@@ -95,11 +99,12 @@
 					>Save <span class="loading loading-sm"></span>
 				</button>
 			{:then}
-				<button class="btn btn-primary btn-sm" onclick={save}>Save</button>
+				<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>Save</button>
 			{/await}
 		{:else}
-			<button class="btn btn-primary btn-sm" onclick={save}>Save</button>
+			<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>Save</button>
 		{/if}
+		<button class="btn btn-ghost btn-sm" disabled={!isDirty} onclick={reset}>Reset</button>
 		<button class="btn btn-ghost btn-sm" onclick={clear}>Clear</button>
 	</div>
 {/snippet}

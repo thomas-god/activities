@@ -104,6 +104,37 @@ describe('HooperIndexForm', () => {
 		expect(displayedValue('mood')).toBe('Not set');
 	});
 
+	it('restores the loaded values with the Reset button', async () => {
+		const user = userEvent.setup();
+		await renderForm({ ...emptyHooperIndex(), fatigue: 7, mood: 4 });
+
+		expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+
+		await fireEvent.input(slider('fatigue'), { target: { value: '9' } });
+		await user.click(screen.getByRole('button', { name: 'Clear' }));
+
+		expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled();
+
+		await user.click(screen.getByRole('button', { name: 'Reset' }));
+
+		expect(displayedValue('fatigue')).toBe('7');
+		expect(displayedValue('mood')).toBe('4');
+		expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+	});
+
+	it('keeps the save button disabled until a measure changes', async () => {
+		await renderForm({ ...emptyHooperIndex(), fatigue: 7 });
+
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+		await fireEvent.input(slider('fatigue'), { target: { value: '8' } });
+		expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+		await fireEvent.input(slider('fatigue'), { target: { value: '7' } });
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+	});
+
 	it('disables the save button while a save request is in flight', async () => {
 		const user = userEvent.setup();
 		let resolveSave!: (value: boolean) => void;
@@ -111,23 +142,33 @@ describe('HooperIndexForm', () => {
 
 		await renderForm();
 
+		await fireEvent.input(slider('fatigue'), { target: { value: '8' } });
 		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
 		resolveSave(true);
 
-		await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+		await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(2));
+		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 	});
 
-	it('saves the loaded values for the current date', async () => {
+	it('saves the modified values for the current date', async () => {
 		const user = userEvent.setup();
-		const values = { ...emptyHooperIndex(), fatigue: 7, mood: 4 };
 
-		await renderForm(values);
+		await renderForm();
+
+		await fireEvent.input(slider('fatigue'), { target: { value: '7' } });
+		await fireEvent.input(slider('mood'), { target: { value: '4' } });
 
 		await user.click(screen.getByRole('button', { name: 'Save' }));
 
-		await waitFor(() => expect(mockedSave).toHaveBeenCalledWith(today(), { ...values }));
+		await waitFor(() =>
+			expect(mockedSave).toHaveBeenCalledWith(today(), {
+				...emptyHooperIndex(),
+				fatigue: 7,
+				mood: 4
+			})
+		);
 	});
 });
