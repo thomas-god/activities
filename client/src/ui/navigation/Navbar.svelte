@@ -50,7 +50,7 @@
 </script>
 
 <div class="flex items-center justify-between gap-2">
-	<div class="flex shrink gap-2 overflow-x-auto xs:gap-3 sm:gap-6">
+	<div class="flex shrink gap-1 overflow-x-auto xs:gap-3 sm:gap-6">
 		<a
 			class={`btn shrink-0 btn-ghost px-1 text-[16px] font-bold xs:px-2 xs:text-lg sm:text-xl ${classExactPath('/')}`}
 			href={resolve('/')}>Activities</a
@@ -69,10 +69,10 @@
 		>
 	</div>
 
-	<div class="flex shrink-0 items-center gap-3">
+	<div class="flex shrink-0 items-center gap-0 min-[400px]:gap-2">
 		<button
 			bind:this={addItemMenuBtn}
-			class="btn btn-ghost btn-primary btn-sm"
+			class="btn btn-ghost btn-primary btn-xs min-[400px]:btn-sm"
 			popovertarget="add-item-menu"
 			style="anchor-name:--anchor-add-item"
 		>
@@ -101,14 +101,18 @@
 		</div>
 
 		{#if showLogout}
-			<button class="btn hidden btn-ghost btn-sm min-[850px]:flex" onclick={handleLogout}
+			<button class="btn hidden btn-ghost btn-sm min-[400px]:flex" onclick={handleLogout}
 				>Log out</button
 			>
 		{/if}
 		<ThemeToggle {theme} onToggle={toggleTheme} class="hidden min-[850px]:flex" />
 
 		<div class="dropdown dropdown-end min-[850px]:hidden">
-			<button tabindex="0" class="btn btn-ghost btn-primary btn-sm" aria-label="Quick actions">
+			<button
+				tabindex="0"
+				class="btn btn-ghost btn-primary btn-xs [min-850px]:btn-sm"
+				aria-label="Quick actions"
+			>
 				<Menu class="size-5" />
 			</button>
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
