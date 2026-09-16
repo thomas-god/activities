@@ -294,7 +294,7 @@ def update_activity(
     if nutrition_details is not None:
         body["nutrition_details"] = nutrition_details
     if feedback is not None:
-        body["feedback"] =  feedback
+        body["feedback"] = feedback
 
     # Make PATCH request
     response = requests.patch(
@@ -351,7 +351,7 @@ def create_global_training_metric(
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
-        "metric": metric,
+        "source": {"type": "activity", "metric": metric},
         "filters": {},
         "scope": {"type": "global"},
     }
@@ -395,7 +395,7 @@ def create_scoped_training_metric(
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
-        "metric": metric,
+        "source": {"type": "activity", "metric": metric},
         "filters": {},
         "scope": {"type": "trainingPeriod", "trainingPeriodId": period_id},
     }
