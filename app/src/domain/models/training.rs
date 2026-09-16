@@ -1274,6 +1274,24 @@ pub struct HooperIndexPatch {
     mood: Option<Option<SubjectiveScale>>,
 }
 
+impl HooperIndexPatch {
+    pub fn fatigue(&self) -> &Option<Option<SubjectiveScale>> {
+        &self.fatigue
+    }
+    pub fn sleep(&self) -> &Option<Option<SubjectiveScale>> {
+        &self.sleep
+    }
+    pub fn pain(&self) -> &Option<Option<SubjectiveScale>> {
+        &self.pain
+    }
+    pub fn stress(&self) -> &Option<Option<SubjectiveScale>> {
+        &self.stress
+    }
+    pub fn mood(&self) -> &Option<Option<SubjectiveScale>> {
+        &self.mood
+    }
+}
+
 // =============================================================================
 // Training Notes
 // =============================================================================

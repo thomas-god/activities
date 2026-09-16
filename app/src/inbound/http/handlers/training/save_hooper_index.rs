@@ -14,7 +14,7 @@ use crate::{
         ports::{
             activity::IActivityService,
             preferences::IPreferencesService,
-            training::{HooperIndexError, ITrainingService, UpdateHooperIndexRequest},
+            training::{HooperIndexError, ITrainingService, SaveHooperIndexRequest},
         },
     },
     inbound::{
@@ -35,7 +35,7 @@ pub struct UpdateHooperIndexBody {
 }
 
 #[tracing::instrument(skip_all, err)]
-pub async fn update_hooper_index<
+pub async fn save_hooper_index<
     AS: IActivityService,
     PF: ParseFile,
     TMS: ITrainingService,
@@ -48,13 +48,9 @@ pub async fn update_hooper_index<
 ) -> Result<StatusCode, StatusCode> {
     let date = NaiveDate::from_str(&date).map_err(|_| StatusCode::BAD_REQUEST)?;
     let patch = HooperIndexPatch::try_from(payload.patch).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let req = UpdateHooperIndexRequest::new(user.user().clone(), date, patch);
+    let req = SaveHooperIndexRequest::new(user.user().clone(), date, patch);
 
-    match state
-        .training_metrics_service
-        .update_hooper_index(req)
-        .await
-    {
+    match state.training_metrics_service.save_hooper_index(req).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(err) => {
             if matches!(&err, HooperIndexError::Unknown(_)) {

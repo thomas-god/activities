@@ -1,10 +1,5 @@
 <script lang="ts">
-	import {
-		createHooperIndex,
-		deleteHooperIndex,
-		updateHooperIndex,
-		type HooperIndex
-	} from '$lib/api';
+	import { deleteHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 
 	// Temporary page used to manually exercise the Hooper index endpoints.
@@ -47,8 +42,7 @@
 		}
 	}
 
-	const save = () => run(() => createHooperIndex(date, payload()), 'Saved');
-	const update = () => run(() => updateHooperIndex(date, payload()), 'Updated');
+	const save = () => run(() => saveHooperIndex(date, payload()), 'Updated');
 	const remove = () => run(() => deleteHooperIndex(date), 'Deleted');
 
 	function clear() {
@@ -85,8 +79,7 @@
 		{/each}
 
 		<div class="flex flex-wrap gap-2">
-			<button class="btn btn-primary btn-sm" onclick={save} disabled={busy}>Save (POST)</button>
-			<button class="btn btn-sm" onclick={update} disabled={busy}>Update (PATCH)</button>
+			<button class="btn btn-primary btn-sm" onclick={save} disabled={busy}>Save</button>
 			<button class="btn btn-error btn-sm" onclick={remove} disabled={busy}>Delete</button>
 			<button class="btn btn-ghost btn-sm" onclick={clear} disabled={busy}>Clear</button>
 		</div>

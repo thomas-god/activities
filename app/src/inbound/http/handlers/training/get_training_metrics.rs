@@ -319,7 +319,7 @@ mod tests {
                 {
                     "id": "metric-id-1",
                     "name": "My Metric",
-                    "metric": "Calories",
+                    "source": {"type": "activity", "metric": "Calories"},
                     "metric_formated": "Activity average calories",
                     "unit": "kcal",
                     "granularity": "Daily",

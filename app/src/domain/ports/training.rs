@@ -277,32 +277,13 @@ pub enum UpdateTrainingMetricNameError {
 }
 
 #[derive(Debug, Clone, Constructor)]
-pub struct AddHooperIndexRequest {
-    user: UserId,
-    date: chrono::NaiveDate,
-    value: HooperIndex,
-}
-
-impl AddHooperIndexRequest {
-    pub fn user(&self) -> &UserId {
-        &self.user
-    }
-    pub fn date(&self) -> &chrono::NaiveDate {
-        &self.date
-    }
-    pub fn value(&self) -> &HooperIndex {
-        &self.value
-    }
-}
-
-#[derive(Debug, Clone, Constructor)]
-pub struct UpdateHooperIndexRequest {
+pub struct SaveHooperIndexRequest {
     user: UserId,
     date: chrono::NaiveDate,
     patch: HooperIndexPatch,
 }
 
-impl UpdateHooperIndexRequest {
+impl SaveHooperIndexRequest {
     pub fn user(&self) -> &UserId {
         &self.user
     }
@@ -487,14 +468,9 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         ordering: TrainingMetricsOrdering,
     ) -> impl Future<Output = Result<(), SetTrainingMetricsOrderingError>> + Send;
 
-    fn create_hooper_index(
+    fn save_hooper_index(
         &self,
-        req: AddHooperIndexRequest,
-    ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
-
-    fn update_hooper_index(
-        &self,
-        req: UpdateHooperIndexRequest,
+        req: SaveHooperIndexRequest,
     ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
 
     fn delete_hooper_index(

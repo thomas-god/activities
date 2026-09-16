@@ -26,16 +26,15 @@ use crate::inbound::auth::infra::add_auth_router;
 use crate::inbound::http::handlers::{get_default_activity_metrics, get_training_metric_templates};
 use crate::inbound::parser::ParseFile;
 use handlers::{
-    compute_training_metric_values, copy_training_metric, create_hooper_index,
-    create_standalone_activity, create_training_metric, create_training_note,
-    create_training_period, delete_activity, delete_hooper_index, delete_preference,
-    delete_training_metric, delete_training_note, delete_training_period,
-    get_active_training_periods, get_activity, get_all_preferences, get_all_raw_activities,
-    get_preference, get_raw_activity, get_training_metrics, get_training_metrics_ordering,
-    get_training_note, get_training_notes, get_training_period, get_training_period_metrics,
-    get_training_period_notes, get_training_periods, list_activities, patch_activity, search,
-    set_preference, set_training_metrics_ordering, update_hooper_index, update_training_metric,
-    update_training_note, update_training_period, upload_activities,
+    compute_training_metric_values, copy_training_metric, create_standalone_activity,
+    create_training_metric, create_training_note, create_training_period, delete_activity,
+    delete_hooper_index, delete_preference, delete_training_metric, delete_training_note,
+    delete_training_period, get_active_training_periods, get_activity, get_all_preferences,
+    get_all_raw_activities, get_preference, get_raw_activity, get_training_metrics,
+    get_training_metrics_ordering, get_training_note, get_training_notes, get_training_period,
+    get_training_period_metrics, get_training_period_notes, get_training_periods, list_activities,
+    patch_activity, save_hooper_index, search, set_preference, set_training_metrics_ordering,
+    update_training_metric, update_training_note, update_training_period, upload_activities,
 };
 
 pub use crate::inbound::auth::email_based::infra::mailer::smtp::SMTPEmailProvider;
@@ -294,12 +293,8 @@ where
             post(compute_training_metric_values::<AS, PF, TS, PS>),
         )
         .route(
-            "/training/hooper-index",
-            post(create_hooper_index::<AS, PF, TS, PS>),
-        )
-        .route(
             "/training/hooper-index/{date}",
-            patch(update_hooper_index::<AS, PF, TS, PS>)
+            patch(save_hooper_index::<AS, PF, TS, PS>)
                 .delete(delete_hooper_index::<AS, PF, TS, PS>),
         )
         .route(
@@ -510,37 +505,37 @@ mod tests {
 
         let mut training_service = MockTrainingService::new();
         training_service
-            .expect_create_hooper_index()
+            .expect_save_hooper_index()
             .times(1)
             .withf(|req| {
                 req.user() == &UserId::default()
                     && req.date() == &test_date()
-                    && req.value().fatigue() == &Some(SubjectiveScale::try_from(5).unwrap())
-                    && req.value().sleep() == &None
-                    && req.value().pain() == &None
+                    && req.patch().fatigue() == &Some(Some(SubjectiveScale::try_from(5).unwrap()))
+                    && req.patch().sleep() == &None
+                    && req.patch().pain() == &None
             })
             .returning(|_| Ok(()));
 
         let server = TestServer::new(build_test_app(training_service));
 
         let response = server
-            .post("/api/training/hooper-index")
-            .json(&serde_json::json!({ "date": "2026-01-15", "fatigue": 5 }))
+            .patch("/api/training/hooper-index/2026-01-15")
+            .json(&serde_json::json!({ "fatigue": 5 }))
             .await;
 
-        response.assert_status(StatusCode::CREATED);
+        response.assert_status(StatusCode::NO_CONTENT);
     }
 
     #[tokio::test]
     async fn create_hooper_index_route_rejects_out_of_range_value() {
         let mut training_service = MockTrainingService::new();
-        training_service.expect_create_hooper_index().times(0);
+        training_service.expect_save_hooper_index().times(0);
 
         let server = TestServer::new(build_test_app(training_service));
 
         let response = server
-            .post("/api/training/hooper-index")
-            .json(&serde_json::json!({ "date": "2026-01-15", "fatigue": 11 }))
+            .patch("/api/training/hooper-index/2026-01-15")
+            .json(&serde_json::json!({ "fatigue": 11 }))
             .await;
 
         response.assert_status(StatusCode::BAD_REQUEST);
@@ -550,7 +545,7 @@ mod tests {
     async fn update_hooper_index_route_calls_service() {
         let mut training_service = MockTrainingService::new();
         training_service
-            .expect_update_hooper_index()
+            .expect_save_hooper_index()
             .times(1)
             .withf(|req| req.user() == &UserId::default() && req.date() == &test_date())
             .returning(|_| Ok(()));
@@ -568,7 +563,7 @@ mod tests {
     #[tokio::test]
     async fn update_hooper_index_route_rejects_invalid_date() {
         let mut training_service = MockTrainingService::new();
-        training_service.expect_update_hooper_index().times(0);
+        training_service.expect_save_hooper_index().times(0);
 
         let server = TestServer::new(build_test_app(training_service));
 

@@ -657,43 +657,12 @@ export const getTrainingMetricPreview = async (
 // =============================================================================
 
 /**
- * Create (or replace) the Hooper index for a given date.
+ * Save the Hooper index for a given date.
  * @param date - The date the index applies to
- * @param values - The subjective measures (use `null` for measures that were not reported)
- * @returns true if the index was saved, false otherwise
- */
-export async function createHooperIndex(
-	date: Date | string,
-	values: HooperIndex
-): Promise<boolean> {
-	const body: CreateHooperIndexBody = CreateHooperIndexSchema.parse({
-		date: dayjs(date).format('YYYY-MM-DD'),
-		...values
-	});
-
-	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index`, {
-		method: 'POST',
-		mode: 'cors',
-		credentials: 'include',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify(body)
-	});
-
-	if (res.status === 401) {
-		goto(resolve('/login'));
-		return false;
-	}
-
-	return res.status === 201;
-}
-
-/**
- * Update the Hooper index for a given date.
- * @param date - The date the index applies to
- * @param patch - The measures to change: omitted fields are left untouched, `null` clears them
+ * @param patch - The measures to save: omitted fields are left untouched, `null` clears them
  * @returns true if the index was updated, false otherwise
  */
-export async function updateHooperIndex(
+export async function saveHooperIndex(
 	date: Date | string,
 	patch: UpdateHooperIndexPatch
 ): Promise<boolean> {
