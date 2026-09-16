@@ -657,6 +657,35 @@ export const getTrainingMetricPreview = async (
 // =============================================================================
 
 /**
+ * Fetch the Hooper index for a given date.
+ *
+ * A date without a stored index resolves to an index with every measure unset, so callers can
+ * always rely on the same response shape.
+ * @param date - The date the index applies to
+ * @returns The Hooper index for that date
+ */
+export async function fetchHooperIndex(date: Date | string): Promise<HooperIndex> {
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index/${formattedDate}`, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return { fatigue: null, sleep: null, pain: null, stress: null, mood: null };
+	}
+
+	if (res.status !== 200) {
+		throw new Error(`Failed to fetch the Hooper index: ${res.status}`);
+	}
+
+	return HooperIndexSchema.parse(await res.json());
+}
+
+/**
  * Save the Hooper index for a given date.
  * @param date - The date the index applies to
  * @param patch - The measures to save: omitted fields are left untouched, `null` clears them

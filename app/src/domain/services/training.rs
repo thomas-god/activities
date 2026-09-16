@@ -10,10 +10,10 @@ use crate::domain::{
         activity::ActivityMetric,
         search::{SearchDocument, SearchDocumentType},
         training::{
-            HooperIndexSource, TrainingMetric, TrainingMetricDefinition, TrainingMetricId,
-            TrainingMetricScope, TrainingMetricSource, TrainingMetricValues, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            HooperIndex, HooperIndexSource, TrainingMetric, TrainingMetricDefinition,
+            TrainingMetricId, TrainingMetricScope, TrainingMetricSource, TrainingMetricValues,
+            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
+            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         },
     },
     ports::{
@@ -696,6 +696,15 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
+    async fn get_hooper_index(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> Result<Option<HooperIndex>, HooperIndexError> {
+        self.training_repository.get_hooper_index(user, *date).await
+    }
+
+    #[tracing::instrument(skip_all, err)]
     async fn delete_hooper_index(
         &self,
         req: DeleteHooperIndexRequest,
@@ -949,6 +958,12 @@ pub mod test_utils {
                 &self,
                 req: SaveHooperIndexRequest,
             ) -> Result<(), HooperIndexError>;
+
+            async fn get_hooper_index(
+                &self,
+                user: &UserId,
+                date: &NaiveDate,
+            ) -> Result<Option<HooperIndex>, HooperIndexError>;
 
             async fn delete_hooper_index(
                 &self,
@@ -5001,6 +5016,51 @@ mod test_training_service_hooper_index {
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
         )
+    }
+
+    #[tokio::test]
+    async fn test_get_hooper_index_returns_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| {
+                Ok(Some(HooperIndex::new(
+                    Some(scale(6)),
+                    None,
+                    None,
+                    None,
+                    None,
+                )))
+            });
+
+        let service = build_service(repository);
+
+        let result = service.get_hooper_index(&user, &date).await.unwrap();
+
+        assert_eq!(result.unwrap().fatigue(), &Some(scale(6)));
+    }
+
+    #[tokio::test]
+    async fn test_get_hooper_index_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_hooper_index()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_hooper_index(&UserId::test_default(), &test_date())
+            .await;
+
+        assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
     }
 
     #[tokio::test]

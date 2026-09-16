@@ -473,6 +473,12 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: SaveHooperIndexRequest,
     ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
 
+    fn get_hooper_index(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> impl Future<Output = Result<Option<HooperIndex>, HooperIndexError>> + Send;
+
     fn delete_hooper_index(
         &self,
         req: DeleteHooperIndexRequest,

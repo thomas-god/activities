@@ -527,13 +527,25 @@ fn format_activity_source_metric(source: ActivityMetricSource) -> String {
 
 /// Hooper's index values as received from the API. Every measure is optional, and each provided
 /// value must be in the `1..=10` range.
-#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct APIHooperIndex {
     pub fatigue: Option<u8>,
     pub sleep: Option<u8>,
     pub pain: Option<u8>,
     pub stress: Option<u8>,
     pub mood: Option<u8>,
+}
+
+impl From<&HooperIndex> for APIHooperIndex {
+    fn from(value: &HooperIndex) -> Self {
+        Self {
+            fatigue: value.fatigue().map(|scale| scale.value()),
+            sleep: value.sleep().map(|scale| scale.value()),
+            pain: value.pain().map(|scale| scale.value()),
+            stress: value.stress().map(|scale| scale.value()),
+            mood: value.mood().map(|scale| scale.value()),
+        }
+    }
 }
 
 impl TryFrom<APIHooperIndex> for HooperIndex {
