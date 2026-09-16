@@ -2,20 +2,18 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteHooperIndex, fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
+import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 import HooperIndexForm from './HooperIndexForm.svelte';
 import { emptyHooperIndex, hooperMeasures } from './index';
 import dayjs from 'dayjs';
 
 vi.mock('$lib/api', () => ({
 	fetchHooperIndex: vi.fn(),
-	saveHooperIndex: vi.fn(),
-	deleteHooperIndex: vi.fn()
+	saveHooperIndex: vi.fn()
 }));
 
 const mockedFetch = vi.mocked(fetchHooperIndex);
 const mockedSave = vi.mocked(saveHooperIndex);
-const mockedDelete = vi.mocked(deleteHooperIndex);
 
 /** The date the form defaults to when it is rendered without any interaction. */
 const today = () => dayjs().format('YYYY-MM-DD');
@@ -37,9 +35,7 @@ const renderForm = async (values: HooperIndex = emptyHooperIndex()) => {
 beforeEach(() => {
 	mockedFetch.mockReset();
 	mockedSave.mockReset();
-	mockedDelete.mockReset();
 	mockedSave.mockResolvedValue(true);
-	mockedDelete.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -118,30 +114,10 @@ describe('HooperIndexForm', () => {
 		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
 
 		resolveSave(true);
 
 		await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
-	});
-
-	it('disables the delete button while a delete request is in flight', async () => {
-		const user = userEvent.setup();
-		let resolveDelete!: (value: boolean) => void;
-		mockedDelete.mockImplementation(
-			() => new Promise<boolean>((resolve) => (resolveDelete = resolve))
-		);
-
-		await renderForm();
-
-		await user.click(screen.getByRole('button', { name: 'Delete' }));
-
-		expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
-
-		resolveDelete(true);
-
-		await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled());
 	});
 
 	it('saves the loaded values for the current date', async () => {
@@ -153,21 +129,5 @@ describe('HooperIndexForm', () => {
 		await user.click(screen.getByRole('button', { name: 'Save' }));
 
 		await waitFor(() => expect(mockedSave).toHaveBeenCalledWith(today(), { ...values }));
-	});
-
-	it('deletes the index for the current date, reloads and clears the measures', async () => {
-		const user = userEvent.setup();
-
-		mockedFetch
-			.mockResolvedValueOnce({ ...emptyHooperIndex(), fatigue: 7 })
-			.mockResolvedValue(emptyHooperIndex());
-
-		render(HooperIndexForm);
-		await screen.findByLabelText('fatigue');
-
-		await user.click(screen.getByRole('button', { name: 'Delete' }));
-
-		await waitFor(() => expect(mockedDelete).toHaveBeenCalledWith(today()));
-		await waitFor(() => expect(displayedValue('fatigue')).toBe('Not set'));
 	});
 });

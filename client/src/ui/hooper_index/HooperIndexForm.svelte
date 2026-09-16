@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { deleteHooperIndex, fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
+	import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import {
@@ -21,9 +21,6 @@
 	let savePromise: Option<Promise<void>> = $state(none());
 	const save = () =>
 		(savePromise = some(saveHooperIndex(date, { ...values }).then((_) => setLoadPromise())));
-	let deletePromise: Option<Promise<void>> = $state(none());
-	const remove = () =>
-		(deletePromise = some(deleteHooperIndex(date).then((_) => setLoadPromise())));
 	const setMeasure = (measure: HooperMeasure, value: number | null) => {
 		values = { ...values, [measure]: value };
 	};
@@ -31,7 +28,8 @@
 	const clear = () => (values = emptyHooperIndex());
 </script>
 
-<div class="flex w-full flex-col gap-4 rounded-box bg-base-100 p-4 shadow-md">
+<fieldset class="fieldset rounded-box border-base-300 bg-base-100">
+	<legend class="fieldset-legend text-base">Update subjective feedback</legend>
 	<div>
 		<label class="label" for="hooper-date">Date</label>
 		<input id="hooper-date" type="date" class="input w-full input-sm" bind:value={date} />
@@ -87,10 +85,10 @@
 	{:catch}
 		<p class="text-error">Failed to load the values for this date.</p>
 	{/await}
-</div>
+</fieldset>
 
 {#snippet actions()}
-	<div class="flex flex-wrap gap-2">
+	<div class="mt-2 flex flex-wrap gap-2">
 		{#if isSome(savePromise)}
 			{#await savePromise.value}
 				<button class="btn btn-primary btn-sm" disabled
@@ -101,17 +99,6 @@
 			{/await}
 		{:else}
 			<button class="btn btn-primary btn-sm" onclick={save}>Save</button>
-		{/if}
-		{#if isSome(deletePromise)}
-			{#await deletePromise.value}
-				<button class="btn btn-error btn-sm" disabled
-					>Delete <span class="loading loading-sm"></span></button
-				>
-			{:then}
-				<button class="btn btn-error btn-sm" onclick={remove}>Delete</button>
-			{/await}
-		{:else}
-			<button class="btn btn-error btn-sm" onclick={remove}>Delete</button>
 		{/if}
 		<button class="btn btn-ghost btn-sm" onclick={clear}>Clear</button>
 	</div>

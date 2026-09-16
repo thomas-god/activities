@@ -7,7 +7,7 @@
 	import { getTheme, persistTheme } from '$lib/contexts/theme';
 	import { getAuthInfo } from '$lib/contexts/auth';
 	import { isSome } from '$lib/Options';
-	import { Menu } from '@lucide/svelte';
+	import { CirclePlus, Menu } from '@lucide/svelte';
 
 	interface Cta {
 		label: string;
@@ -40,12 +40,13 @@
 		goto(resolve('/login'));
 	};
 
-	// On mobile, cta buttons, the logout button, and the theme toggle collapse into a single menu.
+	// On mobile the logout button, and the theme toggle collapse into a single menu.
 	let mobileMenuItems = $derived([
-		...ctas,
 		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : []),
 		{ label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode', onClick: toggleTheme }
 	]);
+
+	let addItemMenuBtn: HTMLButtonElement;
 </script>
 
 <div class="flex items-center justify-between gap-2">
@@ -69,14 +70,36 @@
 	</div>
 
 	<div class="flex shrink-0 items-center gap-3">
-		<div class="hidden flex-row justify-end gap-2 min-[850px]:flex">
-			{#each ctas as cta, idx (cta.label)}
-				<button
-					class={`btn rounded-lg btn-sm sm:btn-md ${idx === 0 ? 'btn-primary' : 'btn-outline btn-primary'}`}
-					onclick={cta.onClick}>+ {cta.label}</button
-				>
-			{/each}
+		<button
+			bind:this={addItemMenuBtn}
+			class="btn btn-ghost btn-primary btn-sm"
+			popovertarget="add-item-menu"
+			style="anchor-name:--anchor-add-item"
+		>
+			<CirclePlus class="size-5" />
+		</button>
+		<div
+			popover
+			id="add-item-menu"
+			style="position-anchor:--anchor-add-item"
+			class="menu dropdown w-52 rounded-box bg-base-100 shadow-sm"
+		>
+			<ul>
+				{#each ctas as cta (cta.label)}
+					<li>
+						<button
+							onclick={() => {
+								addItemMenuBtn.click();
+								cta.onClick();
+							}}
+						>
+							{cta.label}
+						</button>
+					</li>
+				{/each}
+			</ul>
 		</div>
+
 		{#if showLogout}
 			<button class="btn hidden btn-ghost btn-sm min-[850px]:flex" onclick={handleLogout}
 				>Log out</button
