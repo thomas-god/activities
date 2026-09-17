@@ -14,7 +14,7 @@ use crate::domain::{
             TrainingMetricId, TrainingMetricScope, TrainingMetricSource, TrainingMetricValues,
             TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
             TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
-            WeightAndNutrition,
+            WeightAndNutrition, WeightAndNutritionSource,
         },
     },
     ports::{
@@ -77,6 +77,12 @@ where
                 self.compute_training_metric_values_for_hooper_index(definition, source, date_range)
                     .await
             }
+            TrainingMetricSource::WeightAndNutrition(source) => {
+                self.compute_training_metric_values_for_weight_and_nutrition(
+                    definition, source, date_range,
+                )
+                .await
+            }
         }
     }
 
@@ -122,6 +128,23 @@ where
             .map(|(date, hooper_index)| (date, *hooper_index.value(&source)));
 
         Ok(definition.compute_values_from_hooper_indexes(values))
+    }
+
+    async fn compute_training_metric_values_for_weight_and_nutrition(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: WeightAndNutritionSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let values = self
+            .training_repository
+            .get_weight_and_nutritions(definition.user(), date_range)
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter()
+            .map(|(date, hooper_index)| (date, *hooper_index.value(&source)));
+
+        Ok(definition.compute_values_from_weight_and_nutrition_values(values))
     }
 }
 
@@ -4360,16 +4383,18 @@ mod test_training_service_training_note {
 
 #[cfg(test)]
 mod test_training_service_metric_values {
+    use anyhow::anyhow;
     use chrono::NaiveDate;
 
     use super::*;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
-        Sport,
+        Sport, Unit,
     };
     use crate::domain::models::training::{
-        TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
-        TrainingMetricGroupBy, TrainingMetricSummary, TrainingMetricWindow,
+        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
+        TrainingMetricBin, TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricSummary,
+        TrainingMetricValue, TrainingMetricWindow, WeightAndNutrition, WeightAndNutritionSource,
     };
     use crate::domain::ports::training::GetTrainingMetricValuesError;
     use crate::domain::services::activity::test_utils::MockActivityService;
@@ -4513,6 +4538,215 @@ mod test_training_service_metric_values {
         let values = result.unwrap();
         // With weekly granularity and sum aggregate, we should have one bin with the activity distance
         assert!(!values.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_hooper_index() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let d1 = "2024-01-15".parse::<NaiveDate>().unwrap();
+        let d2 = "2024-01-16".parse::<NaiveDate>().unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_hooper_indexes()
+            .times(1)
+            .withf(move |user, range| user == &expected_user && range == &expected_range)
+            .returning(move |_, _| {
+                Ok(vec![
+                    (
+                        d1,
+                        HooperIndex::new(
+                            Some(SubjectiveScale::try_from(4).unwrap()),
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    ),
+                    (d2, HooperIndex::default()),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // The date with a missing fatigue value is skipped.
+        assert_eq!(values.len(), 1);
+        assert_eq!(
+            values.get(&TrainingMetricBin::new_without_group(d1.to_string())),
+            Some(&TrainingMetricValue::SingleValue(4.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_hooper_index_propagates_repository_error() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_hooper_indexes()
+            .times(1)
+            .returning(|_, _| Err(HooperIndexError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_weight_and_nutrition() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let d1 = "2024-01-15".parse::<NaiveDate>().unwrap();
+        let d2 = "2024-01-16".parse::<NaiveDate>().unwrap();
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .withf(move |user, range| user == &expected_user && range == &expected_range)
+            .returning(move |_, _| {
+                Ok(vec![
+                    (
+                        d1,
+                        WeightAndNutrition::new(
+                            Some(70.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    ),
+                    (d2, WeightAndNutrition::default()),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // The date with a missing weight value is skipped.
+        assert_eq!(values.len(), 1);
+        assert_eq!(values.unit(), Unit::Kilogram);
+        assert_eq!(
+            values.get(&TrainingMetricBin::new_without_group(d1.to_string())),
+            Some(&TrainingMetricValue::SingleValue(70.5))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_weight_and_nutrition_propagates_repository_error()
+     {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
     }
 }
 

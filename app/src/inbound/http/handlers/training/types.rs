@@ -20,7 +20,8 @@ use crate::{
                 TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
                 TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSource,
                 TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
-                TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
+                TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports, WeightAndNutrition,
+                WeightAndNutritionSource,
             },
         },
         ports::training::HooperIndexError,
@@ -405,6 +406,7 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
 pub enum APITrainingMetricSource {
     Activity(ActivityMetric),
     HooperIndex(HooperIndexSource),
+    WeightAndNutrition(WeightAndNutritionSource),
 }
 
 impl Display for APITrainingMetricSource {
@@ -412,6 +414,7 @@ impl Display for APITrainingMetricSource {
         match self {
             Self::Activity(source) => f.write_str(&source.to_string()),
             Self::HooperIndex(source) => f.write_str(&source.to_string()),
+            Self::WeightAndNutrition(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -421,6 +424,9 @@ impl From<&APITrainingMetricSource> for TrainingMetricSource {
         match value {
             APITrainingMetricSource::Activity(source) => Self::Activity(*source),
             APITrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
+            APITrainingMetricSource::WeightAndNutrition(source) => {
+                Self::WeightAndNutrition(*source)
+            }
         }
     }
 }
@@ -430,6 +436,7 @@ impl From<&TrainingMetricSource> for APITrainingMetricSource {
         match value {
             TrainingMetricSource::Activity(source) => Self::Activity(*source),
             TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
+            TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
         }
     }
 }
@@ -511,6 +518,7 @@ pub fn format_source_metric(source: &TrainingMetricSource) -> String {
     match source {
         TrainingMetricSource::Activity(source) => format_activity_source_metric(source.source()),
         TrainingMetricSource::HooperIndex(source) => source.to_string(),
+        TrainingMetricSource::WeightAndNutrition(source) => source.to_string(),
     }
 }
 

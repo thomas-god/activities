@@ -533,6 +533,7 @@ impl TrainingMetricDefinitionPatch {
 pub enum TrainingMetricSource {
     Activity(ActivityMetric),
     HooperIndex(HooperIndexSource),
+    WeightAndNutrition(WeightAndNutritionSource),
 }
 
 impl TrainingMetricSource {
@@ -540,6 +541,7 @@ impl TrainingMetricSource {
         match self {
             Self::Activity(source) => source.unit(),
             Self::HooperIndex(source) => source.unit(),
+            Self::WeightAndNutrition(source) => source.unit(),
         }
     }
 }
@@ -549,6 +551,7 @@ impl Display for TrainingMetricSource {
         match self {
             Self::Activity(source) => f.write_str(&source.to_string()),
             Self::HooperIndex(source) => f.write_str(&source.to_string()),
+            Self::WeightAndNutrition(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -591,7 +594,8 @@ impl TrainingMetricDefinition {
     pub fn unit(&self) -> Unit {
         match self.source() {
             TrainingMetricSource::Activity(metric) => metric.source().unit(),
-            TrainingMetricSource::HooperIndex(_) => Unit::Null,
+            TrainingMetricSource::HooperIndex(source) => source.unit(),
+            TrainingMetricSource::WeightAndNutrition(source) => source.unit(),
         }
     }
 
@@ -636,6 +640,32 @@ impl TrainingMetricDefinition {
                     None => (
                         TrainingMetricBin::new_without_group(date.to_string()),
                         IndividualValue::new(value.value() as f64),
+                    ),
+                })
+            })
+            .into_group_map();
+
+        self.compute_training_metric_values(values_by_bin)
+    }
+
+    /// Compute training metric values from a list of values from `WeightAndNutrition`.
+    pub fn compute_values_from_weight_and_nutrition_values(
+        &self,
+        values: impl Iterator<Item = (chrono::NaiveDate, Option<f32>)>,
+    ) -> TrainingMetricValues {
+        let values_by_bin = values
+            .filter_map(|(date, value)| {
+                let Some(value) = value else { return None };
+
+                // Weight and nutrition values have no intrinsic group
+                Some(match &self.window {
+                    Some(window) => (
+                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
+                        IndividualValue::new(value as f64),
+                    ),
+                    None => (
+                        TrainingMetricBin::new_without_group(date.to_string()),
+                        IndividualValue::new(value as f64),
                     ),
                 })
             })
@@ -4012,6 +4042,226 @@ mod test_compute_values_from_hooper_indexes {
         assert_eq!(
             metrics.summary_values().as_hash_map().get("average"),
             Some(&3.0)
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_compute_values_from_weight_and_nutrition_values {
+    use super::*;
+
+    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    fn definition(window: Option<TrainingMetricWindow>) -> TrainingMetricDefinition {
+        TrainingMetricDefinition::new(
+            UserId::test_default(),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            window,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::empty(),
+            None,
+        )
+    }
+
+    fn bin(granule: &str) -> TrainingMetricBin {
+        TrainingMetricBin::new_without_group(granule.to_string())
+    }
+
+    #[test]
+    fn test_empty_input_returns_empty_values() {
+        let metrics =
+            definition(None).compute_values_from_weight_and_nutrition_values(std::iter::empty());
+
+        assert!(metrics.is_empty());
+        assert_eq!(metrics.unit(), Unit::Kilogram);
+    }
+
+    #[test]
+    fn test_without_window_uses_date_as_bin_and_single_value() {
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
+            vec![(d1, Some(70.5_f32)), (d2, Some(71.5_f32))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics.unit(), Unit::Kilogram);
+        assert_eq!(
+            metrics.get(&bin(&d1.to_string())),
+            Some(&TrainingMetricValue::SingleValue(70.5))
+        );
+        assert_eq!(
+            metrics.get(&bin(&d2.to_string())),
+            Some(&TrainingMetricValue::SingleValue(71.5))
+        );
+    }
+
+    #[test]
+    fn test_without_window_skips_none_values() {
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
+            vec![(d1, None), (d2, Some(80.0_f32))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics.get(&bin(&d1.to_string())).is_none());
+        assert_eq!(
+            metrics.get(&bin(&d2.to_string())),
+            Some(&TrainingMetricValue::SingleValue(80.0))
+        );
+    }
+
+    #[test]
+    fn test_without_window_keeps_first_value_for_duplicate_dates() {
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
+            vec![(d, Some(60.0_f32)), (d, Some(90.0_f32))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&bin(&d.to_string())),
+            Some(&TrainingMetricValue::SingleValue(60.0))
+        );
+    }
+
+    #[test]
+    fn test_with_daily_window_aggregates_values_in_same_day() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricGroupBy::none(),
+        );
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
+            vec![(d, Some(2.0_f32)), (d, Some(3.0_f32))].into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&bin(&d.to_string())),
+            Some(&TrainingMetricValue::Sum(5.0))
+        );
+    }
+
+    #[test]
+    fn test_with_weekly_window_aggregates_values_in_same_week() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            TrainingMetricGroupBy::none(),
+        );
+        // 2025-10-01 (Wed) and 2025-10-03 (Fri) share the week starting 2025-09-29.
+        let d1 = date(2025, 10, 1);
+        let d2 = date(2025, 10, 3);
+        // 2025-10-07 falls in the following week.
+        let d3 = date(2025, 10, 7);
+
+        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
+            vec![
+                (d1, Some(3.0_f32)),
+                (d2, Some(4.0_f32)),
+                (d3, Some(5.0_f32)),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(
+            metrics.get(&bin("2025-09-29")),
+            Some(&TrainingMetricValue::Sum(7.0))
+        );
+        assert_eq!(
+            metrics.get(&bin("2025-10-06")),
+            Some(&TrainingMetricValue::Sum(5.0))
+        );
+    }
+
+    #[test]
+    fn test_with_monthly_window_uses_max_aggregate() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Max,
+            TrainingMetricGroupBy::none(),
+        );
+        let d1 = date(2025, 9, 14);
+        let d2 = date(2025, 9, 20);
+        let d3 = date(2025, 10, 1);
+
+        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
+            vec![
+                (d1, Some(60.0_f32)),
+                (d2, Some(62.0_f32)),
+                (d3, Some(58.0_f32)),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(
+            metrics.get(&bin("2025-09-01")),
+            Some(&TrainingMetricValue::Max(62.0))
+        );
+        assert_eq!(
+            metrics.get(&bin("2025-10-01")),
+            Some(&TrainingMetricValue::Max(58.0))
+        );
+    }
+
+    #[test]
+    fn test_weight_and_nutrition_values_are_never_grouped() {
+        let window = TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Max,
+            Some(TrainingMetricGroupBy::Sport),
+        );
+        let d = date(2025, 9, 3);
+
+        let metrics = definition(Some(window))
+            .compute_values_from_weight_and_nutrition_values(vec![(d, Some(70.0_f32))].into_iter());
+
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(
+            metrics.get(&TrainingMetricBin::new(d.to_string(), None)),
+            Some(&TrainingMetricValue::Max(70.0))
+        );
+        assert!(
+            metrics
+                .get(&TrainingMetricBin::new(
+                    d.to_string(),
+                    Some("Cycling".to_string())
+                ))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_summary_average_is_computed_from_weight_and_nutrition_values() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            None,
+            TrainingMetricActivityFilters::empty(),
+            TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
+            None,
+        );
+        let d1 = date(2025, 9, 3);
+        let d2 = date(2025, 9, 4);
+
+        let metrics = definition.compute_values_from_weight_and_nutrition_values(
+            vec![(d1, Some(60.0_f32)), (d2, Some(70.0_f32))].into_iter(),
+        );
+
+        assert_eq!(
+            metrics.summary_values().as_hash_map().get("average"),
+            Some(&65.0)
         );
     }
 }
