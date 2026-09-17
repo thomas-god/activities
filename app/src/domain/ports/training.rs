@@ -337,6 +337,28 @@ impl SaveWeightAndNutritionRequest {
 }
 
 #[derive(Debug, Clone, Constructor)]
+pub struct SaveBulkWeightAndNutritionRequest {
+    user: UserId,
+    values: Vec<(chrono::NaiveDate, WeightAndNutritionPatch)>,
+    range: DateRange,
+}
+
+impl SaveBulkWeightAndNutritionRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn values(&self) -> &[(chrono::NaiveDate, WeightAndNutritionPatch)] {
+        &self.values
+    }
+    pub fn into_values(self) -> impl Iterator<Item = (chrono::NaiveDate, WeightAndNutritionPatch)> {
+        self.values.into_iter()
+    }
+    pub fn range(&self) -> &DateRange {
+        &self.range
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
 pub struct DeleteWeightAndNutritionRequest {
     user: UserId,
     date: chrono::NaiveDate,
@@ -528,6 +550,11 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
     fn save_weight_and_nutrition(
         &self,
         req: SaveWeightAndNutritionRequest,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn save_bulk_weight_and_nutrition(
+        &self,
+        req: SaveBulkWeightAndNutritionRequest,
     ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
 
     fn get_weight_and_nutrition(
@@ -1032,6 +1059,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         date: chrono::NaiveDate,
         value: &WeightAndNutrition,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn save_bulk_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        values: Vec<(chrono::NaiveDate, WeightAndNutrition)>,
     ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
 
     fn get_weight_and_nutrition(

@@ -1094,7 +1094,7 @@ where
                 carbs=excluded.carbs,
                 protein=excluded.protein,
                 water=excluded.water,
-                alcohol=excluded.alcohol",
+                alcohol=excluded.alcohol;",
         )
         .bind(user)
         .bind(date)
@@ -1112,6 +1112,64 @@ where
         .await
         .map(|_| ())
         .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
+    }
+
+    async fn save_bulk_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        values: Vec<(chrono::NaiveDate, WeightAndNutrition)>,
+    ) -> Result<(), WeightAndNutritionError> {
+        // see https://www.sqlite.org/limits.html#max_variable_number
+        // + we have 12 variables to bind per row
+        let batch_size = 32766 / 12;
+        let mut iter = values.into_iter();
+
+        let mut batch = iter.by_ref().take(batch_size).peekable();
+        while batch.peek().is_some() {
+            let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+                "INSERT INTO t_weight_and_nutrition
+                    (user, date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol) "
+            );
+            query_builder.push_values(batch, |mut b, (date, value)| {
+                b.push_bind(&user)
+                    .push_bind(date)
+                    .push_bind(value.weight())
+                    .push_bind(value.fat())
+                    .push_bind(value.muscle())
+                    .push_bind(value.bmi())
+                    .push_bind(value.calories())
+                    .push_bind(value.lipid())
+                    .push_bind(value.carbs())
+                    .push_bind(value.protein())
+                    .push_bind(value.water())
+                    .push_bind(value.alcohol());
+            });
+
+            query_builder.push(
+                "ON CONFLICT (user, date)
+                DO UPDATE SET
+                    weight=excluded.weight,
+                    fat=excluded.fat,
+                    muscle=excluded.muscle,
+                    bmi=excluded.bmi,
+                    calories=excluded.calories,
+                    lipid=excluded.lipid,
+                    carbs=excluded.carbs,
+                    protein=excluded.protein,
+                    water=excluded.water,
+                    alcohol=excluded.alcohol;",
+            );
+
+            let query = query_builder.build();
+
+            if let Err(err) = query.execute(&self.writer).await {
+                return Err(WeightAndNutritionError::Unknown(anyhow!(err)));
+            }
+
+            batch = iter.by_ref().take(batch_size).peekable();
+        }
+
+        Ok(())
     }
 
     async fn get_weight_and_nutrition(
@@ -6089,6 +6147,273 @@ mod test_sqlite_training_repository {
                 .expect("Get should succeed")
                 .expect("Other user row should be kept");
             assert_eq!(kept.weight(), Some(80.0));
+        }
+
+        async fn count_all_rows(
+            repository: &SqliteTrainingRepository<Clock>,
+            user: &UserId,
+        ) -> i64 {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM t_weight_and_nutrition WHERE user=?1",
+            )
+            .bind(user)
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap()
+        }
+
+        fn value_with_weight(weight: f32) -> WeightAndNutrition {
+            WeightAndNutrition::new(
+                Some(weight),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_empty_is_noop() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+
+            repository
+                .save_bulk_weight_and_nutrition(&user, Vec::new())
+                .await
+                .expect("Bulk save should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, 0);
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_round_trip() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+
+            let day_1 = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+            let day_2 = NaiveDate::from_ymd_opt(2026, 1, 2).unwrap();
+            let day_3 = NaiveDate::from_ymd_opt(2026, 1, 3).unwrap();
+
+            repository
+                .save_bulk_weight_and_nutrition(
+                    &user,
+                    vec![
+                        (day_1, value_with_weight(70.0)),
+                        (day_2, sample()),
+                        (day_3, WeightAndNutrition::default()),
+                    ],
+                )
+                .await
+                .expect("Bulk save should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, 3);
+
+            let first = repository
+                .get_weight_and_nutrition(&user, day_1)
+                .await
+                .expect("Get should succeed")
+                .expect("First row should exist");
+            assert_eq!(first.weight(), Some(70.0));
+            assert_eq!(first.fat(), None);
+
+            let second = repository
+                .get_weight_and_nutrition(&user, day_2)
+                .await
+                .expect("Get should succeed")
+                .expect("Second row should exist");
+            assert_eq!(second.weight(), Some(70.0));
+            assert_eq!(second.fat(), Some(15.0));
+            assert_eq!(second.muscle(), Some(30.0));
+            assert_eq!(second.bmi(), Some(22.0));
+            assert_eq!(second.calories(), Some(2000.0));
+            assert_eq!(second.lipid(), Some(50.0));
+            assert_eq!(second.carbs(), Some(250.0));
+            assert_eq!(second.protein(), Some(150.0));
+            assert_eq!(second.water(), Some(2.5));
+            assert_eq!(second.alcohol(), Some(0.0));
+
+            let third = repository
+                .get_weight_and_nutrition(&user, day_3)
+                .await
+                .expect("Get should succeed")
+                .expect("Third row should exist");
+            assert_eq!(third.weight(), None);
+            assert_eq!(third.calories(), None);
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_does_not_affect_other_users() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+
+            repository
+                .save_bulk_weight_and_nutrition(&user, vec![(date, sample())])
+                .await
+                .expect("Bulk save should succeed");
+
+            let other = repository
+                .get_weight_and_nutrition(&other_user, date)
+                .await
+                .expect("Get should succeed");
+            assert!(other.is_none());
+            assert_eq!(count_all_rows(&repository, &other_user).await, 0);
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_persists_all_batches() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let base = test_date();
+
+            // The implementation caps each statement at 32766 / 12 = 2730 bound
+            // values, so 2735 rows forces the loop to execute twice.
+            let total = 2735u64;
+            let values = (0..total)
+                .map(|i| (base.add(Days::new(i)), value_with_weight(i as f32)))
+                .collect::<Vec<_>>();
+
+            repository
+                .save_bulk_weight_and_nutrition(&user, values)
+                .await
+                .expect("Bulk save should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, total as i64);
+
+            let stored = repository
+                .get_weight_and_nutritions(&user, &DateRange::new(base, base.add(Days::new(total))))
+                .await
+                .expect("Get should succeed");
+            assert_eq!(stored.len(), total as usize);
+            assert_eq!(stored.first().unwrap().1.weight(), Some(0.0));
+            assert_eq!(stored.last().unwrap().1.weight(), Some((total - 1) as f32));
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_upserts_existing_rows() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let day_1 = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+            let day_2 = NaiveDate::from_ymd_opt(2026, 1, 2).unwrap();
+
+            repository
+                .save_weight_and_nutrition(&user, day_1, &sample())
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(&user, day_2, &sample())
+                .await
+                .expect("Save should succeed");
+
+            let updated = WeightAndNutrition::new(
+                Some(65.0),
+                Some(12.0),
+                Some(28.0),
+                Some(21.0),
+                Some(1800.0),
+                Some(40.0),
+                Some(200.0),
+                Some(140.0),
+                Some(3.0),
+                Some(5.0),
+            );
+
+            repository
+                .save_bulk_weight_and_nutrition(
+                    &user,
+                    vec![(day_1, updated.clone()), (day_2, updated.clone())],
+                )
+                .await
+                .expect("Bulk save should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, 2);
+
+            for day in [day_1, day_2] {
+                let saved = repository
+                    .get_weight_and_nutrition(&user, day)
+                    .await
+                    .expect("Get should succeed")
+                    .expect("Row should exist");
+                assert_eq!(saved.weight(), Some(65.0));
+                assert_eq!(saved.fat(), Some(12.0));
+                assert_eq!(saved.muscle(), Some(28.0));
+                assert_eq!(saved.bmi(), Some(21.0));
+                assert_eq!(saved.calories(), Some(1800.0));
+                assert_eq!(saved.lipid(), Some(40.0));
+                assert_eq!(saved.carbs(), Some(200.0));
+                assert_eq!(saved.protein(), Some(140.0));
+                assert_eq!(saved.water(), Some(3.0));
+                assert_eq!(saved.alcohol(), Some(5.0));
+            }
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_duplicate_dates_last_value_wins() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_bulk_weight_and_nutrition(
+                    &user,
+                    vec![
+                        (date, value_with_weight(70.0)),
+                        (date, value_with_weight(80.0)),
+                    ],
+                )
+                .await
+                .expect("Bulk save should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, 1);
+
+            let saved = repository
+                .get_weight_and_nutrition(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Row should exist");
+            assert_eq!(saved.weight(), Some(80.0));
+        }
+
+        #[tokio::test]
+        async fn test_save_bulk_weight_and_nutrition_upserts_across_batches() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let base = test_date();
+
+            // The implementation caps each statement at 32766 / 12 = 2730 bound
+            // values, so 2735 rows forces the loop to execute twice.
+            let total = 2735u64;
+            let seed = (0..total)
+                .map(|i| (base.add(Days::new(i)), value_with_weight(0.0)))
+                .collect::<Vec<_>>();
+            repository
+                .save_bulk_weight_and_nutrition(&user, seed)
+                .await
+                .expect("Bulk save should succeed");
+
+            let updates = (0..total)
+                .map(|i| (base.add(Days::new(i)), value_with_weight((i + 1) as f32)))
+                .collect::<Vec<_>>();
+            repository
+                .save_bulk_weight_and_nutrition(&user, updates)
+                .await
+                .expect("Bulk upsert should succeed");
+
+            assert_eq!(count_all_rows(&repository, &user).await, total as i64);
+
+            let stored = repository
+                .get_weight_and_nutritions(&user, &DateRange::new(base, base.add(Days::new(total))))
+                .await
+                .expect("Get should succeed");
+            assert_eq!(stored.len(), total as usize);
+            assert_eq!(stored.first().unwrap().1.weight(), Some(1.0));
+            assert_eq!(stored.last().unwrap().1.weight(), Some(total as f32));
         }
     }
 }

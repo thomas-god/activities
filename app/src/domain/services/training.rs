@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::anyhow;
 use chrono::{Days, NaiveDate};
@@ -29,9 +29,9 @@ use crate::domain::{
             DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
             DeleteWeightAndNutritionRequest, GetTrainingMetricValuesError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
-            HooperIndexError, ITrainingService, SaveHooperIndexRequest,
-            SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError, TrainingRepository,
-            UpdateTrainingMetricError, UpdateTrainingMetricNameError,
+            HooperIndexError, ITrainingService, SaveBulkWeightAndNutritionRequest,
+            SaveHooperIndexRequest, SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError,
+            TrainingRepository, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
             UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
             UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
             UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
@@ -758,6 +758,30 @@ where
             .await
     }
 
+    async fn save_bulk_weight_and_nutrition(
+        &self,
+        req: SaveBulkWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        let user = req.user().clone();
+        let existing_values: HashMap<chrono::NaiveDate, WeightAndNutrition> = HashMap::from_iter(
+            self.training_repository
+                .get_weight_and_nutritions(req.user(), req.range())
+                .await?,
+        );
+
+        let values = req
+            .into_values()
+            .map(|(date, patch)| {
+                let existing_value = existing_values.get(&date).cloned().unwrap_or_default();
+                (date, existing_value.patch(patch))
+            })
+            .collect();
+
+        self.training_repository
+            .save_bulk_weight_and_nutrition(&user, values)
+            .await
+    }
+
     #[tracing::instrument(skip_all, err)]
     async fn get_weight_and_nutrition(
         &self,
@@ -858,9 +882,10 @@ pub mod test_utils {
             CreateTrainingPeriodRequest, DeleteHooperIndexRequest, DeleteTrainingNoteError,
             DeleteTrainingPeriodError, DeleteTrainingPeriodRequest, GetTrainingMetricError,
             GetTrainingMetricValuesRequest, GetTrainingMetricsDefinitionsError,
-            GetTrainingNoteError, HooperIndexError, SaveHooperIndexRequest,
-            SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
-            UpdateTrainingMetricError, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
+            GetTrainingNoteError, HooperIndexError, SaveBulkWeightAndNutritionRequest,
+            SaveHooperIndexRequest, SaveTrainingMetricError, SaveTrainingNoteError,
+            SaveTrainingPeriodError, UpdateTrainingMetricError, UpdateTrainingMetricRequest,
+            UpdateTrainingNoteError,
         },
     };
 
@@ -1038,6 +1063,11 @@ pub mod test_utils {
             async fn save_weight_and_nutrition(
                 &self,
                 req: SaveWeightAndNutritionRequest,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn save_bulk_weight_and_nutrition(
+                &self,
+                req: SaveBulkWeightAndNutritionRequest
             ) -> Result<(), WeightAndNutritionError>;
 
             async fn get_weight_and_nutrition(
@@ -1242,6 +1272,12 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
                 value: &WeightAndNutrition,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn save_bulk_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                values: Vec<(chrono::NaiveDate, WeightAndNutrition)>
             ) -> Result<(), WeightAndNutritionError>;
 
             async fn get_weight_and_nutrition(
@@ -5810,6 +5846,158 @@ mod test_training_service_weight_and_nutrition {
             WeightAndNutritionPatch::default(),
         );
         let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_patches_existing_and_defaults_missing() {
+        let user = UserId::from("user1");
+        let existing_date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        let new_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+        let range = DateRange::new(existing_date, NaiveDate::from_ymd_opt(2026, 1, 20).unwrap());
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        let expected_range = range.clone();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .withf(move |u, r| u == &expected_user && r == &expected_range)
+            .returning(move |_, _| Ok(vec![(existing_date, sample())]));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, values| {
+                u == &expected_user
+                    && values.len() == 2
+                    // Existing value is patched: weight overridden, muscle cleared,
+                    // all other fields kept from the stored value.
+                    && values[0].0 == existing_date
+                    && values[0].1.weight() == Some(72.0)
+                    && values[0].1.fat() == Some(15.0)
+                    && values[0].1.muscle() == None
+                    && values[0].1.calories() == Some(2000.0)
+                    && values[0].1.water() == Some(2.5)
+                    // No stored value for this date, so it starts from the default.
+                    && values[1].0 == new_date
+                    && values[1].1.weight() == Some(68.0)
+                    && values[1].1.fat() == None
+                    && values[1].1.muscle() == None
+                    && values[1].1.calories() == None
+            })
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patches = vec![
+            (
+                existing_date,
+                WeightAndNutritionPatch::new(
+                    Some(Some(72.0)),
+                    None,
+                    Some(None),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                new_date,
+                WeightAndNutritionPatch::new(
+                    Some(Some(68.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ];
+
+        let req = SaveBulkWeightAndNutritionRequest::new(user, patches, range);
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_empty_values_still_delegates() {
+        let user = UserId::from("user1");
+        let range = DateRange::new(test_date(), test_date());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Ok(vec![]));
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .withf(|_, values| values.is_empty())
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(user, vec![], range);
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(0);
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            vec![(test_date(), WeightAndNutritionPatch::default())],
+            DateRange::new(test_date(), test_date()),
+        );
+        let result = service.save_bulk_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_save_bulk_weight_and_nutrition_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutritions()
+            .times(1)
+            .returning(|_, _| Ok(vec![]));
+        repository
+            .expect_save_bulk_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = SaveBulkWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            vec![(test_date(), WeightAndNutritionPatch::default())],
+            DateRange::new(test_date(), test_date()),
+        );
+        let result = service.save_bulk_weight_and_nutrition(req).await;
 
         assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
     }
