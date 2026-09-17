@@ -29,12 +29,13 @@ use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
     create_training_metric, create_training_note, create_training_period, delete_activity,
     delete_hooper_index, delete_preference, delete_training_metric, delete_training_note,
-    delete_training_period, get_active_training_periods, get_activity, get_all_preferences,
-    get_all_raw_activities, get_hooper_index, get_preference, get_raw_activity,
-    get_training_metrics, get_training_metrics_ordering, get_training_note, get_training_notes,
-    get_training_period, get_training_period_metrics, get_training_period_notes,
-    get_training_periods, list_activities, patch_activity, save_hooper_index, search,
-    set_preference, set_training_metrics_ordering, update_training_metric, update_training_note,
+    delete_training_period, delete_weight_and_nutrition, get_active_training_periods, get_activity,
+    get_all_preferences, get_all_raw_activities, get_hooper_index, get_preference,
+    get_raw_activity, get_training_metrics, get_training_metrics_ordering, get_training_note,
+    get_training_notes, get_training_period, get_training_period_metrics,
+    get_training_period_notes, get_training_periods, get_weight_and_nutrition, list_activities,
+    patch_activity, save_hooper_index, save_weight_and_nutrition, search, set_preference,
+    set_training_metrics_ordering, update_training_metric, update_training_note,
     update_training_period, upload_activities,
 };
 
@@ -298,6 +299,12 @@ where
             get(get_hooper_index::<AS, PF, TS, PS>)
                 .patch(save_hooper_index::<AS, PF, TS, PS>)
                 .delete(delete_hooper_index::<AS, PF, TS, PS>),
+        )
+        .route(
+            "/training/weight-and-nutrition/{date}",
+            get(get_weight_and_nutrition::<AS, PF, TS, PS>)
+                .patch(save_weight_and_nutrition::<AS, PF, TS, PS>)
+                .delete(delete_weight_and_nutrition::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period",
@@ -674,6 +681,174 @@ mod tests {
         let server = TestServer::new(build_test_app(training_service));
 
         let response = server.get("/api/training/hooper-index/not-a-date").await;
+
+        response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn save_weight_and_nutrition_route_calls_service() {
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .withf(|req| {
+                req.user() == &UserId::default()
+                    && req.date() == &test_date()
+                    && req.patch().weight() == &Some(Some(70.5))
+                    && req.patch().fat() == &None
+                    && req.patch().muscle() == &Some(None)
+            })
+            .returning(|_| Ok(()));
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .patch("/api/training/weight-and-nutrition/2026-01-15")
+            .json(&serde_json::json!({ "weight": 70.5, "muscle": null }))
+            .await;
+
+        response.assert_status(StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn save_weight_and_nutrition_route_rejects_invalid_date() {
+        let mut training_service = MockTrainingService::new();
+        training_service.expect_save_weight_and_nutrition().times(0);
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .patch("/api/training/weight-and-nutrition/not-a-date")
+            .json(&serde_json::json!({ "weight": 70.5 }))
+            .await;
+
+        response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn delete_weight_and_nutrition_route_calls_service() {
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_delete_weight_and_nutrition()
+            .times(1)
+            .withf(|req| req.user() == &UserId::default() && req.date() == &test_date())
+            .returning(|_| Ok(()));
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .delete("/api/training/weight-and-nutrition/2026-01-15")
+            .await;
+
+        response.assert_status(StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn delete_weight_and_nutrition_route_rejects_invalid_date() {
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_delete_weight_and_nutrition()
+            .times(0);
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .delete("/api/training/weight-and-nutrition/not-a-date")
+            .await;
+
+        response.assert_status(StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn get_weight_and_nutrition_route_returns_values() {
+        use crate::domain::models::training::WeightAndNutrition;
+
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .withf(|user, date| user == &UserId::default() && date == &test_date())
+            .returning(|_, _| {
+                Ok(Some(WeightAndNutrition::new(
+                    Some(70.5),
+                    None,
+                    None,
+                    None,
+                    Some(2000.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(0.0),
+                )))
+            });
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .get("/api/training/weight-and-nutrition/2026-01-15")
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(
+            response.json::<serde_json::Value>(),
+            serde_json::json!({
+                "weight": 70.5,
+                "fat": null,
+                "muscle": null,
+                "bmi": null,
+                "calories": 2000.0,
+                "lipid": null,
+                "carbs": null,
+                "protein": null,
+                "water": null,
+                "alcohol": 0.0
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn get_weight_and_nutrition_route_returns_empty_when_missing() {
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .get("/api/training/weight-and-nutrition/2026-01-15")
+            .await;
+
+        response.assert_status(StatusCode::OK);
+        assert_eq!(
+            response.json::<serde_json::Value>(),
+            serde_json::json!({
+                "weight": null,
+                "fat": null,
+                "muscle": null,
+                "bmi": null,
+                "calories": null,
+                "lipid": null,
+                "carbs": null,
+                "protein": null,
+                "water": null,
+                "alcohol": null
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn get_weight_and_nutrition_route_rejects_invalid_date() {
+        let mut training_service = MockTrainingService::new();
+        training_service.expect_get_weight_and_nutrition().times(0);
+
+        let server = TestServer::new(build_test_app(training_service));
+
+        let response = server
+            .get("/api/training/weight-and-nutrition/not-a-date")
+            .await;
 
         response.assert_status(StatusCode::BAD_REQUEST);
     }

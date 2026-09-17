@@ -55,7 +55,7 @@ const TrainingMetricSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
 	source: z.object({
-		type: z.enum(['activity', 'hooperIndex'] as const),
+		type: z.enum(['activity', 'hooperIndex', 'weightAndNutrition'] as const),
 		metric: z.string()
 	}),
 	unit: z.string(),
@@ -97,7 +97,7 @@ const TrainingMetricTemplatesSchema = z.array(
 	z.object({
 		display_name: z.string(),
 		source: z.object({
-			type: z.enum(['activity', 'hooperIndex'] as const),
+			type: z.enum(['activity', 'hooperIndex', 'weightAndNutrition'] as const),
 			metric: z.string()
 		}),
 		aggregate: z.enum(trainingMetricAggregateFunctions),
@@ -135,6 +135,43 @@ export const UpdateHooperIndexSchema = z.object({
 	mood: SubjectiveScaleSchema.nullable().optional()
 });
 
+/** Weight, body composition, nutrition and hydration measures for a given date. */
+export const WeightAndNutritionSchema = z.object({
+	weight: z.number().nullable(),
+	fat: z.number().nullable(),
+	muscle: z.number().nullable(),
+	bmi: z.number().nullable(),
+	calories: z.number().nullable(),
+	lipid: z.number().nullable(),
+	carbs: z.number().nullable(),
+	protein: z.number().nullable(),
+	water: z.number().nullable(),
+	alcohol: z.number().nullable()
+});
+
+export const CreateWeightAndNutritionSchema = WeightAndNutritionSchema.extend({
+	date: z.string()
+});
+
+/**
+ * Patch body for weight and nutrition. Mirrors the API patch semantics:
+ * - an omitted field leaves the current value untouched,
+ * - `null` clears the value,
+ * - a number sets it.
+ */
+export const UpdateWeightAndNutritionSchema = z.object({
+	weight: z.number().nullable().optional(),
+	fat: z.number().nullable().optional(),
+	muscle: z.number().nullable().optional(),
+	bmi: z.number().nullable().optional(),
+	calories: z.number().nullable().optional(),
+	lipid: z.number().nullable().optional(),
+	carbs: z.number().nullable().optional(),
+	protein: z.number().nullable().optional(),
+	water: z.number().nullable().optional(),
+	alcohol: z.number().nullable().optional()
+});
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -150,6 +187,9 @@ export type TrainingMetricTemplate = z.infer<typeof TrainingMetricTemplatesSchem
 export type HooperIndex = z.infer<typeof HooperIndexSchema>;
 export type CreateHooperIndexBody = z.infer<typeof CreateHooperIndexSchema>;
 export type UpdateHooperIndexPatch = z.infer<typeof UpdateHooperIndexSchema>;
+export type WeightAndNutrition = z.infer<typeof WeightAndNutritionSchema>;
+export type CreateWeightAndNutritionBody = z.infer<typeof CreateWeightAndNutritionSchema>;
+export type UpdateWeightAndNutritionPatch = z.infer<typeof UpdateWeightAndNutritionSchema>;
 
 // =============================================================================
 // API Functions
@@ -550,7 +590,7 @@ export const fetchTrainingMetricTemplates = async () => {
 
 export interface TrainingMetricBasePayload {
 	source: {
-		type: 'activity' | 'hooperIndex';
+		type: 'activity' | 'hooperIndex' | 'weightAndNutrition';
 		metric: string;
 	};
 	window?: {
@@ -723,6 +763,101 @@ export async function deleteHooperIndex(date: Date | string): Promise<boolean> {
 	const formattedDate = dayjs(date).format('YYYY-MM-DD');
 
 	const res = await fetch(`${PUBLIC_APP_URL}/api/training/hooper-index/${formattedDate}`, {
+		method: 'DELETE',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return false;
+	}
+
+	return res.status === 204;
+}
+
+// =============================================================================
+// Weight and nutrition
+// =============================================================================
+
+/**
+ * Fetch the weight and nutrition values for a given date.
+ *
+ * A date without stored values resolves to an entry with every measure unset, so callers can
+ * always rely on the same response shape.
+ * @param date - The date the values apply to
+ * @returns The weight and nutrition values for that date
+ */
+export async function fetchWeightAndNutrition(date: Date | string): Promise<WeightAndNutrition> {
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/weight-and-nutrition/${formattedDate}`, {
+		method: 'GET',
+		mode: 'cors',
+		credentials: 'include'
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return {
+			weight: null,
+			fat: null,
+			muscle: null,
+			bmi: null,
+			calories: null,
+			lipid: null,
+			carbs: null,
+			protein: null,
+			water: null,
+			alcohol: null
+		};
+	}
+
+	if (res.status !== 200) {
+		throw new Error(`Failed to fetch weight and nutrition: ${res.status}`);
+	}
+
+	return WeightAndNutritionSchema.parse(await res.json());
+}
+
+/**
+ * Save the weight and nutrition values for a given date.
+ * @param date - The date the values apply to
+ * @param patch - The values to save: omitted fields are left untouched, `null` clears them
+ * @returns true if the values were updated, false otherwise
+ */
+export async function saveWeightAndNutrition(
+	date: Date | string,
+	patch: UpdateWeightAndNutritionPatch
+): Promise<boolean> {
+	const body = UpdateWeightAndNutritionSchema.parse(patch);
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/weight-and-nutrition/${formattedDate}`, {
+		method: 'PATCH',
+		mode: 'cors',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
+
+	if (res.status === 401) {
+		goto(resolve('/login'));
+		return false;
+	}
+
+	return res.status === 204;
+}
+
+/**
+ * Delete the weight and nutrition values for a given date.
+ * @param date - The date the values apply to
+ * @returns true if the values were deleted, false otherwise
+ */
+export async function deleteWeightAndNutrition(date: Date | string): Promise<boolean> {
+	const formattedDate = dayjs(date).format('YYYY-MM-DD');
+
+	const res = await fetch(`${PUBLIC_APP_URL}/api/training/weight-and-nutrition/${formattedDate}`, {
 		method: 'DELETE',
 		mode: 'cors',
 		credentials: 'include'

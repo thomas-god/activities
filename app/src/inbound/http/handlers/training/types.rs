@@ -21,10 +21,10 @@ use crate::{
                 TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSource,
                 TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
                 TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports, WeightAndNutrition,
-                WeightAndNutritionSource,
+                WeightAndNutritionPatch, WeightAndNutritionSource,
             },
         },
-        ports::training::HooperIndexError,
+        ports::training::{HooperIndexError, WeightAndNutritionError},
     },
     inbound::http::{handlers::training::utils::GranuleValues, shared::PatchField},
 };
@@ -617,6 +617,115 @@ impl From<HooperIndexError> for StatusCode {
     }
 }
 
+/// Weight and nutrition values as received from the API. Every measure is optional.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct APIWeightAndNutrition {
+    pub weight: Option<f32>,
+    pub fat: Option<f32>,
+    pub muscle: Option<f32>,
+    pub bmi: Option<f32>,
+    pub calories: Option<f32>,
+    pub lipid: Option<f32>,
+    pub carbs: Option<f32>,
+    pub protein: Option<f32>,
+    pub water: Option<f32>,
+    pub alcohol: Option<f32>,
+}
+
+impl From<&WeightAndNutrition> for APIWeightAndNutrition {
+    fn from(value: &WeightAndNutrition) -> Self {
+        Self {
+            weight: value.weight(),
+            fat: value.fat(),
+            muscle: value.muscle(),
+            bmi: value.bmi(),
+            calories: value.calories(),
+            lipid: value.lipid(),
+            carbs: value.carbs(),
+            protein: value.protein(),
+            water: value.water(),
+            alcohol: value.alcohol(),
+        }
+    }
+}
+
+impl From<APIWeightAndNutrition> for WeightAndNutrition {
+    fn from(value: APIWeightAndNutrition) -> Self {
+        WeightAndNutrition::new(
+            value.weight,
+            value.fat,
+            value.muscle,
+            value.bmi,
+            value.calories,
+            value.lipid,
+            value.carbs,
+            value.protein,
+            value.water,
+            value.alcohol,
+        )
+    }
+}
+
+/// Patch of weight and nutrition values. Mirrors the domain `WeightAndNutritionPatch` (double
+/// `Option` convention):
+/// - a field **absent** from the body leaves the current value untouched,
+/// - a field set to **`null`** clears/removes the current value,
+/// - a field with a **value** sets it.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+pub struct APIWeightAndNutritionPatch {
+    #[serde(default)]
+    pub weight: PatchField<f32>,
+    #[serde(default)]
+    pub fat: PatchField<f32>,
+    #[serde(default)]
+    pub muscle: PatchField<f32>,
+    #[serde(default)]
+    pub bmi: PatchField<f32>,
+    #[serde(default)]
+    pub calories: PatchField<f32>,
+    #[serde(default)]
+    pub lipid: PatchField<f32>,
+    #[serde(default)]
+    pub carbs: PatchField<f32>,
+    #[serde(default)]
+    pub protein: PatchField<f32>,
+    #[serde(default)]
+    pub water: PatchField<f32>,
+    #[serde(default)]
+    pub alcohol: PatchField<f32>,
+}
+
+fn patch_field_to_domain_f32(field: PatchField<f32>) -> Option<Option<f32>> {
+    match field {
+        PatchField::Absent => None,
+        PatchField::Clear => Some(None),
+        PatchField::Set(value) => Some(Some(value)),
+    }
+}
+
+impl From<APIWeightAndNutritionPatch> for WeightAndNutritionPatch {
+    fn from(value: APIWeightAndNutritionPatch) -> Self {
+        WeightAndNutritionPatch::new(
+            patch_field_to_domain_f32(value.weight),
+            patch_field_to_domain_f32(value.fat),
+            patch_field_to_domain_f32(value.muscle),
+            patch_field_to_domain_f32(value.bmi),
+            patch_field_to_domain_f32(value.calories),
+            patch_field_to_domain_f32(value.lipid),
+            patch_field_to_domain_f32(value.carbs),
+            patch_field_to_domain_f32(value.protein),
+            patch_field_to_domain_f32(value.water),
+            patch_field_to_domain_f32(value.alcohol),
+        )
+    }
+}
+
+impl From<WeightAndNutritionError> for StatusCode {
+    fn from(_value: WeightAndNutritionError) -> Self {
+        Self::UNPROCESSABLE_ENTITY
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -624,7 +733,7 @@ mod tests {
     use crate::domain::models::activity::{Sport, SportCategory, Unit};
     use crate::domain::models::training::{
         HooperIndex, HooperIndexPatch, SportFilter, SubjectiveScale, TrainingMetricTarget,
-        TrainingPeriodSports,
+        TrainingPeriodSports, WeightAndNutrition, WeightAndNutritionPatch,
     };
 
     #[test]
@@ -831,5 +940,87 @@ mod tests {
         let body: APIHooperIndexPatch = serde_json::from_str(r#"{ "mood": 0 }"#).unwrap();
 
         assert!(HooperIndexPatch::try_from(body).is_err());
+    }
+
+    #[test]
+    fn test_api_weight_and_nutrition_converts_all_values() {
+        let api = APIWeightAndNutrition {
+            weight: Some(70.5),
+            fat: Some(15.0),
+            muscle: Some(30.0),
+            bmi: Some(22.0),
+            calories: Some(2000.0),
+            lipid: Some(50.0),
+            carbs: Some(250.0),
+            protein: Some(150.0),
+            water: Some(2.5),
+            alcohol: Some(0.0),
+        };
+
+        let value = WeightAndNutrition::from(api.clone());
+
+        assert_eq!(value.weight(), Some(70.5));
+        assert_eq!(value.fat(), Some(15.0));
+        assert_eq!(value.muscle(), Some(30.0));
+        assert_eq!(value.bmi(), Some(22.0));
+        assert_eq!(value.calories(), Some(2000.0));
+        assert_eq!(value.lipid(), Some(50.0));
+        assert_eq!(value.carbs(), Some(250.0));
+        assert_eq!(value.protein(), Some(150.0));
+        assert_eq!(value.water(), Some(2.5));
+        assert_eq!(value.alcohol(), Some(0.0));
+
+        // Round-trips back to the same API representation.
+        assert_eq!(APIWeightAndNutrition::from(&value), api);
+    }
+
+    #[test]
+    fn test_api_weight_and_nutrition_defaults_every_measure_to_none() {
+        let value = WeightAndNutrition::from(APIWeightAndNutrition::default());
+
+        assert_eq!(value.weight(), None);
+        assert_eq!(value.fat(), None);
+        assert_eq!(value.muscle(), None);
+        assert_eq!(value.bmi(), None);
+        assert_eq!(value.calories(), None);
+        assert_eq!(value.lipid(), None);
+        assert_eq!(value.carbs(), None);
+        assert_eq!(value.protein(), None);
+        assert_eq!(value.water(), None);
+        assert_eq!(value.alcohol(), None);
+    }
+
+    #[test]
+    fn test_api_weight_and_nutrition_patch_semantics() {
+        let body: APIWeightAndNutritionPatch =
+            serde_json::from_str(r#"{ "weight": 72.0, "muscle": null }"#).unwrap();
+        let patch = WeightAndNutritionPatch::from(body);
+
+        let existing = WeightAndNutrition::new(
+            Some(70.0),
+            Some(15.0),
+            Some(30.0),
+            Some(22.0),
+            Some(2000.0),
+            Some(50.0),
+            Some(250.0),
+            Some(150.0),
+            Some(2.5),
+            Some(0.0),
+        );
+
+        let patched = existing.patch(patch);
+
+        // Overridden, cleared and untouched fields respectively.
+        assert_eq!(patched.weight(), Some(72.0));
+        assert_eq!(patched.muscle(), None);
+        assert_eq!(patched.fat(), Some(15.0));
+        assert_eq!(patched.bmi(), Some(22.0));
+        assert_eq!(patched.calories(), Some(2000.0));
+        assert_eq!(patched.lipid(), Some(50.0));
+        assert_eq!(patched.carbs(), Some(250.0));
+        assert_eq!(patched.protein(), Some(150.0));
+        assert_eq!(patched.water(), Some(2.5));
+        assert_eq!(patched.alcohol(), Some(0.0));
     }
 }

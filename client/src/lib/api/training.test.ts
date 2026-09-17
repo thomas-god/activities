@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { CreateHooperIndexSchema, HooperIndexSchema, UpdateHooperIndexSchema } from './training';
+import {
+	CreateHooperIndexSchema,
+	CreateWeightAndNutritionSchema,
+	HooperIndexSchema,
+	UpdateHooperIndexSchema,
+	UpdateWeightAndNutritionSchema,
+	WeightAndNutritionSchema
+} from './training';
 
 describe('HooperIndexSchema', () => {
 	it('parses all measures', () => {
@@ -97,5 +104,116 @@ describe('UpdateHooperIndexSchema', () => {
 
 	it('rejects out of range values', () => {
 		expect(() => UpdateHooperIndexSchema.parse({ mood: 0 })).toThrow();
+	});
+});
+
+describe('WeightAndNutritionSchema', () => {
+	it('parses all measures', () => {
+		const result = WeightAndNutritionSchema.parse({
+			weight: 70.5,
+			fat: 15,
+			muscle: 30,
+			bmi: 22,
+			calories: 2000,
+			lipid: 50,
+			carbs: 250,
+			protein: 150,
+			water: 2.5,
+			alcohol: 0
+		});
+
+		expect(result.weight).toBe(70.5);
+		expect(result.calories).toBe(2000);
+	});
+
+	it('parses null measures', () => {
+		const result = WeightAndNutritionSchema.parse({
+			weight: null,
+			fat: null,
+			muscle: null,
+			bmi: null,
+			calories: null,
+			lipid: null,
+			carbs: null,
+			protein: null,
+			water: null,
+			alcohol: null
+		});
+
+		expect(result.weight).toBeNull();
+		expect(result.alcohol).toBeNull();
+	});
+
+	it('rejects missing measures', () => {
+		expect(() => WeightAndNutritionSchema.parse({ weight: 70 })).toThrow();
+	});
+
+	it('rejects non numeric values', () => {
+		expect(() =>
+			WeightAndNutritionSchema.parse({
+				weight: 'heavy',
+				fat: null,
+				muscle: null,
+				bmi: null,
+				calories: null,
+				lipid: null,
+				carbs: null,
+				protein: null,
+				water: null,
+				alcohol: null
+			})
+		).toThrow();
+	});
+});
+
+describe('CreateWeightAndNutritionSchema', () => {
+	it('parses a date together with measures', () => {
+		const result = CreateWeightAndNutritionSchema.parse({
+			date: '2026-01-15',
+			weight: 70,
+			fat: null,
+			muscle: null,
+			bmi: null,
+			calories: null,
+			lipid: null,
+			carbs: null,
+			protein: null,
+			water: null,
+			alcohol: null
+		});
+
+		expect(result.date).toBe('2026-01-15');
+		expect(result.weight).toBe(70);
+	});
+
+	it('requires a date', () => {
+		expect(() =>
+			CreateWeightAndNutritionSchema.parse({
+				weight: 70,
+				fat: null,
+				muscle: null,
+				bmi: null,
+				calories: null,
+				lipid: null,
+				carbs: null,
+				protein: null,
+				water: null,
+				alcohol: null
+			})
+		).toThrow();
+	});
+});
+
+describe('UpdateWeightAndNutritionSchema', () => {
+	it('allows absent, null and value fields', () => {
+		const result = UpdateWeightAndNutritionSchema.parse({ weight: 72, muscle: null });
+
+		expect(result.weight).toBe(72);
+		expect(result.muscle).toBeNull();
+		expect(result.fat).toBeUndefined();
+	});
+
+	it('accepts an empty patch', () => {
+		expect(UpdateWeightAndNutritionSchema.parse({})).toEqual({});
 	});
 });

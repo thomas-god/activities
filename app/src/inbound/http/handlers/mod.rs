@@ -17,10 +17,11 @@ pub(super) use search::search;
 pub(super) use training::{
     compute_training_metric_values, copy_training_metric, create_training_metric,
     create_training_note, create_training_period, delete_hooper_index, delete_training_metric,
-    delete_training_note, delete_training_period, get_active_training_periods, get_hooper_index,
-    get_training_metric_templates, get_training_metrics, get_training_metrics_ordering,
-    get_training_note, get_training_notes, get_training_period, get_training_period_metrics,
-    get_training_period_notes, get_training_periods, save_hooper_index,
+    delete_training_note, delete_training_period, delete_weight_and_nutrition,
+    get_active_training_periods, get_hooper_index, get_training_metric_templates,
+    get_training_metrics, get_training_metrics_ordering, get_training_note, get_training_notes,
+    get_training_period, get_training_period_metrics, get_training_period_notes,
+    get_training_periods, get_weight_and_nutrition, save_hooper_index, save_weight_and_nutrition,
     set_training_metrics_ordering, update_training_metric, update_training_note,
     update_training_period,
 };
