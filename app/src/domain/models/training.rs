@@ -1435,49 +1435,16 @@ impl WeightAndNutritionSource {
 
 #[derive(Debug, Clone, Copy, Constructor, Default)]
 pub struct WeightAndNutritionPatch {
-    weight: Option<Option<f32>>,
-    fat: Option<Option<f32>>,
-    muscle: Option<Option<f32>>,
-    bmi: Option<Option<f32>>,
-    calories: Option<Option<f32>>,
-    lipid: Option<Option<f32>>,
-    carbs: Option<Option<f32>>,
-    protein: Option<Option<f32>>,
-    water: Option<Option<f32>>,
-    alcohol: Option<Option<f32>>,
-}
-
-impl WeightAndNutritionPatch {
-    pub fn weight(&self) -> &Option<Option<f32>> {
-        &self.weight
-    }
-    pub fn fat(&self) -> &Option<Option<f32>> {
-        &self.fat
-    }
-    pub fn muscle(&self) -> &Option<Option<f32>> {
-        &self.muscle
-    }
-    pub fn bmi(&self) -> &Option<Option<f32>> {
-        &self.bmi
-    }
-    pub fn calories(&self) -> &Option<Option<f32>> {
-        &self.calories
-    }
-    pub fn lipid(&self) -> &Option<Option<f32>> {
-        &self.lipid
-    }
-    pub fn carbs(&self) -> &Option<Option<f32>> {
-        &self.carbs
-    }
-    pub fn protein(&self) -> &Option<Option<f32>> {
-        &self.protein
-    }
-    pub fn water(&self) -> &Option<Option<f32>> {
-        &self.water
-    }
-    pub fn alcohol(&self) -> &Option<Option<f32>> {
-        &self.alcohol
-    }
+    pub weight: Option<Option<f32>>,
+    pub fat: Option<Option<f32>>,
+    pub muscle: Option<Option<f32>>,
+    pub bmi: Option<Option<f32>>,
+    pub calories: Option<Option<f32>>,
+    pub lipid: Option<Option<f32>>,
+    pub carbs: Option<Option<f32>>,
+    pub protein: Option<Option<f32>>,
+    pub water: Option<Option<f32>>,
+    pub alcohol: Option<Option<f32>>,
 }
 
 // =============================================================================

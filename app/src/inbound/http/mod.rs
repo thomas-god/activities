@@ -694,9 +694,9 @@ mod tests {
             .withf(|req| {
                 req.user() == &UserId::default()
                     && req.date() == &test_date()
-                    && req.patch().weight() == &Some(Some(70.5))
-                    && req.patch().fat() == &None
-                    && req.patch().muscle() == &Some(None)
+                    && req.patch().weight == Some(Some(70.5))
+                    && req.patch().fat == None
+                    && req.patch().muscle == Some(None)
             })
             .returning(|_| Ok(()));
 
