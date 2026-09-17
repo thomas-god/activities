@@ -23,7 +23,9 @@ use crate::domain::ports::{
 use crate::inbound::auth::AuthStrategy;
 use crate::inbound::auth::email_based::IUserService;
 use crate::inbound::auth::infra::add_auth_router;
-use crate::inbound::http::handlers::{get_default_activity_metrics, get_training_metric_templates};
+use crate::inbound::http::handlers::{
+    get_default_activity_metrics, get_training_metric_templates, upload_bulk_weight_and_nutrition,
+};
 use crate::inbound::parser::ParseFile;
 use handlers::{
     compute_training_metric_values, copy_training_metric, create_standalone_activity,
@@ -305,6 +307,10 @@ where
             get(get_weight_and_nutrition::<AS, PF, TS, PS>)
                 .patch(save_weight_and_nutrition::<AS, PF, TS, PS>)
                 .delete(delete_weight_and_nutrition::<AS, PF, TS, PS>),
+        )
+        .route(
+            "/training/weight-and-nutrition/history",
+            post(upload_bulk_weight_and_nutrition::<AS, PF, TS, PS>),
         )
         .route(
             "/training/period",

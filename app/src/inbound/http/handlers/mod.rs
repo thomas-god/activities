@@ -23,5 +23,5 @@ pub(super) use training::{
     get_training_period, get_training_period_metrics, get_training_period_notes,
     get_training_periods, get_weight_and_nutrition, save_hooper_index, save_weight_and_nutrition,
     set_training_metrics_ordering, update_training_metric, update_training_note,
-    update_training_period,
+    update_training_period, upload_bulk_weight_and_nutrition,
 };

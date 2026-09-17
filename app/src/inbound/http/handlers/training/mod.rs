@@ -50,7 +50,7 @@ pub use get_training_period::get_training_period;
 pub use get_training_periods::get_training_periods;
 pub use get_weight_and_nutrition::get_weight_and_nutrition;
 pub use save_hooper_index::save_hooper_index;
-pub use save_weight_and_nutrition::save_weight_and_nutrition;
+pub use save_weight_and_nutrition::{save_weight_and_nutrition, upload_bulk_weight_and_nutrition};
 pub use set_training_metrics_ordering::set_training_metrics_ordering;
 pub use update_training_metric::update_training_metric;
 pub use update_training_note::update_training_note;

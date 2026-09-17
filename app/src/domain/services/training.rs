@@ -5962,9 +5962,7 @@ mod test_training_service_weight_and_nutrition {
             .expect_get_weight_and_nutritions()
             .times(1)
             .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
-        repository
-            .expect_save_bulk_weight_and_nutrition()
-            .times(0);
+        repository.expect_save_bulk_weight_and_nutrition().times(0);
 
         let service = build_service(repository);
 

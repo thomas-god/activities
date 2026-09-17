@@ -57,6 +57,13 @@ impl DateRange {
     pub fn extend_end(&self, days_to_add: Days) -> DateRange {
         DateRange::new(self.start, self.end.add(days_to_add))
     }
+
+    pub fn union(self, other: DateRange) -> Self {
+        Self {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+        }
+    }
 }
 
 pub trait IClock: Clone + Send + Sync + 'static {
