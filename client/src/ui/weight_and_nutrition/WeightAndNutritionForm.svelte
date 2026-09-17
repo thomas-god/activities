@@ -1,13 +1,22 @@
 <script lang="ts">
 	import {
 		fetchWeightAndNutrition,
+		importWeightAndNutritionHistory,
 		saveWeightAndNutrition,
 		type UpdateWeightAndNutritionPatch,
 		type WeightAndNutrition
 	} from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import { GlassWater, Utensils, WeightTilde } from '@lucide/svelte';
+	import {
+		ArchiveRestore,
+		CircleX,
+		GlassWater,
+		RotateCcw,
+		Save,
+		Utensils,
+		WeightTilde
+	} from '@lucide/svelte';
 	import {
 		emptyWeightAndNutrition,
 		weightAndNutritionCategories,
@@ -65,11 +74,34 @@
 		values = { ...values, [measure]: value };
 	};
 
+	let showHistoryImport = $state(false);
+	let files: FileList | undefined = $state(undefined);
+	let fileUploadContent = $state('');
+	let canUpload = $derived(files !== undefined && (files as FileList).length > 0);
+	let uploadPromise: Option<Promise<void>> = $state(none());
+	let fileFailures: { file: string; reason: string }[] = $derived([]);
+	let uploadError: Option<string> = $derived(none());
+
+	const setImportHistoryPromise = async () => {
+		if (!canUpload) {
+			return;
+		}
+		uploadPromise = some(
+			importWeightAndNutritionHistory(files as FileList).then((err) => {
+				if (err.type === 'totalFailure') {
+					uploadError = some(err.reason);
+				} else if (err.type === 'partialFailure') {
+					fileFailures = err.files;
+				}
+			})
+		);
+	};
+
 	const clear = () => (values = toEditable(emptyWeightAndNutrition()));
 	const reset = () => (values = { ...baseline });
 </script>
 
-<fieldset class="fieldset rounded-box border-base-300 bg-base-100">
+<fieldset class="fieldset min-w-0 rounded-box border-base-300 bg-base-100">
 	<legend class="fieldset-legend text-base">Update weight &amp; nutrition</legend>
 	<div class="flex flex-row gap-2">
 		<label class="label" for="wn-date">Date</label>
@@ -105,7 +137,73 @@
 				</div>
 			{/each}
 		</div>
-
+		{#if showHistoryImport}
+			<div class="min-w-0 rounded-box border border-base-300 p-3">
+				<p class="mb-1 flex flex-row items-center gap-2 text-sm font-semibold">
+					<ArchiveRestore class="size-5" />
+					Import history
+				</p>
+				<p class="pb-1 italic">
+					You can import your history by uploading one or more csv files of the form (omitting
+					columns for values you don't want to import):
+				</p>
+				<pre
+					class="overflow-x-auto rounded-box border border-base-300 bg-base-200 p-2 font-mono text-xs leading-relaxed">{`date,weight,fat,muscle,bmi,calories,lipid,carbs,protein,water,alcohol
+2024-01-15,70.5,15.2,55.1,22.4,2000,60,250,120,1.5,0.5`}</pre>
+				<div class="join mt-2 gap-3">
+					<input
+						type="file"
+						class="file-input"
+						accept=".csv,.csv.gz"
+						multiple
+						bind:files
+						bind:value={fileUploadContent}
+						id="activity_file"
+						name="activity file"
+					/>
+					{#if isSome(uploadPromise)}
+						{#await uploadPromise.value}
+							<button class="btn rounded-lg btn-primary" disabled>
+								Upload <span class="loading loading-spinner"></span>
+							</button>
+						{:then}
+							<button
+								class="btn rounded-lg btn-primary"
+								disabled={!canUpload}
+								onclick={setImportHistoryPromise}
+							>
+								Upload
+							</button>
+						{/await}
+					{:else}
+						<button
+							class="btn rounded-lg btn-primary"
+							disabled={!canUpload}
+							onclick={setImportHistoryPromise}
+						>
+							Upload
+						</button>
+					{/if}
+					{#if fileFailures.length > 0}
+						<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
+							Some files ({fileFailures.length}) could not be processed
+							<ul>
+								{#each fileFailures as { file, reason } (file)}
+									<li>
+										{file}: {reason}
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+				</div>
+				{#if isSome(uploadError)}
+					<p class="mt-2 bg-error/20 p-3 text-error-content">
+						Error while importing history: {uploadError.value}
+					</p>
+				{/if}
+			</div>
+		{/if}
 		{@render actions()}
 	{:catch}
 		<p class="text-error">Failed to load the values for this date.</p>
@@ -145,17 +243,34 @@
 	<div class="mt-2 flex flex-wrap gap-2">
 		{#if isSome(savePromise)}
 			{#await savePromise.value}
-				<button class="btn btn-primary btn-sm" disabled
-					>Save <span class="loading loading-sm"></span>
+				<button class="btn btn-primary btn-sm" disabled>
+					<Save class="size-4" />
+					Save <span class="loading loading-sm"></span>
 				</button>
 			{:then}
-				<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>Save</button>
+				<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>
+					<Save class="size-4" />
+					Save
+				</button>
 			{/await}
 		{:else}
-			<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>Save</button>
+			<button class="btn btn-primary btn-sm" disabled={!isDirty} onclick={save}>
+				<Save class="size-4" />
+				Save
+			</button>
 		{/if}
-		<button class="btn btn-ghost btn-sm" disabled={!isDirty} onclick={reset}>Reset</button>
-		<button class="btn btn-ghost btn-sm" onclick={clear}>Clear</button>
+		<button class="btn btn-ghost btn-sm" disabled={!isDirty} onclick={reset}>
+			<RotateCcw class="size-4" />
+			Reset
+		</button>
+		<button class="btn btn-ghost btn-sm" onclick={clear}>
+			<CircleX class="size-4" />
+			Clear
+		</button>
+		<button class="btn btn-ghost btn-sm" onclick={() => (showHistoryImport = true)}>
+			<ArchiveRestore class="size-4" />
+			Import history
+		</button>
 	</div>
 {/snippet}
 

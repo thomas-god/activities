@@ -849,6 +849,53 @@ export async function saveWeightAndNutrition(
 	return res.status === 204;
 }
 
+const WeightAndNutritionHistoryResponse = z.object({
+	unprocessable_files: z.array(z.tuple([z.string(), z.string()]))
+});
+
+export type WeightAndNutritionHistoryError =
+	| { type: 'partialFailure'; files: { file: string; reason: string }[] }
+	| { type: 'totalFailure'; reason: string }
+	| { type: 'success' };
+
+export async function importWeightAndNutritionHistory(
+	files: FileList
+): Promise<WeightAndNutritionHistoryError> {
+	if (files.length === 0) {
+		return { type: 'success' };
+	}
+
+	const formData = new FormData();
+	for (let i = 0; i < files.length; i++) {
+		const file = files.item(i)!;
+		formData.append(file.name, file);
+	}
+
+	const response = await fetch(`${PUBLIC_APP_URL}/api/training/weight-and-nutrition/history`, {
+		method: 'POST',
+		credentials: 'include',
+		mode: 'cors',
+		body: formData
+	});
+
+	if (response.status >= 300) {
+		return {
+			type: 'totalFailure',
+			reason: response.status === 422 ? 'No valid date range found in data' : 'Unknown'
+		};
+	}
+
+	const res = WeightAndNutritionHistoryResponse.parse(await response.json());
+	if (res.unprocessable_files.length === 0) {
+		return { type: 'success' };
+	}
+
+	return {
+		type: 'partialFailure',
+		files: res.unprocessable_files.map(([file, reason]) => ({ file, reason }))
+	};
+}
+
 /**
  * Delete the weight and nutrition values for a given date.
  * @param date - The date the values apply to
