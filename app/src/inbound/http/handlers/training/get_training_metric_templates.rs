@@ -13,7 +13,10 @@ use crate::{
     domain::{
         models::{
             activity::{ActivityMetric, ToUnit, Unit},
-            training::{HooperIndexSource, TrainingMetricAggregate, TrainingMetricSource},
+            training::{
+                HooperIndexSource, TrainingMetricAggregate, TrainingMetricSource,
+                WeightAndNutritionSource,
+            },
         },
         ports::{
             activity::IActivityService, preferences::IPreferencesService,
@@ -64,6 +67,8 @@ pub enum TrainingMetricTemplateCategory {
     Stress,
     Sleep,
     Pain,
+    Weight,
+    Nutrition,
     Other,
 }
 
@@ -212,6 +217,33 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         })
     }
 
+    // Weight and nutrition metrics
+    let aggregates = [
+        TrainingMetricAggregate::Min,
+        TrainingMetricAggregate::Max,
+        TrainingMetricAggregate::Average,
+    ];
+    let metrics = [
+        WeightAndNutritionSource::Weight,
+        WeightAndNutritionSource::Fat,
+        WeightAndNutritionSource::Muscle,
+        WeightAndNutritionSource::BMI,
+        WeightAndNutritionSource::Calories,
+        WeightAndNutritionSource::Carbs,
+        WeightAndNutritionSource::Lipid,
+        WeightAndNutritionSource::Protein,
+        WeightAndNutritionSource::Water,
+        WeightAndNutritionSource::Alcohol,
+    ];
+
+    for (source, aggregate) in metrics.iter().cartesian_product(aggregates.iter()) {
+        templates.push(TrainingMetricTemplate {
+            display_name: format!("{} {}", format_aggregate(aggregate), source),
+            source: TrainingMetricSource::WeightAndNutrition(*source),
+            aggregate: *aggregate,
+            category: weight_and_nutrition_category(source),
+        })
+    }
     templates
 });
 
@@ -265,6 +297,23 @@ fn hooper_category(source: &HooperIndexSource) -> TrainingMetricTemplateCategory
         HooperIndexSource::Sleep => TrainingMetricTemplateCategory::Sleep,
         HooperIndexSource::Stress => TrainingMetricTemplateCategory::Stress,
         HooperIndexSource::Pain => TrainingMetricTemplateCategory::Pain,
+    }
+}
+
+fn weight_and_nutrition_category(
+    source: &WeightAndNutritionSource,
+) -> TrainingMetricTemplateCategory {
+    match source {
+        WeightAndNutritionSource::Weight
+        | WeightAndNutritionSource::Fat
+        | WeightAndNutritionSource::Muscle
+        | WeightAndNutritionSource::BMI => TrainingMetricTemplateCategory::Weight,
+        WeightAndNutritionSource::Calories
+        | WeightAndNutritionSource::Lipid
+        | WeightAndNutritionSource::Carbs
+        | WeightAndNutritionSource::Protein
+        | WeightAndNutritionSource::Water
+        | WeightAndNutritionSource::Alcohol => TrainingMetricTemplateCategory::Nutrition,
     }
 }
 
