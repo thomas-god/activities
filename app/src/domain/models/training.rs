@@ -1293,6 +1293,164 @@ impl HooperIndexPatch {
 }
 
 // =============================================================================
+// Weight and nutrition
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, Constructor, Default)]
+pub struct WeightAndNutrition {
+    // Weight
+    weight: Option<f32>,
+    fat: Option<f32>,
+    muscle: Option<f32>,
+    bmi: Option<f32>,
+    // Nutrition
+    calories: Option<f32>,
+    lipid: Option<f32>,
+    carbs: Option<f32>,
+    protein: Option<f32>,
+    // Hydration
+    water: Option<f32>,
+    alcohol: Option<f32>,
+}
+
+impl WeightAndNutrition {
+    pub fn weight(&self) -> Option<f32> {
+        self.weight
+    }
+    pub fn fat(&self) -> Option<f32> {
+        self.fat
+    }
+    pub fn muscle(&self) -> Option<f32> {
+        self.muscle
+    }
+    pub fn bmi(&self) -> Option<f32> {
+        self.bmi
+    }
+    pub fn calories(&self) -> Option<f32> {
+        self.calories
+    }
+    pub fn lipid(&self) -> Option<f32> {
+        self.lipid
+    }
+    pub fn carbs(&self) -> Option<f32> {
+        self.carbs
+    }
+    pub fn protein(&self) -> Option<f32> {
+        self.protein
+    }
+    pub fn water(&self) -> Option<f32> {
+        self.water
+    }
+    pub fn alcohol(&self) -> Option<f32> {
+        self.alcohol
+    }
+
+    pub fn patch(self, patch: WeightAndNutritionPatch) -> Self {
+        Self {
+            weight: patch.weight.unwrap_or(self.weight),
+            muscle: patch.muscle.unwrap_or(self.muscle),
+            fat: patch.fat.unwrap_or(self.fat),
+            bmi: patch.bmi.unwrap_or(self.bmi),
+            calories: patch.calories.unwrap_or(self.calories),
+            lipid: patch.lipid.unwrap_or(self.lipid),
+            carbs: patch.carbs.unwrap_or(self.carbs),
+            protein: patch.protein.unwrap_or(self.protein),
+            water: patch.water.unwrap_or(self.water),
+            alcohol: patch.alcohol.unwrap_or(self.alcohol),
+        }
+    }
+
+    pub fn value(&self, source: &WeightAndNutritionSource) -> &Option<f32> {
+        match source {
+            WeightAndNutritionSource::Weight => &self.weight,
+            WeightAndNutritionSource::Muscle => &self.muscle,
+            WeightAndNutritionSource::Fat => &self.fat,
+            WeightAndNutritionSource::BMI => &self.bmi,
+            WeightAndNutritionSource::Calories => &self.calories,
+            WeightAndNutritionSource::Lipid => &self.lipid,
+            WeightAndNutritionSource::Carbs => &self.carbs,
+            WeightAndNutritionSource::Protein => &self.protein,
+            WeightAndNutritionSource::Water => &self.water,
+            WeightAndNutritionSource::Alcohol => &self.alcohol,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
+pub enum WeightAndNutritionSource {
+    Weight,
+    Fat,
+    Muscle,
+    BMI,
+    Calories,
+    Lipid,
+    Carbs,
+    Protein,
+    Water,
+    Alcohol,
+}
+
+impl WeightAndNutritionSource {
+    pub fn unit(&self) -> Unit {
+        match self {
+            Self::Weight | Self::Fat | Self::Muscle => Unit::Kilogram,
+            Self::BMI => Unit::Null,
+            Self::Calories => Unit::KiloCalorie,
+            Self::Lipid | Self::Carbs | Self::Protein => Unit::Gram,
+            Self::Water => Unit::Liter,
+            Self::Alcohol => Unit::AlcoholUnit,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Constructor, Default)]
+pub struct WeightAndNutritionPatch {
+    weight: Option<Option<f32>>,
+    fat: Option<Option<f32>>,
+    muscle: Option<Option<f32>>,
+    bmi: Option<Option<f32>>,
+    calories: Option<Option<f32>>,
+    lipid: Option<Option<f32>>,
+    carbs: Option<Option<f32>>,
+    protein: Option<Option<f32>>,
+    water: Option<Option<f32>>,
+    alcohol: Option<Option<f32>>,
+}
+
+impl WeightAndNutritionPatch {
+    pub fn weight(&self) -> &Option<Option<f32>> {
+        &self.weight
+    }
+    pub fn fat(&self) -> &Option<Option<f32>> {
+        &self.fat
+    }
+    pub fn muscle(&self) -> &Option<Option<f32>> {
+        &self.muscle
+    }
+    pub fn bmi(&self) -> &Option<Option<f32>> {
+        &self.bmi
+    }
+    pub fn calories(&self) -> &Option<Option<f32>> {
+        &self.calories
+    }
+    pub fn lipid(&self) -> &Option<Option<f32>> {
+        &self.lipid
+    }
+    pub fn carbs(&self) -> &Option<Option<f32>> {
+        &self.carbs
+    }
+    pub fn protein(&self) -> &Option<Option<f32>> {
+        &self.protein
+    }
+    pub fn water(&self) -> &Option<Option<f32>> {
+        &self.water
+    }
+    pub fn alcohol(&self) -> &Option<Option<f32>> {
+        &self.alcohol
+    }
+}
+
+// =============================================================================
 // Training Notes
 // =============================================================================
 

@@ -19,7 +19,7 @@ use crate::domain::{
             TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
             TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
             TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
-            TrainingPeriodSports,
+            TrainingPeriodSports, WeightAndNutrition,
         },
     },
     ports::{
@@ -32,7 +32,7 @@ use crate::domain::{
             SaveTrainingMetricError, SaveTrainingNoteError, SaveTrainingPeriodError,
             SetTrainingMetricsOrderingError, TrainingRepository, UpdateTrainingMetricNameError,
             UpdateTrainingPeriodDatesError, UpdateTrainingPeriodNameError,
-            UpdateTrainingPeriodNoteError,
+            UpdateTrainingPeriodNoteError, WeightAndNutritionError,
         },
     },
 };
@@ -83,6 +83,19 @@ type HooperIndexRow = (
     Option<SubjectiveScale>,
     Option<SubjectiveScale>,
     Option<SubjectiveScale>,
+);
+
+type WeightAndNutritionRow = (
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
 );
 
 #[derive(Debug, Clone)]
@@ -1057,6 +1070,154 @@ where
         .await
         .map(|_| ())
         .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))
+    }
+
+    async fn save_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+        value: &WeightAndNutrition,
+    ) -> Result<(), WeightAndNutritionError> {
+        sqlx::query(
+            "
+            INSERT INTO t_weight_and_nutrition
+                (user, date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            ON CONFLICT (user, date)
+            DO UPDATE SET
+                weight=excluded.weight,
+                fat=excluded.fat,
+                muscle=excluded.muscle,
+                bmi=excluded.bmi,
+                calories=excluded.calories,
+                lipid=excluded.lipid,
+                carbs=excluded.carbs,
+                protein=excluded.protein,
+                water=excluded.water,
+                alcohol=excluded.alcohol",
+        )
+        .bind(user)
+        .bind(date)
+        .bind(value.weight())
+        .bind(value.fat())
+        .bind(value.muscle())
+        .bind(value.bmi())
+        .bind(value.calories())
+        .bind(value.lipid())
+        .bind(value.carbs())
+        .bind(value.protein())
+        .bind(value.water())
+        .bind(value.alcohol())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
+    }
+
+    async fn get_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError> {
+        let row = sqlx::query_as::<_, WeightAndNutritionRow>(
+            "
+            SELECT weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol
+            FROM t_weight_and_nutrition
+            WHERE user=?1 AND date=?2;",
+        )
+        .bind(user)
+        .bind(date)
+        .fetch_optional(&self.readers)
+        .await
+        .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))?;
+
+        Ok(row.map(
+            |(weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol)| {
+                WeightAndNutrition::new(
+                    weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol,
+                )
+            },
+        ))
+    }
+
+    async fn get_weight_and_nutritions(
+        &self,
+        user: &UserId,
+        range: &DateRange,
+    ) -> Result<Vec<(chrono::NaiveDate, WeightAndNutrition)>, WeightAndNutritionError> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                chrono::NaiveDate,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+            ),
+        >(
+            "
+              SELECT date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol
+              FROM t_weight_and_nutrition
+              WHERE user=?1 AND date >= ?2 AND date < ?3
+              ORDER BY date ASC;",
+        )
+        .bind(user)
+        .bind(range.start())
+        .bind(range.end())
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))?;
+
+        Ok(rows
+            .into_iter()
+            .map(
+                |(
+                    date,
+                    weight,
+                    fat,
+                    muscle,
+                    bmi,
+                    calories,
+                    lipid,
+                    carbs,
+                    protein,
+                    water,
+                    alcohol,
+                )| {
+                    (
+                        date,
+                        WeightAndNutrition::new(
+                            weight, fat, muscle, bmi, calories, lipid, carbs, protein, water,
+                            alcohol,
+                        ),
+                    )
+                },
+            )
+            .collect())
+    }
+
+    async fn delete_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> Result<(), WeightAndNutritionError> {
+        sqlx::query(
+            "
+            DELETE FROM t_weight_and_nutrition
+            WHERE user=?1 AND date=?2",
+        )
+        .bind(user)
+        .bind(date)
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
     }
 }
 
@@ -5288,6 +5449,646 @@ mod test_sqlite_training_repository {
                 .expect("Get should succeed")
                 .expect("Other user row should be kept");
             assert_eq!(kept.fatigue(), &Some(scale(2)));
+        }
+    }
+
+    #[cfg(test)]
+    mod test_weight_and_nutrition {
+        use super::*;
+
+        fn test_date() -> NaiveDate {
+            NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+        }
+
+        fn sample() -> WeightAndNutrition {
+            WeightAndNutrition::new(
+                Some(70.0),
+                Some(15.0),
+                Some(30.0),
+                Some(22.0),
+                Some(2000.0),
+                Some(50.0),
+                Some(250.0),
+                Some(150.0),
+                Some(2.5),
+                Some(0.0),
+            )
+        }
+
+        async fn setup() -> (NamedTempFile, SqliteTrainingRepository<Clock>) {
+            let db_file = NamedTempFile::new().unwrap();
+            let repository =
+                SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                    .await
+                    .expect("repo should init");
+            (db_file, repository)
+        }
+
+        async fn count_rows(
+            repository: &SqliteTrainingRepository<Clock>,
+            user: &UserId,
+            date: NaiveDate,
+        ) -> i64 {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM t_weight_and_nutrition WHERE user=?1 AND date=?2",
+            )
+            .bind(user)
+            .bind(date)
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_save_weight_and_nutrition_round_trip() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_weight_and_nutrition(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Weight and nutrition should exist");
+
+            assert_eq!(saved.weight(), Some(70.0));
+            assert_eq!(saved.fat(), Some(15.0));
+            assert_eq!(saved.muscle(), Some(30.0));
+            assert_eq!(saved.bmi(), Some(22.0));
+            assert_eq!(saved.calories(), Some(2000.0));
+            assert_eq!(saved.lipid(), Some(50.0));
+            assert_eq!(saved.carbs(), Some(250.0));
+            assert_eq!(saved.protein(), Some(150.0));
+            assert_eq!(saved.water(), Some(2.5));
+            assert_eq!(saved.alcohol(), Some(0.0));
+        }
+
+        #[tokio::test]
+        async fn test_save_weight_and_nutrition_upserts_existing_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Initial save should succeed");
+
+            let updated = WeightAndNutrition::new(
+                Some(72.0),
+                Some(16.0),
+                Some(31.0),
+                Some(23.0),
+                Some(2100.0),
+                Some(55.0),
+                Some(260.0),
+                Some(160.0),
+                Some(3.0),
+                Some(1.0),
+            );
+            repository
+                .save_weight_and_nutrition(&user, date, &updated)
+                .await
+                .expect("Upsert should succeed");
+
+            // Only one row should exist for the (user, date) pair.
+            assert_eq!(count_rows(&repository, &user, date).await, 1);
+
+            let saved = repository
+                .get_weight_and_nutrition(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Weight and nutrition should exist");
+
+            assert_eq!(saved.weight(), Some(72.0));
+            assert_eq!(saved.fat(), Some(16.0));
+            assert_eq!(saved.muscle(), Some(31.0));
+            assert_eq!(saved.bmi(), Some(23.0));
+            assert_eq!(saved.calories(), Some(2100.0));
+            assert_eq!(saved.lipid(), Some(55.0));
+            assert_eq!(saved.carbs(), Some(260.0));
+            assert_eq!(saved.protein(), Some(160.0));
+            assert_eq!(saved.water(), Some(3.0));
+            assert_eq!(saved.alcohol(), Some(1.0));
+        }
+
+        #[tokio::test]
+        async fn test_save_weight_and_nutrition_allows_missing_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &WeightAndNutrition::default())
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_weight_and_nutrition(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Weight and nutrition should exist");
+
+            assert_eq!(saved.weight(), None);
+            assert_eq!(saved.fat(), None);
+            assert_eq!(saved.muscle(), None);
+            assert_eq!(saved.bmi(), None);
+            assert_eq!(saved.calories(), None);
+            assert_eq!(saved.lipid(), None);
+            assert_eq!(saved.carbs(), None);
+            assert_eq!(saved.protein(), None);
+            assert_eq!(saved.water(), None);
+            assert_eq!(saved.alcohol(), None);
+        }
+
+        #[tokio::test]
+        async fn test_save_weight_and_nutrition_is_scoped_by_user_and_date() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Save should succeed");
+
+            assert!(
+                repository
+                    .get_weight_and_nutrition(&other_user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            assert!(
+                repository
+                    .get_weight_and_nutrition(&user, other_date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutrition_returns_none_when_not_found() {
+            let (_db_file, repository) = setup().await;
+
+            let result = repository
+                .get_weight_and_nutrition(&UserId::from("user1"), test_date())
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutrition_returns_matching_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    other_date,
+                    &WeightAndNutrition::new(
+                        Some(80.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let saved = repository
+                .get_weight_and_nutrition(&user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Weight and nutrition should exist");
+
+            assert_eq!(saved.weight(), Some(70.0));
+            assert_eq!(saved.calories(), Some(2000.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_returns_empty_when_no_rows() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let range = DateRange::new(
+                NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+            );
+
+            let result = repository
+                .get_weight_and_nutritions(&user, &range)
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_returns_all_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_weight_and_nutritions(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            let (returned_date, value) = &result[0];
+            assert_eq!(*returned_date, date);
+            assert_eq!(value.weight(), Some(70.0));
+            assert_eq!(value.calories(), Some(2000.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_returns_rows_ordered_ascending() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let earlier = NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+            let later = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+
+            // Save out of order to make sure the repository sorts the result.
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    later,
+                    &WeightAndNutrition::new(
+                        Some(75.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    earlier,
+                    &WeightAndNutrition::new(
+                        Some(70.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_weight_and_nutritions(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            let dates: Vec<NaiveDate> = result.iter().map(|(date, _)| *date).collect();
+            assert_eq!(dates, vec![earlier, later]);
+            assert_eq!(result[0].1.weight(), Some(70.0));
+            assert_eq!(result[1].1.weight(), Some(75.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_range_is_start_inclusive_end_exclusive() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let start = NaiveDate::from_ymd_opt(2026, 1, 10).unwrap();
+            let end = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+            let before = start.pred_opt().unwrap();
+            let inside = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+            let after = end.succ_opt().unwrap();
+
+            for date in [before, start, inside, end, after] {
+                repository
+                    .save_weight_and_nutrition(
+                        &user,
+                        date,
+                        &WeightAndNutrition::new(
+                            Some(70.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ),
+                    )
+                    .await
+                    .expect("Save should succeed");
+            }
+
+            let result = repository
+                .get_weight_and_nutritions(&user, &DateRange::new(start, end))
+                .await
+                .expect("Get should succeed");
+
+            let dates: Vec<NaiveDate> = result.iter().map(|(date, _)| *date).collect();
+            assert_eq!(dates, vec![start, inside]);
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_is_scoped_by_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    date,
+                    &WeightAndNutrition::new(
+                        Some(70.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &other_user,
+                    date,
+                    &WeightAndNutrition::new(
+                        Some(80.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_weight_and_nutritions(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].1.weight(), Some(70.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_weight_and_nutritions_handles_missing_values() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &WeightAndNutrition::default())
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_weight_and_nutritions(
+                    &user,
+                    &DateRange::new(
+                        NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                        NaiveDate::from_ymd_opt(2026, 1, 31).unwrap(),
+                    ),
+                )
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result.len(), 1);
+            let (_, value) = &result[0];
+            assert_eq!(value.weight(), None);
+            assert_eq!(value.calories(), None);
+            assert_eq!(value.alcohol(), None);
+        }
+
+        #[tokio::test]
+        async fn test_delete_weight_and_nutrition_removes_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(&user, date, &sample())
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_weight_and_nutrition(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            assert!(
+                repository
+                    .get_weight_and_nutrition(&user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            assert_eq!(count_rows(&repository, &user, date).await, 0);
+        }
+
+        #[tokio::test]
+        async fn test_delete_weight_and_nutrition_is_ok_when_not_found() {
+            let (_db_file, repository) = setup().await;
+
+            let result = repository
+                .delete_weight_and_nutrition(&UserId::from("user1"), test_date())
+                .await;
+
+            assert!(result.is_ok());
+        }
+
+        #[tokio::test]
+        async fn test_delete_weight_and_nutrition_only_deletes_matching_row() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let date = test_date();
+            let other_date = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    date,
+                    &WeightAndNutrition::new(
+                        Some(70.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    other_date,
+                    &WeightAndNutrition::new(
+                        Some(80.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_weight_and_nutrition(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            assert!(
+                repository
+                    .get_weight_and_nutrition(&user, date)
+                    .await
+                    .expect("Get should succeed")
+                    .is_none()
+            );
+            let kept = repository
+                .get_weight_and_nutrition(&user, other_date)
+                .await
+                .expect("Get should succeed")
+                .expect("Other date should be kept");
+            assert_eq!(kept.weight(), Some(80.0));
+        }
+
+        #[tokio::test]
+        async fn test_delete_weight_and_nutrition_does_not_delete_other_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let date = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    date,
+                    &WeightAndNutrition::new(
+                        Some(70.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &other_user,
+                    date,
+                    &WeightAndNutrition::new(
+                        Some(80.0),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+                .await
+                .expect("Save should succeed");
+
+            repository
+                .delete_weight_and_nutrition(&user, date)
+                .await
+                .expect("Delete should succeed");
+
+            let kept = repository
+                .get_weight_and_nutrition(&other_user, date)
+                .await
+                .expect("Get should succeed")
+                .expect("Other user row should be kept");
+            assert_eq!(kept.weight(), Some(80.0));
         }
     }
 }

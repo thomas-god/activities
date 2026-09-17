@@ -14,6 +14,7 @@ use crate::domain::{
             TrainingMetricId, TrainingMetricScope, TrainingMetricSource, TrainingMetricValues,
             TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
             TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
+            WeightAndNutrition,
         },
     },
     ports::{
@@ -26,14 +27,16 @@ use crate::domain::{
             CreateTrainingNoteRequest, CreateTrainingPeriodError, CreateTrainingPeriodRequest,
             DeleteHooperIndexRequest, DeleteTrainingMetricError, DeleteTrainingMetricRequest,
             DeleteTrainingNoteError, DeleteTrainingPeriodError, DeleteTrainingPeriodRequest,
-            GetTrainingMetricValuesError, GetTrainingMetricValuesRequest,
-            GetTrainingMetricsOrderingError, GetTrainingNoteError, HooperIndexError,
-            ITrainingService, SaveHooperIndexRequest, SetTrainingMetricsOrderingError,
-            TrainingRepository, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
+            DeleteWeightAndNutritionRequest, GetTrainingMetricValuesError,
+            GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
+            HooperIndexError, ITrainingService, SaveHooperIndexRequest,
+            SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError, TrainingRepository,
+            UpdateTrainingMetricError, UpdateTrainingMetricNameError,
             UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
             UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
             UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
             UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
+            WeightAndNutritionError,
         },
     },
 };
@@ -713,6 +716,45 @@ where
             .delete_hooper_index(req.user(), *req.date())
             .await
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn save_weight_and_nutrition(
+        &self,
+        req: SaveWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        let existing = self
+            .training_repository
+            .get_weight_and_nutrition(req.user(), *req.date())
+            .await?
+            .unwrap_or_default();
+
+        let new = existing.patch(*req.patch());
+
+        self.training_repository
+            .save_weight_and_nutrition(req.user(), *req.date(), &new)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError> {
+        self.training_repository
+            .get_weight_and_nutrition(user, *date)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn delete_weight_and_nutrition(
+        &self,
+        req: DeleteWeightAndNutritionRequest,
+    ) -> Result<(), WeightAndNutritionError> {
+        self.training_repository
+            .delete_weight_and_nutrition(req.user(), *req.date())
+            .await
+    }
 }
 impl<TMR, AS> IDocumentsForSearch for TrainingService<TMR, AS>
 where
@@ -969,6 +1011,22 @@ pub mod test_utils {
                 &self,
                 req: DeleteHooperIndexRequest,
             ) -> Result<(), HooperIndexError>;
+
+            async fn save_weight_and_nutrition(
+                &self,
+                req: SaveWeightAndNutritionRequest,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: &NaiveDate,
+            ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError>;
+
+            async fn delete_weight_and_nutrition(
+                &self,
+                req: DeleteWeightAndNutritionRequest,
+            ) -> Result<(), WeightAndNutritionError>;
         }
     }
 
@@ -1155,6 +1213,31 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
             ) -> Result<(), HooperIndexError>;
+
+            async fn save_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+                value: &WeightAndNutrition,
+            ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError>;
+
+            async fn get_weight_and_nutritions(
+                &self,
+                user: &UserId,
+                range: &DateRange,
+            ) -> Result<Vec<(chrono::NaiveDate, WeightAndNutrition)>, WeightAndNutritionError>;
+
+            async fn delete_weight_and_nutrition(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<(), WeightAndNutritionError>;
         }
     }
 }
@@ -5225,6 +5308,276 @@ mod test_training_service_hooper_index {
         let result = service.save_hooper_index(req).await;
 
         assert!(matches!(result, Err(HooperIndexError::Unknown(_))));
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_weight_and_nutrition {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::domain::models::training::{WeightAndNutrition, WeightAndNutritionPatch};
+    use crate::domain::services::activity::test_utils::MockActivityService;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+    use chrono::NaiveDate;
+
+    fn test_date() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 1, 15).unwrap()
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService> {
+        TrainingService::new(
+            repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+        )
+    }
+
+    fn sample() -> WeightAndNutrition {
+        WeightAndNutrition::new(
+            Some(70.0),
+            Some(15.0),
+            Some(30.0),
+            Some(22.0),
+            Some(2000.0),
+            Some(50.0),
+            Some(250.0),
+            Some(150.0),
+            Some(2.5),
+            Some(0.0),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_weight_and_nutrition_returns_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(Some(sample())));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_weight_and_nutrition(&user, &date)
+            .await
+            .unwrap();
+
+        assert_eq!(result.unwrap().weight(), Some(70.0));
+    }
+
+    #[tokio::test]
+    async fn test_get_weight_and_nutrition_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_weight_and_nutrition(&UserId::test_default(), &test_date())
+            .await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_delete_weight_and_nutrition_deletes_on_date() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_delete_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let req = DeleteWeightAndNutritionRequest::new(user, date);
+        let result = service.delete_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_weight_and_nutrition_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = DeleteWeightAndNutritionRequest::new(UserId::test_default(), test_date());
+        let result = service.delete_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_patches_existing_value() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == date)
+            .returning(|_, _| Ok(Some(sample())));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.weight() == Some(72.0)
+                    && v.fat() == Some(15.0)
+                    && v.muscle() == None
+                    && v.bmi() == Some(22.0)
+                    && v.calories() == Some(2000.0)
+                    && v.lipid() == Some(50.0)
+                    && v.carbs() == Some(250.0)
+                    && v.protein() == Some(150.0)
+                    && v.water() == Some(2.5)
+                    && v.alcohol() == Some(0.0)
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        // Override weight, clear muscle, leave every other field untouched.
+        let patch = WeightAndNutritionPatch::new(
+            Some(Some(72.0)),
+            None,
+            Some(None),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let req = SaveWeightAndNutritionRequest::new(user, date, patch);
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_without_existing_value_starts_from_default() {
+        let user = UserId::from("user1");
+        let date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let expected_user = user.clone();
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .withf(move |u, d, v| {
+                u == &expected_user
+                    && *d == date
+                    && v.weight() == Some(68.0)
+                    && v.fat() == None
+                    && v.muscle() == None
+                    && v.bmi() == None
+                    && v.calories() == None
+                    && v.lipid() == None
+                    && v.carbs() == None
+                    && v.protein() == None
+                    && v.water() == None
+                    && v.alcohol() == None
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository);
+
+        let patch = WeightAndNutritionPatch::new(
+            Some(Some(68.0)),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        let req = SaveWeightAndNutritionRequest::new(user, date, patch);
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_propagates_get_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+        repository.expect_save_weight_and_nutrition().times(0);
+
+        let service = build_service(repository);
+
+        let req = SaveWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            test_date(),
+            WeightAndNutritionPatch::default(),
+        );
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_update_weight_and_nutrition_propagates_save_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        repository
+            .expect_save_weight_and_nutrition()
+            .times(1)
+            .returning(|_, _, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = build_service(repository);
+
+        let req = SaveWeightAndNutritionRequest::new(
+            UserId::test_default(),
+            test_date(),
+            WeightAndNutritionPatch::default(),
+        );
+        let result = service.save_weight_and_nutrition(req).await;
+
+        assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
     }
 }
 

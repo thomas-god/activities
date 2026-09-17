@@ -980,6 +980,10 @@ pub enum Unit {
     Second,
     NumberOfActivities,
     Degree,
+    Gram,
+    Kilogram,
+    Liter,
+    AlcoholUnit,
     Null,
 }
 
@@ -1000,6 +1004,10 @@ impl fmt::Display for Unit {
             Self::Second => "s",
             Self::NumberOfActivities => "activities",
             Self::Degree => "°",
+            Self::Gram => "g",
+            Self::Kilogram => "kg",
+            Self::Liter => "L",
+            Self::AlcoholUnit => "u",
             Self::Null => "",
         };
 
@@ -1024,6 +1032,10 @@ impl FromStr for Unit {
             "rpm" => Ok(Self::RevolutionPerMinute),
             "s" => Ok(Self::Second),
             "activities" => Ok(Self::NumberOfActivities),
+            "g" => Ok(Self::Gram),
+            "kg" => Ok(Self::Kilogram),
+            "L" => Ok(Self::Liter),
+            "u" => Ok(Self::AlcoholUnit),
             "°" => Ok(Self::Degree),
             "" => Ok(Self::Null),
             _ => Err(format!("Unknown Unit: {s}")),

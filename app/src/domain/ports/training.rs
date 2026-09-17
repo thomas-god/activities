@@ -15,6 +15,7 @@ use crate::domain::{
             TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
             TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
             TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+            WeightAndNutrition, WeightAndNutritionPatch,
         },
     },
     ports::{DateRange, search::RemainingDocuments},
@@ -316,6 +317,46 @@ pub enum HooperIndexError {
     Unknown(#[from] anyhow::Error),
 }
 
+#[derive(Debug, Clone, Constructor)]
+pub struct SaveWeightAndNutritionRequest {
+    user: UserId,
+    date: chrono::NaiveDate,
+    patch: WeightAndNutritionPatch,
+}
+
+impl SaveWeightAndNutritionRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn date(&self) -> &chrono::NaiveDate {
+        &self.date
+    }
+    pub fn patch(&self) -> &WeightAndNutritionPatch {
+        &self.patch
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct DeleteWeightAndNutritionRequest {
+    user: UserId,
+    date: chrono::NaiveDate,
+}
+
+impl DeleteWeightAndNutritionRequest {
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+    pub fn date(&self) -> &chrono::NaiveDate {
+        &self.date
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum WeightAndNutritionError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 ///////////////////////////////////////////////////////////////////
 /// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
@@ -483,6 +524,22 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteHooperIndexRequest,
     ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
+
+    fn save_weight_and_nutrition(
+        &self,
+        req: SaveWeightAndNutritionRequest,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn get_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: &NaiveDate,
+    ) -> impl Future<Output = Result<Option<WeightAndNutrition>, WeightAndNutritionError>> + Send;
+
+    fn delete_weight_and_nutrition(
+        &self,
+        req: DeleteWeightAndNutritionRequest,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -969,6 +1026,33 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         date: chrono::NaiveDate,
     ) -> impl Future<Output = Result<(), HooperIndexError>> + Send;
+
+    fn save_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+        value: &WeightAndNutrition,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn get_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<Option<WeightAndNutrition>, WeightAndNutritionError>> + Send;
+
+    fn get_weight_and_nutritions(
+        &self,
+        user: &UserId,
+        range: &DateRange,
+    ) -> impl Future<
+        Output = Result<Vec<(chrono::NaiveDate, WeightAndNutrition)>, WeightAndNutritionError>,
+    > + Send;
+
+    fn delete_weight_and_nutrition(
+        &self,
+        user: &UserId,
+        date: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
 }
 
 #[cfg(test)]
