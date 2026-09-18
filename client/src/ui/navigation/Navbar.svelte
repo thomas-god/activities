@@ -143,23 +143,23 @@
 				<li>
 					<button onclick={() => activitiesUploadDialog.showModal()}>
 						<SportShoe class="size-4" />
-						Add activities
-					</button>
-					<button onclick={() => newTrainingNoteDialog.showModal()}>
-						<NotebookPen class="size-4" />
-						Add training note
+						Activity
 					</button>
 					<button onclick={() => updateFeedbackDialog.showModal()}>
 						<MessageSquareHeart class="size-4" />
-						Update feedback
+						Feedback
 					</button>
 					<button onclick={() => updateWeightAndNutritionDialog.showModal()}>
 						<Utensils class="size-4" />
-						Update weight and nutrition
+						Weight and nutrition
+					</button>
+					<button onclick={() => newTrainingNoteDialog.showModal()}>
+						<NotebookPen class="size-4" />
+						Training note
 					</button>
 					<button onclick={() => createTrainingPeriodDialog.showModal()}>
 						<CalendarFold class="size-4" />
-						New training period
+						Training period
 					</button>
 					<button
 						onclick={() => {
@@ -168,7 +168,7 @@
 						}}
 					>
 						<ChartColumn class="size-4" />
-						New training metric
+						Training metric
 					</button>
 				</li>
 			</ul>
