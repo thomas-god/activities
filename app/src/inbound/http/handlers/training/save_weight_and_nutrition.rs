@@ -250,6 +250,27 @@ fn parse_headers(row: &str) -> Option<Vec<Option<CSVHeader>>> {
     Some(headers)
 }
 
+/// Tolerant date parsing: accepts a plain date, a datetime without timezone,
+/// or a datetime with timezone (e.g. RFC 3339), and extracts the naive date.
+fn parse_date(s: &str) -> Option<chrono::NaiveDate> {
+    // chrono's FromStr implementations require the ISO 8601 'T' separator,
+    // so normalize a single space separator (e.g. "2024-03-01 12:34:56") first.
+    let s = s.trim().trim_matches('"').replacen(' ', "T", 1);
+    s.parse::<chrono::NaiveDate>()
+        .ok()
+        .or_else(|| s.parse::<chrono::NaiveDateTime>().ok().map(|dt| dt.date()))
+        .or_else(|| {
+            s.parse::<chrono::DateTime<chrono::FixedOffset>>()
+                .ok()
+                .map(|dt| dt.date_naive())
+        })
+        .or_else(|| {
+            s.parse::<chrono::DateTime<chrono::Utc>>()
+                .ok()
+                .map(|dt| dt.date_naive())
+        })
+}
+
 fn parse_row(
     row: &str,
     headers: &[Option<CSVHeader>],
@@ -262,7 +283,7 @@ fn parse_row(
             continue;
         };
         match header {
-            CSVHeader::Date => date = col.parse::<chrono::NaiveDate>().ok(),
+            CSVHeader::Date => date = parse_date(col),
             // field absent or can't be parsed -> None
             // field present and can be parsed -> Some(Some()) as per the patch convention
             CSVHeader::Weight => patch.weight = col.parse::<f32>().ok().map(Some),
@@ -303,6 +324,23 @@ mod tests {
     use crate::inbound::http::shared::PatchField;
 
     use super::*;
+
+    #[test]
+    fn test_parse_date_accepts_date_datetime_and_tz() {
+        let expected = NaiveDate::from_ymd_opt(2024, 3, 1).unwrap();
+
+        assert_eq!(parse_date("2024-03-01"), Some(expected));
+        assert_eq!(parse_date("2024-03-01T12:34:56"), Some(expected));
+        assert_eq!(parse_date("2024-03-01 12:34:56"), Some(expected));
+        assert_eq!(parse_date("2024-03-01 12:34:56+02:00"), Some(expected));
+        assert_eq!(parse_date("2024-03-01 12:34:56Z"), Some(expected));
+        assert_eq!(parse_date("2024-03-01T12:34:56+02:00"), Some(expected));
+        assert_eq!(parse_date("2024-03-01T12:34:56Z"), Some(expected));
+        assert_eq!(parse_date("  2024-03-01  "), Some(expected));
+        assert_eq!(parse_date("\"2024-03-01\""), Some(expected));
+        assert_eq!(parse_date("\"2024-03-01 12:34:56+02:00\""), Some(expected));
+        assert_eq!(parse_date("not a date"), None);
+    }
 
     #[test]
     fn test_payload_distinguishes_absent_null_and_value() {
