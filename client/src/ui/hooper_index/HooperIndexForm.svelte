@@ -2,6 +2,7 @@
 	import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import { isSome, none, some, type Option } from '$lib/Options';
+	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import {
 		emptyHooperIndex,
 		HOOPER_MEASURE_MAX,
@@ -12,13 +13,26 @@
 
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>
-		fetchHooperIndex(date).then((loaded) => {
-			values = { ...loaded };
-			baseline = { ...loaded };
-		});
+		Promise.all([
+			fetchHooperIndex(date),
+			fetchHooperIndex(dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))
+		])
+			.then(([loaded, previous]) => {
+				values = { ...loaded };
+				baseline = { ...loaded };
+				previousValues = { ...previous };
+				loadError = false;
+			})
+			.catch(() => {
+				loadError = true;
+			});
 	let loadPromise = $derived(setLoadPromise());
+	let loadError = $derived(false);
 	let values = $state<HooperIndex>(emptyHooperIndex());
 	let baseline = $state<HooperIndex>(emptyHooperIndex());
+	let previousValues = $state<HooperIndex>(emptyHooperIndex());
+	const isToday = $derived(date === dayjs().format('YYYY-MM-DD'));
+	const previousLabel = $derived(isToday ? 'yesterday' : 'day before');
 	const isDirty = $derived(hooperMeasures.some((measure) => values[measure] !== baseline[measure]));
 
 	let savePromise: Option<Promise<void>> = $state(none());
@@ -34,21 +48,36 @@
 
 <fieldset class="fieldset rounded-box border-base-300 bg-base-100">
 	<legend class="fieldset-legend text-base">Update subjective feedback</legend>
-	<div>
-		<label class="label" for="hooper-date">Date</label>
-		<input id="hooper-date" type="date" class="input w-full input-sm" bind:value={date} />
+	<div class="flex flex-row items-center gap-1">
+		<label class="label mr-3" for="hooper-date">Date</label>
+		<button
+			class="btn btn-sm"
+			onclick={() => (date = dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))}
+		>
+			<ChevronLeft class="size-4" />
+		</button>
+		<input id="hooper-date" type="date" class="input w-35 input-sm" bind:value={date} />
+		<button
+			class="btn btn-sm"
+			onclick={() => (date = dayjs(date).add(1, 'day').format('YYYY-MM-DD'))}
+		>
+			<ChevronRight class="size-4" />
+		</button>
 	</div>
 
-	{#await loadPromise}
-		<div class="flex justify-center py-6">
-			<span class="loading loading-lg loading-spinner"></span>
-		</div>
-	{:then}
+	{#if loadError}
+		<p class="text-error">Failed to load the values for this date.</p>
+	{:else}
 		{#each hooperMeasures as measure (measure)}
 			{@const value = values[measure]}
 			<div class="flex flex-col gap-1">
 				<div class="flex items-center justify-between">
-					<label class="label capitalize" for="hooper-{measure}">{measure}</label>
+					<label class="label capitalize" for="hooper-{measure}">
+						{measure}
+						<span class="text-xs font-normal normal-case opacity-50">
+							({previousLabel}: {previousValues[measure] ?? '–'} )
+						</span>
+					</label>
 					<div class="flex items-center gap-1">
 						<span
 							class="text-sm font-semibold tabular-nums"
@@ -86,9 +115,8 @@
 		{/each}
 
 		{@render actions()}
-	{:catch}
-		<p class="text-error">Failed to load the values for this date.</p>
-	{/await}
+	{/if}
+	{#await loadPromise}{/await}
 </fieldset>
 
 {#snippet actions()}
