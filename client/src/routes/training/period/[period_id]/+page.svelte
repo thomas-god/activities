@@ -37,7 +37,6 @@
 	import TrainingMetricImportForm from '$ui/training_metrics/TrainingMetricFormImport.svelte';
 	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import NavbarPeriods from '$ui/navigation/NavbarPeriods.svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
@@ -57,11 +56,15 @@
 	import { formatPeriodDuration } from '$lib/trainingPeriod';
 	import SportIcon from '$ui/shared/SportIcon.svelte';
 	import SearchField, { type SearchResult } from '$ui/shared/SearchField.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let period_id = $state(page.params.period_id);
 
+	const generatePageDetailsPromise = (): Option<Promise<TrainingPeriodDetails | null>> =>
+		period_id === undefined ? none() : some(fetchTrainingPeriodDetails(fetch, period_id));
+	const updatePageDetailsPromise = () => (pageDetailsPromise = generatePageDetailsPromise());
 	let pageDetailsPromise: Option<Promise<TrainingPeriodDetails | null>> = $derived(
-		period_id === undefined ? none() : some(fetchTrainingPeriodDetails(fetch, period_id))
+		generatePageDetailsPromise()
 	);
 	const generateMetricsPromise = (): Option<Promise<TrainingMetricList>> =>
 		period_id === undefined ? none() : some(fetchTrainingPeriodMetrics(fetch, period_id));
@@ -301,7 +304,15 @@
 
 <svelte:window bind:innerWidth={screenWidth} />
 
-<NavbarPeriods invalidateTrainingPeriods={() => invalidate('app:training-periods')} />
+<Navbar
+	invalidateTrainingPeriods={() => invalidate('app:training-periods')}
+	invalidateTrainingMetrics={updateMetricsPromise}
+	invalidateActivities={() => {
+		updatePageDetailsPromise();
+		updateMetricsPromise();
+	}}
+	invalidateTrainingNotes={updateTrainingNotesPromise}
+/>
 
 {#if isSome(pageDetailsPromise)}
 	{#await pageDetailsPromise.value}

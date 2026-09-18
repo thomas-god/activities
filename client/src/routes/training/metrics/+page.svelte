@@ -6,8 +6,8 @@
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
 	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
 	import { isSome, some, type Option } from '$lib/Options';
-	import NavbarMetrics from '$ui/navigation/NavbarMetrics.svelte';
 	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let chartWidths: number[] = $state([]);
 
@@ -35,7 +35,7 @@
 	};
 </script>
 
-<NavbarMetrics invalidateTrainingMetrics={setMetricsPromise} />
+<Navbar invalidateTrainingMetrics={setMetricsPromise} />
 
 <div class="mx-auto flex flex-col gap-4 pt-5">
 	<TrainingMetricsOptions

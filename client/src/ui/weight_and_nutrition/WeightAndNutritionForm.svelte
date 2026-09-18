@@ -13,7 +13,6 @@
 		CalendarArrowUp,
 		ChevronLeft,
 		ChevronRight,
-		CircleX,
 		GlassWater,
 		RotateCcw,
 		Save,
@@ -29,6 +28,8 @@
 		type WeightAndNutritionCategory,
 		type WeightAndNutritionMeasure
 	} from '.';
+
+	let { callback }: { callback: () => void } = $props();
 
 	/** Inputs are kept as raw strings so partially typed decimals ("70.") survive re-renders. */
 	type EditableValues = Record<WeightAndNutritionMeasure, string>;
@@ -83,7 +84,10 @@
 	let savePromise: Option<Promise<void>> = $state(none());
 	const save = () =>
 		(savePromise = some(
-			saveWeightAndNutrition(date, toPatch(values)).then((_) => setLoadPromise())
+			saveWeightAndNutrition(date, toPatch(values)).then((_) => {
+				setLoadPromise();
+				callback();
+			})
 		));
 	const setMeasure = (measure: WeightAndNutritionMeasure, value: string) => {
 		values = { ...values, [measure]: value };
@@ -121,7 +125,6 @@
 		);
 	};
 
-	const clear = () => (values = toEditable(emptyWeightAndNutrition()));
 	const reset = () => (values = { ...baseline });
 
 	const inputStepValue = (unit: string): number => {

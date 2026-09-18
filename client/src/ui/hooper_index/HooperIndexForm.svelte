@@ -11,6 +11,8 @@
 		type HooperMeasure
 	} from '.';
 
+	let { callback }: { callback: () => void } = $props();
+
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>
 		Promise.all([
@@ -37,7 +39,12 @@
 
 	let savePromise: Option<Promise<void>> = $state(none());
 	const save = () =>
-		(savePromise = some(saveHooperIndex(date, { ...values }).then((_) => setLoadPromise())));
+		(savePromise = some(
+			saveHooperIndex(date, { ...values }).then((_) => {
+				setLoadPromise();
+				callback();
+			})
+		));
 	const setMeasure = (measure: HooperMeasure, value: number | null) => {
 		values = { ...values, [measure]: value };
 	};

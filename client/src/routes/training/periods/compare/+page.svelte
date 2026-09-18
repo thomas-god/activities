@@ -1,7 +1,6 @@
 <script lang="ts">
 	import ComparePeriodsSummary from '$ui/training_period/ComparePeriodsSummary.svelte';
 	import ComparePeriodsMetrics from '$ui/training_period/ComparePeriodsMetrics.svelte';
-	import NavbarPeriods from '$ui/navigation/NavbarPeriods.svelte';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -14,6 +13,7 @@
 	import { isNone, isSome, isSomeAnd, none, some, unwrapOr, type Option } from '$lib/Options';
 	import { ArrowLeftRight } from '@lucide/svelte';
 	import type { PageProps } from './$types';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -48,7 +48,7 @@
 	const swapPeriods = () => updateUrl(secondPeriodId, firstPeriodId);
 </script>
 
-<NavbarPeriods invalidateTrainingPeriods={() => invalidate('app:training-periods')} />
+<Navbar invalidateTrainingPeriods={() => invalidate('app:training-periods')} />
 
 {@render selectionSnippet()}
 

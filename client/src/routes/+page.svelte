@@ -10,12 +10,12 @@
 		type ActivityWithTimeseries
 	} from '$lib/api/activities';
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
-	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import { dayjs } from '$lib/duration';
 	import { some } from '$lib/Options';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 	import { resolve } from '$app/paths';
 	import { Maximize2, X } from '@lucide/svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -55,9 +55,11 @@
 
 <svelte:window bind:innerWidth={screenWidth} />
 
-<NavbarActivities
+<Navbar
 	invalidateActivities={() => invalidate('app:activities')}
-	invalidateTrainingNotes={() => invalidate('app:training-notes')}
+	invalidateTrainingNotes={() => invalidate('app:activities')}
+	invalidateTrainingPeriods={() => invalidate('app:activities')}
+	invalidateTrainingMetrics={() => invalidate('app:activities')}
 />
 
 <div class="homepage_container">

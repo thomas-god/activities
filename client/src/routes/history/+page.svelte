@@ -18,13 +18,13 @@
 	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
 	import type { ActivitiesFilters } from '$lib/filters';
-	import NavbarActivities from '$ui/navigation/NavbarActivities.svelte';
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, CalendarFold, List, Maximize2, Settings2, X } from '@lucide/svelte';
 	import { none, type Option } from '$lib/Options';
 	import type { SearchResult } from '$ui/shared/SearchField.svelte';
 	import SearchField from '$ui/shared/SearchField.svelte';
+	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -149,9 +149,9 @@
 <svelte:window bind:innerWidth={screenWidth} />
 
 <div class="flex flex-col">
-	<NavbarActivities
+	<Navbar
 		invalidateActivities={() => invalidate('app:activities')}
-		invalidateTrainingNotes={() => invalidate('app:training-notes')}
+		invalidateTrainingNotes={() => invalidate('app:activities')}
 	/>
 
 	<div class="flex flex-row items-start gap-2">

@@ -6,15 +6,36 @@
 	import ThemeToggle from '$ui/shared/ThemeToggle.svelte';
 	import { getTheme, persistTheme } from '$lib/contexts/theme';
 	import { getAuthInfo } from '$lib/contexts/auth';
-	import { isSome } from '$lib/Options';
-	import { CirclePlus, Menu } from '@lucide/svelte';
+	import { isSome, none, some, type Option } from '$lib/Options';
+	import {
+		CalendarFold,
+		ChartColumn,
+		CirclePlus,
+		Menu,
+		MessageSquareHeart,
+		NotebookPen,
+		SportShoe,
+		Utensils
+	} from '@lucide/svelte';
+	import ActivitiesUploader from './internal/ActivitiesUploader.svelte';
+	import CreateTrainingNote from './internal/CreateTrainingNote.svelte';
+	import HooperIndexForm from '$ui/hooper_index/HooperIndexForm.svelte';
+	import WeightAndNutritionForm from '$ui/weight_and_nutrition/WeightAndNutritionForm.svelte';
+	import CreateTrainingPeriod from './internal/CreateTrainingPeriod.svelte';
+	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
+	import type { Scope } from '$ui/training_metrics';
 
-	interface Cta {
-		label: string;
-		onClick: () => void;
-	}
-
-	let { ctas = [] }: { ctas?: Cta[] } = $props();
+	let {
+		invalidateActivities = () => {},
+		invalidateTrainingNotes = () => {},
+		invalidateTrainingPeriods = () => {},
+		invalidateTrainingMetrics = () => {}
+	}: {
+		invalidateActivities?: () => void;
+		invalidateTrainingNotes?: () => void;
+		invalidateTrainingPeriods?: () => void;
+		invalidateTrainingMetrics?: () => void;
+	} = $props();
 
 	let authInfo = getAuthInfo();
 	let showLogout = $derived(
@@ -47,6 +68,40 @@
 	]);
 
 	let addItemMenuBtn: HTMLButtonElement;
+
+	let activitiesUploadDialog: HTMLDialogElement;
+	let newTrainingNoteDialog: HTMLDialogElement;
+	let updateFeedbackDialog: HTMLDialogElement;
+	let updateWeightAndNutritionDialog: HTMLDialogElement;
+	let createTrainingPeriodDialog: HTMLDialogElement;
+	let createTrainingMetricDialog: HTMLDialogElement;
+	// To prevent the form from loading when the dialog is initialized but hidden
+	let showTrainingMetricForm = $state(false);
+
+	const activitiesUploadedCallback = () => {
+		invalidateActivities();
+	};
+	const newTrainingNoteCallback = () => {
+		newTrainingNoteDialog.close();
+		invalidateTrainingNotes();
+	};
+	const createTrainingPeriodCallback = () => {
+		createTrainingPeriodDialog.close();
+		invalidateTrainingPeriods();
+	};
+	const createTrainingMetricCallback = () => {
+		createTrainingMetricDialog.close();
+		invalidateTrainingMetrics();
+	};
+
+	let trainingPeriod: Option<string> = $derived(
+		page.url.pathname.startsWith('/training/period/')
+			? some(page.url.pathname.replace('/training/period/', ''))
+			: none()
+	);
+	let trainingPeriodScope: Scope = $derived(
+		isSome(trainingPeriod) ? { kind: 'period', periodId: trainingPeriod.value } : { kind: 'global' }
+	);
 </script>
 
 <div class="flex items-center justify-between gap-2">
@@ -85,18 +140,37 @@
 			class="menu dropdown w-52 rounded-box bg-base-100 shadow-sm"
 		>
 			<ul>
-				{#each ctas as cta (cta.label)}
-					<li>
-						<button
-							onclick={() => {
-								addItemMenuBtn.click();
-								cta.onClick();
-							}}
-						>
-							{cta.label}
-						</button>
-					</li>
-				{/each}
+				<li>
+					<button onclick={() => activitiesUploadDialog.showModal()}>
+						<SportShoe class="size-4" />
+						Add activities
+					</button>
+					<button onclick={() => newTrainingNoteDialog.showModal()}>
+						<NotebookPen class="size-4" />
+						Add training note
+					</button>
+					<button onclick={() => updateFeedbackDialog.showModal()}>
+						<MessageSquareHeart class="size-4" />
+						Update feedback
+					</button>
+					<button onclick={() => updateWeightAndNutritionDialog.showModal()}>
+						<Utensils class="size-4" />
+						Update weight and nutrition
+					</button>
+					<button onclick={() => createTrainingPeriodDialog.showModal()}>
+						<CalendarFold class="size-4" />
+						New training period
+					</button>
+					<button
+						onclick={() => {
+							showTrainingMetricForm = true;
+							createTrainingMetricDialog.showModal();
+						}}
+					>
+						<ChartColumn class="size-4" />
+						New training metric
+					</button>
+				</li>
 			</ul>
 		</div>
 
@@ -124,6 +198,83 @@
 		</div>
 	</div>
 </div>
+
+<dialog class="modal" bind:this={activitiesUploadDialog}>
+	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<ActivitiesUploader {activitiesUploadedCallback} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={newTrainingNoteDialog}>
+	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<CreateTrainingNote callback={newTrainingNoteCallback} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={updateFeedbackDialog}>
+	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<HooperIndexForm callback={invalidateTrainingMetrics} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={updateWeightAndNutritionDialog}>
+	<div class="modal-box">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<WeightAndNutritionForm callback={invalidateTrainingMetrics} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={createTrainingPeriodDialog}>
+	<div class="modal-box max-w-3xl">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		<CreateTrainingPeriod callback={createTrainingPeriodCallback} />
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
+
+<dialog class="modal" bind:this={createTrainingMetricDialog}>
+	<div class="modal-box max-w-3xl">
+		<form method="dialog">
+			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
+		</form>
+		{#if showTrainingMetricForm}
+			<TrainingMetricFormCreate
+				callback={createTrainingMetricCallback}
+				scope={trainingPeriodScope}
+			/>
+		{/if}
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
 
 <style>
 	.active {
