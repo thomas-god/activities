@@ -81,6 +81,7 @@
 	let uploadPromise: Option<Promise<void>> = $state(none());
 	let fileFailures: { file: string; reason: string }[] = $derived([]);
 	let uploadError: Option<string> = $derived(none());
+	let uploadSuccess = $state(false);
 
 	const setImportHistoryPromise = async () => {
 		if (!canUpload) {
@@ -90,8 +91,16 @@
 			importWeightAndNutritionHistory(files as FileList).then((err) => {
 				if (err.type === 'totalFailure') {
 					uploadError = some(err.reason);
+					fileFailures = [];
+					uploadSuccess = false;
 				} else if (err.type === 'partialFailure') {
+					uploadError = none();
 					fileFailures = err.files;
+					uploadSuccess = false;
+				} else if (err.type === 'success') {
+					uploadError = none();
+					fileFailures = [];
+					uploadSuccess = true;
 				}
 			})
 		);
@@ -167,6 +176,7 @@
 								Upload <span class="loading loading-spinner"></span>
 							</button>
 						{:then}
+							<!-- TODO: display something in case of success, else no feedback -->
 							<button
 								class="btn rounded-lg btn-primary"
 								disabled={!canUpload}
@@ -184,21 +194,26 @@
 							Upload
 						</button>
 					{/if}
-					{#if fileFailures.length > 0}
-						<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
-							Some files ({fileFailures.length}) could not be processed
-							<ul>
-								{#each fileFailures as { file, reason } (file)}
-									<li>
-										{file}: {reason}
-									</li>
-								{/each}
-							</ul>
-						</div>
-					{/if}
 				</div>
+				{#if uploadSuccess}
+					<div class="mt-2 rounded-box bg-success/20 p-3 text-success-content">
+						History import successful
+					</div>
+				{/if}
+				{#if fileFailures.length > 0}
+					<div class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
+						Some files ({fileFailures.length}) could not be processed
+						<ul>
+							{#each fileFailures as { file, reason } (file)}
+								<li>
+									{file}: {reason}
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 				{#if isSome(uploadError)}
-					<p class="mt-2 bg-error/20 p-3 text-error-content">
+					<p class="mt-2 rounded-box bg-error/20 p-3 text-error-content">
 						Error while importing history: {uploadError.value}
 					</p>
 				{/if}
