@@ -11,7 +11,7 @@
 		type HooperMeasure
 	} from '.';
 
-	let { callback }: { callback: () => void } = $props();
+	let { callback = () => {} }: { callback?: () => void } = $props();
 
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>

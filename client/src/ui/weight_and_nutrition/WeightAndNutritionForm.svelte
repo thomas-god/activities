@@ -29,7 +29,7 @@
 		type WeightAndNutritionMeasure
 	} from '.';
 
-	let { callback }: { callback: () => void } = $props();
+	let { callback = () => {} }: { callback?: () => void } = $props();
 
 	/** Inputs are kept as raw strings so partially typed decimals ("70.") survive re-renders. */
 	type EditableValues = Record<WeightAndNutritionMeasure, string>;

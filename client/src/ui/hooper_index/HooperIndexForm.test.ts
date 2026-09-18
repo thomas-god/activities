@@ -18,8 +18,14 @@ const mockedSave = vi.mocked(saveHooperIndex);
 /** The date the form defaults to when it is rendered without any interaction. */
 const today = () => dayjs().format('YYYY-MM-DD');
 
+/**
+ * Each measure label now ends with the previous day's value in parentheses,
+ * e.g. "fatigue (yesterday: 5)" or "fatigue (day before: not set)".
+ */
+const measureLabel = (measure: string): RegExp => new RegExp(`^${measure} \\(`);
+
 const slider = (measure: string): HTMLInputElement =>
-	screen.getByLabelText(measure) as HTMLInputElement;
+	screen.getByLabelText(measureLabel(measure)) as HTMLInputElement;
 
 const displayedValue = (measure: string): string =>
 	screen.getByTestId(`hooper-${measure}-value`).textContent?.trim() ?? '';
@@ -28,7 +34,7 @@ const displayedValue = (measure: string): string =>
 const renderForm = async (values: HooperIndex = emptyHooperIndex()) => {
 	mockedFetch.mockResolvedValue(values);
 	const result = render(HooperIndexForm);
-	await screen.findByLabelText('fatigue');
+	await screen.findByLabelText(measureLabel('fatigue'));
 	return result;
 };
 
@@ -48,9 +54,10 @@ describe('HooperIndexForm', () => {
 
 		render(HooperIndexForm);
 
-		await screen.findByLabelText('fatigue');
+		await screen.findByLabelText(measureLabel('fatigue'));
 
 		expect(mockedFetch).toHaveBeenCalledWith(today());
+		expect(mockedFetch).toHaveBeenCalledWith(dayjs().subtract(1, 'day').format('YYYY-MM-DD'));
 		expect(screen.getAllByRole('slider')).toHaveLength(hooperMeasures.length);
 		expect(displayedValue('fatigue')).toBe('6');
 		expect(slider('sleep')).toHaveClass('range-empty');
@@ -149,7 +156,9 @@ describe('HooperIndexForm', () => {
 
 		resolveSave(true);
 
-		await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(2));
+		// The reload after saving fetches both the current date and the day before,
+		// on top of the two initial load calls.
+		await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(4));
 		expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 	});
 
@@ -170,5 +179,22 @@ describe('HooperIndexForm', () => {
 				mood: 4
 			})
 		);
+	});
+
+	it('shows the previous day value as yesterday when the selected date is today', async () => {
+		await renderForm({ ...emptyHooperIndex(), fatigue: 5 });
+
+		expect(screen.getByText(/\(yesterday: 5\s*\)/)).toBeInTheDocument();
+		// Every measure but fatigue is unset on the previous day.
+		expect(screen.getAllByText(/\(yesterday: –\s*\)/)).toHaveLength(hooperMeasures.length - 1);
+	});
+
+	it('shows the previous day value as day before when the selected date is not today', async () => {
+		mockedFetch.mockResolvedValue({ ...emptyHooperIndex(), sleep: 3 });
+
+		render(HooperIndexForm);
+		await fireEvent.input(screen.getByLabelText('Date'), { target: { value: '2026-02-11' } });
+
+		expect(await screen.findByText(/\(day before: 3\s*\)/)).toBeInTheDocument();
 	});
 });

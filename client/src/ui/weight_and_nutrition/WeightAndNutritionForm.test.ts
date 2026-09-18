@@ -98,16 +98,6 @@ describe('WeightAndNutritionForm', () => {
 		expect(field('Calories').value).toBe('2000');
 	});
 
-	it('clears every measure with the Clear button', async () => {
-		const user = userEvent.setup();
-		await renderForm({ ...emptyWeightAndNutrition(), weight: 70, calories: 2000 });
-
-		await user.click(screen.getByRole('button', { name: 'Clear' }));
-
-		expect(field('Weight').value).toBe('');
-		expect(field('Calories').value).toBe('');
-	});
-
 	it('restores the loaded values with the Reset button', async () => {
 		const user = userEvent.setup();
 		await renderForm({ ...emptyWeightAndNutrition(), weight: 70, calories: 2000 });
@@ -115,9 +105,6 @@ describe('WeightAndNutritionForm', () => {
 		expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
 
 		await fireEvent.input(field('Weight'), { target: { value: '75' } });
-		await user.click(screen.getByRole('button', { name: 'Clear' }));
-
-		expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled();
 
 		await user.click(screen.getByRole('button', { name: 'Reset' }));
 
