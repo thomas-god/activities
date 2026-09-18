@@ -179,7 +179,7 @@ fn is_csv(filename: &str) -> bool {
 
 enum CSVHeader {
     Date,
-    Weight,
+    TotalWeight,
     Fat,
     Muscle,
     BMI,
@@ -229,7 +229,7 @@ fn parse_headers(row: &str) -> Option<Vec<Option<CSVHeader>>> {
                 date_found = true;
                 headers.push(Some(CSVHeader::Date));
             }
-            "weight" => headers.push(Some(CSVHeader::Weight)),
+            "weight" => headers.push(Some(CSVHeader::TotalWeight)),
             "muscle" => headers.push(Some(CSVHeader::Muscle)),
             "fat" => headers.push(Some(CSVHeader::Fat)),
             "bmi" => headers.push(Some(CSVHeader::BMI)),
@@ -286,7 +286,7 @@ fn parse_row(
             CSVHeader::Date => date = parse_date(col),
             // field absent or can't be parsed -> None
             // field present and can be parsed -> Some(Some()) as per the patch convention
-            CSVHeader::Weight => patch.weight = col.parse::<f32>().ok().map(Some),
+            CSVHeader::TotalWeight => patch.weight = col.parse::<f32>().ok().map(Some),
             CSVHeader::Fat => patch.fat = col.parse::<f32>().ok().map(Some),
             CSVHeader::Muscle => patch.muscle = col.parse::<f32>().ok().map(Some),
             CSVHeader::BMI => patch.bmi = col.parse::<f32>().ok().map(Some),
@@ -407,7 +407,7 @@ mod tests {
 
         assert_eq!(headers.len(), 11);
         assert!(matches!(headers[0], Some(CSVHeader::Date)));
-        assert!(matches!(headers[1], Some(CSVHeader::Weight)));
+        assert!(matches!(headers[1], Some(CSVHeader::TotalWeight)));
         assert!(matches!(headers[2], Some(CSVHeader::Fat)));
         assert!(matches!(headers[3], Some(CSVHeader::Muscle)));
         assert!(matches!(headers[4], Some(CSVHeader::BMI)));
@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(headers.len(), 4);
         assert!(matches!(headers[0], Some(CSVHeader::Date)));
         assert!(headers[1].is_none());
-        assert!(matches!(headers[2], Some(CSVHeader::Weight)));
+        assert!(matches!(headers[2], Some(CSVHeader::TotalWeight)));
         assert!(headers[3].is_none());
     }
 

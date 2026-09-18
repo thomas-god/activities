@@ -24,11 +24,7 @@ export const trainingMetricTemplateCategories = [
 	'Cadence',
 	'Altitude',
 	'Pace',
-	'Sleep',
-	'Stress',
-	'Fatigue',
-	'Pain',
-	'Mood',
+	'Feedback',
 	'Weight',
 	'Nutrition',
 	'Other'

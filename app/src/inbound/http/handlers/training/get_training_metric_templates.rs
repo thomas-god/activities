@@ -62,11 +62,7 @@ pub enum TrainingMetricTemplateCategory {
     Cadence,
     Altitude,
     Pace,
-    Fatigue,
-    Mood,
-    Stress,
-    Sleep,
-    Pain,
+    Feedback,
     Weight,
     Nutrition,
     Other,
@@ -195,11 +191,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     });
 
     // Subjective measures/Hooper index
-    let aggregates = [
-        TrainingMetricAggregate::Min,
-        TrainingMetricAggregate::Max,
-        TrainingMetricAggregate::Average,
-    ];
+    let aggregate = TrainingMetricAggregate::Average;
     let metrics = [
         HooperIndexSource::Fatigue,
         HooperIndexSource::Sleep,
@@ -207,22 +199,16 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         HooperIndexSource::Mood,
         HooperIndexSource::Pain,
     ];
-
-    for (source, aggregate) in metrics.iter().cartesian_product(aggregates.iter()) {
+    for source in metrics.iter() {
         templates.push(TrainingMetricTemplate {
-            display_name: format!("{} {}", format_aggregate(aggregate), source),
+            display_name: source.to_string(),
             source: TrainingMetricSource::HooperIndex(*source),
-            aggregate: *aggregate,
-            category: hooper_category(source),
+            aggregate: aggregate,
+            category: TrainingMetricTemplateCategory::Feedback,
         })
     }
 
     // Weight and nutrition metrics
-    let aggregates = [
-        TrainingMetricAggregate::Min,
-        TrainingMetricAggregate::Max,
-        TrainingMetricAggregate::Average,
-    ];
     let metrics = [
         WeightAndNutritionSource::Weight,
         WeightAndNutritionSource::Fat,
@@ -235,12 +221,12 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
         WeightAndNutritionSource::Water,
         WeightAndNutritionSource::Alcohol,
     ];
-
-    for (source, aggregate) in metrics.iter().cartesian_product(aggregates.iter()) {
+    let aggregate = TrainingMetricAggregate::Average;
+    for source in metrics.iter() {
         templates.push(TrainingMetricTemplate {
-            display_name: format!("{} {}", format_aggregate(aggregate), source),
+            display_name: weight_and_nutrition_format_source(source),
             source: TrainingMetricSource::WeightAndNutrition(*source),
-            aggregate: *aggregate,
+            aggregate: aggregate,
             category: weight_and_nutrition_category(source),
         })
     }
@@ -290,13 +276,10 @@ fn metric_category(metric: &ActivityMetric) -> TrainingMetricTemplateCategory {
     }
 }
 
-fn hooper_category(source: &HooperIndexSource) -> TrainingMetricTemplateCategory {
+fn weight_and_nutrition_format_source(source: &WeightAndNutritionSource) -> String {
     match source {
-        HooperIndexSource::Fatigue => TrainingMetricTemplateCategory::Fatigue,
-        HooperIndexSource::Mood => TrainingMetricTemplateCategory::Mood,
-        HooperIndexSource::Sleep => TrainingMetricTemplateCategory::Sleep,
-        HooperIndexSource::Stress => TrainingMetricTemplateCategory::Stress,
-        HooperIndexSource::Pain => TrainingMetricTemplateCategory::Pain,
+        WeightAndNutritionSource::Weight => String::from("Total weight"),
+        source => source.to_string(),
     }
 }
 
