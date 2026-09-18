@@ -10,6 +10,9 @@
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import {
 		ArchiveRestore,
+		CalendarArrowUp,
+		ChevronLeft,
+		ChevronRight,
 		CircleX,
 		GlassWater,
 		RotateCcw,
@@ -51,13 +54,25 @@
 		) as UpdateWeightAndNutritionPatch;
 
 	let date = $state(dayjs().format('YYYY-MM-DD'));
+	const isToday = $derived(date === dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>
-		fetchWeightAndNutrition(date).then((loaded) => {
-			values = toEditable(loaded);
-			baseline = toEditable(loaded);
-		});
+		Promise.all([
+			fetchWeightAndNutrition(date),
+			fetchWeightAndNutrition(dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))
+		])
+			.then(([loaded, previous]) => {
+				values = toEditable(loaded);
+				baseline = toEditable(loaded);
+				previousValues = toEditable(previous);
+				loadError = false;
+			})
+			.catch(() => {
+				loadError = true;
+			});
 	let loadPromise = $derived(setLoadPromise());
+	let loadError = $state(false);
 	let values = $state<EditableValues>(toEditable(emptyWeightAndNutrition()));
+	let previousValues = $state<EditableValues>(toEditable(emptyWeightAndNutrition()));
 	let baseline = $state<EditableValues>(toEditable(emptyWeightAndNutrition()));
 	const isDirty = $derived(
 		weightAndNutritionMeasures.some(
@@ -108,20 +123,42 @@
 
 	const clear = () => (values = toEditable(emptyWeightAndNutrition()));
 	const reset = () => (values = { ...baseline });
+
+	const inputStepValue = (unit: string): number => {
+		if (unit === 'kg' || unit === 'L') {
+			return 0.1;
+		} else if (unit === 'g') {
+			return 10;
+		} else if (unit === 'kcal') {
+			return 100;
+		} else {
+			return 1;
+		}
+	};
 </script>
 
 <fieldset class="fieldset min-w-0 rounded-box border-base-300 bg-base-100">
 	<legend class="fieldset-legend text-base">Update weight &amp; nutrition</legend>
-	<div class="flex flex-row gap-2">
-		<label class="label" for="wn-date">Date</label>
-		<input id="wn-date" type="date" class="input w-full input-sm" bind:value={date} />
+
+	<div class="flex flex-row items-center gap-1">
+		<label class="label mr-3" for="hooper-date">Date</label>
+		<button
+			class="btn btn-sm"
+			onclick={() => (date = dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'))}
+		>
+			<ChevronLeft class="size-4" />
+		</button>
+		<input id="hooper-date" type="date" class="input w-35 input-sm" bind:value={date} />
+		<button
+			class="btn btn-sm"
+			onclick={() => (date = dayjs(date).add(1, 'day').format('YYYY-MM-DD'))}
+		>
+			<ChevronRight class="size-4" />
+		</button>
 	</div>
 
-	{#await loadPromise}
-		<div class="flex justify-center py-6">
-			<span class="loading loading-lg loading-spinner"></span>
-		</div>
-	{:then}
+	{#await loadPromise}{/await}
+	{#if !loadError}
 		<div class="flex flex-col gap-3">
 			{#each weightAndNutritionCategories as category (category.key)}
 				<div class="rounded-box border border-base-300 p-3">
@@ -220,9 +257,9 @@
 			</div>
 		{/if}
 		{@render actions()}
-	{:catch}
+	{:else}
 		<p class="text-error">Failed to load the values for this date.</p>
-	{/await}
+	{/if}
 </fieldset>
 
 {#snippet measureField(measure: WeightAndNutritionMeasure)}
@@ -238,7 +275,7 @@
 			<input
 				id="wn-{measure}"
 				type="number"
-				step="any"
+				step={inputStepValue(unit)}
 				class="input w-full input-sm"
 				placeholder="Not set"
 				{value}
@@ -278,13 +315,17 @@
 			<RotateCcw class="size-4" />
 			Reset
 		</button>
-		<button class="btn btn-ghost btn-sm" onclick={clear}>
+		<!-- <button class="btn btn-ghost btn-sm" onclick={clear}>
 			<CircleX class="size-4" />
 			Clear
+		</button> -->
+		<button class="btn btn-ghost btn-sm" onclick={() => (values = previousValues)}>
+			<CalendarArrowUp class="size-4" />
+			Values from {isToday ? 'yesterday' : 'the day before'}
 		</button>
-		<button class="btn btn-ghost btn-sm" onclick={() => (showHistoryImport = true)}>
+		<button class="btn btn-ghost btn-sm" onclick={() => (showHistoryImport = !showHistoryImport)}>
 			<ArchiveRestore class="size-4" />
-			Import history
+			{showHistoryImport ? 'Close history import' : 'Import history'}
 		</button>
 	</div>
 {/snippet}
