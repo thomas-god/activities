@@ -6,7 +6,7 @@ export const hooperMeasures = ['fatigue', 'sleep', 'pain', 'stress', 'mood'] as 
 export type HooperMeasure = (typeof hooperMeasures)[number];
 
 /** Inclusive bounds of a single Hooper index measure. */
-export const HOOPER_MEASURE_MIN = 1;
+export const HOOPER_MEASURE_MIN = 0;
 export const HOOPER_MEASURE_MAX = 10;
 
 /** A Hooper index with every measure unset. */

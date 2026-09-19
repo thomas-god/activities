@@ -106,8 +106,8 @@ const TrainingMetricTemplatesSchema = z.array(
 	})
 );
 
-/** A subjective Hooper index measure, constrained to the 1..=10 range. */
-const SubjectiveScaleSchema = z.number().int().min(1).max(10);
+/** A subjective Hooper index measure, constrained to the 0..=10 range. */
+const SubjectiveScaleSchema = z.number().int().min(0).max(10);
 
 export const HooperIndexSchema = z.object({
 	fatigue: SubjectiveScaleSchema.nullable(),

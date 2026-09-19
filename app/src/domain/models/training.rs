@@ -1193,7 +1193,7 @@ impl TrainingPeriodWithActivities {
 // Hooper's Index
 // =============================================================================
 
-/// Subjective scale with value in [1, 10]
+/// Subjective scale with value in [0, 10]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SubjectiveScale(u8);
 
@@ -1201,8 +1201,8 @@ impl TryFrom<u8> for SubjectiveScale {
     type Error = String;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if value == 0 || value > 10 {
-            return Err("subjective scale must be in [1, 10]".to_string());
+        if value > 10 {
+            return Err("subjective scale must be in [0, 10]".to_string());
         }
 
         return Ok(Self(value));

@@ -896,7 +896,7 @@ mod tests {
 
     #[test]
     fn test_api_hooper_index_rejects_out_of_range_values() {
-        for invalid in [0u8, 11, 255] {
+        for invalid in [11, 255] {
             let api = APIHooperIndex {
                 fatigue: Some(invalid),
                 ..Default::default()
@@ -937,7 +937,7 @@ mod tests {
 
     #[test]
     fn test_api_hooper_index_patch_rejects_out_of_range_values() {
-        let body: APIHooperIndexPatch = serde_json::from_str(r#"{ "mood": 0 }"#).unwrap();
+        let body: APIHooperIndexPatch = serde_json::from_str(r#"{ "mood": 11 }"#).unwrap();
 
         assert!(HooperIndexPatch::try_from(body).is_err());
     }
