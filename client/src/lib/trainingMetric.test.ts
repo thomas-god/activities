@@ -19,7 +19,7 @@ import dayjs from 'dayjs';
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: { type: 'activity', metric: 'Distance' },
+	source: { type: 'activity', metric: { metric: 'Distance' } },
 	unit: 'm',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
@@ -68,7 +68,7 @@ describe('metricToPreviewBase', () => {
 	it('carries window, filters, summary and target', () => {
 		const base = extractBaseDefinitionFromMetric(makeMetric());
 
-		expect(base.source).toStrictEqual({ type: 'activity', metric: 'Distance' });
+		expect(base.source).toStrictEqual({ type: 'activity', metric: { metric: 'Distance' } });
 		expect(base.window).toEqual({
 			granularity: 'Weekly',
 			aggregate: 'Sum',
@@ -123,14 +123,14 @@ describe('compareMetricPreviewPayload', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: 'Distance' },
+				source: { type: 'activity', metric: { metric: 'Distance' } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
 
-		expect(payload.source).toStrictEqual({ type: 'activity', metric: 'Distance' });
+		expect(payload.source).toStrictEqual({ type: 'activity', metric: { metric: 'Distance' } });
 		expect(payload.start).toBe('2026-02-02');
 		expect(payload.end).toBe('2026-05-01');
 	});
@@ -141,7 +141,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: 'Distance' },
+				source: { type: 'activity', metric: { metric: 'Distance' } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -159,7 +159,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'first',
 			base: {
-				source: { type: 'activity', metric: 'Distance' },
+				source: { type: 'activity', metric: { metric: 'Distance' } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' },
 				filters: { sports: [{ Sport: 'Cycling' }] }
 			}
@@ -178,7 +178,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: 'Distance' },
+				source: { type: 'activity', metric: { metric: 'Distance' } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -277,7 +277,7 @@ describe('compareDefinitionLabel', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: 'Distance' },
+				source: { type: 'activity', metric: { metric: 'Distance' } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -292,7 +292,7 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: 'Distance' },
+					source: { type: 'activity', metric: { metric: 'Distance' } },
 					window: { granularity: 'Weekly', aggregate: 'Sum' }
 				}
 			})
@@ -304,7 +304,7 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: 'ActiveDuration' },
+					source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
 					window: { granularity: 'Daily', aggregate: 'Max' }
 				}
 			})

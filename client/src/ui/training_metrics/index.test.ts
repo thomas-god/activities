@@ -17,7 +17,7 @@ const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): Training
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: { type: 'activity', metric: 'ActiveDuration' },
+	source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
 	unit: 's',
 	scope: { type: 'global' },
 	granularity: 'Weekly',

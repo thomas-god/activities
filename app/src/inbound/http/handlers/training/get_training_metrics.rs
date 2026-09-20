@@ -247,6 +247,7 @@ mod tests {
         ActivityMetric, ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
     };
     use crate::domain::models::training::TrainingMetricTarget;
+    use crate::inbound::http::handlers::training::types::APIActivitySource;
 
     use super::*;
 
@@ -286,7 +287,9 @@ mod tests {
         let body = ResponseBody(vec![TrainingMetricBody {
             id: "metric-id-1".to_string(),
             name: Some("My Metric".to_string()),
-            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+            )),
             metric_formated: "Activity average calories".to_string(),
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),
@@ -319,7 +322,7 @@ mod tests {
                 {
                     "id": "metric-id-1",
                     "name": "My Metric",
-                    "source": {"type": "activity", "metric": "Calories"},
+                    "source": {"type": "activity", "metric": {"metric": "Calories"}},
                     "metric_formated": "Activity average calories",
                     "unit": "kcal",
                     "granularity": "Daily",

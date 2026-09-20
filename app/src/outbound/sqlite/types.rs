@@ -876,13 +876,30 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityMetric {
     }
 }
 
-impl sqlx::Type<sqlx::Sqlite> for TrainingMetricSource {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RepositoryTrainingMetricSource {
+    Activity(ActivityMetric),
+    HooperIndex(HooperIndexSource),
+    WeightAndNutrition(WeightAndNutritionSource),
+}
+
+impl From<&TrainingMetricSource> for RepositoryTrainingMetricSource {
+    fn from(value: &TrainingMetricSource) -> Self {
+        match value {
+            TrainingMetricSource::Activity(source) => Self::Activity(source.metric()),
+            TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
+            TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for RepositoryTrainingMetricSource {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
         <String as sqlx::Type<sqlx::Sqlite>>::type_info()
     }
 }
 
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricSource {
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RepositoryTrainingMetricSource {
     fn encode_by_ref(
         &self,
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
@@ -948,7 +965,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricSource {
     }
 }
 
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricSource {
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepositoryTrainingMetricSource {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         match s {

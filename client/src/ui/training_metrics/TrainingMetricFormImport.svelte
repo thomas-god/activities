@@ -2,6 +2,7 @@
 	import CopyUploadButton from '$ui/shared/CopyUploadButton.svelte';
 	import {
 		copyTrainingMetricIntoPeriod,
+		metricAsString,
 		type TrainingMetric,
 		type TrainingMetricList
 	} from '$lib/api';
@@ -28,7 +29,7 @@
 		const lines = [];
 
 		// Source metric
-		lines.push({ label: 'Source', value: metric.source.metric.toLocaleLowerCase() });
+		lines.push({ label: 'Source', value: metricAsString(metric) });
 
 		// Granularity
 		if (metric.granularity !== null) {

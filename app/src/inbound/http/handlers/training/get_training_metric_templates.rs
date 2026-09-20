@@ -33,10 +33,27 @@ use crate::{
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum TrainingMetricTemplateSource {
+    Activity(ActivityMetric),
+    HooperIndex(HooperIndexSource),
+    WeightAndNutrition(WeightAndNutritionSource),
+}
+
+impl TrainingMetricTemplateSource {
+    pub fn unit(&self) -> Unit {
+        match self {
+            Self::Activity(source) => source.unit(),
+            Self::HooperIndex(source) => source.unit(),
+            Self::WeightAndNutrition(source) => source.unit(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TrainingMetricTemplate {
     display_name: String,
-    source: TrainingMetricSource,
+    source: TrainingMetricTemplateSource,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
 }
@@ -44,7 +61,7 @@ pub struct TrainingMetricTemplate {
 #[derive(Debug, Clone, Serialize)]
 pub struct TrainingMetricTemplateBody {
     display_name: String,
-    source: APITrainingMetricSource,
+    source: TrainingMetricTemplateSource,
     unit: String,
     aggregate: TrainingMetricAggregate,
     category: TrainingMetricTemplateCategory,
@@ -72,7 +89,7 @@ impl From<&TrainingMetricTemplate> for TrainingMetricTemplateBody {
     fn from(value: &TrainingMetricTemplate) -> Self {
         Self {
             display_name: value.display_name.to_string(),
-            source: APITrainingMetricSource::from(&value.source),
+            source: value.source,
             unit: value.source.unit().to_string(),
             aggregate: value.aggregate,
             category: value.category,
@@ -100,7 +117,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
                     format_aggregate(&aggregate),
                     format_metric(&metric)
                 ),
-                source: TrainingMetricSource::Activity(metric),
+                source: TrainingMetricTemplateSource::Activity(metric),
                 aggregate,
                 category: metric_category(&metric),
             });
@@ -119,7 +136,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            source: TrainingMetricSource::Activity(metric),
+            source: TrainingMetricTemplateSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -137,7 +154,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            source: TrainingMetricSource::Activity(metric),
+            source: TrainingMetricTemplateSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -155,7 +172,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     ] {
         templates.push(TrainingMetricTemplate {
             display_name: format_metric(&metric),
-            source: TrainingMetricSource::Activity(metric),
+            source: TrainingMetricTemplateSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -174,7 +191,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
                 format_aggregate(&aggregate),
                 format_metric(&metric)
             ),
-            source: TrainingMetricSource::Activity(metric),
+            source: TrainingMetricTemplateSource::Activity(metric),
             aggregate,
             category: metric_category(&metric),
         });
@@ -185,7 +202,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     let aggregate = TrainingMetricAggregate::Sum;
     templates.push(TrainingMetricTemplate {
         display_name: format_metric(&metric),
-        source: TrainingMetricSource::Activity(metric),
+        source: TrainingMetricTemplateSource::Activity(metric),
         aggregate,
         category: metric_category(&metric),
     });
@@ -202,8 +219,8 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     for source in metrics.iter() {
         templates.push(TrainingMetricTemplate {
             display_name: source.to_string(),
-            source: TrainingMetricSource::HooperIndex(*source),
-            aggregate: aggregate,
+            source: TrainingMetricTemplateSource::HooperIndex(*source),
+            aggregate,
             category: TrainingMetricTemplateCategory::Feedback,
         })
     }
@@ -225,8 +242,8 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     for source in metrics.iter() {
         templates.push(TrainingMetricTemplate {
             display_name: weight_and_nutrition_format_source(source),
-            source: TrainingMetricSource::WeightAndNutrition(*source),
-            aggregate: aggregate,
+            source: TrainingMetricTemplateSource::WeightAndNutrition(*source),
+            aggregate,
             category: weight_and_nutrition_category(source),
         })
     }

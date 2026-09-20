@@ -84,6 +84,16 @@ const fieldsActiveFilters = (fields: TrainingMetricFields) => {
 	return activeFilters;
 };
 
+const convertTemplateSource = (
+	template: TrainingMetricTemplate
+): TrainingMetricBasePayload['source'] => {
+	if (template.source.type === 'activity') {
+		return { type: 'activity', metric: { metric: template.source.metric } };
+	} else {
+		return { type: template.source.type, metric: template.source.metric };
+	}
+};
+
 export const fieldsAsPayload = (
 	fields: TrainingMetricFields
 ): Option<TrainingMetricBasePayload> => {
@@ -91,7 +101,7 @@ export const fieldsAsPayload = (
 		return none();
 	}
 	let payload: Omit<TrainingMetricBasePayload, 'name'> = {
-		source: fields.selectedTemplate.value.source
+		source: convertTemplateSource(fields.selectedTemplate.value)
 	};
 
 	// Optional window
@@ -133,16 +143,31 @@ export const fieldsAsPayload = (
 	return some(payload);
 };
 
+const matchTemplate = (metric: TrainingMetric, template: TrainingMetricTemplate): boolean => {
+	if (metric.source.type === 'activity' && template.source.type === 'activity') {
+		if (metric.source.metric.metric !== template.source.metric) {
+			return false;
+		}
+	} else if (metric.source.type === 'hooperIndex' && template.source.type === 'hooperIndex') {
+		if (metric.source.metric !== template.source.metric) {
+			return false;
+		}
+	} else if (
+		metric.source.type === 'weightAndNutrition' &&
+		template.source.type === 'weightAndNutrition'
+	) {
+		if (metric.source.metric !== template.source.metric) {
+			return false;
+		}
+	}
+	return metric.aggregate === null ? true : metric.aggregate === template.aggregate;
+};
+
 export const matchMetricToFormFields = (
 	metric: TrainingMetric,
 	templates: TrainingMetricTemplate[]
 ): TrainingMetricFields => {
-	const selectedTemplate = templates.find(
-		(template) =>
-			metric.source.metric === template.source.metric &&
-			metric.source.type === template.source.type &&
-			(metric.aggregate === null ? true : metric.aggregate === template.aggregate)
-	);
+	const selectedTemplate = templates.find((template) => matchTemplate(metric, template));
 
 	const filters = {
 		sports: metric.sports === null ? none() : some(metric.sports.sports),

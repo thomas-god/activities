@@ -109,17 +109,18 @@ mod tests {
 
     use super::*;
 
-    use crate::domain::models::activity::Unit;
+    use crate::{
+        domain::models::activity::Unit, inbound::http::handlers::training::types::APIActivitySource,
+    };
 
     #[test]
     fn test_deserialize_required_fields_only() {
-        let json =
-            r#"{"name": "New Metric Name", "source": {"type": "activity", "metric": "Calories"}}"#;
+        let json = r#"{"name": "New Metric Name", "source": {"type": "activity", "metric": {"metric": "Calories"}}}"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
         assert_eq!(body.name, "New Metric Name".to_string());
         assert_eq!(
             body.source,
-            APITrainingMetricSource::Activity(ActivityMetric::Calories)
+            APITrainingMetricSource::Activity(APIActivitySource::new(ActivityMetric::Calories))
         );
         assert!(body.window.is_none());
         assert!(body.filters.is_none());
@@ -143,7 +144,7 @@ mod tests {
     fn test_build_request_with_target() {
         let json = r#"{
             "name": "New Metric Name",
-            "source": {"type": "activity", "metric": "Calories"},
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "target": {"value": 2000.0, "unit": "kcal"}
         }"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
@@ -164,7 +165,7 @@ mod tests {
     fn test_build_request_with_invalid_target_unit_rejected() {
         let json = r#"{
             "name": "New Metric Name",
-            "source": {"type": "activity", "metric": "Calories"},
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "target": {"value": 2000.0, "unit": "parsec"}
         }"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();

@@ -10,11 +10,11 @@ use crate::domain::{
         activity::ActivityMetric,
         search::{SearchDocument, SearchDocumentType},
         training::{
-            HooperIndex, HooperIndexSource, TrainingMetric, TrainingMetricDefinition,
-            TrainingMetricId, TrainingMetricScope, TrainingMetricSource, TrainingMetricValues,
-            TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote, TrainingNoteContent,
-            TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
-            WeightAndNutrition, WeightAndNutritionSource,
+            ActivitySource, HooperIndex, HooperIndexSource, TrainingMetric,
+            TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope, TrainingMetricSource,
+            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriodId, WeightAndNutrition, WeightAndNutritionSource,
         },
     },
     ports::{
@@ -89,7 +89,7 @@ where
     async fn compute_training_metric_values_for_activity(
         &self,
         definition: &TrainingMetricDefinition,
-        source: ActivityMetric,
+        source: ActivitySource,
         date_range: &DateRange,
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
         let activities_with_metrics = self
@@ -97,13 +97,13 @@ where
             .list_activities_with_metrics(
                 definition.user(),
                 &ListActivitiesFilters::empty().set_date_range(Some(date_range.clone())),
-                &[source],
+                &[source.metric()],
             )
             .await
             .map_err(|err| anyhow!(err))?
             .into_iter()
             .filter_map(|(activity, values)| {
-                if let Some(Some(value)) = values.get(&source).cloned() {
+                if let Some(Some(value)) = values.get(&source.metric()).cloned() {
                     Some((activity, value))
                 } else {
                     None
@@ -1343,7 +1343,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -1379,7 +1379,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -1432,7 +1432,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -1466,7 +1466,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -1500,7 +1500,7 @@ mod tests_training_metrics_service {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Test Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Average,
@@ -1561,7 +1561,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Calories),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Average,
@@ -1611,7 +1611,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Calories),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Average,
@@ -1636,7 +1636,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Calories),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
@@ -1689,7 +1689,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Calories),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
@@ -1715,7 +1715,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Calories),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Average,
@@ -1779,7 +1779,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Distance),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Weekly,
                         TrainingMetricAggregate::Sum,
@@ -1864,7 +1864,7 @@ mod tests_training_metrics_service {
                 TrainingMetricScope::Global,
                 TrainingMetricDefinition::new(
                     UserId::test_default(),
-                    TrainingMetricSource::Activity(ActivityMetric::Distance),
+                    TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
                     Some(TrainingMetricWindow::new(
                         TrainingMetricGranularity::Daily,
                         TrainingMetricAggregate::Sum,
@@ -1943,7 +1943,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("test-period")),
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Duration),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Duration,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Weekly,
                             TrainingMetricAggregate::Average,
@@ -2059,7 +2061,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Distance),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
@@ -2076,7 +2080,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Distance),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
@@ -2154,7 +2160,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Distance),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
@@ -2171,7 +2179,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Distance),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
@@ -2188,7 +2198,9 @@ mod tests_training_metrics_service {
                     TrainingMetricScope::Global,
                     TrainingMetricDefinition::new(
                         UserId::test_default(),
-                        TrainingMetricSource::Activity(ActivityMetric::Distance),
+                        TrainingMetricSource::Activity(ActivitySource::new(
+                            ActivityMetric::Distance,
+                        )),
                         Some(TrainingMetricWindow::new(
                             TrainingMetricGranularity::Daily,
                             TrainingMetricAggregate::Sum,
@@ -2274,7 +2286,9 @@ mod tests_training_metrics_service {
                         TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
                         TrainingMetricDefinition::new(
                             UserId::test_default(),
-                            TrainingMetricSource::Activity(ActivityMetric::Distance),
+                            TrainingMetricSource::Activity(ActivitySource::new(
+                                ActivityMetric::Distance,
+                            )),
                             Some(TrainingMetricWindow::new(
                                 TrainingMetricGranularity::Daily,
                                 TrainingMetricAggregate::Sum,
@@ -2293,7 +2307,9 @@ mod tests_training_metrics_service {
                         TrainingMetricScope::TrainingPeriod(TrainingPeriodId::from("period-id")),
                         TrainingMetricDefinition::new(
                             UserId::test_default(),
-                            TrainingMetricSource::Activity(ActivityMetric::Distance),
+                            TrainingMetricSource::Activity(ActivitySource::new(
+                                ActivityMetric::Distance,
+                            )),
                             Some(TrainingMetricWindow::new(
                                 TrainingMetricGranularity::Daily,
                                 TrainingMetricAggregate::Sum,
@@ -2411,7 +2427,7 @@ mod tests_training_metrics_service {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 "user".to_string().into(),
-                TrainingMetricSource::Activity(ActivityMetric::Calories),
+                TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Average,
@@ -2542,7 +2558,7 @@ mod tests_training_metrics_service {
             "user".to_string().into(),
             TrainingMetricId::from("test"),
             TrainingMetricName::from("Updated Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Sum,
@@ -2578,7 +2594,7 @@ mod tests_training_metrics_service {
             "user".to_string().into(),
             TrainingMetricId::from("test"),
             TrainingMetricName::from("Updated Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -2616,7 +2632,7 @@ mod tests_training_metrics_service {
             "user".to_string().into(),
             TrainingMetricId::from("test"),
             TrainingMetricName::from("Updated Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -2653,7 +2669,7 @@ mod tests_training_metrics_service {
             "user".to_string().into(),
             TrainingMetricId::from("test"),
             TrainingMetricName::from("Updated Metric"),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -4482,7 +4498,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id,
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Sum,
@@ -4524,7 +4540,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id.clone(),
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Sum,
@@ -5115,7 +5131,7 @@ mod test_training_service_copy_metric {
             TrainingMetricScope::Global,
             TrainingMetricDefinition::new(
                 UserId::test_default(),
-                TrainingMetricSource::Activity(ActivityMetric::Distance),
+                TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,

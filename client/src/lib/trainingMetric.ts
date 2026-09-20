@@ -391,7 +391,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly distance',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: 'Distance' },
+			source: { type: 'activity', metric: { metric: 'Distance' } },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -401,7 +401,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly duration',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: 'ActiveDuration' },
+			source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -411,7 +411,7 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly elevation',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: 'Elevation' },
+			source: { type: 'activity', metric: { metric: 'Elevation' } },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -422,12 +422,20 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly calories',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: 'Calories' },
+			source: { type: 'activity', metric: { metric: 'Calories' } },
 			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
 			summary: { average: { include_zeros: false } }
 		}
 	}
 ];
+
+const metricAsString = (definition: CompareMetricDefinition): string => {
+	if (definition.base.source.type === 'activity') {
+		return definition.base.source.metric.metric.toLocaleLowerCase();
+	} else {
+		return definition.base.source.metric.toLocaleLowerCase();
+	}
+};
 
 /** Display label of a comparison definition, composed when it has no name. */
 export const definitionLabel = (definition: CompareMetricDefinition): string => {
@@ -438,9 +446,7 @@ export const definitionLabel = (definition: CompareMetricDefinition): string => 
 	const granularity = definition.base.window?.granularity;
 	const aggregate = definition.base.window?.aggregate ?? 'Sum';
 	const metricName =
-		aggregate === 'NumberOfActivities'
-			? definition.base.source.metric
-			: definition.base.source.metric.toLowerCase();
+		aggregate === 'NumberOfActivities' ? definition.base.source.metric : metricAsString(definition);
 
 	return [
 		granularity === undefined ? null : granularity.toLowerCase(),

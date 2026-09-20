@@ -209,16 +209,18 @@ mod tests {
 
     use crate::domain::models::activity::{BonkStatus, Sport, SportCategory, Unit, WorkoutType};
     use crate::domain::models::training::{
-        SportFilter, TrainingMetricSummaryAverage, TrainingMetricTarget,
+        ActivitySource, SportFilter, TrainingMetricSummaryAverage, TrainingMetricTarget,
     };
-    use crate::inbound::http::handlers::training::types::APITrainingMetricSummaryAverage;
+    use crate::inbound::http::handlers::training::types::{
+        APIActivitySource, APITrainingMetricSummaryAverage,
+    };
 
     #[test]
     fn test_request_deserialize_minimal() {
         // Test with only required fields
         // Demonstrates basic JSON format for the request
         let json = r#"{
-            "source": {"type": "activity", "metric": "Calories"},
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "window": {
                 "granularity": "Daily",
                 "aggregate": "Sum"
@@ -250,7 +252,7 @@ mod tests {
         // - Optional group_by (values: Sport, SportCategory, WorkoutType, RpeRange, Bonked)
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
-            "source": {"type": "activity", "metric": "AvgSpeed"},
+            "source": {"type": "activity", "metric": {"metric": "AvgSpeed"}},
             "window": {
                 "granularity": "Daily",
                 "aggregate": "Sum",
@@ -279,7 +281,7 @@ mod tests {
     #[test]
     fn test_request_deserialize_with_target() {
         let json = r#"{
-            "source": {"type": "activity", "metric": "Calories"},
+            "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "target": {"value": 100.0, "unit": "km"},
             "start": "2024-01-01"
         }"#;
@@ -296,7 +298,9 @@ mod tests {
     #[test]
     fn test_to_body_minimal_request_uses_defaults() {
         let request = ComputeMetricValuesRequest {
-            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+            )),
             window: None,
             filters: None,
             summary: APITrainingMetricSummary::default(),
@@ -341,7 +345,9 @@ mod tests {
     #[test]
     fn test_to_body_full_request_maps_all_fields() {
         let request = ComputeMetricValuesRequest {
-            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+            )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Weekly,
                 APITrainingMetricAggregate::Sum,
@@ -413,7 +419,9 @@ mod tests {
     #[test]
     fn test_to_body_timeseries_metric_and_sport_category_filter() {
         let request = ComputeMetricValuesRequest {
-            source: APITrainingMetricSource::Activity(ActivityMetric::AvgSpeed),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::AvgSpeed,
+            )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Average,
@@ -456,7 +464,9 @@ mod tests {
     #[test]
     fn test_to_body_window_without_filters_keeps_sports_default() {
         let request = ComputeMetricValuesRequest {
-            source: APITrainingMetricSource::Activity(ActivityMetric::Distance),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Distance,
+            )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Monthly,
                 APITrainingMetricAggregate::Sum,
@@ -490,7 +500,9 @@ mod tests {
     #[test]
     fn test_to_body_empty_filter_lists_are_preserved() {
         let request = ComputeMetricValuesRequest {
-            source: APITrainingMetricSource::Activity(ActivityMetric::Calories),
+            source: APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+            )),
             window: None,
             filters: Some(APITrainingMetricFilters {
                 sports: Some(vec![]),

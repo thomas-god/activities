@@ -35,7 +35,7 @@ describe('HooperIndexSchema', () => {
 	});
 
 	it('rejects out of range values', () => {
-		for (const value of [0, 11, -1]) {
+		for (const value of [11, -1]) {
 			expect(() =>
 				HooperIndexSchema.parse({
 					fatigue: value,
@@ -103,7 +103,7 @@ describe('UpdateHooperIndexSchema', () => {
 	});
 
 	it('rejects out of range values', () => {
-		expect(() => UpdateHooperIndexSchema.parse({ mood: 0 })).toThrow();
+		expect(() => UpdateHooperIndexSchema.parse({ mood: 11 })).toThrow();
 	});
 });
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type TrainingMetric } from '$lib/api';
+	import { metricAsString, type TrainingMetric } from '$lib/api';
 	import { aggregateFunctionDisplay } from '$lib/trainingMetric';
 	import TrainingMetricMenu from './internal/TrainingMetricMenu.svelte';
 
@@ -20,7 +20,7 @@
 				{aggregateFunctionDisplay[metric.aggregate]}
 			{/if}
 			{#if metric.aggregate !== 'NumberOfActivities'}
-				{metric.source.metric.toLowerCase()}
+				{metricAsString(metric)}
 			{/if}
 		{/if}
 	</div>

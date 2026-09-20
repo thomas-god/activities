@@ -50,14 +50,17 @@ const TrainingPeriodDetailsSchema = z.object({
 	activities: z.array(ActivitySchema)
 });
 
+const TrainingMetricSourceSchema = z.discriminatedUnion('type', [
+	z.object({ type: z.literal('activity'), metric: z.object({ metric: z.string() }) }),
+	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
+	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() })
+]);
+
 // Schema for the new API response with grouped values
 const TrainingMetricSchema = z.object({
 	id: z.string(),
 	name: z.string().nullable(),
-	source: z.object({
-		type: z.enum(['activity', 'hooperIndex', 'weightAndNutrition'] as const),
-		metric: z.string()
-	}),
+	source: TrainingMetricSourceSchema,
 	unit: z.string(),
 	scope: z.discriminatedUnion('type', [
 		z.object({ type: z.literal('global') }),
@@ -93,13 +96,16 @@ const TrainingNoteSchema = z.object({
 
 const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 
+const TemplateMetricSourceSchema = z.discriminatedUnion('type', [
+	z.object({ type: z.literal('activity'), metric: z.string() }),
+	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
+	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() })
+]);
+
 const TrainingMetricTemplatesSchema = z.array(
 	z.object({
 		display_name: z.string(),
-		source: z.object({
-			type: z.enum(['activity', 'hooperIndex', 'weightAndNutrition'] as const),
-			metric: z.string()
-		}),
+		source: TemplateMetricSourceSchema,
 		aggregate: z.enum(trainingMetricAggregateFunctions),
 		unit: z.string(),
 		category: z.enum(trainingMetricTemplateCategories)
@@ -190,6 +196,18 @@ export type UpdateHooperIndexPatch = z.infer<typeof UpdateHooperIndexSchema>;
 export type WeightAndNutrition = z.infer<typeof WeightAndNutritionSchema>;
 export type CreateWeightAndNutritionBody = z.infer<typeof CreateWeightAndNutritionSchema>;
 export type UpdateWeightAndNutritionPatch = z.infer<typeof UpdateWeightAndNutritionSchema>;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+//
+export const metricAsString = (metric: TrainingMetric): string => {
+	if (metric.source.type === 'activity') {
+		return metric.source.metric.metric.toLocaleLowerCase();
+	} else {
+		return metric.source.metric.toLocaleLowerCase();
+	}
+};
 
 // =============================================================================
 // API Functions
@@ -589,10 +607,12 @@ export const fetchTrainingMetricTemplates = async () => {
 };
 
 export interface TrainingMetricBasePayload {
-	source: {
-		type: 'activity' | 'hooperIndex' | 'weightAndNutrition';
-		metric: string;
-	};
+	source:
+		| {
+				type: 'hooperIndex' | 'weightAndNutrition';
+				metric: string;
+		  }
+		| { type: 'activity'; metric: { metric: string } };
 	window?: {
 		granularity: TrainingMetricGranularity;
 		aggregate: TrainingMetricAggregateFunction;

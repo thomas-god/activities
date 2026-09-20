@@ -1,24 +1,16 @@
 <script lang="ts">
+	import { metricAsString, type TrainingMetric } from '$lib/api';
 	import {
 		getMetricsOrdering,
 		setMetricsOrdering,
 		type MetricsOrderingScope
 	} from '$lib/api/training-metrics-ordering';
-	import {
-		aggregateFunctionDisplay,
-		type TrainingMetricAggregateFunction
-	} from '$lib/trainingMetric';
+	import { aggregateFunctionDisplay } from '$lib/trainingMetric';
 	import { ArrowDown, ArrowUp, List } from '@lucide/svelte';
 
 	interface Props {
 		scope: MetricsOrderingScope;
-		metrics: Array<{
-			id: string;
-			name: string | null;
-			granularity: string | null;
-			aggregate: TrainingMetricAggregateFunction | null;
-			source: { type: string; metric: string };
-		}>;
+		metrics: TrainingMetric[];
 		onSaved?: () => void;
 	}
 
@@ -137,7 +129,7 @@
 		}
 
 		if (metric.aggregate !== 'NumberOfActivities') {
-			parts.push(metric.source.metric.toLowerCase());
+			parts.push(metricAsString(metric));
 		}
 
 		return parts.join(' ');

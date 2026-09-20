@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TrainingMetric } from '$lib/api/training';
+	import { metricAsString, type TrainingMetric } from '$lib/api/training';
 	import { none, type Option } from '$lib/Options';
 	import TrainingMetricMenu from '$ui/training_metrics/internal/TrainingMetricMenu.svelte';
 	import TrainingMetricChart from '../TrainingMetricChart.svelte';
@@ -48,7 +48,7 @@
 			{#if currentMetric.name}
 				{currentMetric.name}
 			{:else}
-				{currentMetric.source.metric.toLowerCase()}
+				{metricAsString(currentMetric)}
 			{/if}
 		</div>
 

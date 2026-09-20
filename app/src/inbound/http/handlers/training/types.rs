@@ -16,12 +16,12 @@ use crate::{
                 Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
             },
             training::{
-                HooperIndex, HooperIndexPatch, HooperIndexSource, SportFilter, SubjectiveScale,
-                TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricGranularity,
-                TrainingMetricGroupBy, TrainingMetricScope, TrainingMetricSource,
-                TrainingMetricSummary, TrainingMetricSummaryAverage, TrainingMetricTarget,
-                TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports, WeightAndNutrition,
-                WeightAndNutritionPatch, WeightAndNutritionSource,
+                ActivitySource, HooperIndex, HooperIndexPatch, HooperIndexSource, SportFilter,
+                SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
+                TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope,
+                TrainingMetricSource, TrainingMetricSummary, TrainingMetricSummaryAverage,
+                TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
+                WeightAndNutrition, WeightAndNutritionPatch, WeightAndNutritionSource,
             },
         },
         ports::training::{HooperIndexError, WeightAndNutritionError},
@@ -401,10 +401,33 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Constructor)]
+pub struct APIActivitySource {
+    metric: ActivityMetric,
+}
+
+impl Display for APIActivitySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.metric.to_string())
+    }
+}
+
+impl From<&APIActivitySource> for ActivitySource {
+    fn from(value: &APIActivitySource) -> Self {
+        Self::new(value.metric)
+    }
+}
+
+impl From<&ActivitySource> for APIActivitySource {
+    fn from(value: &ActivitySource) -> Self {
+        Self::new(value.metric())
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type", content = "metric", rename_all = "camelCase")]
 pub enum APITrainingMetricSource {
-    Activity(ActivityMetric),
+    Activity(APIActivitySource),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
 }
@@ -422,7 +445,9 @@ impl Display for APITrainingMetricSource {
 impl From<&APITrainingMetricSource> for TrainingMetricSource {
     fn from(value: &APITrainingMetricSource) -> Self {
         match value {
-            APITrainingMetricSource::Activity(source) => Self::Activity(*source),
+            APITrainingMetricSource::Activity(source) => {
+                Self::Activity(ActivitySource::from(source))
+            }
             APITrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
             APITrainingMetricSource::WeightAndNutrition(source) => {
                 Self::WeightAndNutrition(*source)
@@ -434,7 +459,9 @@ impl From<&APITrainingMetricSource> for TrainingMetricSource {
 impl From<&TrainingMetricSource> for APITrainingMetricSource {
     fn from(value: &TrainingMetricSource) -> Self {
         match value {
-            TrainingMetricSource::Activity(source) => Self::Activity(*source),
+            TrainingMetricSource::Activity(source) => {
+                Self::Activity(APIActivitySource::from(source))
+            }
             TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
             TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
         }
@@ -516,7 +543,9 @@ pub struct TrainingMetricBody {
 
 pub fn format_source_metric(source: &TrainingMetricSource) -> String {
     match source {
-        TrainingMetricSource::Activity(source) => format_activity_source_metric(source.source()),
+        TrainingMetricSource::Activity(source) => {
+            format_activity_source_metric(source.metric().source())
+        }
         TrainingMetricSource::HooperIndex(source) => source.to_string(),
         TrainingMetricSource::WeightAndNutrition(source) => source.to_string(),
     }
@@ -863,11 +892,15 @@ mod tests {
     #[test]
     fn test_format_source_metric() {
         assert_eq!(
-            format_source_metric(&TrainingMetricSource::Activity(ActivityMetric::Calories)),
+            format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories
+            ))),
             "Calories".to_string()
         );
         assert_eq!(
-            format_source_metric(&TrainingMetricSource::Activity(ActivityMetric::MaxCadence)),
+            format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::MaxCadence
+            ))),
             "Activity Max Cadence".to_string()
         );
     }

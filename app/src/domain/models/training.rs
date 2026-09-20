@@ -16,7 +16,7 @@ use crate::domain::{
         UserId,
         activity::{
             Activity, ActivityMetric, ActivityMetrics, ActivityRpe, BonkStatus, Sport,
-            SportCategory, ToUnit, Unit, WorkoutType,
+            SportCategory, Unit, WorkoutType,
         },
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
@@ -529,9 +529,30 @@ impl TrainingMetricDefinitionPatch {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Constructor)]
+pub struct ActivitySource {
+    metric: ActivityMetric,
+}
+
+impl ActivitySource {
+    pub fn metric(&self) -> ActivityMetric {
+        self.metric
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.metric.unit()
+    }
+}
+
+impl Display for ActivitySource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.metric.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TrainingMetricSource {
-    Activity(ActivityMetric),
+    Activity(ActivitySource),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
 }
@@ -593,7 +614,7 @@ impl TrainingMetricDefinition {
 
     pub fn unit(&self) -> Unit {
         match self.source() {
-            TrainingMetricSource::Activity(metric) => metric.source().unit(),
+            TrainingMetricSource::Activity(source) => source.unit(),
             TrainingMetricSource::HooperIndex(source) => source.unit(),
             TrainingMetricSource::WeightAndNutrition(source) => source.unit(),
         }
@@ -629,7 +650,7 @@ impl TrainingMetricDefinition {
     ) -> TrainingMetricValues {
         let values_by_bin = values
             .filter_map(|(date, value)| {
-                let Some(value) = value else { return None };
+                let value = value?;
 
                 // Hooper index values have no intrinsic group
                 Some(match &self.window {
@@ -655,7 +676,7 @@ impl TrainingMetricDefinition {
     ) -> TrainingMetricValues {
         let values_by_bin = values
             .filter_map(|(date, value)| {
-                let Some(value) = value else { return None };
+                let value = value?;
 
                 // Weight and nutrition values have no intrinsic group
                 Some(match &self.window {
@@ -722,9 +743,7 @@ impl TrainingMetricDefinition {
                 let value = match aggregate {
                     None => {
                         // Skip empty bins
-                        let Some(value) = values.first() else {
-                            return None;
-                        };
+                        let value = values.first()?;
                         TrainingMetricValue::SingleValue(value.value())
                     }
                     Some(aggregate) => aggregate.aggregate_values(&values)?,
@@ -743,7 +762,7 @@ impl TrainingMetricDefinition {
 /// Intermediate, source-agnostic, struct holding the value and metadata necessary to compute
 /// a training metric values. Sources (activity, hooper index) should map/convert to this struct.
 #[derive(Debug, Clone, Copy, Constructor)]
-pub(self) struct IndividualValue(f64);
+pub struct IndividualValue(f64);
 
 impl IndividualValue {
     fn value(&self) -> f64 {
@@ -1205,7 +1224,7 @@ impl TryFrom<u8> for SubjectiveScale {
             return Err("subjective scale must be in [0, 10]".to_string());
         }
 
-        return Ok(Self(value));
+        Ok(Self(value))
     }
 }
 
@@ -1786,7 +1805,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Max,
@@ -1815,7 +1834,7 @@ mod test_training_metrics {
             .collect();
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Weekly,
                 TrainingMetricAggregate::Max,
@@ -1860,7 +1879,7 @@ mod test_training_metrics {
         let window = None;
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             window,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -1902,7 +1921,7 @@ mod test_training_metrics {
         let window = None;
         let metric_definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             window,
             TrainingMetricActivityFilters::new(
                 Some(vec![SportFilter::Sport(Sport::Cycling)]),
@@ -3335,7 +3354,7 @@ mod test_training_metrics_ordering {
     fn generate_test_metrics() -> Vec<TrainingMetric> {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Sum,
@@ -3589,7 +3608,7 @@ mod test_training_metric_target {
     fn definition_with_target() -> TrainingMetricDefinition {
         TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3618,7 +3637,7 @@ mod test_training_metric_target {
     fn test_definition_target_is_none_when_not_set() {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivityMetric::Distance),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3632,7 +3651,7 @@ mod test_training_metric_target {
     fn test_apply_patch_updates_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3646,7 +3665,7 @@ mod test_training_metric_target {
         assert_eq!(target.unit(), Unit::KiloCalorie);
         assert_eq!(
             *patched.source(),
-            TrainingMetricSource::Activity(ActivityMetric::Calories)
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories))
         );
     }
 
@@ -3654,7 +3673,7 @@ mod test_training_metric_target {
     fn test_apply_patch_clears_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            TrainingMetricSource::Activity(ActivityMetric::Calories),
+            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
