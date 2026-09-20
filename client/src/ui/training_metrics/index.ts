@@ -1,10 +1,11 @@
-import type {
-	TrainingMetric,
-	TrainingMetricTemplate,
-	TrainingMetricBasePayload
+import {
+	type TrainingMetric,
+	type TrainingMetricTemplate,
+	type TrainingMetricBasePayload,
+	metricGroupBy
 } from '$lib/api/training';
 import { bonkStatusToAPI } from '$lib/nutrition';
-import { asOption, isNone, isSome, none, some, type Option } from '$lib/Options';
+import { asOption, isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
 import type { Sport, SportCategory } from '$lib/sport';
 import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
 import { workoutTypeToAPI } from '$lib/workout-type';
@@ -85,10 +86,14 @@ const fieldsActiveFilters = (fields: TrainingMetricFields) => {
 };
 
 const convertTemplateSource = (
-	template: TrainingMetricTemplate
+	template: TrainingMetricTemplate,
+	group_by: Option<TrainingMetricGroupByClause>
 ): TrainingMetricBasePayload['source'] => {
 	if (template.source.type === 'activity') {
-		return { type: 'activity', metric: { metric: template.source.metric } };
+		return {
+			type: 'activity',
+			metric: { metric: template.source.metric, group_by: unwrapOr(group_by, null) }
+		};
 	} else {
 		return { type: template.source.type, metric: template.source.metric };
 	}
@@ -101,7 +106,7 @@ export const fieldsAsPayload = (
 		return none();
 	}
 	let payload: Omit<TrainingMetricBasePayload, 'name'> = {
-		source: convertTemplateSource(fields.selectedTemplate.value)
+		source: convertTemplateSource(fields.selectedTemplate.value, fields.groupBy)
 	};
 
 	// Optional window
@@ -112,7 +117,7 @@ export const fieldsAsPayload = (
 		};
 
 		if (isSome(fields.groupBy)) {
-			window = { ...window, group_by: fields.groupBy.value };
+			window = { ...window };
 		}
 
 		payload = { ...payload, window };
@@ -177,11 +182,13 @@ export const matchMetricToFormFields = (
 		workoutTypes: asOption(metric.workout_types)
 	} as TrainingMetricFiltersType;
 
+	const groupBy = metricGroupBy(metric);
+
 	return {
 		name: metric.name || '',
 		selectedTemplate: selectedTemplate === undefined ? none() : some(selectedTemplate),
 		granularity: asOption(metric.granularity),
-		groupBy: asOption(metric.group_by),
+		groupBy,
 		showAverage: metric.show_average !== null,
 		target: asOption(metric.target?.value ?? null),
 		filters

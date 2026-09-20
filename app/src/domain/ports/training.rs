@@ -1093,7 +1093,9 @@ mod tests {
     use super::*;
 
     use crate::domain::models::activity::Unit;
-    use crate::domain::models::training::{ActivitySource, TrainingMetricTarget};
+    use crate::domain::models::training::{
+        ActivitySource, TrainingMetricGroupBy, TrainingMetricTarget,
+    };
 
     fn sample_target() -> TrainingMetricTarget {
         TrainingMetricTarget::new(100.0, Unit::Kilometer)
@@ -1104,7 +1106,10 @@ mod tests {
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
             TrainingMetricName::from("Metric"),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -1121,7 +1126,10 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -1139,7 +1147,10 @@ mod tests {
             UserId::test_default(),
             TrainingMetricId::from("id"),
             TrainingMetricName::from("Metric"),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),

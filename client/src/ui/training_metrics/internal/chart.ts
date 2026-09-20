@@ -1,4 +1,5 @@
 import { formatDurationCompactWithUnits } from '$lib/duration';
+import { isNone, type Option } from '$lib/Options';
 import { paceInSecondToString } from '$lib/speed';
 import type { TrainingMetricGroupByClause } from '$lib/trainingMetric';
 
@@ -22,11 +23,11 @@ export const formatTooltipValue = (
 /** Color of a metric value group, based on the group-by category. */
 export const getGroupColor = (
 	groupName: string,
-	groupBy: TrainingMetricGroupByClause | null
+	groupBy: Option<TrainingMetricGroupByClause>
 ): string | null => {
-	if (!groupBy) return null;
+	if (isNone(groupBy)) return null;
 
-	switch (groupBy) {
+	switch (groupBy.value) {
 		case 'RpeRange':
 			if (groupName === 'Easy') return 'var(--color-rpe-easy)';
 			if (groupName === 'Moderate') return 'var(--color-rpe-moderate)';

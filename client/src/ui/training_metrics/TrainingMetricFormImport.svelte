@@ -3,6 +3,7 @@
 	import {
 		copyTrainingMetricIntoPeriod,
 		metricAsString,
+		metricGroupBy,
 		type TrainingMetric,
 		type TrainingMetricList
 	} from '$lib/api';
@@ -42,8 +43,9 @@
 		}
 
 		// Group by if present
-		if (metric.group_by) {
-			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(metric.group_by) });
+		const groupBy = metricGroupBy(metric);
+		if (isSome(groupBy)) {
+			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(groupBy.value) });
 		}
 
 		// Sports filter

@@ -162,7 +162,6 @@ impl TryFrom<APITrainingMetricTarget> for TrainingMetricTarget {
 pub struct APITimeseriesWindow {
     granularity: APITrainingMetricGranularity,
     aggregate: APITrainingMetricAggregate,
-    group_by: Option<APITrainingMetricGroupBy>,
 }
 
 impl APITimeseriesWindow {
@@ -172,16 +171,12 @@ impl APITimeseriesWindow {
     pub fn aggregate(&self) -> &APITrainingMetricAggregate {
         &self.aggregate
     }
-    pub fn group_by(&self) -> &Option<APITrainingMetricGroupBy> {
-        &self.group_by
-    }
 }
 impl From<&APITimeseriesWindow> for TrainingMetricWindow {
     fn from(value: &APITimeseriesWindow) -> Self {
         Self::new(
             TrainingMetricGranularity::from(&value.granularity),
             TrainingMetricAggregate::from(&value.aggregate),
-            value.group_by.as_ref().map(TrainingMetricGroupBy::from),
         )
     }
 }
@@ -321,7 +316,7 @@ impl TryFrom<APITrainingMetricFilters> for TrainingMetricActivityFilters {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum APITrainingMetricGroupBy {
     Sport,
     SportCategory,
@@ -354,9 +349,29 @@ impl From<&APITrainingMetricGroupBy> for TrainingMetricGroupBy {
         }
     }
 }
+
 impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
     fn from(value: APITrainingMetricGroupBy) -> Self {
         Self::from(&value)
+    }
+}
+
+impl From<&TrainingMetricGroupBy> for APITrainingMetricGroupBy {
+    fn from(value: &TrainingMetricGroupBy) -> Self {
+        match value {
+            TrainingMetricGroupBy::Sport => Self::Sport,
+            TrainingMetricGroupBy::SportCategory => Self::SportCategory,
+            TrainingMetricGroupBy::WorkoutType => Self::WorkoutType,
+            TrainingMetricGroupBy::RpeRange => Self::RpeRange,
+            TrainingMetricGroupBy::Bonked => Self::Bonked,
+        }
+    }
+}
+
+#[cfg(test)]
+impl APITrainingMetricGroupBy {
+    pub fn none() -> Option<Self> {
+        None
     }
 }
 
@@ -403,7 +418,8 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Constructor)]
 pub struct APIActivitySource {
-    metric: ActivityMetric,
+    pub metric: ActivityMetric,
+    pub group_by: Option<APITrainingMetricGroupBy>,
 }
 
 impl Display for APIActivitySource {
@@ -414,13 +430,22 @@ impl Display for APIActivitySource {
 
 impl From<&APIActivitySource> for ActivitySource {
     fn from(value: &APIActivitySource) -> Self {
-        Self::new(value.metric)
+        Self::new(
+            value.metric,
+            value.group_by.as_ref().map(TrainingMetricGroupBy::from),
+        )
     }
 }
 
 impl From<&ActivitySource> for APIActivitySource {
     fn from(value: &ActivitySource) -> Self {
-        Self::new(value.metric())
+        Self::new(
+            value.metric(),
+            value
+                .group_by()
+                .as_ref()
+                .map(APITrainingMetricGroupBy::from),
+        )
     }
 }
 
@@ -536,7 +561,6 @@ pub struct TrainingMetricBody {
     pub show_average: Option<TrainingMetricSummaryAverage>,
     pub target: Option<TrainingMetricTarget>,
     pub values: HashMap<String, GranuleValues>,
-    pub group_by: Option<String>,
     pub scope: APITrainingMetricScope,
     pub summary: HashMap<String, f64>,
 }
@@ -893,13 +917,15 @@ mod tests {
     fn test_format_source_metric() {
         assert_eq!(
             format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
-                ActivityMetric::Calories
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none()
             ))),
             "Calories".to_string()
         );
         assert_eq!(
             format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
-                ActivityMetric::MaxCadence
+                ActivityMetric::MaxCadence,
+                TrainingMetricGroupBy::none()
             ))),
             "Activity Max Cadence".to_string()
         );

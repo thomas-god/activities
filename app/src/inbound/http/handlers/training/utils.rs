@@ -760,7 +760,6 @@ mod test_fill_grouped_metric_values {
         let window = TrainingMetricWindow::new(
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
             start: "2025-09-24".parse::<chrono::NaiveDate>().unwrap(),
@@ -803,7 +802,6 @@ mod test_fill_grouped_metric_values {
         let window = TrainingMetricWindow::new(
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
             start: "2025-09-23".parse::<chrono::NaiveDate>().unwrap(),
@@ -847,7 +845,6 @@ mod test_fill_grouped_metric_values {
         let window = TrainingMetricWindow::new(
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Average,
-            TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
             start: "2025-09-24".parse::<chrono::NaiveDate>().unwrap(),
@@ -889,7 +886,6 @@ mod test_fill_grouped_metric_values {
         let window = TrainingMetricWindow::new(
             TrainingMetricGranularity::Monthly,
             TrainingMetricAggregate::Average,
-            TrainingMetricGroupBy::none(),
         );
         let range = MetricsDateRange {
             start: "2025-09-14".parse::<chrono::NaiveDate>().unwrap(),

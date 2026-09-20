@@ -34,6 +34,7 @@ use crate::{
 pub struct ResponseBody(Vec<TrainingMetricTemplateBody>);
 
 #[derive(Debug, Clone, Copy, Serialize)]
+#[serde(tag = "type", content = "metric", rename_all = "camelCase")]
 pub enum TrainingMetricTemplateSource {
     Activity(ActivityMetric),
     HooperIndex(HooperIndexSource),

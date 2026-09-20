@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { TrainingMetric } from '$lib/api';
+	import { metricGroupBy, type TrainingMetric } from '$lib/api';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
-	import { none, some } from '$lib/Options';
+	import { isSome, none, some } from '$lib/Options';
 	import CompareMetricChartBars from './internal/CompareMetricChartBars.svelte';
 
 	let {
@@ -36,6 +36,8 @@
 		}
 		return { factor: 1, unit: metric.unit };
 	});
+
+	let groupBy = $derived(metricGroupBy(metric));
 </script>
 
 {#if metric.granularity === null}
@@ -54,8 +56,8 @@
 		granularity={metric.granularity}
 		unit={yScale.unit}
 		format={metricValuesDisplayFormat(metric)}
-		groupBy={metric.group_by}
-		showGroup={metric.group_by !== null}
+		{groupBy}
+		showGroup={isSome(groupBy)}
 		stacked={metric.aggregate === 'Sum'}
 		{average}
 		{target}

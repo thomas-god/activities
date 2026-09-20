@@ -15,7 +15,7 @@
 		granularity: string;
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
-		groupBy: TrainingMetricGroupByClause | null;
+		groupBy: Option<TrainingMetricGroupByClause>;
 		stacked?: boolean;
 		average: Option<number>;
 		target: Option<number>;

@@ -17,8 +17,8 @@ use crate::{
             activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric},
             training::{
                 SportFilter, TrainingMetric, TrainingMetricDefinition, TrainingMetricScope,
-                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricValues,
-                TrainingPeriodId, TrainingPeriodSports,
+                TrainingMetricSource, TrainingMetricSummaryAverage, TrainingMetricTarget,
+                TrainingMetricValues, TrainingPeriodId, TrainingPeriodSports,
             },
         },
         ports::{
@@ -149,10 +149,6 @@ fn to_response_body_item(
         show_average: definition.summary().average().clone(),
         target,
         values,
-        group_by: definition
-            .window()
-            .as_ref()
-            .and_then(|w| w.group_by().as_ref().map(|g| format!("{:?}", g))),
         scope: metric.scope().into(),
         summary,
     }
@@ -247,7 +243,9 @@ mod tests {
         ActivityMetric, ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
     };
     use crate::domain::models::training::TrainingMetricTarget;
-    use crate::inbound::http::handlers::training::types::APIActivitySource;
+    use crate::inbound::http::handlers::training::types::{
+        APIActivitySource, APITrainingMetricGroupBy,
+    };
 
     use super::*;
 
@@ -289,6 +287,7 @@ mod tests {
             name: Some("My Metric".to_string()),
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
+                Some(APITrainingMetricGroupBy::Sport),
             )),
             metric_formated: "Activity average calories".to_string(),
             unit: "kcal".to_string(),
@@ -307,7 +306,6 @@ mod tests {
                 "Running".to_string(),
                 HashMap::from([("2025-09-24".to_string(), 10.5)]),
             )]),
-            group_by: Some("Sport".to_string()),
             scope: APITrainingMetricScope::TrainingPeriod {
                 training_period_id: "period-1".to_string(),
             },
@@ -322,7 +320,7 @@ mod tests {
                 {
                     "id": "metric-id-1",
                     "name": "My Metric",
-                    "source": {"type": "activity", "metric": {"metric": "Calories"}},
+                    "source": {"type": "activity", "metric": {"metric": "Calories", "group_by": "Sport"}},
                     "metric_formated": "Activity average calories",
                     "unit": "kcal",
                     "granularity": "Daily",
@@ -341,7 +339,6 @@ mod tests {
                             "2025-09-24": 10.5
                         }
                     },
-                    "group_by": "Sport",
                     "scope": {
                         "type": "trainingPeriod",
                         "trainingPeriodId": "period-1"

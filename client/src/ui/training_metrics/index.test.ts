@@ -17,12 +17,11 @@ const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): Training
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
+	source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: 'Sport' } },
 	unit: 's',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
 	aggregate: 'Sum',
-	group_by: 'Sport',
 	sports: {
 		sports: ['Running'],
 		categories: ['Running']
@@ -65,8 +64,8 @@ describe('matchMetricToFormFields', () => {
 	it('returns none/empty defaults for nullable metric fields', () => {
 		const metric = makeMetric({
 			name: null,
+			source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: null } },
 			granularity: null,
-			group_by: null,
 			sports: null,
 			workout_types: null,
 			bonked: null,

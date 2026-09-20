@@ -9,6 +9,7 @@ import type {
 	PreviewTrainingMetricPayload,
 	TrainingPeriodDetails
 } from '$lib/api';
+import { asOption, isNone, none, type Option } from './Options';
 
 export const trainingMetricGranularities = ['Daily', 'Weekly', 'Monthly'] as const;
 export type TrainingMetricGranularity = (typeof trainingMetricGranularities)[number];
@@ -92,17 +93,17 @@ export const rpeRangeDisplay = (range: RpeRange): string => {
 
 export const displayGroupName = (
 	group: string,
-	groupBy: TrainingMetricGroupByClause | null
+	groupBy: Option<TrainingMetricGroupByClause>
 ): string => {
 	if (group === 'Other') {
 		return 'Other';
 	}
 
-	if (groupBy === null) {
+	if (isNone(groupBy)) {
 		return group;
 	}
 
-	switch (groupBy) {
+	switch (groupBy.value) {
 		case 'Sport':
 			return sportDisplay(group as Sport);
 		case 'SportCategory':
@@ -157,12 +158,24 @@ export const metricDefinitionKey = (metric: TrainingMetric): string =>
 		source: metric.source,
 		granularity: metric.granularity,
 		aggregate: metric.aggregate,
-		group_by: metric.group_by,
 		sports: metric.sports,
 		workout_types: metric.workout_types,
 		rpes: metric.rpes,
 		bonked: metric.bonked
 	});
+
+export const definitionGroupBy = (
+	definition: CompareMetricDefinition
+): Option<TrainingMetricGroupByClause> => {
+	if (
+		definition.base.source.type === 'activity' &&
+		definition.base.source.metric.group_by !== undefined
+	) {
+		return asOption(definition.base.source.metric.group_by);
+	} else {
+		return none();
+	}
+};
 
 const periodSportFilters = (
 	period: Pick<TrainingPeriodDetails, 'sports'>
@@ -193,9 +206,6 @@ export const extractBaseDefinitionFromMetric = (
 			granularity: metric.granularity,
 			aggregate: metric.aggregate
 		};
-		if (metric.group_by !== null) {
-			payload.window.group_by = metric.group_by;
-		}
 	}
 
 	if (
@@ -391,8 +401,8 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly distance',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Distance' } },
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			source: { type: 'activity', metric: { metric: 'Distance', group_by: 'SportCategory' } },
+			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
 	},
@@ -401,8 +411,8 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly duration',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: 'SportCategory' } },
+			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
 	},
@@ -411,8 +421,8 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly elevation',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Elevation' } },
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			source: { type: 'activity', metric: { metric: 'Elevation', group_by: 'SportCategory' } },
+			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
 	},
@@ -422,8 +432,8 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly calories',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Calories' } },
-			window: { granularity: 'Weekly', aggregate: 'Sum', group_by: 'SportCategory' },
+			source: { type: 'activity', metric: { metric: 'Calories', group_by: 'SportCategory' } },
+			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
 	}

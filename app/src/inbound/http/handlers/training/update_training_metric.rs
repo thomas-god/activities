@@ -110,7 +110,8 @@ mod tests {
     use super::*;
 
     use crate::{
-        domain::models::activity::Unit, inbound::http::handlers::training::types::APIActivitySource,
+        domain::models::activity::Unit,
+        inbound::http::handlers::training::types::{APIActivitySource, APITrainingMetricGroupBy},
     };
 
     #[test]
@@ -120,7 +121,10 @@ mod tests {
         assert_eq!(body.name, "New Metric Name".to_string());
         assert_eq!(
             body.source,
-            APITrainingMetricSource::Activity(APIActivitySource::new(ActivityMetric::Calories))
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+                APITrainingMetricGroupBy::none()
+            ))
         );
         assert!(body.window.is_none());
         assert!(body.filters.is_none());

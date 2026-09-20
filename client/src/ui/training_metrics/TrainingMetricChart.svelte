@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { TrainingMetric } from '$lib/api';
-	import { none, some, type Option } from '$lib/Options';
+	import { metricGroupBy, type TrainingMetric } from '$lib/api';
+	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricChartLine from './internal/TrainingMetricChartLine.svelte';
 	import TrainingMetricChartStacked from './internal/TrainingMetricChartStacked.svelte';
 
@@ -22,6 +22,7 @@
 		if (unit === 's/km') return 'pace';
 		return 'number';
 	};
+	let groupBy = $derived(metricGroupBy(metric));
 </script>
 
 {#if Object.entries(metric.values).length > 0}
@@ -33,8 +34,8 @@
 			unit={metric.unit}
 			granularity={metric.granularity}
 			format={previewFormat(metric.unit)}
-			showGroup={metric.group_by !== null}
-			groupBy={metric.group_by}
+			showGroup={isSome(groupBy)}
+			{groupBy}
 			stacked={metric.aggregate === 'Sum'}
 			average={'average' in metric.summary ? some(metric.summary.average) : none()}
 			target={metric.target === null ? none() : some(metric.target.value)}

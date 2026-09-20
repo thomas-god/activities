@@ -192,10 +192,6 @@ fn to_body(
             .map(TrainingMetricSummaryAverage::from),
         target,
         values,
-        group_by: request
-            .window
-            .as_ref()
-            .and_then(|w| w.group_by().as_ref().map(|g| g.to_string())),
         // Default to Global as not relevant for temporary metric
         scope: APITrainingMetricScope::Global,
         summary,
@@ -214,6 +210,13 @@ mod tests {
     use crate::inbound::http::handlers::training::types::{
         APIActivitySource, APITrainingMetricSummaryAverage,
     };
+
+    fn extract_group_by(request: &ComputeMetricValuesRequest) -> Option<APITrainingMetricGroupBy> {
+        match &request.source {
+            APITrainingMetricSource::Activity(source) => source.group_by.clone(),
+            _ => None,
+        }
+    }
 
     #[test]
     fn test_request_deserialize_minimal() {
@@ -237,7 +240,6 @@ mod tests {
             APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Sum,
-                None
             )
         );
         assert!(request.end.is_none());
@@ -249,14 +251,12 @@ mod tests {
         // Demonstrates complete JSON format including:
         // - Metric: ActivityMetricV2::AvgSpeed
         // - Optional end date
-        // - Optional group_by (values: Sport, SportCategory, WorkoutType, RpeRange, Bonked)
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
-            "source": {"type": "activity", "metric": {"metric": "AvgSpeed"}},
+            "source": {"type": "activity", "metric": {"metric": "AvgSpeed", "group_by": "Sport"}},
             "window": {
                 "granularity": "Daily",
-                "aggregate": "Sum",
-                "group_by": "Sport"
+                "aggregate": "Sum"
             },
             "start": "2024-01-01",
             "end": "2024-12-31",
@@ -266,13 +266,17 @@ mod tests {
 
         assert!(result.is_ok());
         let request = result.unwrap();
+
+        assert_eq!(
+            extract_group_by(&request),
+            Some(APITrainingMetricGroupBy::Sport)
+        );
         assert!(request.filters.is_some());
         assert_eq!(
             request.window.unwrap(),
             APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Sum,
-                Some(APITrainingMetricGroupBy::Sport)
             )
         );
         assert!(request.end.is_some());
@@ -300,6 +304,7 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
+                APITrainingMetricGroupBy::none(),
             )),
             window: None,
             filters: None,
@@ -337,7 +342,6 @@ mod tests {
         assert_eq!(body.show_average, None);
         assert_eq!(body.target, None);
         assert_eq!(body.values, values);
-        assert_eq!(body.group_by, None);
         assert_eq!(body.scope, APITrainingMetricScope::Global);
         assert_eq!(body.summary, summary);
     }
@@ -347,11 +351,11 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
+                Some(APITrainingMetricGroupBy::Sport),
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Weekly,
                 APITrainingMetricAggregate::Sum,
-                Some(APITrainingMetricGroupBy::Sport),
             )),
             filters: Some(APITrainingMetricFilters {
                 sports: Some(vec![SportFilter::Sport(Sport::Running)]),
@@ -393,6 +397,13 @@ mod tests {
 
         assert_eq!(body.id, "temporary-metric");
         assert_eq!(body.name, None);
+        assert_eq!(
+            body.source,
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+                Some(APITrainingMetricGroupBy::Sport),
+            ))
+        );
         assert_eq!(body.metric_formated, "Calories");
         assert_eq!(body.unit, "kcal");
         assert_eq!(body.granularity, Some("Weekly".to_string()));
@@ -411,7 +422,6 @@ mod tests {
         );
         assert_eq!(body.target, target);
         assert_eq!(body.values, values);
-        assert_eq!(body.group_by, Some("Sport".to_string()));
         assert_eq!(body.scope, APITrainingMetricScope::Global);
         assert_eq!(body.summary, summary);
     }
@@ -421,11 +431,11 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::AvgSpeed,
+                APITrainingMetricGroupBy::none(),
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Average,
-                None,
             )),
             filters: Some(APITrainingMetricFilters {
                 sports: Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
@@ -447,11 +457,17 @@ mod tests {
             None,
         );
 
+        assert_eq!(
+            body.source,
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::AvgSpeed,
+                APITrainingMetricGroupBy::none(),
+            ))
+        );
         assert_eq!(body.metric_formated, "Activity Average Speed");
         assert_eq!(body.unit, "m/s");
         assert_eq!(body.granularity, Some("Daily".to_string()));
         assert_eq!(body.aggregate, Some("Average".to_string()));
-        assert_eq!(body.group_by, None);
         assert_eq!(body.sports.categories, vec!["Running".to_string()]);
         assert!(body.sports.sports.is_empty());
         assert_eq!(body.workout_types, None);
@@ -466,11 +482,11 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Distance,
+                Some(APITrainingMetricGroupBy::WorkoutType),
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Monthly,
                 APITrainingMetricAggregate::Sum,
-                Some(APITrainingMetricGroupBy::WorkoutType),
             )),
             filters: None,
             summary: APITrainingMetricSummary::default(),
@@ -481,11 +497,17 @@ mod tests {
 
         let body = to_body(&request, HashMap::new(), Unit::Meter, HashMap::new(), None);
 
+        assert_eq!(
+            body.source,
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Distance,
+                Some(APITrainingMetricGroupBy::WorkoutType),
+            ))
+        );
         assert_eq!(body.metric_formated, "Distance");
         assert_eq!(body.unit, "m");
         assert_eq!(body.granularity, Some("Monthly".to_string()));
         assert_eq!(body.aggregate, Some("Sum".to_string()));
-        assert_eq!(body.group_by, Some("WorkoutType".to_string()));
         // No filters provided -> sports response falls back to default (empty)
         assert!(body.sports.sports.is_empty());
         assert!(body.sports.categories.is_empty());
@@ -502,6 +524,7 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
+                APITrainingMetricGroupBy::none(),
             )),
             window: None,
             filters: Some(APITrainingMetricFilters {
@@ -524,6 +547,13 @@ mod tests {
             None,
         );
 
+        assert_eq!(
+            body.source,
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::Calories,
+                APITrainingMetricGroupBy::none(),
+            ))
+        );
         assert!(body.sports.sports.is_empty());
         assert!(body.sports.categories.is_empty());
         assert_eq!(body.workout_types, Some(vec![]));
@@ -531,6 +561,5 @@ mod tests {
         assert_eq!(body.rpes, Some(vec![]));
         assert_eq!(body.granularity, None);
         assert_eq!(body.aggregate, None);
-        assert_eq!(body.group_by, None);
     }
 }

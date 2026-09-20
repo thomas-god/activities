@@ -19,12 +19,17 @@ import dayjs from 'dayjs';
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: { type: 'activity', metric: { metric: 'Distance' } },
+	source: {
+		type: 'activity',
+		metric: {
+			metric: 'Distance',
+			group_by: 'Sport'
+		}
+	},
 	unit: 'm',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
 	aggregate: 'Sum',
-	group_by: 'Sport',
 	sports: {
 		sports: ['Running'],
 		categories: ['Cycling']
@@ -68,11 +73,13 @@ describe('metricToPreviewBase', () => {
 	it('carries window, filters, summary and target', () => {
 		const base = extractBaseDefinitionFromMetric(makeMetric());
 
-		expect(base.source).toStrictEqual({ type: 'activity', metric: { metric: 'Distance' } });
+		expect(base.source).toStrictEqual({
+			type: 'activity',
+			metric: { metric: 'Distance', group_by: 'Sport' }
+		});
 		expect(base.window).toEqual({
 			granularity: 'Weekly',
-			aggregate: 'Sum',
-			group_by: 'Sport'
+			aggregate: 'Sum'
 		});
 		expect(base.filters).toEqual({
 			sports: [{ SportCategory: 'Cycling' }, { Sport: 'Running' }],
@@ -99,7 +106,6 @@ describe('metricToPreviewBase', () => {
 			makeMetric({
 				granularity: null,
 				aggregate: null,
-				group_by: null,
 				sports: null,
 				workout_types: null,
 				rpes: null,
@@ -123,14 +129,17 @@ describe('compareMetricPreviewPayload', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance' } },
+				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
 
-		expect(payload.source).toStrictEqual({ type: 'activity', metric: { metric: 'Distance' } });
+		expect(payload.source).toStrictEqual({
+			type: 'activity',
+			metric: { metric: 'Distance', group_by: null }
+		});
 		expect(payload.start).toBe('2026-02-02');
 		expect(payload.end).toBe('2026-05-01');
 	});
@@ -141,7 +150,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance' } },
+				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -159,7 +168,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'first',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance' } },
+				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' },
 				filters: { sports: [{ Sport: 'Cycling' }] }
 			}
@@ -178,7 +187,7 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance' } },
+				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -277,7 +286,7 @@ describe('compareDefinitionLabel', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance' } },
+				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -292,7 +301,7 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: { metric: 'Distance' } },
+					source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
 					window: { granularity: 'Weekly', aggregate: 'Sum' }
 				}
 			})
@@ -304,7 +313,7 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: { metric: 'ActiveDuration' } },
+					source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: null } },
 					window: { granularity: 'Daily', aggregate: 'Max' }
 				}
 			})

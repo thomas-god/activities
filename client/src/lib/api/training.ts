@@ -51,7 +51,13 @@ const TrainingPeriodDetailsSchema = z.object({
 });
 
 const TrainingMetricSourceSchema = z.discriminatedUnion('type', [
-	z.object({ type: z.literal('activity'), metric: z.object({ metric: z.string() }) }),
+	z.object({
+		type: z.literal('activity'),
+		metric: z.object({
+			metric: z.string(),
+			group_by: z.enum(trainingMetricGroupByClauses).nullable()
+		})
+	}),
 	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
 	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() })
 ]);
@@ -68,7 +74,6 @@ const TrainingMetricSchema = z.object({
 	]),
 	granularity: z.enum(trainingMetricGranularities).nullable(),
 	aggregate: z.enum(trainingMetricAggregateFunctions).nullable(),
-	group_by: z.enum(trainingMetricGroupByClauses).nullable(),
 	sports: z
 		.object({
 			sports: z.array(z.enum(sports)),
@@ -206,6 +211,14 @@ export const metricAsString = (metric: TrainingMetric): string => {
 		return metric.source.metric.metric.toLocaleLowerCase();
 	} else {
 		return metric.source.metric.toLocaleLowerCase();
+	}
+};
+
+export const metricGroupBy = (metric: TrainingMetric): Option<TrainingMetricGroupByClause> => {
+	if (metric.source.type === 'activity' && metric.source.metric.group_by !== null) {
+		return some(metric.source.metric.group_by);
+	} else {
+		return none();
 	}
 };
 
@@ -612,11 +625,16 @@ export interface TrainingMetricBasePayload {
 				type: 'hooperIndex' | 'weightAndNutrition';
 				metric: string;
 		  }
-		| { type: 'activity'; metric: { metric: string } };
+		| {
+				type: 'activity';
+				metric: {
+					metric: string;
+					group_by: TrainingMetricGroupByClause | null;
+				};
+		  };
 	window?: {
 		granularity: TrainingMetricGranularity;
 		aggregate: TrainingMetricAggregateFunction;
-		group_by?: TrainingMetricGroupByClause;
 	};
 	filters?: {
 		sports?: (

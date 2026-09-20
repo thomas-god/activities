@@ -215,7 +215,7 @@ impl TrainingMetricActivityFilters {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TrainingMetricGroupBy {
     Sport,
     SportCategory,
@@ -235,6 +235,18 @@ impl TrainingMetricGroupBy {
                 .nutrition()
                 .as_ref()
                 .map(|nutrition| nutrition.bonk_status().to_string()),
+        }
+    }
+}
+
+impl Display for TrainingMetricGroupBy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bonked => f.write_str("Bonked"),
+            Self::RpeRange => f.write_str("RpeRange"),
+            Self::SportCategory => f.write_str("SportCategory"),
+            Self::Sport => f.write_str("Sport"),
+            Self::WorkoutType => f.write_str("WorkoutType"),
         }
     }
 }
@@ -481,7 +493,6 @@ impl TrainingMetricTarget {
 pub struct TrainingMetricWindow {
     granularity: TrainingMetricGranularity,
     aggregate: TrainingMetricAggregate,
-    group_by: Option<TrainingMetricGroupBy>,
 }
 
 impl TrainingMetricWindow {
@@ -491,10 +502,6 @@ impl TrainingMetricWindow {
 
     pub fn aggregate(&self) -> &TrainingMetricAggregate {
         &self.aggregate
-    }
-
-    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
-        &self.group_by
     }
 }
 
@@ -532,11 +539,16 @@ impl TrainingMetricDefinitionPatch {
 #[derive(Debug, Clone, Copy, PartialEq, Constructor)]
 pub struct ActivitySource {
     metric: ActivityMetric,
+    group_by: Option<TrainingMetricGroupBy>,
 }
 
 impl ActivitySource {
     pub fn metric(&self) -> ActivityMetric {
         self.metric
+    }
+
+    pub fn group_by(&self) -> &Option<TrainingMetricGroupBy> {
+        &self.group_by
     }
 
     pub fn unit(&self) -> Unit {
@@ -563,8 +575,8 @@ impl ActivitySource {
                             .granularity()
                             .datetime_key(activity.start_time().datetime());
 
-                        let group = window
-                            .group_by()
+                        let group = self
+                            .group_by
                             .as_ref()
                             .and_then(|group_by| group_by.extract_group(&activity));
 
@@ -2763,11 +2775,10 @@ mod test_activity_source_extract_values {
         )
     }
 
-    fn daily_window(group_by: Option<TrainingMetricGroupBy>) -> Option<TrainingMetricWindow> {
+    fn daily_window() -> Option<TrainingMetricWindow> {
         Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Sum,
-            group_by,
         ))
     }
 
@@ -2782,7 +2793,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_no_window_bins_by_exact_start_time() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         let activities = vec![
             (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
@@ -2804,7 +2818,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_daily_window_groups_activities_of_same_day() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         let activities = vec![
             (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
@@ -2812,7 +2829,7 @@ mod test_activity_source_extract_values {
             (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 30.0),
         ];
 
-        let result = source.extract_values(&daily_window(None), &filters, activities.into_iter());
+        let result = source.extract_values(&daily_window(), &filters, activities.into_iter());
 
         assert_eq!(result.len(), 2);
         let mut same_day = values(&result, "2025-09-03", None);
@@ -2823,7 +2840,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_weekly_window_groups_by_monday_of_week() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         // 2025-09-03 is a Wednesday and 2025-09-07 the Sunday of the same week (Monday
         // 2025-09-01); 2025-09-08 starts the next week.
@@ -2835,7 +2855,6 @@ mod test_activity_source_extract_values {
         let window = Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Sum,
-            None,
         ));
 
         let result = source.extract_values(&window, &filters, activities.into_iter());
@@ -2849,7 +2868,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_monthly_window_groups_by_first_day_of_month() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         let activities = vec![
             (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
@@ -2859,7 +2881,6 @@ mod test_activity_source_extract_values {
         let window = Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Monthly,
             TrainingMetricAggregate::Sum,
-            None,
         ));
 
         let result = source.extract_values(&window, &filters, activities.into_iter());
@@ -2873,7 +2894,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_filters_exclude_non_matching_activities() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::new(
             Some(vec![SportFilter::Sport(Sport::Cycling)]),
             None,
@@ -2885,7 +2909,7 @@ mod test_activity_source_extract_values {
             (activity_at("2025-09-03T18:00:00Z", Sport::Running), 20.0),
         ];
 
-        let result = source.extract_values(&daily_window(None), &filters, activities.into_iter());
+        let result = source.extract_values(&daily_window(), &filters, activities.into_iter());
 
         assert_eq!(result.len(), 1);
         assert_eq!(values(&result, "2025-09-03", None), vec![10.0]);
@@ -2893,7 +2917,10 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_group_by_sport_adds_group_to_bin() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            Some(TrainingMetricGroupBy::Sport),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         let activities = vec![
             (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
@@ -2901,11 +2928,7 @@ mod test_activity_source_extract_values {
             (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 30.0),
         ];
 
-        let result = source.extract_values(
-            &daily_window(Some(TrainingMetricGroupBy::Sport)),
-            &filters,
-            activities.into_iter(),
-        );
+        let result = source.extract_values(&daily_window(), &filters, activities.into_iter());
 
         assert_eq!(result.len(), 3);
         assert_eq!(values(&result, "2025-09-03", Some("Cycling")), vec![10.0]);
@@ -2915,18 +2938,17 @@ mod test_activity_source_extract_values {
 
     #[test]
     fn test_group_by_none_yields_bin_without_group() {
-        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let source = ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricGroupBy::none(),
+        );
         let filters = TrainingMetricActivityFilters::empty();
         let activities = vec![
             (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
             (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 20.0),
         ];
 
-        let result = source.extract_values(
-            &daily_window(TrainingMetricGroupBy::none()),
-            &filters,
-            activities.into_iter(),
-        );
+        let result = source.extract_values(&daily_window(), &filters, activities.into_iter());
 
         assert_eq!(result.len(), 2);
         assert_eq!(values(&result, "2025-09-03", None), vec![10.0]);
@@ -2950,7 +2972,6 @@ mod test_hooper_index_source_extract_values {
         Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
         ))
     }
 
@@ -3021,7 +3042,6 @@ mod test_hooper_index_source_extract_values {
         let window = Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Weekly,
             TrainingMetricAggregate::Average,
-            None,
         ));
 
         let result = source.extract_values(&window, values.into_iter());
@@ -3070,7 +3090,6 @@ mod test_weight_and_nutrition_source_extract_values {
         Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Daily,
             TrainingMetricAggregate::Average,
-            None,
         ))
     }
 
@@ -3177,7 +3196,6 @@ mod test_weight_and_nutrition_source_extract_values {
         let window = Some(TrainingMetricWindow::new(
             TrainingMetricGranularity::Monthly,
             TrainingMetricAggregate::Average,
-            None,
         ));
 
         let result = source.extract_values(&window, values.into_iter());
@@ -3677,11 +3695,13 @@ mod test_training_metrics_ordering {
     fn generate_test_metrics() -> Vec<TrainingMetric> {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricGroupBy::none(),
+            )),
             Some(TrainingMetricWindow::new(
                 TrainingMetricGranularity::Daily,
                 TrainingMetricAggregate::Sum,
-                None,
             )),
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3931,7 +3951,10 @@ mod test_training_metric_target {
     fn definition_with_target() -> TrainingMetricDefinition {
         TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3960,7 +3983,10 @@ mod test_training_metric_target {
     fn test_definition_target_is_none_when_not_set() {
         let definition = TrainingMetricDefinition::new(
             UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Distance)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Distance,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3974,7 +4000,10 @@ mod test_training_metric_target {
     fn test_apply_patch_updates_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
@@ -3988,7 +4017,10 @@ mod test_training_metric_target {
         assert_eq!(target.unit(), Unit::KiloCalorie);
         assert_eq!(
             *patched.source(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories))
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            ))
         );
     }
 
@@ -3996,7 +4028,10 @@ mod test_training_metric_target {
     fn test_apply_patch_clears_target() {
         let definition = definition_with_target();
         let patch = TrainingMetricDefinitionPatch::new(
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
+            TrainingMetricSource::Activity(ActivitySource::new(
+                ActivityMetric::Calories,
+                TrainingMetricGroupBy::none(),
+            )),
             None,
             TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),

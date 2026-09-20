@@ -17,7 +17,8 @@
 		metricDefinitionKey,
 		extractBaseDefinitionFromMetric,
 		type CompareAlignment,
-		type CompareMetricDefinition
+		type CompareMetricDefinition,
+		definitionGroupBy
 	} from '$lib/trainingMetric';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
 	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
@@ -228,6 +229,7 @@
 		{:then [firstPeriodMetrics, secondPeriodMetrics]}
 			<ul class="menu w-full rounded-box bg-base-200 p-2">
 				{#each pickerEntries(firstPeriodMetrics, firstPeriod.name, secondPeriodMetrics, secondPeriod.name) as entry (entry.definition.key)}
+					{@const groupBy = definitionGroupBy(entry.definition)}
 					<li class="w-full" class:disabled={entry.added}>
 						<button disabled={entry.added} onclick={() => addDefinition(entry.definition)}>
 							<div class="flex w-full flex-col items-start gap-0.5">
@@ -239,8 +241,8 @@
 									{entry.definition.base.source.metric}
 									· {entry.definition.base.window?.granularity}
 									{entry.definition.base.window?.aggregate}
-									{#if entry.definition.base.window?.group_by}
-										· by {entry.definition.base.window.group_by}
+									{#if isSome(groupBy)}
+										· by {groupBy.value}
 									{/if}
 								</span>
 							</div>
