@@ -228,14 +228,10 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
 
     // Weight and nutrition metrics
     let metrics = [
-        WeightAndNutritionSource::Weight,
-        WeightAndNutritionSource::Fat,
-        WeightAndNutritionSource::Muscle,
-        WeightAndNutritionSource::BMI,
+        WeightAndNutritionSource::TotalWeight,
+        WeightAndNutritionSource::BodyComposition,
         WeightAndNutritionSource::Calories,
-        WeightAndNutritionSource::Carbs,
-        WeightAndNutritionSource::Lipid,
-        WeightAndNutritionSource::Protein,
+        WeightAndNutritionSource::Macros,
         WeightAndNutritionSource::Water,
         WeightAndNutritionSource::Alcohol,
     ];
@@ -296,7 +292,7 @@ fn metric_category(metric: &ActivityMetric) -> TrainingMetricTemplateCategory {
 
 fn weight_and_nutrition_format_source(source: &WeightAndNutritionSource) -> String {
     match source {
-        WeightAndNutritionSource::Weight => String::from("Total weight"),
+        WeightAndNutritionSource::TotalWeight => String::from("Total weight"),
         source => source.to_string(),
     }
 }
@@ -305,14 +301,11 @@ fn weight_and_nutrition_category(
     source: &WeightAndNutritionSource,
 ) -> TrainingMetricTemplateCategory {
     match source {
-        WeightAndNutritionSource::Weight
-        | WeightAndNutritionSource::Fat
-        | WeightAndNutritionSource::Muscle
-        | WeightAndNutritionSource::BMI => TrainingMetricTemplateCategory::Weight,
+        WeightAndNutritionSource::TotalWeight | WeightAndNutritionSource::BodyComposition => {
+            TrainingMetricTemplateCategory::Weight
+        }
         WeightAndNutritionSource::Calories
-        | WeightAndNutritionSource::Lipid
-        | WeightAndNutritionSource::Carbs
-        | WeightAndNutritionSource::Protein
+        | WeightAndNutritionSource::Macros
         | WeightAndNutritionSource::Water
         | WeightAndNutritionSource::Alcohol => TrainingMetricTemplateCategory::Nutrition,
     }

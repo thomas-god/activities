@@ -338,7 +338,12 @@ describe('compareDefinitionLabel', () => {
 						metric: {
 							metric: 'Distance',
 							group_by: null,
-							filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+							filters: metricFilters({
+								sports: null,
+								workout_types: null,
+								bonked: null,
+								rpes: null
+							})
 						}
 					},
 					window: { granularity: 'Weekly', aggregate: 'Sum' }
@@ -357,7 +362,12 @@ describe('compareDefinitionLabel', () => {
 						metric: {
 							metric: 'ActiveDuration',
 							group_by: null,
-							filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+							filters: metricFilters({
+								sports: null,
+								workout_types: null,
+								bonked: null,
+								rpes: null
+							})
 						}
 					},
 					window: { granularity: 'Daily', aggregate: 'Max' }

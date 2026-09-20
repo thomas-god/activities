@@ -49,7 +49,7 @@ type DefinitionRow = (
     Option<RepositoryTrainingMetricSource>,
     Option<TrainingMetricGranularity>,
     Option<TrainingMetricAggregate>,
-    TrainingMetricActivityFilters,
+    Option<TrainingMetricActivityFilters>,
     Option<TrainingMetricActivityGroupBy>,
     Option<TrainingPeriodId>,
     Option<TrainingMetricSummary>,
@@ -90,7 +90,6 @@ type HooperIndexRow = (
 );
 
 type WeightAndNutritionRow = (
-    Option<f32>,
     Option<f32>,
     Option<f32>,
     Option<f32>,
@@ -262,8 +261,12 @@ where
                 summary,
                 target,
             )) => {
-                let Some(metric) = parse_definition_row_metric(metric, source, group_by, filters)
-                else {
+                let Some(metric) = parse_definition_row_metric(
+                    metric,
+                    source,
+                    group_by,
+                    filters.unwrap_or_default(),
+                ) else {
                     return Ok(None);
                 };
                 let window = match (granularity, aggregate) {
@@ -333,8 +336,12 @@ where
                         summary,
                         target,
                     )| {
-                        let metric =
-                            parse_definition_row_metric(metric, source, group_by, filters)?;
+                        let metric = parse_definition_row_metric(
+                            metric,
+                            source,
+                            group_by,
+                            filters.unwrap_or_default(),
+                        )?;
                         let window = match (granularity, aggregate) {
                             (Some(granularity), Some(aggregate)) => {
                                 Some(TrainingMetricWindow::new(granularity, aggregate))
@@ -404,8 +411,12 @@ where
                         summary,
                         target,
                     )| {
-                        let metric =
-                            parse_definition_row_metric(metric, source, group_by, filters)?;
+                        let metric = parse_definition_row_metric(
+                            metric,
+                            source,
+                            group_by,
+                            filters.unwrap_or_default(),
+                        )?;
                         let window = match (granularity, aggregate) {
                             (Some(granularity), Some(aggregate)) => {
                                 Some(TrainingMetricWindow::new(granularity, aggregate))
@@ -1085,14 +1096,13 @@ where
         sqlx::query(
             "
             INSERT INTO t_weight_and_nutrition
-                (user, date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                (user, date, weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             ON CONFLICT (user, date)
             DO UPDATE SET
                 weight=excluded.weight,
                 fat=excluded.fat,
                 muscle=excluded.muscle,
-                bmi=excluded.bmi,
                 calories=excluded.calories,
                 lipid=excluded.lipid,
                 carbs=excluded.carbs,
@@ -1105,7 +1115,6 @@ where
         .bind(value.weight())
         .bind(value.fat())
         .bind(value.muscle())
-        .bind(value.bmi())
         .bind(value.calories())
         .bind(value.lipid())
         .bind(value.carbs())
@@ -1132,7 +1141,7 @@ where
         while batch.peek().is_some() {
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
                 "INSERT INTO t_weight_and_nutrition
-                    (user, date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol) "
+                    (user, date, weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol) "
             );
             query_builder.push_values(batch, |mut b, (date, value)| {
                 b.push_bind(user)
@@ -1140,7 +1149,6 @@ where
                     .push_bind(value.weight())
                     .push_bind(value.fat())
                     .push_bind(value.muscle())
-                    .push_bind(value.bmi())
                     .push_bind(value.calories())
                     .push_bind(value.lipid())
                     .push_bind(value.carbs())
@@ -1155,7 +1163,6 @@ where
                     weight=excluded.weight,
                     fat=excluded.fat,
                     muscle=excluded.muscle,
-                    bmi=excluded.bmi,
                     calories=excluded.calories,
                     lipid=excluded.lipid,
                     carbs=excluded.carbs,
@@ -1183,7 +1190,7 @@ where
     ) -> Result<Option<WeightAndNutrition>, WeightAndNutritionError> {
         let row = sqlx::query_as::<_, WeightAndNutritionRow>(
             "
-            SELECT weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol
+            SELECT weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol
             FROM t_weight_and_nutrition
             WHERE user=?1 AND date=?2;",
         )
@@ -1194,9 +1201,9 @@ where
         .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))?;
 
         Ok(row.map(
-            |(weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol)| {
+            |(weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol)| {
                 WeightAndNutrition::new(
-                    weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol,
+                    weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol,
                 )
             },
         ))
@@ -1220,11 +1227,10 @@ where
                 Option<f32>,
                 Option<f32>,
                 Option<f32>,
-                Option<f32>,
             ),
         >(
             "
-              SELECT date, weight, fat, muscle, bmi, calories, lipid, carbs, protein, water, alcohol
+              SELECT date, weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol
               FROM t_weight_and_nutrition
               WHERE user=?1 AND date >= ?2 AND date < ?3
               ORDER BY date ASC;",
@@ -1239,24 +1245,11 @@ where
         Ok(rows
             .into_iter()
             .map(
-                |(
-                    date,
-                    weight,
-                    fat,
-                    muscle,
-                    bmi,
-                    calories,
-                    lipid,
-                    carbs,
-                    protein,
-                    water,
-                    alcohol,
-                )| {
+                |(date, weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol)| {
                     (
                         date,
                         WeightAndNutrition::new(
-                            weight, fat, muscle, bmi, calories, lipid, carbs, protein, water,
-                            alcohol,
+                            weight, fat, muscle, calories, lipid, carbs, protein, water, alcohol,
                         ),
                     )
                 },
@@ -1343,7 +1336,7 @@ mod test_sqlite_training_repository {
                 TrainingMetricAggregate, TrainingMetricDefinitionPatch, TrainingMetricGranularity,
                 TrainingMetricPatch, TrainingMetricSummaryAverage, TrainingMetricTarget,
                 TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle,
-                TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
+                TrainingPeriod, TrainingPeriodId, TrainingPeriodSports, WeightAndNutritionSource,
             },
         },
     };
@@ -1555,6 +1548,50 @@ mod test_sqlite_training_repository {
                     TrainingMetricActivityFilters::empty(),
                 )),
                 None,
+                TrainingMetricSummary::empty(),
+                None,
+            ),
+        );
+
+        repository
+            .save_metric(metric.clone())
+            .await
+            .expect("Should have return Ok");
+
+        let saved_metric = repository
+            .get_metric(metric.definition().user(), metric.id())
+            .await
+            .expect("Should have returned OK")
+            .expect("Should have returned Some");
+        assert_eq!(saved_metric.definition(), metric.definition());
+
+        let saved_metrics = repository
+            .get_global_metrics(metric.definition().user())
+            .await
+            .expect("Should have returned OK");
+        assert_eq!(saved_metrics, vec![metric]);
+    }
+
+    #[tokio::test]
+    async fn test_save_training_metric_definition_with_weight_and_nutrition_calories_source_round_trip()
+     {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository =
+            SqliteTrainingRepository::new(&db_file.path().to_string_lossy(), Clock::new())
+                .await
+                .expect("repo should init");
+
+        let metric = TrainingMetric::new(
+            TrainingMetricId::new(),
+            Some(TrainingMetricName::from("Calories Metric")),
+            TrainingMetricScope::Global,
+            TrainingMetricDefinition::new(
+                UserId::test_default(),
+                TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Calories),
+                Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Sum,
+                )),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -5675,7 +5712,6 @@ mod test_sqlite_training_repository {
                 Some(70.0),
                 Some(15.0),
                 Some(30.0),
-                Some(22.0),
                 Some(2000.0),
                 Some(50.0),
                 Some(250.0),
@@ -5729,7 +5765,6 @@ mod test_sqlite_training_repository {
             assert_eq!(saved.weight(), Some(70.0));
             assert_eq!(saved.fat(), Some(15.0));
             assert_eq!(saved.muscle(), Some(30.0));
-            assert_eq!(saved.bmi(), Some(22.0));
             assert_eq!(saved.calories(), Some(2000.0));
             assert_eq!(saved.lipid(), Some(50.0));
             assert_eq!(saved.carbs(), Some(250.0));
@@ -5753,7 +5788,6 @@ mod test_sqlite_training_repository {
                 Some(72.0),
                 Some(16.0),
                 Some(31.0),
-                Some(23.0),
                 Some(2100.0),
                 Some(55.0),
                 Some(260.0),
@@ -5778,7 +5812,6 @@ mod test_sqlite_training_repository {
             assert_eq!(saved.weight(), Some(72.0));
             assert_eq!(saved.fat(), Some(16.0));
             assert_eq!(saved.muscle(), Some(31.0));
-            assert_eq!(saved.bmi(), Some(23.0));
             assert_eq!(saved.calories(), Some(2100.0));
             assert_eq!(saved.lipid(), Some(55.0));
             assert_eq!(saved.carbs(), Some(260.0));
@@ -5807,7 +5840,6 @@ mod test_sqlite_training_repository {
             assert_eq!(saved.weight(), None);
             assert_eq!(saved.fat(), None);
             assert_eq!(saved.muscle(), None);
-            assert_eq!(saved.bmi(), None);
             assert_eq!(saved.calories(), None);
             assert_eq!(saved.lipid(), None);
             assert_eq!(saved.carbs(), None);
@@ -5874,7 +5906,6 @@ mod test_sqlite_training_repository {
                     other_date,
                     &WeightAndNutrition::new(
                         Some(80.0),
-                        None,
                         None,
                         None,
                         None,
@@ -5966,7 +5997,6 @@ mod test_sqlite_training_repository {
                         None,
                         None,
                         None,
-                        None,
                     ),
                 )
                 .await
@@ -5977,7 +6007,6 @@ mod test_sqlite_training_repository {
                     earlier,
                     &WeightAndNutrition::new(
                         Some(70.0),
-                        None,
                         None,
                         None,
                         None,
@@ -6033,7 +6062,6 @@ mod test_sqlite_training_repository {
                             None,
                             None,
                             None,
-                            None,
                         ),
                     )
                     .await
@@ -6070,7 +6098,6 @@ mod test_sqlite_training_repository {
                         None,
                         None,
                         None,
-                        None,
                     ),
                 )
                 .await
@@ -6081,7 +6108,6 @@ mod test_sqlite_training_repository {
                     date,
                     &WeightAndNutrition::new(
                         Some(80.0),
-                        None,
                         None,
                         None,
                         None,
@@ -6197,7 +6223,6 @@ mod test_sqlite_training_repository {
                         None,
                         None,
                         None,
-                        None,
                     ),
                 )
                 .await
@@ -6208,7 +6233,6 @@ mod test_sqlite_training_repository {
                     other_date,
                     &WeightAndNutrition::new(
                         Some(80.0),
-                        None,
                         None,
                         None,
                         None,
@@ -6263,7 +6287,6 @@ mod test_sqlite_training_repository {
                         None,
                         None,
                         None,
-                        None,
                     ),
                 )
                 .await
@@ -6274,7 +6297,6 @@ mod test_sqlite_training_repository {
                     date,
                     &WeightAndNutrition::new(
                         Some(80.0),
-                        None,
                         None,
                         None,
                         None,
@@ -6315,18 +6337,7 @@ mod test_sqlite_training_repository {
         }
 
         fn value_with_weight(weight: f32) -> WeightAndNutrition {
-            WeightAndNutrition::new(
-                Some(weight),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
+            WeightAndNutrition::new(Some(weight), None, None, None, None, None, None, None, None)
         }
 
         #[tokio::test]
@@ -6381,7 +6392,6 @@ mod test_sqlite_training_repository {
             assert_eq!(second.weight(), Some(70.0));
             assert_eq!(second.fat(), Some(15.0));
             assert_eq!(second.muscle(), Some(30.0));
-            assert_eq!(second.bmi(), Some(22.0));
             assert_eq!(second.calories(), Some(2000.0));
             assert_eq!(second.lipid(), Some(50.0));
             assert_eq!(second.carbs(), Some(250.0));
@@ -6467,7 +6477,6 @@ mod test_sqlite_training_repository {
                 Some(65.0),
                 Some(12.0),
                 Some(28.0),
-                Some(21.0),
                 Some(1800.0),
                 Some(40.0),
                 Some(200.0),
@@ -6495,7 +6504,6 @@ mod test_sqlite_training_repository {
                 assert_eq!(saved.weight(), Some(65.0));
                 assert_eq!(saved.fat(), Some(12.0));
                 assert_eq!(saved.muscle(), Some(28.0));
-                assert_eq!(saved.bmi(), Some(21.0));
                 assert_eq!(saved.calories(), Some(1800.0));
                 assert_eq!(saved.lipid(), Some(40.0));
                 assert_eq!(saved.carbs(), Some(200.0));

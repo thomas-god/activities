@@ -14,11 +14,12 @@ use crate::domain::models::{
     preferences::{ActivityListSummary, Preference, PreferenceKey},
     search::SearchDocumentEvent,
     training::{
-        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
-        TrainingMetricGranularity, TrainingMetricActivityGroupBy, TrainingMetricId, TrainingMetricName,
-        TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue,
-        TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
-        TrainingPeriodSports, WeightAndNutritionSource,
+        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
+        TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
+        TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
+        TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
+        TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
+        WeightAndNutritionSource,
     },
 };
 
@@ -948,18 +949,15 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RepositoryTrainingMetricSource {
                 HooperIndexSource::Stress => "subjective-stress",
             },
             Self::WeightAndNutrition(source) => match source {
-                WeightAndNutritionSource::Weight => "wn-weight",
-                WeightAndNutritionSource::Fat => "wn-fat",
-                WeightAndNutritionSource::Muscle => "wn-muscle",
-                WeightAndNutritionSource::BMI => "wn-bmi",
+                WeightAndNutritionSource::TotalWeight => "wn-weight",
+                WeightAndNutritionSource::BodyComposition => "wn-body-composition",
                 WeightAndNutritionSource::Calories => "wn-calories",
-                WeightAndNutritionSource::Lipid => "wn-lipid",
-                WeightAndNutritionSource::Carbs => "wn-carbs",
-                WeightAndNutritionSource::Protein => "wn-protein",
+                WeightAndNutritionSource::Macros => "wn-macros",
                 WeightAndNutritionSource::Water => "wn-water",
                 WeightAndNutritionSource::Alcohol => "wn-alcohol",
             },
         };
+
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
         Ok(IsNull::No)
     }
@@ -1009,14 +1007,14 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepositoryTrainingMetricSource {
             "subjective-sleep" => Ok(Self::HooperIndex(HooperIndexSource::Sleep)),
             "subjective-stress" => Ok(Self::HooperIndex(HooperIndexSource::Stress)),
 
-            "wn-weight" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Weight)),
-            "wn-fat" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Fat)),
-            "wn-muscle" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Muscle)),
-            "wn-bmi" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::BMI)),
+            "wn-weight" => Ok(Self::WeightAndNutrition(
+                WeightAndNutritionSource::TotalWeight,
+            )),
+            "wn-body-composition" => Ok(Self::WeightAndNutrition(
+                WeightAndNutritionSource::BodyComposition,
+            )),
             "wn-calories" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Calories)),
-            "wn-lipid" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Lipid)),
-            "wn-carbs" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Carbs)),
-            "wn-protein" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Protein)),
+            "wn-macros" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Macros)),
             "wn-water" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Water)),
             "wn-alcohol" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Alcohol)),
 

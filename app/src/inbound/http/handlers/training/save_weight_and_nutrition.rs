@@ -182,7 +182,6 @@ enum CSVHeader {
     TotalWeight,
     Fat,
     Muscle,
-    BMI,
     Calories,
     Lipid,
     Carbs,
@@ -232,7 +231,6 @@ fn parse_headers(row: &str) -> Option<Vec<Option<CSVHeader>>> {
             "weight" => headers.push(Some(CSVHeader::TotalWeight)),
             "muscle" => headers.push(Some(CSVHeader::Muscle)),
             "fat" => headers.push(Some(CSVHeader::Fat)),
-            "bmi" => headers.push(Some(CSVHeader::BMI)),
             "calories" => headers.push(Some(CSVHeader::Calories)),
             "lipid" => headers.push(Some(CSVHeader::Lipid)),
             "carbs" => headers.push(Some(CSVHeader::Carbs)),
@@ -289,7 +287,6 @@ fn parse_row(
             CSVHeader::TotalWeight => patch.weight = col.parse::<f32>().ok().map(Some),
             CSVHeader::Fat => patch.fat = col.parse::<f32>().ok().map(Some),
             CSVHeader::Muscle => patch.muscle = col.parse::<f32>().ok().map(Some),
-            CSVHeader::BMI => patch.bmi = col.parse::<f32>().ok().map(Some),
             CSVHeader::Calories => patch.calories = col.parse::<f32>().ok().map(Some),
             CSVHeader::Lipid => patch.lipid = col.parse::<f32>().ok().map(Some),
             CSVHeader::Carbs => patch.carbs = col.parse::<f32>().ok().map(Some),
@@ -402,21 +399,20 @@ mod tests {
     #[test]
     fn test_parse_headers_maps_all_known_columns() {
         let headers =
-            parse_headers("date,weight,fat,muscle,bmi,calories,lipid,carbs,protein,water,alcohol")
+            parse_headers("date,weight,fat,muscle,calories,lipid,carbs,protein,water,alcohol")
                 .unwrap();
 
-        assert_eq!(headers.len(), 11);
+        assert_eq!(headers.len(), 10);
         assert!(matches!(headers[0], Some(CSVHeader::Date)));
         assert!(matches!(headers[1], Some(CSVHeader::TotalWeight)));
         assert!(matches!(headers[2], Some(CSVHeader::Fat)));
         assert!(matches!(headers[3], Some(CSVHeader::Muscle)));
-        assert!(matches!(headers[4], Some(CSVHeader::BMI)));
-        assert!(matches!(headers[5], Some(CSVHeader::Calories)));
-        assert!(matches!(headers[6], Some(CSVHeader::Lipid)));
-        assert!(matches!(headers[7], Some(CSVHeader::Carbs)));
-        assert!(matches!(headers[8], Some(CSVHeader::Protein)));
-        assert!(matches!(headers[9], Some(CSVHeader::Water)));
-        assert!(matches!(headers[10], Some(CSVHeader::Alcohol)));
+        assert!(matches!(headers[4], Some(CSVHeader::Calories)));
+        assert!(matches!(headers[5], Some(CSVHeader::Lipid)));
+        assert!(matches!(headers[6], Some(CSVHeader::Carbs)));
+        assert!(matches!(headers[7], Some(CSVHeader::Protein)));
+        assert!(matches!(headers[8], Some(CSVHeader::Water)));
+        assert!(matches!(headers[9], Some(CSVHeader::Alcohol)));
     }
 
     #[test]
@@ -441,11 +437,11 @@ mod tests {
     #[test]
     fn test_parse_row_parses_all_fields() {
         let headers =
-            parse_headers("date,weight,fat,muscle,bmi,calories,lipid,carbs,protein,water,alcohol")
+            parse_headers("date,weight,fat,muscle,calories,lipid,carbs,protein,water,alcohol")
                 .unwrap();
 
         let (date, patch) = parse_row(
-            "2024-01-15,70.5,15.2,55.1,22.4,2000,60,250,120,1.5,0.5",
+            "2024-01-15,70.5,15.2,55.1,2000,60,250,120,1.5,0.5",
             &headers,
         )
         .unwrap();
@@ -454,7 +450,6 @@ mod tests {
         assert_eq!(patch.weight, Some(Some(70.5)));
         assert_eq!(patch.fat, Some(Some(15.2)));
         assert_eq!(patch.muscle, Some(Some(55.1)));
-        assert_eq!(patch.bmi, Some(Some(22.4)));
         assert_eq!(patch.calories, Some(Some(2000.0)));
         assert_eq!(patch.lipid, Some(Some(60.0)));
         assert_eq!(patch.carbs, Some(Some(250.0)));

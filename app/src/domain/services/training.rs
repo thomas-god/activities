@@ -4745,7 +4745,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id.clone(),
-            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight),
             None,
             TrainingMetricSummary::empty(),
             None,
@@ -4767,7 +4767,6 @@ mod test_training_service_metric_values {
                         d1,
                         WeightAndNutrition::new(
                             Some(70.5),
-                            None,
                             None,
                             None,
                             None,
@@ -4813,7 +4812,7 @@ mod test_training_service_metric_values {
 
         let definition = TrainingMetricDefinition::new(
             user_id,
-            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
+            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight),
             None,
             TrainingMetricSummary::empty(),
             None,
@@ -5670,7 +5669,6 @@ mod test_training_service_weight_and_nutrition {
             Some(70.0),
             Some(15.0),
             Some(30.0),
-            Some(22.0),
             Some(2000.0),
             Some(50.0),
             Some(250.0),
@@ -5780,7 +5778,6 @@ mod test_training_service_weight_and_nutrition {
                     && v.weight() == Some(72.0)
                     && v.fat() == Some(15.0)
                     && v.muscle() == None
-                    && v.bmi() == Some(22.0)
                     && v.calories() == Some(2000.0)
                     && v.lipid() == Some(50.0)
                     && v.carbs() == Some(250.0)
@@ -5797,7 +5794,6 @@ mod test_training_service_weight_and_nutrition {
             Some(Some(72.0)),
             None,
             Some(None),
-            None,
             None,
             None,
             None,
@@ -5833,7 +5829,6 @@ mod test_training_service_weight_and_nutrition {
                     && v.weight() == Some(68.0)
                     && v.fat() == None
                     && v.muscle() == None
-                    && v.bmi() == None
                     && v.calories() == None
                     && v.lipid() == None
                     && v.carbs() == None
@@ -5847,7 +5842,6 @@ mod test_training_service_weight_and_nutrition {
 
         let patch = WeightAndNutritionPatch::new(
             Some(Some(68.0)),
-            None,
             None,
             None,
             None,
@@ -5963,14 +5957,12 @@ mod test_training_service_weight_and_nutrition {
                     None,
                     None,
                     None,
-                    None,
                 ),
             ),
             (
                 new_date,
                 WeightAndNutritionPatch::new(
                     Some(Some(68.0)),
-                    None,
                     None,
                     None,
                     None,

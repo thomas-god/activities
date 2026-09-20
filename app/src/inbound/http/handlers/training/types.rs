@@ -708,7 +708,6 @@ pub struct APIWeightAndNutrition {
     pub weight: Option<f32>,
     pub fat: Option<f32>,
     pub muscle: Option<f32>,
-    pub bmi: Option<f32>,
     pub calories: Option<f32>,
     pub lipid: Option<f32>,
     pub carbs: Option<f32>,
@@ -723,7 +722,6 @@ impl From<&WeightAndNutrition> for APIWeightAndNutrition {
             weight: value.weight(),
             fat: value.fat(),
             muscle: value.muscle(),
-            bmi: value.bmi(),
             calories: value.calories(),
             lipid: value.lipid(),
             carbs: value.carbs(),
@@ -740,7 +738,6 @@ impl From<APIWeightAndNutrition> for WeightAndNutrition {
             value.weight,
             value.fat,
             value.muscle,
-            value.bmi,
             value.calories,
             value.lipid,
             value.carbs,
@@ -764,8 +761,6 @@ pub struct APIWeightAndNutritionPatch {
     pub fat: PatchField<f32>,
     #[serde(default)]
     pub muscle: PatchField<f32>,
-    #[serde(default)]
-    pub bmi: PatchField<f32>,
     #[serde(default)]
     pub calories: PatchField<f32>,
     #[serde(default)]
@@ -794,7 +789,6 @@ impl From<APIWeightAndNutritionPatch> for WeightAndNutritionPatch {
             patch_field_to_domain_f32(value.weight),
             patch_field_to_domain_f32(value.fat),
             patch_field_to_domain_f32(value.muscle),
-            patch_field_to_domain_f32(value.bmi),
             patch_field_to_domain_f32(value.calories),
             patch_field_to_domain_f32(value.lipid),
             patch_field_to_domain_f32(value.carbs),
@@ -1041,7 +1035,6 @@ mod tests {
             weight: Some(70.5),
             fat: Some(15.0),
             muscle: Some(30.0),
-            bmi: Some(22.0),
             calories: Some(2000.0),
             lipid: Some(50.0),
             carbs: Some(250.0),
@@ -1055,7 +1048,6 @@ mod tests {
         assert_eq!(value.weight(), Some(70.5));
         assert_eq!(value.fat(), Some(15.0));
         assert_eq!(value.muscle(), Some(30.0));
-        assert_eq!(value.bmi(), Some(22.0));
         assert_eq!(value.calories(), Some(2000.0));
         assert_eq!(value.lipid(), Some(50.0));
         assert_eq!(value.carbs(), Some(250.0));
@@ -1074,7 +1066,6 @@ mod tests {
         assert_eq!(value.weight(), None);
         assert_eq!(value.fat(), None);
         assert_eq!(value.muscle(), None);
-        assert_eq!(value.bmi(), None);
         assert_eq!(value.calories(), None);
         assert_eq!(value.lipid(), None);
         assert_eq!(value.carbs(), None);
@@ -1093,7 +1084,6 @@ mod tests {
             Some(70.0),
             Some(15.0),
             Some(30.0),
-            Some(22.0),
             Some(2000.0),
             Some(50.0),
             Some(250.0),
@@ -1108,7 +1098,6 @@ mod tests {
         assert_eq!(patched.weight(), Some(72.0));
         assert_eq!(patched.muscle(), None);
         assert_eq!(patched.fat(), Some(15.0));
-        assert_eq!(patched.bmi(), Some(22.0));
         assert_eq!(patched.calories(), Some(2000.0));
         assert_eq!(patched.lipid(), Some(50.0));
         assert_eq!(patched.carbs(), Some(250.0));

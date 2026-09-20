@@ -35,7 +35,7 @@ describe('weightAndNutritionCategories', () => {
 		);
 
 		expect(groups).toEqual({
-			weight: { main: 'weight', subs: ['fat', 'muscle', 'bmi'] },
+			weight: { main: 'weight', subs: ['fat', 'muscle'] },
 			nutrition: { main: 'calories', subs: ['lipid', 'carbs', 'protein'] },
 			hydration: { main: 'water', subs: ['alcohol'] }
 		});

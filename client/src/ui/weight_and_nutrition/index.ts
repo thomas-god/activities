@@ -5,7 +5,6 @@ export const weightAndNutritionMeasures = [
 	'weight',
 	'fat',
 	'muscle',
-	'bmi',
 	'calories',
 	'lipid',
 	'carbs',
@@ -28,7 +27,7 @@ export interface WeightAndNutritionCategory {
 }
 
 export const weightAndNutritionCategories: readonly WeightAndNutritionCategory[] = [
-	{ key: 'weight', label: 'Weight', main: 'weight', subs: ['fat', 'muscle', 'bmi'] },
+	{ key: 'weight', label: 'Weight', main: 'weight', subs: ['fat', 'muscle'] },
 	{ key: 'nutrition', label: 'Nutrition', main: 'calories', subs: ['lipid', 'carbs', 'protein'] },
 	{ key: 'hydration', label: 'Hydration', main: 'water', subs: ['alcohol'] }
 ];
@@ -38,7 +37,6 @@ export const weightAndNutritionLabels: Record<WeightAndNutritionMeasure, string>
 	weight: 'Weight',
 	fat: 'Fat',
 	muscle: 'Muscle',
-	bmi: 'BMI',
 	calories: 'Calories',
 	lipid: 'Lipid',
 	carbs: 'Carbs',
@@ -52,7 +50,6 @@ export const weightAndNutritionUnits: Record<WeightAndNutritionMeasure, string> 
 	weight: 'kg',
 	fat: 'kg',
 	muscle: 'kg',
-	bmi: '',
 	calories: 'kcal',
 	lipid: 'g',
 	carbs: 'g',
@@ -66,7 +63,6 @@ export const emptyWeightAndNutrition = (): WeightAndNutrition => ({
 	weight: null,
 	fat: null,
 	muscle: null,
-	bmi: null,
 	calories: null,
 	lipid: null,
 	carbs: null,

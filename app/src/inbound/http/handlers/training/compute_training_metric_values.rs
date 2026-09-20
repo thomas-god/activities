@@ -393,7 +393,7 @@ mod tests {
         );
 
         let json = r#"{
-            "source": {"type": "weightAndNutrition", "metric": "Weight"},
+            "source": {"type": "weightAndNutrition", "metric": "TotalWeight"},
             "start": "2024-01-01"
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
@@ -402,7 +402,7 @@ mod tests {
         let request = result.unwrap();
         assert_eq!(
             request.source,
-            APITrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight)
+            APITrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight)
         );
     }
 

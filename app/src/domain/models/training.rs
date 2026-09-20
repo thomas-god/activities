@@ -1342,7 +1342,6 @@ pub struct WeightAndNutrition {
     weight: Option<f32>,
     fat: Option<f32>,
     muscle: Option<f32>,
-    bmi: Option<f32>,
     // Nutrition
     calories: Option<f32>,
     lipid: Option<f32>,
@@ -1362,9 +1361,6 @@ impl WeightAndNutrition {
     }
     pub fn muscle(&self) -> Option<f32> {
         self.muscle
-    }
-    pub fn bmi(&self) -> Option<f32> {
-        self.bmi
     }
     pub fn calories(&self) -> Option<f32> {
         self.calories
@@ -1390,7 +1386,6 @@ impl WeightAndNutrition {
             weight: patch.weight.unwrap_or(self.weight),
             muscle: patch.muscle.unwrap_or(self.muscle),
             fat: patch.fat.unwrap_or(self.fat),
-            bmi: patch.bmi.unwrap_or(self.bmi),
             calories: patch.calories.unwrap_or(self.calories),
             lipid: patch.lipid.unwrap_or(self.lipid),
             carbs: patch.carbs.unwrap_or(self.carbs),
@@ -1399,33 +1394,14 @@ impl WeightAndNutrition {
             alcohol: patch.alcohol.unwrap_or(self.alcohol),
         }
     }
-
-    pub fn value(&self, source: &WeightAndNutritionSource) -> &Option<f32> {
-        match source {
-            WeightAndNutritionSource::Weight => &self.weight,
-            WeightAndNutritionSource::Muscle => &self.muscle,
-            WeightAndNutritionSource::Fat => &self.fat,
-            WeightAndNutritionSource::BMI => &self.bmi,
-            WeightAndNutritionSource::Calories => &self.calories,
-            WeightAndNutritionSource::Lipid => &self.lipid,
-            WeightAndNutritionSource::Carbs => &self.carbs,
-            WeightAndNutritionSource::Protein => &self.protein,
-            WeightAndNutritionSource::Water => &self.water,
-            WeightAndNutritionSource::Alcohol => &self.alcohol,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum WeightAndNutritionSource {
-    Weight,
-    Fat,
-    Muscle,
-    BMI,
+    TotalWeight,
+    BodyComposition,
     Calories,
-    Lipid,
-    Carbs,
-    Protein,
+    Macros,
     Water,
     Alcohol,
 }
@@ -1433,10 +1409,9 @@ pub enum WeightAndNutritionSource {
 impl WeightAndNutritionSource {
     pub fn unit(&self) -> Unit {
         match self {
-            Self::Weight | Self::Fat | Self::Muscle => Unit::Kilogram,
-            Self::BMI => Unit::Null,
+            Self::TotalWeight | Self::BodyComposition => Unit::Kilogram,
             Self::Calories => Unit::KiloCalorie,
-            Self::Lipid | Self::Carbs | Self::Protein => Unit::Gram,
+            Self::Macros => Unit::Gram,
             Self::Water => Unit::Liter,
             Self::Alcohol => Unit::AlcoholUnit,
         }
@@ -1448,23 +1423,85 @@ impl WeightAndNutritionSource {
         values: impl Iterator<Item = (chrono::NaiveDate, WeightAndNutrition)>,
     ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
         values
-            .filter_map(|(date, value)| {
-                let Some(value) = value.value(self) else {
-                    return None;
+            .map(|(date, value)| {
+                let bin = window
+                    .as_ref()
+                    .map(|w| w.granularity().date_key(&date))
+                    .unwrap_or_else(|| date.to_string());
+
+                let mut values = vec![];
+                match self {
+                    Self::TotalWeight => {
+                        if let Some(weight) = value.weight() {
+                            values.push((
+                                TrainingMetricBin::new_without_group(bin),
+                                IndividualValue::new(weight as f64),
+                            ));
+                        }
+                    }
+                    Self::BodyComposition => {
+                        if let Some(fat) = value.fat() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("fat".to_string())),
+                                IndividualValue::new(fat as f64),
+                            ));
+                        }
+                        if let Some(muscle) = value.muscle() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some("muscle".to_string())),
+                                IndividualValue::new(muscle as f64),
+                            ));
+                        }
+                    }
+                    Self::Calories => {
+                        if let Some(calories) = value.calories() {
+                            values.push((
+                                TrainingMetricBin::new_without_group(bin),
+                                IndividualValue::new(calories as f64),
+                            ));
+                        }
+                    }
+                    Self::Macros => {
+                        if let Some(lipids) = value.lipid() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("lipids".to_string())),
+                                IndividualValue::new(lipids as f64),
+                            ));
+                        }
+                        if let Some(carbs) = value.carbs() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("carbs".to_string())),
+                                IndividualValue::new(carbs as f64),
+                            ));
+                        }
+                        if let Some(proteins) = value.protein() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some("proteins".to_string())),
+                                IndividualValue::new(proteins as f64),
+                            ));
+                        }
+                    }
+                    Self::Water => {
+                        if let Some(water) = value.water() {
+                            values.push((
+                                TrainingMetricBin::new_without_group(bin),
+                                IndividualValue::new(water as f64),
+                            ));
+                        }
+                    }
+                    Self::Alcohol => {
+                        if let Some(alcohol) = value.alcohol() {
+                            values.push((
+                                TrainingMetricBin::new_without_group(bin),
+                                IndividualValue::new(alcohol as f64),
+                            ));
+                        }
+                    }
                 };
 
-                // Weight and nutrition values have no intrinsic group
-                Some(match window {
-                    Some(window) => (
-                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
-                        IndividualValue::new(*value as f64),
-                    ),
-                    None => (
-                        TrainingMetricBin::new_without_group(date.to_string()),
-                        IndividualValue::new(*value as f64),
-                    ),
-                })
+                values
             })
+            .flatten()
             .into_group_map()
     }
 }
@@ -1474,7 +1511,6 @@ pub struct WeightAndNutritionPatch {
     pub weight: Option<Option<f32>>,
     pub fat: Option<Option<f32>>,
     pub muscle: Option<Option<f32>>,
-    pub bmi: Option<Option<f32>>,
     pub calories: Option<Option<f32>>,
     pub lipid: Option<Option<f32>>,
     pub carbs: Option<Option<f32>>,
@@ -3100,46 +3136,39 @@ mod test_weight_and_nutrition_source_extract_values {
         ))
     }
 
-    fn value_at<'a>(
-        result: &'a HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+    fn bin(granule: &str, group: Option<&str>) -> TrainingMetricBin {
+        TrainingMetricBin::new(granule.to_string(), group.map(|g| g.to_string()))
+    }
+
+    fn value_at(result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>, granule: &str) -> f64 {
+        result[&bin(granule, None)][0].value()
+    }
+
+    fn grouped_value_at(
+        result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>,
         granule: &str,
+        group: &str,
     ) -> f64 {
-        result[&TrainingMetricBin::from_granule(granule)][0].value()
+        result[&bin(granule, Some(group))][0].value()
     }
 
     #[test]
     fn test_no_window_bins_by_date() {
-        let source = WeightAndNutritionSource::Weight;
+        let source = WeightAndNutritionSource::TotalWeight;
         let values = vec![
             (
                 date("2025-09-03"),
-                WeightAndNutrition::new(
-                    Some(75.5),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    weight: Some(75.5),
+                    ..Default::default()
+                },
             ),
             (
                 date("2025-09-04"),
-                WeightAndNutrition::new(
-                    Some(76.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    weight: Some(76.0),
+                    ..Default::default()
+                },
             ),
         ];
 
@@ -3151,53 +3180,109 @@ mod test_weight_and_nutrition_source_extract_values {
     }
 
     #[test]
+    fn test_ungrouped_sources_bin_a_single_value_without_group_per_date() {
+        // TotalWeight, Calories, Water and Alcohol each extract a single
+        // value per date, so they bin it without a group.
+        let cases = [
+            (
+                WeightAndNutritionSource::TotalWeight,
+                75.5,
+                WeightAndNutrition {
+                    weight: Some(75.5),
+                    ..Default::default()
+                },
+            ),
+            (
+                WeightAndNutritionSource::Calories,
+                2500.0,
+                WeightAndNutrition {
+                    calories: Some(2500.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                WeightAndNutritionSource::Water,
+                2.0,
+                WeightAndNutrition {
+                    water: Some(2.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                WeightAndNutritionSource::Alcohol,
+                1.5,
+                WeightAndNutrition {
+                    alcohol: Some(1.5),
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        for (source, expected, value) in cases {
+            let values = vec![(date("2025-09-03"), value), (date("2025-09-04"), value)];
+
+            let result = source.extract_values(&None, values.into_iter());
+
+            assert_eq!(result.len(), 2);
+            assert!(result.keys().all(|k| k.group().is_none()));
+            assert_eq!(value_at(&result, "2025-09-03"), expected);
+            assert_eq!(value_at(&result, "2025-09-04"), expected);
+        }
+    }
+
+    #[test]
+    fn test_ungrouped_sources_ignore_other_fields() {
+        let value = WeightAndNutrition {
+            weight: Some(75.0),
+            fat: Some(20.0),
+            muscle: Some(40.0),
+            calories: Some(2500.0),
+            lipid: Some(70.0),
+            carbs: Some(300.0),
+            protein: Some(100.0),
+            water: Some(2.0),
+            alcohol: Some(1.0),
+        };
+        let cases = [
+            (WeightAndNutritionSource::TotalWeight, 75.0),
+            (WeightAndNutritionSource::Calories, 2500.0),
+            (WeightAndNutritionSource::Water, 2.0),
+            (WeightAndNutritionSource::Alcohol, 1.0),
+        ];
+
+        for (source, expected) in cases {
+            let result =
+                source.extract_values(&None, vec![(date("2025-09-03"), value)].into_iter());
+
+            assert_eq!(result.len(), 1);
+            assert_eq!(value_at(&result, "2025-09-03"), expected);
+        }
+    }
+
+    #[test]
     fn test_monthly_window_groups_by_first_day_of_month() {
         let source = WeightAndNutritionSource::Calories;
         let values = vec![
             (
                 date("2025-09-03"),
-                WeightAndNutrition::new(
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(2500.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    calories: Some(2500.0),
+                    ..Default::default()
+                },
             ),
             (
                 date("2025-09-28"),
-                WeightAndNutrition::new(
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(2600.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    calories: Some(2600.0),
+                    ..Default::default()
+                },
             ),
             (
                 date("2025-10-15"),
-                WeightAndNutrition::new(
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(2700.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    calories: Some(2700.0),
+                    ..Default::default()
+                },
             ),
         ];
         let window = Some(TrainingMetricWindow::new(
@@ -3220,21 +3305,15 @@ mod test_weight_and_nutrition_source_extract_values {
 
     #[test]
     fn test_extracts_the_requested_field() {
-        let source = WeightAndNutritionSource::Protein;
+        let source = WeightAndNutritionSource::Water;
         let values = vec![(
             date("2025-09-03"),
-            WeightAndNutrition::new(
-                Some(75.0),
-                None,
-                None,
-                None,
-                Some(2500.0),
-                None,
-                None,
-                Some(120.0),
-                None,
-                None,
-            ),
+            WeightAndNutrition {
+                weight: Some(75.0),
+                calories: Some(2500.0),
+                water: Some(120.0),
+                ..Default::default()
+            },
         )];
 
         let result = source.extract_values(&daily_window(), values.into_iter());
@@ -3245,37 +3324,22 @@ mod test_weight_and_nutrition_source_extract_values {
 
     #[test]
     fn test_skips_entries_missing_the_source_value() {
-        let source = WeightAndNutritionSource::Fat;
+        let source = WeightAndNutritionSource::Water;
         let values = vec![
             (
                 date("2025-09-03"),
-                WeightAndNutrition::new(
-                    Some(75.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    weight: Some(75.0),
+                    ..Default::default()
+                },
             ),
             (
                 date("2025-09-04"),
-                WeightAndNutrition::new(
-                    Some(76.0),
-                    Some(15.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                WeightAndNutrition {
+                    weight: Some(76.0),
+                    water: Some(15.0),
+                    ..Default::default()
+                },
             ),
         ];
 
@@ -3283,6 +3347,207 @@ mod test_weight_and_nutrition_source_extract_values {
 
         assert_eq!(result.len(), 1);
         assert_eq!(value_at(&result, "2025-09-04"), 15.0);
+    }
+
+    #[test]
+    fn test_body_composition_groups_fat_and_muscle_into_separate_bins() {
+        let source = WeightAndNutritionSource::BodyComposition;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition {
+                fat: Some(20.0),
+                muscle: Some(40.0),
+                ..Default::default()
+            },
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "fat"), 20.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "muscle"), 40.0);
+    }
+
+    #[test]
+    fn test_body_composition_skips_missing_values() {
+        let source = WeightAndNutritionSource::BodyComposition;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition {
+                    fat: Some(20.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                date("2025-09-04"),
+                WeightAndNutrition {
+                    muscle: Some(41.0),
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "fat"), 20.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-04", "muscle"), 41.0);
+    }
+
+    #[test]
+    fn test_body_composition_ignores_other_fields() {
+        let source = WeightAndNutritionSource::BodyComposition;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition {
+                weight: Some(75.0),
+                fat: Some(20.0),
+                muscle: Some(40.0),
+                calories: Some(2500.0),
+                ..Default::default()
+            },
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "fat"), 20.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "muscle"), 40.0);
+    }
+
+    #[test]
+    fn test_macros_groups_lipids_carbs_and_proteins_into_separate_bins() {
+        let source = WeightAndNutritionSource::Macros;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition {
+                lipid: Some(70.0),
+                carbs: Some(300.0),
+                protein: Some(100.0),
+                ..Default::default()
+            },
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "lipids"), 70.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "carbs"), 300.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "proteins"), 100.0);
+    }
+
+    #[test]
+    fn test_macros_skips_missing_values() {
+        let source = WeightAndNutritionSource::Macros;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition {
+                carbs: Some(300.0),
+                ..Default::default()
+            },
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "carbs"), 300.0);
+    }
+
+    #[test]
+    fn test_macros_ignores_other_fields() {
+        let source = WeightAndNutritionSource::Macros;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition {
+                weight: Some(75.0),
+                lipid: Some(70.0),
+                carbs: Some(300.0),
+                protein: Some(100.0),
+                water: Some(2.0),
+                ..Default::default()
+            },
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "lipids"), 70.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "carbs"), 300.0);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "proteins"), 100.0);
+    }
+
+    #[test]
+    fn test_monthly_window_groups_grouped_sources_by_first_day_of_month() {
+        let source = WeightAndNutritionSource::Macros;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition {
+                    lipid: Some(70.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                date("2025-09-28"),
+                WeightAndNutrition {
+                    lipid: Some(80.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                date("2025-10-15"),
+                WeightAndNutrition {
+                    lipid: Some(90.0),
+                    ..Default::default()
+                },
+            ),
+        ];
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Average,
+        ));
+
+        let result = source.extract_values(&window, values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        let september = &result[&bin("2025-09-01", Some("lipids"))];
+        let mut values = september
+            .iter()
+            .map(|value| value.value())
+            .collect::<Vec<_>>();
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(values, vec![70.0, 80.0]);
+        assert_eq!(grouped_value_at(&result, "2025-10-01", "lipids"), 90.0);
+    }
+
+    #[test]
+    fn test_grouped_bins_only_exist_for_their_own_granule() {
+        // Dates falling in different windows must not share a bin,
+        // even though the group names are the same.
+        let source = WeightAndNutritionSource::BodyComposition;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition {
+                    fat: Some(20.0),
+                    ..Default::default()
+                },
+            ),
+            (
+                date("2025-10-15"),
+                WeightAndNutrition {
+                    fat: Some(21.0),
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(grouped_value_at(&result, "2025-09-03", "fat"), 20.0);
+        assert_eq!(grouped_value_at(&result, "2025-10-15", "fat"), 21.0);
     }
 }
 

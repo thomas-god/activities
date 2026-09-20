@@ -197,8 +197,8 @@
 					columns for values you don't want to import):
 				</p>
 				<pre
-					class="overflow-x-auto rounded-box border border-base-300 bg-base-200 p-2 font-mono text-xs leading-relaxed">{`date,weight,fat,muscle,bmi,calories,lipid,carbs,protein,water,alcohol
-2024-01-15,70.5,15.2,55.1,22.4,2000,60,250,120,1.5,0.5`}</pre>
+					class="overflow-x-auto rounded-box border border-base-300 bg-base-200 p-2 font-mono text-xs leading-relaxed">{`date,weight,fat,muscle,calories,lipid,carbs,protein,water,alcohol
+2024-01-15,70.5,15.2,55.1,2000,60,250,120,1.5,0.5`}</pre>
 				<div class="join mt-2 gap-3">
 					<input
 						type="file"
