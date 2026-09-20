@@ -110,7 +110,12 @@ where
                 }
             });
 
-        Ok(definition.compute_values_from_activities(activities_with_metrics))
+        let values = source.extract_values(
+            definition.window(),
+            definition.filters(),
+            activities_with_metrics,
+        );
+        Ok(definition.compute_training_metric_values(values))
     }
 
     async fn compute_training_metric_values_for_hooper_index(
@@ -119,15 +124,15 @@ where
         source: HooperIndexSource,
         date_range: &DateRange,
     ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
-        let values = self
+        let scales = self
             .training_repository
             .get_hooper_indexes(definition.user(), date_range)
             .await
             .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
-            .into_iter()
-            .map(|(date, hooper_index)| (date, *hooper_index.value(&source)));
+            .into_iter();
 
-        Ok(definition.compute_values_from_hooper_indexes(values))
+        let values = source.extract_values(definition.window(), scales);
+        Ok(definition.compute_training_metric_values(values))
     }
 
     async fn compute_training_metric_values_for_weight_and_nutrition(
@@ -141,10 +146,10 @@ where
             .get_weight_and_nutritions(definition.user(), date_range)
             .await
             .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
-            .into_iter()
-            .map(|(date, hooper_index)| (date, *hooper_index.value(&source)));
+            .into_iter();
 
-        Ok(definition.compute_values_from_weight_and_nutrition_values(values))
+        let values = source.extract_values(definition.window(), values);
+        Ok(definition.compute_training_metric_values(values))
     }
 }
 

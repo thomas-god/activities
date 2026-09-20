@@ -542,6 +542,40 @@ impl ActivitySource {
     pub fn unit(&self) -> Unit {
         self.metric.unit()
     }
+
+    pub fn extract_values(
+        &self,
+        window: &Option<TrainingMetricWindow>,
+        filters: &TrainingMetricActivityFilters,
+        activities: impl Iterator<Item = (Activity, f64)>,
+    ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
+        let filtered_activities =
+            activities.filter(|(activity, _metric_value)| filters.matches(activity));
+
+        filtered_activities
+            .map(|(activity, metric)| {
+                let bin = match window {
+                    None => TrainingMetricBin::new_without_group(
+                        activity.start_time().datetime().to_rfc3339(),
+                    ),
+                    Some(window) => {
+                        let granule = window
+                            .granularity()
+                            .datetime_key(activity.start_time().datetime());
+
+                        let group = window
+                            .group_by()
+                            .as_ref()
+                            .and_then(|group_by| group_by.extract_group(&activity));
+
+                        TrainingMetricBin::new(granule, group)
+                    }
+                };
+
+                (bin, IndividualValue::new(metric))
+            })
+            .into_group_map()
+    }
 }
 
 impl Display for ActivitySource {
@@ -642,97 +676,9 @@ impl TrainingMetricDefinition {
         }
     }
 
-    /// Compute training metric values from a list of `SubjectiveScale` values from an
-    /// `HooperIndex`.
-    pub fn compute_values_from_hooper_indexes(
-        &self,
-        values: impl Iterator<Item = (chrono::NaiveDate, Option<SubjectiveScale>)>,
-    ) -> TrainingMetricValues {
-        let values_by_bin = values
-            .filter_map(|(date, value)| {
-                let value = value?;
-
-                // Hooper index values have no intrinsic group
-                Some(match &self.window {
-                    Some(window) => (
-                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
-                        IndividualValue::new(value.value() as f64),
-                    ),
-                    None => (
-                        TrainingMetricBin::new_without_group(date.to_string()),
-                        IndividualValue::new(value.value() as f64),
-                    ),
-                })
-            })
-            .into_group_map();
-
-        self.compute_training_metric_values(values_by_bin)
-    }
-
-    /// Compute training metric values from a list of values from `WeightAndNutrition`.
-    pub fn compute_values_from_weight_and_nutrition_values(
-        &self,
-        values: impl Iterator<Item = (chrono::NaiveDate, Option<f32>)>,
-    ) -> TrainingMetricValues {
-        let values_by_bin = values
-            .filter_map(|(date, value)| {
-                let value = value?;
-
-                // Weight and nutrition values have no intrinsic group
-                Some(match &self.window {
-                    Some(window) => (
-                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
-                        IndividualValue::new(value as f64),
-                    ),
-                    None => (
-                        TrainingMetricBin::new_without_group(date.to_string()),
-                        IndividualValue::new(value as f64),
-                    ),
-                })
-            })
-            .into_group_map();
-
-        self.compute_training_metric_values(values_by_bin)
-    }
-
-    /// Compute training metric values from a list of activities with their extracted metric value.
-    pub fn compute_values_from_activities(
-        &self,
-        activities_with_metric: impl Iterator<Item = (Activity, f64)>,
-    ) -> TrainingMetricValues {
-        let filtered_activities = activities_with_metric
-            .filter(|(activity, _metric_value)| self.filters().matches(activity));
-
-        let values_by_bin = filtered_activities
-            .map(|(activity, metric)| {
-                let bin = match &self.window {
-                    None => TrainingMetricBin::new_without_group(
-                        activity.start_time().datetime().to_rfc3339(),
-                    ),
-                    Some(window) => {
-                        let granule = window
-                            .granularity()
-                            .datetime_key(activity.start_time().datetime());
-
-                        let group = window
-                            .group_by()
-                            .as_ref()
-                            .and_then(|group_by| group_by.extract_group(&activity));
-
-                        TrainingMetricBin::new(granule, group)
-                    }
-                };
-
-                (bin, IndividualValue::new(metric))
-            })
-            .into_group_map();
-
-        self.compute_training_metric_values(values_by_bin)
-    }
-
     /// Compute for each bin the corresponding training metric value based on the window/aggregate
     /// of the definition and return the final `TrainingMetricValues`.
-    fn compute_training_metric_values(
+    pub fn compute_training_metric_values(
         &self,
         values: HashMap<TrainingMetricBin, Vec<IndividualValue>>,
     ) -> TrainingMetricValues {
@@ -1312,6 +1258,32 @@ impl HooperIndexSource {
     pub fn unit(&self) -> Unit {
         Unit::Null
     }
+
+    pub fn extract_values(
+        &self,
+        window: &Option<TrainingMetricWindow>,
+        values: impl Iterator<Item = (chrono::NaiveDate, HooperIndex)>,
+    ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
+        values
+            .filter_map(|(date, value)| {
+                let Some(value) = value.value(self) else {
+                    return None;
+                };
+
+                // Hooper index values have no intrinsic group
+                Some(match window {
+                    Some(window) => (
+                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
+                        IndividualValue::new(value.value() as f64),
+                    ),
+                    None => (
+                        TrainingMetricBin::new_without_group(date.to_string()),
+                        IndividualValue::new(value.value() as f64),
+                    ),
+                })
+            })
+            .into_group_map()
+    }
 }
 
 #[derive(Debug, Clone, Copy, Constructor, Default)]
@@ -1449,6 +1421,32 @@ impl WeightAndNutritionSource {
             Self::Water => Unit::Liter,
             Self::Alcohol => Unit::AlcoholUnit,
         }
+    }
+
+    pub fn extract_values(
+        &self,
+        window: &Option<TrainingMetricWindow>,
+        values: impl Iterator<Item = (chrono::NaiveDate, WeightAndNutrition)>,
+    ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
+        values
+            .filter_map(|(date, value)| {
+                let Some(value) = value.value(self) else {
+                    return None;
+                };
+
+                // Weight and nutrition values have no intrinsic group
+                Some(match window {
+                    Some(window) => (
+                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
+                        IndividualValue::new(*value as f64),
+                    ),
+                    None => (
+                        TrainingMetricBin::new_without_group(date.to_string()),
+                        IndividualValue::new(*value as f64),
+                    ),
+                })
+            })
+            .into_group_map()
     }
 }
 
@@ -1750,198 +1748,7 @@ impl TrainingMetricsOrdering {
 #[cfg(test)]
 mod test_training_metrics {
 
-    use crate::domain::models::{
-        UserId,
-        activity::{
-            ActiveTime, Activity, ActivityDuration, ActivityId, ActivityStartTime,
-            ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData,
-            Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-            TimeseriesValue,
-        },
-    };
-
     use super::*;
-
-    fn default_activity() -> ActivityWithParsedData {
-        ActivityWithParsedData::new(
-            Activity::new_empty(
-                ActivityId::default(),
-                UserId::test_default(),
-                ActivityStartTime::new(
-                    "2025-09-03T00:00:00Z"
-                        .parse::<DateTime<FixedOffset>>()
-                        .unwrap(),
-                ),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            ),
-            ActivityTimeseries::new(
-                TimeseriesTime::new(vec![0, 1, 2]),
-                TimeseriesActiveTime::new(vec![
-                    ActiveTime::Running(0),
-                    ActiveTime::Running(1),
-                    ActiveTime::Running(2),
-                ]),
-                vec![],
-                vec![Timeseries::new(
-                    TimeseriesMetric::Power,
-                    vec![
-                        Some(TimeseriesValue::Int(10)),
-                        Some(TimeseriesValue::Int(20)),
-                        Some(TimeseriesValue::Int(30)),
-                    ],
-                )],
-            )
-            .unwrap(),
-            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
-        )
-    }
-
-    #[test]
-    fn test_compute_training_metrics_with_filters() {
-        let activities: Vec<(Activity, f64)> = [default_activity()]
-            .iter()
-            .map(|activity| (activity.activity().clone(), 0.))
-            .collect();
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
-            Some(TrainingMetricWindow::new(
-                TrainingMetricGranularity::Weekly,
-                TrainingMetricAggregate::Max,
-                TrainingMetricGroupBy::none(),
-            )),
-            TrainingMetricActivityFilters::new(
-                Some(vec![SportFilter::Sport(Sport::Running)]),
-                None,
-                None,
-                None,
-            ),
-            TrainingMetricSummary::empty(),
-            None,
-        );
-
-        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
-
-        assert!(metrics.is_empty());
-    }
-
-    #[test]
-    fn test_compute_training_metrics_with_group_by() {
-        let activities: Vec<(Activity, f64)> = [default_activity()]
-            .iter()
-            .map(|activity| (activity.activity().clone(), 0.))
-            .collect();
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
-            Some(TrainingMetricWindow::new(
-                TrainingMetricGranularity::Weekly,
-                TrainingMetricAggregate::Max,
-                Some(TrainingMetricGroupBy::Sport),
-            )),
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::empty(),
-            None,
-        );
-
-        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
-
-        assert!(
-            metrics
-                .get(&TrainingMetricBin::new(
-                    "2025-09-01".to_string(),
-                    Some("Cycling".to_string())
-                ))
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn test_compute_training_metrics_without_window() {
-        let activity_1 = default_activity().activity().clone();
-        let activity_2 = Activity::new_empty(
-            ActivityId::default(),
-            UserId::test_default(),
-            ActivityStartTime::new(
-                "2025-09-04T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::default(),
-            Sport::Cycling,
-        );
-
-        let date_key_1 = activity_1.start_time().datetime().to_rfc3339();
-        let date_key_2 = activity_2.start_time().datetime().to_rfc3339();
-        let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
-
-        let window = None;
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
-            window,
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::empty(),
-            None,
-        );
-
-        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(metrics.unit(), Unit::KiloCalorie);
-        assert_eq!(
-            metrics.get(&TrainingMetricBin::new(date_key_1, None)),
-            Some(&TrainingMetricValue::SingleValue(42.0))
-        );
-        assert_eq!(
-            metrics.get(&TrainingMetricBin::new(date_key_2, None)),
-            Some(&TrainingMetricValue::SingleValue(84.0))
-        );
-    }
-
-    #[test]
-    fn test_compute_training_metrics_without_window_with_filters() {
-        let activity_1 = default_activity().activity().clone();
-        let activity_2 = Activity::new_empty(
-            ActivityId::default(),
-            UserId::test_default(),
-            ActivityStartTime::new(
-                "2025-09-04T00:00:00Z"
-                    .parse::<DateTime<FixedOffset>>()
-                    .unwrap(),
-            ),
-            ActivityDuration::default(),
-            Sport::Running,
-        );
-
-        let date_key_1 = activity_1.start_time().datetime().to_rfc3339();
-        let activities: Vec<(Activity, f64)> = vec![(activity_1, 42.0), (activity_2, 84.0)];
-
-        let window = None;
-        let metric_definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::Activity(ActivitySource::new(ActivityMetric::Calories)),
-            window,
-            TrainingMetricActivityFilters::new(
-                Some(vec![SportFilter::Sport(Sport::Cycling)]),
-                None,
-                None,
-                None,
-            ),
-            TrainingMetricSummary::empty(),
-            None,
-        );
-
-        let metrics = metric_definition.compute_values_from_activities(activities.into_iter());
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics.unit(), Unit::KiloCalorie);
-        assert_eq!(
-            metrics.get(&TrainingMetricBin::new(date_key_1, None)),
-            Some(&TrainingMetricValue::SingleValue(42.0))
-        );
-    }
 
     #[test]
     fn test_granularity_bins_daily() {
@@ -2939,6 +2746,522 @@ mod test_training_metric_filters {
 }
 
 #[cfg(test)]
+mod test_activity_source_extract_values {
+    use crate::domain::models::activity::{
+        Activity, ActivityDuration, ActivityId, ActivityStartTime,
+    };
+
+    use super::*;
+
+    fn activity_at(start: &str, sport: Sport) -> Activity {
+        Activity::new_empty(
+            ActivityId::default(),
+            UserId::test_default(),
+            ActivityStartTime::new(start.parse::<DateTime<FixedOffset>>().unwrap()),
+            ActivityDuration::default(),
+            sport,
+        )
+    }
+
+    fn daily_window(group_by: Option<TrainingMetricGroupBy>) -> Option<TrainingMetricWindow> {
+        Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+            group_by,
+        ))
+    }
+
+    fn values<'a>(
+        result: &'a HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+        granule: &str,
+        group: Option<&str>,
+    ) -> Vec<f64> {
+        let bin = TrainingMetricBin::new(granule.to_string(), group.map(|g| g.to_string()));
+        result[&bin].iter().map(|value| value.value()).collect()
+    }
+
+    #[test]
+    fn test_no_window_bins_by_exact_start_time() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-04T12:00:00Z", Sport::Running), 20.0),
+        ];
+
+        let result = source.extract_values(&None, &filters, activities.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            values(&result, "2025-09-03T10:00:00+00:00", None),
+            vec![10.0]
+        );
+        assert_eq!(
+            values(&result, "2025-09-04T12:00:00+00:00", None),
+            vec![20.0]
+        );
+    }
+
+    #[test]
+    fn test_daily_window_groups_activities_of_same_day() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-03T18:00:00Z", Sport::Running), 20.0),
+            (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 30.0),
+        ];
+
+        let result = source.extract_values(&daily_window(None), &filters, activities.into_iter());
+
+        assert_eq!(result.len(), 2);
+        let mut same_day = values(&result, "2025-09-03", None);
+        same_day.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(same_day, vec![10.0, 20.0]);
+        assert_eq!(values(&result, "2025-09-04", None), vec![30.0]);
+    }
+
+    #[test]
+    fn test_weekly_window_groups_by_monday_of_week() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        // 2025-09-03 is a Wednesday and 2025-09-07 the Sunday of the same week (Monday
+        // 2025-09-01); 2025-09-08 starts the next week.
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-07T18:00:00Z", Sport::Running), 20.0),
+            (activity_at("2025-09-08T08:00:00Z", Sport::Cycling), 30.0),
+        ];
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+            None,
+        ));
+
+        let result = source.extract_values(&window, &filters, activities.into_iter());
+
+        assert_eq!(result.len(), 2);
+        let mut same_week = values(&result, "2025-09-01", None);
+        same_week.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(same_week, vec![10.0, 20.0]);
+        assert_eq!(values(&result, "2025-09-08", None), vec![30.0]);
+    }
+
+    #[test]
+    fn test_monthly_window_groups_by_first_day_of_month() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-28T18:00:00Z", Sport::Running), 20.0),
+            (activity_at("2025-10-15T08:00:00Z", Sport::Cycling), 30.0),
+        ];
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Sum,
+            None,
+        ));
+
+        let result = source.extract_values(&window, &filters, activities.into_iter());
+
+        assert_eq!(result.len(), 2);
+        let mut same_month = values(&result, "2025-09-01", None);
+        same_month.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(same_month, vec![10.0, 20.0]);
+        assert_eq!(values(&result, "2025-10-01", None), vec![30.0]);
+    }
+
+    #[test]
+    fn test_filters_exclude_non_matching_activities() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::new(
+            Some(vec![SportFilter::Sport(Sport::Cycling)]),
+            None,
+            None,
+            None,
+        );
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-03T18:00:00Z", Sport::Running), 20.0),
+        ];
+
+        let result = source.extract_values(&daily_window(None), &filters, activities.into_iter());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(values(&result, "2025-09-03", None), vec![10.0]);
+    }
+
+    #[test]
+    fn test_group_by_sport_adds_group_to_bin() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-03T18:00:00Z", Sport::Running), 20.0),
+            (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 30.0),
+        ];
+
+        let result = source.extract_values(
+            &daily_window(Some(TrainingMetricGroupBy::Sport)),
+            &filters,
+            activities.into_iter(),
+        );
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(values(&result, "2025-09-03", Some("Cycling")), vec![10.0]);
+        assert_eq!(values(&result, "2025-09-03", Some("Running")), vec![20.0]);
+        assert_eq!(values(&result, "2025-09-04", Some("Cycling")), vec![30.0]);
+    }
+
+    #[test]
+    fn test_group_by_none_yields_bin_without_group() {
+        let source = ActivitySource::new(ActivityMetric::NumberOfActivity);
+        let filters = TrainingMetricActivityFilters::empty();
+        let activities = vec![
+            (activity_at("2025-09-03T10:00:00Z", Sport::Cycling), 10.0),
+            (activity_at("2025-09-04T08:00:00Z", Sport::Cycling), 20.0),
+        ];
+
+        let result = source.extract_values(
+            &daily_window(TrainingMetricGroupBy::none()),
+            &filters,
+            activities.into_iter(),
+        );
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(values(&result, "2025-09-03", None), vec![10.0]);
+        assert_eq!(values(&result, "2025-09-04", None), vec![20.0]);
+    }
+}
+
+#[cfg(test)]
+mod test_hooper_index_source_extract_values {
+    use super::*;
+
+    fn scale(value: u8) -> SubjectiveScale {
+        SubjectiveScale::try_from(value).unwrap()
+    }
+
+    fn date(date: &str) -> NaiveDate {
+        date.parse::<NaiveDate>().unwrap()
+    }
+
+    fn daily_window() -> Option<TrainingMetricWindow> {
+        Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            None,
+        ))
+    }
+
+    fn value_at<'a>(
+        result: &'a HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+        granule: &str,
+    ) -> f64 {
+        result[&TrainingMetricBin::from_granule(granule)][0].value()
+    }
+
+    #[test]
+    fn test_no_window_bins_by_date() {
+        let source = HooperIndexSource::Fatigue;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                HooperIndex::new(Some(scale(2)), None, None, None, None),
+            ),
+            (
+                date("2025-09-04"),
+                HooperIndex::new(Some(scale(5)), None, None, None, None),
+            ),
+        ];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(value_at(&result, "2025-09-03"), 2.0);
+        assert_eq!(value_at(&result, "2025-09-04"), 5.0);
+    }
+
+    #[test]
+    fn test_daily_window_groups_activities_of_same_day() {
+        let source = HooperIndexSource::Sleep;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                HooperIndex::new(None, Some(scale(7)), None, None, None),
+            ),
+            (
+                date("2025-09-04"),
+                HooperIndex::new(None, Some(scale(8)), None, None, None),
+            ),
+        ];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(value_at(&result, "2025-09-03"), 7.0);
+        assert_eq!(value_at(&result, "2025-09-04"), 8.0);
+    }
+
+    #[test]
+    fn test_weekly_window_groups_by_monday_of_week() {
+        let source = HooperIndexSource::Stress;
+        // 2025-09-03 is a Wednesday and 2025-09-07 the Sunday of the week starting
+        // Monday 2025-09-01.
+        let values = vec![
+            (
+                date("2025-09-03"),
+                HooperIndex::new(None, None, None, Some(scale(3)), None),
+            ),
+            (
+                date("2025-09-07"),
+                HooperIndex::new(None, None, None, Some(scale(4)), None),
+            ),
+        ];
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Average,
+            None,
+        ));
+
+        let result = source.extract_values(&window, values.into_iter());
+
+        assert_eq!(result.len(), 1);
+        let grouped = &result[&TrainingMetricBin::from_granule("2025-09-01")];
+        let mut values = grouped
+            .iter()
+            .map(|value| value.value())
+            .collect::<Vec<_>>();
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(values, vec![3.0, 4.0]);
+    }
+
+    #[test]
+    fn test_skips_entries_missing_the_source_value() {
+        let source = HooperIndexSource::Mood;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                HooperIndex::new(Some(scale(1)), None, None, None, None),
+            ),
+            (
+                date("2025-09-04"),
+                HooperIndex::new(None, None, None, None, Some(scale(6))),
+            ),
+            (date("2025-09-05"), HooperIndex::default()),
+        ];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(value_at(&result, "2025-09-04"), 6.0);
+    }
+}
+
+#[cfg(test)]
+mod test_weight_and_nutrition_source_extract_values {
+    use super::*;
+
+    fn date(date: &str) -> NaiveDate {
+        date.parse::<NaiveDate>().unwrap()
+    }
+
+    fn daily_window() -> Option<TrainingMetricWindow> {
+        Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Average,
+            None,
+        ))
+    }
+
+    fn value_at<'a>(
+        result: &'a HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+        granule: &str,
+    ) -> f64 {
+        result[&TrainingMetricBin::from_granule(granule)][0].value()
+    }
+
+    #[test]
+    fn test_no_window_bins_by_date() {
+        let source = WeightAndNutritionSource::Weight;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition::new(
+                    Some(75.5),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                date("2025-09-04"),
+                WeightAndNutrition::new(
+                    Some(76.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(value_at(&result, "2025-09-03"), 75.5);
+        assert_eq!(value_at(&result, "2025-09-04"), 76.0);
+    }
+
+    #[test]
+    fn test_monthly_window_groups_by_first_day_of_month() {
+        let source = WeightAndNutritionSource::Calories;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition::new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(2500.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                date("2025-09-28"),
+                WeightAndNutrition::new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(2600.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                date("2025-10-15"),
+                WeightAndNutrition::new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(2700.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ];
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Average,
+            None,
+        ));
+
+        let result = source.extract_values(&window, values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        let september = &result[&TrainingMetricBin::from_granule("2025-09-01")];
+        let mut values = september
+            .iter()
+            .map(|value| value.value())
+            .collect::<Vec<_>>();
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(values, vec![2500.0, 2600.0]);
+        assert_eq!(value_at(&result, "2025-10-01"), 2700.0);
+    }
+
+    #[test]
+    fn test_extracts_the_requested_field() {
+        let source = WeightAndNutritionSource::Protein;
+        let values = vec![(
+            date("2025-09-03"),
+            WeightAndNutrition::new(
+                Some(75.0),
+                None,
+                None,
+                None,
+                Some(2500.0),
+                None,
+                None,
+                Some(120.0),
+                None,
+                None,
+            ),
+        )];
+
+        let result = source.extract_values(&daily_window(), values.into_iter());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(value_at(&result, "2025-09-03"), 120.0);
+    }
+
+    #[test]
+    fn test_skips_entries_missing_the_source_value() {
+        let source = WeightAndNutritionSource::Fat;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                WeightAndNutrition::new(
+                    Some(75.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                date("2025-09-04"),
+                WeightAndNutrition::new(
+                    Some(76.0),
+                    Some(15.0),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(value_at(&result, "2025-09-04"), 15.0);
+    }
+}
+
+#[cfg(test)]
 mod test_training_period {
 
     use crate::domain::models::activity::{ActivityDuration, ActivityId, ActivityStartTime};
@@ -3807,447 +4130,5 @@ mod test_training_note_search_document {
             .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "Great session");
-    }
-}
-
-#[cfg(test)]
-mod test_compute_values_from_hooper_indexes {
-    use super::*;
-
-    fn scale(value: u8) -> SubjectiveScale {
-        SubjectiveScale::try_from(value).unwrap()
-    }
-
-    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
-        NaiveDate::from_ymd_opt(year, month, day).unwrap()
-    }
-
-    fn definition(window: Option<TrainingMetricWindow>) -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
-            window,
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::empty(),
-            None,
-        )
-    }
-
-    fn bin(granule: &str) -> TrainingMetricBin {
-        TrainingMetricBin::new_without_group(granule.to_string())
-    }
-
-    #[test]
-    fn test_empty_input_returns_empty_values() {
-        let metrics = definition(None).compute_values_from_hooper_indexes(std::iter::empty());
-
-        assert!(metrics.is_empty());
-        assert_eq!(metrics.unit(), Unit::Null);
-    }
-
-    #[test]
-    fn test_without_window_uses_date_as_bin_and_single_value() {
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition(None).compute_values_from_hooper_indexes(
-            vec![(d1, Some(scale(5))), (d2, Some(scale(7)))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(metrics.unit(), Unit::Null);
-        assert_eq!(
-            metrics.get(&bin(&d1.to_string())),
-            Some(&TrainingMetricValue::SingleValue(5.0))
-        );
-        assert_eq!(
-            metrics.get(&bin(&d2.to_string())),
-            Some(&TrainingMetricValue::SingleValue(7.0))
-        );
-    }
-
-    #[test]
-    fn test_without_window_skips_none_values() {
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition(None)
-            .compute_values_from_hooper_indexes(vec![(d1, None), (d2, Some(scale(4)))].into_iter());
-
-        assert_eq!(metrics.len(), 1);
-        assert!(metrics.get(&bin(&d1.to_string())).is_none());
-        assert_eq!(
-            metrics.get(&bin(&d2.to_string())),
-            Some(&TrainingMetricValue::SingleValue(4.0))
-        );
-    }
-
-    #[test]
-    fn test_without_window_keeps_first_value_for_duplicate_dates() {
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(None).compute_values_from_hooper_indexes(
-            vec![(d, Some(scale(2))), (d, Some(scale(9)))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&bin(&d.to_string())),
-            Some(&TrainingMetricValue::SingleValue(2.0))
-        );
-    }
-
-    #[test]
-    fn test_with_daily_window_aggregates_values_in_same_day() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricGroupBy::none(),
-        );
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
-            vec![(d, Some(scale(2))), (d, Some(scale(3)))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&bin(&d.to_string())),
-            Some(&TrainingMetricValue::Sum(5.0))
-        );
-    }
-
-    #[test]
-    fn test_with_weekly_window_aggregates_values_in_same_week() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricGroupBy::none(),
-        );
-        // 2025-10-01 (Wed) and 2025-10-03 (Fri) share the week starting 2025-09-29.
-        let d1 = date(2025, 10, 1);
-        let d2 = date(2025, 10, 3);
-        // 2025-10-07 falls in the following week.
-        let d3 = date(2025, 10, 7);
-
-        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
-            vec![
-                (d1, Some(scale(3))),
-                (d2, Some(scale(4))),
-                (d3, Some(scale(5))),
-            ]
-            .into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(
-            metrics.get(&bin("2025-09-29")),
-            Some(&TrainingMetricValue::Sum(7.0))
-        );
-        assert_eq!(
-            metrics.get(&bin("2025-10-06")),
-            Some(&TrainingMetricValue::Sum(5.0))
-        );
-    }
-
-    #[test]
-    fn test_with_monthly_window_uses_max_aggregate() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Monthly,
-            TrainingMetricAggregate::Max,
-            TrainingMetricGroupBy::none(),
-        );
-        let d1 = date(2025, 9, 14);
-        let d2 = date(2025, 9, 20);
-        let d3 = date(2025, 10, 1);
-
-        let metrics = definition(Some(window)).compute_values_from_hooper_indexes(
-            vec![
-                (d1, Some(scale(6))),
-                (d2, Some(scale(2))),
-                (d3, Some(scale(8))),
-            ]
-            .into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(
-            metrics.get(&bin("2025-09-01")),
-            Some(&TrainingMetricValue::Max(6.0))
-        );
-        assert_eq!(
-            metrics.get(&bin("2025-10-01")),
-            Some(&TrainingMetricValue::Max(8.0))
-        );
-    }
-
-    #[test]
-    fn test_hooper_values_are_never_grouped() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Max,
-            Some(TrainingMetricGroupBy::Sport),
-        );
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(Some(window))
-            .compute_values_from_hooper_indexes(vec![(d, Some(scale(5)))].into_iter());
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&TrainingMetricBin::new(d.to_string(), None)),
-            Some(&TrainingMetricValue::Max(5.0))
-        );
-        assert!(
-            metrics
-                .get(&TrainingMetricBin::new(
-                    d.to_string(),
-                    Some("Cycling".to_string())
-                ))
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn test_summary_average_is_computed_from_hooper_values() {
-        let definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue),
-            None,
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
-            None,
-        );
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition.compute_values_from_hooper_indexes(
-            vec![(d1, Some(scale(2))), (d2, Some(scale(4)))].into_iter(),
-        );
-
-        assert_eq!(
-            metrics.summary_values().as_hash_map().get("average"),
-            Some(&3.0)
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_compute_values_from_weight_and_nutrition_values {
-    use super::*;
-
-    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
-        NaiveDate::from_ymd_opt(year, month, day).unwrap()
-    }
-
-    fn definition(window: Option<TrainingMetricWindow>) -> TrainingMetricDefinition {
-        TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
-            window,
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::empty(),
-            None,
-        )
-    }
-
-    fn bin(granule: &str) -> TrainingMetricBin {
-        TrainingMetricBin::new_without_group(granule.to_string())
-    }
-
-    #[test]
-    fn test_empty_input_returns_empty_values() {
-        let metrics =
-            definition(None).compute_values_from_weight_and_nutrition_values(std::iter::empty());
-
-        assert!(metrics.is_empty());
-        assert_eq!(metrics.unit(), Unit::Kilogram);
-    }
-
-    #[test]
-    fn test_without_window_uses_date_as_bin_and_single_value() {
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
-            vec![(d1, Some(70.5_f32)), (d2, Some(71.5_f32))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(metrics.unit(), Unit::Kilogram);
-        assert_eq!(
-            metrics.get(&bin(&d1.to_string())),
-            Some(&TrainingMetricValue::SingleValue(70.5))
-        );
-        assert_eq!(
-            metrics.get(&bin(&d2.to_string())),
-            Some(&TrainingMetricValue::SingleValue(71.5))
-        );
-    }
-
-    #[test]
-    fn test_without_window_skips_none_values() {
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
-            vec![(d1, None), (d2, Some(80.0_f32))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 1);
-        assert!(metrics.get(&bin(&d1.to_string())).is_none());
-        assert_eq!(
-            metrics.get(&bin(&d2.to_string())),
-            Some(&TrainingMetricValue::SingleValue(80.0))
-        );
-    }
-
-    #[test]
-    fn test_without_window_keeps_first_value_for_duplicate_dates() {
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(None).compute_values_from_weight_and_nutrition_values(
-            vec![(d, Some(60.0_f32)), (d, Some(90.0_f32))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&bin(&d.to_string())),
-            Some(&TrainingMetricValue::SingleValue(60.0))
-        );
-    }
-
-    #[test]
-    fn test_with_daily_window_aggregates_values_in_same_day() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricGroupBy::none(),
-        );
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
-            vec![(d, Some(2.0_f32)), (d, Some(3.0_f32))].into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&bin(&d.to_string())),
-            Some(&TrainingMetricValue::Sum(5.0))
-        );
-    }
-
-    #[test]
-    fn test_with_weekly_window_aggregates_values_in_same_week() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Weekly,
-            TrainingMetricAggregate::Sum,
-            TrainingMetricGroupBy::none(),
-        );
-        // 2025-10-01 (Wed) and 2025-10-03 (Fri) share the week starting 2025-09-29.
-        let d1 = date(2025, 10, 1);
-        let d2 = date(2025, 10, 3);
-        // 2025-10-07 falls in the following week.
-        let d3 = date(2025, 10, 7);
-
-        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
-            vec![
-                (d1, Some(3.0_f32)),
-                (d2, Some(4.0_f32)),
-                (d3, Some(5.0_f32)),
-            ]
-            .into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(
-            metrics.get(&bin("2025-09-29")),
-            Some(&TrainingMetricValue::Sum(7.0))
-        );
-        assert_eq!(
-            metrics.get(&bin("2025-10-06")),
-            Some(&TrainingMetricValue::Sum(5.0))
-        );
-    }
-
-    #[test]
-    fn test_with_monthly_window_uses_max_aggregate() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Monthly,
-            TrainingMetricAggregate::Max,
-            TrainingMetricGroupBy::none(),
-        );
-        let d1 = date(2025, 9, 14);
-        let d2 = date(2025, 9, 20);
-        let d3 = date(2025, 10, 1);
-
-        let metrics = definition(Some(window)).compute_values_from_weight_and_nutrition_values(
-            vec![
-                (d1, Some(60.0_f32)),
-                (d2, Some(62.0_f32)),
-                (d3, Some(58.0_f32)),
-            ]
-            .into_iter(),
-        );
-
-        assert_eq!(metrics.len(), 2);
-        assert_eq!(
-            metrics.get(&bin("2025-09-01")),
-            Some(&TrainingMetricValue::Max(62.0))
-        );
-        assert_eq!(
-            metrics.get(&bin("2025-10-01")),
-            Some(&TrainingMetricValue::Max(58.0))
-        );
-    }
-
-    #[test]
-    fn test_weight_and_nutrition_values_are_never_grouped() {
-        let window = TrainingMetricWindow::new(
-            TrainingMetricGranularity::Daily,
-            TrainingMetricAggregate::Max,
-            Some(TrainingMetricGroupBy::Sport),
-        );
-        let d = date(2025, 9, 3);
-
-        let metrics = definition(Some(window))
-            .compute_values_from_weight_and_nutrition_values(vec![(d, Some(70.0_f32))].into_iter());
-
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(
-            metrics.get(&TrainingMetricBin::new(d.to_string(), None)),
-            Some(&TrainingMetricValue::Max(70.0))
-        );
-        assert!(
-            metrics
-                .get(&TrainingMetricBin::new(
-                    d.to_string(),
-                    Some("Cycling".to_string())
-                ))
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn test_summary_average_is_computed_from_weight_and_nutrition_values() {
-        let definition = TrainingMetricDefinition::new(
-            UserId::test_default(),
-            TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight),
-            None,
-            TrainingMetricActivityFilters::empty(),
-            TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
-            None,
-        );
-        let d1 = date(2025, 9, 3);
-        let d2 = date(2025, 9, 4);
-
-        let metrics = definition.compute_values_from_weight_and_nutrition_values(
-            vec![(d1, Some(60.0_f32)), (d2, Some(70.0_f32))].into_iter(),
-        );
-
-        assert_eq!(
-            metrics.summary_values().as_hash_map().get("average"),
-            Some(&65.0)
-        );
     }
 }
