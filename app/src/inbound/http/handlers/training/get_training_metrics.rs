@@ -16,9 +16,10 @@ use crate::{
         models::{
             activity::{ActivityMetricSource, ActivityStatistic, TimeseriesMetric},
             training::{
-                SportFilter, TrainingMetric, TrainingMetricDefinition, TrainingMetricScope,
-                TrainingMetricSource, TrainingMetricSummaryAverage, TrainingMetricTarget,
-                TrainingMetricValues, TrainingPeriodId, TrainingPeriodSports,
+                SportFilter, TrainingMetric, TrainingMetricActivityFilters,
+                TrainingMetricDefinition, TrainingMetricScope, TrainingMetricSource,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricValues,
+                TrainingPeriodId, TrainingPeriodSports,
             },
         },
         ports::{
@@ -34,8 +35,8 @@ use crate::{
             AppState,
             handlers::training::{
                 types::{
-                    APITrainingMetricScope, APITrainingMetricSource, SportsResponse,
-                    TrainingMetricBody, format_source_metric,
+                    APITrainingMetricScope, APITrainingMetricSource, TrainingMetricBody,
+                    format_source_metric,
                 },
                 utils::{
                     GranuleValues, GroupedMetricValues, MetricsDateRange,
@@ -130,22 +131,6 @@ fn to_response_body_item(
             .window()
             .as_ref()
             .map(|w| w.aggregate().to_string()),
-        sports: SportsResponse::from(definition.filters().sports()),
-        workout_types: definition
-            .filters()
-            .workout_types()
-            .as_ref()
-            .map(|types| types.iter().map(|wt| wt.to_string()).collect()),
-        bonked: definition
-            .filters()
-            .bonked()
-            .as_ref()
-            .map(|status| status.to_string()),
-        rpes: definition
-            .filters()
-            .rpes()
-            .as_ref()
-            .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
         show_average: definition.summary().average().clone(),
         target,
         values,
@@ -240,11 +225,12 @@ mod tests {
     use serde_json::json;
 
     use crate::domain::models::activity::{
-        ActivityMetric, ActivityStatistic, TimeseriesAggregate, TimeseriesMetric, Unit,
+        ActivityMetric, ActivityRpe, ActivityStatistic, BonkStatus, Sport, SportCategory,
+        TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
     };
     use crate::domain::models::training::TrainingMetricTarget;
     use crate::inbound::http::handlers::training::types::{
-        APIActivitySource, APITrainingMetricGroupBy,
+        APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricFilters,
     };
 
     use super::*;
@@ -287,19 +273,21 @@ mod tests {
             name: Some("My Metric".to_string()),
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                Some(APITrainingMetricGroupBy::Sport),
+                Some(APITrainingMetricActivityGroupBy::Sport),
+                APITrainingMetricFilters::new(
+                    Some(vec![
+                        SportFilter::Sport(Sport::TrailRunning),
+                        SportFilter::SportCategory(SportCategory::Cycling),
+                    ]),
+                    Some(vec![WorkoutType::Tempo]),
+                    Some(BonkStatus::Bonked),
+                    Some(vec![1, 2]),
+                ),
             )),
             metric_formated: "Activity average calories".to_string(),
             unit: "kcal".to_string(),
             granularity: Some("Daily".to_string()),
             aggregate: Some("Average".to_string()),
-            sports: SportsResponse {
-                sports: vec!["TrailRunning".to_string()],
-                categories: vec!["Cycling".to_string()],
-            },
-            workout_types: Some(vec!["tempo".to_string()]),
-            bonked: Some("bonked".to_string()),
-            rpes: Some(vec![1, 2]),
             show_average: Some(TrainingMetricSummaryAverage::new(false)),
             target: Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             values: HashMap::from([(
@@ -320,18 +308,26 @@ mod tests {
                 {
                     "id": "metric-id-1",
                     "name": "My Metric",
-                    "source": {"type": "activity", "metric": {"metric": "Calories", "group_by": "Sport"}},
+                    "source": {
+                        "type": "activity",
+                        "metric": {
+                            "metric": "Calories",
+                            "group_by": "Sport",
+                            "filters": {
+                                "sports": [
+                                    {"Sport": "TrailRunning"},
+                                    {"SportCategory": "Cycling"}
+                                ],
+                                "workout_types": ["Tempo"],
+                                "bonked": "Bonked",
+                                "rpes": [1, 2]
+                            }
+                        }
+                    },
                     "metric_formated": "Activity average calories",
                     "unit": "kcal",
                     "granularity": "Daily",
                     "aggregate": "Average",
-                    "sports": {
-                        "sports": ["TrailRunning"],
-                        "categories": ["Cycling"]
-                    },
-                    "workout_types": ["tempo"],
-                    "bonked": "bonked",
-                    "rpes": [1, 2],
                     "show_average": {"include_zeros": false},
                     "target": {"value": 100.0, "unit": "km"},
                     "values": {

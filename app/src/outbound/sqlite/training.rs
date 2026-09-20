@@ -15,9 +15,9 @@ use crate::{
             search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
             training::{
                 ActivitySource, HooperIndex, SubjectiveScale, TrainingMetric,
-                TrainingMetricActivityFilters, TrainingMetricAggregate, TrainingMetricDefinition,
-                TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId,
-                TrainingMetricName, TrainingMetricScope, TrainingMetricSource,
+                TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
+                TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
+                TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSource,
                 TrainingMetricSummary, TrainingMetricTarget, TrainingMetricWindow,
                 TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
                 TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodId,
@@ -50,7 +50,7 @@ type DefinitionRow = (
     Option<TrainingMetricGranularity>,
     Option<TrainingMetricAggregate>,
     TrainingMetricActivityFilters,
-    Option<TrainingMetricGroupBy>,
+    Option<TrainingMetricActivityGroupBy>,
     Option<TrainingPeriodId>,
     Option<TrainingMetricSummary>,
     Option<TrainingMetricTarget>,
@@ -199,7 +199,7 @@ where
         .bind(RepositoryTrainingMetricSource::from(definition.source()))
         .bind(definition.window().as_ref().map(|w| w.granularity()))
         .bind(definition.window().as_ref().map(|w| w.aggregate()))
-        .bind(definition.filters())
+        .bind(definition_filters(definition))
         .bind(definition_group_by(definition))
         .bind(metric.name())
         .bind(metric.scope().period())
@@ -262,7 +262,8 @@ where
                 summary,
                 target,
             )) => {
-                let Some(metric) = parse_definition_row_metric(metric, source, group_by) else {
+                let Some(metric) = parse_definition_row_metric(metric, source, group_by, filters)
+                else {
                     return Ok(None);
                 };
                 let window = match (granularity, aggregate) {
@@ -279,7 +280,6 @@ where
                     user_id,
                     metric,
                     window,
-                    filters,
                     summary.unwrap_or_else(TrainingMetricSummary::empty),
                     target,
                 );
@@ -333,7 +333,8 @@ where
                         summary,
                         target,
                     )| {
-                        let metric = parse_definition_row_metric(metric, source, group_by)?;
+                        let metric =
+                            parse_definition_row_metric(metric, source, group_by, filters)?;
                         let window = match (granularity, aggregate) {
                             (Some(granularity), Some(aggregate)) => {
                                 Some(TrainingMetricWindow::new(granularity, aggregate))
@@ -348,7 +349,6 @@ where
                                 user_id,
                                 metric,
                                 window,
-                                filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
                                 target,
                             ),
@@ -404,7 +404,8 @@ where
                         summary,
                         target,
                     )| {
-                        let metric = parse_definition_row_metric(metric, source, group_by)?;
+                        let metric =
+                            parse_definition_row_metric(metric, source, group_by, filters)?;
                         let window = match (granularity, aggregate) {
                             (Some(granularity), Some(aggregate)) => {
                                 Some(TrainingMetricWindow::new(granularity, aggregate))
@@ -419,7 +420,6 @@ where
                                 user_id,
                                 metric,
                                 window,
-                                filters,
                                 summary.unwrap_or_else(TrainingMetricSummary::empty),
                                 target,
                             ),
@@ -1286,12 +1286,13 @@ where
 fn parse_definition_row_metric(
     metric: Option<RepositoryTrainingMetricSource>,
     source: Option<ActivityMetricSource>,
-    group_by: Option<TrainingMetricGroupBy>,
+    group_by: Option<TrainingMetricActivityGroupBy>,
+    filters: TrainingMetricActivityFilters,
 ) -> Option<TrainingMetricSource> {
     match (metric, source.map(ActivityMetric::try_from)) {
         (Some(metric), _) => Some(match metric {
             RepositoryTrainingMetricSource::Activity(metric) => {
-                TrainingMetricSource::Activity(ActivitySource::new(metric, group_by))
+                TrainingMetricSource::Activity(ActivitySource::new(metric, group_by, filters))
             }
             RepositoryTrainingMetricSource::HooperIndex(source) => {
                 TrainingMetricSource::HooperIndex(source)
@@ -1301,16 +1302,27 @@ fn parse_definition_row_metric(
             }
         }),
         (None, Some(Ok(metric))) => Some(TrainingMetricSource::Activity(ActivitySource::new(
-            metric, group_by,
+            metric, group_by, filters,
         ))),
         _ => None,
     }
 }
 
-fn definition_group_by(definition: &TrainingMetricDefinition) -> &Option<TrainingMetricGroupBy> {
+fn definition_group_by(
+    definition: &TrainingMetricDefinition,
+) -> &Option<TrainingMetricActivityGroupBy> {
     match definition.source() {
         TrainingMetricSource::Activity(source) => source.group_by(),
         _ => &None,
+    }
+}
+
+fn definition_filters(
+    definition: &TrainingMetricDefinition,
+) -> Option<&TrainingMetricActivityFilters> {
+    match definition.source() {
+        TrainingMetricSource::Activity(source) => Some(source.filters()),
+        _ => None,
     }
 }
 
@@ -1327,11 +1339,11 @@ mod test_sqlite_training_repository {
         domain::models::{
             activity::{ActivityMetricSource, Sport, TimeseriesAggregate, TimeseriesMetric, Unit},
             training::{
-                SportFilter, TrainingMetricActivityFilters, TrainingMetricAggregate,
-                TrainingMetricDefinitionPatch, TrainingMetricGranularity, TrainingMetricPatch,
-                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingNote,
-                TrainingNoteContent, TrainingNoteId, TrainingNoteTitle, TrainingPeriod,
-                TrainingPeriodId, TrainingPeriodSports, HooperIndexSource,
+                HooperIndexSource, SportFilter, TrainingMetricActivityFilters,
+                TrainingMetricAggregate, TrainingMetricDefinitionPatch, TrainingMetricGranularity,
+                TrainingMetricPatch, TrainingMetricSummaryAverage, TrainingMetricTarget,
+                TrainingNote, TrainingNoteContent, TrainingNoteId, TrainingNoteTitle,
+                TrainingPeriod, TrainingPeriodId, TrainingPeriodSports,
             },
         },
     };
@@ -1371,13 +1383,13 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1393,13 +1405,13 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1415,18 +1427,18 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::new(
+                        Some(vec![SportFilter::Sport(Sport::Running)]),
+                        None,
+                        None,
+                        None,
+                    ),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::new(
-                    Some(vec![SportFilter::Sport(Sport::Running)]),
-                    None,
-                    None,
-                    None,
-                ),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1442,18 +1454,18 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    Some(TrainingMetricGroupBy::Sport),
+                    Some(TrainingMetricActivityGroupBy::Sport),
+                    TrainingMetricActivityFilters::new(
+                        Some(vec![SportFilter::Sport(Sport::Running)]),
+                        None,
+                        None,
+                        None,
+                    ),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::new(
-                    Some(vec![SportFilter::Sport(Sport::Running)]),
-                    None,
-                    None,
-                    None,
-                ),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1468,13 +1480,13 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             ),
@@ -1489,18 +1501,18 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    Some(TrainingMetricGroupBy::Sport),
+                    Some(TrainingMetricActivityGroupBy::Sport),
+                    TrainingMetricActivityFilters::new(
+                        Some(vec![SportFilter::Sport(Sport::Running)]),
+                        None,
+                        None,
+                        None,
+                    ),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::new(
-                    Some(vec![SportFilter::Sport(Sport::Running)]),
-                    None,
-                    None,
-                    None,
-                ),
                 TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true))),
                 None,
             ),
@@ -1539,10 +1551,10 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 None,
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -1625,13 +1637,13 @@ mod test_sqlite_training_repository {
             .expect("Should have return Ok");
 
         assert_eq!(
-            sqlx::query_scalar::<_, Option<TrainingMetricGroupBy>>(
+            sqlx::query_scalar::<_, Option<TrainingMetricActivityGroupBy>>(
                 "select group_by from t_training_metrics_definitions limit 1;"
             )
             .fetch_one(&repository.readers)
             .await
             .unwrap(),
-            Some(TrainingMetricGroupBy::Sport)
+            Some(TrainingMetricActivityGroupBy::Sport)
         );
     }
 
@@ -1712,10 +1724,10 @@ mod test_sqlite_training_repository {
             TrainingMetricDefinitionPatch::new(
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::AvgPace,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 None,
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -2044,13 +2056,13 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::MaxAltitude,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
                     TrainingMetricAggregate::Max,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -2063,13 +2075,13 @@ mod test_sqlite_training_repository {
                 UserId::test_default(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -2128,7 +2140,7 @@ mod test_sqlite_training_repository {
         .bind(TrainingMetricGranularity::Daily)
         .bind(TrainingMetricAggregate::Max)
         .bind(TrainingMetricActivityFilters::empty())
-        .bind(TrainingMetricGroupBy::none())
+        .bind(TrainingMetricActivityGroupBy::none())
         .bind::<Option<String>>(None)
         .execute(&repository.writer)
         .await
@@ -3939,13 +3951,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -3961,13 +3973,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4019,13 +4031,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4041,13 +4053,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4063,13 +4075,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4154,13 +4166,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4176,13 +4188,13 @@ mod test_sqlite_training_repository {
                 user_id.clone(),
                 TrainingMetricSource::Activity(ActivitySource::new(
                     ActivityMetric::Distance,
-                    TrainingMetricGroupBy::none(),
+                    TrainingMetricActivityGroupBy::none(),
+                    TrainingMetricActivityFilters::empty(),
                 )),
                 Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Weekly,
                     TrainingMetricAggregate::Sum,
                 )),
-                TrainingMetricActivityFilters::empty(),
                 TrainingMetricSummary::empty(),
                 None,
             ),
@@ -4557,13 +4569,16 @@ mod test_sqlite_training_repository {
         let result = parse_definition_row_metric(
             metric,
             None,
-            Some(TrainingMetricGroupBy::Sport),
+            Some(TrainingMetricActivityGroupBy::Sport),
+            TrainingMetricActivityFilters::empty(),
         );
+
         assert_eq!(
             result,
             Some(TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Distance,
-                Some(TrainingMetricGroupBy::Sport)
+                Some(TrainingMetricActivityGroupBy::Sport),
+                TrainingMetricActivityFilters::empty()
             )))
         );
     }
@@ -4580,13 +4595,15 @@ mod test_sqlite_training_repository {
         let result = parse_definition_row_metric(
             metric,
             source,
-            Some(TrainingMetricGroupBy::WorkoutType),
+            Some(TrainingMetricActivityGroupBy::WorkoutType),
+            TrainingMetricActivityFilters::empty(),
         );
         assert_eq!(
             result,
             Some(TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Distance,
-                Some(TrainingMetricGroupBy::WorkoutType)
+                Some(TrainingMetricActivityGroupBy::WorkoutType),
+                TrainingMetricActivityFilters::empty()
             )))
         );
     }
@@ -4601,13 +4618,15 @@ mod test_sqlite_training_repository {
         let result = parse_definition_row_metric(
             metric,
             source,
-            Some(TrainingMetricGroupBy::SportCategory),
+            Some(TrainingMetricActivityGroupBy::SportCategory),
+            TrainingMetricActivityFilters::empty(),
         );
         assert_eq!(
             result,
             Some(TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::MaxAltitude,
-                Some(TrainingMetricGroupBy::SportCategory)
+                Some(TrainingMetricActivityGroupBy::SportCategory),
+                TrainingMetricActivityFilters::empty()
             )))
         );
     }
@@ -4617,12 +4636,18 @@ mod test_sqlite_training_repository {
         let metric = Some(RepositoryTrainingMetricSource::Activity(
             ActivityMetric::Distance,
         ));
-        let result = parse_definition_row_metric(metric, None, TrainingMetricGroupBy::none());
+        let result = parse_definition_row_metric(
+            metric,
+            None,
+            TrainingMetricActivityGroupBy::none(),
+            TrainingMetricActivityFilters::empty(),
+        );
         assert_eq!(
             result,
             Some(TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Distance,
-                TrainingMetricGroupBy::none()
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty()
             )))
         );
     }
@@ -4635,7 +4660,8 @@ mod test_sqlite_training_repository {
         let result = parse_definition_row_metric(
             metric,
             None,
-            Some(TrainingMetricGroupBy::Sport),
+            Some(TrainingMetricActivityGroupBy::Sport),
+            TrainingMetricActivityFilters::empty(),
         );
         assert_eq!(
             result,
@@ -4647,7 +4673,12 @@ mod test_sqlite_training_repository {
     fn test_parse_definition_row_metric_returns_none_when_both_none() {
         let metric = None;
         let source = None;
-        let result = parse_definition_row_metric(metric, source, TrainingMetricGroupBy::none());
+        let result = parse_definition_row_metric(
+            metric,
+            source,
+            TrainingMetricActivityGroupBy::none(),
+            TrainingMetricActivityFilters::empty(),
+        );
         assert_eq!(result, None);
     }
 
@@ -4659,7 +4690,12 @@ mod test_sqlite_training_repository {
             TimeseriesMetric::Latitude,
             TimeseriesAggregate::Max,
         )));
-        let result = parse_definition_row_metric(metric, source, TrainingMetricGroupBy::none());
+        let result = parse_definition_row_metric(
+            metric,
+            source,
+            TrainingMetricActivityGroupBy::none(),
+            TrainingMetricActivityFilters::empty(),
+        );
         assert_eq!(result, None);
     }
 

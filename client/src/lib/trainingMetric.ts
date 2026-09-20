@@ -1,7 +1,6 @@
-import { getBonkStatusLabel, bonkStatusToAPI, type BonkStatus } from './nutrition';
+import { getBonkStatusLabel, type BonkStatus } from './nutrition';
 import { sportCategoryDisplay, sportDisplay, type Sport, type SportCategory } from './sport';
-import { workoutTypeDisplay, workoutTypeToAPI, type WorkoutType } from './workout-type';
-import type { RPEValue } from './rpe';
+import { workoutTypeDisplay, type WorkoutType } from './workout-type';
 import { dayjs, now as dayjsNow } from './duration';
 import type {
 	TrainingMetric,
@@ -157,11 +156,7 @@ export const metricDefinitionKey = (metric: TrainingMetric): string =>
 	JSON.stringify({
 		source: metric.source,
 		granularity: metric.granularity,
-		aggregate: metric.aggregate,
-		sports: metric.sports,
-		workout_types: metric.workout_types,
-		rpes: metric.rpes,
-		bonked: metric.bonked
+		aggregate: metric.aggregate
 	});
 
 export const definitionGroupBy = (
@@ -175,19 +170,6 @@ export const definitionGroupBy = (
 	} else {
 		return none();
 	}
-};
-
-const periodSportFilters = (
-	period: Pick<TrainingPeriodDetails, 'sports'>
-): ({ Sport: Sport } | { SportCategory: SportCategory })[] | undefined => {
-	if (period.sports.categories.length === 0 && period.sports.sports.length === 0) {
-		return undefined;
-	}
-
-	return [
-		...period.sports.categories.map((category) => ({ SportCategory: category })),
-		...period.sports.sports.map((sport) => ({ Sport: sport }))
-	];
 };
 
 /**
@@ -206,44 +188,6 @@ export const extractBaseDefinitionFromMetric = (
 			granularity: metric.granularity,
 			aggregate: metric.aggregate
 		};
-	}
-
-	if (
-		metric.sports !== null ||
-		metric.workout_types !== null ||
-		metric.rpes !== null ||
-		metric.bonked !== null
-	) {
-		// Filter values use their API representation (like `fieldsAsPayload` sends
-		// them): workout types and bonk status go through the *ToAPI converters.
-		// The `TrainingMetricBasePayload` filter types don't reflect that wire
-		// format, hence the local type and final cast.
-		const filters: {
-			sports?: ({ Sport: Sport } | { SportCategory: SportCategory })[];
-			workout_types?: string[];
-			rpes?: number[];
-			bonked?: string;
-		} = {};
-
-		if (metric.sports !== null) {
-			if (metric.sports.categories.length > 0 || metric.sports.sports.length > 0) {
-				filters.sports = [
-					...metric.sports.categories.map((category) => ({ SportCategory: category })),
-					...metric.sports.sports.map((sport) => ({ Sport: sport }))
-				];
-			}
-		}
-		if (metric.workout_types !== null && metric.workout_types.length > 0) {
-			filters.workout_types = metric.workout_types.map(workoutTypeToAPI);
-		}
-		if (metric.rpes !== null && metric.rpes.length > 0) {
-			filters.rpes = metric.rpes.map((rpe) => rpe as RPEValue);
-		}
-		if (metric.bonked !== null) {
-			filters.bonked = bonkStatusToAPI(metric.bonked);
-		}
-
-		payload.filters = filters as TrainingMetricBasePayload['filters'];
 	}
 
 	if (metric.show_average !== null) {
@@ -267,14 +211,8 @@ export const metricPreviewPayload = (
 	period: Pick<TrainingPeriodDetails, 'start' | 'end' | 'sports'>,
 	now = dayjsNow
 ): PreviewTrainingMetricPayload => {
-	const filters =
-		definition.base.filters !== undefined && definition.base.filters.sports !== undefined
-			? definition.base.filters
-			: { ...definition.base.filters, sports: periodSportFilters(period) };
-
 	return {
 		...definition.base,
-		filters,
 		...periodMetricRange(period, now)
 	};
 };
@@ -401,7 +339,19 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly distance',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Distance', group_by: 'SportCategory' } },
+			source: {
+				type: 'activity',
+				metric: {
+					metric: 'Distance',
+					group_by: 'SportCategory',
+					filters: {
+						bonked: null,
+						rpes: null,
+						sports: null,
+						workout_types: null
+					}
+				}
+			},
 			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -411,7 +361,19 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly duration',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: 'SportCategory' } },
+			source: {
+				type: 'activity',
+				metric: {
+					metric: 'ActiveDuration',
+					group_by: 'SportCategory',
+					filters: {
+						bonked: null,
+						rpes: null,
+						sports: null,
+						workout_types: null
+					}
+				}
+			},
 			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -421,7 +383,19 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly elevation',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Elevation', group_by: 'SportCategory' } },
+			source: {
+				type: 'activity',
+				metric: {
+					metric: 'Elevation',
+					group_by: 'SportCategory',
+					filters: {
+						bonked: null,
+						rpes: null,
+						sports: null,
+						workout_types: null
+					}
+				}
+			},
 			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}
@@ -432,7 +406,19 @@ export const defaultCompareDefinitions = (): CompareMetricDefinition[] => [
 		label: 'Weekly calories',
 		source: 'default',
 		base: {
-			source: { type: 'activity', metric: { metric: 'Calories', group_by: 'SportCategory' } },
+			source: {
+				type: 'activity',
+				metric: {
+					metric: 'Calories',
+					group_by: 'SportCategory',
+					filters: {
+						bonked: null,
+						rpes: null,
+						sports: null,
+						workout_types: null
+					}
+				}
+			},
 			window: { granularity: 'Weekly', aggregate: 'Sum' },
 			summary: { average: { include_zeros: false } }
 		}

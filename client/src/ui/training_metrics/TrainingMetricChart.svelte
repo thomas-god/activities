@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { metricGroupBy, type TrainingMetric } from '$lib/api';
+	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
 	import { isSome, none, some, type Option } from '$lib/Options';
 	import TrainingMetricChartLine from './internal/TrainingMetricChartLine.svelte';
 	import TrainingMetricChartStacked from './internal/TrainingMetricChartStacked.svelte';
@@ -22,7 +22,7 @@
 		if (unit === 's/km') return 'pace';
 		return 'number';
 	};
-	let groupBy = $derived(metricGroupBy(metric));
+	let groupBy = $derived(getMetricGroupBy(metric));
 </script>
 
 {#if Object.entries(metric.values).length > 0}

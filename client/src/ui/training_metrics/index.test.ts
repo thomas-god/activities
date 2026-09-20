@@ -17,18 +17,24 @@ const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): Training
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: 'Sport' } },
+	source: {
+		type: 'activity',
+		metric: {
+			metric: 'ActiveDuration',
+			group_by: 'Sport',
+			filters: {
+				sports: [{ Sport: 'Running' }, { SportCategory: 'Running' }],
+				workout_types: ['easy'],
+				bonked: 'none',
+				rpes: [5, 7]
+			}
+		}
+	},
 	unit: 's',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
 	aggregate: 'Sum',
-	sports: {
-		sports: ['Running'],
-		categories: ['Running']
-	},
-	workout_types: ['easy'],
-	bonked: 'none',
-	rpes: [5, 7],
+
 	show_average: { include_zeros: false },
 	target: { value: 100, unit: 'km' },
 	values: { no_group: { '2026-01-01': 10 } },
@@ -64,12 +70,20 @@ describe('matchMetricToFormFields', () => {
 	it('returns none/empty defaults for nullable metric fields', () => {
 		const metric = makeMetric({
 			name: null,
-			source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: null } },
+			source: {
+				type: 'activity',
+				metric: {
+					metric: 'ActiveDuration',
+					group_by: null,
+					filters: {
+						bonked: null,
+						rpes: null,
+						sports: null,
+						workout_types: null
+					}
+				}
+			},
 			granularity: null,
-			sports: null,
-			workout_types: null,
-			bonked: null,
-			rpes: null,
 			show_average: null,
 			target: null
 		});

@@ -8,14 +8,13 @@ use crate::domain::{
         activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData},
         search::SearchDocument,
         training::{
-            HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricActivityFilters,
-            TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
-            TrainingMetricPatch, TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
-            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
-            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
-            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
-            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
-            WeightAndNutrition, WeightAndNutritionPatch,
+            HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricDefinitionPatch,
+            TrainingMetricId, TrainingMetricName, TrainingMetricPatch, TrainingMetricScope,
+            TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
+            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
+            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
+            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
+            TrainingPeriodWithActivities, WeightAndNutrition, WeightAndNutritionPatch,
         },
     },
     ports::{DateRange, search::RemainingDocuments},
@@ -28,7 +27,6 @@ pub struct CreateTrainingMetricRequest {
     name: TrainingMetricName,
     source: TrainingMetricSource,
     window: Option<TrainingMetricWindow>,
-    filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
     scope: TrainingMetricScope,
     target: Option<TrainingMetricTarget>,
@@ -49,10 +47,6 @@ impl CreateTrainingMetricRequest {
 
     pub fn window(&self) -> &Option<TrainingMetricWindow> {
         &self.window
-    }
-
-    pub fn filters(&self) -> &TrainingMetricActivityFilters {
-        &self.filters
     }
 
     pub fn summary(&self) -> &TrainingMetricSummary {
@@ -99,7 +93,6 @@ pub struct UpdateTrainingMetricRequest {
     name: TrainingMetricName,
     source: TrainingMetricSource,
     window: Option<TrainingMetricWindow>,
-    filters: TrainingMetricActivityFilters,
     summary: TrainingMetricSummary,
     target: Option<TrainingMetricTarget>,
 }
@@ -117,13 +110,7 @@ impl UpdateTrainingMetricRequest {
     pub fn patch(self) -> TrainingMetricPatch {
         TrainingMetricPatch::new(
             self.name,
-            TrainingMetricDefinitionPatch::new(
-                self.source,
-                self.window,
-                self.filters,
-                self.summary,
-                self.target,
-            ),
+            TrainingMetricDefinitionPatch::new(self.source, self.window, self.summary, self.target),
         )
     }
 }
@@ -156,7 +143,6 @@ pub enum GetTrainingMetricValuesRequest {
         user: UserId,
         source: TrainingMetricSource,
         window: Option<TrainingMetricWindow>,
-        filters: TrainingMetricActivityFilters,
         summary: TrainingMetricSummary,
         target: Option<TrainingMetricTarget>,
     },
@@ -1094,7 +1080,8 @@ mod tests {
 
     use crate::domain::models::activity::Unit;
     use crate::domain::models::training::{
-        ActivitySource, TrainingMetricGroupBy, TrainingMetricTarget,
+        ActivitySource, TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
+        TrainingMetricTarget,
     };
 
     fn sample_target() -> TrainingMetricTarget {
@@ -1108,10 +1095,10 @@ mod tests {
             TrainingMetricName::from("Metric"),
             TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Calories,
-                TrainingMetricGroupBy::none(),
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
             )),
             None,
-            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             TrainingMetricScope::Global,
             Some(sample_target()),
@@ -1128,10 +1115,10 @@ mod tests {
             TrainingMetricName::from("Metric"),
             TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Calories,
-                TrainingMetricGroupBy::none(),
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
             )),
             None,
-            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             Some(sample_target()),
         );
@@ -1149,10 +1136,10 @@ mod tests {
             TrainingMetricName::from("Metric"),
             TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Calories,
-                TrainingMetricGroupBy::none(),
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::empty(),
             )),
             None,
-            TrainingMetricActivityFilters::empty(),
             TrainingMetricSummary::empty(),
             None,
         );

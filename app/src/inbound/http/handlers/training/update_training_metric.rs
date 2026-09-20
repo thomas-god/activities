@@ -31,8 +31,6 @@ pub struct UpdateTrainingMetricBody {
     source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
     #[serde(default)]
-    filters: Option<APITrainingMetricFilters>,
-    #[serde(default)]
     summary: APITrainingMetricSummary,
     #[serde(default)]
     target: Option<APITrainingMetricTarget>,
@@ -78,12 +76,6 @@ fn build_request(
     body: UpdateTrainingMetricBody,
 ) -> Result<UpdateTrainingMetricRequest, String> {
     let name = TrainingMetricName::from(body.name);
-    let filters = body
-        .filters
-        .map(TrainingMetricActivityFilters::try_from)
-        .transpose()
-        .map_err(|_| "Invalid fitlers".to_string())?
-        .unwrap_or_else(TrainingMetricActivityFilters::empty);
 
     let target = body
         .target
@@ -95,9 +87,8 @@ fn build_request(
         user,
         metric,
         name,
-        TrainingMetricSource::from(&body.source),
+        TrainingMetricSource::try_from(&body.source)?,
         body.window.map(TrainingMetricWindow::from),
-        filters,
         body.summary.into(),
         target,
     ))
@@ -111,23 +102,31 @@ mod tests {
 
     use crate::{
         domain::models::activity::Unit,
-        inbound::http::handlers::training::types::{APIActivitySource, APITrainingMetricGroupBy},
+        inbound::http::handlers::training::types::{
+            APIActivitySource, APITrainingMetricActivityGroupBy,
+        },
     };
 
     #[test]
     fn test_deserialize_required_fields_only() {
-        let json = r#"{"name": "New Metric Name", "source": {"type": "activity", "metric": {"metric": "Calories"}}}"#;
+        let json = r#"{
+            "name": "New Metric Name",
+            "source": {
+                "type": "activity",
+                "metric": {"metric": "Calories"}
+            }
+        }"#;
         let body: UpdateTrainingMetricBody = serde_json::from_str(json).unwrap();
         assert_eq!(body.name, "New Metric Name".to_string());
         assert_eq!(
             body.source,
             APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                APITrainingMetricGroupBy::none()
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters::default()
             ))
         );
         assert!(body.window.is_none());
-        assert!(body.filters.is_none());
     }
 
     #[test]

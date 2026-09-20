@@ -2,13 +2,15 @@ import {
 	type TrainingMetric,
 	type TrainingMetricTemplate,
 	type TrainingMetricBasePayload,
-	metricGroupBy
+	type TrainingMetricFilters,
+	getMetricGroupBy,
+	getMetricFilters,
+	type TrainingMetricBasePayloadFilters
 } from '$lib/api/training';
-import { bonkStatusToAPI } from '$lib/nutrition';
 import { asOption, isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
+import type { RPEValue } from '$lib/rpe';
 import type { Sport, SportCategory } from '$lib/sport';
 import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
-import { workoutTypeToAPI } from '$lib/workout-type';
 import type { TrainingMetricFiltersType } from './internal/TrainingMetricFilters.svelte';
 
 export interface TrainingMetricFields {
@@ -45,8 +47,13 @@ export const fieldsAreEmpty = (fields: TrainingMetricFields): boolean => {
 
 export type Scope = { kind: 'global' } | { kind: 'period'; periodId: string };
 
-const fieldsActiveFilters = (fields: TrainingMetricFields) => {
-	let activeFilters: object = {};
+const fieldsActiveFilters = (fields: TrainingMetricFields): TrainingMetricBasePayloadFilters => {
+	let activeFilters: TrainingMetricBasePayloadFilters = {
+		bonked: null,
+		rpes: null,
+		sports: null,
+		workout_types: null
+	};
 
 	if (isSome(fields.filters.sports) && isSome(fields.filters.sportCategories)) {
 		const sportFilter = fields.filters.sports.value.map((sport) => ({
@@ -67,14 +74,14 @@ const fieldsActiveFilters = (fields: TrainingMetricFields) => {
 	if (isSome(fields.filters.workoutTypes) && fields.filters.workoutTypes.value.length > 0) {
 		activeFilters = {
 			...activeFilters,
-			workout_types: fields.filters.workoutTypes.value.map(workoutTypeToAPI)
+			workout_types: fields.filters.workoutTypes.value
 		};
 	}
 
 	if (isSome(fields.filters.bonked)) {
 		activeFilters = {
 			...activeFilters,
-			bonked: bonkStatusToAPI(fields.filters.bonked.value)
+			bonked: fields.filters.bonked.value
 		};
 	}
 
@@ -87,12 +94,13 @@ const fieldsActiveFilters = (fields: TrainingMetricFields) => {
 
 const convertTemplateSource = (
 	template: TrainingMetricTemplate,
-	group_by: Option<TrainingMetricGroupByClause>
+	group_by: Option<TrainingMetricGroupByClause>,
+	filters: TrainingMetricBasePayloadFilters
 ): TrainingMetricBasePayload['source'] => {
 	if (template.source.type === 'activity') {
 		return {
 			type: 'activity',
-			metric: { metric: template.source.metric, group_by: unwrapOr(group_by, null) }
+			metric: { metric: template.source.metric, group_by: unwrapOr(group_by, null), filters }
 		};
 	} else {
 		return { type: template.source.type, metric: template.source.metric };
@@ -105,8 +113,9 @@ export const fieldsAsPayload = (
 	if (isNone(fields.selectedTemplate)) {
 		return none();
 	}
+	const activeFilters = fieldsActiveFilters(fields);
 	let payload: Omit<TrainingMetricBasePayload, 'name'> = {
-		source: convertTemplateSource(fields.selectedTemplate.value, fields.groupBy)
+		source: convertTemplateSource(fields.selectedTemplate.value, fields.groupBy, activeFilters)
 	};
 
 	// Optional window
@@ -121,12 +130,6 @@ export const fieldsAsPayload = (
 		}
 
 		payload = { ...payload, window };
-	}
-
-	// Optional filters
-	const activeFilters = fieldsActiveFilters(fields);
-	if (Object.keys(activeFilters).length > 0) {
-		payload = { ...payload, filters: activeFilters };
 	}
 
 	// Optional summary
@@ -168,21 +171,45 @@ const matchTemplate = (metric: TrainingMetric, template: TrainingMetricTemplate)
 	return metric.aggregate === null ? true : metric.aggregate === template.aggregate;
 };
 
+const convertFilters = (filters: Option<TrainingMetricFilters>): TrainingMetricFiltersType => {
+	if (isNone(filters)) {
+		return {
+			bonked: none(),
+			rpes: none(),
+			sportCategories: none(),
+			sports: none(),
+			workoutTypes: none()
+		};
+	}
+
+	const sports: Sport[] = [];
+	const categories: SportCategory[] = [];
+	for (const item of filters.value.sports || []) {
+		if ('Sport' in item) {
+			sports.push(item.Sport);
+		} else if ('SportCategory' in item) {
+			categories.push(item.SportCategory);
+		}
+	}
+
+	return {
+		bonked: asOption(filters.value.bonked),
+		rpes: asOption(filters.value.rpes) as Option<RPEValue[]>,
+		sports: sports.length === 0 ? none() : some(sports),
+		sportCategories: categories.length === 0 ? none() : some(categories),
+		workoutTypes: asOption(filters.value.workout_types)
+	};
+};
+
 export const matchMetricToFormFields = (
 	metric: TrainingMetric,
 	templates: TrainingMetricTemplate[]
 ): TrainingMetricFields => {
 	const selectedTemplate = templates.find((template) => matchTemplate(metric, template));
 
-	const filters = {
-		sports: metric.sports === null ? none() : some(metric.sports.sports),
-		sportCategories: metric.sports === null ? none() : some(metric.sports.categories),
-		bonked: asOption(metric.bonked),
-		rpes: asOption(metric.rpes),
-		workoutTypes: asOption(metric.workout_types)
-	} as TrainingMetricFiltersType;
+	const filters = convertFilters(getMetricFilters(metric));
 
-	const groupBy = metricGroupBy(metric);
+	const groupBy = getMetricGroupBy(metric);
 
 	return {
 		name: metric.name || '',

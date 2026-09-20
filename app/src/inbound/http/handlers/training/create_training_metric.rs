@@ -7,7 +7,7 @@ use crate::{
             UserId,
             activity::ActivityMetric,
             training::{
-                TrainingMetricActivityFilters, TrainingMetricGroupBy, TrainingMetricName,
+                TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricName,
                 TrainingMetricSource, TrainingMetricTarget, TrainingMetricWindow,
             },
         },
@@ -23,9 +23,8 @@ use crate::{
             AppState,
             handlers::training::types::{
                 APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
-                APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricGroupBy,
-                APITrainingMetricScope, APITrainingMetricSource, APITrainingMetricSummary,
-                APITrainingMetricTarget,
+                APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricScope,
+                APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
             },
         },
         parser::ParseFile,
@@ -37,8 +36,6 @@ pub struct CreateTrainingMetricBody {
     name: String,
     source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
-    #[serde(default)]
-    filters: Option<APITrainingMetricFilters>,
     #[serde(default)]
     summary: APITrainingMetricSummary,
     #[serde(default)]
@@ -53,12 +50,6 @@ fn build_request(
     if body.name.trim().is_empty() {
         return Err("Metric name cannot be empty".to_string());
     }
-    let filters = body
-        .filters
-        .map(TrainingMetricActivityFilters::try_from)
-        .transpose()
-        .map_err(|_| "Invalid fitlers".to_string())?
-        .unwrap_or_else(TrainingMetricActivityFilters::empty);
 
     let target = body
         .target
@@ -69,9 +60,8 @@ fn build_request(
     Ok(CreateTrainingMetricRequest::new(
         user.clone(),
         TrainingMetricName::from(body.name),
-        TrainingMetricSource::from(&body.source),
+        TrainingMetricSource::try_from(&body.source)?,
         body.window.map(TrainingMetricWindow::from),
-        filters,
         body.summary.into(),
         body.scope.into(),
         target,
@@ -132,7 +122,6 @@ mod tests_create_training_metric {
             "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {},
             "scope": {"type": "global"}
         }"#,
             )
@@ -146,7 +135,6 @@ mod tests_create_training_metric {
             "source": {"type": "activity", "metric": {"metric": "MinSpeed"}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {},
             "scope": {"type": "trainingPeriod", "trainingPeriodId": "123e4567-e89b-12d3-a456-426614174000"}
         }"#,
             )
@@ -157,10 +145,9 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "Test Metric",
-            "source": {"type": "activity", "metric": {"metric": "MinSpeed"}},
+            "source": {"type": "activity", "metric": {"metric": "MinSpeed", "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] }}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": { "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}] },
             "scope": {"type": "global"}
         }"#,
             )
@@ -174,7 +161,6 @@ mod tests_create_training_metric {
             "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {},
             "group_by": "Sport",
             "scope": {"type": "global"}
         }"#,
@@ -189,7 +175,6 @@ mod tests_create_training_metric {
             "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {},
             "group_by": "RpeRange",
             "scope": {"type": "global"}
         }"#,
@@ -204,7 +189,6 @@ mod tests_create_training_metric {
             "source": {"type": "activity", "metric": {"metric": "Calories"}},
             "granularity": "Weekly",
             "aggregate": "Min",
-            "filters": {},
             "scope": {"type": "global"}
         }"#,
             )
@@ -215,14 +199,13 @@ mod tests_create_training_metric {
             serde_json::from_str::<CreateTrainingMetricBody>(
                 r#"{
             "name": "My Custom Metric",
-            "source": {"type": "activity", "metric": {"metric": "Calories"}},
-            "granularity": "Weekly",
-            "aggregate": "Min",
-            "filters": {
+            "source": {"type": "activity", "metric": {"metric": "Calories", "filters": {
                 "rpes":[1, 5],
                 "bonked": "Bonked",
                 "workout_types": ["Tempo", "Easy"]
-            },
+            }}},
+            "granularity": "Weekly",
+            "aggregate": "Min",
             "scope": {"type": "global"}
         }"#,
             )

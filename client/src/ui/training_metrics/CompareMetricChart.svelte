@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { metricGroupBy, type TrainingMetric } from '$lib/api';
+	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
 	import { metricValuesDisplayFormat } from '$lib/trainingMetric';
 	import { isSome, none, some } from '$lib/Options';
 	import CompareMetricChartBars from './internal/CompareMetricChartBars.svelte';
@@ -37,7 +37,7 @@
 		return { factor: 1, unit: metric.unit };
 	});
 
-	let groupBy = $derived(metricGroupBy(metric));
+	let groupBy = $derived(getMetricGroupBy(metric));
 </script>
 
 {#if metric.granularity === null}

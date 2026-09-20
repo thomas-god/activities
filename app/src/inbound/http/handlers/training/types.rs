@@ -17,8 +17,8 @@ use crate::{
             },
             training::{
                 ActivitySource, HooperIndex, HooperIndexPatch, HooperIndexSource, SportFilter,
-                SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
-                TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricScope,
+                SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
+                TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricScope,
                 TrainingMetricSource, TrainingMetricSummary, TrainingMetricSummaryAverage,
                 TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
                 WeightAndNutrition, WeightAndNutritionPatch, WeightAndNutritionSource,
@@ -277,7 +277,7 @@ impl Display for APITrainingMetricGranularity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Default, Constructor)]
 pub struct APITrainingMetricFilters {
     pub sports: Option<Vec<SportFilter>>,
     pub workout_types: Option<Vec<WorkoutType>>,
@@ -311,13 +311,28 @@ impl TryFrom<&APITrainingMetricFilters> for TrainingMetricActivityFilters {
 
 impl TryFrom<APITrainingMetricFilters> for TrainingMetricActivityFilters {
     type Error = String;
+
     fn try_from(value: APITrainingMetricFilters) -> Result<Self, Self::Error> {
         Self::try_from(&value)
     }
 }
 
+impl From<&TrainingMetricActivityFilters> for APITrainingMetricFilters {
+    fn from(value: &TrainingMetricActivityFilters) -> Self {
+        Self {
+            sports: value.sports().clone(),
+            workout_types: value.workout_types().clone(),
+            bonked: *value.bonked(),
+            rpes: value
+                .rpes()
+                .as_ref()
+                .map(|rpes| rpes.iter().map(|rpe| rpe.value()).collect()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub enum APITrainingMetricGroupBy {
+pub enum APITrainingMetricActivityGroupBy {
     Sport,
     SportCategory,
     WorkoutType,
@@ -325,7 +340,7 @@ pub enum APITrainingMetricGroupBy {
     Bonked,
 }
 
-impl Display for APITrainingMetricGroupBy {
+impl Display for APITrainingMetricActivityGroupBy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let d = match self {
             Self::Sport => "Sport",
@@ -338,38 +353,38 @@ impl Display for APITrainingMetricGroupBy {
     }
 }
 
-impl From<&APITrainingMetricGroupBy> for TrainingMetricGroupBy {
-    fn from(value: &APITrainingMetricGroupBy) -> Self {
+impl From<&APITrainingMetricActivityGroupBy> for TrainingMetricActivityGroupBy {
+    fn from(value: &APITrainingMetricActivityGroupBy) -> Self {
         match value {
-            APITrainingMetricGroupBy::Sport => Self::Sport,
-            APITrainingMetricGroupBy::SportCategory => Self::SportCategory,
-            APITrainingMetricGroupBy::WorkoutType => Self::WorkoutType,
-            APITrainingMetricGroupBy::RpeRange => Self::RpeRange,
-            APITrainingMetricGroupBy::Bonked => Self::Bonked,
+            APITrainingMetricActivityGroupBy::Sport => Self::Sport,
+            APITrainingMetricActivityGroupBy::SportCategory => Self::SportCategory,
+            APITrainingMetricActivityGroupBy::WorkoutType => Self::WorkoutType,
+            APITrainingMetricActivityGroupBy::RpeRange => Self::RpeRange,
+            APITrainingMetricActivityGroupBy::Bonked => Self::Bonked,
         }
     }
 }
 
-impl From<APITrainingMetricGroupBy> for TrainingMetricGroupBy {
-    fn from(value: APITrainingMetricGroupBy) -> Self {
+impl From<APITrainingMetricActivityGroupBy> for TrainingMetricActivityGroupBy {
+    fn from(value: APITrainingMetricActivityGroupBy) -> Self {
         Self::from(&value)
     }
 }
 
-impl From<&TrainingMetricGroupBy> for APITrainingMetricGroupBy {
-    fn from(value: &TrainingMetricGroupBy) -> Self {
+impl From<&TrainingMetricActivityGroupBy> for APITrainingMetricActivityGroupBy {
+    fn from(value: &TrainingMetricActivityGroupBy) -> Self {
         match value {
-            TrainingMetricGroupBy::Sport => Self::Sport,
-            TrainingMetricGroupBy::SportCategory => Self::SportCategory,
-            TrainingMetricGroupBy::WorkoutType => Self::WorkoutType,
-            TrainingMetricGroupBy::RpeRange => Self::RpeRange,
-            TrainingMetricGroupBy::Bonked => Self::Bonked,
+            TrainingMetricActivityGroupBy::Sport => Self::Sport,
+            TrainingMetricActivityGroupBy::SportCategory => Self::SportCategory,
+            TrainingMetricActivityGroupBy::WorkoutType => Self::WorkoutType,
+            TrainingMetricActivityGroupBy::RpeRange => Self::RpeRange,
+            TrainingMetricActivityGroupBy::Bonked => Self::Bonked,
         }
     }
 }
 
 #[cfg(test)]
-impl APITrainingMetricGroupBy {
+impl APITrainingMetricActivityGroupBy {
     pub fn none() -> Option<Self> {
         None
     }
@@ -419,7 +434,9 @@ impl From<&TrainingMetricScope> for APITrainingMetricScope {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Constructor)]
 pub struct APIActivitySource {
     pub metric: ActivityMetric,
-    pub group_by: Option<APITrainingMetricGroupBy>,
+    pub group_by: Option<APITrainingMetricActivityGroupBy>,
+    #[serde(default)]
+    pub filters: APITrainingMetricFilters,
 }
 
 impl Display for APIActivitySource {
@@ -428,12 +445,18 @@ impl Display for APIActivitySource {
     }
 }
 
-impl From<&APIActivitySource> for ActivitySource {
-    fn from(value: &APIActivitySource) -> Self {
-        Self::new(
+impl TryFrom<&APIActivitySource> for ActivitySource {
+    type Error = String;
+
+    fn try_from(value: &APIActivitySource) -> Result<Self, Self::Error> {
+        Ok(Self::new(
             value.metric,
-            value.group_by.as_ref().map(TrainingMetricGroupBy::from),
-        )
+            value
+                .group_by
+                .as_ref()
+                .map(TrainingMetricActivityGroupBy::from),
+            TrainingMetricActivityFilters::try_from(&value.filters)?,
+        ))
     }
 }
 
@@ -444,7 +467,8 @@ impl From<&ActivitySource> for APIActivitySource {
             value
                 .group_by()
                 .as_ref()
-                .map(APITrainingMetricGroupBy::from),
+                .map(APITrainingMetricActivityGroupBy::from),
+            APITrainingMetricFilters::from(value.filters()),
         )
     }
 }
@@ -457,6 +481,16 @@ pub enum APITrainingMetricSource {
     WeightAndNutrition(WeightAndNutritionSource),
 }
 
+impl APITrainingMetricSource {
+    pub fn format_source_metric(&self) -> String {
+        match self {
+            Self::Activity(source) => format_activity_source_metric(source.metric.source()),
+            Self::HooperIndex(source) => source.to_string(),
+            Self::WeightAndNutrition(source) => source.to_string(),
+        }
+    }
+}
+
 impl Display for APITrainingMetricSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -467,17 +501,19 @@ impl Display for APITrainingMetricSource {
     }
 }
 
-impl From<&APITrainingMetricSource> for TrainingMetricSource {
-    fn from(value: &APITrainingMetricSource) -> Self {
-        match value {
+impl TryFrom<&APITrainingMetricSource> for TrainingMetricSource {
+    type Error = String;
+
+    fn try_from(value: &APITrainingMetricSource) -> Result<Self, Self::Error> {
+        Ok(match value {
             APITrainingMetricSource::Activity(source) => {
-                Self::Activity(ActivitySource::from(source))
+                Self::Activity(ActivitySource::try_from(source)?)
             }
             APITrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
             APITrainingMetricSource::WeightAndNutrition(source) => {
                 Self::WeightAndNutrition(*source)
             }
-        }
+        })
     }
 }
 
@@ -554,10 +590,6 @@ pub struct TrainingMetricBody {
     pub unit: String,
     pub granularity: Option<String>,
     pub aggregate: Option<String>,
-    pub sports: SportsResponse,
-    pub workout_types: Option<Vec<String>>,
-    pub bonked: Option<String>,
-    pub rpes: Option<Vec<u8>>,
     pub show_average: Option<TrainingMetricSummaryAverage>,
     pub target: Option<TrainingMetricTarget>,
     pub values: HashMap<String, GranuleValues>,
@@ -918,14 +950,16 @@ mod tests {
         assert_eq!(
             format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::Calories,
-                TrainingMetricGroupBy::none()
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::default()
             ))),
             "Calories".to_string()
         );
         assert_eq!(
             format_source_metric(&TrainingMetricSource::Activity(ActivitySource::new(
                 ActivityMetric::MaxCadence,
-                TrainingMetricGroupBy::none()
+                TrainingMetricActivityGroupBy::none(),
+                TrainingMetricActivityFilters::default()
             ))),
             "Activity Max Cadence".to_string()
         );

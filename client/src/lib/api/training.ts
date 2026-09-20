@@ -14,9 +14,9 @@ import {
 import { dayjs } from '$lib/duration';
 import { ActivitySchema } from './activities';
 import { none, type Option, some } from '$lib/Options';
-import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
+import { WORKOUT_TYPE_VALUES, type WorkoutType } from '$lib/workout-type';
 import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
-import type { RPEValue } from '$lib/rpe';
+import { RPE_VALUES, type RPEValue } from '$lib/rpe';
 import { resolve } from '$app/paths';
 
 // =============================================================================
@@ -49,13 +49,31 @@ const TrainingPeriodDetailsSchema = z.object({
 	note: z.string().nullable(),
 	activities: z.array(ActivitySchema)
 });
+const TrainingMetricFiltersSchema = z.object({
+	sports: z
+		.array(
+			z.union([
+				z.object({
+					Sport: z.enum(sports)
+				}),
+				z.object({
+					SportCategory: z.enum(SportCategories)
+				})
+			])
+		)
+		.nullable(),
+	workout_types: z.array(z.enum(WORKOUT_TYPE_VALUES)).nullable(),
+	bonked: z.enum(BONK_STATUS_VALUES).nullable().nullable(),
+	rpes: z.array(z.literal(RPE_VALUES)).nullable()
+});
 
 const TrainingMetricSourceSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('activity'),
 		metric: z.object({
 			metric: z.string(),
-			group_by: z.enum(trainingMetricGroupByClauses).nullable()
+			group_by: z.enum(trainingMetricGroupByClauses).nullable(),
+			filters: TrainingMetricFiltersSchema
 		})
 	}),
 	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
@@ -74,15 +92,6 @@ const TrainingMetricSchema = z.object({
 	]),
 	granularity: z.enum(trainingMetricGranularities).nullable(),
 	aggregate: z.enum(trainingMetricAggregateFunctions).nullable(),
-	sports: z
-		.object({
-			sports: z.array(z.enum(sports)),
-			categories: z.array(z.enum(SportCategories))
-		})
-		.nullable(),
-	workout_types: z.array(z.enum(WORKOUT_TYPE_VALUES)).nullable(),
-	bonked: z.enum(BONK_STATUS_VALUES).nullable().nullable(),
-	rpes: z.array(z.number()).nullable(),
 	show_average: z.object({ include_zeros: z.boolean() }).nullable(),
 	target: z.object({ value: z.number(), unit: z.string() }).nullable(),
 	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
@@ -191,6 +200,7 @@ export type TrainingPeriodListItem = z.infer<typeof TrainingPeriodListItemSchema
 export type TrainingPeriodList = z.infer<typeof TrainingPeriodListSchema>;
 export type TrainingPeriodDetails = z.infer<typeof TrainingPeriodDetailsSchema>;
 export type TrainingMetric = z.infer<typeof TrainingMetricSchema>;
+export type TrainingMetricFilters = z.infer<typeof TrainingMetricFiltersSchema>;
 export type TrainingMetricList = z.infer<typeof TrainingMetricListSchema>;
 export type TrainingNote = z.infer<typeof TrainingNoteSchema>;
 export type TrainingNotesList = z.infer<typeof TrainingNotesListSchema>;
@@ -214,12 +224,48 @@ export const metricAsString = (metric: TrainingMetric): string => {
 	}
 };
 
-export const metricGroupBy = (metric: TrainingMetric): Option<TrainingMetricGroupByClause> => {
+export const getMetricGroupBy = (metric: TrainingMetric): Option<TrainingMetricGroupByClause> => {
 	if (metric.source.type === 'activity' && metric.source.metric.group_by !== null) {
 		return some(metric.source.metric.group_by);
 	} else {
 		return none();
 	}
+};
+
+export const getMetricFilters = (metric: TrainingMetric): Option<TrainingMetricFilters> => {
+	if (metric.source.type !== 'activity') {
+		return none();
+	}
+
+	return some(metric.source.metric.filters);
+};
+
+export const metricSportsRepr = (metric: TrainingMetric): Option<string> => {
+	if (metric.source.type !== 'activity') {
+		return none();
+	}
+
+	if (metric.source.metric.filters.sports === null) {
+		return none();
+	}
+	const sports = metric.source.metric.filters.sports;
+
+	if (sports.length > 0) {
+		return some(
+			sports
+				.map((sport) => {
+					if ('Sport' in sport) {
+						return sport.Sport;
+					}
+					if ('SportCategory' in sport) {
+						return sport.SportCategory;
+					}
+				})
+				.join(', ')
+		);
+	}
+
+	return none();
 };
 
 // =============================================================================
@@ -619,6 +665,20 @@ export const fetchTrainingMetricTemplates = async () => {
 	return TrainingMetricTemplatesSchema.parse(await res.json());
 };
 
+export interface TrainingMetricBasePayloadFilters {
+	sports:
+		| (
+				| {
+						Sport: Sport;
+				  }
+				| { SportCategory: SportCategory }
+		  )[]
+		| null;
+	workout_types: WorkoutType[] | null;
+	rpes: RPEValue[] | null;
+	bonked: BonkStatus | null;
+}
+
 export interface TrainingMetricBasePayload {
 	source:
 		| {
@@ -630,22 +690,12 @@ export interface TrainingMetricBasePayload {
 				metric: {
 					metric: string;
 					group_by: TrainingMetricGroupByClause | null;
+					filters: TrainingMetricBasePayloadFilters;
 				};
 		  };
 	window?: {
 		granularity: TrainingMetricGranularity;
 		aggregate: TrainingMetricAggregateFunction;
-	};
-	filters?: {
-		sports?: (
-			| {
-					Sport: Sport;
-			  }
-			| { SportCategory: SportCategory }
-		)[];
-		workout_types?: WorkerType[];
-		rpes?: RPEValue[];
-		bonked?: BonkStatus;
 	};
 	summary?: {
 		average: {

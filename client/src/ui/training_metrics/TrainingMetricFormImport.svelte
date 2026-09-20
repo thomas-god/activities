@@ -3,7 +3,8 @@
 	import {
 		copyTrainingMetricIntoPeriod,
 		metricAsString,
-		metricGroupBy,
+		getMetricGroupBy,
+		metricSportsRepr,
 		type TrainingMetric,
 		type TrainingMetricList
 	} from '$lib/api';
@@ -43,17 +44,17 @@
 		}
 
 		// Group by if present
-		const groupBy = metricGroupBy(metric);
+		const groupBy = getMetricGroupBy(metric);
 		if (isSome(groupBy)) {
 			lines.push({ label: 'Grouped by', value: groupByClauseDisplay(groupBy.value) });
 		}
 
 		// Sports filter
-		if (metric.sports && metric.sports.sports.length + metric.sports.categories.length > 0) {
-			const sports = (metric.sports.sports as string[]).concat(metric.sports.categories);
+		const sportsRepr = metricSportsRepr(metric);
+		if (isSome(sportsRepr)) {
 			lines.push({
 				label: 'Filters',
-				value: sports.map((s) => s.toLocaleLowerCase()).join(', ')
+				value: sportsRepr
 			});
 		} else {
 			lines.push({ label: 'Filters', value: 'all sports' });

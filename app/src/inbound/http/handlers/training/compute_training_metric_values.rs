@@ -31,10 +31,9 @@ use crate::{
             handlers::training::{
                 types::{
                     APIActivityMetricSource, APITimeseriesWindow, APITrainingMetricAggregate,
-                    APITrainingMetricFilters, APITrainingMetricGranularity,
-                    APITrainingMetricGroupBy, APITrainingMetricScope, APITrainingMetricSource,
-                    APITrainingMetricSummary, APITrainingMetricTarget, SportsResponse,
-                    TrainingMetricBody, format_source_metric,
+                    APITrainingMetricFilters, APITrainingMetricGranularity, APITrainingMetricScope,
+                    APITrainingMetricSource, APITrainingMetricSummary, APITrainingMetricTarget,
+                    SportsResponse, TrainingMetricBody, format_source_metric,
                 },
                 utils::{
                     GranuleValues, MetricsDateRange, convert_metric_target_unit,
@@ -51,8 +50,6 @@ use crate::{
 pub struct ComputeMetricValuesRequest {
     source: APITrainingMetricSource,
     window: Option<APITimeseriesWindow>,
-    #[serde(default)]
-    filters: Option<APITrainingMetricFilters>,
     #[serde(default)]
     summary: APITrainingMetricSummary,
     #[serde(default)]
@@ -89,13 +86,8 @@ pub async fn compute_training_metric_values<
 ) -> Result<impl IntoResponse, StatusCode> {
     let date_range = DateRange::from(&request);
 
-    let filters = request
-        .filters
-        .as_ref()
-        .map(TrainingMetricActivityFilters::try_from)
-        .transpose()
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .unwrap_or_else(TrainingMetricActivityFilters::empty);
+    let source =
+        TrainingMetricSource::try_from(&request.source).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let target = request
         .target
@@ -112,9 +104,8 @@ pub async fn compute_training_metric_values<
 
     let req = GetTrainingMetricValuesRequest::ByDefinition {
         user: user.user().clone(),
-        source: TrainingMetricSource::from(&request.source),
+        source,
         window: window.clone(),
-        filters,
         summary: TrainingMetricSummary::from(&request.summary),
         target,
     };
@@ -163,28 +154,10 @@ fn to_body(
         id: "temporary-metric".to_string(),
         name: None,
         source: request.source.clone(),
-        metric_formated: format_source_metric(&TrainingMetricSource::from(&request.source)),
+        metric_formated: request.source.format_source_metric(),
         unit: unit.to_string(),
         granularity: request.window.as_ref().map(|w| w.granularity().to_string()),
         aggregate: request.window.as_ref().map(|w| w.aggregate().to_string()),
-        sports: request
-            .filters
-            .as_ref()
-            .map(|f| SportsResponse::from(&f.sports))
-            .unwrap_or_default(),
-        workout_types: request.filters.as_ref().and_then(|f| {
-            f.workout_types
-                .as_ref()
-                .map(|wt| wt.iter().map(|t| t.to_string()).collect())
-        }),
-        bonked: request
-            .filters
-            .as_ref()
-            .and_then(|f| f.bonked.as_ref().map(|b| b.to_string())),
-        rpes: request
-            .filters
-            .as_ref()
-            .and_then(|f| f.rpes.as_ref().map(|rs| rs.to_vec())),
         show_average: request
             .summary
             .average
@@ -203,17 +176,29 @@ mod tests {
     use super::*;
     use serde_json;
 
-    use crate::domain::models::activity::{BonkStatus, Sport, SportCategory, Unit, WorkoutType};
+    use crate::domain::models::activity::{
+        ActivityRpe, BonkStatus, Sport, SportCategory, Unit, WorkoutType,
+    };
     use crate::domain::models::training::{
-        ActivitySource, SportFilter, TrainingMetricSummaryAverage, TrainingMetricTarget,
+        ActivitySource, HooperIndexSource, SportFilter, TrainingMetricSummaryAverage,
+        TrainingMetricTarget, WeightAndNutritionSource,
     };
     use crate::inbound::http::handlers::training::types::{
-        APIActivitySource, APITrainingMetricSummaryAverage,
+        APIActivitySource, APITrainingMetricActivityGroupBy, APITrainingMetricSummaryAverage,
     };
 
-    fn extract_group_by(request: &ComputeMetricValuesRequest) -> Option<APITrainingMetricGroupBy> {
+    fn extract_group_by(
+        request: &ComputeMetricValuesRequest,
+    ) -> Option<APITrainingMetricActivityGroupBy> {
         match &request.source {
             APITrainingMetricSource::Activity(source) => source.group_by.clone(),
+            _ => None,
+        }
+    }
+
+    fn extract_filters(request: &ComputeMetricValuesRequest) -> Option<APITrainingMetricFilters> {
+        match &request.source {
+            APITrainingMetricSource::Activity(source) => Some(source.filters.clone()),
             _ => None,
         }
     }
@@ -234,7 +219,12 @@ mod tests {
 
         assert!(result.is_ok());
         let request = result.unwrap();
-        assert!(request.filters.is_none());
+        assert!(extract_group_by(&request).is_none());
+        // Filters now live in the source and default to an empty set
+        assert_eq!(
+            extract_filters(&request),
+            Some(APITrainingMetricFilters::default())
+        );
         assert_eq!(
             request.window.unwrap(),
             APITimeseriesWindow::new(
@@ -253,14 +243,20 @@ mod tests {
         // - Optional end date
         // - Optional filters with sports (Sport or SportCategory)
         let json = r#"{
-            "source": {"type": "activity", "metric": {"metric": "AvgSpeed", "group_by": "Sport"}},
+            "source": {
+                "type": "activity",
+                "metric": {
+                    "metric": "AvgSpeed",
+                    "group_by": "Sport",
+                    "filters": {"sports": [{"Sport": "Running"}]}
+                }
+            },
             "window": {
                 "granularity": "Daily",
                 "aggregate": "Sum"
             },
             "start": "2024-01-01",
-            "end": "2024-12-31",
-            "filters": {"sports": [{"Sport": "Running"}]}
+            "end": "2024-12-31"
         }"#;
         let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
 
@@ -269,9 +265,17 @@ mod tests {
 
         assert_eq!(
             extract_group_by(&request),
-            Some(APITrainingMetricGroupBy::Sport)
+            Some(APITrainingMetricActivityGroupBy::Sport)
         );
-        assert!(request.filters.is_some());
+        assert_eq!(
+            extract_filters(&request),
+            Some(APITrainingMetricFilters {
+                sports: Some(vec![SportFilter::Sport(Sport::Running)]),
+                workout_types: None,
+                bonked: None,
+                rpes: None
+            })
+        );
         assert_eq!(
             request.window.unwrap(),
             APITimeseriesWindow::new(
@@ -300,14 +304,117 @@ mod tests {
     }
 
     #[test]
+    fn test_request_deserialize_full_json_layout() {
+        // Reference example of the request JSON layout with every field populated.
+        // Optional fields absent from the payload fall back to defaults, see
+        // test_request_deserialize_minimal.
+        let json = r#"{
+            "source": {
+                "type": "activity",
+                "metric": {
+                    "metric": "AvgHeartRate",
+                    "group_by": "SportCategory",
+                    "filters": {
+                        "sports": [{"Sport": "Running"}, {"SportCategory": "Cycling"}],
+                        "workout_types": ["Easy", "Intervals"],
+                        "bonked": "Bonked",
+                        "rpes": [5, 6, 7]
+                    }
+                }
+            },
+            "window": {
+                "granularity": "Weekly",
+                "aggregate": "Average"
+            },
+            "summary": {"average": {"include_zeros": true}},
+            "target": {"value": 150.5, "unit": "bpm"},
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+
+        assert_eq!(
+            request.source,
+            APITrainingMetricSource::Activity(APIActivitySource::new(
+                ActivityMetric::AvgHeartRate,
+                Some(APITrainingMetricActivityGroupBy::SportCategory),
+                APITrainingMetricFilters {
+                    sports: Some(vec![
+                        SportFilter::Sport(Sport::Running),
+                        SportFilter::SportCategory(SportCategory::Cycling),
+                    ]),
+                    workout_types: Some(vec![WorkoutType::Easy, WorkoutType::Intervals]),
+                    bonked: Some(BonkStatus::Bonked),
+                    rpes: Some(vec![5, 6, 7]),
+                },
+            ))
+        );
+        assert_eq!(
+            request.window,
+            Some(APITimeseriesWindow::new(
+                APITrainingMetricGranularity::Weekly,
+                APITrainingMetricAggregate::Average,
+            ))
+        );
+        assert_eq!(
+            request.summary,
+            APITrainingMetricSummary::new(Some(APITrainingMetricSummaryAverage::new(true)))
+        );
+        assert_eq!(
+            request.target,
+            Some(APITrainingMetricTarget::new(150.5, "bpm".to_string()))
+        );
+        assert_eq!(request.start, "2024-01-01".parse().unwrap());
+        assert_eq!(request.end, Some("2024-12-31".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_request_deserialize_non_activity_sources_json_layout() {
+        // Hooper index and weight & nutrition sources take a plain source name and
+        // carry no group_by/filters.
+        let json = r#"{
+            "source": {"type": "hooperIndex", "metric": "Sleep"},
+            "window": {
+                "granularity": "Monthly",
+                "aggregate": "Sum"
+            },
+            "start": "2024-01-01"
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+        assert_eq!(
+            request.source,
+            APITrainingMetricSource::HooperIndex(HooperIndexSource::Sleep)
+        );
+
+        let json = r#"{
+            "source": {"type": "weightAndNutrition", "metric": "Weight"},
+            "start": "2024-01-01"
+        }"#;
+        let result: Result<ComputeMetricValuesRequest, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok());
+        let request = result.unwrap();
+        assert_eq!(
+            request.source,
+            APITrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::Weight)
+        );
+    }
+
+    #[test]
     fn test_to_body_minimal_request_uses_defaults() {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                APITrainingMetricGroupBy::none(),
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters::default(),
             )),
             window: None,
-            filters: None,
             summary: APITrainingMetricSummary::default(),
             target: None,
             start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
@@ -334,11 +441,6 @@ mod tests {
         assert_eq!(body.unit, "kcal");
         assert_eq!(body.granularity, None);
         assert_eq!(body.aggregate, None);
-        assert!(body.sports.sports.is_empty());
-        assert!(body.sports.categories.is_empty());
-        assert_eq!(body.workout_types, None);
-        assert_eq!(body.bonked, None);
-        assert_eq!(body.rpes, None);
         assert_eq!(body.show_average, None);
         assert_eq!(body.target, None);
         assert_eq!(body.values, values);
@@ -351,18 +453,18 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                Some(APITrainingMetricGroupBy::Sport),
+                Some(APITrainingMetricActivityGroupBy::Sport),
+                APITrainingMetricFilters {
+                    sports: Some(vec![SportFilter::Sport(Sport::Running)]),
+                    workout_types: Some(vec![WorkoutType::Easy, WorkoutType::Intervals]),
+                    bonked: Some(BonkStatus::Bonked),
+                    rpes: Some(vec![6, 7]),
+                },
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Weekly,
                 APITrainingMetricAggregate::Sum,
             )),
-            filters: Some(APITrainingMetricFilters {
-                sports: Some(vec![SportFilter::Sport(Sport::Running)]),
-                workout_types: Some(vec![WorkoutType::Easy, WorkoutType::Intervals]),
-                bonked: Some(BonkStatus::Bonked),
-                rpes: Some(vec![6, 7]),
-            }),
             summary: APITrainingMetricSummary::new(Some(APITrainingMetricSummaryAverage::new(
                 true,
             ))),
@@ -401,21 +503,19 @@ mod tests {
             body.source,
             APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                Some(APITrainingMetricGroupBy::Sport),
+                Some(APITrainingMetricActivityGroupBy::Sport),
+                APITrainingMetricFilters {
+                    sports: Some(vec![SportFilter::Sport(Sport::Running)]),
+                    workout_types: Some(vec![WorkoutType::Easy, WorkoutType::Intervals]),
+                    bonked: Some(BonkStatus::Bonked),
+                    rpes: Some(vec![6, 7]),
+                }
             ))
         );
         assert_eq!(body.metric_formated, "Calories");
         assert_eq!(body.unit, "kcal");
         assert_eq!(body.granularity, Some("Weekly".to_string()));
         assert_eq!(body.aggregate, Some("Sum".to_string()));
-        assert_eq!(body.sports.sports, vec!["Running".to_string()]);
-        assert!(body.sports.categories.is_empty());
-        assert_eq!(
-            body.workout_types,
-            Some(vec!["easy".to_string(), "intervals".to_string()])
-        );
-        assert_eq!(body.bonked, Some("bonked".to_string()));
-        assert_eq!(body.rpes, Some(vec![6, 7]));
         assert_eq!(
             body.show_average,
             Some(TrainingMetricSummaryAverage::new(true))
@@ -431,18 +531,18 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::AvgSpeed,
-                APITrainingMetricGroupBy::none(),
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters {
+                    sports: Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
+                    workout_types: None,
+                    bonked: None,
+                    rpes: None,
+                },
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Daily,
                 APITrainingMetricAggregate::Average,
             )),
-            filters: Some(APITrainingMetricFilters {
-                sports: Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
-                workout_types: None,
-                bonked: None,
-                rpes: None,
-            }),
             summary: APITrainingMetricSummary::default(),
             target: None,
             start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
@@ -461,18 +561,19 @@ mod tests {
             body.source,
             APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::AvgSpeed,
-                APITrainingMetricGroupBy::none(),
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters {
+                    sports: Some(vec![SportFilter::SportCategory(SportCategory::Running)]),
+                    workout_types: None,
+                    bonked: None,
+                    rpes: None,
+                },
             ))
         );
         assert_eq!(body.metric_formated, "Activity Average Speed");
         assert_eq!(body.unit, "m/s");
         assert_eq!(body.granularity, Some("Daily".to_string()));
         assert_eq!(body.aggregate, Some("Average".to_string()));
-        assert_eq!(body.sports.categories, vec!["Running".to_string()]);
-        assert!(body.sports.sports.is_empty());
-        assert_eq!(body.workout_types, None);
-        assert_eq!(body.bonked, None);
-        assert_eq!(body.rpes, None);
         assert_eq!(body.show_average, None);
         assert_eq!(body.target, None);
     }
@@ -482,13 +583,13 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Distance,
-                Some(APITrainingMetricGroupBy::WorkoutType),
+                Some(APITrainingMetricActivityGroupBy::WorkoutType),
+                APITrainingMetricFilters::default(),
             )),
             window: Some(APITimeseriesWindow::new(
                 APITrainingMetricGranularity::Monthly,
                 APITrainingMetricAggregate::Sum,
             )),
-            filters: None,
             summary: APITrainingMetricSummary::default(),
             target: None,
             start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
@@ -501,19 +602,14 @@ mod tests {
             body.source,
             APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Distance,
-                Some(APITrainingMetricGroupBy::WorkoutType),
+                Some(APITrainingMetricActivityGroupBy::WorkoutType),
+                APITrainingMetricFilters::default(),
             ))
         );
         assert_eq!(body.metric_formated, "Distance");
         assert_eq!(body.unit, "m");
         assert_eq!(body.granularity, Some("Monthly".to_string()));
         assert_eq!(body.aggregate, Some("Sum".to_string()));
-        // No filters provided -> sports response falls back to default (empty)
-        assert!(body.sports.sports.is_empty());
-        assert!(body.sports.categories.is_empty());
-        assert_eq!(body.workout_types, None);
-        assert_eq!(body.bonked, None);
-        assert_eq!(body.rpes, None);
         assert_eq!(body.show_average, None);
         assert_eq!(body.target, None);
         assert_eq!(body.scope, APITrainingMetricScope::Global);
@@ -524,15 +620,15 @@ mod tests {
         let request = ComputeMetricValuesRequest {
             source: APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                APITrainingMetricGroupBy::none(),
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters {
+                    sports: Some(vec![]),
+                    workout_types: Some(vec![]),
+                    bonked: None,
+                    rpes: Some(vec![]),
+                },
             )),
             window: None,
-            filters: Some(APITrainingMetricFilters {
-                sports: Some(vec![]),
-                workout_types: Some(vec![]),
-                bonked: None,
-                rpes: Some(vec![]),
-            }),
             summary: APITrainingMetricSummary::default(),
             target: None,
             start: "2024-01-01".parse::<chrono::NaiveDate>().unwrap(),
@@ -551,14 +647,15 @@ mod tests {
             body.source,
             APITrainingMetricSource::Activity(APIActivitySource::new(
                 ActivityMetric::Calories,
-                APITrainingMetricGroupBy::none(),
+                APITrainingMetricActivityGroupBy::none(),
+                APITrainingMetricFilters {
+                    sports: Some(vec![]),
+                    workout_types: Some(vec![]),
+                    bonked: None,
+                    rpes: Some(vec![]),
+                }
             ))
         );
-        assert!(body.sports.sports.is_empty());
-        assert!(body.sports.categories.is_empty());
-        assert_eq!(body.workout_types, Some(vec![]));
-        assert_eq!(body.bonked, None);
-        assert_eq!(body.rpes, Some(vec![]));
         assert_eq!(body.granularity, None);
         assert_eq!(body.aggregate, None);
     }

@@ -15,7 +15,7 @@ use crate::domain::models::{
     search::SearchDocumentEvent,
     training::{
         HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricAggregate,
-        TrainingMetricGranularity, TrainingMetricGroupBy, TrainingMetricId, TrainingMetricName,
+        TrainingMetricGranularity, TrainingMetricActivityGroupBy, TrainingMetricId, TrainingMetricName,
         TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget, TrainingMetricValue,
         TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle, TrainingPeriodId,
         TrainingPeriodSports, WeightAndNutritionSource,
@@ -528,13 +528,13 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for ActivityNutrition {
     }
 }
 
-impl sqlx::Type<sqlx::Sqlite> for TrainingMetricGroupBy {
+impl sqlx::Type<sqlx::Sqlite> for TrainingMetricActivityGroupBy {
     fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
         <String as sqlx::Type<sqlx::Sqlite>>::type_info()
     }
 }
 
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricGroupBy {
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricActivityGroupBy {
     fn encode_by_ref(
         &self,
         args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
@@ -551,7 +551,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for TrainingMetricGroupBy {
     }
 }
 
-impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricGroupBy {
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for TrainingMetricActivityGroupBy {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
 

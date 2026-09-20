@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { TrainingMetric } from '$lib/api';
+import type { TrainingMetric, TrainingMetricFilters } from '$lib/api';
 
 import {
 	bucketOffset,
@@ -16,6 +16,14 @@ import {
 } from './trainingMetric';
 import dayjs from 'dayjs';
 
+const metricFilters = (overrides: Partial<TrainingMetricFilters> = {}): TrainingMetricFilters => ({
+	sports: [{ Sport: 'Running' }, { SportCategory: 'Cycling' }],
+	workout_types: ['easy'],
+	bonked: 'none',
+	rpes: [5, 7],
+	...overrides
+});
+
 const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
@@ -23,20 +31,14 @@ const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => 
 		type: 'activity',
 		metric: {
 			metric: 'Distance',
-			group_by: 'Sport'
+			group_by: 'Sport',
+			filters: metricFilters()
 		}
 	},
 	unit: 'm',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
 	aggregate: 'Sum',
-	sports: {
-		sports: ['Running'],
-		categories: ['Cycling']
-	},
-	workout_types: ['easy'],
-	bonked: 'none',
-	rpes: [5, 7],
 	show_average: { include_zeros: false },
 	target: { value: 100, unit: 'km' },
 	values: { no_group: { '2026-01-01': 10 } },
@@ -63,60 +65,80 @@ describe('metricDefinitionKey', () => {
 		expect(metricDefinitionKey(makeMetric())).not.toBe(
 			metricDefinitionKey(makeMetric({ granularity: 'Daily' }))
 		);
+		// The definition key includes the whole source, filters included
 		expect(metricDefinitionKey(makeMetric())).not.toBe(
-			metricDefinitionKey(makeMetric({ sports: null }))
+			metricDefinitionKey(
+				makeMetric({
+					source: {
+						type: 'activity',
+						metric: {
+							metric: 'Distance',
+							group_by: 'Sport',
+							filters: metricFilters({ sports: null })
+						}
+					}
+				})
+			)
 		);
 	});
 });
 
 describe('metricToPreviewBase', () => {
-	it('carries window, filters, summary and target', () => {
+	it('carries source with filters, window, summary and target', () => {
 		const base = extractBaseDefinitionFromMetric(makeMetric());
 
 		expect(base.source).toStrictEqual({
 			type: 'activity',
-			metric: { metric: 'Distance', group_by: 'Sport' }
+			metric: {
+				metric: 'Distance',
+				group_by: 'Sport',
+				filters: {
+					sports: [{ Sport: 'Running' }, { SportCategory: 'Cycling' }],
+					workout_types: ['easy'],
+					bonked: 'none',
+					rpes: [5, 7]
+				}
+			}
 		});
 		expect(base.window).toEqual({
 			granularity: 'Weekly',
 			aggregate: 'Sum'
 		});
-		expect(base.filters).toEqual({
-			sports: [{ SportCategory: 'Cycling' }, { Sport: 'Running' }],
-			workout_types: ['Easy'],
-			rpes: [5, 7],
-			bonked: 'None'
-		});
 		expect(base.summary).toEqual({ average: { include_zeros: false } });
 		expect(base.target).toEqual({ value: 100, unit: 'km' });
 	});
 
-	it('omits sports from filters when the metric inherits the period sports', () => {
-		const base = extractBaseDefinitionFromMetric(makeMetric({ sports: null }));
+	it('keeps unset sports filters as-is so each period applies its own sports', () => {
+		const base = extractBaseDefinitionFromMetric(
+			makeMetric({
+				source: {
+					type: 'activity',
+					metric: {
+						metric: 'Distance',
+						group_by: 'Sport',
+						filters: metricFilters({ sports: null })
+					}
+				}
+			})
+		);
 
-		expect(base.filters).toEqual({
-			workout_types: ['Easy'],
-			rpes: [5, 7],
-			bonked: 'None'
-		});
+		if (base.source.type !== 'activity') {
+			throw new Error('expected an activity source');
+		}
+		expect(base.source.metric.filters.sports).toBeNull();
 	});
 
-	it('omits window and filters when unset', () => {
+	it('omits window, summary and target when unset', () => {
 		const base = extractBaseDefinitionFromMetric(
 			makeMetric({
 				granularity: null,
 				aggregate: null,
-				sports: null,
-				workout_types: null,
-				rpes: null,
-				bonked: null,
 				show_average: null,
 				target: null
 			})
 		);
 
 		expect(base.window).toBeUndefined();
-		expect(base.filters).toBeUndefined();
 		expect(base.summary).toBeUndefined();
 		expect(base.target).toBeUndefined();
 	});
@@ -129,54 +151,50 @@ describe('compareMetricPreviewPayload', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
+				source: {
+					type: 'activity',
+					metric: {
+						metric: 'Distance',
+						group_by: null,
+						filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+					}
+				},
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
 
-		expect(payload.source).toStrictEqual({
-			type: 'activity',
-			metric: { metric: 'Distance', group_by: null }
-		});
+		expect(payload.source).toStrictEqual(definition.base.source);
 		expect(payload.start).toBe('2026-02-02');
 		expect(payload.end).toBe('2026-05-01');
 	});
 
-	it('defaults sports filters to the period sports', () => {
-		const definition: CompareMetricDefinition = {
-			key: 'default:weekly-distance',
-			label: null,
-			source: 'default',
-			base: {
-				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
-				window: { granularity: 'Weekly', aggregate: 'Sum' }
-			}
-		};
-
-		const payload = metricPreviewPayload(definition, makePeriod());
-
-		expect(payload.filters).toEqual({
-			sports: [{ SportCategory: 'Cycling' }, { Sport: 'TrailRunning' }]
-		});
-	});
-
-	it('keeps the definition sports filters when set', () => {
+	it('keeps the definition filters unchanged in the payload', () => {
 		const definition: CompareMetricDefinition = {
 			key: 'key',
 			label: null,
 			source: 'first',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
-				window: { granularity: 'Weekly', aggregate: 'Sum' },
-				filters: { sports: [{ Sport: 'Cycling' }] }
+				source: {
+					type: 'activity',
+					metric: {
+						metric: 'Distance',
+						group_by: null,
+						filters: metricFilters({ sports: [{ Sport: 'Cycling' }] })
+					}
+				},
+				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
 
 		const payload = metricPreviewPayload(definition, makePeriod());
 
-		expect(payload.filters).toEqual({ sports: [{ Sport: 'Cycling' }] });
+		expect(payload.source).toStrictEqual(definition.base.source);
+		if (payload.source.type !== 'activity') {
+			throw new Error('expected an activity source');
+		}
+		expect(payload.source.metric.filters.sports).toEqual([{ Sport: 'Cycling' }]);
 	});
 
 	it('uses tomorrow for an ongoing period', () => {
@@ -187,7 +205,14 @@ describe('compareMetricPreviewPayload', () => {
 			label: null,
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
+				source: {
+					type: 'activity',
+					metric: {
+						metric: 'Distance',
+						group_by: null,
+						filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+					}
+				},
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -286,7 +311,14 @@ describe('compareDefinitionLabel', () => {
 			label: 'Weekly distance',
 			source: 'default',
 			base: {
-				source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
+				source: {
+					type: 'activity',
+					metric: {
+						metric: 'Distance',
+						group_by: null,
+						filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+					}
+				},
 				window: { granularity: 'Weekly', aggregate: 'Sum' }
 			}
 		};
@@ -301,7 +333,14 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: { metric: 'Distance', group_by: null } },
+					source: {
+						type: 'activity',
+						metric: {
+							metric: 'Distance',
+							group_by: null,
+							filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+						}
+					},
 					window: { granularity: 'Weekly', aggregate: 'Sum' }
 				}
 			})
@@ -313,7 +352,14 @@ describe('compareDefinitionLabel', () => {
 				label: null,
 				source: 'first',
 				base: {
-					source: { type: 'activity', metric: { metric: 'ActiveDuration', group_by: null } },
+					source: {
+						type: 'activity',
+						metric: {
+							metric: 'ActiveDuration',
+							group_by: null,
+							filters: metricFilters({ sports: null, workout_types: null, bonked: null, rpes: null })
+						}
+					},
 					window: { granularity: 'Daily', aggregate: 'Max' }
 				}
 			})

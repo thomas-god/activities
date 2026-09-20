@@ -751,7 +751,7 @@ mod test_grouping_metric_values {
 mod test_fill_grouped_metric_values {
     use chrono::NaiveDate;
 
-    use crate::domain::models::training::TrainingMetricGroupBy;
+    use crate::domain::models::training::TrainingMetricActivityGroupBy;
 
     use super::*;
 
