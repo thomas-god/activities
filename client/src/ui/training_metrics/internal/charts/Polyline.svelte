@@ -145,6 +145,7 @@
 		y: number;
 		showBelow: boolean;
 		time: string;
+		timestamp: number;
 		group: string;
 		value: number;
 	}>({
@@ -153,6 +154,7 @@
 		y: 0,
 		showBelow: false,
 		time: '',
+		timestamp: 0,
 		group: '',
 		value: 0
 	});
@@ -234,6 +236,7 @@
 							y: yPos,
 							showBelow: showBelow,
 							time: point.time,
+							timestamp: point.timestamp,
 							value: point.value,
 							group: point.group
 						};
@@ -363,9 +366,11 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{tooltip.time}</div>
-							<div class="font-italic text-xs">{tooltip.group}</div>
-							<div class="text-xs opacity-80">
+							<div class="font-semibold">{dayjs.unix(tooltip.timestamp).format('MMM D')}</div>
+							<div class="font-italic text-xs">
+								<span class="font-semibold">
+									{tooltip.group}:
+								</span>
 								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>
 							</div>
 						</div>

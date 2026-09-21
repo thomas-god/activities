@@ -396,7 +396,7 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{tooltip.time}</div>
+							<div class="font-semibold">{dayjs(tooltip.time).format('MMM D')}</div>
 							<div class="text-xs">
 								<span class="font-semibold">{tooltip.group}</span>:
 								{formatTooltipValue(tooltip.value, format, unit)}
