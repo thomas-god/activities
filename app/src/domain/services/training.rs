@@ -4693,7 +4693,7 @@ mod test_training_service_metric_values {
         assert_eq!(values.len(), 1);
         assert_eq!(
             values.get(&TrainingMetricBin::new_without_group(d1.to_string())),
-            Some(&TrainingMetricValue::SingleValue(4.0))
+            Some(&TrainingMetricValue::Average(4.0))
         );
     }
 
@@ -4797,7 +4797,7 @@ mod test_training_service_metric_values {
         assert_eq!(values.unit(), Unit::Kilogram);
         assert_eq!(
             values.get(&TrainingMetricBin::new_without_group(d1.to_string())),
-            Some(&TrainingMetricValue::SingleValue(70.5))
+            Some(&TrainingMetricValue::Average(70.5))
         );
     }
 

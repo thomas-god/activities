@@ -637,7 +637,7 @@ impl Display for TrainingMetricSource {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Constructor)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TrainingMetricDefinition {
     user: UserId,
     source: TrainingMetricSource,
@@ -647,6 +647,35 @@ pub struct TrainingMetricDefinition {
 }
 
 impl TrainingMetricDefinition {
+    pub fn new(
+        user: UserId,
+        source: TrainingMetricSource,
+        window: Option<TrainingMetricWindow>,
+        summary: TrainingMetricSummary,
+        target: Option<TrainingMetricTarget>,
+    ) -> Self {
+        // By definitions, Hooper values and Weight&Nutrition are day aligned values, so we reflect
+        // that by converting None window to be of TrainingMetricGranularity::Daily granularity.
+        // With one value per day the chosen aggregate funcion (average) is identity.
+        let window = match &source {
+            TrainingMetricSource::HooperIndex(_) | TrainingMetricSource::WeightAndNutrition(_) => {
+                window.or(Some(TrainingMetricWindow::new(
+                    TrainingMetricGranularity::Daily,
+                    TrainingMetricAggregate::Average,
+                )))
+            }
+            TrainingMetricSource::Activity(_) => window,
+        };
+
+        Self {
+            user,
+            source,
+            window,
+            summary,
+            target,
+        }
+    }
+
     pub fn user(&self) -> &UserId {
         &self.user
     }
@@ -735,7 +764,7 @@ impl IndividualValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
 pub enum TrainingMetricGranularity {
     Daily,
     Weekly,
@@ -1283,6 +1312,12 @@ impl HooperIndexSource {
         window: &Option<TrainingMetricWindow>,
         values: impl Iterator<Item = (chrono::NaiveDate, HooperIndex)>,
     ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
+        // Hooper values are day-aligned
+        let granularity = window
+            .as_ref()
+            .map(|w| *w.granularity())
+            .unwrap_or(TrainingMetricGranularity::Daily);
+
         values
             .filter_map(|(date, value)| {
                 let Some(value) = value.value(self) else {
@@ -1290,16 +1325,10 @@ impl HooperIndexSource {
                 };
 
                 // Hooper index values have no intrinsic group
-                Some(match window {
-                    Some(window) => (
-                        TrainingMetricBin::new_without_group(window.granularity().date_key(&date)),
-                        IndividualValue::new(value.value() as f64),
-                    ),
-                    None => (
-                        TrainingMetricBin::new_without_group(date.to_string()),
-                        IndividualValue::new(value.value() as f64),
-                    ),
-                })
+                Some((
+                    TrainingMetricBin::new_without_group(granularity.date_key(&date)),
+                    IndividualValue::new(value.value() as f64),
+                ))
             })
             .into_group_map()
     }
@@ -1422,12 +1451,15 @@ impl WeightAndNutritionSource {
         window: &Option<TrainingMetricWindow>,
         values: impl Iterator<Item = (chrono::NaiveDate, WeightAndNutrition)>,
     ) -> HashMap<TrainingMetricBin, Vec<IndividualValue>> {
+        // Weight and nutrition values are day-aligned
+        let granularity = window
+            .as_ref()
+            .map(|w| *w.granularity())
+            .unwrap_or(TrainingMetricGranularity::Daily);
+
         values
             .map(|(date, value)| {
-                let bin = window
-                    .as_ref()
-                    .map(|w| w.granularity().date_key(&date))
-                    .unwrap_or_else(|| date.to_string());
+                let bin = granularity.date_key(&date);
 
                 let mut values = vec![];
                 match self {
@@ -1797,6 +1829,158 @@ impl TrainingMetricsOrdering {
 
     pub fn ids(&self) -> &[TrainingMetricId] {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod test_training_metric_definition_new {
+    use super::*;
+
+    fn activity_source() -> TrainingMetricSource {
+        TrainingMetricSource::Activity(ActivitySource::new(
+            ActivityMetric::NumberOfActivity,
+            TrainingMetricActivityGroupBy::none(),
+            TrainingMetricActivityFilters::empty(),
+        ))
+    }
+
+    fn hooper_source() -> TrainingMetricSource {
+        TrainingMetricSource::HooperIndex(HooperIndexSource::Fatigue)
+    }
+
+    fn weight_source() -> TrainingMetricSource {
+        TrainingMetricSource::WeightAndNutrition(WeightAndNutritionSource::TotalWeight)
+    }
+
+    fn summary() -> TrainingMetricSummary {
+        TrainingMetricSummary::new(Some(TrainingMetricSummaryAverage::new(true)))
+    }
+
+    #[test]
+    fn test_activity_source_keeps_none_window() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            activity_source(),
+            None,
+            summary(),
+            None,
+        );
+
+        assert_eq!(definition.window(), &None);
+    }
+
+    #[test]
+    fn test_activity_source_keeps_provided_window() {
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Sum,
+        ));
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            activity_source(),
+            window.clone(),
+            summary(),
+            None,
+        );
+
+        assert_eq!(definition.window(), &window);
+    }
+
+    #[test]
+    fn test_hooper_source_defaults_to_daily_average_window() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            hooper_source(),
+            None,
+            summary(),
+            None,
+        );
+
+        assert_eq!(
+            definition.window(),
+            &Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            ))
+        );
+    }
+
+    #[test]
+    fn test_hooper_source_keeps_provided_window() {
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Weekly,
+            TrainingMetricAggregate::Max,
+        ));
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            hooper_source(),
+            window.clone(),
+            summary(),
+            None,
+        );
+
+        assert_eq!(definition.window(), &window);
+    }
+
+    #[test]
+    fn test_weight_and_nutrition_source_defaults_to_daily_average_window() {
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            weight_source(),
+            None,
+            summary(),
+            None,
+        );
+
+        assert_eq!(
+            definition.window(),
+            &Some(TrainingMetricWindow::new(
+                TrainingMetricGranularity::Daily,
+                TrainingMetricAggregate::Average,
+            ))
+        );
+    }
+
+    #[test]
+    fn test_weight_and_nutrition_source_keeps_provided_window() {
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Monthly,
+            TrainingMetricAggregate::Min,
+        ));
+        let definition = TrainingMetricDefinition::new(
+            UserId::test_default(),
+            weight_source(),
+            window.clone(),
+            summary(),
+            None,
+        );
+
+        assert_eq!(definition.window(), &window);
+    }
+
+    #[test]
+    fn test_fields_are_stored() {
+        let user = UserId::test_default();
+        let target = Some(TrainingMetricTarget::new(5., Unit::Kilometer));
+        let source = activity_source();
+        let window = Some(TrainingMetricWindow::new(
+            TrainingMetricGranularity::Daily,
+            TrainingMetricAggregate::Sum,
+        ));
+
+        let definition = TrainingMetricDefinition::new(
+            user.clone(),
+            source.clone(),
+            window.clone(),
+            summary(),
+            target.clone(),
+        );
+
+        assert_eq!(definition.user(), &user);
+        assert_eq!(definition.source(), &source);
+        assert_eq!(definition.window(), &window);
+        assert_eq!(definition.summary(), &summary());
+        assert_eq!(definition.target(), &target);
     }
 }
 

@@ -4,6 +4,7 @@
 	import type { TrainingMetricTemplate } from '$lib/api';
 	import TrainingMetricFilters from './internal/TrainingMetricFilters.svelte';
 	import type { TrainingMetricFields } from '.';
+	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 
 	let {
 		templates,
@@ -34,6 +35,23 @@
 
 		return fields.selectedTemplate.value.source.type === 'activity';
 	});
+
+	let templateIsActivity = $derived.by(() => {
+		if (isNone(fields.selectedTemplate)) {
+			return false;
+		}
+		return fields.selectedTemplate.value.source.type === 'activity';
+	});
+
+	const resetGranularity = (
+		newTemplate: TrainingMetricTemplate,
+		existingGranularity: Option<TrainingMetricGranularity>
+	): Option<TrainingMetricGranularity> => {
+		if (newTemplate.source.type !== 'activity' && isNone(existingGranularity)) {
+			return some('Daily');
+		}
+		return existingGranularity;
+	};
 </script>
 
 <label class="label" for="metric-source"> Metric to extract from each activity </label>
@@ -51,7 +69,11 @@
 			if (v === null) {
 				fields = { ...fields, selectedTemplate: none() };
 			} else {
-				fields = { ...fields, selectedTemplate: some(v) };
+				fields = {
+					...fields,
+					selectedTemplate: some(v),
+					granularity: resetGranularity(v, fields.granularity)
+				};
 			}
 		}
 	}
@@ -75,7 +97,9 @@
 	}
 	id="metric-granularity"
 >
-	<option value="None">None</option>
+	{#if templateIsActivity}
+		<option value="None">None</option>
+	{/if}
 	<option value="Daily">Day</option>
 	<option value="Weekly">Week</option>
 	<option value="Monthly">Month</option>
