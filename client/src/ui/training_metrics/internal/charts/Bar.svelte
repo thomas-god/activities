@@ -5,7 +5,7 @@
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
-	import { formatTooltipValue, getGroupColor } from './chart';
+	import { formatTooltipValue, getGroupColor } from '.';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -91,7 +91,7 @@
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
 	});
 
-	let yAxisDefaultTickValues = (): number[] => {
+	let yAxisDefaultTickValues = $derived.by(() => {
 		if (formatedValues.length === 0) {
 			return [];
 		}
@@ -110,9 +110,9 @@
 					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
 			: (d3.max(formatedValues, (v) => v.value) ?? 0);
 		return d3.ticks(0, Math.max(maxGroupValue, unwrapOr(target, 0)), 6);
-	};
+	});
 
-	let yAxisTickValues = (): number[] => {
+	let yAxisTickValues = $derived.by(() => {
 		if (formatedValues.length === 0) {
 			return [];
 		}
@@ -144,10 +144,10 @@
 				}
 				return ticks;
 			}
-			return yAxisDefaultTickValues();
+			return yAxisDefaultTickValues;
 		}
-		return yAxisDefaultTickValues();
-	};
+		return yAxisDefaultTickValues;
+	});
 
 	// Order of the groups inside the stacked series, sorted alphabetically ascending by
 	// display name. First entry in the array is stacked at the bottom.
@@ -234,6 +234,8 @@
 	let xGroup = $derived(d3.scaleBand().domain(groups).range([0, x.bandwidth()]).padding(0.1));
 
 	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
+
+	let yValues = $derived(yAxisTickValues.length === 0 ? y.ticks() : yAxisTickValues);
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -392,10 +394,8 @@
 		);
 
 		d3.select(gy).call((sel) =>
-			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
+			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues))
 		);
-
-		const yValues = yAxisTickValues() === null ? y.ticks() : yAxisTickValues();
 
 		d3.select(gyGrid).call((sel) =>
 			sel

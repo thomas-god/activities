@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricChartLine from './internal/TrainingMetricChartLine.svelte';
-	import TrainingMetricChartStacked from './internal/TrainingMetricChartStacked.svelte';
+	import ScatterChart from './internal/charts/Scatter.svelte';
+	import BarChart from './internal/charts/Bar.svelte';
+	import StackedArea from './internal/charts/StackedArea.svelte';
+	import Polyline from './internal/charts/Polyline.svelte';
 
 	let {
 		metric,
@@ -23,34 +25,70 @@
 		return 'number';
 	};
 	let groupBy = $derived(getMetricGroupBy(metric));
+	let format = $derived(previewFormat(metric.unit));
+	let showGroup = $derived(isSome(groupBy));
+	let stacked = $derived(metric.aggregate === 'Sum');
+	let average: Option<number> = $derived(
+		'average' in metric.summary ? some(metric.summary.average) : none()
+	);
+	let target: Option<number> = $derived(
+		metric.target === null ? none() : some(metric.target.value)
+	);
+	let values = $derived(metric.values);
 </script>
 
 {#if Object.entries(metric.values).length > 0}
-	{#if metric.granularity !== null}
-		<TrainingMetricChartStacked
-			{height}
-			{width}
-			values={metric.values}
-			unit={metric.unit}
-			granularity={metric.granularity}
-			format={previewFormat(metric.unit)}
-			showGroup={isSome(groupBy)}
-			{groupBy}
-			stacked={metric.aggregate === 'Sum'}
-			average={'average' in metric.summary ? some(metric.summary.average) : none()}
-			target={metric.target === null ? none() : some(metric.target.value)}
-		/>
+	{#if metric.source.type === 'activity'}
+		{#if metric.granularity !== null}
+			<BarChart
+				{height}
+				{width}
+				{values}
+				unit={metric.unit}
+				granularity={metric.granularity}
+				{format}
+				{showGroup}
+				{groupBy}
+				{stacked}
+				{average}
+				{target}
+			/>
+		{:else}
+			<ScatterChart
+				{height}
+				{width}
+				values={metric.values}
+				unit={metric.unit}
+				format={previewFormat(metric.unit)}
+				average={'average' in metric.summary ? some(metric.summary.average) : none()}
+				target={metric.target === null ? none() : some(metric.target.value)}
+				{timeDomain}
+			/>
+		{/if}
 	{:else}
-		<TrainingMetricChartLine
-			{height}
-			{width}
-			values={metric.values}
-			unit={metric.unit}
-			format={previewFormat(metric.unit)}
-			average={'average' in metric.summary ? some(metric.summary.average) : none()}
-			target={metric.target === null ? none() : some(metric.target.value)}
-			{timeDomain}
-		/>
+		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
+			<StackedArea
+				data={metric.values}
+				unit={metric.unit}
+				format="number"
+				average={'average' in metric.summary ? some(metric.summary.average) : none()}
+				target={metric.target === null ? none() : some(metric.target.value)}
+				{width}
+				{height}
+				yMaxValue={none()}
+			/>
+		{:else}
+			<Polyline
+				data={metric.values}
+				unit={metric.unit}
+				format="number"
+				average={'average' in metric.summary ? some(metric.summary.average) : none()}
+				target={metric.target === null ? none() : some(metric.target.value)}
+				{width}
+				{height}
+				yMaxValue={some(10)}
+			/>
+		{/if}
 	{/if}
 {:else}
 	<p class="pb-2 text-center text-sm italic opacity-70">No values found</p>

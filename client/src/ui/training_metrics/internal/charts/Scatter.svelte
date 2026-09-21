@@ -4,7 +4,7 @@
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
-	import { formatTooltipValue } from './chart';
+	import { formatTooltipValue } from '.';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
