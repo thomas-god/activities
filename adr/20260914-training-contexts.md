@@ -43,10 +43,21 @@ Quantitative measures :
 - Resting heart rate, HRV, O2 saturation,
 - Blood pressure, blood glucose.
 
----
-
 [^1]:
     Saw, A. E., Main, L. C., & Gastin, P. B. (2016). Monitoring the athlete training response:
     subjective self-reported measures trump commonly used objective measures: a systematic review.
     British Journal of Sports Medicine, 50(5), 281–291. DOI:
     [10.1136/bjsports-2015-094758](https://doi.org/10.1136/bjsports-2015-094758).
+
+---
+
+# Scratchpad
+
+- feedback and w&n are considered continuous, i.e. they're defined each day, with contrast to
+  activities that are "a point in time" (rational is you eat, sleep and feel every day even if you
+  don't exercise/not track it, whereas activities are intentional and do not necessarly happen every
+  day)
+  - this reflect in their chart that should display them continuously (eg. line, areas) whereas
+    activity based metrics are displayed discontinuoulsy (scatter plot, bar chart)
+- feedback and w&n values are day-aligned by definition
+  - metrics based on them have their window set to granularity::daily by default if not set
