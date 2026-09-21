@@ -94,7 +94,7 @@ const TrainingMetricSchema = z.object({
 	aggregate: z.enum(trainingMetricAggregateFunctions).nullable(),
 	show_average: z.object({ include_zeros: z.boolean() }).nullable(),
 	target: z.object({ value: z.number(), unit: z.string() }).nullable(),
-	values: z.record(z.string(), z.record(z.string(), z.number())), // grouped: { group_name: { date: value } }
+	values: z.record(z.string(), z.record(z.string(), z.number().nullable())), // grouped: { group_name: { date: value } }
 	summary: z.record(z.string(), z.number())
 });
 

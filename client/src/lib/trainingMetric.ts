@@ -309,7 +309,7 @@ const metricMaxValue = (metric: TrainingMetric): number => {
 		const totals = new Map<string, number>();
 		for (const granuleValues of Object.values(metric.values)) {
 			for (const [time, value] of Object.entries(granuleValues)) {
-				totals.set(time, (totals.get(time) ?? 0) + value);
+				totals.set(time, (totals.get(time) ?? 0) + (value ?? 0));
 			}
 		}
 		for (const total of totals.values()) {
@@ -320,7 +320,7 @@ const metricMaxValue = (metric: TrainingMetric): number => {
 
 	for (const granuleValues of Object.values(metric.values)) {
 		for (const value of Object.values(granuleValues)) {
-			max = Math.max(max, value);
+			max = Math.max(max, value ?? 0);
 		}
 	}
 	return max;

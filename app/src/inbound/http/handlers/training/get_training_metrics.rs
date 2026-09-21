@@ -292,7 +292,7 @@ mod tests {
             target: Some(TrainingMetricTarget::new(100.0, Unit::Kilometer)),
             values: HashMap::from([(
                 "Running".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 10.5)]),
+                HashMap::from([("2025-09-24".to_string(), Some(10.5))]),
             )]),
             scope: APITrainingMetricScope::TrainingPeriod {
                 training_period_id: "period-1".to_string(),

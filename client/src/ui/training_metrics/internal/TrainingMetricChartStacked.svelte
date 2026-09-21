@@ -8,7 +8,7 @@
 	import { formatTooltipValue, getGroupColor } from './chart';
 
 	export interface TimeseriesChartProps {
-		values: Record<string, Record<string, number>>;
+		values: Record<string, Record<string, number | null>>;
 		width: number;
 		height: number;
 		unit: string;

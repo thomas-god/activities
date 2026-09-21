@@ -14,7 +14,7 @@
 	import { formatTooltipValue, getGroupColor } from './chart';
 
 	export interface CompareMetricChartBarsProps {
-		values: Record<string, Record<string, number>>;
+		values: Record<string, Record<string, number | null>>;
 		/** Date the chart's buckets are aligned to (the compared period's anchor). */
 		anchor: string;
 		/** Shared x-axis domain of the comparison (union of both periods' bucket offsets). */

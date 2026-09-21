@@ -32,7 +32,7 @@ pub const NO_GROUP: &str = "Other";
 ///   "2025-09-26": 0.0
 /// }
 /// ```
-pub type GranuleValues = HashMap<String, f64>;
+pub type GranuleValues = HashMap<String, Option<f64>>;
 
 /// Type alias for metric values organized by group
 /// Maps group name (sport, activity type, etc.) to its granule values
@@ -63,13 +63,15 @@ pub struct GroupedMetricValues {
 }
 
 impl GroupedMetricValues {
-    pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, HashMap<String, f64>> {
+    pub fn iter(
+        &self,
+    ) -> std::collections::hash_map::Iter<'_, String, HashMap<String, Option<f64>>> {
         self.values.iter()
     }
 
     pub fn iter_mut(
         &mut self,
-    ) -> std::collections::hash_map::IterMut<'_, String, HashMap<String, f64>> {
+    ) -> std::collections::hash_map::IterMut<'_, String, HashMap<String, Option<f64>>> {
         self.values.iter_mut()
     }
 
@@ -101,7 +103,7 @@ pub fn group_metric_values(values: TrainingMetricValues) -> GroupedMetricValues 
         grouped_values
             .entry(bin.group().clone().unwrap_or_else(|| NO_GROUP.to_string()))
             .or_default()
-            .insert(bin.granule().to_string(), value.value());
+            .insert(bin.granule().to_string(), Some(value.value()));
     }
 
     GroupedMetricValues::new(
@@ -128,7 +130,7 @@ pub fn fill_missing_granules(
 
     for (_group, values) in values.iter_mut() {
         for granule in expected_granules.iter() {
-            values.entry(granule.to_owned()).or_insert(0.);
+            values.entry(granule.to_owned()).or_insert(None);
         }
     }
 
@@ -165,7 +167,7 @@ pub fn convert_metric_values_unit(values: GroupedMetricValues) -> GroupedMetricV
                         group.clone(),
                         group_values
                             .iter()
-                            .map(|(k, val)| (k.clone(), *val / 1000.))
+                            .map(|(k, val)| (k.clone(), val.map(|v| v / 1000.)))
                             .collect::<GranuleValues>(),
                     )
                 })
@@ -185,7 +187,7 @@ pub fn convert_metric_values_unit(values: GroupedMetricValues) -> GroupedMetricV
                         group.clone(),
                         group_values
                             .iter()
-                            .map(|(k, val)| (k.clone(), *val * 3.6))
+                            .map(|(k, val)| (k.clone(), val.map(|v| v * 3.6)))
                             .collect(),
                     )
                 })
@@ -205,7 +207,7 @@ pub fn convert_metric_values_unit(values: GroupedMetricValues) -> GroupedMetricV
                         group.clone(),
                         group_values
                             .iter()
-                            .map(|(k, val)| (k.clone(), *val * 1000.))
+                            .map(|(k, val)| (k.clone(), val.map(|v| v * 1000.)))
                             .collect(),
                     )
                 })
@@ -264,8 +266,8 @@ mod tests {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 10000.0), // 10km in meters
-                    ("2025-09-25".to_string(), 25000.0), // 25km in meters
+                    ("2025-09-24".to_string(), Some(10000.0)), // 10km in meters
+                    ("2025-09-25".to_string(), Some(25000.0)), // 25km in meters
                 ]),
             )]),
             HashMap::from([("average".to_string(), 12000.)]),
@@ -281,7 +283,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&10.0)
+            Some(&Some(10.0))
         );
         assert_eq!(
             converted_values
@@ -289,7 +291,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-25"),
-            Some(&25.0)
+            Some(&Some(25.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -303,7 +305,7 @@ mod tests {
         let values = GroupedMetricValues::new(
             HashMap::from([(
                 "Running".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 5000.0)]), // 5km in meters
+                HashMap::from([("2025-09-24".to_string(), Some(5000.0))]), // 5km in meters
             )]),
             HashMap::from([("average".to_string(), 12000.)]),
             Unit::Meter,
@@ -318,7 +320,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&5.0)
+            Some(&Some(5.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -333,8 +335,8 @@ mod tests {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 10.0), // 10 m/s = 36 km/h
-                    ("2025-09-25".to_string(), 5.55), // 5.55 m/s ≈ 20 km/h
+                    ("2025-09-24".to_string(), Some(10.0)), // 10 m/s = 36 km/h
+                    ("2025-09-25".to_string(), Some(5.55)), // 5.55 m/s ≈ 20 km/h
                 ]),
             )]),
             HashMap::from([("average".to_string(), 10.)]),
@@ -350,7 +352,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&36.0)
+            Some(&Some(36.0))
         );
         assert!(
             (converted_values
@@ -358,6 +360,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-25")
+                .unwrap()
                 .unwrap()
                 - 19.98)
                 .abs()
@@ -378,8 +381,8 @@ mod tests {
             HashMap::from([(
                 "Other".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 3600.0), // 1 hour in seconds
-                    ("2025-09-25".to_string(), 7200.0), // 2 hours in seconds
+                    ("2025-09-24".to_string(), Some(3600.0)), // 1 hour in seconds
+                    ("2025-09-25".to_string(), Some(7200.0)), // 2 hours in seconds
                 ]),
             )]),
             HashMap::from([("average".to_string(), 1000.)]),
@@ -395,7 +398,7 @@ mod tests {
                 .get("Other")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&3600.0)
+            Some(&Some(3600.0))
         );
         assert_eq!(
             converted_values
@@ -403,7 +406,7 @@ mod tests {
                 .get("Other")
                 .unwrap()
                 .get("2025-09-25"),
-            Some(&7200.0)
+            Some(&Some(7200.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -417,7 +420,7 @@ mod tests {
         let values = GroupedMetricValues::new(
             HashMap::from([(
                 "Cycling".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 250.0)]),
+                HashMap::from([("2025-09-24".to_string(), Some(250.0))]),
             )]),
             HashMap::from([("average".to_string(), 100.)]),
             Unit::Watt,
@@ -432,7 +435,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&250.0)
+            Some(&Some(250.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -449,11 +452,11 @@ mod tests {
             HashMap::from([
                 (
                     "Cycling".to_string(),
-                    HashMap::from([("2025-09-24".to_string(), 20000.0)]),
+                    HashMap::from([("2025-09-24".to_string(), Some(20000.0))]),
                 ),
                 (
                     "Running".to_string(),
-                    HashMap::from([("2025-09-24".to_string(), 10000.0)]),
+                    HashMap::from([("2025-09-24".to_string(), Some(10000.0))]),
                 ),
             ]),
             HashMap::from([("average".to_string(), 1000.)]),
@@ -469,7 +472,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&20.0)
+            Some(&Some(20.0))
         );
         assert_eq!(
             converted_values
@@ -477,7 +480,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&10.0)
+            Some(&Some(10.0))
         );
         assert_eq!(*converted_values.summary_values.get("average").unwrap(), 1.);
     }
@@ -489,8 +492,8 @@ mod tests {
             HashMap::from([(
                 "Running".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 0.2),  // 0.2 s:m = 200 s/km = 3:20 min/km
-                    ("2025-09-25".to_string(), 0.25), // 0.25 s:m = 250 s/km = 4:10 min/km
+                    ("2025-09-24".to_string(), Some(0.2)), // 0.2 s:m = 200 s/km = 3:20 min/km
+                    ("2025-09-25".to_string(), Some(0.25)), // 0.25 s:m = 250 s/km = 4:10 min/km
                 ]),
             )]),
             HashMap::from([("average".to_string(), 0.2)]),
@@ -506,7 +509,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&200.0)
+            Some(&Some(200.0))
         );
         assert_eq!(
             converted_values
@@ -514,7 +517,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-25"),
-            Some(&250.0)
+            Some(&Some(250.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -531,11 +534,11 @@ mod tests {
             HashMap::from([
                 (
                     "Running".to_string(),
-                    HashMap::from([("2025-09-24".to_string(), 0.2)]), // 200 s/km
+                    HashMap::from([("2025-09-24".to_string(), Some(0.2))]), // 200 s/km
                 ),
                 (
                     "Cycling".to_string(),
-                    HashMap::from([("2025-09-24".to_string(), 0.1)]), // 100 s/km
+                    HashMap::from([("2025-09-24".to_string(), Some(0.1))]), // 100 s/km
                 ),
             ]),
             HashMap::from([("average".to_string(), 0.2)]),
@@ -551,7 +554,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&200.0)
+            Some(&Some(200.0))
         );
         assert_eq!(
             converted_values
@@ -559,7 +562,7 @@ mod tests {
                 .get("Cycling")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&100.0)
+            Some(&Some(100.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -573,7 +576,7 @@ mod tests {
         let values = GroupedMetricValues::new(
             HashMap::from([(
                 "Running".to_string(),
-                HashMap::from([("2025-09-24".to_string(), 0.0)]),
+                HashMap::from([("2025-09-24".to_string(), Some(0.0))]),
             )]),
             HashMap::from([("average".to_string(), 0.0)]),
             Unit::SecondPerMeter,
@@ -588,7 +591,7 @@ mod tests {
                 .get("Running")
                 .unwrap()
                 .get("2025-09-24"),
-            Some(&0.0)
+            Some(&Some(0.0))
         );
         assert_eq!(
             *converted_values.summary_values.get("average").unwrap(),
@@ -628,8 +631,8 @@ mod test_grouping_metric_values {
                 HashMap::from([(
                     NO_GROUP.to_string(),
                     HashMap::from([
-                        ("2025-09-24".to_string(), 10.0,),
-                        ("2025-09-25".to_string(), 15.0),
+                        ("2025-09-24".to_string(), Some(10.0,)),
+                        ("2025-09-25".to_string(), Some(15.0)),
                     ])
                 )]),
                 HashMap::new(),
@@ -674,15 +677,15 @@ mod test_grouping_metric_values {
                     (
                         NO_GROUP.to_string(),
                         HashMap::from([
-                            ("2025-09-24".to_string(), 10.0,),
-                            ("2025-09-25".to_string(), 15.0),
+                            ("2025-09-24".to_string(), Some(10.0)),
+                            ("2025-09-25".to_string(), Some(15.0)),
                         ])
                     ),
                     (
                         "Running".to_string(),
                         HashMap::from([
-                            ("2025-09-24".to_string(), 5.0,),
-                            ("2025-09-26".to_string(), 8.0),
+                            ("2025-09-24".to_string(), Some(5.0)),
+                            ("2025-09-26".to_string(), Some(8.0)),
                         ])
                     )
                 ]),
@@ -728,15 +731,15 @@ mod test_grouping_metric_values {
                     (
                         "Cycling".to_string(),
                         HashMap::from([
-                            ("2025-09-24".to_string(), 10.0,),
-                            ("2025-09-25".to_string(), 15.0),
+                            ("2025-09-24".to_string(), Some(10.0)),
+                            ("2025-09-25".to_string(), Some(15.0)),
                         ])
                     ),
                     (
                         "Running".to_string(),
                         HashMap::from([
-                            ("2025-09-24".to_string(), 5.0,),
-                            ("2025-09-26".to_string(), 8.0),
+                            ("2025-09-24".to_string(), Some(5.0)),
+                            ("2025-09-26".to_string(), Some(8.0)),
                         ])
                     )
                 ]),
@@ -769,9 +772,9 @@ mod test_fill_grouped_metric_values {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 10.0),
-                    ("2025-09-25".to_string(), 15.0),
-                    ("2025-09-26".to_string(), 12.0),
+                    ("2025-09-24".to_string(), Some(10.0)),
+                    ("2025-09-25".to_string(), Some(15.0)),
+                    ("2025-09-26".to_string(), Some(12.0)),
                 ]),
             )]),
             HashMap::new(),
@@ -786,9 +789,9 @@ mod test_fill_grouped_metric_values {
                 HashMap::from([(
                     "Cycling".to_string(),
                     HashMap::from([
-                        ("2025-09-24".to_string(), 10.0),
-                        ("2025-09-25".to_string(), 15.0),
-                        ("2025-09-26".to_string(), 12.0),
+                        ("2025-09-24".to_string(), Some(10.0)),
+                        ("2025-09-25".to_string(), Some(15.0)),
+                        ("2025-09-26".to_string(), Some(12.0)),
                     ]),
                 )]),
                 HashMap::new(),
@@ -811,8 +814,8 @@ mod test_fill_grouped_metric_values {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-24".to_string(), 10.0),
-                    ("2025-09-26".to_string(), 12.0),
+                    ("2025-09-24".to_string(), Some(10.0)),
+                    ("2025-09-26".to_string(), Some(12.0)),
                 ]),
             )]),
             HashMap::new(),
@@ -827,11 +830,11 @@ mod test_fill_grouped_metric_values {
                 HashMap::from([(
                     "Cycling".to_string(),
                     HashMap::from([
-                        ("2025-09-23".to_string(), 0.),
-                        ("2025-09-24".to_string(), 10.0),
-                        ("2025-09-25".to_string(), 0.),
-                        ("2025-09-26".to_string(), 12.0),
-                        ("2025-09-27".to_string(), 0.),
+                        ("2025-09-23".to_string(), None),
+                        ("2025-09-24".to_string(), Some(10.0)),
+                        ("2025-09-25".to_string(), None),
+                        ("2025-09-26".to_string(), Some(12.0)),
+                        ("2025-09-27".to_string(), None),
                     ]),
                 )]),
                 HashMap::new(),
@@ -854,8 +857,8 @@ mod test_fill_grouped_metric_values {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-29".to_string(), 10.0),
-                    ("2025-10-06".to_string(), 12.0),
+                    ("2025-09-29".to_string(), Some(10.0)),
+                    ("2025-10-06".to_string(), Some(12.0)),
                 ]),
             )]),
             HashMap::new(),
@@ -870,9 +873,9 @@ mod test_fill_grouped_metric_values {
                 HashMap::from([(
                     "Cycling".to_string(),
                     HashMap::from([
-                        ("2025-09-22".to_string(), 0.),
-                        ("2025-09-29".to_string(), 10.0),
-                        ("2025-10-06".to_string(), 12.0),
+                        ("2025-09-22".to_string(), None),
+                        ("2025-09-29".to_string(), Some(10.0)),
+                        ("2025-10-06".to_string(), Some(12.0)),
                     ]),
                 )]),
                 HashMap::new(),
@@ -895,8 +898,8 @@ mod test_fill_grouped_metric_values {
             HashMap::from([(
                 "Cycling".to_string(),
                 HashMap::from([
-                    ("2025-09-01".to_string(), 20.0),
-                    ("2025-11-01".to_string(), 30.0),
+                    ("2025-09-01".to_string(), Some(20.0)),
+                    ("2025-11-01".to_string(), Some(30.0)),
                 ]),
             )]),
             HashMap::new(),
@@ -911,9 +914,9 @@ mod test_fill_grouped_metric_values {
                 HashMap::from([(
                     "Cycling".to_string(),
                     HashMap::from([
-                        ("2025-09-01".to_string(), 20.0),
-                        ("2025-10-01".to_string(), 0.),
-                        ("2025-11-01".to_string(), 30.0),
+                        ("2025-09-01".to_string(), Some(20.0)),
+                        ("2025-10-01".to_string(), None),
+                        ("2025-11-01".to_string(), Some(30.0)),
                     ]),
                 )]),
                 HashMap::new(),

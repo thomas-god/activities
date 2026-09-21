@@ -144,7 +144,7 @@ pub async fn compute_training_metric_values<
 
 fn to_body(
     request: &ComputeMetricValuesRequest,
-    values: HashMap<String, HashMap<String, f64>>,
+    values: HashMap<String, HashMap<String, Option<f64>>>,
     unit: Unit,
     summary: HashMap<String, f64>,
     target: Option<TrainingMetricTarget>,
@@ -423,7 +423,7 @@ mod tests {
 
         let values = HashMap::from([(
             "Other".to_string(),
-            HashMap::from([("2024-01-01".to_string(), 100.0)]),
+            HashMap::from([("2024-01-01".to_string(), Some(100.0))]),
         )]);
         let summary = HashMap::new();
 
@@ -477,13 +477,13 @@ mod tests {
             (
                 "Running".to_string(),
                 HashMap::from([
-                    ("2024-W01".to_string(), 10.0),
-                    ("2024-W02".to_string(), 20.0),
+                    ("2024-W01".to_string(), Some(10.0)),
+                    ("2024-W02".to_string(), Some(20.0)),
                 ]),
             ),
             (
                 "Cycling".to_string(),
-                HashMap::from([("2024-W01".to_string(), 30.0)]),
+                HashMap::from([("2024-W01".to_string(), Some(30.0))]),
             ),
         ]);
         let summary = HashMap::from([("average".to_string(), 15.0)]);
