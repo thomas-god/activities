@@ -135,7 +135,7 @@
 	});
 </script>
 
-{#if isSome(sports) && isSome(categories)}
+{#if isSome(sports) || isSome(categories)}
 	<div class="flex flex-col gap-1 rounded border border-black/30 p-1.5 shadow">
 		<div class="flex flex-row items-center justify-between">
 			<div class="flex-1 text-wrap wrap-break-word">
