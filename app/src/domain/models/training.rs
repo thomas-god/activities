@@ -1324,9 +1324,8 @@ impl HooperIndexSource {
                     return None;
                 };
 
-                // Hooper index values have no intrinsic group
                 Some((
-                    TrainingMetricBin::new_without_group(granularity.date_key(&date)),
+                    TrainingMetricBin::new(granularity.date_key(&date), Some(self.to_string())),
                     IndividualValue::new(value.value() as f64),
                 ))
             })
@@ -3202,11 +3201,16 @@ mod test_hooper_index_source_extract_values {
         ))
     }
 
-    fn value_at<'a>(
-        result: &'a HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+    fn bin(source: &HooperIndexSource, granule: &str) -> TrainingMetricBin {
+        TrainingMetricBin::new(granule.to_string(), Some(source.to_string()))
+    }
+
+    fn value_at(
+        result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+        source: &HooperIndexSource,
         granule: &str,
     ) -> f64 {
-        result[&TrainingMetricBin::from_granule(granule)][0].value()
+        result[&bin(source, granule)][0].value()
     }
 
     #[test]
@@ -3226,8 +3230,8 @@ mod test_hooper_index_source_extract_values {
         let result = source.extract_values(&None, values.into_iter());
 
         assert_eq!(result.len(), 2);
-        assert_eq!(value_at(&result, "2025-09-03"), 2.0);
-        assert_eq!(value_at(&result, "2025-09-04"), 5.0);
+        assert_eq!(value_at(&result, &source, "2025-09-03"), 2.0);
+        assert_eq!(value_at(&result, &source, "2025-09-04"), 5.0);
     }
 
     #[test]
@@ -3247,8 +3251,8 @@ mod test_hooper_index_source_extract_values {
         let result = source.extract_values(&daily_window(), values.into_iter());
 
         assert_eq!(result.len(), 2);
-        assert_eq!(value_at(&result, "2025-09-03"), 7.0);
-        assert_eq!(value_at(&result, "2025-09-04"), 8.0);
+        assert_eq!(value_at(&result, &source, "2025-09-03"), 7.0);
+        assert_eq!(value_at(&result, &source, "2025-09-04"), 8.0);
     }
 
     #[test]
@@ -3274,7 +3278,7 @@ mod test_hooper_index_source_extract_values {
         let result = source.extract_values(&window, values.into_iter());
 
         assert_eq!(result.len(), 1);
-        let grouped = &result[&TrainingMetricBin::from_granule("2025-09-01")];
+        let grouped = &result[&bin(&source, "2025-09-01")];
         let mut values = grouped
             .iter()
             .map(|value| value.value())
@@ -3301,7 +3305,7 @@ mod test_hooper_index_source_extract_values {
         let result = source.extract_values(&None, values.into_iter());
 
         assert_eq!(result.len(), 1);
-        assert_eq!(value_at(&result, "2025-09-04"), 6.0);
+        assert_eq!(value_at(&result, &source, "2025-09-04"), 6.0);
     }
 }
 

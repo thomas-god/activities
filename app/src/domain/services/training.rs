@@ -4692,7 +4692,10 @@ mod test_training_service_metric_values {
         // The date with a missing fatigue value is skipped.
         assert_eq!(values.len(), 1);
         assert_eq!(
-            values.get(&TrainingMetricBin::new_without_group(d1.to_string())),
+            values.get(&TrainingMetricBin::new(
+                d1.to_string(),
+                Some(HooperIndexSource::Fatigue.to_string())
+            )),
             Some(&TrainingMetricValue::Average(4.0))
         );
     }
