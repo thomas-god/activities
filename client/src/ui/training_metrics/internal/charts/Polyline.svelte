@@ -86,12 +86,18 @@ The same design decision applies to other types of chart in this module.
 		unwrapOr(target, Number.POSITIVE_INFINITY)
 	);
 
+	const delta = (maxValue - minValue) * 0.1;
+	// svelte-ignore state_referenced_locally
+	const range = [
+		yInterceptZero ? 0 : minValue - delta,
+		yInterceptZero ? maxValue * 1.1 : maxValue + delta
+	];
 	const yAxisDefaultTickValues = (): number[] => {
 		if (points.length === 0) {
 			return [];
 		}
 
-		return d3.ticks(0, maxValue, 6);
+		return d3.ticks(range[0], range[1], 6);
 	};
 
 	const yAxisTickValues = (): number[] => {
@@ -120,7 +126,7 @@ The same design decision applies to other types of chart in this module.
 	let yAxis = $derived(
 		d3
 			.scaleLinear()
-			.domain([yInterceptZero ? 0 : minValue, maxValue * 1.1])
+			.domain(range)
 			.rangeRound([height - marginBottom, marginTop])
 	);
 

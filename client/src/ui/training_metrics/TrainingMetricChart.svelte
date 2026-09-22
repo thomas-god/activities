@@ -91,9 +91,10 @@
 				target={metric.target === null ? none() : some(metric.target.value)}
 				{width}
 				{height}
-				yMaxValue={some(10)}
+				yMaxValue={metric.source.type === 'hooperIndex' ? some(10) : none()}
 				{timeDomain}
 				{granularity}
+				yInterceptZero={metric.source.metric !== 'TotalWeight'}
 			/>
 		{/if}
 	{/if}
