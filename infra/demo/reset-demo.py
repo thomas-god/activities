@@ -351,8 +351,10 @@ def create_global_training_metric(
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
-        "source": {"type": "activity", "metric": metric},
-        "filters": {},
+        "source": {
+            "type": "activity",
+            "metric": {"metric": metric, "group_by": group_by, "filters": {}},
+        },
         "scope": {"type": "global"},
     }
     if aggregate:
@@ -360,8 +362,6 @@ def create_global_training_metric(
             "granularity": granularity,
             "aggregate": aggregate,
         }
-        if group_by:
-            payload["window"]["group_by"] = group_by
 
     if average:
         payload["summary"] = {"average": {"include_zeros": False}}
@@ -395,8 +395,10 @@ def create_scoped_training_metric(
     """Create a training metric."""
     payload: dict[str, Any] = {
         "name": name,
-        "source": {"type": "activity", "metric": metric},
-        "filters": {},
+        "source": {
+            "type": "activity",
+            "metric": {"metric": metric, "group_by": group_by, "filters": {}},
+        },
         "scope": {"type": "trainingPeriod", "trainingPeriodId": period_id},
     }
 
@@ -405,8 +407,6 @@ def create_scoped_training_metric(
             "granularity": granularity,
             "aggregate": aggregate,
         }
-        if group_by:
-            payload["window"]["group_by"] = group_by
 
     if average:
         payload["summary"] = {"average": {"include_zeros": False}}
