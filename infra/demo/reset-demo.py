@@ -425,6 +425,97 @@ def create_scoped_training_metric(
     return None
 
 
+def create_global_hooper_metric(name: str, measure: str) -> dict[str, Any] | None:
+    """Create a global training metric based on a Hooper index measure."""
+    payload: dict[str, Any] = {
+        "name": name,
+        "source": {"type": "hooperIndex", "metric": measure},
+        "scope": {"type": "global"},
+        "window": {"granularity": "Daily", "aggregate": "Average"},
+    }
+
+    response = requests.post(
+        f"{API_URL}/training/metric",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    if response.status_code == 201:
+        data = response.text
+        print(f"Creating metric... 201 - {data}")
+        return data
+    else:
+        print(f"Creating metric... {response.status_code} - {response.text}")
+    return None
+
+
+def save_hooper_index(
+    date: str,
+    fatigue: int | None = None,
+    sleep: int | None = None,
+    pain: int | None = None,
+    stress: int | None = None,
+    mood: int | None = None,
+) -> bool:
+    """Save Hooper index feedback for a given date (values in the 0..=10 range)."""
+    payload: dict[str, int] = {}
+    if fatigue is not None:
+        payload["fatigue"] = fatigue
+    if sleep is not None:
+        payload["sleep"] = sleep
+    if pain is not None:
+        payload["pain"] = pain
+    if stress is not None:
+        payload["stress"] = stress
+    if mood is not None:
+        payload["mood"] = mood
+
+    response = requests.patch(
+        f"{API_URL}/training/hooper-index/{date}",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    if response.status_code == 204:
+        return True
+    else:
+        print(
+            f"Failed to save Hooper index for {date}: {response.status_code} - {response.text}"
+        )
+        return False
+
+
+def post_hooper_indexes(days: int = 21) -> None:
+    """Post Hooper index feedback for the last `days` days.
+
+    Values are randomized but loosely correlated: fatigue tends to be higher on days
+    following hard sessions (tempo runs on Thursdays, long rides on Saturdays).
+    """
+    print(f"Posting Hooper index feedback for the last {days} days...")
+
+    today = datetime.now().date()
+    for offset in range(days, 0, -1):
+        date = today - timedelta(days=offset)
+        weekday = date.weekday()  # 0=Monday, 6=Sunday
+
+        # Hard sessions on Thursday (tempo) and Saturday (long ride): higher fatigue the
+        # day after, recovering over the following days.
+        if weekday in (4, 5, 0):
+            fatigue = random.randint(5, 9)
+        else:
+            fatigue = random.randint(1, 5)
+
+        # Occasionally leave a measure unset, as users rarely fill in everything.
+        payload = {
+            "fatigue": fatigue,
+            "sleep": random.randint(3, 9) if random.random() > 0.2 else None,
+            "stress": random.randint(1, 8) if random.random() > 0.3 else None,
+            "mood": random.randint(4, 9) if random.random() > 0.3 else None,
+            "pain": random.randint(0, 3) if random.random() > 0.7 else None,
+        }
+        save_hooper_index(date.strftime("%Y-%m-%d"), **payload)
+
+    print(f"Posted {days} days of Hooper index feedback")
+
+
 def create_training_note(date: str, content: str) -> dict[str, Any] | None:
     """Create a training note."""
     payload = {"date": date, "content": content}
@@ -692,6 +783,14 @@ def generate_demo_data() -> int:
         group_by="WorkoutType",
     )
 
+    create_global_hooper_metric(
+        "You can also track feedback like sleep, fatigue, etc.",
+        "Fatigue",
+    )
+
+    # Post Hooper index feedback data
+    post_hooper_indexes(days=21)
+
     # Create training notes
     print("\nCreating training notes...")
 
@@ -724,7 +823,8 @@ def generate_demo_data() -> int:
     print("Generated:")
     print("  - 48 activities (12 weeks × 4 activities/week)")
     print("  - 4 training periods")
-    print("  - 2 training metrics")
+    print("  - 3 training metrics")
+    print("  - 21 days of Hooper index feedback")
     print("  - 2 training notes")
 
     return 0
