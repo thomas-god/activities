@@ -151,24 +151,24 @@ export const fieldsAsPayload = (
 	return some(payload);
 };
 
-const matchTemplate = (metric: TrainingMetric, template: TrainingMetricTemplate): boolean => {
+export const matchTemplate = (
+	metric: TrainingMetric,
+	template: TrainingMetricTemplate
+): boolean => {
 	if (metric.source.type === 'activity' && template.source.type === 'activity') {
 		if (metric.source.metric.metric !== template.source.metric) {
 			return false;
 		}
+		return metric.aggregate === null ? true : metric.aggregate === template.aggregate;
 	} else if (metric.source.type === 'hooperIndex' && template.source.type === 'hooperIndex') {
-		if (metric.source.metric !== template.source.metric) {
-			return false;
-		}
+		return metric.source.metric === template.source.metric;
 	} else if (
 		metric.source.type === 'weightAndNutrition' &&
 		template.source.type === 'weightAndNutrition'
 	) {
-		if (metric.source.metric !== template.source.metric) {
-			return false;
-		}
+		return metric.source.metric === template.source.metric;
 	}
-	return metric.aggregate === null ? true : metric.aggregate === template.aggregate;
+	return false;
 };
 
 const convertFilters = (filters: Option<TrainingMetricFilters>): TrainingMetricFiltersType => {

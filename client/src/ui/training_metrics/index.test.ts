@@ -3,49 +3,70 @@ import { describe, expect, it } from 'vitest';
 import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
 import { isNone, isSome, none, some } from '$lib/Options';
 
-import { fieldsAsPayload, matchMetricToFormFields, type TrainingMetricFields } from './index';
+import {
+	fieldsAsPayload,
+	matchMetricToFormFields,
+	matchTemplate,
+	type TrainingMetricFields
+} from './index';
 
-const makeTemplate = (overrides: Partial<TrainingMetricTemplate> = {}): TrainingMetricTemplate => ({
-	display_name: 'Total Duration',
-	source: { type: 'activity', metric: 'ActiveDuration' },
-	aggregate: 'Sum',
-	unit: 's',
-	category: 'Duration',
-	...overrides
+const activityMetricSource = (metric: string): TrainingMetric['source'] => ({
+	type: 'activity',
+	metric: {
+		metric,
+		group_by: 'Sport',
+		filters: {
+			sports: [{ Sport: 'Running' }, { SportCategory: 'Running' }],
+			workout_types: ['easy'],
+			bonked: 'none',
+			rpes: [5, 7]
+		}
+	}
 });
 
-const makeMetric = (overrides: Partial<TrainingMetric> = {}): TrainingMetric => ({
+const makeTemplate = ({
+	source,
+	aggregate,
+	...overrides
+}: Pick<TrainingMetricTemplate, 'source' | 'aggregate'> &
+	Partial<TrainingMetricTemplate>): TrainingMetricTemplate => ({
+	display_name: 'Total Duration',
+	unit: 's',
+	category: 'Duration',
+	...overrides,
+	source,
+	aggregate
+});
+
+const makeMetric = ({
+	source,
+	aggregate,
+	...overrides
+}: Pick<TrainingMetric, 'source' | 'aggregate'> & Partial<TrainingMetric>): TrainingMetric => ({
 	id: 'metric-1',
 	name: 'My Metric',
-	source: {
-		type: 'activity',
-		metric: {
-			metric: 'ActiveDuration',
-			group_by: 'Sport',
-			filters: {
-				sports: [{ Sport: 'Running' }, { SportCategory: 'Running' }],
-				workout_types: ['easy'],
-				bonked: 'none',
-				rpes: [5, 7]
-			}
-		}
-	},
 	unit: 's',
 	scope: { type: 'global' },
 	granularity: 'Weekly',
-	aggregate: 'Sum',
-
 	show_average: { include_zeros: false },
 	target: { value: 100, unit: 'km' },
 	values: { no_group: { '2026-01-01': 10 } },
 	summary: { total: 10 },
-	...overrides
+	...overrides,
+	source,
+	aggregate
 });
 
 describe('matchMetricToFormFields', () => {
 	it('maps a fully populated metric into form fields', () => {
-		const template = makeTemplate();
-		const metric = makeMetric();
+		const template = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Sum'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Sum'
+		});
 
 		const result = matchMetricToFormFields(metric, [template]);
 
@@ -83,6 +104,7 @@ describe('matchMetricToFormFields', () => {
 					}
 				}
 			},
+			aggregate: 'Sum',
 			granularity: null,
 			show_average: null,
 			target: null
@@ -104,9 +126,18 @@ describe('matchMetricToFormFields', () => {
 	});
 
 	it('matches template by metric and aggregate when aggregate is set', () => {
-		const matchingTemplate = makeTemplate({ aggregate: 'Average' });
-		const wrongAggregateTemplate = makeTemplate({ aggregate: 'Sum' });
-		const metric = makeMetric({ aggregate: 'Average' });
+		const matchingTemplate = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Average'
+		});
+		const wrongAggregateTemplate = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Sum'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Average'
+		});
 
 		const result = matchMetricToFormFields(metric, [wrongAggregateTemplate, matchingTemplate]);
 
@@ -117,9 +148,18 @@ describe('matchMetricToFormFields', () => {
 	});
 
 	it('matches by metric only when metric aggregate is null', () => {
-		const firstMetricTemplate = makeTemplate({ aggregate: 'Min' });
-		const secondMetricTemplate = makeTemplate({ aggregate: 'Max' });
-		const metric = makeMetric({ aggregate: null });
+		const firstMetricTemplate = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Min'
+		});
+		const secondMetricTemplate = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Max'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: null
+		});
 
 		const result = matchMetricToFormFields(metric, [firstMetricTemplate, secondMetricTemplate]);
 
@@ -130,10 +170,144 @@ describe('matchMetricToFormFields', () => {
 	});
 });
 
+describe('matchTemplate', () => {
+	it('matches activity templates with the same metric and aggregate', () => {
+		const template = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Sum'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Sum'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(true);
+	});
+
+	it('matches any activity template when the metric aggregate is null', () => {
+		const template = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Max'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: null
+		});
+
+		expect(matchTemplate(metric, template)).toBe(true);
+	});
+
+	it('does not match activity templates with a different aggregate', () => {
+		const template = makeTemplate({
+			source: { type: 'activity', metric: 'ActiveDuration' },
+			aggregate: 'Sum'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(false);
+	});
+
+	it('does not match activity templates with a different metric', () => {
+		const template = makeTemplate({
+			source: { type: 'activity', metric: 'Distance' },
+			aggregate: 'Sum'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Sum'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(false);
+	});
+
+	it('matches hooperIndex templates with the same metric', () => {
+		const template = makeTemplate({
+			source: { type: 'hooperIndex', metric: 'Fatigue' },
+			aggregate: 'Average',
+			unit: 'index',
+			category: 'Feedback'
+		});
+		const metric = makeMetric({
+			source: { type: 'hooperIndex', metric: 'Fatigue' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(true);
+	});
+
+	it('does not match hooperIndex templates with a different metric', () => {
+		const template = makeTemplate({
+			source: { type: 'hooperIndex', metric: 'Fatigue' },
+			aggregate: 'Average',
+			unit: 'index',
+			category: 'Feedback'
+		});
+		const metric = makeMetric({
+			source: { type: 'hooperIndex', metric: 'Stress' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(false);
+	});
+
+	it('matches weightAndNutrition templates with the same metric', () => {
+		const template = makeTemplate({
+			source: { type: 'weightAndNutrition', metric: 'Weight' },
+			aggregate: 'Average',
+			unit: 'kg',
+			category: 'Weight'
+		});
+		const metric = makeMetric({
+			source: { type: 'weightAndNutrition', metric: 'Weight' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(true);
+	});
+
+	it('does not match weightAndNutrition templates with a different metric', () => {
+		const template = makeTemplate({
+			source: { type: 'weightAndNutrition', metric: 'Weight' },
+			aggregate: 'Average',
+			unit: 'kg',
+			category: 'Weight'
+		});
+		const metric = makeMetric({
+			source: { type: 'weightAndNutrition', metric: 'Calories' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(false);
+	});
+
+	it('does not match when the source types differ', () => {
+		const hooperTemplate = makeTemplate({
+			source: { type: 'hooperIndex', metric: 'ActiveDuration' },
+			aggregate: 'Sum',
+			unit: 'index',
+			category: 'Feedback'
+		});
+		const metric = makeMetric({
+			source: activityMetricSource('ActiveDuration'),
+			aggregate: 'Sum'
+		});
+
+		expect(matchTemplate(metric, hooperTemplate)).toBe(false);
+	});
+});
+
 describe('fieldsAsPayload', () => {
 	const makeFields = (target: number | null): TrainingMetricFields => ({
 		name: 'Metric',
-		selectedTemplate: some(makeTemplate()),
+		selectedTemplate: some(
+			makeTemplate({
+				source: { type: 'activity', metric: 'ActiveDuration' },
+				aggregate: 'Sum'
+			})
+		),
 		granularity: none(),
 		groupBy: none(),
 		filters: {
@@ -159,7 +333,13 @@ describe('fieldsAsPayload', () => {
 	it('uses the selected template unit for the target', () => {
 		const fields: TrainingMetricFields = {
 			...makeFields(50),
-			selectedTemplate: some(makeTemplate({ unit: 'km' }))
+			selectedTemplate: some(
+				makeTemplate({
+					source: { type: 'activity', metric: 'ActiveDuration' },
+					aggregate: 'Sum',
+					unit: 'km'
+				})
+			)
 		};
 
 		const payload = fieldsAsPayload(fields);
