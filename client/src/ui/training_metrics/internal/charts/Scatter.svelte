@@ -34,6 +34,7 @@ The same design decision applies to other types of chart in this module.
 		average: Option<number>;
 		target: Option<number>;
 		timeDomain?: TimeDomain;
+		yInterceptZero?: boolean;
 	}
 
 	let {
@@ -44,7 +45,8 @@ The same design decision applies to other types of chart in this module.
 		format,
 		average,
 		target,
-		timeDomain = none()
+		timeDomain = none(),
+		yInterceptZero = true
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -87,14 +89,28 @@ The same design decision applies to other types of chart in this module.
 	})();
 
 	// svelte-ignore state_referenced_locally
-	const maxValue = Math.max(d3.max(valuesAsTime, (v) => v.value) ?? 0, unwrapOr(target, 0));
+	const maxValue = Math.max(
+		d3.max(valuesAsTime, (v) => v.value) ?? 0,
+		unwrapOr(target, Number.NEGATIVE_INFINITY)
+	);
+	// svelte-ignore state_referenced_locally
+	const minValue = Math.min(
+		d3.min(valuesAsTime, (v) => v.value) ?? 0,
+		unwrapOr(target, Number.POSITIVE_INFINITY)
+	);
+	const delta = (maxValue - minValue) * 0.1;
+	// svelte-ignore state_referenced_locally
+	const range = [
+		yInterceptZero ? 0 : minValue - delta,
+		yInterceptZero ? maxValue * 1.1 : maxValue + delta
+	];
 
 	const yAxisDefaultTickValues = (): number[] => {
 		if (valuesAsTime.length === 0) {
 			return [];
 		}
 
-		return d3.ticks(0, maxValue, 6);
+		return d3.ticks(range[0], range[1], 6);
 	};
 
 	const yAxisTickValues = (): number[] => {
@@ -158,7 +174,7 @@ The same design decision applies to other types of chart in this module.
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([0, maxValue * 1.1])
+			.domain(range)
 			.rangeRound([height - marginBottom, marginTop])
 	);
 

@@ -66,6 +66,7 @@
 				average={'average' in metric.summary ? some(metric.summary.average) : none()}
 				target={metric.target === null ? none() : some(metric.target.value)}
 				{timeDomain}
+				yInterceptZero={!metric.source.metric.metric.includes('HeartRate')}
 			/>
 		{/if}
 	{:else}
