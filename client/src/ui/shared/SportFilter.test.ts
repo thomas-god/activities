@@ -19,7 +19,7 @@ describe('SportFilterV2', () => {
 		const { container } = render(SportFilter, {
 			props: {
 				sports: none<Sport[]>() as Option<Sport[]>,
-				categories: some<SportCategory[]>([]) as Option<SportCategory[]>
+				categories: none<SportCategory[]>() as Option<SportCategory[]>
 			}
 		});
 

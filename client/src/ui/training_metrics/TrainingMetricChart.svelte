@@ -1,22 +1,24 @@
 <script lang="ts">
 	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
-	import { asOption, isSome, none, some, type Option } from '$lib/Options';
+	import { isSome, none, some, type Option } from '$lib/Options';
 	import ScatterChart from './internal/charts/Scatter.svelte';
 	import BarChart from './internal/charts/Bar.svelte';
 	import StackedArea from './internal/charts/StackedArea.svelte';
 	import Polyline from './internal/charts/Polyline.svelte';
-	import { type TimeDomain } from './internal/charts';
+	import { type DisplayMode, type TimeDomain } from './internal/charts';
 
 	let {
 		metric,
 		width,
 		height = 300,
-		timeDomain = none()
+		timeDomain = none(),
+		displayMode = 'absolute'
 	}: {
 		metric: TrainingMetric;
 		width: number;
 		height?: number;
 		timeDomain?: TimeDomain;
+		displayMode?: DisplayMode;
 	} = $props();
 
 	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
@@ -26,7 +28,6 @@
 		return 'number';
 	};
 	let groupBy = $derived(getMetricGroupBy(metric));
-	let granularity = $derived(asOption(metric.granularity));
 	let format = $derived(previewFormat(metric.unit));
 	let showGroup = $derived(isSome(groupBy));
 	let stacked = $derived(metric.aggregate === 'Sum');
@@ -47,7 +48,7 @@
 				{width}
 				{values}
 				unit={metric.unit}
-				{granularity}
+				granularity={metric.granularity}
 				{format}
 				{showGroup}
 				{groupBy}
@@ -55,6 +56,7 @@
 				{average}
 				{target}
 				{timeDomain}
+				{displayMode}
 			/>
 		{:else}
 			<ScatterChart
@@ -67,9 +69,10 @@
 				target={metric.target === null ? none() : some(metric.target.value)}
 				{timeDomain}
 				yInterceptZero={!metric.source.metric.metric.includes('HeartRate')}
+				{displayMode}
 			/>
 		{/if}
-	{:else}
+	{:else if metric.granularity !== null}
 		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
 			<StackedArea
 				data={metric.values}
@@ -81,7 +84,8 @@
 				{height}
 				yMaxValue={none()}
 				{timeDomain}
-				{granularity}
+				granularity={metric.granularity}
+				{displayMode}
 			/>
 		{:else}
 			<Polyline
@@ -94,8 +98,9 @@
 				{height}
 				yMaxValue={metric.source.type === 'hooperIndex' ? some(10) : none()}
 				{timeDomain}
-				{granularity}
+				granularity={metric.granularity}
 				yInterceptZero={metric.source.metric !== 'TotalWeight'}
+				{displayMode}
 			/>
 		{/if}
 	{/if}

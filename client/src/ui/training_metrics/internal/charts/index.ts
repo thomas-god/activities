@@ -53,6 +53,7 @@ export const getGroupColor = (
 	}
 };
 
+export type DisplayMode = 'relative' | 'absolute';
 export type TimeDomain = Option<{ start: string; end: string | null }>;
 export type Point = { time: string; timestamp: number; group: string; value: number };
 
@@ -99,15 +100,15 @@ export const parseMetricIntoPoints = (
 **/
 export const mapDomainToGranularity = (
 	domain: TimeDomain,
-	granularity: Option<TrainingMetricGranularity>
+	granularity: TrainingMetricGranularity
 ): TimeDomain => {
-	if (isNone(domain) || isNone(granularity)) {
+	if (isNone(domain)) {
 		return domain;
 	}
 
-	if (granularity.value === 'Daily') {
+	if (granularity === 'Daily') {
 		return domain;
-	} else if (granularity.value === 'Weekly') {
+	} else if (granularity === 'Weekly') {
 		return some({
 			start: dayjs(domain.value.start).startOf('isoWeek').format('YYYY-MM-DD'),
 			end:
@@ -115,7 +116,7 @@ export const mapDomainToGranularity = (
 					? null
 					: dayjs(domain.value.end).startOf('isoWeek').format('YYYY-MM-DD')
 		});
-	} else if (granularity.value === 'Monthly') {
+	} else if (granularity === 'Monthly') {
 		return some({
 			start: dayjs(domain.value.start).startOf('month').format('YYYY-MM-DD'),
 			end:
@@ -128,24 +129,76 @@ export const mapDomainToGranularity = (
 	return domain;
 };
 
-export const buildTimeFormatter = (granularity: Option<TrainingMetricGranularity>) => {
-	if (isNone(granularity)) {
-		return (date: string, _idx: number) => {
-			return dayjs(date).format('MMM D');
-		};
-	}
-	if (granularity.value === 'Monthly') {
+export const buildAbsoluteTimeFormatter = (granularity: TrainingMetricGranularity) => {
+	if (granularity === 'Monthly') {
 		return (date: string, _idx: number) => {
 			return dayjs(date).format('MMM YYYY');
 		};
 	}
 
-	if (granularity.value === 'Weekly') {
+	if (granularity === 'Weekly') {
 		return (date: string) => {
 			return formatWeekInterval(date);
 		};
 	}
+
 	return (date: string, _idx: number) => {
 		return dayjs(date).format('MMM D');
 	};
+};
+
+export const buildRelativeTimeFormatter = (
+	times: string[],
+	granularity: TrainingMetricGranularity
+) => {
+	if (granularity === 'Monthly') {
+		const mappedValues: Map<string, string> = new Map();
+		for (const [idx, time] of times.entries()) {
+			mappedValues.set(time, `Month ${idx + 1}`);
+		}
+		return (date: string, _idx: number) => {
+			return mappedValues.get(date) ?? date;
+		};
+	}
+
+	if (granularity === 'Weekly') {
+		const mappedValues: Map<string, string> = new Map();
+		for (const [idx, time] of times.entries()) {
+			mappedValues.set(time, `Week ${idx + 1}`);
+		}
+		return (date: string, _idx: number) => {
+			return mappedValues.get(date) ?? date;
+		};
+	}
+
+	// Granularity === "daily"
+	const mappedValues: Map<string, string> = new Map();
+	for (const [idx, time] of times.entries()) {
+		mappedValues.set(time, `Day ${idx + 1}`);
+	}
+	return (date: string, _idx: number) => {
+		return mappedValues.get(date) ?? date;
+	};
+};
+
+export const buildContinuousTimeRelativeFormatter = (domain: TimeDomain) => {
+	if (isSome(domain)) {
+		let start = dayjs(domain.value.start);
+		const end = domain.value.end === null ? dayjs().startOf('day') : dayjs(domain.value.end);
+
+		const days: Map<string, string> = new Map();
+		let idx = 1;
+		while (start <= end) {
+			days.set(start.format('YYYY-MM-DD'), `Day ${idx}`);
+			idx++;
+			start = start.add(1, 'day');
+		}
+
+		return (date: d3.NumberValue, _idx: number) => {
+			const day = dayjs.unix(date.valueOf());
+			return `${days.get(day.format('YYYY-MM-DD')) ?? ''}`;
+		};
+	} else {
+		return (date: d3.NumberValue, _idx: number) => dayjs.unix(date.valueOf()).format('YYYY-MM-DD');
+	}
 };

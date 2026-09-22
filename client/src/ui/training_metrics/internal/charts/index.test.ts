@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { dayjs } from '$lib/duration';
-import { isNone, none, some } from '$lib/Options';
+import { none, some } from '$lib/Options';
 
 import {
+	buildAbsoluteTimeFormatter,
+	buildContinuousTimeRelativeFormatter,
+	buildRelativeTimeFormatter,
 	formatTooltipValue,
 	mapDomainToGranularity,
 	parseMetricIntoPoints,
@@ -110,20 +113,13 @@ describe('mapDomainToGranularity', () => {
 	it('returns the domain unchanged when the domain is none', () => {
 		const domain: TimeDomain = none();
 
-		expect(mapDomainToGranularity(domain, some('Weekly'))).toBe(domain);
-	});
-
-	it('returns the domain unchanged when the granularity is none', () => {
-		const domain = some({ start: '2026-01-01', end: null });
-
-		expect(isNone(mapDomainToGranularity(domain, none()))).toBe(false);
-		expect(mapDomainToGranularity(domain, none())).toEqual(domain);
+		expect(mapDomainToGranularity(domain, 'Weekly')).toBe(domain);
 	});
 
 	it('returns the domain unchanged for Daily granularity', () => {
 		const domain = some({ start: '2026-01-01', end: '2026-01-31' });
 
-		expect(mapDomainToGranularity(domain, some('Daily'))).toEqual(
+		expect(mapDomainToGranularity(domain, 'Daily')).toEqual(
 			some({ start: '2026-01-01', end: '2026-01-31' })
 		);
 	});
@@ -132,7 +128,7 @@ describe('mapDomainToGranularity', () => {
 		// 2026-01-01 is a Thursday, its iso week starts on Monday 2025-12-29.
 		const domain = some({ start: '2026-01-01', end: '2026-01-10' });
 
-		expect(mapDomainToGranularity(domain, some('Weekly'))).toEqual(
+		expect(mapDomainToGranularity(domain, 'Weekly')).toEqual(
 			some({ start: '2025-12-29', end: '2026-01-05' })
 		);
 	});
@@ -140,7 +136,7 @@ describe('mapDomainToGranularity', () => {
 	it('keeps a null end when snapping to weeks', () => {
 		const domain = some({ start: '2026-01-01', end: null });
 
-		expect(mapDomainToGranularity(domain, some('Weekly'))).toEqual(
+		expect(mapDomainToGranularity(domain, 'Weekly')).toEqual(
 			some({ start: '2025-12-29', end: null })
 		);
 	});
@@ -148,7 +144,7 @@ describe('mapDomainToGranularity', () => {
 	it('snaps the domain to month starts for Monthly granularity', () => {
 		const domain = some({ start: '2026-01-15', end: '2026-03-10' });
 
-		expect(mapDomainToGranularity(domain, some('Monthly'))).toEqual(
+		expect(mapDomainToGranularity(domain, 'Monthly')).toEqual(
 			some({ start: '2026-01-01', end: '2026-03-01' })
 		);
 	});
@@ -156,8 +152,100 @@ describe('mapDomainToGranularity', () => {
 	it('keeps a null end when snapping to months', () => {
 		const domain = some({ start: '2026-01-15', end: null });
 
-		expect(mapDomainToGranularity(domain, some('Monthly'))).toEqual(
+		expect(mapDomainToGranularity(domain, 'Monthly')).toEqual(
 			some({ start: '2026-01-01', end: null })
 		);
+	});
+});
+
+describe('buildAbsoluteTimeFormatter', () => {
+	it('formats monthly tick dates as MMM YYYY', () => {
+		const formatter = buildAbsoluteTimeFormatter('Monthly');
+
+		expect(formatter('2026-01-15', 0)).toBe('Jan 2026');
+		expect(formatter('2026-03-01', 1)).toBe('Mar 2026');
+	});
+
+	it('formats weekly tick dates as week intervals', () => {
+		const formatter = buildAbsoluteTimeFormatter('Weekly');
+
+		// 2026-01-05 is a Monday, so its interval spans Jan 5 to Jan 11.
+		expect(formatter('2026-01-05', 0)).toBe('Jan 5-11');
+
+		// 2026-01-26 is a Monday whose iso week ends in the next month.
+		expect(formatter('2026-01-26', 1)).toBe('Jan 26-Feb 1');
+	});
+
+	it('formats daily tick dates as MMM D', () => {
+		const formatter = buildAbsoluteTimeFormatter('Daily');
+
+		expect(formatter('2026-01-05', 0)).toBe('Jan 5');
+		expect(formatter('2026-12-31', 1)).toBe('Dec 31');
+	});
+});
+
+describe('buildRelativeTimeFormatter', () => {
+	it('maps monthly times to 1-based month labels', () => {
+		const formatter = buildRelativeTimeFormatter(['2026-01-01', '2026-02-01'], 'Monthly');
+
+		expect(formatter('2026-01-01', 0)).toBe('Month 1');
+		expect(formatter('2026-02-01', 1)).toBe('Month 2');
+	});
+
+	it('maps weekly times to 1-based week labels', () => {
+		const formatter = buildRelativeTimeFormatter(['2026-01-05', '2026-01-12'], 'Weekly');
+
+		expect(formatter('2026-01-05', 0)).toBe('Week 1');
+		expect(formatter('2026-01-12', 1)).toBe('Week 2');
+	});
+
+	it('maps daily times to 1-based day labels', () => {
+		const formatter = buildRelativeTimeFormatter(['2026-01-01', '2026-01-02'], 'Daily');
+
+		expect(formatter('2026-01-01', 0)).toBe('Day 1');
+		expect(formatter('2026-01-02', 1)).toBe('Day 2');
+	});
+
+	it('falls back to the raw date for unknown times', () => {
+		const formatter = buildRelativeTimeFormatter(['2026-01-01'], 'Daily');
+
+		expect(formatter('2026-06-15', 1)).toBe('2026-06-15');
+	});
+});
+
+describe('buildContinuousTimeRelativeFormatter', () => {
+	it('labels each day of the domain with a 1-based day number', () => {
+		const formatter = buildContinuousTimeRelativeFormatter(
+			some({ start: '2026-01-01', end: '2026-01-03' })
+		);
+
+		expect(formatter(dayjs('2026-01-01').unix(), 0)).toBe('Day 1');
+		expect(formatter(dayjs('2026-01-02').unix(), 1)).toBe('Day 2');
+		expect(formatter(dayjs('2026-01-03').unix(), 2)).toBe('Day 3');
+	});
+
+	it('uses today as the end when the domain end is null', () => {
+		const today = dayjs().startOf('day');
+		const formatter = buildContinuousTimeRelativeFormatter(some({ start: '2026-01-01', end: null }));
+
+		// The label is relative to the start, not to today.
+		expect(formatter(dayjs('2026-01-01').unix(), 0)).toBe('Day 1');
+		// Days beyond today are not labelled.
+		expect(formatter(today.add(1, 'day').unix(), 999)).toBe('');
+	});
+
+	it('returns an empty label for dates outside the domain', () => {
+		const formatter = buildContinuousTimeRelativeFormatter(
+			some({ start: '2026-01-01', end: '2026-01-03' })
+		);
+
+		expect(formatter(dayjs('2025-12-31').unix(), 0)).toBe('');
+		expect(formatter(dayjs('2026-01-04').unix(), 3)).toBe('');
+	});
+
+	it('formats dates as YYYY-MM-DD when the domain is none', () => {
+		const formatter = buildContinuousTimeRelativeFormatter(none());
+
+		expect(formatter(dayjs('2026-01-02').unix(), 0)).toBe('2026-01-02');
 	});
 });

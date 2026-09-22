@@ -21,10 +21,12 @@ The same design decision applies to other types of chart in this module.
 	import * as d3 from 'd3';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 	import {
-		buildTimeFormatter,
+		buildAbsoluteTimeFormatter,
+		buildRelativeTimeFormatter,
 		formatTooltipValue,
 		mapDomainToGranularity,
 		parseMetricIntoPoints,
+		type DisplayMode,
 		type Point,
 		type TimeDomain
 	} from '.';
@@ -41,7 +43,8 @@ The same design decision applies to other types of chart in this module.
 		granularity,
 		yInterceptZero = true,
 		yMaxValue = none(),
-		timeDomain = none()
+		timeDomain = none(),
+		displayMode = 'absolute'
 	}: {
 		data: Record<string, Record<string, number | null>>;
 		width: number;
@@ -53,7 +56,8 @@ The same design decision applies to other types of chart in this module.
 		yInterceptZero?: boolean;
 		yMaxValue?: Option<number>;
 		timeDomain?: TimeDomain;
-		granularity: Option<TrainingMetricGranularity>;
+		granularity: TrainingMetricGranularity;
+		displayMode?: DisplayMode;
 	} = $props();
 
 	let marginTop = 20;
@@ -148,7 +152,9 @@ The same design decision applies to other types of chart in this module.
 		.domain(groupedValues.map(([group]) => group).sort());
 
 	// svelte-ignore state_referenced_locally
-	const timeAxisTickFormatter = buildTimeFormatter(granularity);
+	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
+	// svelte-ignore state_referenced_locally
+	const relativeTimeFormatter = buildRelativeTimeFormatter(times, granularity);
 
 	const yAxisTickFormatter = () => {
 		return (value: d3.NumberValue, _idx: number) =>
@@ -298,7 +304,12 @@ The same design decision applies to other types of chart in this module.
 		);
 
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(xAxis).tickFormat(timeAxisTickFormatter).tickValues(xTickValues));
+			sel.call(
+				d3
+					.axisBottom(xAxis)
+					.tickFormat(displayMode === 'absolute' ? absoluteTimeFormatter : relativeTimeFormatter)
+					.tickValues(xTickValues)
+			);
 		});
 
 		d3.select(gy).call((sel) =>
@@ -397,7 +408,17 @@ The same design decision applies to other types of chart in this module.
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{timeAxisTickFormatter(tooltip.time, 0)}</div>
+							<div class="font-semibold">
+								{displayMode === 'absolute'
+									? absoluteTimeFormatter(tooltip.time, 0)
+									: relativeTimeFormatter(tooltip.time, 0)}
+								{#if displayMode === 'relative'}
+									<span class="text-xs font-light italic">
+										•
+										{absoluteTimeFormatter(tooltip.time, 0)}
+									</span>
+								{/if}
+							</div>
 							<div class="font-italic text-xs">
 								<span class="font-semibold">
 									{tooltip.group}:

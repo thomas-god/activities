@@ -23,7 +23,13 @@ The same design decision applies to other types of chart in this module.
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
-	import { formatTooltipValue, parseMetricIntoPoints, type TimeDomain } from '.';
+	import {
+		buildContinuousTimeRelativeFormatter,
+		formatTooltipValue,
+		parseMetricIntoPoints,
+		type DisplayMode,
+		type TimeDomain
+	} from '.';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -35,6 +41,7 @@ The same design decision applies to other types of chart in this module.
 		target: Option<number>;
 		timeDomain?: TimeDomain;
 		yInterceptZero?: boolean;
+		displayMode?: DisplayMode;
 	}
 
 	let {
@@ -46,7 +53,8 @@ The same design decision applies to other types of chart in this module.
 		average,
 		target,
 		timeDomain = none(),
-		yInterceptZero = true
+		yInterceptZero = true,
+		displayMode = 'absolute'
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -67,10 +75,12 @@ The same design decision applies to other types of chart in this module.
 		value: value
 	}));
 
-	let timeAxisTickFormatter = $derived.by(() => {
+	let absoluteTimeFormatter = $derived.by(() => {
 		return (timestamp: d3.NumberValue, _idx: number) =>
 			dayjs.unix(timestamp.valueOf()).format('MMM D');
 	});
+	// svelte-ignore state_referenced_locally
+	const relativeTimeFormatter = buildContinuousTimeRelativeFormatter(timeDomain);
 
 	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
@@ -300,7 +310,12 @@ The same design decision applies to other types of chart in this module.
 
 		let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(x).tickFormat(timeAxisTickFormatter).ticks(maxTimeTicks));
+			sel.call(
+				d3
+					.axisBottom(x)
+					.tickFormat(displayMode === 'absolute' ? absoluteTimeFormatter : relativeTimeFormatter)
+					.ticks(maxTimeTicks)
+			);
 		});
 
 		d3.select(gy).call((sel) =>
@@ -397,7 +412,17 @@ The same design decision applies to other types of chart in this module.
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{dayjs.unix(tooltip.time.valueOf()).format('MMM D')}</div>
+							<div class="font-semibold">
+								{displayMode === 'absolute'
+									? absoluteTimeFormatter(tooltip.time, 0)
+									: relativeTimeFormatter(tooltip.time, 0)}
+								{#if displayMode === 'relative'}
+									<span class="text-xs font-light italic">
+										•
+										{absoluteTimeFormatter(tooltip.time, 0)}
+									</span>
+								{/if}
+							</div>
 							<div class="font-italic text-xs">{dayjs.unix(tooltip.time).format('H[h]mm')}</div>
 							<div class="text-xs opacity-80">
 								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>

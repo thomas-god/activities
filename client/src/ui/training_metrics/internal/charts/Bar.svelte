@@ -28,11 +28,13 @@ The same design decision applies to other types of chart in this module.
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import {
-		buildTimeFormatter,
+		buildAbsoluteTimeFormatter,
+		buildRelativeTimeFormatter,
 		formatTooltipValue,
 		getGroupColor,
 		mapDomainToGranularity,
 		parseMetricIntoPoints,
+		type DisplayMode,
 		type TimeDomain
 	} from '.';
 
@@ -41,7 +43,7 @@ The same design decision applies to other types of chart in this module.
 		width: number;
 		height: number;
 		unit: string;
-		granularity: Option<TrainingMetricGranularity>;
+		granularity: TrainingMetricGranularity;
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
 		groupBy: Option<TrainingMetricGroupByClause>;
@@ -49,6 +51,7 @@ The same design decision applies to other types of chart in this module.
 		average: Option<number>;
 		target: Option<number>;
 		timeDomain?: TimeDomain;
+		displayMode?: DisplayMode;
 	}
 
 	let {
@@ -63,7 +66,8 @@ The same design decision applies to other types of chart in this module.
 		target,
 		showGroup = true,
 		stacked = true,
-		timeDomain = none()
+		timeDomain = none(),
+		displayMode = 'absolute'
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -84,10 +88,13 @@ The same design decision applies to other types of chart in this module.
 	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
 
 	// svelte-ignore state_referenced_locally
-	const { points } = parseMetricIntoPoints(values, snappedDomain);
+	const { points, times } = parseMetricIntoPoints(values, snappedDomain);
 
 	// svelte-ignore state_referenced_locally
-	const timeAxisTickFormatter = buildTimeFormatter(granularity);
+	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
+	// svelte-ignore state_referenced_locally
+	const relativeTimeFormatter = buildRelativeTimeFormatter(times, granularity);
+
 	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
 			return (value: d3.NumberValue, _idx: number) => {
@@ -387,7 +394,7 @@ The same design decision applies to other types of chart in this module.
 			sel.call(
 				d3
 					.axisBottom(x)
-					.tickFormat(timeAxisTickFormatter)
+					.tickFormat(displayMode === 'absolute' ? absoluteTimeFormatter : relativeTimeFormatter)
 					.tickValues(
 						x.domain().filter((val, idx, arr) => {
 							return idx %
@@ -492,7 +499,17 @@ The same design decision applies to other types of chart in this module.
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{timeAxisTickFormatter(tooltip.time, 0)}</div>
+							<div class="font-semibold">
+								{displayMode === 'absolute'
+									? absoluteTimeFormatter(tooltip.time, 0)
+									: relativeTimeFormatter(tooltip.time, 0)}
+								{#if displayMode === 'relative'}
+									<span class="text-xs font-light italic">
+										•
+										{absoluteTimeFormatter(tooltip.time, 0)}
+									</span>
+								{/if}
+							</div>
 							<div class="text-xs opacity-80">
 								{#if showGroup}
 									<span>{tooltip.group}</span>
