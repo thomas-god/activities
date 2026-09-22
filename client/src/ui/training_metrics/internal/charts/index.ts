@@ -1,7 +1,8 @@
-import { formatDurationCompactWithUnits } from '$lib/duration';
-import { isNone, type Option } from '$lib/Options';
+import type { TrainingMetric } from '$lib/api';
+import { dayjs, formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
+import { isNone, isSome, some, type Option } from '$lib/Options';
 import { paceInSecondToString } from '$lib/speed';
-import type { TrainingMetricGroupByClause } from '$lib/trainingMetric';
+import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
 
 export const formatTooltipValue = (
 	value: number,
@@ -50,4 +51,101 @@ export const getGroupColor = (
 		default:
 			return null;
 	}
+};
+
+export type TimeDomain = Option<{ start: string; end: string | null }>;
+export type Point = { time: string; timestamp: number; group: string; value: number };
+
+export const parseMetricIntoPoints = (
+	metric: TrainingMetric['values'],
+	timeDomain: TimeDomain,
+	opts: {
+		replaceNullValues: boolean;
+	} = {
+		replaceNullValues: true
+	}
+): { points: Point[]; times: string[] } => {
+	const points: Point[] = [];
+	const times: Set<string> = new Set();
+
+	if (isSome(timeDomain)) {
+		times.add(timeDomain.value.start);
+	}
+
+	for (const [group, granuleValues] of Object.entries(metric)) {
+		for (const [time, value] of Object.entries(granuleValues)) {
+			times.add(time);
+			if (value === null) {
+				if (opts.replaceNullValues) {
+					points.push({ time, timestamp: dayjs(time).unix(), group, value: 0 });
+				}
+			} else {
+				points.push({ time, timestamp: dayjs(time).unix(), group, value });
+			}
+		}
+	}
+
+	if (isSome(timeDomain) && timeDomain.value.end !== null) {
+		times.add(timeDomain.value.end);
+	}
+
+	return { points, times: [...times.keys()].toSorted() };
+};
+
+/** Map a domain to match the border expected for a given granularity.
+
+ * e.g. if granularity is Month make sure the resulting domain starts on the first day of a month,
+ * same if granularity is weekly make sure the resulting domain starts on a Monday.
+**/
+export const mapDomainToGranularity = (
+	domain: TimeDomain,
+	granularity: Option<TrainingMetricGranularity>
+): TimeDomain => {
+	if (isNone(domain) || isNone(granularity)) {
+		return domain;
+	}
+
+	if (granularity.value === 'Daily') {
+		return domain;
+	} else if (granularity.value === 'Weekly') {
+		return some({
+			start: dayjs(domain.value.start).startOf('isoWeek').format('YYYY-MM-DD'),
+			end:
+				domain.value.end === null
+					? null
+					: dayjs(domain.value.end).startOf('isoWeek').format('YYYY-MM-DD')
+		});
+	} else if (granularity.value === 'Monthly') {
+		return some({
+			start: dayjs(domain.value.start).startOf('month').format('YYYY-MM-DD'),
+			end:
+				domain.value.end === null
+					? null
+					: dayjs(domain.value.end).startOf('month').format('YYYY-MM-DD')
+		});
+	}
+
+	return domain;
+};
+
+export const buildTimeFormatter = (granularity: Option<TrainingMetricGranularity>) => {
+	if (isNone(granularity)) {
+		return (date: string, _idx: number) => {
+			return dayjs(date).format('MMM D');
+		};
+	}
+	if (granularity.value === 'Monthly') {
+		return (date: string, _idx: number) => {
+			return dayjs(date).format('MMM YYYY');
+		};
+	}
+
+	if (granularity.value === 'Weekly') {
+		return (date: string) => {
+			return formatWeekInterval(date);
+		};
+	}
+	return (date: string, _idx: number) => {
+		return dayjs(date).format('MMM D');
+	};
 };

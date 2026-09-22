@@ -11,7 +11,7 @@
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import dayjs from 'dayjs';
-	import { formatTooltipValue, getGroupColor } from './chart';
+	import { formatTooltipValue, getGroupColor } from './charts';
 
 	export interface CompareMetricChartBarsProps {
 		values: Record<string, Record<string, number | null>>;

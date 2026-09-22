@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	import { asOption, isSome, none, some, type Option } from '$lib/Options';
 	import ScatterChart from './internal/charts/Scatter.svelte';
 	import BarChart from './internal/charts/Bar.svelte';
 	import StackedArea from './internal/charts/StackedArea.svelte';
 	import Polyline from './internal/charts/Polyline.svelte';
+	import { type TimeDomain } from './internal/charts';
 
 	let {
 		metric,
@@ -15,7 +16,7 @@
 		metric: TrainingMetric;
 		width: number;
 		height?: number;
-		timeDomain?: Option<{ start: string; end: string | null }>;
+		timeDomain?: TimeDomain;
 	} = $props();
 
 	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
@@ -25,6 +26,7 @@
 		return 'number';
 	};
 	let groupBy = $derived(getMetricGroupBy(metric));
+	let granularity = $derived(asOption(metric.granularity));
 	let format = $derived(previewFormat(metric.unit));
 	let showGroup = $derived(isSome(groupBy));
 	let stacked = $derived(metric.aggregate === 'Sum');
@@ -45,13 +47,14 @@
 				{width}
 				{values}
 				unit={metric.unit}
-				granularity={metric.granularity}
+				{granularity}
 				{format}
 				{showGroup}
 				{groupBy}
 				{stacked}
 				{average}
 				{target}
+				{timeDomain}
 			/>
 		{:else}
 			<ScatterChart
@@ -76,10 +79,12 @@
 				{width}
 				{height}
 				yMaxValue={none()}
+				{timeDomain}
+				{granularity}
 			/>
 		{:else}
 			<Polyline
-				data={metric.values}
+				data={values}
 				unit={metric.unit}
 				format="number"
 				average={'average' in metric.summary ? some(metric.summary.average) : none()}
@@ -87,6 +92,8 @@
 				{width}
 				{height}
 				yMaxValue={some(10)}
+				{timeDomain}
+				{granularity}
 			/>
 		{/if}
 	{/if}

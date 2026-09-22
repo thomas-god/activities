@@ -1,9 +1,34 @@
-<!-- Polyline chart for Feedback/Weight&Nutrition data -->
+<!--
+@component
+Training metric's data and metadata are considered fixed: they're computed by the server, the client
+cannot directly update them. Editing a training metric's definition or changing the date range
+always involves a round-trip with the server.
+
+Thus this chart's variables are mostly static: we don't `$derived` from fixed props like `data`,
+`format`, `unit`, etc. This avoids some undefined behavior with d3.js where multiple `$derived`
+would rerun on some unidentified conditions (up to several hundreds times, obviously tanking
+performances).
+
+The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
+
+The `state_referenced_locally` warnings are left ON so that we have to explicitly add
+`// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
+forgetting `$derived` on actual dynamic variables.
+
+The same design decision applies to other types of chart in this module.
+-->
 <script lang="ts">
-	import dayjs from 'dayjs';
 	import * as d3 from 'd3';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
-	import { formatTooltipValue } from '.';
+	import {
+		buildTimeFormatter,
+		formatTooltipValue,
+		mapDomainToGranularity,
+		parseMetricIntoPoints,
+		type Point,
+		type TimeDomain
+	} from '.';
+	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 
 	let {
 		data,
@@ -13,8 +38,10 @@
 		average,
 		format,
 		unit,
+		granularity,
 		yInterceptZero = true,
-		yMaxValue = none()
+		yMaxValue = none(),
+		timeDomain = none()
 	}: {
 		data: Record<string, Record<string, number | null>>;
 		width: number;
@@ -25,6 +52,8 @@
 		target: Option<number>;
 		yInterceptZero?: boolean;
 		yMaxValue?: Option<number>;
+		timeDomain?: TimeDomain;
+		granularity: Option<TrainingMetricGranularity>;
 	} = $props();
 
 	let marginTop = 20;
@@ -39,49 +68,53 @@
 	let gPaths: SVGGElement;
 	let svgElement: SVGElement;
 
-	type Point = { time: string; timestamp: number; group: string; value: number };
+	// svelte-ignore state_referenced_locally
+	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
 
-	let values = $derived.by(() => {
-		const _values: Point[] = [];
-		for (const [group, granuleValues] of Object.entries(data)) {
-			for (const [time, value] of Object.entries(granuleValues)) {
-				if (value !== null) {
-					_values.push({ time, timestamp: dayjs(time).unix(), group, value });
-				}
-			}
-		}
-		return _values;
+	// svelte-ignore state_referenced_locally
+	const { points, times } = parseMetricIntoPoints(data, snappedDomain, {
+		replaceNullValues: false
 	});
 
-	let yAxisDefaultTickValues = (): number[] => {
-		if (values.length === 0) {
+	// svelte-ignore state_referenced_locally
+	const maxValue = isSome(yMaxValue)
+		? yMaxValue.value
+		: Math.max(d3.max(points, (v) => v.value) ?? 0, unwrapOr(target, Number.NEGATIVE_INFINITY));
+	// svelte-ignore state_referenced_locally
+	const minValue = Math.min(
+		d3.min(points, (v) => v.value) ?? 0,
+		unwrapOr(target, Number.POSITIVE_INFINITY)
+	);
+
+	const yAxisDefaultTickValues = (): number[] => {
+		if (points.length === 0) {
 			return [];
 		}
 
 		return d3.ticks(0, maxValue, 6);
 	};
 
-	let yAxisTickValues = (): number[] => {
-		if (values.length === 0) {
+	const yAxisTickValues = (): number[] => {
+		if (points.length === 0) {
 			return [];
 		}
 
 		return yAxisDefaultTickValues();
 	};
 
-	let maxValue = $derived(
-		isSome(yMaxValue)
-			? yMaxValue.value
-			: Math.max(d3.max(values, (v) => v.value) ?? 0, unwrapOr(target, Number.NEGATIVE_INFINITY))
-	);
-	let minValue = $derived(
-		Math.min(d3.min(values, (v) => v.value) ?? 0, unwrapOr(target, Number.POSITIVE_INFINITY))
-	);
+	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
+	let xTickValues = $derived.by(() => {
+		if (times.length === 0) {
+			return [];
+		}
+		const step = Math.max(1, Math.ceil(times.length / maxTimeTicks));
+		return times.filter((_, i) => i % step === 0 || i === times.length - 1);
+	});
 
 	let xAxis = $derived(
 		d3
 			.scalePoint()
-			.domain(values.map((v) => v.time).sort((a, b) => (a > b ? 1 : -1)))
+			.domain(times)
 			.range([marginLeft, width - marginRight])
 	);
 	let yAxis = $derived(
@@ -99,44 +132,37 @@
 			.curve(d3.curveCatmullRom.alpha(0.5))
 	);
 
-	let groupedValues = $derived(
-		d3.groups(
-			[...values].sort((a, b) => a.timestamp - b.timestamp),
-			(v) => v.group
-		)
+	const groupedValues = d3.groups(
+		[...points].sort((a, b) => a.timestamp - b.timestamp),
+		(v) => v.group
 	);
 
-	let color = $derived(
-		d3.scaleOrdinal(d3.schemeCategory10).domain(groupedValues.map(([group]) => group).sort())
-	);
+	const color = d3
+		.scaleOrdinal(d3.schemeCategory10)
+		.domain(groupedValues.map(([group]) => group).sort());
 
-	let timeAxisTickFormater = $derived.by(() => {
-		return (date: string, _idx: number) => {
-			return dayjs(date).format('MMM D');
-		};
-	});
+	// svelte-ignore state_referenced_locally
+	const timeAxisTickFormatter = buildTimeFormatter(granularity);
 
-	let yAxisTickFormater = $derived.by(() => {
+	const yAxisTickFormatter = () => {
 		return (value: d3.NumberValue, _idx: number) =>
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
-	});
+	};
 	let averageLineY = $derived(map(average, (avg) => yAxis(avg)));
 	let averageLegendY = $derived(
 		map(averageLineY, (avg) =>
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(
-		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const averageLegend = map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`);
 
 	let targetLineY = $derived(map(target, (t) => yAxis(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(
-		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const targetLegend = map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`);
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -191,7 +217,7 @@
 				.attr('stroke-width', 1)
 				.attr('fill-opacity', 0.6)
 				.selectAll('circle')
-				.data(values)
+				.data(points)
 				.join('circle')
 				.attr('stroke', (d) => color(d.group))
 				.attr('fill', (d) => color(d.group))
@@ -265,13 +291,12 @@
 				})
 		);
 
-		let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(xAxis).tickFormat(timeAxisTickFormater).ticks(maxTimeTicks));
+			sel.call(d3.axisBottom(xAxis).tickFormat(timeAxisTickFormatter).tickValues(xTickValues));
 		});
 
 		d3.select(gy).call((sel) =>
-			sel.call(d3.axisLeft(yAxis).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
+			sel.call(d3.axisLeft(yAxis).tickFormat(yAxisTickFormatter()).tickValues(yAxisTickValues()))
 		);
 
 		const yValues = yAxisTickValues() === null ? yAxis.ticks() : yAxisTickValues();
@@ -366,7 +391,7 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{dayjs.unix(tooltip.timestamp).format('MMM D')}</div>
+							<div class="font-semibold">{timeAxisTickFormatter(tooltip.time, 0)}</div>
 							<div class="font-italic text-xs">
 								<span class="font-semibold">
 									{tooltip.group}:

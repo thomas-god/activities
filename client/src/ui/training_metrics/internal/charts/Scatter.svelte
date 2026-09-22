@@ -1,10 +1,29 @@
+<!--
+@component
+Training metric's data and metadata are considered fixed: they're computed by the server, the client
+cannot directly update them. Editing a training metric's definition or changing the date range
+always involves a round-trip with the server.
+
+Thus this chart's variables are mostly static: we don't `$derived` from fixed props like `data`,
+`format`, `unit`, etc. This avoids some undefined behavior with d3.js where multiple `$derived`
+would rerun on some unidentified conditions (up to several hundreds times, obviously tanking
+performances).
+
+The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
+
+The `state_referenced_locally` warnings are left ON so that we have to explicitly add
+`// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
+forgetting `$derived` on actual dynamic variables.
+
+The same design decision applies to other types of chart in this module.
+-->
 <script lang="ts">
 	import { formatDurationCompactWithUnits } from '$lib/duration';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
-	import { formatTooltipValue } from '.';
+	import { formatTooltipValue, parseMetricIntoPoints, type TimeDomain } from '.';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -14,7 +33,7 @@
 		format: 'number' | 'duration' | 'pace';
 		average: Option<number>;
 		target: Option<number>;
-		timeDomain?: Option<{ start: string; end: string | null }>;
+		timeDomain?: TimeDomain;
 	}
 
 	let {
@@ -38,26 +57,20 @@
 	let gDots: SVGGElement;
 	let svgElement: SVGElement;
 
-	let formatedValues = $derived.by(() => {
-		const _values: { time: string; group: string; value: number }[] = [];
-		for (const [group, granuleValues] of Object.entries(values)) {
-			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
-				_values.push({ time, group, value });
-			}
-		}
-		return _values;
-	});
+	// svelte-ignore state_referenced_locally
+	const { points } = parseMetricIntoPoints(values, timeDomain);
 
-	let valuesAsTime = $derived(
-		formatedValues.map(({ time, value }) => ({ time: dayjs(time).unix(), value: value }))
-	);
+	const valuesAsTime = points.map(({ time, value }) => ({
+		time: dayjs(time).unix(),
+		value: value
+	}));
 
-	let timeAxisTickFormater = $derived.by(() => {
+	let timeAxisTickFormatter = $derived.by(() => {
 		return (timestamp: d3.NumberValue, _idx: number) =>
 			dayjs.unix(timestamp.valueOf()).format('MMM D');
 	});
 
-	let yAxisTickFormater = $derived.by(() => {
+	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
 			return (value: d3.NumberValue, _idx: number) => {
 				return formatDurationCompactWithUnits(value.valueOf());
@@ -71,11 +84,12 @@
 
 		return (value: d3.NumberValue, _idx: number) =>
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
-	});
+	})();
 
-	let maxValue = $derived(Math.max(d3.max(valuesAsTime, (v) => v.value) ?? 0, unwrapOr(target, 0)));
+	// svelte-ignore state_referenced_locally
+	const maxValue = Math.max(d3.max(valuesAsTime, (v) => v.value) ?? 0, unwrapOr(target, 0));
 
-	let yAxisDefaultTickValues = (): number[] => {
+	const yAxisDefaultTickValues = (): number[] => {
 		if (valuesAsTime.length === 0) {
 			return [];
 		}
@@ -83,7 +97,7 @@
 		return d3.ticks(0, maxValue, 6);
 	};
 
-	let yAxisTickValues = (): number[] => {
+	const yAxisTickValues = (): number[] => {
 		if (valuesAsTime.length === 0) {
 			return [];
 		}
@@ -105,7 +119,8 @@
 		}
 		return yAxisDefaultTickValues();
 	};
-	let minTime = $derived.by(() => {
+
+	const minTime = (() => {
 		const values = [
 			dayjs
 				.unix(d3.min(valuesAsTime, (v) => v.time) ?? 0)
@@ -117,8 +132,8 @@
 		}
 
 		return Math.min(...values);
-	});
-	let maxTime = $derived.by(() => {
+	})();
+	const maxTime = (() => {
 		const values = [
 			dayjs
 				.unix(d3.max(valuesAsTime, (v) => v.time) ?? 0)
@@ -131,7 +146,7 @@
 		}
 
 		return Math.max(...values);
-	});
+	})();
 
 	let x = $derived(
 		d3
@@ -153,17 +168,15 @@
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(
-		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const averageLegend = map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`);
 
 	let targetLineY = $derived(map(target, (t) => y(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(
-		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const targetLegend = map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`);
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -271,11 +284,11 @@
 
 		let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(x).tickFormat(timeAxisTickFormater).ticks(maxTimeTicks));
+			sel.call(d3.axisBottom(x).tickFormat(timeAxisTickFormatter).ticks(maxTimeTicks));
 		});
 
 		d3.select(gy).call((sel) =>
-			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
+			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormatter).tickValues(yAxisTickValues()))
 		);
 
 		const yValues = yAxisTickValues() === null ? y.ticks() : yAxisTickValues();

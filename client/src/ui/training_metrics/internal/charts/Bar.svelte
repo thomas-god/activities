@@ -1,24 +1,54 @@
+<!--
+@component
+Training metric's data and metadata are considered fixed: they're computed by the server, the client
+cannot directly update them. Editing a training metric's definition or changing the date range
+always involves a round-trip with the server.
+
+Thus this chart's variables are mostly static: we don't `$derived` from fixed props like `data`,
+`format`, `unit`, etc. This avoids some undefined behavior with d3.js where multiple `$derived`
+would rerun on some unidentified conditions (up to several hundreds times, obviously tanking
+performances).
+
+The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
+
+The `state_referenced_locally` warnings are left ON so that we have to explicitly add
+`// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
+forgetting `$derived` on actual dynamic variables.
+
+The same design decision applies to other types of chart in this module.
+-->
 <script lang="ts">
-	import { formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
-	import { displayGroupName, type TrainingMetricGroupByClause } from '$lib/trainingMetric';
-	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
+	import { formatDurationCompactWithUnits } from '$lib/duration';
+	import {
+		displayGroupName,
+		type TrainingMetricGranularity,
+		type TrainingMetricGroupByClause
+	} from '$lib/trainingMetric';
+	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
-	import dayjs from 'dayjs';
-	import { formatTooltipValue, getGroupColor } from '.';
+	import {
+		buildTimeFormatter,
+		formatTooltipValue,
+		getGroupColor,
+		mapDomainToGranularity,
+		parseMetricIntoPoints,
+		type TimeDomain
+	} from '.';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
 		width: number;
 		height: number;
 		unit: string;
-		granularity: string;
+		granularity: Option<TrainingMetricGranularity>;
 		format: 'number' | 'duration' | 'pace';
 		showGroup?: boolean;
 		groupBy: Option<TrainingMetricGroupByClause>;
 		stacked?: boolean;
 		average: Option<number>;
 		target: Option<number>;
+		timeDomain?: TimeDomain;
 	}
 
 	let {
@@ -32,7 +62,8 @@
 		average,
 		target,
 		showGroup = true,
-		stacked = true
+		stacked = true,
+		timeDomain = none()
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -49,33 +80,15 @@
 	type SeriesDatum = [string, d3.InternMap<string, FormattedValue>];
 	type StackedDataPoint = d3.SeriesPoint<SeriesDatum> & { key: string };
 
-	let formatedValues = $derived.by(() => {
-		const _values: FormattedValue[] = [];
-		for (const [group, granuleValues] of Object.entries(values)) {
-			for (const [time, value] of Object.entries(granuleValues as Record<string, number>)) {
-				_values.push({ time, group, value });
-			}
-		}
-		return _values;
-	});
+	// svelte-ignore state_referenced_locally
+	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
 
-	let timeAxisTickFormater = $derived.by(() => {
-		if (granularity === 'Monthly') {
-			return (date: string, _idx: number) => {
-				return dayjs(date).format('MMM YYYY');
-			};
-		}
+	// svelte-ignore state_referenced_locally
+	const { points } = parseMetricIntoPoints(values, snappedDomain);
 
-		if (granularity === 'Weekly') {
-			return (date: string) => {
-				return formatWeekInterval(date);
-			};
-		}
-
-		return (date: string, _idx: number) => dayjs(date).format('MMM D');
-	});
-
-	let yAxisTickFormater = $derived.by(() => {
+	// svelte-ignore state_referenced_locally
+	const timeAxisTickFormatter = buildTimeFormatter(granularity);
+	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
 			return (value: d3.NumberValue, _idx: number) => {
 				return formatDurationCompactWithUnits(value.valueOf());
@@ -89,14 +102,14 @@
 
 		return (value: d3.NumberValue, _idx: number) =>
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
-	});
+	})();
 
-	let yAxisDefaultTickValues = $derived.by(() => {
-		if (formatedValues.length === 0) {
+	const yAxisDefaultTickValues = (() => {
+		if (points.length === 0) {
 			return [];
 		}
 		const maxGroupValue = stacked
-			? formatedValues
+			? points
 					.reduce<Map<string, number>>((groupValues, value) => {
 						if (groupValues.has(value.time)) {
 							groupValues.set(value.time, groupValues.get(value.time)! + value.value);
@@ -108,18 +121,18 @@
 					}, new Map<string, number>())
 					.entries()
 					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-			: (d3.max(formatedValues, (v) => v.value) ?? 0);
+			: (d3.max(points, (v) => v.value) ?? 0);
 		return d3.ticks(0, Math.max(maxGroupValue, unwrapOr(target, 0)), 6);
-	});
+	})();
 
-	let yAxisTickValues = $derived.by(() => {
-		if (formatedValues.length === 0) {
+	const yAxisTickValues = (() => {
+		if (points.length === 0) {
 			return [];
 		}
 		if (format === 'duration') {
 			const dt = 600;
 			const maxDuration = stacked
-				? formatedValues
+				? points
 						.reduce<Map<string, number>>((times, value) => {
 							if (times.has(value.time)) {
 								times.set(value.time, times.get(value.time)! + value.value);
@@ -131,7 +144,7 @@
 						}, new Map<string, number>())
 						.entries()
 						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-				: (d3.max(formatedValues, (v) => v.value) ?? 0);
+				: (d3.max(points, (v) => v.value) ?? 0);
 			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
 			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
 			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
@@ -147,51 +160,51 @@
 			return yAxisDefaultTickValues;
 		}
 		return yAxisDefaultTickValues;
-	});
+	})();
 
 	// Order of the groups inside the stacked series, sorted alphabetically ascending by
 	// display name. First entry in the array is stacked at the bottom.
-	let groupOrdering = $derived(
-		Array.from(d3.union(formatedValues.map((v) => displayGroupName(v.group, groupBy)))).sort()
-	);
+	const groups = Array.from(
+		d3.union(points.map((v) => displayGroupName(v.group, groupBy)))
+	).toSorted();
 
 	// Create stacked series data structure
 	// Each series represents one group (e.g., "Cycling", "Running")
 	// d3.stack() transforms the data into layers for stacked bar visualization
-	let series = $derived(
-		d3
-			.stack<SeriesDatum, string>()
-			.keys(groupOrdering)
-			.value(([, groupMap], groupKey) => groupMap.get(groupKey)!.value)(
-			d3.index(
-				formatedValues,
-				(value) => value.time,
-				(value) => displayGroupName(value.group, groupBy)
-			)
+	const series = d3
+		.stack<SeriesDatum, string>()
+		.keys(groups)
+		.value(([, groupMap], groupKey) => groupMap.get(groupKey)!.value)(
+		d3.index(
+			points,
+			(value) => value.time,
+			(value) => displayGroupName(value.group, groupBy)
 		)
 	);
 
-	let x = $derived(
+	let x = $state(
 		d3
 			.scaleBand()
 			.domain(
 				d3.groupSort(
-					formatedValues,
+					points,
 					(a, b) => (a.at(0)!.time < b.at(0)!.time ? -1 : 1),
 					(value) => value.time
 				)
 			)
-			.range([marginLeft, width - marginRight])
 			.padding(0.6)
 	);
+	// Set only the range in an $effect so that we don't have to recompute the groupSort each time
+	$effect(() => {
+		x.range([marginLeft, width - marginRight]);
+	});
 
-	let maxValue = $derived(
-		Math.max(
-			stacked
-				? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
-				: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
-			unwrapOr(target, 0)
-		)
+	// svelte-ignore state_referenced_locally
+	const maxValue = Math.max(
+		stacked
+			? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
+			: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
+		unwrapOr(target, 0)
 	);
 
 	let y = $derived(
@@ -207,29 +220,25 @@
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(
-		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
-	);
+
+	// svelte-ignore state_referenced_locally
+	const averageLegend = map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`);
 
 	let targetLineY = $derived(map(target, (t) => y(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(
-		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const targetLegend = map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`);
 
-	const colors = $derived.by(() => {
+	const colors = (() => {
 		const scale = d3.scaleOrdinal(d3.schemeObservable10);
 		const customScale = (groupName: string) => {
 			const customColor = getGroupColor(groupName, groupBy);
 			return customColor || scale(groupName);
 		};
 		return customScale;
-	});
-
-	// Extract unique group names for the legend (alphabetical ascending).
-	let groups = $derived(groupOrdering);
+	})();
 
 	let xGroup = $derived(d3.scaleBand().domain(groups).range([0, x.bandwidth()]).padding(0.1));
 
@@ -313,9 +322,7 @@
 					const time = stackedDataPoint.data[0];
 
 					// Calculate total for this time across all groups
-					const total = formatedValues
-						.filter((v) => v.time === time)
-						.reduce((sum, v) => sum + v.value, 0);
+					const total = points.filter((v) => v.time === time).reduce((sum, v) => sum + v.value, 0);
 
 					// Use SVG coordinates directly
 					const xPos = stacked
@@ -380,7 +387,7 @@
 			sel.call(
 				d3
 					.axisBottom(x)
-					.tickFormat(timeAxisTickFormater)
+					.tickFormat(timeAxisTickFormatter)
 					.tickValues(
 						x.domain().filter((val, idx, arr) => {
 							return idx %
@@ -394,7 +401,7 @@
 		);
 
 		d3.select(gy).call((sel) =>
-			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues))
+			sel.call(d3.axisLeft(y).tickFormat(yAxisTickFormatter).tickValues(yAxisTickValues))
 		);
 
 		d3.select(gyGrid).call((sel) =>
@@ -485,7 +492,7 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{timeAxisTickFormater(tooltip.time, 0)}</div>
+							<div class="font-semibold">{timeAxisTickFormatter(tooltip.time, 0)}</div>
 							<div class="text-xs opacity-80">
 								{#if showGroup}
 									<span>{tooltip.group}</span>

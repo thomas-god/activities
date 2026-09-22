@@ -1,10 +1,34 @@
-<!-- Stacked area chart for Feedback/Weight&Nutrition data -->
+<!--
+@component
+Training metric's data and metadata are considered fixed: they're computed by the server, the client
+cannot directly update them. Editing a training metric's definition or changing the date range
+always involves a round-trip with the server.
+
+Thus this chart's variables are mostly static: we don't `$derived` from fixed props like `data`,
+`format`, `unit`, etc. This avoids some undefined behavior with d3.js where multiple `$derived`
+would rerun on some unidentified conditions (up to several hundreds times, obviously tanking
+performances).
+
+The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
+
+The `state_referenced_locally` warnings are left ON so that we have to explicitly add
+`// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
+forgetting `$derived` on actual dynamic variables.
+
+The same design decision applies to other types of chart in this module.
+-->
 <script lang="ts">
 	import dayjs from 'dayjs';
 	import * as d3 from 'd3';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
-	import { formatTooltipValue } from '.';
-	import { SvelteMap } from 'svelte/reactivity';
+	import {
+		buildTimeFormatter,
+		formatTooltipValue,
+		mapDomainToGranularity,
+		parseMetricIntoPoints,
+		type TimeDomain
+	} from '.';
+	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 
 	let {
 		data,
@@ -13,8 +37,10 @@
 		target,
 		average,
 		format,
+		granularity,
 		unit,
-		yMaxValue = none()
+		yMaxValue = none(),
+		timeDomain = none()
 	}: {
 		data: Record<string, Record<string, number | null>>;
 		width: number;
@@ -24,6 +50,8 @@
 		average: Option<number>;
 		target: Option<number>;
 		yMaxValue?: Option<number>;
+		timeDomain?: TimeDomain;
+		granularity: Option<TrainingMetricGranularity>;
 	} = $props();
 
 	let marginTop = 20;
@@ -41,36 +69,22 @@
 	// '__ts' carries the timestamp so we can recover the time string from stack data.
 	type StackRow = Record<string, number>;
 
-	let values = $derived.by(() => {
-		const _values: { time: string; timestamp: number; group: string; value: number }[] = [];
-		for (const [group, granuleValues] of Object.entries(data)) {
-			for (const [time, value] of Object.entries(granuleValues)) {
-				if (value !== null) {
-					_values.push({ time, timestamp: dayjs(time).unix(), group, value });
-				}
-			}
-		}
-		return _values;
+	// svelte-ignore state_referenced_locally
+	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
+
+	// svelte-ignore state_referenced_locally
+	const { points, times } = parseMetricIntoPoints(data, snappedDomain, {
+		replaceNullValues: false
 	});
 
-	let groups = $derived([...new Set(values.map((v) => v.group))].sort());
+	const groups = [...new Set(points.map((v) => v.group))].sort();
 
-	let times = $derived.by(() => {
-		const tsByTime = new SvelteMap<string, number>();
-		for (const v of values) {
-			const known = tsByTime.get(v.time);
-			if (known === undefined || v.timestamp < known) {
-				tsByTime.set(v.time, v.timestamp);
-			}
-		}
-		return [...tsByTime.entries()].sort((a, b) => a[1] - b[1]).map(([time]) => time);
-	});
+	const timeByTs = new Map(times.map((time) => [dayjs(time).unix(), time]));
 
-	let timeByTs = $derived(new Map(times.map((time) => [dayjs(time).unix(), time])));
-
-	let rows = $derived.by(() => {
-		const valueByGroupAndTime = new SvelteMap<string, number>();
-		for (const v of values) {
+	const rows = (() => {
+		/* eslint-disable svelte/prefer-svelte-reactivity */
+		const valueByGroupAndTime = new Map<string, number>();
+		for (const v of points) {
 			valueByGroupAndTime.set(`${v.group}\u0000${v.time}`, v.value);
 		}
 		return times.map((time) => {
@@ -80,39 +94,47 @@
 			}
 			return row;
 		});
-	});
+	})();
 
-	let series = $derived(
-		d3
-			.stack<StackRow>()
-			.keys(groups)
-			.value((d, key) => d[key] ?? 0)(rows)
-	);
+	const series = d3
+		.stack<StackRow>()
+		.keys(groups)
+		.value((d, key) => d[key] ?? 0)(rows);
 
-	let yAxisDefaultTickValues = (): number[] => {
-		if (values.length === 0) {
+	const yAxisDefaultTickValues = (): number[] => {
+		if (points.length === 0) {
 			return [];
 		}
 
 		return d3.ticks(0, maxValue, 6);
 	};
 
-	let yAxisTickValues = (): number[] => {
-		if (values.length === 0) {
+	const yAxisTickValues = (): number[] => {
+		if (points.length === 0) {
 			return [];
 		}
 
 		return yAxisDefaultTickValues();
 	};
 
-	let maxValue = $derived(
-		isSome(yMaxValue)
-			? yMaxValue.value
-			: Math.max(
-					d3.max(series, (s) => d3.max(s, (d) => d[1]) ?? 0) ?? 0,
-					unwrapOr(target, Number.NEGATIVE_INFINITY)
-				)
-	);
+	// svelte-ignore state_referenced_locally
+	const maxValue = isSome(yMaxValue)
+		? yMaxValue.value
+		: Math.max(
+				d3.max(series, (s) => d3.max(s, (d) => d[1]) ?? 0) ?? 0,
+				unwrapOr(target, Number.NEGATIVE_INFINITY)
+			);
+
+	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
+
+	// Point scales ignore axis .ticks(n), so select tick times explicitly.
+	let xTickValues = $derived.by(() => {
+		if (times.length === 0) {
+			return [];
+		}
+		const step = Math.max(1, Math.ceil(times.length / maxTimeTicks));
+		return times.filter((_, i) => i % step === 0 || i === times.length - 1);
+	});
 
 	let xAxis = $derived(
 		d3
@@ -136,35 +158,31 @@
 			.curve(d3.curveMonotoneX)
 	);
 
-	let color = $derived(d3.scaleOrdinal(d3.schemeCategory10).domain(groups));
+	const color = d3.scaleOrdinal(d3.schemeCategory10).domain(groups);
 
-	let timeAxisTickFormater = $derived.by(() => {
-		return (date: string, _idx: number) => {
-			return dayjs(date).format('MMM D');
-		};
-	});
+	// svelte-ignore state_referenced_locally
+	const timeAxisTickFormatter = buildTimeFormatter(granularity);
 
-	let yAxisTickFormater = $derived.by(() => {
+	const yAxisTickFormatter = () => {
 		return (value: d3.NumberValue, _idx: number) =>
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
-	});
+	};
+
 	let averageLineY = $derived(map(average, (avg) => yAxis(avg)));
 	let averageLegendY = $derived(
 		map(averageLineY, (avg) =>
 			Math.max(marginTop + 12, Math.min(height - marginBottom - 4, avg - 6))
 		)
 	);
-	let averageLegend = $derived(
-		map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const averageLegend = map(average, (avg) => `Average = ${formatTooltipValue(avg, format, unit)}`);
 
 	let targetLineY = $derived(map(target, (t) => yAxis(t)));
 	let targetLegendY = $derived(
 		map(targetLineY, (t) => Math.max(marginTop + 12, Math.min(height - marginBottom - 4, t - 6)))
 	);
-	let targetLegend = $derived(
-		map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`)
-	);
+	// svelte-ignore state_referenced_locally
+	const targetLegend = map(target, (t) => `Target = ${formatTooltipValue(t, format, unit)}`);
 
 	// Tooltip state
 	let tooltip = $state<{
@@ -286,7 +304,7 @@
 					showTooltipAt(xPos, yPos, time, s.key, point[1] - point[0], total);
 
 					// Highlight the band
-					d3.select(this).attr('fill-opacity', 0.9);
+					d3.select(this).attr('fill-opacity', 1);
 				})
 				.on('mouseleave', function (_event: MouseEvent) {
 					// Hide tooltip
@@ -297,13 +315,12 @@
 				})
 		);
 
-		let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 		d3.select(gx).call((sel) => {
-			sel.call(d3.axisBottom(xAxis).tickFormat(timeAxisTickFormater).ticks(maxTimeTicks));
+			sel.call(d3.axisBottom(xAxis).tickFormat(timeAxisTickFormatter).tickValues(xTickValues));
 		});
 
 		d3.select(gy).call((sel) =>
-			sel.call(d3.axisLeft(yAxis).tickFormat(yAxisTickFormater).tickValues(yAxisTickValues()))
+			sel.call(d3.axisLeft(yAxis).tickFormat(yAxisTickFormatter()).tickValues(yAxisTickValues()))
 		);
 
 		const yValues = yAxisTickValues() === null ? yAxis.ticks() : yAxisTickValues();
@@ -396,7 +413,7 @@
 				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
 					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
 						<div class="flex flex-col gap-1">
-							<div class="font-semibold">{dayjs(tooltip.time).format('MMM D')}</div>
+							<div class="font-semibold">{timeAxisTickFormatter(tooltip.time, 0)}</div>
 							<div class="text-xs">
 								<span class="font-semibold">{tooltip.group}</span>:
 								{formatTooltipValue(tooltip.value, format, unit)}
