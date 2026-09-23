@@ -2,16 +2,16 @@
 	import * as d3 from 'd3';
 	import { X } from '@lucide/svelte';
 	import type { TrainingMetric, TrainingPeriodDetails } from '$lib/api';
-	import { isSome, type Option } from '$lib/Options';
+	import { asOption, isSome, some, type Option } from '$lib/Options';
 	import {
-		compareAnchor,
-		compareBucketDomain,
 		definitionLabel,
-		yDomain as extractYDomain,
 		type CompareAlignment,
 		type CompareMetricDefinition
 	} from '$lib/trainingMetric';
-	import CompareMetricChart from '$ui/training_metrics/CompareMetricChart.svelte';
+	import TrainingMetricChart, {
+		type ChartHandle
+	} from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import { computeExtendedTimeDomain, computeMissingNumberOfBins } from './CompareMetricEntry';
 
 	interface ComparedSide {
 		period: TrainingPeriodDetails;
@@ -35,12 +35,18 @@
 	let hovered: number | null = $state(null);
 	let chartWidths: number[] = $state([300, 300]);
 
+	let firstChartRef = $state<ChartHandle>();
+	let secondChartRef = $state<ChartHandle>();
+
+	let globalMax = $derived(Math.max(firstChartRef?.getYMax() ?? 0, secondChartRef?.getYMax() ?? 0));
+
 	const heightFor = (width: number): number => Math.max(150, Math.min(300, width * 0.6));
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
 	<div class="mb-2 flex items-center justify-between gap-2">
 		<h3 class="text-base font-semibold">
+			{globalMax}
 			{definitionLabel(definition)}
 			{#if definition.source !== 'default'}
 				<span class="badge badge-ghost align-middle badge-sm">from: {definition.source}</span>
@@ -60,16 +66,26 @@
 			{#if isSome(firstMetricOpt) && isSome(secondMetricOpt)}
 				{@const firstMetric = firstMetricOpt.value}
 				{@const secondMetric = secondMetricOpt.value}
-				{@const bucketDomain = compareBucketDomain(
-					[firstMetric, secondMetric],
-					[compareAnchor(firstPeriod.period, alignBy), compareAnchor(secondPeriod.period, alignBy)]
+				{@const deltas = computeMissingNumberOfBins(
+					{ metric: firstMetric, period: firstPeriod.period },
+					{ metric: secondMetric, period: secondPeriod.period }
 				)}
-				{@const yDomain = extractYDomain(firstMetric, secondMetric)}
 				{@const sides = [
-					{ period: firstPeriod.period, metric: firstMetric },
-					{ period: secondPeriod.period, metric: secondMetric }
+					{ period: firstPeriod.period, metric: firstMetric, delta: deltas.first, type: 'first' },
+					{
+						period: secondPeriod.period,
+						metric: secondMetric,
+						delta: deltas.second,
+						type: 'second'
+					}
 				]}
 				{#each sides as side, idx (side.period.id)}
+					{@const timeDomain = computeExtendedTimeDomain(
+						side.period,
+						side.delta,
+						asOption(side.metric.granularity),
+						alignBy
+					)}
 					<div class="flex flex-col" bind:clientWidth={chartWidths[idx]}>
 						<div class="mb-1 flex items-center gap-1.5 text-sm">
 							<span
@@ -83,14 +99,23 @@
 								Failed to compute metric
 							</div>
 						{:else}
-							<CompareMetricChart
+							<TrainingMetricChart
+								bind:this={
+									() => (side.type === 'first' ? firstChartRef : secondChartRef),
+									(v) => {
+										if (side.type === 'first') {
+											firstChartRef = v;
+										} else {
+											secondChartRef = v;
+										}
+									}
+								}
 								metric={side.metric}
-								anchor={compareAnchor(side.period, alignBy)}
-								{yDomain}
-								{bucketDomain}
 								width={chartWidths[idx]}
 								height={heightFor(chartWidths[idx])}
-								bind:hovered
+								{timeDomain}
+								displayMode="relative"
+								yMax={some(globalMax)}
 							/>
 						{/if}
 					</div>

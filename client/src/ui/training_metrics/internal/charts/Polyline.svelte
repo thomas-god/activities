@@ -37,6 +37,7 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode,
 		type Point
 	} from '.';
+	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	let {
 		data,
@@ -96,21 +97,34 @@ The same design decision applies to other types of chart in this module.
 	let times = $derived(unwrapOr(domainTimes, metricTimes));
 
 	// svelte-ignore state_referenced_locally
-	const maxValue = isSome(yMaxValue)
-		? yMaxValue.value
-		: Math.max(d3.max(points, (v) => v.value) ?? 0, unwrapOr(target, Number.NEGATIVE_INFINITY));
+	const internalMaxValue = Math.max(
+		d3.max(points, (v) => v.value) ?? 0,
+		unwrapOr(target, Number.NEGATIVE_INFINITY)
+	);
+
+	export function getYMax() {
+		return internalMaxValue;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
+
+	let maxValue = $derived(unwrapOr(yMaxValue, internalMaxValue));
+
 	// svelte-ignore state_referenced_locally
 	const minValue = Math.min(
 		d3.min(points, (v) => v.value) ?? 0,
 		unwrapOr(target, Number.POSITIVE_INFINITY)
 	);
 
-	const delta = (maxValue - minValue) * 0.1;
-	// svelte-ignore state_referenced_locally
-	const range = [
+	const delta = $derived((maxValue - minValue) * 0.1);
+
+	export function getYMin() {
+		return yInterceptZero ? 0 : minValue - delta;
+	}
+
+	const range = $derived([
 		yInterceptZero ? 0 : minValue - delta,
 		yInterceptZero ? maxValue * 1.1 : maxValue + delta
-	];
+	]);
 	const yAxisDefaultTickValues = (): number[] => {
 		if (points.length === 0) {
 			return [];

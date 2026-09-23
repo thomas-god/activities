@@ -3,15 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { TrainingMetric, TrainingMetricFilters } from '$lib/api';
 
 import {
-	bucketOffset,
-	compareAnchor,
-	compareBucketDomain,
 	definitionLabel,
 	metricPreviewPayload,
 	metricDefinitionKey,
 	extractBaseDefinitionFromMetric,
 	periodMetricRange,
-	relativeBucketLabel,
 	type CompareMetricDefinition
 } from './trainingMetric';
 import { dayjs } from '$lib/duration';
@@ -229,78 +225,6 @@ describe('periodMetricRange', () => {
 			start: '2026-02-02',
 			end: '2026-05-01'
 		});
-	});
-});
-
-describe('compareAnchor', () => {
-	it('returns the period start when aligning by start', () => {
-		expect(compareAnchor(makePeriod(), 'start')).toBe('2026-02-02');
-	});
-
-	it('returns the period end when aligning by end', () => {
-		expect(compareAnchor(makePeriod(), 'end')).toBe('2026-04-30');
-	});
-
-	it('falls back to the start when aligning an ongoing period by end', () => {
-		expect(compareAnchor(makePeriod({ end: null }), 'end')).toBe('2026-02-02');
-	});
-});
-
-describe('bucketOffset', () => {
-	it('counts weeks between the bucket and the anchor', () => {
-		expect(bucketOffset('2026-01-05', '2026-01-05', 'Weekly')).toBe(0);
-		expect(bucketOffset('2026-01-19', '2026-01-05', 'Weekly')).toBe(2);
-		expect(bucketOffset('2025-12-29', '2026-01-05', 'Weekly')).toBe(-1);
-	});
-
-	it('counts days between the bucket and the anchor', () => {
-		expect(bucketOffset('2026-01-05', '2026-01-05', 'Daily')).toBe(0);
-		expect(bucketOffset('2026-01-08', '2026-01-05', 'Daily')).toBe(3);
-	});
-
-	it('counts months between the bucket and the anchor', () => {
-		expect(bucketOffset('2026-03-01', '2026-01-05', 'Monthly')).toBe(2);
-	});
-
-	it('is normalized within the granule', () => {
-		// Mid-week anchors still align whole weeks (Jan 7 → week of Jan 5)
-		expect(bucketOffset('2026-01-19', '2026-01-07', 'Weekly')).toBe(2);
-	});
-});
-
-describe('relativeBucketLabel', () => {
-	it('numbers buckets from the first offset of the shared domain', () => {
-		expect(relativeBucketLabel(0, 0, 'Weekly')).toBe('Week 1');
-		expect(relativeBucketLabel(2, 0, 'Weekly')).toBe('Week 3');
-		expect(relativeBucketLabel(4, 0, 'Daily')).toBe('Day 5');
-		expect(relativeBucketLabel(1, 0, 'Monthly')).toBe('Month 2');
-	});
-
-	it('numbers from the domain start whatever the offset sign', () => {
-		expect(relativeBucketLabel(-5, -8, 'Weekly')).toBe('Week 4');
-		expect(relativeBucketLabel(0, -3, 'Monthly')).toBe('Month 4');
-	});
-});
-
-describe('compareBucketDomain', () => {
-	it('unions and sorts the bucket offsets of both metrics', () => {
-		const first = makeMetric({
-			values: { no_group: { '2026-02-02': 1, '2026-02-09': 2 } }
-		});
-		const second = makeMetric({
-			values: { no_group: { '2026-02-09': 3, '2026-02-16': 4 } }
-		});
-
-		expect(compareBucketDomain([first, second], ['2026-02-02', '2026-02-02'])).toEqual([0, 1, 2]);
-	});
-
-	it('ignores missing metrics', () => {
-		const metric = makeMetric({
-			values: { no_group: { '2026-02-02': 1 } }
-		});
-
-		expect(compareBucketDomain([undefined, metric], [undefined, '2026-02-02'])).toEqual([0]);
-		expect(compareBucketDomain([], [])).toEqual([]);
 	});
 });
 

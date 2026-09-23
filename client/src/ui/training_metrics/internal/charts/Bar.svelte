@@ -41,6 +41,7 @@ The same design decision applies to other types of chart in this module.
 		parseMetricIntoPoints,
 		type DisplayMode
 	} from '.';
+	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -56,6 +57,7 @@ The same design decision applies to other types of chart in this module.
 		target: Option<number>;
 		timeDomain?: TimeDomain;
 		displayMode?: DisplayMode;
+		yMaxValue?: Option<number>;
 	}
 
 	let {
@@ -71,6 +73,7 @@ The same design decision applies to other types of chart in this module.
 		showGroup = true,
 		stacked = true,
 		timeDomain = none(),
+		yMaxValue = none(),
 		displayMode = 'absolute'
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
@@ -123,64 +126,6 @@ The same design decision applies to other types of chart in this module.
 			`${value.toString()} ${unit === 'activities' ? '' : unit}`;
 	})();
 
-	const yAxisDefaultTickValues = (() => {
-		if (points.length === 0) {
-			return [];
-		}
-		const maxGroupValue = stacked
-			? points
-					.reduce<Map<string, number>>((groupValues, value) => {
-						if (groupValues.has(value.time)) {
-							groupValues.set(value.time, groupValues.get(value.time)! + value.value);
-						} else {
-							groupValues.set(value.time, value.value);
-						}
-
-						return groupValues;
-					}, new Map<string, number>())
-					.entries()
-					.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-			: (d3.max(points, (v) => v.value) ?? 0);
-		return d3.ticks(0, Math.max(maxGroupValue, unwrapOr(target, 0)), 6);
-	})();
-
-	const yAxisTickValues = (() => {
-		if (points.length === 0) {
-			return [];
-		}
-		if (format === 'duration') {
-			const dt = 600;
-			const maxDuration = stacked
-				? points
-						.reduce<Map<string, number>>((times, value) => {
-							if (times.has(value.time)) {
-								times.set(value.time, times.get(value.time)! + value.value);
-							} else {
-								times.set(value.time, value.value);
-							}
-
-							return times;
-						}, new Map<string, number>())
-						.entries()
-						.reduce(([_dt, previous], [__, curr]) => [_dt, curr > previous ? curr : previous])[1]
-				: (d3.max(points, (v) => v.value) ?? 0);
-			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
-			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
-			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
-			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
-
-			if (intervalDuration !== 0) {
-				const ticks = [];
-				for (let i = 0; i < roundedUpMaxDuration; i += intervalDuration) {
-					ticks.push(i);
-				}
-				return ticks;
-			}
-			return yAxisDefaultTickValues;
-		}
-		return yAxisDefaultTickValues;
-	})();
-
 	// Order of the groups inside the stacked series, sorted alphabetically ascending by
 	// display name. First entry in the array is stacked at the bottom.
 	const groups = Array.from(
@@ -200,6 +145,49 @@ The same design decision applies to other types of chart in this module.
 			(value) => displayGroupName(value.group, groupBy)
 		)
 	);
+	// svelte-ignore state_referenced_locally
+	const internalYMaxValue = Math.max(
+		stacked
+			? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
+			: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
+		unwrapOr(target, 0)
+	);
+
+	export function getYMax() {
+		return internalYMaxValue;
+	}
+	export function getYMin() {
+		return 0;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
+
+	let maxValue = $derived(unwrapOr(yMaxValue, internalYMaxValue));
+
+	const yAxisDefaultTickValues = $derived(d3.ticks(0, maxValue, 6));
+
+	const yAxisTickValues = $derived.by(() => {
+		if (points.length === 0) {
+			return [];
+		}
+		if (format === 'duration') {
+			const dt = 600;
+			const maxDuration = maxValue;
+			const maxDurationWithTarget = Math.max(maxDuration, unwrapOr(target, 0));
+			const roundedUpMaxDuration = Math.ceil(maxDurationWithTarget / dt) * dt;
+			const numberOfIntervals = Math.min(6, Math.floor(roundedUpMaxDuration / dt));
+			const intervalDuration = Math.floor(roundedUpMaxDuration / numberOfIntervals / dt) * dt;
+
+			if (intervalDuration !== 0) {
+				const ticks = [];
+				for (let i = 0; i < roundedUpMaxDuration; i += intervalDuration) {
+					ticks.push(i);
+				}
+				return ticks;
+			}
+			return yAxisDefaultTickValues;
+		}
+		return yAxisDefaultTickValues;
+	});
 
 	// svelte-ignore state_referenced_locally
 	let x = $state(
@@ -213,14 +201,6 @@ The same design decision applies to other types of chart in this module.
 	$effect(() => {
 		x.domain(times).range([marginLeft, width - marginRight]);
 	});
-
-	// svelte-ignore state_referenced_locally
-	const maxValue = Math.max(
-		stacked
-			? d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1]))!
-			: d3.max(series, (groupSeries) => d3.max(groupSeries, (point) => point[1] - point[0]))!,
-		unwrapOr(target, 0)
-	);
 
 	let y = $derived(
 		d3

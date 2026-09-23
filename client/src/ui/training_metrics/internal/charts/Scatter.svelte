@@ -36,6 +36,7 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode
 	} from '.';
 	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
+	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -47,6 +48,7 @@ The same design decision applies to other types of chart in this module.
 		target: Option<number>;
 		timeDomain?: TimeDomain;
 		yInterceptZero?: boolean;
+		yMaxValue?: Option<number>;
 		displayMode?: DisplayMode;
 	}
 
@@ -60,6 +62,7 @@ The same design decision applies to other types of chart in this module.
 		target,
 		timeDomain = none(),
 		yInterceptZero = true,
+		yMaxValue = none(),
 		displayMode = 'absolute'
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
@@ -113,21 +116,32 @@ The same design decision applies to other types of chart in this module.
 	})();
 
 	// svelte-ignore state_referenced_locally
-	const maxValue = Math.max(
+	const internalMaxValue = Math.max(
 		d3.max(valuesAsTime, (v) => v.value) ?? 0,
 		unwrapOr(target, Number.NEGATIVE_INFINITY)
 	);
+
+	export function getYMax() {
+		return internalMaxValue;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
+
+	const maxValue = $derived(unwrapOr(yMaxValue, internalMaxValue));
+
 	// svelte-ignore state_referenced_locally
 	const minValue = Math.min(
 		d3.min(valuesAsTime, (v) => v.value) ?? 0,
 		unwrapOr(target, Number.POSITIVE_INFINITY)
 	);
-	const delta = (maxValue - minValue) * 0.1;
-	// svelte-ignore state_referenced_locally
-	const range = [
+	const delta = $derived((maxValue - minValue) * 0.1);
+	export function getYMin() {
+		return yInterceptZero ? 0 : minValue - delta;
+	}
+
+	const range = $derived([
 		yInterceptZero ? 0 : minValue - delta,
 		yInterceptZero ? maxValue * 1.1 : maxValue + delta
-	];
+	]);
 
 	const yAxisDefaultTickValues = (): number[] => {
 		if (valuesAsTime.length === 0) {

@@ -34,6 +34,7 @@ The same design decision applies to other types of chart in this module.
 	} from '.';
 	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	let {
 		data,
@@ -136,12 +137,19 @@ The same design decision applies to other types of chart in this module.
 	};
 
 	// svelte-ignore state_referenced_locally
-	const maxValue = isSome(yMaxValue)
-		? yMaxValue.value
-		: Math.max(
-				d3.max(series, (s) => d3.max(s, (d) => d[1]) ?? 0) ?? 0,
-				unwrapOr(target, Number.NEGATIVE_INFINITY)
-			);
+	const internalMaxValue = Math.max(
+		d3.max(series, (s) => d3.max(s, (d) => d[1]) ?? 0) ?? 0,
+		unwrapOr(target, Number.NEGATIVE_INFINITY)
+	);
+	export function getYMax() {
+		return internalMaxValue;
+	}
+	export function getYMin() {
+		return 0;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
+
+	let maxValue = $derived(unwrapOr(yMaxValue, internalMaxValue));
 
 	let maxTimeTicks = $derived(Math.min(8, Math.floor(width / 70)));
 

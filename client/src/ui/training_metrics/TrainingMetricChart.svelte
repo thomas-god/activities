@@ -8,18 +8,25 @@
 	import { type DisplayMode } from './internal/charts';
 	import type { TimeDomain } from '$ui/training_metrics';
 
+	export interface ChartHandle {
+		getYMax(): number;
+		getYMin(): number;
+	}
+
 	let {
 		metric,
 		width,
 		height = 300,
 		timeDomain = none(),
-		displayMode = 'absolute'
+		displayMode = 'absolute',
+		yMax = none()
 	}: {
 		metric: TrainingMetric;
 		width: number;
 		height?: number;
 		timeDomain?: TimeDomain;
 		displayMode?: DisplayMode;
+		yMax?: Option<number>;
 	} = $props();
 
 	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
@@ -39,12 +46,22 @@
 		metric.target === null ? none() : some(metric.target.value)
 	);
 	let values = $derived(metric.values);
+
+	let chartRef = $state<ChartHandle>();
+	export function getYMax(): number {
+		return chartRef?.getYMax() ?? 0;
+	}
+	export function getYMin(): number {
+		return chartRef?.getYMin() ?? 0;
+	}
+	({ getYMax, getYMin }) satisfies ChartHandle;
 </script>
 
 {#if Object.entries(metric.values).length > 0}
 	{#if metric.source.type === 'activity'}
 		{#if metric.granularity !== null}
 			<BarChart
+				bind:this={chartRef}
 				{height}
 				{width}
 				{values}
@@ -58,9 +75,11 @@
 				{target}
 				{timeDomain}
 				{displayMode}
+				yMaxValue={yMax}
 			/>
 		{:else}
 			<ScatterChart
+				bind:this={chartRef}
 				{height}
 				{width}
 				values={metric.values}
@@ -71,11 +90,13 @@
 				{timeDomain}
 				yInterceptZero={!metric.source.metric.metric.includes('HeartRate')}
 				{displayMode}
+				yMaxValue={yMax}
 			/>
 		{/if}
 	{:else if metric.granularity !== null}
 		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
 			<StackedArea
+				bind:this={chartRef}
 				data={metric.values}
 				unit={metric.unit}
 				format="number"
@@ -83,13 +104,14 @@
 				target={metric.target === null ? none() : some(metric.target.value)}
 				{width}
 				{height}
-				yMaxValue={none()}
 				{timeDomain}
 				granularity={metric.granularity}
 				{displayMode}
+				yMaxValue={yMax}
 			/>
 		{:else}
 			<Polyline
+				bind:this={chartRef}
 				data={values}
 				unit={metric.unit}
 				format="number"
@@ -97,7 +119,7 @@
 				target={metric.target === null ? none() : some(metric.target.value)}
 				{width}
 				{height}
-				yMaxValue={metric.source.type === 'hooperIndex' ? some(10) : none()}
+				yMaxValue={metric.source.type === 'hooperIndex' ? some(10) : yMax}
 				{timeDomain}
 				granularity={metric.granularity}
 				yInterceptZero={metric.source.metric !== 'TotalWeight'}
