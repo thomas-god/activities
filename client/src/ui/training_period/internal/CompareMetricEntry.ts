@@ -42,13 +42,15 @@ export const computeExtendedTimeDomain = (
 	period: TrainingPeriodDetails,
 	binsDelta: Option<number>,
 	granularity: Option<TrainingMetricGranularity>,
-	alignBy: CompareAlignment
+	alignBy: CompareAlignment,
+	now: dayjs.Dayjs
 ): TimeDomain => {
-	if (isNone(binsDelta)) {
-		return some({ start: period.start, end: period.end });
-	}
+	const start = period.start;
+	const end = period.end === null ? now.format('YYYY-MM-DD') : period.end;
 
-	const { start, end } = period;
+	if (isNone(binsDelta)) {
+		return some({ start: period.start, end: end });
+	}
 
 	const deltaGranularity = granularityUnits(granularity);
 

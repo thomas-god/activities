@@ -9,6 +9,7 @@ import {
 	computeMissingNumberOfBins,
 	numberOfDistinctBins
 } from './CompareMetricEntry';
+import dayjs from 'dayjs';
 
 const makeMetric = (granularity: TrainingMetricGranularity | null = 'Daily'): TrainingMetric => ({
 	id: 'metric-1',
@@ -134,48 +135,64 @@ describe('computeMissingNumberOfBins', () => {
 describe('computeExtendedTimeDomain', () => {
 	it('returns the period unchanged when there is no bins delta', () => {
 		const period = makePeriod();
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, none(), none(), 'start');
+		const domain = computeExtendedTimeDomain(period, none(), none(), 'start', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-02-01', end: '2026-04-30' });
+	});
+	it('extends the period to today when there is no bins delta but the period has no end', () => {
+		const period = makePeriod();
+		period.end = null;
+
+		const now = dayjs('2026-09-17');
+
+		const domain = computeExtendedTimeDomain(period, none(), none(), 'start', now);
+
+		expect(unwrap(domain)).toEqual({ start: '2026-02-01', end: '2026-09-17' });
 	});
 
 	it('extends the end when aligning by start', () => {
 		const period = makePeriod();
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, some(2), some('Weekly'), 'start');
+		const domain = computeExtendedTimeDomain(period, some(2), some('Weekly'), 'start', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-02-01', end: '2026-05-14' });
 	});
 
 	it('extends the start (backwards) when aligning by end', () => {
 		const period = makePeriod();
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, some(3), some('Daily'), 'end');
+		const domain = computeExtendedTimeDomain(period, some(3), some('Daily'), 'end', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-01-29', end: '2026-04-30' });
 	});
 
 	it('defaults to days when granularity is none', () => {
 		const period = makePeriod();
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, some(10), none(), 'start');
+		const domain = computeExtendedTimeDomain(period, some(10), none(), 'start', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-02-01', end: '2026-05-10' });
 	});
 
 	it('extends by months for monthly granularity', () => {
 		const period = makePeriod({ start: '2026-02-15', end: '2026-03-10' });
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, some(1), some('Monthly'), 'start');
+		const domain = computeExtendedTimeDomain(period, some(1), some('Monthly'), 'start', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-02-15', end: '2026-04-10' });
 	});
 
 	it('keeps the period end as-is when aligning by end', () => {
 		const period = makePeriod();
+		const now = dayjs('2026-09-17');
 
-		const domain = computeExtendedTimeDomain(period, some(2), some('Weekly'), 'end');
+		const domain = computeExtendedTimeDomain(period, some(2), some('Weekly'), 'end', now);
 
 		expect(unwrap(domain)).toEqual({ start: '2026-01-18', end: '2026-04-30' });
 	});

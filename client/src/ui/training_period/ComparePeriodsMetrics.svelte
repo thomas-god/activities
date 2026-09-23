@@ -6,6 +6,7 @@
 		fetchTrainingPeriodMetrics,
 		getTrainingMetricPreview,
 		type TrainingMetric,
+		type TrainingMetricBasePayload,
 		type TrainingMetricList,
 		type TrainingPeriodDetails
 	} from '$lib/api';
@@ -80,13 +81,6 @@
 	let firstPeriodMetricsPromise = $derived(fetchTrainingPeriodMetrics(fetch, firstPeriod.id));
 	let secondPeriodMetricsPromise = $derived(fetchTrainingPeriodMetrics(fetch, secondPeriod.id));
 
-	let endAlignable = $derived(firstPeriod.end !== null && secondPeriod.end !== null);
-
-	// The End alignment only applies while both periods have an end date; fall
-	// back to Start otherwise (e.g. after selecting an ongoing period), so the
-	// charts never mix a start anchor with end-style labeling.
-	let effectiveAlignBy = $derived.by((): CompareAlignment => (endAlignable ? alignBy : 'start'));
-
 	const addDefinition = (definition: CompareMetricDefinition) => {
 		if (comparisons.some((comparison) => comparison.definition.key === definition.key)) {
 			return;
@@ -156,6 +150,14 @@
 			base: b
 		}));
 	};
+
+	const formatMetricSource = (metric: TrainingMetricBasePayload): string => {
+		if (metric.source.type === 'activity') {
+			return metric.source.metric.metric;
+		} else {
+			return metric.source.metric;
+		}
+	};
 </script>
 
 <div class="rounded-box bg-base-100 p-4 shadow-md">
@@ -166,22 +168,15 @@
 			<div class="join">
 				<button
 					class="btn join-item btn-sm"
-					class:btn-active={effectiveAlignBy === 'start'}
+					class:btn-active={alignBy === 'start'}
 					onclick={() => (alignBy = 'start')}>Start</button
 				>
-				<div
-					class="tooltip"
-					data-tip={endAlignable
-						? 'Align periods by their end date'
-						: 'Unavailable while a period is ongoing'}
+
+				<button
+					class="btn join-item btn-sm"
+					class:btn-active={alignBy === 'end'}
+					onclick={() => (alignBy = 'end')}>End</button
 				>
-					<button
-						class="btn join-item btn-sm"
-						class:btn-active={effectiveAlignBy === 'end'}
-						disabled={!endAlignable}
-						onclick={() => (alignBy = 'end')}>End</button
-					>
-				</div>
 			</div>
 			<button class="btn btn-sm" onclick={() => importMetricDialog.show()}>
 				<Import class="size-4" />
@@ -201,7 +196,7 @@
 			definition={comparison.definition}
 			firstPeriod={{ period: firstPeriod, metric: comparison.firstPeriodValues }}
 			secondPeriod={{ period: secondPeriod, metric: comparison.secondPeriodValues }}
-			alignBy={effectiveAlignBy}
+			{alignBy}
 			onRemove={() => removeDefinition(comparison.definition.key)}
 		/>
 	</div>
@@ -238,7 +233,7 @@
 									<span class="badge badge-ghost badge-xs">{entry.definition.source}</span>
 								</span>
 								<span class="text-xs opacity-60">
-									{entry.definition.base.source.metric}
+									{formatMetricSource(entry.definition.base)}
 									· {entry.definition.base.window?.granularity}
 									{entry.definition.base.window?.aggregate}
 									{#if isSome(groupBy)}

@@ -12,6 +12,7 @@
 		type ChartHandle
 	} from '$ui/training_metrics/TrainingMetricChart.svelte';
 	import { computeExtendedTimeDomain, computeMissingNumberOfBins } from './CompareMetricEntry';
+	import { dayjs } from '$lib/duration';
 
 	interface ComparedSide {
 		period: TrainingPeriodDetails;
@@ -46,7 +47,6 @@
 <div class="rounded-box bg-base-100 p-4 shadow-md">
 	<div class="mb-2 flex items-center justify-between gap-2">
 		<h3 class="text-base font-semibold">
-			{globalMax}
 			{definitionLabel(definition)}
 			{#if definition.source !== 'default'}
 				<span class="badge badge-ghost align-middle badge-sm">from: {definition.source}</span>
@@ -84,7 +84,8 @@
 						side.period,
 						side.delta,
 						asOption(side.metric.granularity),
-						alignBy
+						alignBy,
+						dayjs()
 					)}
 					<div class="flex flex-col" bind:clientWidth={chartWidths[idx]}>
 						<div class="mb-1 flex items-center gap-1.5 text-sm">
