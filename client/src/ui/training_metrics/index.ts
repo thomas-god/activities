@@ -7,6 +7,7 @@ import {
 	getMetricFilters,
 	type TrainingMetricBasePayloadFilters
 } from '$lib/api/training';
+import { dayjs, granularityUnits } from '$lib/duration';
 import { asOption, isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
 import type { RPEValue } from '$lib/rpe';
 import type { Sport, SportCategory } from '$lib/sport';
@@ -220,4 +221,27 @@ export const matchMetricToFormFields = (
 		target: asOption(metric.target?.value ?? null),
 		filters
 	};
+};
+
+export type TimeDomain = Option<{ start: string; end: string | null }>;
+
+export const expectedBinsForDomain = (
+	domain: TimeDomain,
+	granularity: Option<TrainingMetricGranularity>,
+	now: dayjs.Dayjs
+): Option<string[]> => {
+	if (isNone(domain)) {
+		return none();
+	}
+
+	const granularityUnit = granularityUnits(granularity);
+	let start = dayjs(domain.value.start).startOf(granularityUnit.startOf);
+	const end = domain.value.end === null ? now : dayjs(domain.value.end);
+	const times = [];
+	while (start <= end) {
+		times.push(start.format('YYYY-MM-DD'));
+		start = start.add(1, granularityUnit.add);
+	}
+
+	return some(times);
 };

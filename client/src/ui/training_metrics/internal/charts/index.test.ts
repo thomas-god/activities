@@ -10,9 +10,9 @@ import {
 	formatTooltipValue,
 	mapDomainToGranularity,
 	parseMetricIntoPoints,
-	type Point,
-	type TimeDomain
+	type Point
 } from './index';
+import type { TimeDomain } from '$ui/training_metrics';
 
 describe('formatTooltipValue', () => {
 	it('formats duration values with compact units', () => {
@@ -226,7 +226,9 @@ describe('buildContinuousTimeRelativeFormatter', () => {
 
 	it('uses today as the end when the domain end is null', () => {
 		const today = dayjs().startOf('day');
-		const formatter = buildContinuousTimeRelativeFormatter(some({ start: '2026-01-01', end: null }));
+		const formatter = buildContinuousTimeRelativeFormatter(
+			some({ start: '2026-01-01', end: null })
+		);
 
 		// The label is relative to the start, not to today.
 		expect(formatter(dayjs('2026-01-01').unix(), 0)).toBe('Day 1');

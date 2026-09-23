@@ -3,6 +3,7 @@ import { dayjs, formatDurationCompactWithUnits, formatWeekInterval } from '$lib/
 import { isNone, isSome, some, type Option } from '$lib/Options';
 import { paceInSecondToString } from '$lib/speed';
 import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
+import type { TimeDomain } from '$ui/training_metrics';
 
 export const formatTooltipValue = (
 	value: number,
@@ -54,7 +55,6 @@ export const getGroupColor = (
 };
 
 export type DisplayMode = 'relative' | 'absolute';
-export type TimeDomain = Option<{ start: string; end: string | null }>;
 export type Point = { time: string; timestamp: number; group: string; value: number };
 
 export const parseMetricIntoPoints = (

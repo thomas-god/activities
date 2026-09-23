@@ -5,7 +5,8 @@
 	import BarChart from './internal/charts/Bar.svelte';
 	import StackedArea from './internal/charts/StackedArea.svelte';
 	import Polyline from './internal/charts/Polyline.svelte';
-	import { type DisplayMode, type TimeDomain } from './internal/charts';
+	import { type DisplayMode } from './internal/charts';
+	import type { TimeDomain } from '$ui/training_metrics';
 
 	let {
 		metric,

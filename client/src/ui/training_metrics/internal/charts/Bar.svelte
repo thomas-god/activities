@@ -11,6 +11,10 @@ performances).
 
 The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
 
+If even with limited `$derived` performances are still bad, you can replace some of them with
+plain `$state(/* mutation */)` and `$effect(() => /* mutation */)` to apparently break the
+`$derived` reruns explosion. Use the browser performance tool to find which `$derived` to convert.
+
 The `state_referenced_locally` warnings are left ON so that we have to explicitly add
 `// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
 forgetting `$derived` on actual dynamic variables.
@@ -18,15 +22,16 @@ forgetting `$derived` on actual dynamic variables.
 The same design decision applies to other types of chart in this module.
 -->
 <script lang="ts">
-	import { formatDurationCompactWithUnits } from '$lib/duration';
+	import * as d3 from 'd3';
+	import { dayjs, formatDurationCompactWithUnits } from '$lib/duration';
 	import {
 		displayGroupName,
 		type TrainingMetricGranularity,
 		type TrainingMetricGroupByClause
 	} from '$lib/trainingMetric';
-	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { asOption, isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
-	import * as d3 from 'd3';
+	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
 	import {
 		buildAbsoluteTimeFormatter,
 		buildRelativeTimeFormatter,
@@ -34,8 +39,7 @@ The same design decision applies to other types of chart in this module.
 		getGroupColor,
 		mapDomainToGranularity,
 		parseMetricIntoPoints,
-		type DisplayMode,
-		type TimeDomain
+		type DisplayMode
 	} from '.';
 
 	export interface TimeseriesChartProps {
@@ -88,12 +92,20 @@ The same design decision applies to other types of chart in this module.
 	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
 
 	// svelte-ignore state_referenced_locally
-	const { points, times } = parseMetricIntoPoints(values, snappedDomain);
+	const { points, times: metricTimes } = parseMetricIntoPoints(values, snappedDomain);
+
+	// svelte-ignore state_referenced_locally
+	/* eslint-disable svelte/prefer-writable-derived */
+	let domainTimes = $state(expectedBinsForDomain(timeDomain, asOption(granularity), dayjs()));
+	$effect(() => {
+		domainTimes = expectedBinsForDomain(timeDomain, asOption(granularity), dayjs());
+	});
+
+	let times = $derived(unwrapOr(domainTimes, metricTimes));
 
 	// svelte-ignore state_referenced_locally
 	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
-	// svelte-ignore state_referenced_locally
-	const relativeTimeFormatter = buildRelativeTimeFormatter(times, granularity);
+	let relativeTimeFormatter = $derived(buildRelativeTimeFormatter(times, granularity));
 
 	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
@@ -189,21 +201,17 @@ The same design decision applies to other types of chart in this module.
 		)
 	);
 
+	// svelte-ignore state_referenced_locally
 	let x = $state(
 		d3
 			.scaleBand()
-			.domain(
-				d3.groupSort(
-					points,
-					(a, b) => (a.at(0)!.time < b.at(0)!.time ? -1 : 1),
-					(value) => value.time
-				)
-			)
+			.domain(times)
 			.padding(0.6)
+			.range([marginLeft, width - marginRight])
 	);
-	// Set only the range in an $effect so that we don't have to recompute the groupSort each time
+
 	$effect(() => {
-		x.range([marginLeft, width - marginRight]);
+		x.domain(times).range([marginLeft, width - marginRight]);
 	});
 
 	// svelte-ignore state_referenced_locally

@@ -4,11 +4,13 @@ import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
 import { isNone, isSome, none, some } from '$lib/Options';
 
 import {
+	expectedBinsForDomain,
 	fieldsAsPayload,
 	matchMetricToFormFields,
 	matchTemplate,
 	type TrainingMetricFields
 } from './index';
+import { dayjs } from '$lib/duration';
 
 const activityMetricSource = (metric: string): TrainingMetric['source'] => ({
 	type: 'activity',
@@ -357,5 +359,84 @@ describe('fieldsAsPayload', () => {
 		if (isSome(payload)) {
 			expect('target' in payload.value).toBe(false);
 		}
+	});
+});
+
+describe('expectedBinsForDomain', () => {
+	it('returns none for a none domain', () => {
+		const now = dayjs('2026-01-04');
+		expect(isNone(expectedBinsForDomain(none(), some('Daily'), now))).toBe(true);
+	});
+
+	it('returns a bin per day for daily granularity', () => {
+		const now = dayjs('2026-01-04');
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-01-01', end: '2026-01-04' }),
+			some('Daily'),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual([
+			'2026-01-01',
+			'2026-01-02',
+			'2026-01-03',
+			'2026-01-04'
+		]);
+	});
+
+	it('snaps the start to the beginning of the week for weekly granularity', () => {
+		const now = dayjs('2026-01-04');
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-09-23', end: '2026-10-02' }),
+			some('Weekly'),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual(['2026-09-21', '2026-09-28']);
+	});
+
+	it('snaps the start to the beginning of the month for monthly granularity', () => {
+		const now = dayjs('2026-01-04');
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-01-15', end: '2026-03-31' }),
+			some('Monthly'),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual(['2026-01-01', '2026-02-01', '2026-03-01']);
+	});
+
+	it('defaults to daily bins when the granularity is none', () => {
+		const now = dayjs('2026-01-04');
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-02-01', end: '2026-02-03' }),
+			none(),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual(['2026-02-01', '2026-02-02', '2026-02-03']);
+	});
+
+	it('uses now as the end when the domain end is null', () => {
+		const now = dayjs('2026-01-02');
+
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-01-01', end: null }),
+			some('Daily'),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual(['2026-01-01', '2026-01-02']);
+	});
+
+	it('returns no bins when the domain is empty (start > end)', () => {
+		const now = dayjs('2026-01-02');
+		const bins = expectedBinsForDomain(
+			some({ start: '2026-01-06', end: '2026-01-05' }),
+			some('Daily'),
+			now
+		);
+
+		expect(isSome(bins) && bins.value).toEqual([]);
 	});
 });

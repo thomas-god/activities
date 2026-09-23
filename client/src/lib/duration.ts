@@ -5,6 +5,8 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
 import isoWeek from 'dayjs/plugin/isoWeek';
+import { isNone, type Option } from './Options';
+import type { TrainingMetricGranularity } from './trainingMetric';
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
@@ -119,3 +121,21 @@ export const formatWeekInterval = (start: number | string): string => {
 };
 
 export const now = (): dayjs.Dayjs => dayjs();
+
+export const granularityUnits = (
+	granularity: Option<TrainingMetricGranularity>
+): { startOf: dayjs.ManipulateType; add: dayjs.ManipulateType } => {
+	if (isNone(granularity)) {
+		return { startOf: 'day', add: 'day' };
+	}
+
+	if (granularity.value === 'Daily') {
+		return { startOf: 'day', add: 'day' };
+	} else if (granularity.value === 'Weekly') {
+		return { startOf: 'isoWeek' as dayjs.ManipulateType, add: 'week' };
+	} else if (granularity.value === 'Monthly') {
+		return { startOf: 'month', add: 'month' };
+	}
+
+	return { startOf: 'day', add: 'day' };
+};

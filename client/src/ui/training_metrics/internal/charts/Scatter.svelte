@@ -11,6 +11,10 @@ performances).
 
 The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
 
+If even with limited `$derived` performances are still bad, you can replace some of them with
+plain `$state(/* mutation */)` and `$effect(() => /* mutation */)` to apparently break the
+`$derived` reruns explosion. Use the browser performance tool to find which `$derived` to convert.
+
 The `state_referenced_locally` warnings are left ON so that we have to explicitly add
 `// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
 forgetting `$derived` on actual dynamic variables.
@@ -23,13 +27,15 @@ The same design decision applies to other types of chart in this module.
 	import * as d3 from 'd3';
 	import { dayjs } from '$lib/duration';
 	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+
 	import {
 		buildContinuousTimeRelativeFormatter,
 		formatTooltipValue,
 		parseMetricIntoPoints,
-		type DisplayMode,
-		type TimeDomain
+		type DisplayMode
 	} from '.';
+	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -68,19 +74,27 @@ The same design decision applies to other types of chart in this module.
 	let svgElement: SVGElement;
 
 	// svelte-ignore state_referenced_locally
-	const { points } = parseMetricIntoPoints(values, timeDomain);
+	const { points, times: metricTimes } = parseMetricIntoPoints(values, timeDomain);
+	const now = dayjs();
+	const _none: Option<TrainingMetricGranularity> = none();
+
+	// svelte-ignore state_referenced_locally
+	/* eslint-disable svelte/prefer-writable-derived */
+	let domainTimes = $state(expectedBinsForDomain(timeDomain, _none, now));
+	$effect(() => {
+		domainTimes = expectedBinsForDomain(timeDomain, _none, now);
+	});
+	let times = $derived(unwrapOr(domainTimes, metricTimes));
 
 	const valuesAsTime = points.map(({ time, value }) => ({
 		time: dayjs(time).unix(),
 		value: value
 	}));
 
-	let absoluteTimeFormatter = $derived.by(() => {
-		return (timestamp: d3.NumberValue, _idx: number) =>
-			dayjs.unix(timestamp.valueOf()).format('MMM D');
-	});
-	// svelte-ignore state_referenced_locally
-	const relativeTimeFormatter = buildContinuousTimeRelativeFormatter(timeDomain);
+	let absoluteTimeFormatter = (timestamp: d3.NumberValue, _idx: number) =>
+		dayjs.unix(timestamp.valueOf()).format('MMM D');
+
+	let relativeTimeFormatter = $derived(buildContinuousTimeRelativeFormatter(timeDomain));
 
 	const yAxisTickFormatter = (() => {
 		if (format === 'duration') {
@@ -146,33 +160,8 @@ The same design decision applies to other types of chart in this module.
 		return yAxisDefaultTickValues();
 	};
 
-	const minTime = (() => {
-		const values = [
-			dayjs
-				.unix(d3.min(valuesAsTime, (v) => v.time) ?? 0)
-				.startOf('day')
-				.unix()
-		];
-		if (isSome(timeDomain)) {
-			values.push(dayjs(timeDomain.value.start).unix());
-		}
-
-		return Math.min(...values);
-	})();
-	const maxTime = (() => {
-		const values = [
-			dayjs
-				.unix(d3.max(valuesAsTime, (v) => v.time) ?? 0)
-				.endOf('day')
-				.unix()
-		];
-
-		if (isSome(timeDomain) && timeDomain.value.end !== null) {
-			values.push(dayjs(timeDomain.value.end).unix());
-		}
-
-		return Math.max(...values);
-	})();
+	let minTime = $derived(dayjs(times.at(0)).unix());
+	let maxTime = $derived(dayjs(times.at(-1)).unix());
 
 	let x = $derived(
 		d3

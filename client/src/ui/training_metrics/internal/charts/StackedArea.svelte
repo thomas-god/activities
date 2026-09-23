@@ -11,6 +11,10 @@ performances).
 
 The only real dynamic props we use `$derived` on are `width` and `height` to handle resizing.
 
+If even with limited `$derived` performances are still bad, you can replace some of them with
+plain `$state(/* mutation */)` and `$effect(() => /* mutation */)` to apparently break the
+`$derived` reruns explosion. Use the browser performance tool to find which `$derived` to convert.
+
 The `state_referenced_locally` warnings are left ON so that we have to explicitly add
 `// svelte-ignore state_referenced_locally` comments to variables we consider fixed, and avoid
 forgetting `$derived` on actual dynamic variables.
@@ -18,19 +22,18 @@ forgetting `$derived` on actual dynamic variables.
 The same design decision applies to other types of chart in this module.
 -->
 <script lang="ts">
-	import dayjs from 'dayjs';
+	import { dayjs } from '$lib/duration';
 	import * as d3 from 'd3';
-	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { asOption, isSome, map, none, unwrapOr, type Option } from '$lib/Options';
 	import {
 		buildAbsoluteTimeFormatter,
 		buildRelativeTimeFormatter,
 		formatTooltipValue,
-		mapDomainToGranularity,
 		parseMetricIntoPoints,
-		type DisplayMode,
-		type TimeDomain
+		type DisplayMode
 	} from '.';
 	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
+	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
 
 	let {
 		data,
@@ -74,18 +77,27 @@ The same design decision applies to other types of chart in this module.
 	type StackRow = Record<string, number>;
 
 	// svelte-ignore state_referenced_locally
-	const snappedDomain = mapDomainToGranularity(timeDomain, granularity);
-
-	// svelte-ignore state_referenced_locally
-	const { points, times } = parseMetricIntoPoints(data, snappedDomain, {
+	const { points, times: metricTimes } = parseMetricIntoPoints(data, timeDomain, {
 		replaceNullValues: false
 	});
+	// svelte-ignore state_referenced_locally
+	/* eslint-disable svelte/prefer-writable-derived */
+	let domainTimes = $state(expectedBinsForDomain(timeDomain, asOption(granularity), dayjs()));
+	$effect(() => {
+		domainTimes = expectedBinsForDomain(timeDomain, asOption(granularity), dayjs());
+	});
+
+	let times = $derived(unwrapOr(domainTimes, metricTimes));
 
 	const groups = [...new Set(points.map((v) => v.group))].sort();
 
-	const timeByTs = new Map(times.map((time) => [dayjs(time).unix(), time]));
+	// svelte-ignore state_referenced_locally
+	let timeByTs = $state(new Map(times.map((time) => [dayjs(time).unix(), time])));
+	$effect(() => {
+		timeByTs = new Map(times.map((time) => [dayjs(time).unix(), time]));
+	});
 
-	const rows = (() => {
+	let rows = $derived.by(() => {
 		/* eslint-disable svelte/prefer-svelte-reactivity */
 		const valueByGroupAndTime = new Map<string, number>();
 		for (const v of points) {
@@ -98,12 +110,14 @@ The same design decision applies to other types of chart in this module.
 			}
 			return row;
 		});
-	})();
+	});
 
-	const series = d3
-		.stack<StackRow>()
-		.keys(groups)
-		.value((d, key) => d[key] ?? 0)(rows);
+	let series = $derived(
+		d3
+			.stack<StackRow>()
+			.keys(groups)
+			.value((d, key) => d[key] ?? 0)(rows)
+	);
 
 	const yAxisDefaultTickValues = (): number[] => {
 		if (points.length === 0) {
@@ -140,12 +154,17 @@ The same design decision applies to other types of chart in this module.
 		return times.filter((_, i) => i % step === 0 || i === times.length - 1);
 	});
 
-	let xAxis = $derived(
+	// svelte-ignore state_referenced_locally
+	let xAxis = $state(
 		d3
 			.scalePoint()
 			.domain(times)
 			.range([marginLeft, width - marginRight])
 	);
+	$effect(() => {
+		xAxis.domain(times).range([marginLeft, width - marginRight]);
+	});
+
 	let yAxis = $derived(
 		d3
 			.scaleLinear()
@@ -166,8 +185,7 @@ The same design decision applies to other types of chart in this module.
 
 	// svelte-ignore state_referenced_locally
 	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
-	// svelte-ignore state_referenced_locally
-	const relativeTimeFormatter = buildRelativeTimeFormatter(times, granularity);
+	let relativeTimeFormatter = $derived(buildRelativeTimeFormatter(times, granularity));
 
 	const yAxisTickFormatter = () => {
 		return (value: d3.NumberValue, _idx: number) =>
