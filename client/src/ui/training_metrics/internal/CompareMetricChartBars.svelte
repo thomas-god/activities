@@ -10,7 +10,7 @@
 	import { isSome, map, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import * as d3 from 'd3';
-	import dayjs from 'dayjs';
+	import { dayjs } from '$lib/duration';
 	import { formatTooltipValue, getGroupColor } from './charts';
 
 	export interface CompareMetricChartBarsProps {

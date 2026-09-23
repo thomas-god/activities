@@ -5,9 +5,9 @@ import {
 	formatDateTime,
 	formatWeekInterval,
 	formatDurationHoursMinutes,
-	formatDurationCompactWithUnits
+	formatDurationCompactWithUnits,
+	dayjs
 } from './duration';
-import dayjs from 'dayjs';
 
 it('Should format a number of seconds into hh:mm:ss', () => {
 	expect(formatDuration(0)).toEqual('00:00');

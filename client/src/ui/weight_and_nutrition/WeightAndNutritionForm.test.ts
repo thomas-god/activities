@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import dayjs from 'dayjs';
+import { dayjs } from '$lib/duration';
 
 import { fetchWeightAndNutrition, saveWeightAndNutrition, type WeightAndNutrition } from '$lib/api';
 import WeightAndNutritionForm from './WeightAndNutritionForm.svelte';

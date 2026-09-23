@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 import HooperIndexForm from './HooperIndexForm.svelte';
 import { emptyHooperIndex, hooperMeasures } from './index';
-import dayjs from 'dayjs';
+import { dayjs } from '$lib/duration';
 
 vi.mock('$lib/api', () => ({
 	fetchHooperIndex: vi.fn(),

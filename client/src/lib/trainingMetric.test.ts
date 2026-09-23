@@ -14,7 +14,7 @@ import {
 	relativeBucketLabel,
 	type CompareMetricDefinition
 } from './trainingMetric';
-import dayjs from 'dayjs';
+import { dayjs } from '$lib/duration';
 
 const metricFilters = (overrides: Partial<TrainingMetricFilters> = {}): TrainingMetricFilters => ({
 	sports: [{ Sport: 'Running' }, { SportCategory: 'Cycling' }],
