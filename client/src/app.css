@@ -14,6 +14,19 @@
 	--color-speed-chart: #3f88c5;
 	--color-elevation-chart: #032b43;
 	--color-cadence-chart: #754f2f;
+
+	/* Feedback (Hooper index) stable chart colors */
+	--color-feedback-fatigue: #ea580c; /* orange-600 */
+	--color-feedback-sleep: #2563eb; /* blue-600 */
+	--color-feedback-pain: #dc2626; /* red-600 */
+	--color-feedback-stress: #7c3aed; /* violet-600 */
+	--color-feedback-mood: #16a34a; /* green-600 */
+
+	/* Weight and nutrition stable chart colors */
+	--color-nutrition-total-weight: #64748b; /* slate-500 */
+	--color-nutrition-calories: #b45309; /* amber-700 */
+	--color-nutrition-water: #0891b2; /* cyan-600 */
+	--color-nutrition-alcohol: #9333ea; /* purple-600 */
 }
 
 @plugin 'daisyui/theme' {
@@ -25,6 +38,19 @@
 	--color-speed-chart: #3f88c5;
 	--color-elevation-chart: #87a5b0;
 	--color-cadence-chart: #d28546;
+
+	/* Feedback (Hooper index) stable chart colors */
+	--color-feedback-fatigue: #fb923c; /* orange-400 */
+	--color-feedback-sleep: #60a5fa; /* blue-400 */
+	--color-feedback-pain: #f87171; /* red-400 */
+	--color-feedback-stress: #a78bfa; /* violet-400 */
+	--color-feedback-mood: #4ade80; /* green-400 */
+
+	/* Weight and nutrition stable chart colors */
+	--color-nutrition-total-weight: #94a3b8; /* slate-400 */
+	--color-nutrition-calories: #fbbf24; /* amber-400 */
+	--color-nutrition-water: #22d3ee; /* cyan-400 */
+	--color-nutrition-alcohol: #c084fc; /* purple-400 */
 }
 
 @theme {

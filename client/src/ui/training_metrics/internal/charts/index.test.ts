@@ -8,6 +8,7 @@ import {
 	buildContinuousTimeRelativeFormatter,
 	buildRelativeTimeFormatter,
 	formatTooltipValue,
+	getGroupColorScale,
 	mapDomainToGranularity,
 	parseMetricIntoPoints,
 	type Point
@@ -249,5 +250,46 @@ describe('buildContinuousTimeRelativeFormatter', () => {
 		const formatter = buildContinuousTimeRelativeFormatter(none());
 
 		expect(formatter(dayjs('2026-01-02').unix(), 0)).toBe('2026-01-02');
+	});
+});
+
+describe('getGroupColorScale', () => {
+	it('returns stable colors for a subset of the feedback set', () => {
+		const color = getGroupColorScale(['sleep', 'fatigue']);
+
+		expect(color('fatigue')).toBe('var(--color-feedback-fatigue)');
+		expect(color('sleep')).toBe('var(--color-feedback-sleep)');
+	});
+
+	it('returns stable colors for the full feedback set regardless of order', () => {
+		const color = getGroupColorScale(['stress', 'mood', 'pain', 'sleep', 'fatigue']);
+
+		expect(color('mood')).toBe('var(--color-feedback-mood)');
+		expect(color('pain')).toBe('var(--color-feedback-pain)');
+		expect(color('stress')).toBe('var(--color-feedback-stress)');
+	});
+
+	it('returns stable colors for the weight and nutrition set', () => {
+		const color = getGroupColorScale(['Total weight', 'Calories', 'Water', 'Alcohol']);
+
+		expect(color('Total weight')).toBe('var(--color-nutrition-total-weight)');
+		expect(color('Calories')).toBe('var(--color-nutrition-calories)');
+		expect(color('Water')).toBe('var(--color-nutrition-water)');
+		expect(color('Alcohol')).toBe('var(--color-nutrition-alcohol)');
+	});
+
+	it('falls back to ordinal colors for an unknown set', () => {
+		const color = getGroupColorScale(['b', 'a']);
+
+		expect(color('a')).toBe('#1f77b4');
+		expect(color('b')).toBe('#ff7f0e');
+	});
+
+	it('falls back to ordinal colors when a group is outside every known set', () => {
+		const color = getGroupColorScale(['fatigue', 'sleep', 'Unknown']);
+
+		// Domain is sorted, so 'Unknown' (uppercase) comes first.
+		expect(color('Unknown')).toBe('#1f77b4');
+		expect(color('fatigue')).toBe('#ff7f0e');
 	});
 });

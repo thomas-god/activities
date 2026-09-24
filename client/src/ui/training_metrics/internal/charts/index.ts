@@ -1,3 +1,4 @@
+import { scaleOrdinal, schemeCategory10 } from 'd3';
 import type { TrainingMetric } from '$lib/api';
 import { dayjs, formatDurationHoursMinutes, formatWeekInterval } from '$lib/duration';
 import { isNone, isSome, some, type Option } from '$lib/Options';
@@ -52,6 +53,40 @@ export const getGroupColor = (
 		default:
 			return null;
 	}
+};
+
+/** Stable colors for known sets of groups, so a missing group doesn't shift every color.
+
+ * A chart whose groups all belong to a known set uses the set's fixed colors; any other
+ * chart falls back to the default d3 ordinal scheme (colors assigned by sorted group order).
+**/
+const STABLE_GROUP_COLOR_SETS: Record<string, string>[] = [
+	// Feedback (HooperIndexSource::All)
+	{
+		fatigue: 'var(--color-feedback-fatigue)',
+		sleep: 'var(--color-feedback-sleep)',
+		pain: 'var(--color-feedback-pain)',
+		stress: 'var(--color-feedback-stress)',
+		mood: 'var(--color-feedback-mood)'
+	},
+	// Weight and nutrition
+	{
+		'Total weight': 'var(--color-nutrition-total-weight)',
+		Calories: 'var(--color-nutrition-calories)',
+		Water: 'var(--color-nutrition-water)',
+		Alcohol: 'var(--color-nutrition-alcohol)'
+	}
+];
+
+export const getGroupColorScale = (groups: string[]): ((group: string) => string) => {
+	for (const stableColors of STABLE_GROUP_COLOR_SETS) {
+		if (groups.every((group) => group in stableColors)) {
+			return (group: string) => stableColors[group];
+		}
+	}
+
+	const fallback = scaleOrdinal(schemeCategory10).domain([...groups].sort());
+	return (group: string) => fallback(group);
 };
 
 export type DisplayMode = 'relative' | 'absolute';

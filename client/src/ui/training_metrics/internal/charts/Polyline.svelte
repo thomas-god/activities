@@ -25,6 +25,7 @@ The same design decision applies to other types of chart in this module.
 	import * as d3 from 'd3';
 	import { asOption, isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
 	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
 	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
 	import { dayjs } from '$lib/duration';
@@ -33,6 +34,7 @@ The same design decision applies to other types of chart in this module.
 		buildAbsoluteTimeFormatter,
 		buildRelativeTimeFormatter,
 		formatTooltipValue,
+		getGroupColorScale,
 		mapDomainToGranularity,
 		parseMetricIntoPoints,
 		type DisplayMode,
@@ -180,9 +182,22 @@ The same design decision applies to other types of chart in this module.
 		(v) => v.group
 	);
 
-	const color = d3
-		.scaleOrdinal(d3.schemeCategory10)
-		.domain(groupedValues.map(([group]) => group).sort());
+	const legendGroups = groupedValues.map(([group]) => group).sort();
+
+	const color = getGroupColorScale(legendGroups);
+
+	// Groups toggled off by clicking their legend entry; the y-scale is intentionally kept
+	// computed from all points so hiding/showing lines doesn't rescale the chart.
+	const hiddenGroups = new SvelteSet<string>();
+	const toggleGroup = (group: string) => {
+		if (hiddenGroups.has(group)) {
+			hiddenGroups.delete(group);
+		} else {
+			hiddenGroups.add(group);
+		}
+	};
+	let visiblePoints = $derived(points.filter((p) => !hiddenGroups.has(p.group)));
+	let visibleGroupedValues = $derived(groupedValues.filter(([group]) => !hiddenGroups.has(group)));
 
 	// svelte-ignore state_referenced_locally
 	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
@@ -298,24 +313,25 @@ The same design decision applies to other types of chart in this module.
 			sel
 				.attr('fill', 'none')
 				.selectAll<SVGPathElement, [string, Point[]]>('path')
-				.data(groupedValues, (d) => d[0])
+				.data(visibleGroupedValues, (d) => d[0])
 				.join('path')
 				.attr('stroke', (d) => color(d[0]))
 				.attr('d', (d) => line(d[1]))
+				.attr('stroke-width', 1.5)
 		);
 
 		d3.select(gDots).call((sel) =>
 			sel
 				.attr('stroke-width', 1)
 				.attr('fill-opacity', 0.6)
-				.selectAll('circle')
-				.data(points)
+				.selectAll<SVGCircleElement, Point>('circle')
+				.data(visiblePoints, (d) => `${d.group}-${d.time}`)
 				.join('circle')
 				.attr('stroke', (d) => color(d.group))
 				.attr('fill', (d) => color(d.group))
 				.attr('cx', (d) => xAxis(d.time)!)
 				.attr('cy', (d) => yAxis(d.value))
-				.attr('r', 4)
+				.attr('r', 2.5)
 
 				.on(
 					'mouseenter',
@@ -496,4 +512,28 @@ The same design decision applies to other types of chart in this module.
 				: none()}
 		/>
 	</svg>
+
+	{#if legendGroups.length > 1}
+		<div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+			{#each legendGroups as group (group)}
+				<button
+					type="button"
+					class="flex cursor-pointer items-center gap-1.5 transition-opacity select-none hover:opacity-100"
+					class:opacity-40={hiddenGroups.has(group)}
+					onclick={() => toggleGroup(group)}
+					aria-pressed={hiddenGroups.has(group)}
+					title={hiddenGroups.has(group) ? `Show ${group}` : `Hide ${group}`}
+				>
+					<span
+						class="capi inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+						style={`background: ${color(group)}`}
+					>
+					</span>
+					<span class="capitalize opacity-80" class:line-through={hiddenGroups.has(group)}
+						>{group}</span
+					>
+				</button>
+			{/each}
+		</div>
+	{/if}
 </div>
