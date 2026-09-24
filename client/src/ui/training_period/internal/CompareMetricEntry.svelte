@@ -2,14 +2,15 @@
 	import * as d3 from 'd3';
 	import { X } from '@lucide/svelte';
 	import type { TrainingMetric, TrainingPeriodDetails } from '$lib/api';
-	import { asOption, isSome, some, type Option } from '$lib/Options';
+	import { asOption, isSome, none, some, type Option } from '$lib/Options';
 	import {
 		definitionLabel,
 		type CompareAlignment,
 		type CompareMetricDefinition
 	} from '$lib/trainingMetric';
 	import TrainingMetricChart, {
-		type ChartHandle
+		type ChartHandle,
+		type HoveredBin
 	} from '$ui/training_metrics/TrainingMetricChart.svelte';
 	import { computeExtendedTimeDomain, computeMissingNumberOfBins } from './CompareMetricEntry';
 	import { dayjs } from '$lib/duration';
@@ -33,13 +34,13 @@
 		onRemove: () => void;
 	} = $props();
 
-	let hovered: number | null = $state(null);
 	let chartWidths: number[] = $state([300, 300]);
 
 	let firstChartRef = $state<ChartHandle>();
 	let secondChartRef = $state<ChartHandle>();
 
 	let globalMax = $derived(Math.max(firstChartRef?.getYMax() ?? 0, secondChartRef?.getYMax() ?? 0));
+	let hoveredBin: Option<HoveredBin> = $state(none());
 
 	const heightFor = (width: number): number => Math.max(150, Math.min(300, width * 0.6));
 </script>
@@ -117,6 +118,7 @@
 								{timeDomain}
 								displayMode="relative"
 								yMax={some(globalMax)}
+								bind:syncHoveredBin={hoveredBin}
 							/>
 						{/if}
 					</div>

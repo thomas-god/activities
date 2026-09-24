@@ -93,15 +93,4 @@ describe('ComparePeriodsSummary', () => {
 		expect(screen.getByText('15 km')).toBeInTheDocument();
 		expect(screen.getByText('370 m')).toBeInTheDocument();
 	});
-
-	it('shows a dash for missing values', () => {
-		render(ComparePeriodsSummary, {
-			props: {
-				periods: [makePeriod({ activities: [makeActivity({})] })]
-			}
-		});
-
-		const dashes = screen.getAllByText('—');
-		expect(dashes.length).toBeGreaterThan(0);
-	});
 });

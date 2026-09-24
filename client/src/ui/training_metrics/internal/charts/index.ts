@@ -1,5 +1,5 @@
 import type { TrainingMetric } from '$lib/api';
-import { dayjs, formatDurationCompactWithUnits, formatWeekInterval } from '$lib/duration';
+import { dayjs, formatDurationHoursMinutes, formatWeekInterval } from '$lib/duration';
 import { isNone, isSome, some, type Option } from '$lib/Options';
 import { paceInSecondToString } from '$lib/speed';
 import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
@@ -11,7 +11,7 @@ export const formatTooltipValue = (
 	unit: string
 ): string => {
 	if (format === 'duration') {
-		return formatDurationCompactWithUnits(value);
+		return formatDurationHoursMinutes(value);
 	}
 	if (unit === 'activities') {
 		return `${Math.round(value)} ${unit}`;

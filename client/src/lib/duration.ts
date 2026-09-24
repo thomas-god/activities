@@ -79,7 +79,7 @@ export const formatDurationHoursMinutes = (time: number): string => {
 	const minutes = Math.floor(remaining / ONE_MINUTE_IN_SECONDS);
 
 	if (time === 0) {
-		return '';
+		return '0m';
 	}
 
 	if (hours === 0) {

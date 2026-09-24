@@ -29,7 +29,7 @@ The same design decision applies to other types of chart in this module.
 		type TrainingMetricGranularity,
 		type TrainingMetricGroupByClause
 	} from '$lib/trainingMetric';
-	import { asOption, isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { asOption, isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
 	import { paceInSecondToString } from '$lib/speed';
 	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
 	import {
@@ -41,7 +41,9 @@ The same design decision applies to other types of chart in this module.
 		parseMetricIntoPoints,
 		type DisplayMode
 	} from '.';
-	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import { untrack } from 'svelte';
+	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;
@@ -58,6 +60,7 @@ The same design decision applies to other types of chart in this module.
 		timeDomain?: TimeDomain;
 		displayMode?: DisplayMode;
 		yMaxValue?: Option<number>;
+		syncHoveredBin: Option<HoveredBin>;
 	}
 
 	let {
@@ -74,7 +77,8 @@ The same design decision applies to other types of chart in this module.
 		stacked = true,
 		timeDomain = none(),
 		yMaxValue = none(),
-		displayMode = 'absolute'
+		displayMode = 'absolute',
+		syncHoveredBin = $bindable()
 	}: TimeseriesChartProps = $props();
 	let marginTop = 20;
 	let marginRight = 20;
@@ -105,6 +109,7 @@ The same design decision applies to other types of chart in this module.
 	});
 
 	let times = $derived(unwrapOr(domainTimes, metricTimes));
+	let binByTime = $derived(new Map(times.entries().map(([idx, bin]) => [bin, idx])));
 
 	// svelte-ignore state_referenced_locally
 	const absoluteTimeFormatter = buildAbsoluteTimeFormatter(granularity);
@@ -242,24 +247,74 @@ The same design decision applies to other types of chart in this module.
 	let yValues = $derived(yAxisTickValues.length === 0 ? y.ticks() : yAxisTickValues);
 
 	// Tooltip state
-	let tooltip = $state<{
-		visible: boolean;
-		x: number;
-		y: number;
-		showBelow: boolean;
-		time: string;
-		group: string;
-		value: number;
-		total: number;
-	}>({
+	let tooltip = $state<TooltipData>({
 		visible: false,
+		source: 'local',
 		x: 0,
 		y: 0,
 		showBelow: false,
 		time: '',
 		group: '',
 		value: 0,
-		total: 0
+		total: none()
+	});
+
+	$effect(() => {
+		const _tooltip = untrack(() => tooltip);
+		if (isNone(syncHoveredBin)) {
+			if (_tooltip.source === 'external') {
+				tooltip = { ..._tooltip, visible: false };
+			}
+			return;
+		}
+		if (_tooltip.visible && _tooltip.source === 'local') {
+			// Already visible from local, don't try to override it
+			return;
+		}
+
+		const time = times.at(syncHoveredBin.value.bin);
+		if (time === undefined) {
+			return;
+		}
+		const group = syncHoveredBin.value.group;
+
+		const xPos = x(time)! + x.bandwidth() / 2;
+		const total = points.filter((v) => v.time === time).reduce((sum, v) => sum + v.value, 0);
+		const value = points.find((v) => v.time === time && v.group === group)?.value;
+		const yPos = y(total);
+
+		// Check if there's enough space above the bar for tooltip (need ~100px)
+		const tooltipHeight = 100;
+		const spaceAbove = yPos - marginTop;
+		const showBelow = spaceAbove < tooltipHeight;
+
+		// Check horizontal space for tooltip (tooltip width is 200px)
+		const tooltipWidth = 100;
+		const tooltipHalfWidth = tooltipWidth / 2;
+		const spaceLeft = xPos - marginLeft;
+		const spaceRight = width - marginRight - xPos;
+
+		// Determine tooltip x position
+		let tooltipX = xPos - tooltipHalfWidth; // Center by default
+		if (spaceLeft < tooltipHalfWidth) {
+			// Not enough space on the left, align to left edge
+			tooltipX += tooltipHalfWidth;
+		} else if (spaceRight < tooltipHalfWidth) {
+			// Not enough space on the right, align to right edge
+			tooltipX -= tooltipHalfWidth;
+		}
+
+		tooltip = {
+			visible: true,
+			source: 'external',
+			x: tooltipX,
+			y: yPos,
+			showBelow,
+			time,
+			group: group === undefined ? 'Total' : group,
+			value: value === undefined ? total : value,
+			total: some(total)
+		};
 	});
 
 	// Hide tooltip on scroll
@@ -348,15 +403,21 @@ The same design decision applies to other types of chart in this module.
 						tooltipX -= tooltipHalfWidth;
 					}
 
+					const bin = binByTime.get(time);
+					if (bin !== undefined) {
+						syncHoveredBin = some({ bin, group: stackedDataPoint.key });
+					}
+
 					tooltip = {
 						visible: true,
+						source: 'local',
 						x: tooltipX,
 						y: yPos,
 						showBelow: showBelow,
 						time: time,
 						group: stackedDataPoint.key,
 						value: value,
-						total: total
+						total: some(total)
 					};
 
 					// Highlight the bar with a border using the group's color
@@ -371,7 +432,18 @@ The same design decision applies to other types of chart in this module.
 				})
 				.on('mouseleave', function (event: MouseEvent) {
 					// Hide tooltip
-					tooltip = { ...tooltip, visible: false };
+					tooltip = {
+						visible: false,
+						source: 'local',
+						x: 0,
+						y: 0,
+						showBelow: false,
+						time: '',
+						group: '',
+						value: 0,
+						total: none()
+					};
+					syncHoveredBin = none();
 
 					// Remove highlight
 					d3.select(event.target as SVGRectElement).attr('stroke', 'none');
@@ -476,47 +548,17 @@ The same design decision applies to other types of chart in this module.
 		<g bind:this={gy} transform="translate({marginLeft} 0)" />
 
 		<!-- Tooltip inside SVG -->
-		{#if tooltip.visible}
-			<foreignObject
-				x={Math.round(tooltip.x)}
-				y={tooltip.showBelow ? Math.round(tooltip.y) + 10 : Math.round(tooltip.y) - 90}
-				width="200"
-				height="100"
-				class="pointer-events-none overflow-visible"
-			>
-				<div xmlns="http://www.w3.org/1999/xhtml" class="fixed">
-					<div class="rounded-box bg-base-300 px-3 py-2 text-sm shadow-lg">
-						<div class="flex flex-col gap-1">
-							<div class="font-semibold">
-								{displayMode === 'absolute'
-									? absoluteTimeFormatter(tooltip.time, 0)
-									: relativeTimeFormatter(tooltip.time, 0)}
-								{#if displayMode === 'relative'}
-									<span class="text-xs font-light italic">
-										•
-										{absoluteTimeFormatter(tooltip.time, 0)}
-									</span>
-								{/if}
-							</div>
-							<div class="text-xs opacity-80">
-								{#if showGroup}
-									<span>{tooltip.group}</span>
-									<span>•</span>
-								{/if}
-								<span>{formatTooltipValue(tooltip.value, format, unit)}</span>
-							</div>
-							{#if showGroup && tooltip.total !== tooltip.value && stacked}
-								<div class="text-xs opacity-60">
-									<span>Total</span>
-									<span>•</span>
-									<span>{formatTooltipValue(tooltip.total, format, unit)}</span>
-								</div>
-							{/if}
-						</div>
-					</div>
-				</div>
-			</foreignObject>
-		{/if}
+		<Tooltip
+			data={tooltip}
+			{format}
+			{unit}
+			primaryTimeFormatter={displayMode === 'absolute'
+				? (time: string) => absoluteTimeFormatter(time, 0)
+				: (time: string) => relativeTimeFormatter(time, 0)}
+			secondaryTimeFormatter={displayMode === 'relative'
+				? some((time: string) => absoluteTimeFormatter(time, 0))
+				: none()}
+		/>
 	</svg>
 
 	<!-- Legend -->

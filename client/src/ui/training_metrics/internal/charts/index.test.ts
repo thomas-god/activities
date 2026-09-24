@@ -16,9 +16,9 @@ import type { TimeDomain } from '$ui/training_metrics';
 
 describe('formatTooltipValue', () => {
 	it('formats duration values with compact units', () => {
-		expect(formatTooltipValue(90, 'duration', 's')).toBe('1m');
+		expect(formatTooltipValue(90, 'duration', 's')).toBe('01m');
 		expect(formatTooltipValue(0, 'duration', 's')).toBe('0m');
-		expect(formatTooltipValue(90000, 'duration', 's')).toBe('1d01h');
+		expect(formatTooltipValue(90000, 'duration', 's')).toBe('25h 00m');
 	});
 
 	it('rounds number values for activities', () => {

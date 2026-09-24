@@ -13,13 +13,19 @@
 		getYMin(): number;
 	}
 
+	export interface HoveredBin {
+		bin: number;
+		group?: string;
+	}
+
 	let {
 		metric,
 		width,
 		height = 300,
 		timeDomain = none(),
 		displayMode = 'absolute',
-		yMax = none()
+		yMax = none(),
+		syncHoveredBin = $bindable(none())
 	}: {
 		metric: TrainingMetric;
 		width: number;
@@ -27,6 +33,7 @@
 		timeDomain?: TimeDomain;
 		displayMode?: DisplayMode;
 		yMax?: Option<number>;
+		syncHoveredBin?: Option<HoveredBin>;
 	} = $props();
 
 	const previewFormat = (unit: string): 'number' | 'duration' | 'pace' => {
@@ -54,6 +61,7 @@
 	export function getYMin(): number {
 		return chartRef?.getYMin() ?? 0;
 	}
+
 	({ getYMax, getYMin }) satisfies ChartHandle;
 </script>
 
@@ -76,6 +84,7 @@
 				{timeDomain}
 				{displayMode}
 				yMaxValue={yMax}
+				bind:syncHoveredBin
 			/>
 		{:else}
 			<ScatterChart
@@ -108,6 +117,7 @@
 				granularity={metric.granularity}
 				{displayMode}
 				yMaxValue={yMax}
+				bind:syncHoveredBin
 			/>
 		{:else}
 			<Polyline
@@ -124,6 +134,7 @@
 				granularity={metric.granularity}
 				yInterceptZero={metric.source.metric !== 'TotalWeight'}
 				{displayMode}
+				bind:syncHoveredBin
 			/>
 		{/if}
 	{/if}
