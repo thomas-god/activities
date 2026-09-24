@@ -211,6 +211,7 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
     // Subjective measures/Hooper index
     let aggregate = TrainingMetricAggregate::Average;
     let metrics = [
+        HooperIndexSource::All,
         HooperIndexSource::Fatigue,
         HooperIndexSource::Sleep,
         HooperIndexSource::Stress,

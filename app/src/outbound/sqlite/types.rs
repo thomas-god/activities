@@ -942,6 +942,7 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RepositoryTrainingMetricSource {
                 ActivityMetric::NumberOfActivity => "number-of-activities",
             },
             Self::HooperIndex(source) => match source {
+                HooperIndexSource::All => "subjective-all",
                 HooperIndexSource::Fatigue => "subjective-fatigue",
                 HooperIndexSource::Mood => "subjective-mood",
                 HooperIndexSource::Pain => "subjective-pain",
@@ -1001,6 +1002,7 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepositoryTrainingMetricSource {
 
             "number-of-activities" => Ok(Self::Activity(ActivityMetric::NumberOfActivity)),
 
+            "subjective-all" => Ok(Self::HooperIndex(HooperIndexSource::All)),
             "subjective-fatigue" => Ok(Self::HooperIndex(HooperIndexSource::Fatigue)),
             "subjective-pain" => Ok(Self::HooperIndex(HooperIndexSource::Pain)),
             "subjective-mood" => Ok(Self::HooperIndex(HooperIndexSource::Mood)),

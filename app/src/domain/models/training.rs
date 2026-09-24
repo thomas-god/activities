@@ -1272,16 +1272,6 @@ impl HooperIndex {
         &self.mood
     }
 
-    pub fn value(&self, source: &HooperIndexSource) -> &Option<SubjectiveScale> {
-        match source {
-            HooperIndexSource::Fatigue => &self.fatigue,
-            HooperIndexSource::Sleep => &self.sleep,
-            HooperIndexSource::Mood => &self.mood,
-            HooperIndexSource::Pain => &self.pain,
-            HooperIndexSource::Stress => &self.stress,
-        }
-    }
-
     pub fn patch(self, patch: HooperIndexPatch) -> Self {
         Self {
             fatigue: patch.fatigue.unwrap_or(self.fatigue),
@@ -1295,6 +1285,7 @@ impl HooperIndex {
 
 #[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
 pub enum HooperIndexSource {
+    All,
     Fatigue,
     Sleep,
     Pain,
@@ -1319,16 +1310,88 @@ impl HooperIndexSource {
             .unwrap_or(TrainingMetricGranularity::Daily);
 
         values
-            .filter_map(|(date, value)| {
-                let Some(value) = value.value(self) else {
-                    return None;
+            .map(|(date, value)| {
+                let bin = granularity.date_key(&date);
+
+                let mut values = vec![];
+                match self {
+                    Self::All => {
+                        if let Some(fatigue) = value.fatigue() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("fatigue".to_string())),
+                                IndividualValue::new(fatigue.value() as f64),
+                            ));
+                        }
+                        if let Some(sleep) = value.sleep() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("sleep".to_string())),
+                                IndividualValue::new(sleep.value() as f64),
+                            ));
+                        }
+                        if let Some(pain) = value.pain() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("pain".to_string())),
+                                IndividualValue::new(pain.value() as f64),
+                            ));
+                        }
+                        if let Some(stress) = value.stress() {
+                            values.push((
+                                TrainingMetricBin::new(bin.clone(), Some("stress".to_string())),
+                                IndividualValue::new(stress.value() as f64),
+                            ));
+                        }
+                        if let Some(mood) = value.mood() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some("mood".to_string())),
+                                IndividualValue::new(mood.value() as f64),
+                            ));
+                        }
+                    }
+                    Self::Fatigue => {
+                        if let Some(value) = value.fatigue() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
+                                IndividualValue::new(value.value() as f64),
+                            ));
+                        }
+                    }
+                    Self::Sleep => {
+                        if let Some(value) = value.sleep() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
+                                IndividualValue::new(value.value() as f64),
+                            ));
+                        }
+                    }
+                    Self::Pain => {
+                        if let Some(value) = value.pain() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
+                                IndividualValue::new(value.value() as f64),
+                            ));
+                        }
+                    }
+                    Self::Stress => {
+                        if let Some(value) = value.stress() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
+                                IndividualValue::new(value.value() as f64),
+                            ));
+                        }
+                    }
+                    Self::Mood => {
+                        if let Some(value) = value.mood() {
+                            values.push((
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
+                                IndividualValue::new(value.value() as f64),
+                            ));
+                        }
+                    }
                 };
 
-                Some((
-                    TrainingMetricBin::new(granularity.date_key(&date), Some(self.to_string())),
-                    IndividualValue::new(value.value() as f64),
-                ))
+                values
             })
+            .flatten()
             .into_group_map()
     }
 }
@@ -3319,6 +3382,64 @@ mod test_hooper_index_source_extract_values {
 
         assert_eq!(result.len(), 1);
         assert_eq!(value_at(&result, &source, "2025-09-04"), 6.0);
+    }
+
+    fn all_bin(granule: &str, group: &str) -> TrainingMetricBin {
+        TrainingMetricBin::new(granule.to_string(), Some(group.to_string()))
+    }
+
+    fn all_value_at(
+        result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>,
+        granule: &str,
+        group: &str,
+    ) -> f64 {
+        result[&all_bin(granule, group)][0].value()
+    }
+
+    #[test]
+    fn test_all_source_extracts_each_available_scale() {
+        let source = HooperIndexSource::All;
+        let values = vec![(
+            date("2025-09-03"),
+            HooperIndex::new(
+                Some(scale(1)),
+                Some(scale(2)),
+                Some(scale(3)),
+                Some(scale(4)),
+                Some(scale(5)),
+            ),
+        )];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 5);
+        assert_eq!(all_value_at(&result, "2025-09-03", "fatigue"), 1.0);
+        assert_eq!(all_value_at(&result, "2025-09-03", "sleep"), 2.0);
+        assert_eq!(all_value_at(&result, "2025-09-03", "pain"), 3.0);
+        assert_eq!(all_value_at(&result, "2025-09-03", "stress"), 4.0);
+        assert_eq!(all_value_at(&result, "2025-09-03", "mood"), 5.0);
+    }
+
+    #[test]
+    fn test_all_source_skips_missing_scales_and_empty_entries() {
+        let source = HooperIndexSource::All;
+        let values = vec![
+            (
+                date("2025-09-03"),
+                HooperIndex::new(Some(scale(1)), None, None, Some(scale(4)), None),
+            ),
+            (date("2025-09-04"), HooperIndex::default()),
+        ];
+
+        let result = source.extract_values(&None, values.into_iter());
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key(&all_bin("2025-09-03", "fatigue")));
+        assert!(result.contains_key(&all_bin("2025-09-03", "stress")));
+        assert!(!result.contains_key(&all_bin("2025-09-03", "sleep")));
+        assert!(!result.contains_key(&all_bin("2025-09-03", "pain")));
+        assert!(!result.contains_key(&all_bin("2025-09-03", "mood")));
+        assert!(!result.contains_key(&all_bin("2025-09-04", "fatigue")));
     }
 }
 
