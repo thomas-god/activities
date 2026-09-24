@@ -19,8 +19,8 @@
 	} from '@lucide/svelte';
 	import ActivitiesUploader from './internal/ActivitiesUploader.svelte';
 	import CreateTrainingNote from './internal/CreateTrainingNote.svelte';
-	import HooperIndexForm from '$ui/hooper_index/HooperIndexForm.svelte';
-	import WeightAndNutritionForm from '$ui/weight_and_nutrition/WeightAndNutritionForm.svelte';
+	import FeedbackForm from './internal/FeedbackForm.svelte';
+	import WeightAndNutritionForm from './internal/WeightAndNutritionForm.svelte';
 	import CreateTrainingPeriod from './internal/CreateTrainingPeriod.svelte';
 	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import type { Scope } from '$ui/training_metrics';
@@ -228,7 +228,7 @@
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<HooperIndexForm callback={invalidateTrainingMetrics} />
+		<FeedbackForm callback={invalidateTrainingMetrics} />
 	</div>
 	<form method="dialog" class="modal-backdrop">
 		<button>close</button>

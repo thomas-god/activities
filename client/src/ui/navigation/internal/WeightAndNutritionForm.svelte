@@ -27,7 +27,7 @@
 		weightAndNutritionUnits,
 		type WeightAndNutritionCategory,
 		type WeightAndNutritionMeasure
-	} from '.';
+	} from './weightAndNutrition';
 
 	let { callback = () => {} }: { callback?: () => void } = $props();
 

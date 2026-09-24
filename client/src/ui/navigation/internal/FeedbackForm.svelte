@@ -9,7 +9,7 @@
 		HOOPER_MEASURE_MIN,
 		hooperMeasures,
 		type HooperMeasure
-	} from '.';
+	} from './feedback';
 
 	let { callback = () => {} }: { callback?: () => void } = $props();
 

@@ -4,7 +4,7 @@ import {
 	emptyWeightAndNutrition,
 	weightAndNutritionCategories,
 	weightAndNutritionMeasures
-} from './index';
+} from './weightAndNutrition';
 
 describe('emptyWeightAndNutrition', () => {
 	it('has every measure unset', () => {

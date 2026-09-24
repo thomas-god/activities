@@ -5,7 +5,7 @@ import { dayjs } from '$lib/duration';
 
 import { fetchWeightAndNutrition, saveWeightAndNutrition, type WeightAndNutrition } from '$lib/api';
 import WeightAndNutritionForm from './WeightAndNutritionForm.svelte';
-import { emptyWeightAndNutrition } from './index';
+import { emptyWeightAndNutrition } from './weightAndNutrition';
 
 vi.mock('$lib/api', () => ({
 	fetchWeightAndNutrition: vi.fn(),

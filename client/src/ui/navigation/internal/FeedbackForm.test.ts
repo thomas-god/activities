@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
-import HooperIndexForm from './HooperIndexForm.svelte';
-import { emptyHooperIndex, hooperMeasures } from './index';
+import HooperIndexForm from './FeedbackForm.svelte';
+import { emptyHooperIndex, hooperMeasures } from './feedback';
 import { dayjs } from '$lib/duration';
 
 vi.mock('$lib/api', () => ({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { emptyHooperIndex, hooperMeasures } from './index';
+import { emptyHooperIndex, hooperMeasures } from './feedback';
 
 describe('emptyHooperIndex', () => {
 	it('has every measure unset', () => {
