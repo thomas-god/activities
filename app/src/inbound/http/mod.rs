@@ -122,6 +122,7 @@ impl<
     PS: IPreferencesService,
 > HttpServer<AS, PF, TMS, US, PS>
 {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new<SS: ISearchService>(
         mode: &AppMode,
         activity_service: AS,

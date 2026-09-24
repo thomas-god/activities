@@ -1310,7 +1310,7 @@ impl HooperIndexSource {
             .unwrap_or(TrainingMetricGranularity::Daily);
 
         values
-            .map(|(date, value)| {
+            .flat_map(|(date, value)| {
                 let bin = granularity.date_key(&date);
 
                 let mut values = vec![];
@@ -1391,7 +1391,6 @@ impl HooperIndexSource {
 
                 values
             })
-            .flatten()
             .into_group_map()
     }
 }
@@ -1427,6 +1426,7 @@ impl HooperIndexPatch {
 // Weight and nutrition
 // =============================================================================
 
+#[allow(clippy::too_many_arguments)]
 #[derive(Debug, Clone, Copy, Constructor, Default)]
 pub struct WeightAndNutrition {
     // Weight
@@ -1533,7 +1533,7 @@ impl WeightAndNutritionSource {
             .unwrap_or(TrainingMetricGranularity::Daily);
 
         values
-            .map(|(date, value)| {
+            .flat_map(|(date, value)| {
                 let bin = granularity.date_key(&date);
 
                 let mut values = vec![];
@@ -1608,11 +1608,11 @@ impl WeightAndNutritionSource {
 
                 values
             })
-            .flatten()
             .into_group_map()
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[derive(Debug, Clone, Copy, Constructor, Default)]
 pub struct WeightAndNutritionPatch {
     pub weight: Option<Option<f32>>,
