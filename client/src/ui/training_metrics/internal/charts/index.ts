@@ -20,6 +20,9 @@ export const formatTooltipValue = (
 	if (format === 'pace') {
 		return `${paceInSecondToString(value)} /km`;
 	}
+	if (unit === 'kg') {
+		return `${value.toFixed(2)} ${unit}`;
+	}
 	return `${value.toFixed(0)} ${unit}`;
 };
 
