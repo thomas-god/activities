@@ -51,7 +51,7 @@
 						{/if}
 					</div>
 					<div class="text-xs opacity-80">
-						<span>{data.group}</span>
+						<span class="capitalize">{data.group}</span>
 						<span>•</span>
 						<span>{formatTooltipValue(data.value, format, unit)}</span>
 					</div>
