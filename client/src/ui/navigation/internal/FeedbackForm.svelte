@@ -2,7 +2,7 @@
 	import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
 	import { dayjs } from '$lib/duration';
 	import { isSome, none, some, type Option } from '$lib/Options';
-	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import { ChevronLeft, ChevronRight, MessageSquareHeart } from '@lucide/svelte';
 	import {
 		emptyHooperIndex,
 		HOOPER_MEASURE_MAX,
@@ -10,8 +10,13 @@
 		hooperMeasures,
 		type HooperMeasure
 	} from './feedback';
+	import FormTitle from '../FormTitle.svelte';
 
-	let { callback = () => {} }: { callback?: () => void } = $props();
+	let {
+		callback = () => {},
+		next = none(),
+		previous = none()
+	}: { callback?: () => void; next?: Option<() => void>; previous?: Option<() => void> } = $props();
 
 	let date = $state(dayjs().format('YYYY-MM-DD'));
 	const setLoadPromise = () =>
@@ -53,8 +58,13 @@
 	const reset = () => (values = { ...baseline });
 </script>
 
+{#snippet formTitle()}
+	<MessageSquareHeart class="size-4" />
+	Subjective feedback
+{/snippet}
+
 <fieldset class="fieldset rounded-box border-base-300 bg-base-100">
-	<legend class="fieldset-legend text-base">Update subjective feedback</legend>
+	<FormTitle {previous} {next} content={formTitle} />
 	<div class="flex flex-row items-center gap-1">
 		<label class="label mr-3" for="hooper-date">Date</label>
 		<button

@@ -69,28 +69,16 @@
 
 	let addItemMenuBtn: HTMLButtonElement;
 
-	let activitiesUploadDialog: HTMLDialogElement;
-	let newTrainingNoteDialog: HTMLDialogElement;
-	let updateFeedbackDialog: HTMLDialogElement;
-	let updateWeightAndNutritionDialog: HTMLDialogElement;
-	let createTrainingPeriodDialog: HTMLDialogElement;
-	let createTrainingMetricDialog: HTMLDialogElement;
-	// To prevent the form from loading when the dialog is initialized but hidden
-	let showTrainingMetricForm = $state(false);
-
 	const activitiesUploadedCallback = () => {
 		invalidateActivities();
 	};
 	const newTrainingNoteCallback = () => {
-		newTrainingNoteDialog.close();
 		invalidateTrainingNotes();
 	};
 	const createTrainingPeriodCallback = () => {
-		createTrainingPeriodDialog.close();
 		invalidateTrainingPeriods();
 	};
 	const createTrainingMetricCallback = () => {
-		createTrainingMetricDialog.close();
 		invalidateTrainingMetrics();
 	};
 
@@ -102,6 +90,30 @@
 	let trainingPeriodScope: Scope = $derived(
 		isSome(trainingPeriod) ? { kind: 'period', periodId: trainingPeriod.value } : { kind: 'global' }
 	);
+
+	let quickMenuDialog: HTMLDialogElement;
+	const quickMenuItems = ['activity', 'feedback', 'w&n', 'note', 'period', 'metric'] as const;
+	const indexByItem = new Map(quickMenuItems.entries().map(([i, v]) => [v, i]));
+	let quickMenuIndex = $state(0);
+	const nextMenuItem = () => {
+		if (quickMenuIndex === quickMenuItems.length - 1) {
+			quickMenuIndex = 0;
+			return;
+		}
+		quickMenuIndex = Math.min(quickMenuIndex + 1, quickMenuItems.length - 1);
+	};
+	const previousMenuItem = () => {
+		if (quickMenuIndex === 0) {
+			quickMenuIndex = quickMenuItems.length - 1;
+			return;
+		}
+		quickMenuIndex = Math.max(quickMenuIndex - 1, 0);
+	};
+	const setQuickMenuIndex = (item: (typeof quickMenuItems)[number]) => {
+		quickMenuDialog.show();
+		quickMenuIndex = indexByItem.get(item)!;
+	};
+	let selectedItem = $derived(quickMenuItems[quickMenuIndex]);
 </script>
 
 <div class="flex items-center justify-between gap-2">
@@ -141,32 +153,27 @@
 		>
 			<ul>
 				<li>
-					<button onclick={() => activitiesUploadDialog.showModal()}>
+					<button onclick={() => setQuickMenuIndex('activity')}>
 						<SportShoe class="size-4" />
 						Activity
 					</button>
-					<button onclick={() => updateFeedbackDialog.showModal()}>
+					<button onclick={() => setQuickMenuIndex('feedback')}>
 						<MessageSquareHeart class="size-4" />
 						Feedback
 					</button>
-					<button onclick={() => updateWeightAndNutritionDialog.showModal()}>
+					<button onclick={() => setQuickMenuIndex('w&n')}>
 						<Utensils class="size-4" />
 						Weight and nutrition
 					</button>
-					<button onclick={() => newTrainingNoteDialog.showModal()}>
+					<button onclick={() => setQuickMenuIndex('note')}>
 						<NotebookPen class="size-4" />
 						Training note
 					</button>
-					<button onclick={() => createTrainingPeriodDialog.showModal()}>
+					<button onclick={() => setQuickMenuIndex('period')}>
 						<CalendarFold class="size-4" />
 						Training period
 					</button>
-					<button
-						onclick={() => {
-							showTrainingMetricForm = true;
-							createTrainingMetricDialog.showModal();
-						}}
-					>
+					<button onclick={() => setQuickMenuIndex('metric')}>
 						<ChartColumn class="size-4" />
 						Training metric
 					</button>
@@ -199,75 +206,47 @@
 	</div>
 </div>
 
-<dialog class="modal" bind:this={activitiesUploadDialog}>
-	<div class="modal-box">
+<dialog class="modal" bind:this={quickMenuDialog}>
+	<div class="overflow-y-none modal-box h-150 w-[90%] max-w-lg">
 		<form method="dialog">
 			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
 		</form>
-		<ActivitiesUploader {activitiesUploadedCallback} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<dialog class="modal" bind:this={newTrainingNoteDialog}>
-	<div class="modal-box">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		<CreateTrainingNote callback={newTrainingNoteCallback} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<dialog class="modal" bind:this={updateFeedbackDialog}>
-	<div class="modal-box">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		<FeedbackForm callback={invalidateTrainingMetrics} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<dialog class="modal" bind:this={updateWeightAndNutritionDialog}>
-	<div class="modal-box">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		<WeightAndNutritionForm callback={invalidateTrainingMetrics} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<dialog class="modal" bind:this={createTrainingPeriodDialog}>
-	<div class="modal-box max-w-3xl">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		<CreateTrainingPeriod callback={createTrainingPeriodCallback} />
-	</div>
-	<form method="dialog" class="modal-backdrop">
-		<button>close</button>
-	</form>
-</dialog>
-
-<dialog class="modal" bind:this={createTrainingMetricDialog}>
-	<div class="modal-box max-w-3xl">
-		<form method="dialog">
-			<button class="btn absolute top-2 right-2 btn-circle btn-ghost btn-sm">✕</button>
-		</form>
-		{#if showTrainingMetricForm}
+		{#if selectedItem === 'activity'}
+			<ActivitiesUploader
+				{activitiesUploadedCallback}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
+			/>
+		{:else if selectedItem === 'feedback'}
+			<FeedbackForm
+				callback={invalidateTrainingMetrics}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
+			/>
+		{:else if selectedItem === 'w&n'}
+			<WeightAndNutritionForm
+				callback={invalidateTrainingMetrics}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
+			/>
+		{:else if selectedItem === 'note'}
+			<CreateTrainingNote
+				callback={newTrainingNoteCallback}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
+			/>
+		{:else if selectedItem === 'period'}
+			<CreateTrainingPeriod
+				callback={createTrainingPeriodCallback}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
+			/>
+		{:else if selectedItem === 'metric'}
 			<TrainingMetricFormCreate
 				callback={createTrainingMetricCallback}
 				scope={trainingPeriodScope}
+				previous={some(previousMenuItem)}
+				next={some(nextMenuItem)}
 			/>
 		{/if}
 	</div>

@@ -13,15 +13,21 @@
 	import TrainingMetricForm from './TrainingMetricForm.svelte';
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
+	import { ChartColumn } from '@lucide/svelte';
+	import FormTitle from '$ui/navigation/FormTitle.svelte';
 
 	let {
 		callback,
 		scope = { kind: 'global' },
-		existingSportsConstraints = none()
+		existingSportsConstraints = none(),
+		next = none(),
+		previous = none()
 	}: {
 		callback: () => void;
 		scope?: Scope;
 		existingSportsConstraints?: Option<{ sports: Sport[]; categories: SportCategory[] }>;
+		next?: Option<() => void>;
+		previous?: Option<() => void>;
 	} = $props();
 
 	const buildPromise = async () => {
@@ -115,10 +121,14 @@
 	};
 </script>
 
+{#snippet content()}
+	<ChartColumn class="size-4" />
+	New training metric
+{/snippet}
+
+<FormTitle {previous} {next} {content} />
 <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2" id="test-debug">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
-		<legend class="fieldset-legend text-base">New training metric</legend>
-
 		{#await metricTemplatesPromise then metricTemplates}
 			<TrainingMetricForm templates={metricTemplates} bind:fields {existingSportsConstraints} />
 

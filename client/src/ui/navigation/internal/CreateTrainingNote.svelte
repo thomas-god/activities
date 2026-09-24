@@ -2,8 +2,15 @@
 	import { invalidate } from '$app/navigation';
 	import { createTrainingNote } from '$lib/api/training';
 	import { dayjs } from '$lib/duration';
+	import { NotebookPen } from '@lucide/svelte';
+	import FormTitle from '../FormTitle.svelte';
+	import { none, type Option } from '$lib/Options';
 
-	let { callback }: { callback: () => void } = $props();
+	let {
+		callback,
+		next = none(),
+		previous = none()
+	}: { callback: () => void; next?: Option<() => void>; previous?: Option<() => void> } = $props();
 
 	let content = $state('');
 	let date = $state(dayjs().format('YYYY-MM-DD'));
@@ -32,9 +39,14 @@
 	};
 </script>
 
+{#snippet formTitle()}
+	<NotebookPen class="size-4" />
+	New training note
+{/snippet}
+
 <div class="text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
-		<legend class="fieldset-legend text-base">New training note</legend>
+		<FormTitle {previous} {next} content={formTitle} />
 		<label class="label" for="note-date">Date</label>
 		<input type="date" class="input" id="note-date" bind:value={date} />
 

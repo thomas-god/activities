@@ -28,8 +28,13 @@
 		type WeightAndNutritionCategory,
 		type WeightAndNutritionMeasure
 	} from './weightAndNutrition';
+	import FormTitle from '../FormTitle.svelte';
 
-	let { callback = () => {} }: { callback?: () => void } = $props();
+	let {
+		callback = () => {},
+		next = none(),
+		previous = none()
+	}: { callback?: () => void; next?: Option<() => void>; previous?: Option<() => void> } = $props();
 
 	/** Inputs are kept as raw strings so partially typed decimals ("70.") survive re-renders. */
 	type EditableValues = Record<WeightAndNutritionMeasure, string>;
@@ -140,8 +145,13 @@
 	};
 </script>
 
+{#snippet content()}
+	<Utensils class="size-4" />
+	Weight &amp; nutrition
+{/snippet}
+
 <fieldset class="fieldset min-w-0 rounded-box border-base-300 bg-base-100">
-	<legend class="fieldset-legend text-base">Update weight &amp; nutrition</legend>
+	<FormTitle {previous} {next} {content} />
 
 	<div class="flex flex-row items-center gap-1">
 		<label class="label mr-3" for="hooper-date">Date</label>

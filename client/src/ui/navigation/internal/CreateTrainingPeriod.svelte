@@ -4,10 +4,16 @@
 	import { PUBLIC_APP_URL } from '$env/static/public';
 	import { type Sport, type SportCategory } from '$lib/sport';
 	import DateRange from '$ui/shared/DateRange.svelte';
-	import { unwrapOr, some } from '$lib/Options';
+	import { unwrapOr, some, none, type Option } from '$lib/Options';
 	import { resolve } from '$app/paths';
+	import { CalendarFold } from '@lucide/svelte';
+	import FormTitle from '../FormTitle.svelte';
 
-	let { callback }: { callback: () => void } = $props();
+	let {
+		callback,
+		next = none(),
+		previous = none()
+	}: { callback: () => void; next?: Option<() => void>; previous?: Option<() => void> } = $props();
 
 	let name = $state('');
 	let dates = $state({ start: null, end: null });
@@ -65,9 +71,14 @@
 	};
 </script>
 
+{#snippet content()}
+	<CalendarFold class="size-4" />
+	New training period
+{/snippet}
+
 <div class=" text-sm">
 	<fieldset class="fieldset rounded-box bg-base-100 p-2">
-		<legend class="fieldset-legend text-base">New training period</legend>
+		<FormTitle {previous} {next} {content} />
 		<label class="label" for="period-name">Training period name</label>
 		<input type="text" placeholder="Name" class="input" id="period-name" bind:value={name} />
 

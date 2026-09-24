@@ -2,9 +2,20 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { postActivities } from '$lib/api';
+	import { SportShoe } from '@lucide/svelte';
 	import CreateStandaloneActivity from './CreateStandaloneActivity.svelte';
+	import { none, type Option } from '$lib/Options';
+	import FormTitle from '../FormTitle.svelte';
 
-	let { activitiesUploadedCallback }: { activitiesUploadedCallback: () => void } = $props();
+	let {
+		activitiesUploadedCallback,
+		next = none(),
+		previous = none()
+	}: {
+		activitiesUploadedCallback: () => void;
+		next?: Option<() => void>;
+		previous?: Option<() => void>;
+	} = $props();
 
 	let files: FileList | undefined = $state(undefined);
 	let file_upload_content = $state('');
@@ -67,9 +78,16 @@
 	};
 </script>
 
+{#snippet content()}
+	<SportShoe class="size-4" />
+	New activities
+{/snippet}
+
 <div class="grid grid-cols-1 gap-4">
 	<fieldset class="fieldset rounded-box border-base-300 bg-base-100">
-		<legend class="fieldset-legend text-base">Upload activity files</legend>
+		<FormTitle {previous} {next} {content} />
+
+		<legend class="fieldset-legend pt-0 text-base">Upload activity files</legend>
 		<div class="join gap-3">
 			<input
 				type="file"
