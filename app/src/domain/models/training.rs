@@ -1424,7 +1424,7 @@ impl WeightAndNutrition {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum WeightAndNutritionSource {
     TotalWeight,
     BodyComposition,
@@ -1432,6 +1432,19 @@ pub enum WeightAndNutritionSource {
     Macros,
     Water,
     Alcohol,
+}
+
+impl Display for WeightAndNutritionSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TotalWeight => f.write_str("Total weight"),
+            Self::BodyComposition => f.write_str("Body composition"),
+            Self::Calories => f.write_str("Calories"),
+            Self::Macros => f.write_str("Macros"),
+            Self::Water => f.write_str("Water"),
+            Self::Alcohol => f.write_str("Alcohol"),
+        }
+    }
 }
 
 impl WeightAndNutritionSource {
@@ -1465,7 +1478,7 @@ impl WeightAndNutritionSource {
                     Self::TotalWeight => {
                         if let Some(weight) = value.weight() {
                             values.push((
-                                TrainingMetricBin::new_without_group(bin),
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
                                 IndividualValue::new(weight as f64),
                             ));
                         }
@@ -1487,7 +1500,7 @@ impl WeightAndNutritionSource {
                     Self::Calories => {
                         if let Some(calories) = value.calories() {
                             values.push((
-                                TrainingMetricBin::new_without_group(bin),
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
                                 IndividualValue::new(calories as f64),
                             ));
                         }
@@ -1515,7 +1528,7 @@ impl WeightAndNutritionSource {
                     Self::Water => {
                         if let Some(water) = value.water() {
                             values.push((
-                                TrainingMetricBin::new_without_group(bin),
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
                                 IndividualValue::new(water as f64),
                             ));
                         }
@@ -1523,7 +1536,7 @@ impl WeightAndNutritionSource {
                     Self::Alcohol => {
                         if let Some(alcohol) = value.alcohol() {
                             values.push((
-                                TrainingMetricBin::new_without_group(bin),
+                                TrainingMetricBin::new(bin, Some(self.to_string())),
                                 IndividualValue::new(alcohol as f64),
                             ));
                         }
@@ -3328,10 +3341,6 @@ mod test_weight_and_nutrition_source_extract_values {
         TrainingMetricBin::new(granule.to_string(), group.map(|g| g.to_string()))
     }
 
-    fn value_at(result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>, granule: &str) -> f64 {
-        result[&bin(granule, None)][0].value()
-    }
-
     fn grouped_value_at(
         result: &HashMap<TrainingMetricBin, Vec<IndividualValue>>,
         granule: &str,
@@ -3363,8 +3372,14 @@ mod test_weight_and_nutrition_source_extract_values {
         let result = source.extract_values(&None, values.into_iter());
 
         assert_eq!(result.len(), 2);
-        assert_eq!(value_at(&result, "2025-09-03"), 75.5);
-        assert_eq!(value_at(&result, "2025-09-04"), 76.0);
+        assert_eq!(
+            grouped_value_at(&result, "2025-09-03", &source.to_string()),
+            75.5
+        );
+        assert_eq!(
+            grouped_value_at(&result, "2025-09-04", &source.to_string()),
+            76.0
+        );
     }
 
     #[test]
@@ -3412,9 +3427,14 @@ mod test_weight_and_nutrition_source_extract_values {
             let result = source.extract_values(&None, values.into_iter());
 
             assert_eq!(result.len(), 2);
-            assert!(result.keys().all(|k| k.group().is_none()));
-            assert_eq!(value_at(&result, "2025-09-03"), expected);
-            assert_eq!(value_at(&result, "2025-09-04"), expected);
+            assert_eq!(
+                grouped_value_at(&result, "2025-09-03", &source.to_string()),
+                expected
+            );
+            assert_eq!(
+                grouped_value_at(&result, "2025-09-04", &source.to_string()),
+                expected
+            );
         }
     }
 
@@ -3443,7 +3463,10 @@ mod test_weight_and_nutrition_source_extract_values {
                 source.extract_values(&None, vec![(date("2025-09-03"), value)].into_iter());
 
             assert_eq!(result.len(), 1);
-            assert_eq!(value_at(&result, "2025-09-03"), expected);
+            assert_eq!(
+                grouped_value_at(&result, "2025-09-03", &source.to_string()),
+                expected
+            );
         }
     }
 
@@ -3481,14 +3504,18 @@ mod test_weight_and_nutrition_source_extract_values {
         let result = source.extract_values(&window, values.into_iter());
 
         assert_eq!(result.len(), 2);
-        let september = &result[&TrainingMetricBin::from_granule("2025-09-01")];
+        let september =
+            &result[&TrainingMetricBin::new("2025-09-01".to_string(), Some(source.to_string()))];
         let mut values = september
             .iter()
             .map(|value| value.value())
             .collect::<Vec<_>>();
         values.sort_by(|a, b| a.partial_cmp(b).unwrap());
         assert_eq!(values, vec![2500.0, 2600.0]);
-        assert_eq!(value_at(&result, "2025-10-01"), 2700.0);
+        assert_eq!(
+            grouped_value_at(&result, "2025-10-01", &source.to_string()),
+            2700.0
+        );
     }
 
     #[test]
@@ -3507,7 +3534,10 @@ mod test_weight_and_nutrition_source_extract_values {
         let result = source.extract_values(&daily_window(), values.into_iter());
 
         assert_eq!(result.len(), 1);
-        assert_eq!(value_at(&result, "2025-09-03"), 120.0);
+        assert_eq!(
+            grouped_value_at(&result, "2025-09-03", &source.to_string()),
+            120.0
+        );
     }
 
     #[test]
@@ -3534,7 +3564,10 @@ mod test_weight_and_nutrition_source_extract_values {
         let result = source.extract_values(&None, values.into_iter());
 
         assert_eq!(result.len(), 1);
-        assert_eq!(value_at(&result, "2025-09-04"), 15.0);
+        assert_eq!(
+            grouped_value_at(&result, "2025-09-04", &source.to_string()),
+            15.0
+        );
     }
 
     #[test]
