@@ -69,7 +69,9 @@
 	</div>
 
 	<div bind:clientWidth={chartWidth}>
-		<TrainingMetricChart metric={currentMetric} width={chartWidth} {height} {timeDomain} />
+		{#key currentMetric.id}
+			<TrainingMetricChart metric={currentMetric} width={chartWidth} {height} {timeDomain} />
+		{/key}
 	</div>
 
 	{#if metrics.length > 1}
