@@ -11,3 +11,4 @@ alternative options considered and the resulting trade-offs.
 - [Computation of activity metrics derived from timeseries](20260216-activity-timeseries-metrics-computation.md)
 - [Client Component Organization Strategy](20260808-client-component-organization.md)
 - [Search feature](20260906-search.md)
+- [Feedback, weight and nutrition training contexts](20260914-training-contexts.md)
