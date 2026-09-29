@@ -322,8 +322,8 @@ The same design decision applies to other types of chart in this module.
 
 		d3.select(gDots).call((sel) =>
 			sel
-				.attr('stroke-width', 1)
-				.attr('fill-opacity', 0.6)
+				.attr('stroke-width', 0)
+				.attr('fill-opacity', 0)
 				.selectAll<SVGCircleElement, Point>('circle')
 				.data(visiblePoints, (d) => `${d.group}-${d.time}`)
 				.join('circle')
@@ -331,7 +331,7 @@ The same design decision applies to other types of chart in this module.
 				.attr('fill', (d) => color(d.group))
 				.attr('cx', (d) => xAxis(d.time)!)
 				.attr('cy', (d) => yAxis(d.value))
-				.attr('r', 2.5)
+				.attr('r', 5)
 
 				.on(
 					'mouseenter',
@@ -383,7 +383,7 @@ The same design decision applies to other types of chart in this module.
 
 						// Highlight the circle
 						d3.select(event.target as SVGRectElement)
-							.attr('stroke-width', 2.5)
+							.attr('stroke-width', 1)
 							.attr('fill', color(point.group))
 							.attr('fill-opacity', 0.8);
 					}
@@ -395,14 +395,14 @@ The same design decision applies to other types of chart in this module.
 
 					// Remove highlight
 					d3.select(event.target as SVGCircleElement)
-						.attr('stroke-width', 1)
+						.attr('fill-opacity', 0)
+						.attr('stroke-width', 0)
 						.attr(
 							'fill',
 							color(
 								(d3.select(event.target as SVGCircleElement).datum() as { group: string }).group
 							)
-						)
-						.attr('fill-opacity', 0.6);
+						);
 				})
 		);
 
