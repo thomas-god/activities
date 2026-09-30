@@ -137,6 +137,72 @@ impl<R, FP, C> SqliteActivityRepository<R, FP, C> {
             metric
         ))
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn list_user_activities(
+        &self,
+        user: &UserId,
+        filters: &ListActivitiesFilters,
+    ) -> Result<Vec<Activity>, ListActivitiesError> {
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
+               "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
+               FROM t_activities_v2",
+           );
+        builder.push(" WHERE user_id = ").push_bind(user);
+
+        if let Some(date_range) = filters.date_range() {
+            builder
+                .push(" AND start_time >= ")
+                .push_bind(date_range.start());
+            builder
+                .push(" AND start_time < ")
+                .push_bind(date_range.end());
+        }
+
+        builder.push("ORDER BY start_time DESC ");
+
+        if let Some(limit) = *filters.limit() {
+            builder.push("LIMIT ").push_bind(limit as i64);
+        }
+
+        let query = builder.build_query_as::<'_, ActivityRow>();
+
+        query
+            .fetch_all(&self.readers)
+            .await
+            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
+            .map(|rows| {
+                rows.into_iter()
+                    .map(
+                        |(
+                            id,
+                            user_id,
+                            name,
+                            start_time,
+                            duration,
+                            sport,
+                            rpe,
+                            workout_type,
+                            nutrition,
+                            feedback,
+                        )| {
+                            Activity::new(
+                                id,
+                                user_id,
+                                name,
+                                start_time,
+                                duration.unwrap_or_default(),
+                                sport,
+                                rpe,
+                                workout_type,
+                                nutrition,
+                                feedback,
+                            )
+                        },
+                    )
+                    .collect()
+            })
+    }
 }
 
 impl<R, FP, C> SqliteActivityRepository<R, FP, C>
@@ -394,72 +460,6 @@ where
             .collect();
 
         Ok((documents, documents_remaining))
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn list_user_activities(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> Result<Vec<Activity>, ListActivitiesError> {
-        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
-            "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
-            FROM t_activities_v2",
-        );
-        builder.push(" WHERE user_id = ").push_bind(user);
-
-        if let Some(date_range) = filters.date_range() {
-            builder
-                .push(" AND start_time >= ")
-                .push_bind(date_range.start());
-            builder
-                .push(" AND start_time < ")
-                .push_bind(date_range.end());
-        }
-
-        builder.push("ORDER BY start_time DESC ");
-
-        if let Some(limit) = *filters.limit() {
-            builder.push("LIMIT ").push_bind(limit as i64);
-        }
-
-        let query = builder.build_query_as::<'_, ActivityRow>();
-
-        query
-            .fetch_all(&self.readers)
-            .await
-            .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))
-            .map(|rows| {
-                rows.into_iter()
-                    .map(
-                        |(
-                            id,
-                            user_id,
-                            name,
-                            start_time,
-                            duration,
-                            sport,
-                            rpe,
-                            workout_type,
-                            nutrition,
-                            feedback,
-                        )| {
-                            Activity::new(
-                                id,
-                                user_id,
-                                name,
-                                start_time,
-                                duration.unwrap_or_default(),
-                                sport,
-                                rpe,
-                                workout_type,
-                                nutrition,
-                                feedback,
-                            )
-                        },
-                    )
-                    .collect()
-            })
     }
 
     #[tracing::instrument(skip_all, err)]

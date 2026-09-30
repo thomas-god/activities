@@ -118,28 +118,6 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn list_activities(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> Result<Vec<Activity>, ListActivitiesError> {
-        self.activity_repository
-            .list_user_activities(user, filters)
-            .await
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn list_activities_with_parsed_data(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError> {
-        self.activity_repository
-            .list_activities_with_parsed_data(user, filters)
-            .await
-    }
-
-    #[tracing::instrument(skip_all, err)]
     async fn list_activities_with_metrics(
         &self,
         user: &UserId,
@@ -182,46 +160,6 @@ where
         }
 
         Ok(activities)
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn list_activities_with_metrics_and_parsed_data(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetric],
-    ) -> Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError> {
-        let activities = self
-            .list_activities_with_metrics(user, filters, metrics)
-            .await?;
-
-        let mut res = Vec::new();
-        for (activity, metrics) in activities {
-            let Ok(activity_with_parsed_data) =
-                self.get_activity_with_parsed_data(activity.id()).await
-            else {
-                continue;
-            };
-            res.push((activity_with_parsed_data, metrics));
-        }
-
-        Ok(res)
-    }
-
-    #[tracing::instrument(skip_all, err)]
-    async fn get_activity_with_parsed_data(
-        &self,
-        activity_id: &ActivityId,
-    ) -> Result<ActivityWithParsedData, GetActivityError> {
-        match self
-            .activity_repository
-            .get_activity_with_parsed_data(activity_id)
-            .await
-        {
-            Ok(Some(activity)) => Ok(activity),
-            Ok(None) => Err(GetActivityError::ActivityDoesNotExist(activity_id.clone())),
-            Err(err) => Err(err),
-        }
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -407,36 +345,12 @@ pub mod test_utils {
                 req: CreateActivityRequest,
             ) -> Result<Activity, CreateActivityError>;
 
-            async fn list_activities(
-                &self,
-                user: &UserId,
-                filters: &ListActivitiesFilters
-            ) -> Result<Vec<Activity>, ListActivitiesError>;
-
-            async fn list_activities_with_parsed_data(
-                &self,
-                user: &UserId,
-                filters: &ListActivitiesFilters
-            ) -> Result<Vec<ActivityWithParsedData>, ListActivitiesError>;
-
             async fn list_activities_with_metrics(
                 &self,
                 user: &UserId,
                 filters: &ListActivitiesFilters,
                 metrics: &[ActivityMetric],
             ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>;
-
-            async fn list_activities_with_metrics_and_parsed_data(
-                &self,
-                user: &UserId,
-                filters: &ListActivitiesFilters,
-                metrics: &[ActivityMetric],
-            ) -> Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError>;
-
-            async fn get_activity_with_parsed_data(
-                &self,
-                activity_id: &ActivityId,
-            ) -> Result<ActivityWithParsedData, GetActivityError>;
 
             async fn get_activity_with_metrics_and_parsed_data(
                 &self,
@@ -470,7 +384,6 @@ pub mod test_utils {
         pub fn test_default() -> Self {
             let mut mock = Self::new();
             mock.default_create_activity();
-            mock.default_list_activities();
             mock.default_delete_activity();
 
             mock
@@ -486,9 +399,6 @@ pub mod test_utils {
                     Sport::Running,
                 ))
             });
-        }
-        pub fn default_list_activities(&mut self) {
-            self.expect_list_activities().returning(|_, _| Ok(vec![]));
         }
 
         pub fn default_delete_activity(&mut self) {
@@ -519,12 +429,6 @@ pub mod test_utils {
                 batch_size: i64,
                 page: i64,
             ) -> Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>;
-
-            async fn list_user_activities(
-                &self,
-                user: &UserId,
-                filters: &ListActivitiesFilters
-            ) -> Result<Vec<Activity>, ListActivitiesError>;
 
             async fn get_raw_activity(
                 &self,

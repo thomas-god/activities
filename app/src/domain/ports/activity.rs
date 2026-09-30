@@ -23,38 +23,12 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         req: CreateActivityRequest,
     ) -> impl Future<Output = Result<Activity, CreateActivityError>> + Send;
 
-    fn list_activities(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
-
-    fn list_activities_with_parsed_data(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<ActivityWithParsedData>, ListActivitiesError>> + Send;
-
     fn list_activities_with_metrics(
         &self,
         user: &UserId,
         filters: &ListActivitiesFilters,
         metrics: &[ActivityMetric],
     ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>> + Send;
-
-    fn list_activities_with_metrics_and_parsed_data(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-        metrics: &[ActivityMetric],
-    ) -> impl Future<
-        Output = Result<Vec<(ActivityWithParsedData, ActivityMetrics)>, ListActivitiesError>,
-    > + Send;
-
-    fn get_activity_with_parsed_data(
-        &self,
-        activity_id: &ActivityId,
-    ) -> impl Future<Output = Result<ActivityWithParsedData, GetActivityError>> + Send;
 
     fn get_activity_with_metrics_and_parsed_data(
         &self,
@@ -371,18 +345,6 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 
-    fn list_activity_documents(
-        &self,
-        batch_size: i64,
-        page: i64,
-    ) -> impl Future<Output = Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>> + Send;
-
-    fn list_user_activities(
-        &self,
-        user: &UserId,
-        filters: &ListActivitiesFilters,
-    ) -> impl Future<Output = Result<Vec<Activity>, ListActivitiesError>> + Send;
-
     fn get_raw_activity(
         &self,
         user: &UserId,
@@ -440,6 +402,12 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         &self,
         user: &UserId,
     ) -> impl Future<Output = Result<Option<DateTimeRange>, anyhow::Error>> + Send;
+
+    fn list_activity_documents(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> impl Future<Output = Result<(Vec<SearchDocument>, RemainingDocuments), anyhow::Error>> + Send;
 
     fn get_outbox_documents_to_process(
         &self,
