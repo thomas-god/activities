@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use chrono::{DateTime, Days, FixedOffset, NaiveDate};
 use sqlx::{
     ConnectOptions, QueryBuilder, Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
@@ -1273,6 +1273,38 @@ where
         .await
         .map(|_| ())
         .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
+    }
+
+    async fn get_last_weight(
+        &self,
+        user: &UserId,
+        reference_date: chrono::NaiveDate,
+    ) -> Result<Option<f32>, anyhow::Error> {
+        // Values recorded exactly 30 days before the reference date are
+        // considered too old and are ignored, hence the strict comparison.
+        let oldest_date = reference_date
+            .checked_sub_days(Days::new(29))
+            .ok_or_else(|| anyhow!("invalid reference date {reference_date}"))?;
+
+        let weight = sqlx::query_scalar::<_, f32>(
+            "
+            SELECT weight
+            FROM t_weight_and_nutrition
+            WHERE user = ?1
+              AND weight IS NOT NULL
+              AND date >= ?2
+              AND date <= ?3
+            ORDER BY date DESC
+            LIMIT 1;",
+        )
+        .bind(user)
+        .bind(oldest_date)
+        .bind(reference_date)
+        .fetch_optional(&self.readers)
+        .await
+        .map_err(|err| anyhow!(err))?;
+
+        Ok(weight)
     }
 }
 
@@ -6574,6 +6606,205 @@ mod test_sqlite_training_repository {
             assert_eq!(stored.len(), total as usize);
             assert_eq!(stored.first().unwrap().1.weight(), Some(1.0));
             assert_eq!(stored.last().unwrap().1.weight(), Some(total as f32));
+        }
+
+        fn days_before(date: NaiveDate, days: u64) -> NaiveDate {
+            date.checked_sub_days(Days::new(days)).unwrap()
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_returns_none_when_no_rows() {
+            let (_db_file, repository) = setup().await;
+
+            let result = repository
+                .get_last_weight(&UserId::from("user1"), test_date())
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_returns_none_when_weights_are_null() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+
+            repository
+                .save_weight_and_nutrition(&user, test_date(), &WeightAndNutrition::default())
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, test_date())
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_returns_weight_at_reference_date() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let reference = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 1),
+                    &value_with_weight(70.0),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(&user, reference, &value_with_weight(71.0))
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result, Some(71.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_returns_closest_weight_before_reference_date() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let reference = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 5),
+                    &value_with_weight(70.0),
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 2),
+                    &value_with_weight(71.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+
+            assert_eq!(result, Some(71.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_ignores_weights_after_reference_date() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let reference = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    reference.add(Days::new(1)),
+                    &value_with_weight(80.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_ignores_weights_older_than_30_days() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let reference = test_date();
+
+            // Exactly 30 days before the reference date: too old.
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 30),
+                    &value_with_weight(70.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+            assert!(result.is_none());
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_keeps_weights_29_days_old() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let reference = test_date();
+
+            // 29 days before the reference date: still within the window.
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 29),
+                    &value_with_weight(71.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+            assert_eq!(result, Some(71.0));
+        }
+
+        #[tokio::test]
+        async fn test_get_last_weight_is_scoped_by_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let other_user = UserId::from("user2");
+            let reference = test_date();
+
+            repository
+                .save_weight_and_nutrition(
+                    &other_user,
+                    days_before(reference, 1),
+                    &value_with_weight(80.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+            assert!(result.is_none());
+
+            repository
+                .save_weight_and_nutrition(
+                    &user,
+                    days_before(reference, 1),
+                    &value_with_weight(70.0),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let result = repository
+                .get_last_weight(&user, reference)
+                .await
+                .expect("Get should succeed");
+            assert_eq!(result, Some(70.0));
         }
     }
 }

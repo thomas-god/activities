@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData},
+        activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData, TrainingContext},
         search::SearchDocument,
         training::{
             HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricDefinitionPatch,
@@ -553,6 +553,12 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         &self,
         req: DeleteWeightAndNutritionRequest,
     ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn get_training_context(
+        &self,
+        user: &UserId,
+        reference_date: &chrono::NaiveDate,
+    ) -> impl Future<Output = Result<TrainingContext, anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Error)]
@@ -1072,6 +1078,12 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         date: chrono::NaiveDate,
     ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
+
+    fn get_last_weight(
+        &self,
+        user: &UserId,
+        reference_date: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<Option<f32>, anyhow::Error>> + Send;
 }
 
 #[cfg(test)]

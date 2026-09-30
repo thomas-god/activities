@@ -7,7 +7,7 @@ use derive_more::Constructor;
 use crate::domain::{
     models::{
         UserId,
-        activity::ActivityMetric,
+        activity::{ActivityMetric, TrainingContext},
         search::{SearchDocument, SearchDocumentType},
         training::{
             ActivitySource, HooperIndex, HooperIndexSource, TrainingMetric,
@@ -801,7 +801,22 @@ where
             .delete_weight_and_nutrition(req.user(), *req.date())
             .await
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_training_context(
+        &self,
+        user: &UserId,
+        reference_date: &chrono::NaiveDate,
+    ) -> Result<TrainingContext, anyhow::Error> {
+        let weight = self
+            .training_repository
+            .get_last_weight(user, *reference_date)
+            .await?;
+
+        Ok(TrainingContext::new(weight))
+    }
 }
+
 impl<TMR, AS> IDocumentsForSearch for TrainingService<TMR, AS>
 where
     TMR: TrainingRepository,
@@ -1079,6 +1094,12 @@ pub mod test_utils {
                 &self,
                 req: DeleteWeightAndNutritionRequest,
             ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_training_context(
+                 &self,
+                 user: &UserId,
+                 reference_date: &chrono::NaiveDate,
+             ) -> Result<TrainingContext, anyhow::Error>;
         }
     }
 
@@ -1296,6 +1317,12 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
             ) -> Result<(), WeightAndNutritionError>;
+
+            async fn get_last_weight(
+                &self,
+                user: &UserId,
+                date: chrono::NaiveDate,
+            ) -> Result<Option<f32>, anyhow::Error>;
         }
     }
 }
@@ -5759,6 +5786,70 @@ mod test_training_service_weight_and_nutrition {
         let result = service.delete_weight_and_nutrition(req).await;
 
         assert!(matches!(result, Err(WeightAndNutritionError::Unknown(_))));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_context_returns_weight() {
+        let user = UserId::from("user1");
+        let reference_date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == reference_date)
+            .returning(|_, _| Ok(Some(70.0)));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_training_context(&user, &reference_date)
+            .await
+            .unwrap();
+
+        assert_eq!(result, TrainingContext::new(Some(70.0)));
+    }
+
+    #[tokio::test]
+    async fn test_get_training_context_returns_none_weight_when_no_weight_found() {
+        let user = UserId::from("user1");
+        let reference_date = test_date();
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == reference_date)
+            .returning(|_, _| Ok(None));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_training_context(&user, &reference_date)
+            .await
+            .unwrap();
+
+        assert_eq!(result, TrainingContext::new(None));
+        assert_eq!(result.weight(), &None);
+    }
+
+    #[tokio::test]
+    async fn test_get_training_context_propagates_error() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Err(anyhow!("db error")));
+
+        let service = build_service(repository);
+
+        let result = service
+            .get_training_context(&UserId::test_default(), &test_date())
+            .await;
+
+        assert!(result.is_err());
     }
 
     #[tokio::test]
