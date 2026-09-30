@@ -2,8 +2,6 @@
 
 _Date:_ 2026-09-14
 
-_Status:_ in progress/draft
-
 ## Context
 
 While users can currently track individual training activities, training periods and training notes,
