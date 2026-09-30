@@ -25,7 +25,7 @@ pub const NO_GROUP: &str = "Other";
 /// Maps granule string (like "2025-09-24" or "2025-W39") to the metric value
 ///
 /// Example:
-/// ```ignore
+/// ```json
 /// {
 ///   "2025-09-24": 100.0,
 ///   "2025-09-25": 150.0,
@@ -39,7 +39,7 @@ pub type GranuleValues = HashMap<String, Option<f64>>;
 /// Groups with None are represented by the NO_GROUP constant
 ///
 /// Example:
-/// ```ignore
+/// ```json
 /// {
 ///   "Cycling": {
 ///     "2025-09-24": 100.0,
