@@ -10,7 +10,7 @@ use crate::domain::{
         activity::{
             Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics,
             ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
-            ActivityTimeseries, ActivityWithExtraContext, ActivityWithParsedData, Sport,
+            ActivityTimeseries, ActivityWithParsedData, Sport,
         },
         search::SearchDocument,
     },
@@ -30,11 +30,12 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         metrics: &[ActivityMetric],
     ) -> impl Future<Output = Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>> + Send;
 
-    fn get_activity_with_extra_context(
+    fn get_activity_with_parsed_data_and_metrics(
         &self,
+        user: &UserId,
         activity_id: &ActivityId,
         metrics: &[ActivityMetric],
-    ) -> impl Future<Output = Result<ActivityWithExtraContext, GetActivityError>> + Send;
+    ) -> impl Future<Output = Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError>> + Send;
 
     fn patch_activity(
         &self,

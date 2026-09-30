@@ -10,7 +10,7 @@ use crate::{
         ports::{
             activity::{GetActivityError, IActivityService},
             preferences::IPreferencesService,
-            training::ITrainingService,
+            training::{ActivityWithTrainingContextError, ITrainingService},
         },
     },
     inbound::{auth::AuthenticatedUser, http::AppState, parser::ParseFile},
@@ -30,13 +30,17 @@ pub async fn get_activity<
     Path(activity_id): Path<String>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
     match state
-        .activity_service
-        .get_activity_with_extra_context(&ActivityId::from(&activity_id), &DEFAULT_METRICS)
+        .training_metrics_service
+        .get_activity_with_training_context(
+            user.user(),
+            &ActivityId::from(&activity_id),
+            &DEFAULT_METRICS,
+        )
         .await
     {
         Ok(activity) => Ok(Json(PublicActivityWithTimeseries::from(&activity))),
-        Err(GetActivityError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
-        Err(GetActivityError::Unknown(err)) => {
+        Err(ActivityWithTrainingContextError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
+        Err(ActivityWithTrainingContextError::Unknown(err)) => {
             tracing::error!(
                 "Error while getting activity {}: {}",
                 activity_id,
@@ -62,12 +66,14 @@ mod tests {
                 activity::{
                     ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetric,
                     ActivityMetrics, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                    ActivityTimeseries, ActivityWithExtraContext, ActivityWithParsedData, Sport,
-                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-                    TimeseriesValue, TrainingContext,
+                    ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
+                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
-            ports::activity::GetActivityError,
+            ports::{
+                activity::GetActivityError,
+                training::{ActivityWithTrainingContext, TrainingContext},
+            },
             services::{
                 activity::test_utils::MockActivityService,
                 preferences::tests_utils::MockPreferencesService,
@@ -88,11 +94,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_activity_exists() {
         let target_id = "target_id".to_string();
-        let mut service = MockActivityService::new();
-        service
-            .expect_get_activity_with_extra_context()
-            .returning(|_, _| {
-                Ok(ActivityWithExtraContext::new(
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_get_activity_with_training_context()
+            .returning(|_, _, _| {
+                Ok(ActivityWithTrainingContext::new(
                     ActivityWithParsedData::new(
                         Activity::new_empty(
                             ActivityId::from("target_id"),
@@ -133,11 +139,11 @@ mod tests {
                 ))
             });
         let file_parser = MockFileParser::test_default();
-        let metrics = MockTrainingService::test_default();
+        let activity_service = MockActivityService::test_default();
 
         let state = axum::extract::State(AppState {
-            activity_service: Arc::new(service),
-            training_metrics_service: Arc::new(metrics),
+            activity_service: Arc::new(activity_service),
+            training_metrics_service: Arc::new(training_service),
             file_parser: Arc::new(file_parser),
             preferences_service: Arc::new(MockPreferencesService::new()),
         });
@@ -194,22 +200,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_activity_does_not_exist() {
-        let mut service = MockActivityService::new();
-        service
-            .expect_get_activity_with_extra_context()
-            .with(eq(ActivityId::from("target_id")), eq(DEFAULT_METRICS))
-            .returning(|_, _| {
-                Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
-                    "target_id",
-                )))
+        let mut training_service = MockTrainingService::new();
+        training_service
+            .expect_get_activity_with_training_context()
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("target_id")),
+                eq(DEFAULT_METRICS),
+            )
+            .returning(|_, _, _| {
+                Err(ActivityWithTrainingContextError::ActivityDoesNotExist(
+                    ActivityId::from("target_id"),
+                ))
             });
 
         let file_parser = MockFileParser::test_default();
-        let metrics = MockTrainingService::test_default();
+        let activity_service = MockActivityService::test_default();
 
         let state = axum::extract::State(AppState {
-            activity_service: Arc::new(service),
-            training_metrics_service: Arc::new(metrics),
+            activity_service: Arc::new(activity_service),
+            training_metrics_service: Arc::new(training_service),
             file_parser: Arc::new(file_parser),
             preferences_service: Arc::new(MockPreferencesService::new()),
         });

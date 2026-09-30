@@ -7,7 +7,7 @@ use derive_more::Constructor;
 use crate::domain::{
     models::{
         UserId,
-        activity::{ActivityMetric, TrainingContext},
+        activity::{ActivityId, ActivityMetric},
         search::{SearchDocument, SearchDocumentType},
         training::{
             ActivitySource, HooperIndex, HooperIndexSource, TrainingMetric,
@@ -19,9 +19,10 @@ use crate::domain::{
     },
     ports::{
         DateRange,
-        activity::{IActivityService, ListActivitiesFilters},
+        activity::{GetActivityError, IActivityService, ListActivitiesFilters},
         search::{IDocumentsForSearch, RemainingDocuments},
         training::{
+            ActivityWithTrainingContext, ActivityWithTrainingContextError,
             ComputeTrainingMetricValuesError, CopyTrainingMetricError, CopyTrainingMetricRequest,
             CreateTrainingMetricError, CreateTrainingMetricRequest, CreateTrainingNoteError,
             CreateTrainingNoteRequest, CreateTrainingPeriodError, CreateTrainingPeriodRequest,
@@ -31,12 +32,12 @@ use crate::domain::{
             GetTrainingMetricValuesRequest, GetTrainingMetricsOrderingError, GetTrainingNoteError,
             HooperIndexError, ITrainingService, SaveBulkWeightAndNutritionRequest,
             SaveHooperIndexRequest, SaveWeightAndNutritionRequest, SetTrainingMetricsOrderingError,
-            TrainingRepository, UpdateTrainingMetricError, UpdateTrainingMetricNameError,
-            UpdateTrainingMetricNameRequest, UpdateTrainingMetricRequest, UpdateTrainingNoteError,
-            UpdateTrainingPeriodDatesError, UpdateTrainingPeriodDatesRequest,
-            UpdateTrainingPeriodNameError, UpdateTrainingPeriodNameRequest,
-            UpdateTrainingPeriodNoteError, UpdateTrainingPeriodNoteRequest,
-            WeightAndNutritionError,
+            TrainingContext, TrainingRepository, UpdateTrainingMetricError,
+            UpdateTrainingMetricNameError, UpdateTrainingMetricNameRequest,
+            UpdateTrainingMetricRequest, UpdateTrainingNoteError, UpdateTrainingPeriodDatesError,
+            UpdateTrainingPeriodDatesRequest, UpdateTrainingPeriodNameError,
+            UpdateTrainingPeriodNameRequest, UpdateTrainingPeriodNoteError,
+            UpdateTrainingPeriodNoteRequest, WeightAndNutritionError,
         },
     },
 };
@@ -803,17 +804,36 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn get_training_context(
+    async fn get_activity_with_training_context(
         &self,
         user: &UserId,
-        reference_date: &chrono::NaiveDate,
-    ) -> Result<TrainingContext, anyhow::Error> {
-        let weight = self
-            .training_repository
-            .get_last_weight(user, *reference_date)
+        activity: &ActivityId,
+        metrics: &[ActivityMetric],
+    ) -> Result<ActivityWithTrainingContext, ActivityWithTrainingContextError> {
+        let (activity, metrics) = self
+            .activity_service
+            .get_activity_with_parsed_data_and_metrics(user, activity, metrics)
             .await?;
 
-        Ok(TrainingContext::new(weight))
+        let weight = self
+            .training_repository
+            .get_last_weight(user, activity.start_time().naive_date())
+            .await?;
+
+        Ok(ActivityWithTrainingContext::new(
+            activity,
+            TrainingContext::new(weight),
+            metrics,
+        ))
+    }
+}
+
+impl From<GetActivityError> for ActivityWithTrainingContextError {
+    fn from(value: GetActivityError) -> Self {
+        match value {
+            GetActivityError::ActivityDoesNotExist(id) => Self::ActivityDoesNotExist(id),
+            GetActivityError::Unknown(err) => Self::Unknown(err),
+        }
     }
 }
 
@@ -1095,11 +1115,12 @@ pub mod test_utils {
                 req: DeleteWeightAndNutritionRequest,
             ) -> Result<(), WeightAndNutritionError>;
 
-            async fn get_training_context(
-                 &self,
-                 user: &UserId,
-                 reference_date: &chrono::NaiveDate,
-             ) -> Result<TrainingContext, anyhow::Error>;
+            async fn get_activity_with_training_context(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+                  metrics: &[ActivityMetric],
+             ) -> Result<ActivityWithTrainingContext, ActivityWithTrainingContextError>;
         }
     }
 
@@ -5789,70 +5810,6 @@ mod test_training_service_weight_and_nutrition {
     }
 
     #[tokio::test]
-    async fn test_get_training_context_returns_weight() {
-        let user = UserId::from("user1");
-        let reference_date = test_date();
-
-        let mut repository = MockTrainingRepository::new();
-        let expected_user = user.clone();
-        repository
-            .expect_get_last_weight()
-            .times(1)
-            .withf(move |u, d| u == &expected_user && *d == reference_date)
-            .returning(|_, _| Ok(Some(70.0)));
-
-        let service = build_service(repository);
-
-        let result = service
-            .get_training_context(&user, &reference_date)
-            .await
-            .unwrap();
-
-        assert_eq!(result, TrainingContext::new(Some(70.0)));
-    }
-
-    #[tokio::test]
-    async fn test_get_training_context_returns_none_weight_when_no_weight_found() {
-        let user = UserId::from("user1");
-        let reference_date = test_date();
-
-        let mut repository = MockTrainingRepository::new();
-        let expected_user = user.clone();
-        repository
-            .expect_get_last_weight()
-            .times(1)
-            .withf(move |u, d| u == &expected_user && *d == reference_date)
-            .returning(|_, _| Ok(None));
-
-        let service = build_service(repository);
-
-        let result = service
-            .get_training_context(&user, &reference_date)
-            .await
-            .unwrap();
-
-        assert_eq!(result, TrainingContext::new(None));
-        assert_eq!(result.weight(), &None);
-    }
-
-    #[tokio::test]
-    async fn test_get_training_context_propagates_error() {
-        let mut repository = MockTrainingRepository::new();
-        repository
-            .expect_get_last_weight()
-            .times(1)
-            .returning(|_, _| Err(anyhow!("db error")));
-
-        let service = build_service(repository);
-
-        let result = service
-            .get_training_context(&UserId::test_default(), &test_date())
-            .await;
-
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
     async fn test_update_weight_and_nutrition_patches_existing_value() {
         let user = UserId::from("user1");
         let date = test_date();
@@ -6261,5 +6218,211 @@ mod test_align_date_range {
                 "2026-06-26".parse::<NaiveDate>().unwrap(), // +1 day to make the range end inclusive
             )
         )
+    }
+}
+
+#[cfg(test)]
+mod test_training_service_activity_with_training_context {
+    use std::sync::Arc;
+
+    use anyhow::anyhow;
+    use chrono::{DateTime, FixedOffset};
+
+    use super::*;
+    use crate::domain::models::activity::{
+        Activity, ActivityDuration, ActivityId, ActivityMetrics, ActivityStartTime,
+        ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+    };
+    use crate::domain::services::activity::test_utils::MockActivityService;
+    use crate::domain::services::training::test_utils::MockTrainingRepository;
+
+    fn build_activity_with_parsed_data(start_time: &str) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::from("activity-1"),
+                UserId::test_default(),
+                ActivityStartTime::new(start_time.parse::<DateTime<FixedOffset>>().unwrap()),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::empty(),
+            ActivityStatistics::new(HashMap::new()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_returns_last_weight() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let expected_user = user.clone();
+        let expected_activity_id = activity_id.clone();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .withf(move |u, id, _| u == &expected_user && *id == expected_activity_id)
+            .returning(move |_, _, _| {
+                Ok((returned_activity.clone(), returned_metrics.clone()))
+            });
+
+        let mut repository = MockTrainingRepository::new();
+        let expected_user = user.clone();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .withf(move |u, d| u == &expected_user && *d == activity.start_time().naive_date())
+            .returning(|_, _| Ok(Some(85.0)));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+            )
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(result.activity().id(), &activity_id);
+        assert_eq!(result.metrics(), &metrics);
+        assert_eq!(result.training_context().weight(), &Some(85.0));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_without_weight() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| {
+                Ok((returned_activity.clone(), returned_metrics.clone()))
+            });
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+            )
+            .await
+            .expect("Should have succeeded");
+
+        assert_eq!(result.training_context().weight(), &None);
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_activity_does_not_exist() {
+        let user = UserId::from("user1");
+        let activity_id = ActivityId::from("activity-1");
+
+        let mut activity_service = MockActivityService::new();
+        let expected_user = user.clone();
+        let expected_activity_id = activity_id.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .withf(move |u, id, _| u == &expected_user && *id == expected_activity_id)
+            .returning(|_, _, _| {
+                Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
+                    "activity-1",
+                )))
+            });
+
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_get_last_weight().times(0);
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let err = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+            )
+            .await
+            .expect_err("Should have failed");
+
+        let ActivityWithTrainingContextError::ActivityDoesNotExist(id) = err else {
+            unreachable!(
+                "Should have returned ActivityWithTrainingContextError::ActivityDoesNotExist"
+            )
+        };
+        assert_eq!(id, activity_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_propagates_get_last_weight_error() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| {
+                Ok((returned_activity.clone(), returned_metrics.clone()))
+            });
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Err(anyhow!("db error")));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+        );
+
+        let result = service
+            .get_activity_with_training_context(
+                &user,
+                &activity_id,
+                &[ActivityMetric::AvgPower],
+            )
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ActivityWithTrainingContextError::Unknown(_))
+        ));
     }
 }

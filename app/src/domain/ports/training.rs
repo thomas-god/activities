@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetric, ActivityWithParsedData, TrainingContext},
+        activity::{Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithParsedData},
         search::SearchDocument,
         training::{
             HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricDefinitionPatch,
@@ -365,6 +365,46 @@ pub enum WeightAndNutritionError {
     Unknown(#[from] anyhow::Error),
 }
 
+/// Additional training context to help interpret or derive statistics (like W/kg) from an activity.
+#[derive(Clone, Debug, Constructor, Default, PartialEq)]
+pub struct TrainingContext {
+    weight: Option<f32>,
+}
+
+impl TrainingContext {
+    pub fn weight(&self) -> &Option<f32> {
+        &self.weight
+    }
+}
+
+/// Activity extended with extra training context.
+#[derive(Clone, Debug, Constructor)]
+pub struct ActivityWithTrainingContext {
+    activity: ActivityWithParsedData,
+    training_context: TrainingContext,
+    metrics: ActivityMetrics,
+}
+
+impl ActivityWithTrainingContext {
+    pub fn activity(&self) -> &ActivityWithParsedData {
+        &self.activity
+    }
+    pub fn training_context(&self) -> &TrainingContext {
+        &self.training_context
+    }
+    pub fn metrics(&self) -> &ActivityMetrics {
+        &self.metrics
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ActivityWithTrainingContextError {
+    #[error("Activity {0} does not exist")]
+    ActivityDoesNotExist(ActivityId),
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
 ///////////////////////////////////////////////////////////////////
 /// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
@@ -554,11 +594,19 @@ pub trait ITrainingService: Clone + Send + Sync + 'static {
         req: DeleteWeightAndNutritionRequest,
     ) -> impl Future<Output = Result<(), WeightAndNutritionError>> + Send;
 
-    fn get_training_context(
+    /// Get an activity and enrich it with its training context.
+    ///
+    /// We chose to put this method in the TrainingService rather than in the ActivityService to
+    /// avoid introducing a circular dependency between the two. Returning an activity from the
+    /// TrainingService is not considered a domain-smell as 1/ both domains have been designed to
+    /// have the training depends on the activity one, and 2/ we already return activities from the
+    /// training domain when returning a training period's activities.
+    fn get_activity_with_training_context(
         &self,
         user: &UserId,
-        reference_date: &chrono::NaiveDate,
-    ) -> impl Future<Output = Result<TrainingContext, anyhow::Error>> + Send;
+        activity: &ActivityId,
+        metrics: &[ActivityMetric],
+    ) -> impl Future<Output = Result<ActivityWithTrainingContext, ActivityWithTrainingContextError>> + Send;
 }
 
 #[derive(Debug, Error)]

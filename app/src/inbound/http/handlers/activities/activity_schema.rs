@@ -4,10 +4,12 @@ use chrono::{DateTime, FixedOffset};
 use derive_more::Constructor;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::models::activity::{
-    Activity, ActivityMetric, ActivityMetrics, ActivityNutrition, ActivityTimeseries,
-    ActivityWithExtraContext, ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric,
-    TimeseriesValue, ToUnit, TrainingContext, Unit,
+use crate::domain::{
+    models::activity::{
+        Activity, ActivityMetric, ActivityMetrics, ActivityNutrition, ActivityTimeseries,
+        ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+    },
+    ports::training::{ActivityWithTrainingContext, TrainingContext},
 };
 
 // =============================================================================
@@ -221,8 +223,8 @@ pub struct PublicActivityWithTimeseries {
     pub timeseries: PublicActivityTimeseries,
 }
 
-impl From<&ActivityWithExtraContext> for PublicActivityWithTimeseries {
-    fn from(activity: &ActivityWithExtraContext) -> Self {
+impl From<&ActivityWithTrainingContext> for PublicActivityWithTimeseries {
+    fn from(activity: &ActivityWithTrainingContext) -> Self {
         Self {
             activity: PublicActivity::from(activity.activity().activity(), activity.metrics()),
             training_context: PublicTrainingContext::from(activity.training_context()),
@@ -261,8 +263,8 @@ mod tests {
     use crate::domain::models::UserId;
     use crate::domain::models::activity::{
         ActiveTime, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistic,
-        ActivityStatistics, ActivityTimeseries, ActivityWithExtraContext, ActivityWithParsedData,
-        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
+        TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
 
     fn activity_id() -> ActivityId {
@@ -312,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_public_activity_with_timeseries_json_roundtrip() {
-        let activity = ActivityWithExtraContext::new(
+        let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
             TrainingContext::new(Some(70.0)),
             metrics(),
@@ -328,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_public_activity_with_timeseries_serialises_training_context() {
-        let activity = ActivityWithExtraContext::new(
+        let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
             TrainingContext::new(Some(70.0)),
             metrics(),
@@ -343,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_public_activity_with_timeseries_serialises_null_weight() {
-        let activity = ActivityWithExtraContext::new(
+        let activity = ActivityWithTrainingContext::new(
             activity_with_parsed_data(),
             TrainingContext::new(None),
             metrics(),

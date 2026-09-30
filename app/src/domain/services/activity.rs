@@ -7,8 +7,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithExtraContext,
-            ActivityWithParsedData, DEFAULT_METRICS, TrainingContext,
+            Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithParsedData,
+            DEFAULT_METRICS,
         },
         search::{SearchDocument, SearchDocumentType},
     },
@@ -163,12 +163,12 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn get_activity_with_extra_context(
+    async fn get_activity_with_parsed_data_and_metrics(
         &self,
         user: &UserId,
         activity_id: &ActivityId,
         metrics: &[ActivityMetric],
-    ) -> Result<ActivityWithExtraContext, GetActivityError> {
+    ) -> Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError> {
         let (activity, metrics) = match self
             .activity_repository
             .get_activity_with_metrics(user, activity_id, metrics)
@@ -189,11 +189,7 @@ where
             Err(err) => return Err(err),
         };
 
-        Ok(ActivityWithExtraContext::new(
-            activity,
-            TrainingContext::default(),
-            metrics,
-        ))
+        Ok((activity, metrics))
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -365,12 +361,12 @@ pub mod test_utils {
                 metrics: &[ActivityMetric],
             ) -> Result<Vec<(Activity, ActivityMetrics)>, ListActivitiesError>;
 
-            async fn get_activity_with_extra_context(
+            async fn get_activity_with_parsed_data_and_metrics(
                 &self,
                 user: &UserId,
                 activity_id: &ActivityId,
                 metrics: &[ActivityMetric],
-            ) -> Result<ActivityWithExtraContext, GetActivityError>;
+            ) -> Result<(ActivityWithParsedData, ActivityMetrics), GetActivityError>;
 
             async fn patch_activity(
                 &self,

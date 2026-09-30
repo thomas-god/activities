@@ -1625,38 +1625,6 @@ impl TimeseriesAggregate {
     }
 }
 
-/// Additional training context to help interpret or derive statistics (like W/kg) form an activity.
-#[derive(Clone, Debug, Constructor, Default, PartialEq)]
-pub struct TrainingContext {
-    weight: Option<f32>,
-}
-
-impl TrainingContext {
-    pub fn weight(&self) -> &Option<f32> {
-        &self.weight
-    }
-}
-
-/// Activity extended with extra context like its parsed data, training context and computed metrics.
-#[derive(Clone, Debug, Constructor)]
-pub struct ActivityWithExtraContext {
-    activity: ActivityWithParsedData,
-    training_context: TrainingContext,
-    metrics: ActivityMetrics,
-}
-
-impl ActivityWithExtraContext {
-    pub fn activity(&self) -> &ActivityWithParsedData {
-        &self.activity
-    }
-    pub fn training_context(&self) -> &TrainingContext {
-        &self.training_context
-    }
-    pub fn metrics(&self) -> &ActivityMetrics {
-        &self.metrics
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
