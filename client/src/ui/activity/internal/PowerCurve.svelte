@@ -1,13 +1,15 @@
 <script lang="ts">
 	import * as d3 from 'd3';
+	import { isSome, none, type Option } from '$lib/Options';
 
 	interface Props {
 		powerValues: (number | null)[];
 		width: number;
 		height: number;
+		weight?: Option<number>;
 	}
 
-	let { powerValues, width, height }: Props = $props();
+	let { powerValues, width, height, weight = none() }: Props = $props();
 
 	const marginTop = 20;
 	const marginRight = 20;
@@ -16,6 +18,13 @@
 
 	// Fixed duration set in seconds — ensures curves are comparable across activities
 	const FIXED_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 3600 * 5];
+
+	type Mode = 'absolute' | 'relative';
+
+	let mode = $state<Mode>('absolute');
+
+	let hasWeight = $derived(isSome(weight));
+	let effectiveMode = $derived(hasWeight ? mode : 'absolute');
 
 	function computePowerCurve(values: (number | null)[]): [number, number][] {
 		// Concatenate active (non-null) seconds into a single continuous stream.
@@ -57,6 +66,12 @@
 
 	let curveData = $derived(computePowerCurve(powerValues));
 
+	let displayedData = $derived(
+		effectiveMode === 'relative' && isSome(weight)
+			? curveData.map(([d, p]) => [d, p / weight.value] as [number, number])
+			: curveData
+	);
+
 	let xScale = $derived(
 		d3.scaleLog(
 			[FIXED_DURATIONS.at(0)!, FIXED_DURATIONS.at(-1)!],
@@ -65,29 +80,29 @@
 	);
 
 	let yScale = $derived.by(() => {
-		const maxPower = d3.max(curveData, (d) => d[1]) ?? 100;
+		const maxPower = d3.max(displayedData, (d) => d[1]) ?? 100;
 		return d3.scaleLinear([0, maxPower * 1.05], [height - marginBottom, marginTop]);
 	});
 
 	let areaPath = $derived.by(() => {
-		if (curveData.length === 0) return '';
+		if (displayedData.length === 0) return '';
 		const gen = d3
 			.area<[number, number]>()
 			.x((d) => xScale(d[0]))
 			.y0(yScale(0))
 			.y1((d) => yScale(d[1]))
 			.curve(d3.curveCatmullRom.alpha(0.5));
-		return gen(curveData) ?? '';
+		return gen(displayedData) ?? '';
 	});
 
 	let linePath = $derived.by(() => {
-		if (curveData.length === 0) return '';
+		if (displayedData.length === 0) return '';
 		const gen = d3
 			.line<[number, number]>()
 			.x((d) => xScale(d[0]))
 			.y((d) => yScale(d[1]))
 			.curve(d3.curveCatmullRom.alpha(0.5));
-		return gen(curveData) ?? '';
+		return gen(displayedData) ?? '';
 	});
 
 	const formatTickDuration = (s: number): string => {
@@ -105,16 +120,29 @@
 		return `${sec}s`;
 	};
 
+	const formatPower = (v: number): string => {
+		if (effectiveMode === 'relative') return `${(Math.round(v * 10) / 10).toString()} W/kg`;
+		return `${Math.round(v).toString()} W`;
+	};
+
+	const formatTickValue = (v: number): string => {
+		if (effectiveMode === 'relative') return `${+v.toFixed(1)}W/kg`;
+		return `${v}W`;
+	};
+
 	let yTicks = $derived(yScale.ticks(5));
 
 	// Tooltip
 	let tooltipX = $state<number | undefined>(undefined);
 	const bisector = d3.bisector<[number, number], number>((d) => d[0]);
 	let tooltipData = $derived.by(() => {
-		if (tooltipX === undefined || curveData.length === 0) return null;
+		if (tooltipX === undefined || displayedData.length === 0) return null;
 		const duration = xScale.invert(tooltipX);
-		const idx = Math.max(0, Math.min(bisector.center(curveData, duration), curveData.length - 1));
-		return curveData[idx] ?? null;
+		const idx = Math.max(
+			0,
+			Math.min(bisector.center(displayedData, duration), displayedData.length - 1)
+		);
+		return displayedData[idx] ?? null;
 	});
 
 	const handleMouseMove = (e: MouseEvent) => {
@@ -126,13 +154,29 @@
 	};
 </script>
 
-{#if curveData.length > 0}
-	<div class="flex flex-wrap justify-center pt-2 text-xs sm:text-base">
+{#if displayedData.length > 0}
+	<div class="flex flex-wrap items-center justify-center pt-2 text-xs sm:text-base">
 		{#if tooltipData}
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData[0])}</span>
-			<span class="text-power-chart px-1.5 font-semibold">{Math.round(tooltipData[1])} W</span>
+			<span class="text-power-chart px-1.5 font-semibold">{formatPower(tooltipData[1])}</span>
 		{:else}
 			<span class="invisible px-1.5">Interval: –</span>
+		{/if}
+		{#if hasWeight}
+			<div class="join ml-auto" role="group" aria-label="Power curve unit">
+				<button
+					class="btn join-item btn-xs"
+					class:btn-primary={effectiveMode === 'absolute'}
+					class:btn-outline={effectiveMode === 'relative'}
+					onclick={() => (mode = 'absolute')}>W</button
+				>
+				<button
+					class="btn join-item btn-xs"
+					class:btn-primary={effectiveMode === 'relative'}
+					class:btn-outline={effectiveMode === 'absolute'}
+					onclick={() => (mode = 'relative')}>W/kg</button
+				>
+			</div>
 		{/if}
 	</div>
 	<svg
@@ -167,7 +211,7 @@
 					text-anchor="end"
 					dominant-baseline="middle"
 					font-size="10"
-					class="fill-current opacity-60">{tick}W</text
+					class="fill-current opacity-60">{formatTickValue(tick)}</text
 				>
 				<line
 					x1={marginLeft}

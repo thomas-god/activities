@@ -19,7 +19,7 @@
 	import type { Nutrition } from '$lib/nutrition';
 	import { sportDisplay } from '$lib/sport';
 	import type { ActivityWithTimeseries } from '$lib/api/activities';
-	import { isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
+	import { asOption, isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
 	import { resolve } from '$app/paths';
 
 	interface Props {
@@ -70,6 +70,7 @@
 		'Power' in active_metrics.metrics ? active_metrics.metrics['Power'].values : null
 	);
 	let hasPowerData = $derived(powerValues !== null && powerValues.some((v) => v !== null));
+	let activityWeight = $derived(asOption(activity.training_context.weight));
 
 	interface MetricOption {
 		option: Metric;
@@ -368,7 +369,12 @@
 			<div class="collapse-content px-0">
 				<div class="px-2 pb-2">
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-						<PowerCurve powerValues={powerValues!} width={chartWidth} height={chartHeight} />
+						<PowerCurve
+							powerValues={powerValues!}
+							width={chartWidth}
+							height={chartHeight}
+							weight={activityWeight}
+						/>
 					</div>
 				</div>
 			</div>
