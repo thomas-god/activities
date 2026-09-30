@@ -378,17 +378,20 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn get_activity(
         &self,
+        user: &UserId,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<Activity>, GetActivityError>> + Send;
 
     fn get_activity_with_metrics(
         &self,
+        user: &UserId,
         id: &ActivityId,
         metrics: &[ActivityMetric],
     ) -> impl Future<Output = Result<Option<(Activity, ActivityMetrics)>, GetActivityError>> + Send;
 
     fn get_activity_with_parsed_data(
         &self,
+        user: &UserId,
         id: &ActivityId,
     ) -> impl Future<Output = Result<Option<ActivityWithParsedData>, GetActivityError>> + Send;
 

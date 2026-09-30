@@ -25,7 +25,7 @@ pub async fn get_activity<
     TMS: ITrainingService,
     PS: IPreferencesService,
 >(
-    Extension(_user): Extension<AuthenticatedUser>,
+    Extension(user): Extension<AuthenticatedUser>,
     State(state): State<AppState<AS, PF, TMS, PS>>,
     Path(activity_id): Path<String>,
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {

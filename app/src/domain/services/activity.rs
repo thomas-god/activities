@@ -141,7 +141,7 @@ where
 
             let Some(activity_with_parsed_data) = self
                 .activity_repository
-                .get_activity_with_parsed_data(activity.id())
+                .get_activity_with_parsed_data(user, activity.id())
                 .await
                 .map_err(|err| ListActivitiesError::Unknown(anyhow!(err)))?
             else {
@@ -165,12 +165,13 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_extra_context(
         &self,
+        user: &UserId,
         activity_id: &ActivityId,
         metrics: &[ActivityMetric],
     ) -> Result<ActivityWithExtraContext, GetActivityError> {
         let (activity, metrics) = match self
             .activity_repository
-            .get_activity_with_metrics(activity_id, metrics)
+            .get_activity_with_metrics(user, activity_id, metrics)
             .await
         {
             Ok(Some(res)) => res,
@@ -180,7 +181,7 @@ where
 
         let activity = match self
             .activity_repository
-            .get_activity_with_parsed_data(activity.id())
+            .get_activity_with_parsed_data(user, activity.id())
             .await
         {
             Ok(Some(activity)) => activity,
@@ -197,7 +198,11 @@ where
 
     #[tracing::instrument(skip_all, err)]
     async fn patch_activity(&self, req: PatchActivityRequest) -> Result<(), PatchActivityError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
+        let Ok(Some(activity)) = self
+            .activity_repository
+            .get_activity(req.user(), req.activity())
+            .await
+        else {
             return Err(PatchActivityError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -231,7 +236,11 @@ where
 
     #[tracing::instrument(skip_all, err)]
     async fn delete_activity(&self, req: DeleteActivityRequest) -> Result<(), DeleteActivityError> {
-        let Ok(Some(activity)) = self.activity_repository.get_activity(req.activity()).await else {
+        let Ok(Some(activity)) = self
+            .activity_repository
+            .get_activity(req.user(), req.activity())
+            .await
+        else {
             return Err(DeleteActivityError::ActivityDoesNotExist(
                 req.activity().clone(),
             ));
@@ -358,6 +367,7 @@ pub mod test_utils {
 
             async fn get_activity_with_extra_context(
                 &self,
+                user: &UserId,
                 activity_id: &ActivityId,
                 metrics: &[ActivityMetric],
             ) -> Result<ActivityWithExtraContext, GetActivityError>;
@@ -467,17 +477,20 @@ pub mod test_utils {
 
             async fn get_activity(
                 &self,
+                user: &UserId,
                 id: &ActivityId,
             ) -> Result<Option<Activity>, GetActivityError>;
 
             async fn get_activity_with_metrics(
                 &self,
+                user: &UserId,
                 id: &ActivityId,
                 metrics: &[ActivityMetric],
             ) -> Result<Option<(Activity, ActivityMetrics)>, GetActivityError>;
 
             async fn get_activity_with_parsed_data(
                 &self,
+                user: &UserId,
                 id: &ActivityId,
             ) -> Result<Option<ActivityWithParsedData>, GetActivityError>;
 
@@ -782,7 +795,7 @@ mod tests_activity_service {
         use crate::domain::models::activity::{ActivityFeedback, ActivityPatch, ActivityRpe};
 
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
@@ -838,7 +851,7 @@ mod tests_activity_service {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_get_activity()
-            .return_once(|_| Ok(None));
+            .return_once(|_, _| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
         let service = ActivityService::new(
@@ -866,7 +879,7 @@ mod tests_activity_service {
         use crate::domain::models::activity::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
@@ -908,7 +921,7 @@ mod tests_activity_service {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_get_activity()
-            .return_once(|_| Ok(None));
+            .return_once(|_, _| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
 
@@ -936,7 +949,7 @@ mod tests_activity_service {
         use crate::domain::models::activity::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 "another_user".into(),
@@ -973,7 +986,7 @@ mod tests_activity_service {
         use crate::domain::models::activity::ActivityPatch;
 
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::test_default(),
@@ -1009,7 +1022,7 @@ mod tests_activity_service {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_get_activity()
-            .return_once(|_| Ok(None));
+            .return_once(|_, _| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
         let service = ActivityService::new(
@@ -1031,7 +1044,7 @@ mod tests_activity_service {
     #[tokio::test]
     async fn test_activity_service_delete_activity_triggers_notify() {
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::from("test_user".to_string()),
@@ -1070,7 +1083,7 @@ mod tests_activity_service {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_get_activity()
-            .return_once(|_| Ok(None));
+            .return_once(|_, _| Ok(None));
 
         let raw_data_repository = MockRawDataRepository::default();
 
@@ -1092,15 +1105,17 @@ mod tests_activity_service {
     #[tokio::test]
     async fn test_activity_service_delete_activity_not_owned_by_user() {
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().return_once(|_| {
-            Ok(Some(Activity::new_empty(
-                ActivityId::from("test_activity"),
-                UserId::from("another_user".to_string()),
-                ActivityStartTime::from_timestamp(0).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
-            )))
-        });
+        activity_repository
+            .expect_get_activity()
+            .return_once(|_, _| {
+                Ok(Some(Activity::new_empty(
+                    ActivityId::from("test_activity"),
+                    UserId::from("another_user".to_string()),
+                    ActivityStartTime::from_timestamp(0).unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                )))
+            });
 
         let raw_data_repository = MockRawDataRepository::default();
         let service = ActivityService::new(
@@ -1126,7 +1141,7 @@ mod tests_activity_service {
     #[tokio::test]
     async fn test_activity_service_delete_activity_ok() {
         let mut activity_repository = MockActivityRepository::new();
-        activity_repository.expect_get_activity().returning(|_| {
+        activity_repository.expect_get_activity().returning(|_, _| {
             Ok(Some(Activity::new_empty(
                 ActivityId::from("test_activity"),
                 UserId::from("test_user".to_string()),
@@ -1168,7 +1183,7 @@ mod tests_activity_service {
         // Activity doesn't exist
         activity_repository
             .expect_get_activity()
-            .return_once(move |_| Ok(None));
+            .return_once(move |_, _| Ok(None));
         let raw_data_repository = MockRawDataRepository::default();
 
         let service = ActivityService::new(
@@ -1371,8 +1386,11 @@ mod tests_activity_service {
             activity_repository
                 .expect_get_activity_with_parsed_data()
                 .times(1)
-                .with(eq(ActivityId::from("test_activity")))
-                .returning(|_| Ok(Some(default_activity())));
+                .with(
+                    eq(UserId::test_default()),
+                    eq(ActivityId::from("test_activity")),
+                )
+                .returning(|_, _| Ok(Some(default_activity())));
             activity_repository
                 .expect_update_activity_metric()
                 .times(1)
@@ -1422,8 +1440,11 @@ mod tests_activity_service {
             activity_repository
                 .expect_get_activity_with_parsed_data()
                 .times(1)
-                .with(eq(ActivityId::from("test_activity")))
-                .returning(|_| Ok(Some(default_activity())));
+                .with(
+                    eq(UserId::test_default()),
+                    eq(ActivityId::from("test_activity")),
+                )
+                .returning(|_, _| Ok(Some(default_activity())));
             activity_repository
                 .expect_update_activity_metric()
                 .times(1)
@@ -1476,8 +1497,11 @@ mod tests_activity_service {
             activity_repository
                 .expect_get_activity_with_parsed_data()
                 .times(1)
-                .with(eq(ActivityId::from("test_activity")))
-                .returning(|_| Ok(None));
+                .with(
+                    eq(UserId::test_default()),
+                    eq(ActivityId::from("test_activity")),
+                )
+                .returning(|_, _| Ok(None));
             activity_repository.expect_update_activity_metric().times(0);
             let raw_data_repository = MockRawDataRepository::default();
 
@@ -1519,8 +1543,11 @@ mod tests_activity_service {
             activity_repository
                 .expect_get_activity_with_parsed_data()
                 .times(1)
-                .with(eq(ActivityId::from("test_activity")))
-                .returning(|_| Err(GetActivityError::Unknown(anyhow!("error"))));
+                .with(
+                    eq(UserId::test_default()),
+                    eq(ActivityId::from("test_activity")),
+                )
+                .returning(|_, _| Err(GetActivityError::Unknown(anyhow!("error"))));
             activity_repository.expect_update_activity_metric().times(0);
             let raw_data_repository = MockRawDataRepository::default();
 

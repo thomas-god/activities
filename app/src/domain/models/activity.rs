@@ -637,6 +637,10 @@ impl ActivityStartTime {
     pub fn datetime(&self) -> &DateTime<FixedOffset> {
         &self.0
     }
+
+    pub fn naive_date(&self) -> chrono::NaiveDate {
+        self.0.date_naive()
+    }
 }
 
 #[derive(Clone, Debug, Display, PartialEq, PartialOrd, From, Into, Copy, Constructor, Default)]

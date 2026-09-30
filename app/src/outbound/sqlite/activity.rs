@@ -305,14 +305,19 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>, GetActivityError> {
+    async fn get_activity(
+        &self,
+        user: &UserId,
+        id: &ActivityId,
+    ) -> Result<Option<Activity>, GetActivityError> {
         match sqlx::query_as::<_, ActivityRow>(
             "SELECT id, user_id, name, start_time, duration, sport, rpe, workout_type, nutrition, feedback
             FROM t_activities_v2
-            WHERE id = ?1
+            WHERE id = ?1 AND user_id = ?2
             LIMIT 1;",
         )
         .bind(id)
+        .bind(user)
         .fetch_one(&self.readers)
         .await
         {
@@ -341,19 +346,27 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_metrics(
         &self,
+        user: &UserId,
         id: &ActivityId,
         metrics: &[ActivityMetric],
     ) -> Result<Option<(Activity, ActivityMetrics)>, GetActivityError> {
-        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new("
+        let mut builder = sqlx::QueryBuilder::<'_, Sqlite>::new(
+            "
         SELECT
             t_activities_v2.id,
             t_activities_metrics.metric,
             t_activities_metrics_values.value
         FROM t_activities_v2
-        JOIN t_activities_metrics_values ON t_activities_metrics_values.activity_rowid = t_activities_v2.rowid
-        JOIN t_activities_metrics ON t_activities_metrics_values.metric_rowid = t_activities_metrics.rowid");
+        JOIN t_activities_metrics_values
+            ON t_activities_metrics_values.activity_rowid = t_activities_v2.rowid
+        JOIN t_activities_metrics
+            ON t_activities_metrics_values.metric_rowid = t_activities_metrics.rowid",
+        );
 
         builder.push(" WHERE t_activities_v2.id = ").push_bind(id);
+        builder
+            .push(" AND t_activities_v2.user_id = ")
+            .push_bind(user);
 
         builder.push(" AND t_activities_metrics.metric IN (");
         for (idx, metric) in metrics.iter().enumerate() {
@@ -374,7 +387,7 @@ where
             metrics_values.push((metric, value));
         }
 
-        let Some(activity) = self.get_activity(id).await? else {
+        let Some(activity) = self.get_activity(user, id).await? else {
             return Err(GetActivityError::ActivityDoesNotExist(id.clone()));
         };
 
@@ -387,13 +400,13 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn get_activity_with_parsed_data(
         &self,
+        user: &UserId,
         id: &ActivityId,
     ) -> Result<Option<ActivityWithParsedData>, GetActivityError> {
-        let activity = match self.get_activity(id).await {
-            Ok(Some(activity)) => activity,
-            Ok(None) => return Err(GetActivityError::ActivityDoesNotExist(id.clone())),
-            Err(err) => return Err(GetActivityError::Unknown(anyhow!(err))),
-        };
+        let activity = self
+            .get_activity(user, id)
+            .await?
+            .ok_or_else(|| GetActivityError::ActivityDoesNotExist(id.clone()))?;
 
         let activity_with_parsed_data = match self.load_timeseries(id, activity).await {
             Ok(value) => value,
@@ -916,7 +929,7 @@ mod test_sqlite_activity_repository {
             .expect("Should have succeeded");
 
         let activity = repository
-            .get_activity(patched_activity.id())
+            .get_activity(&UserId::test_default(), patched_activity.id())
             .await
             .expect("Should have returned the activity")
             .expect("Activity should be some");
@@ -1006,7 +1019,7 @@ mod test_sqlite_activity_repository {
             .expect("Insertion should have succeed");
 
         let res = repository
-            .get_activity(activity.id())
+            .get_activity(&UserId::test_default(), activity.id())
             .await
             .expect("Get should have succeeded")
             .expect("Should not be None");
@@ -1032,7 +1045,71 @@ mod test_sqlite_activity_repository {
         let activity = build_activity();
 
         let res = repository
-            .get_activity(activity.id())
+            .get_activity(&UserId::test_default(), activity.id())
+            .await
+            .expect_err("Get should have failed");
+
+        let GetActivityError::ActivityDoesNotExist(id) = res else {
+            unreachable!("Should have returned GetActivityError::ActivityDoesNotExist(id)")
+        };
+
+        assert_eq!(id, *activity.id());
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+            Clock::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .get_activity(&UserId::from("another_user"), activity.id())
+            .await
+            .expect_err("Get should have failed");
+
+        let GetActivityError::ActivityDoesNotExist(id) = res else {
+            unreachable!("Should have returned GetActivityError::ActivityDoesNotExist(id)")
+        };
+
+        assert_eq!(id, *activity.id());
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_metrics_wrong_user() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+            Clock::new(),
+        )
+        .await
+        .expect("repo should init");
+        let activity = build_activity();
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Insertion should have succeed");
+
+        let res = repository
+            .get_activity_with_metrics(
+                &UserId::from("another_user"),
+                activity.id(),
+                &[ActivityMetric::AvgPower],
+            )
             .await
             .expect_err("Get should have failed");
 
@@ -1333,7 +1410,7 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         let res = repository
-            .get_activity_with_parsed_data(activity.id())
+            .get_activity_with_parsed_data(&UserId::test_default(), activity.id())
             .await
             .expect("Should have succeeded")
             .expect("Should not be none");
@@ -1350,6 +1427,38 @@ mod test_sqlite_activity_repository {
                 ],
             )
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_parsed_data_wrong_user() {
+        let raw_data_repo = MockRawDataRepository::new();
+        let file_parser = MockFileParser::new();
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+            Clock::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity();
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .get_activity_with_parsed_data(&UserId::from("another_user"), activity.id())
+            .await
+            .expect_err("Should have failed");
+
+        let GetActivityError::ActivityDoesNotExist(id) = res else {
+            unreachable!("Should have returned GetActivityError::ActivityDoesNotExist(id)")
+        };
+
+        assert_eq!(id, *activity.id());
     }
 
     #[tokio::test]
@@ -1378,7 +1487,7 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         repository
-            .get_activity_with_parsed_data(activity.id())
+            .get_activity_with_parsed_data(&UserId::test_default(), activity.id())
             .await
             .expect_err("Should have failed");
     }
@@ -1413,7 +1522,7 @@ mod test_sqlite_activity_repository {
             .expect("Save should have succeeded");
 
         repository
-            .get_activity_with_parsed_data(activity.id())
+            .get_activity_with_parsed_data(&UserId::test_default(), activity.id())
             .await
             .expect_err("Should have failed");
     }
@@ -2342,7 +2451,11 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             let (returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
+                .get_activity_with_metrics(
+                    &UserId::test_default(),
+                    activity.id(),
+                    &[ActivityMetric::AvgPower],
+                )
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
@@ -2372,7 +2485,11 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeed");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
+                .get_activity_with_metrics(
+                    &UserId::test_default(),
+                    activity.id(),
+                    &[ActivityMetric::AvgPower],
+                )
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
@@ -2394,6 +2511,7 @@ mod test_sqlite_activity_repository {
 
             let err = repo
                 .get_activity_with_metrics(
+                    &UserId::test_default(),
                     &ActivityId::from("non-existing-activity"),
                     &[ActivityMetric::AvgPower],
                 )
@@ -2431,7 +2549,11 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
+                .get_activity_with_metrics(
+                    &UserId::test_default(),
+                    activity.id(),
+                    &[ActivityMetric::AvgPower],
+                )
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
@@ -2465,7 +2587,11 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             let (_returned_activity, metrics) = repo
-                .get_activity_with_metrics(activity.id(), &[ActivityMetric::AvgPower])
+                .get_activity_with_metrics(
+                    &UserId::test_default(),
+                    activity.id(),
+                    &[ActivityMetric::AvgPower],
+                )
                 .await
                 .expect("Should have succeeded")
                 .expect("Should not be None");
