@@ -53,10 +53,19 @@ const TimeseriesSchema = z.object({
 });
 
 /**
+ * Additional context used to interpret or derive statistics of an activity
+ * (e.g. the athlete weight at the time of the activity, used for W/kg).
+ */
+const TrainingContextSchema = z.object({
+	weight: z.number().nullable()
+});
+
+/**
  * Activity that includes its timeseries data. Structurally a superset of
  * `Activity`, so it can be used anywhere an `Activity` is expected.
  */
-const ActivityWithTimeseriesSchema = ActivitySchema.extend({
+export const ActivityWithTimeseriesSchema = ActivitySchema.extend({
+	training_context: TrainingContextSchema,
 	timeseries: TimeseriesSchema
 });
 
@@ -68,6 +77,7 @@ export type Activity = z.infer<typeof ActivitySchema>;
 export type ActivityList = z.infer<typeof ActivityListSchema>;
 export type ActivityWithTimeseries = z.infer<typeof ActivityWithTimeseriesSchema>;
 export type Timeseries = z.infer<typeof TimeseriesSchema>;
+export type TrainingContext = z.infer<typeof TrainingContextSchema>;
 
 // =============================================================================
 // API Functions

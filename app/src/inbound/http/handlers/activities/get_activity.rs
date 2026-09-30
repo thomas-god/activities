@@ -34,10 +34,7 @@ pub async fn get_activity<
         .get_activity_with_extra_context(&ActivityId::from(&activity_id), &DEFAULT_METRICS)
         .await
     {
-        Ok(activity) => Ok(Json(PublicActivityWithTimeseries::from(
-            activity.activity(),
-            activity.metrics(),
-        ))),
+        Ok(activity) => Ok(Json(PublicActivityWithTimeseries::from(&activity))),
         Err(GetActivityError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
         Err(GetActivityError::Unknown(err)) => {
             tracing::error!(
@@ -80,7 +77,7 @@ mod tests {
         inbound::{
             http::handlers::activities::activity_schema::{
                 PublicActivity, PublicActivityTimeseries, PublicMetricValue, PublicTimeseries,
-                PublicTimeseriesValue,
+                PublicTimeseriesValue, PublicTrainingContext,
             },
             parser::test_utils::MockFileParser,
         },
@@ -131,7 +128,7 @@ mod tests {
                             1200.,
                         )])),
                     ),
-                    TrainingContext::default(),
+                    TrainingContext::new(Some(70.0)),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });
@@ -189,7 +186,8 @@ mod tests {
                         }
                     )]),
                     laps: vec![]
-                }
+                },
+                training_context: PublicTrainingContext { weight: Some(70.0) },
             }
         );
     }

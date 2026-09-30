@@ -2,18 +2,19 @@ use std::{collections::HashMap, ops::Mul};
 
 use chrono::{DateTime, FixedOffset};
 use derive_more::Constructor;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::models::activity::{
     Activity, ActivityMetric, ActivityMetrics, ActivityNutrition, ActivityTimeseries,
-    ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+    ActivityWithExtraContext, ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric,
+    TimeseriesValue, ToUnit, TrainingContext, Unit,
 };
 
 // =============================================================================
 // Nutrition
 // =============================================================================
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicNutrition {
     pub bonk_status: String,
     pub details: Option<String>,
@@ -32,7 +33,7 @@ impl From<&ActivityNutrition> for PublicNutrition {
 // Timeseries
 // =============================================================================
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicActivityTimeseries {
     pub time: Vec<usize>,
     pub active_time: Vec<Option<usize>>,
@@ -40,19 +41,19 @@ pub struct PublicActivityTimeseries {
     pub laps: Vec<PublicLap>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicTimeseries {
     pub unit: String,
     pub values: Vec<Option<PublicTimeseriesValue>>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicLap {
     pub start: usize,
     pub end: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PublicTimeseriesValue {
     Int(usize),
@@ -157,7 +158,7 @@ fn extract_and_convert_metrics(metrics: &[Timeseries]) -> HashMap<String, Public
 /// Canonical representation of an activity returned by the API.
 /// All activity statistics (duration, distance, elevation, etc.) are exposed
 /// through the `statistics` map so every endpoint returns the same shape.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicActivity {
     pub id: String,
     pub sport: String,
@@ -198,7 +199,7 @@ impl PublicActivity {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Constructor)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Constructor)]
 pub struct PublicMetricValue {
     value: f64,
     unit: String,
@@ -210,20 +211,148 @@ pub struct PublicMetricValue {
 
 /// Extension of `PublicActivity` that also includes raw timeseries data.
 /// Serialises as a flat JSON object (all `PublicActivity` fields at the top level
-/// plus a `timeseries` key), so it can be used anywhere `PublicActivity` is
-/// accepted on the client side.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+/// plus `training_context` and `timeseries` keys), so it can be used anywhere
+/// `PublicActivity` is accepted on the client side.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicActivityWithTimeseries {
     #[serde(flatten)]
     pub activity: PublicActivity,
+    pub training_context: PublicTrainingContext,
     pub timeseries: PublicActivityTimeseries,
 }
 
-impl PublicActivityWithTimeseries {
-    pub fn from(activity: &ActivityWithParsedData, metrics: &ActivityMetrics) -> Self {
+impl From<&ActivityWithExtraContext> for PublicActivityWithTimeseries {
+    fn from(activity: &ActivityWithExtraContext) -> Self {
         Self {
-            activity: PublicActivity::from(activity.activity(), metrics),
-            timeseries: activity.timeseries().into(),
+            activity: PublicActivity::from(activity.activity().activity(), activity.metrics()),
+            training_context: PublicTrainingContext::from(activity.training_context()),
+            timeseries: activity.activity().timeseries().into(),
         }
+    }
+}
+
+/// Additional context used to interpret or derive statistics of an activity
+/// (e.g. the athlete weight at the time of the activity, used for W/kg).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PublicTrainingContext {
+    pub weight: Option<f32>,
+}
+
+impl From<&TrainingContext> for PublicTrainingContext {
+    fn from(context: &TrainingContext) -> Self {
+        Self {
+            weight: *context.weight(),
+        }
+    }
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+
+    use chrono::DateTime;
+
+    use crate::domain::models::UserId;
+    use crate::domain::models::activity::{
+        ActiveTime, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistic,
+        ActivityStatistics, ActivityTimeseries, ActivityWithExtraContext, ActivityWithParsedData,
+        Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+    };
+
+    fn activity_id() -> ActivityId {
+        ActivityId::from("activity_id")
+    }
+
+    fn start_time() -> DateTime<FixedOffset> {
+        "2025-09-03T00:00:00Z"
+            .parse::<DateTime<FixedOffset>>()
+            .unwrap()
+    }
+
+    fn activity_with_parsed_data() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                activity_id(),
+                UserId::test_default(),
+                ActivityStartTime::new(start_time()),
+                ActivityDuration::from(1200.),
+                Sport::IndoorCycling,
+            ),
+            ActivityTimeseries::new(
+                TimeseriesTime::new(vec![0, 1, 2]),
+                TimeseriesActiveTime::new(vec![
+                    ActiveTime::Running(0),
+                    ActiveTime::Running(1),
+                    ActiveTime::Running(2),
+                ]),
+                vec![],
+                vec![Timeseries::new(
+                    TimeseriesMetric::Power,
+                    vec![
+                        Some(TimeseriesValue::Int(120)),
+                        None,
+                        Some(TimeseriesValue::Int(130)),
+                    ],
+                )],
+            )
+            .unwrap(),
+            ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.0)])),
+        )
+    }
+
+    fn metrics() -> ActivityMetrics {
+        ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.0))]))
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_json_roundtrip() {
+        let activity = ActivityWithExtraContext::new(
+            activity_with_parsed_data(),
+            TrainingContext::new(Some(70.0)),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+
+        let json = serde_json::to_string(&public).unwrap();
+        let parsed: PublicActivityWithTimeseries = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed, public);
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_serialises_training_context() {
+        let activity = ActivityWithExtraContext::new(
+            activity_with_parsed_data(),
+            TrainingContext::new(Some(70.0)),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
+
+        assert_eq!(json["training_context"]["weight"], serde_json::json!(70.0));
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_serialises_null_weight() {
+        let activity = ActivityWithExtraContext::new(
+            activity_with_parsed_data(),
+            TrainingContext::new(None),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
+
+        assert_eq!(json["training_context"]["weight"], serde_json::json!(null));
     }
 }
