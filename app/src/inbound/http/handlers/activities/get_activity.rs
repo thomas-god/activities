@@ -31,14 +31,12 @@ pub async fn get_activity<
 ) -> Result<Json<PublicActivityWithTimeseries>, StatusCode> {
     match state
         .activity_service
-        .get_activity_with_metrics_and_parsed_data(
-            &ActivityId::from(&activity_id),
-            &DEFAULT_METRICS,
-        )
+        .get_activity_with_extra_context(&ActivityId::from(&activity_id), &DEFAULT_METRICS)
         .await
     {
-        Ok((activity, metrics)) => Ok(Json(PublicActivityWithTimeseries::from(
-            &activity, &metrics,
+        Ok(activity) => Ok(Json(PublicActivityWithTimeseries::from(
+            activity.activity(),
+            activity.metrics(),
         ))),
         Err(GetActivityError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
         Err(GetActivityError::Unknown(err)) => {
@@ -67,8 +65,9 @@ mod tests {
                 activity::{
                     ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetric,
                     ActivityMetrics, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                    ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
-                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActivityTimeseries, ActivityWithExtraContext, ActivityWithParsedData, Sport,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue, TrainingContext,
                 },
             },
             ports::activity::GetActivityError,
@@ -94,9 +93,9 @@ mod tests {
         let target_id = "target_id".to_string();
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_metrics_and_parsed_data()
+            .expect_get_activity_with_extra_context()
             .returning(|_, _| {
-                Ok((
+                Ok(ActivityWithExtraContext::new(
                     ActivityWithParsedData::new(
                         Activity::new_empty(
                             ActivityId::from("target_id"),
@@ -132,6 +131,7 @@ mod tests {
                             1200.,
                         )])),
                     ),
+                    TrainingContext::default(),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });
@@ -198,7 +198,7 @@ mod tests {
     async fn test_get_activity_does_not_exist() {
         let mut service = MockActivityService::new();
         service
-            .expect_get_activity_with_metrics_and_parsed_data()
+            .expect_get_activity_with_extra_context()
             .with(eq(ActivityId::from("target_id")), eq(DEFAULT_METRICS))
             .returning(|_, _| {
                 Err(GetActivityError::ActivityDoesNotExist(ActivityId::from(
@@ -228,6 +228,3 @@ mod tests {
         assert_eq!(response, StatusCode::NOT_FOUND);
     }
 }
-
-// left: PublicActivityWithTimeseries { activity: PublicActivity { id: "target_id", sport: "IndoorCycling", sport_category: Some("Cycling"), name: None, start_time: 2025-09-03T00:00:00+00:00, rpe: None, workout_type: None, feedback: None, nutrition: None, metrics: {} }, timeseries: PublicActivityTimeseries { time: [0, 1, 2], active_time: [Some(0), Some(1), Some(2)], metrics: {"Power": PublicTimeseries { unit: "W", values: [Some(Int(120)), None, Some(Int(130))] }}, laps: [] } }
-// right: PublicActivityWithTimeseries { activity: PublicActivity { id: "target_id", sport: "IndoorCycling", sport_category: Some("Cycling"), name: None, start_time: 2025-09-03T00:00:00+00:00, rpe: None, workout_type: None, feedback: None, nutrition: None, metrics: {"Duration": 1200.0} }, timeseries: PublicActivityTimeseries { time: [0, 1, 2], active_time: [Some(0), Some(1), Some(2)], metrics: {"Power": PublicTimeseries { unit: "W", values: [Some(Int(120)), None, Some(Int(130))] }}, laps: [] } }

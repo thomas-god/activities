@@ -1043,10 +1043,6 @@ impl FromStr for Unit {
     }
 }
 
-///////////////////////////////////////////////////////////////////
-// New activity metric to mask the difference between stats and timeseries sources
-///////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, Serialize, Deserialize)]
 pub enum ActivityMetric {
     // From activity's raw stats
@@ -1622,6 +1618,38 @@ impl TimeseriesAggregate {
                 .reduce(|acc, e| acc + e)
                 .map(|val| val / length as f64),
         }
+    }
+}
+
+/// Additional training context to help interpret or derive statistics (like W/kg) form an activity.
+#[derive(Clone, Debug, Constructor, Default, PartialEq)]
+pub struct TrainingContext {
+    weight: Option<f32>,
+}
+
+impl TrainingContext {
+    pub fn weight(&self) -> &Option<f32> {
+        &self.weight
+    }
+}
+
+/// Activity extended with extra context like its parsed data, training context and computed metrics.
+#[derive(Clone, Debug, Constructor)]
+pub struct ActivityWithExtraContext {
+    activity: ActivityWithParsedData,
+    training_context: TrainingContext,
+    metrics: ActivityMetrics,
+}
+
+impl ActivityWithExtraContext {
+    pub fn activity(&self) -> &ActivityWithParsedData {
+        &self.activity
+    }
+    pub fn training_context(&self) -> &TrainingContext {
+        &self.training_context
+    }
+    pub fn metrics(&self) -> &ActivityMetrics {
+        &self.metrics
     }
 }
 
