@@ -1322,6 +1322,139 @@ impl TryFrom<ActivityMetricSource> for ActivityMetric {
         Self::try_from(&value)
     }
 }
+///////////////////////////////////////////////////////////////////
+// Duration-curve
+///////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DurationCurveType {
+    Power,
+    Pace,
+}
+
+pub const DURATION_CURVE_DURATIONS_SECOND: [usize; 12] = [
+    5,
+    10,
+    30,
+    60,
+    2 * 60,
+    5 * 60,
+    10 * 60,
+    20 * 60,
+    30 * 60,
+    60 * 60,
+    2 * 60 * 60,
+    5 * 60 * 60,
+];
+
+const CONSECUTVE_NONE_THRESHOLD: usize = 30;
+
+/// Duration curve from an activity's timeseries. i.e. highest rolling average values found for a
+/// set of durations.
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct ActivityDurationCurve {
+    curve_type: DurationCurveType,
+    values: [Option<f32>; 12],
+}
+
+impl ActivityDurationCurve {
+    pub fn curve_type(&self) -> DurationCurveType {
+        self.curve_type
+    }
+
+    pub fn values(&self) -> &[Option<f32>; 12] {
+        &self.values
+    }
+
+    pub fn unit(&self) -> Unit {
+        match self.curve_type {
+            DurationCurveType::Pace => Unit::SecondPerKilometer,
+            DurationCurveType::Power => Unit::Watt,
+        }
+    }
+
+    pub fn from(timeseries: &ActivityTimeseries, curve_type: DurationCurveType) -> Option<Self> {
+        let Some(metric) = get_target_metric(timeseries, curve_type) else {
+            return None;
+        };
+
+        let continuous_metric = split_values_into_pseudo_continuous_segments(
+            metric.values(),
+            CONSECUTVE_NONE_THRESHOLD,
+        );
+
+        let mut values: [Option<f32>; 12] = [None; 12];
+
+        for (idx, duration) in DURATION_CURVE_DURATIONS_SECOND.iter().enumerate() {
+            let mut max = None;
+            for values in &continuous_metric {
+                let iter = values.windows(*duration);
+                let local_max = iter
+                    .map(|values| values.iter().fold(0.0, |acc, value| acc + value.as_f32()))
+                    .reduce(f32::max);
+
+                max = match (max, local_max) {
+                    (None, None) => None,
+                    (Some(max), None) => Some(max),
+                    (None, Some(max)) => Some(max),
+                    (Some(max_1), Some(max_2)) => Some(max_1.max(max_2)),
+                }
+            }
+            values[idx] = max.map(|max| max / (*duration as f32));
+        }
+
+        Some(Self { curve_type, values })
+    }
+}
+
+fn get_target_metric(
+    timeseries: &ActivityTimeseries,
+    curve_type: DurationCurveType,
+) -> Option<&Timeseries> {
+    let target_metric = match curve_type {
+        DurationCurveType::Pace => TimeseriesMetric::Speed,
+        DurationCurveType::Power => TimeseriesMetric::Power,
+    };
+
+    timeseries
+        .metrics()
+        .iter()
+        .find(|metric| metric.metric == target_metric)
+}
+
+/// Split a slice of values into multiple segments each time there are more than `threshold`
+/// consecutive None values. The `None` values themselves are stripped from the resulting
+/// segments.
+fn split_values_into_pseudo_continuous_segments(
+    metric: &[Option<TimeseriesValue>],
+    threshold: usize,
+) -> Vec<Vec<TimeseriesValue>> {
+    let mut segments: Vec<Vec<TimeseriesValue>> = Vec::new();
+    let mut current: Vec<TimeseriesValue> = Vec::new();
+    let mut consecutive_none = 0;
+
+    for value in metric {
+        match value {
+            Some(value) => {
+                consecutive_none = 0;
+                current.push(value.clone());
+            }
+            None => {
+                consecutive_none += 1;
+
+                if consecutive_none > threshold && !current.is_empty() {
+                    segments.push(std::mem::take(&mut current));
+                }
+            }
+        }
+    }
+
+    if !current.is_empty() {
+        segments.push(current);
+    }
+
+    segments
+}
 
 ///////////////////////////////////////////////////////////////////
 // TIMESERIES
@@ -1563,6 +1696,13 @@ impl From<&TimeseriesValue> for f64 {
 }
 
 impl TimeseriesValue {
+    pub fn as_f32(&self) -> f32 {
+        match self {
+            Self::Int(value) => *value as f32,
+            Self::Float(value) => *value as f32,
+        }
+    }
+
     pub fn inverse(&self) -> Option<TimeseriesValue> {
         match self {
             TimeseriesValue::Float(val) => {
@@ -2808,5 +2948,233 @@ mod test_search_document {
             .to_search_document(SearchDocumentEvent::Updated, now());
 
         assert_eq!(doc.content(), "");
+    }
+}
+
+#[cfg(test)]
+mod test_duration_curve {
+
+    use super::*;
+
+    fn values<const N: usize>(values: [Option<f64>; N]) -> Vec<Option<TimeseriesValue>> {
+        values
+            .iter()
+            .map(|value| value.map(TimeseriesValue::Float))
+            .collect()
+    }
+
+    fn expected_segments(segments: &[&[f64]]) -> Vec<Vec<TimeseriesValue>> {
+        segments
+            .iter()
+            .map(|segment| {
+                segment
+                    .iter()
+                    .map(|value| TimeseriesValue::Float(*value))
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_split_no_none() {
+        let metric = values([Some(1.), Some(2.), Some(3.), Some(4.)]);
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
+    }
+
+    #[test]
+    fn test_split_empty() {
+        let metric: Vec<Option<TimeseriesValue>> = vec![];
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert!(segments.is_empty());
+    }
+
+    #[test]
+    fn test_split_only_none() {
+        let metric = values([None, None, None]);
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert!(segments.is_empty());
+    }
+
+    #[test]
+    fn test_split_gap_below_threshold() {
+        let metric = values([Some(1.), Some(2.), None, None, Some(3.), Some(4.)]);
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
+    }
+
+    #[test]
+    fn test_split_gap_equal_threshold() {
+        let mut metric = values([Some(1.), Some(2.)]);
+        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD]);
+        metric.extend(values([Some(3.), Some(4.)]));
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
+    }
+
+    #[test]
+    fn test_split_gap_above_threshold() {
+        let mut metric = values([Some(1.), Some(2.)]);
+        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+        metric.extend(values([Some(3.), Some(4.)]));
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2.], &[3., 4.]]));
+    }
+
+    #[test]
+    fn test_split_multiple_gaps() {
+        let mut metric = values([Some(1.)]);
+        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+        metric.extend(values([Some(2.), Some(3.)]));
+        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 5]);
+        metric.extend(values([Some(4.)]));
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1.], &[2., 3.], &[4.]]));
+    }
+
+    #[test]
+    fn test_split_leading_and_trailing_none() {
+        let mut metric = vec![None; CONSECUTVE_NONE_THRESHOLD + 1];
+        metric.extend(values([Some(1.), Some(2.)]));
+        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2.]]));
+    }
+
+    #[test]
+    fn test_split_mixed_none_and_values() {
+        let metric = values([
+            Some(1.),
+            None,
+            Some(2.),
+            None,
+            None,
+            Some(3.),
+            None,
+            Some(4.),
+        ]);
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
+    }
+
+    #[test]
+    fn test_split_int_values() {
+        let metric = vec![
+            Some(TimeseriesValue::Int(1)),
+            None,
+            Some(TimeseriesValue::Int(2)),
+        ];
+
+        let segments =
+            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+
+        assert_eq!(
+            segments,
+            vec![vec![TimeseriesValue::Int(1), TimeseriesValue::Int(2)]]
+        );
+    }
+
+    fn activity_timeseries(
+        metric: TimeseriesMetric,
+        values: Vec<Option<TimeseriesValue>>,
+    ) -> ActivityTimeseries {
+        let len = values.len();
+        ActivityTimeseries::new(
+            TimeseriesTime::new((0..len).collect()),
+            TimeseriesActiveTime::new(vec![ActiveTime::Running(1); len]),
+            vec![],
+            vec![Timeseries::new(metric, values)],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_duration_curve_no_metric() {
+        let timeseries = activity_timeseries(
+            TimeseriesMetric::HeartRate,
+            values([Some(150.), Some(160.)]),
+        );
+
+        assert!(ActivityDurationCurve::from(&timeseries, DurationCurveType::Power).is_none());
+        assert!(ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).is_none());
+    }
+
+    #[test]
+    fn test_duration_curve_constant_values() {
+        // All values equal 10.0: the rolling average over any fitting window is 10.0.
+        let timeseries = activity_timeseries(TimeseriesMetric::Power, values([Some(10.); 10]));
+
+        let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Power).unwrap();
+
+        // Durations longer than the timeseries length have no window to average over.
+        let expected: [Option<f32>; 12] = DURATION_CURVE_DURATIONS_SECOND
+            .iter()
+            .map(|duration| if *duration <= 10 { Some(10.) } else { None })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(curve.curve_type(), DurationCurveType::Power);
+        assert_eq!(curve.unit(), Unit::Watt);
+        assert_eq!(curve.values(), &expected);
+    }
+
+    #[test]
+    fn test_duration_curve_rolling_average() {
+        // A ramp from 1.0 to 20.0: the best 5-sample window is the last one (16..=20),
+        // averaging 18.0; the best 10-sample window is (11..=20), averaging 15.5;
+        // durations longer than the timeseries have no window and yield None.
+        let timeseries = activity_timeseries(
+            TimeseriesMetric::Power,
+            (1..=20)
+                .map(|value| Some(TimeseriesValue::Float(value as f64)))
+                .collect(),
+        );
+
+        let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Power).unwrap();
+
+        let values = curve.values();
+        assert_eq!(values[0], Some(18.)); // 5s
+        assert_eq!(values[1], Some(15.5)); // 10s
+        assert_eq!(values[2], None); // 30s
+        assert_eq!(values[11], None); // 5h
+    }
+
+    #[test]
+    fn test_duration_curve_pace_uses_speed() {
+        let timeseries = activity_timeseries(TimeseriesMetric::Speed, values([Some(5.); 10]));
+
+        let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).unwrap();
+
+        assert_eq!(curve.curve_type(), DurationCurveType::Pace);
+        assert_eq!(curve.unit(), Unit::SecondPerKilometer);
+        assert_eq!(curve.values()[0], Some(5.));
     }
 }
