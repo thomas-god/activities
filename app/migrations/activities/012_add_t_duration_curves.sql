@@ -25,3 +25,13 @@ CREATE TABLE IF NOT EXISTS t_duration_curves (
 CREATE UNIQUE INDEX IF NOT EXISTS u_duration_curves_null_type
 ON t_duration_curves (activity_id, user_id)
 WHERE type IS NULL;
+
+-- Add matching outbox table for notifying the training service
+CREATE TABLE IF NOT EXISTS t_outbox_duration_curve (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    event TEXT NOT NULL, -- added/deleted
+    occurred_at TEXT NOT NULL,
+    processed_at TEXT
+);

@@ -331,6 +331,12 @@ pub enum GetActivityError {
     ActivityDoesNotExist(ActivityId),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DurationCurveEvent {
+    Created,
+    Deleted,
+}
+
 ///////////////////////////////////////////////////////////////////
 // ACTIVITY AND RAW DATA REPOSITORIES
 ///////////////////////////////////////////////////////////////////

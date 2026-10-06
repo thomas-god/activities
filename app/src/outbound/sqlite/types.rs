@@ -3,24 +3,27 @@ use std::collections::HashMap;
 use chrono::{DateTime, NaiveDate};
 use sqlx::{Database, encode::IsNull, error::BoxDynError};
 
-use crate::domain::models::{
-    UserId,
-    activity::{
-        ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
-        ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-        ActivityStatistic, ActivityStatistics, DurationCurveType, Sport, TimeseriesAggregate,
-        TimeseriesMetric, WorkoutType,
+use crate::domain::{
+    models::{
+        UserId,
+        activity::{
+            ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
+            ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+            ActivityStatistic, ActivityStatistics, DurationCurveType, Sport, TimeseriesAggregate,
+            TimeseriesMetric, WorkoutType,
+        },
+        preferences::{ActivityListSummary, Preference, PreferenceKey},
+        search::SearchDocumentEvent,
+        training::{
+            HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
+            TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
+            TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
+            TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
+            WeightAndNutritionSource,
+        },
     },
-    preferences::{ActivityListSummary, Preference, PreferenceKey},
-    search::SearchDocumentEvent,
-    training::{
-        HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
-        TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
-        TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
-        TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
-        TrainingNoteId, TrainingNoteTitle, TrainingPeriodId, TrainingPeriodSports,
-        WeightAndNutritionSource,
-    },
+    ports::activity::DurationCurveEvent,
 };
 
 impl sqlx::Type<sqlx::Sqlite> for ActivityId {
@@ -1178,6 +1181,37 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for DurationCurveType {
             "pace" => Ok(Self::Pace),
             "power" => Ok(Self::Power),
             _ => Err(format!("Unknown DurationCurveType: {}", s).into()),
+        }
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for DurationCurveEvent {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for DurationCurveEvent {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Created => "created",
+            Self::Deleted => "deleted",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for DurationCurveEvent {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "created" => Ok(Self::Created),
+            "deleted" => Ok(Self::Deleted),
+            _ => Err(format!("Unknown DurationCurveEvent: {}", s).into()),
         }
     }
 }

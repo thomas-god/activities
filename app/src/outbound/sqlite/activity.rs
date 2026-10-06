@@ -22,9 +22,9 @@ use crate::{
         ports::{
             DateTimeRange, IClock,
             activity::{
-                ActivityRepository, GetActivityError, GetRawActivityError, ListActivitiesError,
-                ListActivitiesFilters, RawActivity, RawDataRepository, SaveActivityError,
-                SimilarActivityError, UpdateActivityMetricError,
+                ActivityRepository, DurationCurveEvent, GetActivityError, GetRawActivityError,
+                ListActivitiesError, ListActivitiesFilters, RawActivity, RawDataRepository,
+                SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
             },
             search::RemainingDocuments,
         },
@@ -296,7 +296,7 @@ where
         date: &ActivityStartTime,
         curve: &ActivityDurationCurve,
     ) -> Result<(), anyhow::Error> {
-        sqlx::query(
+        let rows_affected = sqlx::query(
             "
             INSERT INTO t_duration_curves
                 (
@@ -331,14 +331,23 @@ where
         .bind(curve.values()[11])
         .execute(&mut **tx)
         .await
-        .map(|_| ())
+        .map(|result| result.rows_affected())
         .map_err(|err| {
             anyhow!(
                 "Unable to save duration curve {} for activity {}. {err}",
                 curve.curve_type(),
                 activity
             )
-        })
+        })?;
+
+        // Only notify the training service when a new curve was actually inserted: curves
+        // are immutable, conflicting saves are ignored.
+        if rows_affected > 0 {
+            self.duration_curve_to_outbox(tx, activity, user, DurationCurveEvent::Created)
+                .await
+        } else {
+            Ok(())
+        }
     }
 
     async fn save_null_duration_curve(
@@ -348,7 +357,7 @@ where
         user: &UserId,
         date: &ActivityStartTime,
     ) -> Result<(), anyhow::Error> {
-        sqlx::query(
+        let rows_affected = sqlx::query(
             "INSERT INTO t_duration_curves (activity_id, user_id, type, date)
             VALUES (?1, ?2, ?3, ?4)
             ON CONFLICT (activity_id, user_id) WHERE type IS NULL DO NOTHING;", // reflect duration curve immutability
@@ -359,13 +368,21 @@ where
         .bind(date.datetime())
         .execute(&mut **tx)
         .await
-        .map(|_| ())
+        .map(|result| result.rows_affected())
         .map_err(|err| {
             anyhow!(
                 "Unable to save null duration curve for activity {}. {err}",
                 activity
             )
-        })
+        })?;
+
+        // Only notify the training service when a new marker was actually inserted.
+        if rows_affected > 0 {
+            self.duration_curve_to_outbox(tx, activity, user, DurationCurveEvent::Created)
+                .await
+        } else {
+            Ok(())
+        }
     }
 
     async fn load_duration_curves(
@@ -455,6 +472,35 @@ where
         .map_err(|err| {
             anyhow!(
                 "Unable to delete duration curves for activity {}. {err}",
+                activity
+            )
+        })?;
+
+        self.duration_curve_to_outbox(tx, activity, user, DurationCurveEvent::Deleted)
+            .await
+    }
+
+    async fn duration_curve_to_outbox(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        activity: &ActivityId,
+        user: &UserId,
+        event: DurationCurveEvent,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "INSERT INTO t_outbox_duration_curve (activity_id, user_id, event, occurred_at)
+            VALUES (?1, ?2, ?3, ?4);",
+        )
+        .bind(activity)
+        .bind(user)
+        .bind(event)
+        .bind(self.clock.now())
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to save null duration curve for activity {}. {err}",
                 activity
             )
         })
@@ -1710,6 +1756,20 @@ mod test_sqlite_activity_repository {
             .await
             .unwrap(),
             1
+        );
+
+        // Only the first marker save and the real curve save posted an outbox event.
+        let events: Vec<DurationCurveEvent> =
+            sqlx::query_as("select event from t_outbox_duration_curve order by rowid;")
+                .fetch_all(&repository.readers)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(event,)| event)
+                .collect();
+        assert_eq!(
+            events,
+            vec![DurationCurveEvent::Created, DurationCurveEvent::Created]
         );
     }
 
@@ -3656,6 +3716,215 @@ mod test_sqlite_activity_repository {
             repo.mark_outbox_document_as_processed(&document, processed_at)
                 .await
                 .expect("Marking document as processes should be idempotent");
+        }
+    }
+
+    mod test_t_outbox_duration_curve {
+
+        use chrono::{DateTime, Utc};
+
+        use super::*;
+
+        type OutboxRow = (
+            ActivityId,
+            UserId,
+            DurationCurveEvent,
+            DateTime<Utc>,
+            Option<DateTime<Utc>>,
+        );
+
+        async fn outbox_rows<R, FP, C>(
+            repo: &SqliteActivityRepository<R, FP, C>,
+        ) -> Vec<OutboxRow> {
+            sqlx::query_as(
+                "SELECT activity_id, user_id, event, occurred_at, processed_at
+                FROM t_outbox_duration_curve
+                ORDER BY rowid;",
+            )
+            .fetch_all(&repo.readers)
+            .await
+            .expect("Reading the duration curve outbox should have succeeded")
+        }
+
+        async fn test_repository(
+            now: DateTime<Utc>,
+        ) -> (
+            SqliteActivityRepository<
+                crate::domain::ports::activity::test_utils::MockRawDataRepository,
+                crate::inbound::parser::test_utils::MockFileParser,
+                FakeClock,
+            >,
+            NamedTempFile,
+        ) {
+            let db_file = NamedTempFile::new().unwrap();
+            let repo = SqliteActivityRepository::new(
+                &db_file.path().to_string_lossy(),
+                MockRawDataRepository::new(),
+                MockFileParser::new(),
+                FakeClock::new(now),
+            )
+            .await
+            .expect("repo should init");
+
+            (repo, db_file)
+        }
+
+        #[tokio::test]
+        async fn test_save_duration_curve_posts_created_event() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity_id = ActivityId::new();
+            let user = UserId::test_default();
+            let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+            // Outbox initially empty
+            assert!(outbox_rows(&repo).await.is_empty());
+
+            let mut tx = repo.writer.begin().await.unwrap();
+            repo.save_duration_curve(
+                &mut tx,
+                &activity_id,
+                &user,
+                &date,
+                &build_duration_curve(DurationCurveType::Power),
+            )
+            .await
+            .expect("Should have succeeded");
+            tx.commit().await.unwrap();
+
+            // Outbox contains a single created event for the curve
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].0, activity_id);
+            assert_eq!(rows[0].1, user);
+            assert_eq!(rows[0].2, DurationCurveEvent::Created);
+            assert_eq!(rows[0].3, now);
+            assert_eq!(rows[0].4, None); // not processed yet
+        }
+
+        #[tokio::test]
+        async fn test_save_null_duration_curve_posts_created_event() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity_id = ActivityId::new();
+            let user = UserId::test_default();
+            let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+            // Outbox initially empty
+            assert!(outbox_rows(&repo).await.is_empty());
+
+            let mut tx = repo.writer.begin().await.unwrap();
+            repo.save_null_duration_curve(&mut tx, &activity_id, &user, &date)
+                .await
+                .expect("Should have succeeded");
+            tx.commit().await.unwrap();
+
+            // Outbox contains a single created event for the (null) curve
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].0, activity_id);
+            assert_eq!(rows[0].1, user);
+            assert_eq!(rows[0].2, DurationCurveEvent::Created);
+            assert_eq!(rows[0].3, now);
+            assert_eq!(rows[0].4, None);
+        }
+
+        #[tokio::test]
+        async fn test_save_duration_curve_conflict_posts_no_event() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity_id = ActivityId::new();
+            let user = UserId::test_default();
+            let date = ActivityStartTime::from_timestamp(1000).unwrap();
+            let curve = build_duration_curve(DurationCurveType::Power);
+
+            let mut tx = repo.writer.begin().await.unwrap();
+            repo.save_duration_curve(&mut tx, &activity_id, &user, &date, &curve)
+                .await
+                .expect("Should have succeeded");
+
+            // Saving the same curve again is a no-op (curves are immutable) and should
+            // not post any event.
+            repo.save_duration_curve(&mut tx, &activity_id, &user, &date, &curve)
+                .await
+                .expect("Should have succeeded");
+            tx.commit().await.unwrap();
+
+            // Outbox contains a single created event, for the first save only
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].0, activity_id);
+            assert_eq!(rows[0].1, user);
+            assert_eq!(rows[0].2, DurationCurveEvent::Created);
+            assert_eq!(rows[0].3, now);
+            assert_eq!(rows[0].4, None);
+        }
+
+        #[tokio::test]
+        async fn test_save_activity_posts_created_event_per_curve() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // Outbox initially empty
+            assert!(outbox_rows(&repo).await.is_empty());
+
+            let activity = build_activity_with_curves(vec![
+                build_duration_curve(DurationCurveType::Power),
+                build_duration_curve(DurationCurveType::Pace),
+            ]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // Outbox contains one created event per saved curve
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 2);
+            for row in rows.iter() {
+                assert_eq!(row.0, *activity.id());
+                assert_eq!(row.1, *activity.user());
+                assert_eq!(row.2, DurationCurveEvent::Created);
+                assert_eq!(row.3, now);
+                assert_eq!(row.4, None);
+            }
+        }
+
+        #[tokio::test]
+        async fn test_delete_activity_posts_deleted_event_per_curve() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity = build_activity_with_curves(vec![
+                build_duration_curve(DurationCurveType::Power),
+                build_duration_curve(DurationCurveType::Pace),
+            ]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // The save posted one created event per curve
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 2);
+            assert!(rows.iter().all(|row| row.2 == DurationCurveEvent::Created));
+
+            repo.delete_activity(activity.user(), activity.id())
+                .await
+                .expect("Should have succeeded");
+
+            // The deletion posted a single deleted event for the activity's curves
+            let rows = outbox_rows(&repo).await;
+            assert_eq!(rows.len(), 3);
+            for row in rows
+                .iter()
+                .filter(|row| row.2 == DurationCurveEvent::Deleted)
+            {
+                assert_eq!(row.0, *activity.id());
+                assert_eq!(row.1, *activity.user());
+                assert_eq!(row.3, now);
+                assert_eq!(row.4, None);
+            }
         }
     }
 }
