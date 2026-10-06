@@ -981,6 +981,7 @@ where
         .map_err(|err| anyhow!(err))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_hooper_index(
         &self,
         user: &UserId,
@@ -1012,6 +1013,7 @@ where
         .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_hooper_index(
         &self,
         user: &UserId,
@@ -1033,6 +1035,7 @@ where
         }))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_hooper_indexes(
         &self,
         user: &UserId,
@@ -1069,6 +1072,7 @@ where
             .collect())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_hooper_index(
         &self,
         user: &UserId,
@@ -1087,6 +1091,7 @@ where
         .map_err(|err| HooperIndexError::Unknown(anyhow!(err)))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_weight_and_nutrition(
         &self,
         user: &UserId,
@@ -1127,6 +1132,7 @@ where
         .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn save_bulk_weight_and_nutrition(
         &self,
         user: &UserId,
@@ -1183,6 +1189,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_weight_and_nutrition(
         &self,
         user: &UserId,
@@ -1209,6 +1216,7 @@ where
         ))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_weight_and_nutritions(
         &self,
         user: &UserId,
@@ -1257,6 +1265,7 @@ where
             .collect())
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn delete_weight_and_nutrition(
         &self,
         user: &UserId,
@@ -1275,6 +1284,7 @@ where
         .map_err(|err| WeightAndNutritionError::Unknown(anyhow!(err)))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_last_weight(
         &self,
         user: &UserId,
