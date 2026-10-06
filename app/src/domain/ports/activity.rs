@@ -343,6 +343,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
 
     fn save_activity(
         &self,
+        activity: &ActivityWithParsedData,
+    ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
+
+    fn update_activity(
+        &self,
         activity: &Activity,
     ) -> impl Future<Output = Result<(), SaveActivityError>> + Send;
 

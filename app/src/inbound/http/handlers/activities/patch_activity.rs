@@ -297,7 +297,7 @@ mod tests {
         activity_service
             .expect_patch_activity()
             .with(function(move |req: &PatchActivityRequest| {
-                let patched = base_activity().apply_patch(req.patch().clone());
+                let patched = base_activity().patch(req.patch().clone());
                 req.user() == &UserId::from(USER_ID)
                     && req.activity() == &ActivityId::from(ACTIVITY_ID)
                     && summary(&patched) == expected
@@ -397,7 +397,7 @@ mod tests {
         };
 
         let patch = ActivityPatch::try_from(body).unwrap();
-        let patched = base_activity().apply_patch(patch);
+        let patched = base_activity().patch(patch);
 
         assert_eq!(
             summary(&patched),
@@ -422,7 +422,7 @@ mod tests {
         };
 
         let patch = ActivityPatch::try_from(body).unwrap();
-        let patched = base_activity().apply_patch(patch);
+        let patched = base_activity().patch(patch);
 
         assert_eq!(summary(&patched), (None, None, None, None, None));
     }
@@ -435,7 +435,7 @@ mod tests {
         };
 
         let patch = ActivityPatch::try_from(body).unwrap();
-        let patched = base_activity().apply_patch(patch);
+        let patched = base_activity().patch(patch);
 
         // Only RPE changes, everything else keeps its current value.
         assert_eq!(

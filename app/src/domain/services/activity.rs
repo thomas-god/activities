@@ -100,7 +100,7 @@ where
 
         // Persist activity
         self.activity_repository
-            .save_activity(&activity)
+            .save_activity(&activity_with_parsed_data)
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
         self.notify_new_document.notify_one();
@@ -216,10 +216,10 @@ where
             ));
         }
 
-        let new_activity = activity.apply_patch(req.as_patch());
+        let new_activity = activity.patch(req.as_patch());
 
         self.activity_repository
-            .save_activity(&new_activity)
+            .update_activity(&new_activity)
             .await
             .map_err(|err| {
                 anyhow!(err).context(format!("Failed to persist activity {}", new_activity.id()))
@@ -430,6 +430,11 @@ pub mod test_utils {
             ) -> Result<bool, SimilarActivityError>;
 
             async fn save_activity(
+                &self,
+                activity: &ActivityWithParsedData,
+            ) -> Result<(), SaveActivityError>;
+
+            async fn update_activity(
                 &self,
                 activity: &Activity,
             ) -> Result<(), SaveActivityError>;
@@ -807,7 +812,7 @@ mod tests_activity_service {
         });
         // Only the patched fields should change, the others must be preserved as-is.
         activity_repository
-            .expect_save_activity()
+            .expect_update_activity()
             .withf(|activity| {
                 activity.id() == &ActivityId::from("test_activity")
                     && activity.rpe().as_ref() == Some(&ActivityRpe::Five)
@@ -885,7 +890,7 @@ mod tests_activity_service {
             )))
         });
         activity_repository
-            .expect_save_activity()
+            .expect_update_activity()
             .times(1)
             .returning(|_| Ok(()));
 
@@ -992,7 +997,7 @@ mod tests_activity_service {
             )))
         });
         activity_repository
-            .expect_save_activity()
+            .expect_update_activity()
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("an error occured"))));
 
         let raw_data_repository = MockRawDataRepository::default();

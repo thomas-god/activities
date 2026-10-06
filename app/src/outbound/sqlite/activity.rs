@@ -276,6 +276,91 @@ where
     C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
+    async fn save_activity(
+        &self,
+        activity: &ActivityWithParsedData,
+    ) -> Result<(), SaveActivityError> {
+        let mut tx = self
+            .writer
+            .begin()
+            .await
+            .map_err(|err| SaveActivityError::Unknown(err.into()))?;
+
+        sqlx::query(
+            "INSERT INTO t_activities_v2 (
+                id, user_id, name, start_time, duration, sport, natural_key, rpe, workout_type, nutrition, feedback
+            )
+            VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+            )
+            ON CONFLICT (id)
+            DO UPDATE SET
+                name=excluded.name,
+                rpe=excluded.rpe,
+                workout_type=excluded.workout_type,
+                nutrition=excluded.nutrition,
+                feedback=excluded.feedback;",
+        )
+        .bind(activity.id())
+        .bind(activity.user())
+        .bind(activity.name())
+        .bind(activity.start_time().datetime())
+        .bind(activity.duration())
+        .bind(activity.sport())
+        .bind(activity.natural_key())
+        .bind(activity.rpe())
+        .bind(activity.workout_type())
+        .bind(activity.nutrition())
+        .bind(activity.feedback())
+        .execute(&mut *tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            SaveActivityError::Unknown(anyhow!("Unable to save activity {}. {err}", activity.id()))
+        })?;
+
+        let search_document = activity
+            .activity()
+            .to_search_document(SearchDocumentEvent::Updated, self.clock.now());
+
+        self.save_search_document(&mut tx, search_document).await?;
+
+        tx.commit()
+            .await
+            .map_err(|err| SaveActivityError::Unknown(err.into()))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn update_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
+        sqlx::query(
+            "UPDATE t_activities_v2
+                SET
+                    name = ?3,
+                    rpe = ?4,
+                    workout_type = ?5,
+                    nutrition = ?6,
+                    feedback = ?7
+                WHERE id = ?1 AND user_id = ?2;",
+        )
+        .bind(activity.id())
+        .bind(activity.user())
+        .bind(activity.name())
+        .bind(activity.rpe())
+        .bind(activity.workout_type())
+        .bind(activity.nutrition())
+        .bind(activity.feedback())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            SaveActivityError::Unknown(anyhow!(
+                "Unable to update activity {}. {err}",
+                activity.id()
+            ))
+        })
+    }
+
+    #[tracing::instrument(skip_all, err)]
     async fn delete_activity(
         &self,
         user: &UserId,
@@ -662,57 +747,6 @@ where
     }
 
     #[tracing::instrument(skip_all, err)]
-    async fn save_activity(&self, activity: &Activity) -> Result<(), SaveActivityError> {
-        let mut tx = self
-            .writer
-            .begin()
-            .await
-            .map_err(|err| SaveActivityError::Unknown(err.into()))?;
-
-        sqlx::query(
-            "INSERT INTO t_activities_v2 (
-                id, user_id, name, start_time, duration, sport, natural_key, rpe, workout_type, nutrition, feedback
-            )
-            VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
-            )
-            ON CONFLICT (id)
-            DO UPDATE SET
-                name=excluded.name,
-                rpe=excluded.rpe,
-                workout_type=excluded.workout_type,
-                nutrition=excluded.nutrition,
-                feedback=excluded.feedback;",
-        )
-        .bind(activity.id())
-        .bind(activity.user())
-        .bind(activity.name())
-        .bind(activity.start_time().datetime())
-        .bind(activity.duration())
-        .bind(activity.sport())
-        .bind(activity.natural_key())
-        .bind(activity.rpe())
-        .bind(activity.workout_type())
-        .bind(activity.nutrition())
-        .bind(activity.feedback())
-        .execute(&mut *tx)
-        .await
-        .map(|_| ())
-        .map_err(|err| {
-            SaveActivityError::Unknown(anyhow!("Unable to save activity {}. {err}", activity.id()))
-        })?;
-
-        let search_document =
-            activity.to_search_document(SearchDocumentEvent::Updated, self.clock.now());
-
-        self.save_search_document(&mut tx, search_document).await?;
-
-        tx.commit()
-            .await
-            .map_err(|err| SaveActivityError::Unknown(err.into()))
-    }
-
-    #[tracing::instrument(skip_all, err)]
     async fn similar_activity_exists(
         &self,
         natural_key: &ActivityNaturalKey,
@@ -850,23 +884,31 @@ mod test_sqlite_activity_repository {
             .unwrap();
     }
 
-    fn build_activity() -> Activity {
-        Activity::new_empty(
-            ActivityId::new(),
-            UserId::test_default(),
-            ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
-            ActivityDuration::default(),
-            Sport::Cycling,
+    fn build_activity() -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::new(),
+                UserId::test_default(),
+                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::default(),
+            ActivityStatistics::default(),
         )
     }
 
-    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> Activity {
-        Activity::new_empty(
-            ActivityId::new(),
-            UserId::test_default(),
-            ActivityStartTime::new(*start),
-            ActivityDuration::default(),
-            Sport::Cycling,
+    fn build_activity_starting_at(start: &DateTime<FixedOffset>) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::new(),
+                UserId::test_default(),
+                ActivityStartTime::new(*start),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::default(),
+            ActivityStatistics::default(),
         )
     }
 
@@ -898,7 +940,7 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
-    async fn test_save_existing_activity_id_updates_optional_fields() {
+    async fn test_update_existing_activity_id_updates_optional_fields() {
         let db_file = NamedTempFile::new().unwrap();
         let repository = SqliteActivityRepository::new(
             &db_file.path().to_string_lossy(),
@@ -915,7 +957,7 @@ mod test_sqlite_activity_repository {
             .await
             .expect("Should have succeed");
 
-        let patched_activity = activity.apply_patch(ActivityPatch::new(
+        let patched_activity = activity.patch(ActivityPatch::new(
             Some(Some(ActivityName::from("Another name"))),
             Some(Some(ActivityRpe::Eight)),
             Some(Some(WorkoutType::CrossTraining)),
@@ -924,7 +966,7 @@ mod test_sqlite_activity_repository {
         ));
 
         repository
-            .save_activity(&patched_activity)
+            .update_activity(&patched_activity.activity())
             .await
             .expect("Should have succeeded");
 
@@ -1849,17 +1891,41 @@ mod test_sqlite_activity_repository {
 
         use super::*;
 
-        fn build_activity_with_name(name: &str) -> Activity {
-            build_activity().apply_patch(ActivityPatch::name(Some(ActivityName::from(name))))
+        fn build_activity_with_name(name: &str) -> ActivityWithParsedData {
+            ActivityWithParsedData::new(
+                Activity::new(
+                    ActivityId::new(),
+                    UserId::test_default(),
+                    Some(ActivityName::from(name)),
+                    ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityRpe::empty(),
+                    WorkoutType::empty(),
+                    ActivityNutrition::empty(),
+                    ActivityFeedback::empty(),
+                ),
+                ActivityTimeseries::default(),
+                ActivityStatistics::default(),
+            )
         }
 
-        fn build_activity_for(user: UserId) -> Activity {
-            Activity::new_empty(
-                ActivityId::new(),
-                user,
-                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
-                ActivityDuration::default(),
-                Sport::Cycling,
+        fn build_activity_for(user: UserId) -> ActivityWithParsedData {
+            ActivityWithParsedData::new(
+                Activity::new(
+                    ActivityId::new(),
+                    user,
+                    ActivityName::empty(),
+                    ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                    ActivityDuration::default(),
+                    Sport::Cycling,
+                    ActivityRpe::empty(),
+                    WorkoutType::empty(),
+                    ActivityNutrition::empty(),
+                    ActivityFeedback::empty(),
+                ),
+                ActivityTimeseries::default(),
+                ActivityStatistics::default(),
             )
         }
 
@@ -1940,19 +2006,25 @@ mod test_sqlite_activity_repository {
             .await
             .expect("repo should init");
 
-            let activity = build_activity()
-                .apply_patch(ActivityPatch::name(Some(ActivityName::from("Epic ride"))))
-                .apply_patch(ActivityPatch::feedback(Some(ActivityFeedback::from(
+            let activity = build_activity();
+            repository
+                .save_activity(&activity)
+                .await
+                .expect("Save should have succeeded");
+
+            let patched_activity = activity
+                .patch(ActivityPatch::name(Some(ActivityName::from("Epic ride"))))
+                .patch(ActivityPatch::feedback(Some(ActivityFeedback::from(
                     "Felt great",
                 ))))
-                .apply_patch(ActivityPatch::nutrition(Some(ActivityNutrition::new(
+                .patch(ActivityPatch::nutrition(Some(ActivityNutrition::new(
                     BonkStatus::None,
                     Some("Drank early".to_string()),
                 ))));
             repository
-                .save_activity(&activity)
+                .update_activity(&patched_activity.activity())
                 .await
-                .expect("Insertion should have succeeded");
+                .expect("Patch should have succeeded");
 
             let (documents, _remaining) = repository
                 .list_activity_documents(10, 0)
@@ -1960,7 +2032,7 @@ mod test_sqlite_activity_repository {
                 .expect("Should have succeeded");
 
             let document = documents.first().expect("Should contain one document");
-            assert_eq!(document.document_id(), activity.id().to_string());
+            assert_eq!(document.document_id(), patched_activity.id().to_string());
             assert!(document.content().contains("Epic ride"));
             assert!(document.content().contains("Felt great"));
             assert!(document.content().contains("Drank early"));
@@ -2623,8 +2695,8 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("repo should init");
-            let activity = build_activity()
-                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+            let activity =
+                build_activity().patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
 
             // Outbox initially empty
             assert!(
@@ -2674,8 +2746,8 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("repo should init");
-            let activity = build_activity()
-                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+            let activity =
+                build_activity().patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
 
             // Outbox initially empty
             assert!(
@@ -2717,8 +2789,8 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("repo should init");
-            let activity = build_activity()
-                .apply_patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
+            let activity =
+                build_activity().patch(ActivityPatch::name(Some(ActivityName::from("test name"))));
 
             // Outbox initially empty
             assert!(

@@ -153,7 +153,7 @@ impl Activity {
         &self.feedback
     }
 
-    pub fn apply_patch(self, patch: ActivityPatch) -> Self {
+    pub fn patch(self, patch: ActivityPatch) -> Self {
         Self {
             // Immutable fields
             id: self.id,
@@ -330,6 +330,14 @@ impl ActivityWithParsedData {
             || self.activity.duration,
             |duration| ActivityDuration::from(duration as f64),
         )
+    }
+
+    pub fn patch(self, patch: ActivityPatch) -> Self {
+        Self {
+            activity: self.activity.patch(patch),
+            timeseries: self.timeseries,
+            statistics: self.statistics,
+        }
     }
 }
 
@@ -1372,6 +1380,7 @@ impl ActivityDurationCurve {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     pub fn from(timeseries: &ActivityTimeseries, curve_type: DurationCurveType) -> Option<Self> {
         let metric = get_target_metric(timeseries, curve_type)?;
 
@@ -1893,7 +1902,7 @@ mod tests {
             Some(Some(ActivityFeedback::from("good session"))),
         );
 
-        let patched = activity.apply_patch(patch);
+        let patched = activity.patch(patch);
 
         assert_eq!(patched.name().unwrap().to_string(), "Interval Session");
         assert_eq!(patched.rpe().unwrap(), ActivityRpe::Eight);
@@ -1912,7 +1921,7 @@ mod tests {
         let activity = activity_with_all_optional_fields();
         let patch = ActivityPatch::new(Some(None), Some(None), Some(None), Some(None), Some(None));
 
-        let patched = activity.apply_patch(patch);
+        let patched = activity.patch(patch);
 
         assert!(patched.name().is_none());
         assert!(patched.rpe().is_none());
@@ -1933,7 +1942,7 @@ mod tests {
             Some(Some(ActivityFeedback::from("updated note"))),
         );
 
-        let patched = activity.apply_patch(patch);
+        let patched = activity.patch(patch);
 
         assert_eq!(patched.name().unwrap().to_string(), "Morning Run");
         assert_eq!(patched.rpe().unwrap(), ActivityRpe::Five);
@@ -1959,7 +1968,7 @@ mod tests {
             None,
         );
 
-        let patched = activity.clone().apply_patch(patch);
+        let patched = activity.clone().patch(patch);
 
         assert_eq!(patched.id(), activity.id());
         assert_eq!(patched.user(), activity.user());
