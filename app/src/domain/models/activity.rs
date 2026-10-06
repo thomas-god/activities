@@ -266,6 +266,7 @@ pub struct ActivityWithParsedData {
     activity: Activity,
     timeseries: ActivityTimeseries,
     statistics: ActivityStatistics,
+    duration_curves: ActivityDurationCurves,
 }
 
 impl ActivityWithParsedData {
@@ -332,11 +333,16 @@ impl ActivityWithParsedData {
         )
     }
 
+    pub fn duration_curves(&self) -> &ActivityDurationCurves {
+        &self.duration_curves
+    }
+
     pub fn patch(self, patch: ActivityPatch) -> Self {
         Self {
             activity: self.activity.patch(patch),
             timeseries: self.timeseries,
             statistics: self.statistics,
+            duration_curves: self.duration_curves,
         }
     }
 }
@@ -1364,6 +1370,9 @@ pub struct ActivityDurationCurve {
     values: [Option<f32>; 12],
 }
 
+#[derive(Debug, Clone, Constructor, Default)]
+pub struct ActivityDurationCurves(Vec<ActivityDurationCurve>);
+
 impl ActivityDurationCurve {
     pub fn curve_type(&self) -> DurationCurveType {
         self.curve_type
@@ -2166,6 +2175,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Calories, 123.3)])),
+            ActivityDurationCurves::default(),
         )
     }
 
@@ -2203,6 +2213,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         let res = aggregate.value_from_timeseries(&metric, &activity);
@@ -2475,6 +2486,7 @@ mod test_timeseries {
                 (ActivityStatistic::Distance, 10000.0), // 10 km in meters
                 (ActivityStatistic::Duration, 3600.0),  // 1 hour in seconds
             ])),
+            ActivityDurationCurves::default(),
         );
 
         let result =
@@ -2518,6 +2530,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 3600.0)])),
+            ActivityDurationCurves::default(),
         );
 
         let result =
@@ -2559,6 +2572,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Distance, 10000.0)])),
+            ActivityDurationCurves::default(),
         );
 
         let result =
@@ -2600,6 +2614,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         let result =
@@ -2645,6 +2660,7 @@ mod test_timeseries {
                 (ActivityStatistic::Distance, 10000.0),
                 (ActivityStatistic::Duration, 3600.0),
             ])),
+            ActivityDurationCurves::default(),
         );
 
         let min_result =
@@ -2745,6 +2761,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         // Should return timeseries duration (500), not activity's duration (9999)
@@ -2777,6 +2794,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         // Timeseries has no running values, should fall back to activity's duration
@@ -2805,6 +2823,7 @@ mod test_timeseries {
             )
             .unwrap(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         // Empty timeseries, should use statistics
@@ -2827,6 +2846,7 @@ mod test_timeseries {
             ),
             ActivityTimeseries::empty(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         );
 
         let result = ActivityMetric::ActiveDuration.compute_value(&activity);

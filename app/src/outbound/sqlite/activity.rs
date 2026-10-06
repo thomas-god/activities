@@ -12,9 +12,10 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric,
-                ActivityMetrics, ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe,
-                ActivityStartTime, ActivityWithParsedData, Sport, WorkoutType,
+                Activity, ActivityDuration, ActivityDurationCurves, ActivityFeedback, ActivityId,
+                ActivityMetric, ActivityMetrics, ActivityName, ActivityNaturalKey,
+                ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport,
+                WorkoutType,
             },
             search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         },
@@ -239,6 +240,8 @@ where
             activity,
             parsed_content.timeseries().clone(),
             parsed_content.statistics().clone(),
+            // TODO: actually load duration curves
+            ActivityDurationCurves::default(),
         ))
     }
 
@@ -851,9 +854,10 @@ mod test_sqlite_activity_repository {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, ActivityDuration, ActivityPatch, ActivityStartTime,
-                    ActivityStatistics, ActivityTimeseries, BonkStatus, Sport, Timeseries,
-                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, ActivityDuration, ActivityDurationCurves, ActivityPatch,
+                    ActivityStartTime, ActivityStatistics, ActivityTimeseries, BonkStatus, Sport,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue,
                 },
             },
             ports::{
@@ -895,6 +899,7 @@ mod test_sqlite_activity_repository {
             ),
             ActivityTimeseries::default(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         )
     }
 
@@ -909,6 +914,7 @@ mod test_sqlite_activity_repository {
             ),
             ActivityTimeseries::default(),
             ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
         )
     }
 
@@ -1907,6 +1913,7 @@ mod test_sqlite_activity_repository {
                 ),
                 ActivityTimeseries::default(),
                 ActivityStatistics::default(),
+                ActivityDurationCurves::default(),
             )
         }
 
@@ -1926,6 +1933,7 @@ mod test_sqlite_activity_repository {
                 ),
                 ActivityTimeseries::default(),
                 ActivityStatistics::default(),
+                ActivityDurationCurves::default(),
             )
         }
 

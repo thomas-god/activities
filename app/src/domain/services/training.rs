@@ -6230,8 +6230,8 @@ mod test_training_service_activity_with_training_context {
 
     use super::*;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityId, ActivityMetrics, ActivityStartTime,
-        ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+        Activity, ActivityDuration, ActivityDurationCurves, ActivityId, ActivityMetrics,
+        ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
     };
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
@@ -6247,6 +6247,7 @@ mod test_training_service_activity_with_training_context {
             ),
             ActivityTimeseries::empty(),
             ActivityStatistics::new(HashMap::new()),
+            ActivityDurationCurves::default(),
         )
     }
 
@@ -6266,9 +6267,7 @@ mod test_training_service_activity_with_training_context {
             .expect_get_activity_with_parsed_data_and_metrics()
             .times(1)
             .withf(move |u, id, _| u == &expected_user && *id == expected_activity_id)
-            .returning(move |_, _, _| {
-                Ok((returned_activity.clone(), returned_metrics.clone()))
-            });
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
 
         let mut repository = MockTrainingRepository::new();
         let expected_user = user.clone();
@@ -6285,11 +6284,7 @@ mod test_training_service_activity_with_training_context {
         );
 
         let result = service
-            .get_activity_with_training_context(
-                &user,
-                &activity_id,
-                &[ActivityMetric::AvgPower],
-            )
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
             .await
             .expect("Should have succeeded");
 
@@ -6311,9 +6306,7 @@ mod test_training_service_activity_with_training_context {
         activity_service
             .expect_get_activity_with_parsed_data_and_metrics()
             .times(1)
-            .returning(move |_, _, _| {
-                Ok((returned_activity.clone(), returned_metrics.clone()))
-            });
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
 
         let mut repository = MockTrainingRepository::new();
         repository
@@ -6328,11 +6321,7 @@ mod test_training_service_activity_with_training_context {
         );
 
         let result = service
-            .get_activity_with_training_context(
-                &user,
-                &activity_id,
-                &[ActivityMetric::AvgPower],
-            )
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
             .await
             .expect("Should have succeeded");
 
@@ -6367,11 +6356,7 @@ mod test_training_service_activity_with_training_context {
         );
 
         let err = service
-            .get_activity_with_training_context(
-                &user,
-                &activity_id,
-                &[ActivityMetric::AvgPower],
-            )
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
             .await
             .expect_err("Should have failed");
 
@@ -6396,9 +6381,7 @@ mod test_training_service_activity_with_training_context {
         activity_service
             .expect_get_activity_with_parsed_data_and_metrics()
             .times(1)
-            .returning(move |_, _, _| {
-                Ok((returned_activity.clone(), returned_metrics.clone()))
-            });
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
 
         let mut repository = MockTrainingRepository::new();
         repository
@@ -6413,11 +6396,7 @@ mod test_training_service_activity_with_training_context {
         );
 
         let result = service
-            .get_activity_with_training_context(
-                &user,
-                &activity_id,
-                &[ActivityMetric::AvgPower],
-            )
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
             .await;
 
         assert!(matches!(

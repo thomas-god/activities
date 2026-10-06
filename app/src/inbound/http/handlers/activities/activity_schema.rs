@@ -262,9 +262,9 @@ mod tests {
 
     use crate::domain::models::UserId;
     use crate::domain::models::activity::{
-        ActiveTime, ActivityDuration, ActivityId, ActivityStartTime, ActivityStatistic,
-        ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
-        TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActiveTime, ActivityDuration, ActivityDurationCurves, ActivityId, ActivityStartTime,
+        ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+        Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
 
     fn activity_id() -> ActivityId {
@@ -305,6 +305,7 @@ mod tests {
             )
             .unwrap(),
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.0)])),
+            ActivityDurationCurves::default(),
         )
     }
 

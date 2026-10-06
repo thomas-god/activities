@@ -39,7 +39,9 @@ pub async fn get_activity<
         .await
     {
         Ok(activity) => Ok(Json(PublicActivityWithTimeseries::from(&activity))),
-        Err(ActivityWithTrainingContextError::ActivityDoesNotExist(_id)) => Err(StatusCode::NOT_FOUND),
+        Err(ActivityWithTrainingContextError::ActivityDoesNotExist(_id)) => {
+            Err(StatusCode::NOT_FOUND)
+        }
         Err(ActivityWithTrainingContextError::Unknown(err)) => {
             tracing::error!(
                 "Error while getting activity {}: {}",
@@ -64,10 +66,11 @@ mod tests {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, Activity, ActivityDuration, ActivityId, ActivityMetric,
-                    ActivityMetrics, ActivityStartTime, ActivityStatistic, ActivityStatistics,
-                    ActivityTimeseries, ActivityWithParsedData, Sport, Timeseries,
-                    TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+                    ActiveTime, Activity, ActivityDuration, ActivityDurationCurves, ActivityId,
+                    ActivityMetric, ActivityMetrics, ActivityStartTime, ActivityStatistic,
+                    ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
+                    TimeseriesValue,
                 },
             },
             ports::{
@@ -133,6 +136,7 @@ mod tests {
                             ActivityStatistic::Duration,
                             1200.,
                         )])),
+                        ActivityDurationCurves::default(),
                     ),
                     TrainingContext::new(Some(70.0)),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),

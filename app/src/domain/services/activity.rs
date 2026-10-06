@@ -7,8 +7,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithParsedData,
-            DEFAULT_METRICS,
+            Activity, ActivityDurationCurves, ActivityId, ActivityMetric, ActivityMetrics,
+            ActivityWithParsedData, DEFAULT_METRICS,
         },
         search::{SearchDocument, SearchDocumentType},
     },
@@ -77,6 +77,8 @@ where
             activity.clone(),
             req.timeseries().clone(),
             req.statistics().clone(),
+            // TODO: actually compute duration curve
+            ActivityDurationCurves::default(),
         );
 
         if self
@@ -1264,6 +1266,7 @@ mod tests_activity_service {
                 )
                 .unwrap(),
                 ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.)])),
+                ActivityDurationCurves::default(),
             )
         }
 
