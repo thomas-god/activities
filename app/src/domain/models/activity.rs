@@ -1347,8 +1347,6 @@ pub const DURATION_CURVE_DURATIONS_SECOND: [usize; 12] = [
     5 * 60 * 60,
 ];
 
-const CONSECUTVE_NONE_THRESHOLD: usize = 30;
-
 /// Duration curve from an activity's timeseries. i.e. highest rolling average values found for a
 /// set of durations.
 #[derive(Debug, Clone, Constructor, PartialEq)]
@@ -1374,19 +1372,17 @@ impl ActivityDurationCurve {
     }
 
     pub fn from(timeseries: &ActivityTimeseries, curve_type: DurationCurveType) -> Option<Self> {
-        let Some(metric) = get_target_metric(timeseries, curve_type) else {
-            return None;
-        };
-
-        let continuous_metric = split_values_into_pseudo_continuous_segments(
-            metric.values(),
-            CONSECUTVE_NONE_THRESHOLD,
-        );
+        let metric = get_target_metric(timeseries, curve_type)?;
 
         let mut values: [Option<f32>; 12] = [None; 12];
 
         for (idx, duration) in DURATION_CURVE_DURATIONS_SECOND.iter().enumerate() {
             let mut max = None;
+            let continuous_metric = split_values_into_pseudo_continuous_segments(
+                metric.values(),
+                consecutive_none_threshold(*duration),
+            );
+
             for values in &continuous_metric {
                 let iter = values.windows(*duration);
                 let local_max = iter
@@ -1404,6 +1400,17 @@ impl ActivityDurationCurve {
         }
 
         Some(Self { curve_type, values })
+    }
+}
+
+const fn consecutive_none_threshold(duration: usize) -> usize {
+    match duration {
+        duration if duration <= 10 => 1,
+        duration if duration <= 30 => 3,
+        duration if duration <= 5 * 60 => 15,
+        duration if duration <= 30 * 60 => 30,
+        duration if duration <= 60 * 60 => 60,
+        _ => 5 * 60,
     }
 }
 
@@ -2956,6 +2963,10 @@ mod test_duration_curve {
 
     use super::*;
 
+    /// Threshold of the 30-minute duration bucket, used as a representative fixed threshold for
+    /// the splitting tests.
+    const THRESHOLD: usize = consecutive_none_threshold(30 * 60);
+
     fn values<const N: usize>(values: [Option<f64>; N]) -> Vec<Option<TimeseriesValue>> {
         values
             .iter()
@@ -2979,8 +2990,7 @@ mod test_duration_curve {
     fn test_split_no_none() {
         let metric = values([Some(1.), Some(2.), Some(3.), Some(4.)]);
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
     }
@@ -2989,8 +2999,7 @@ mod test_duration_curve {
     fn test_split_empty() {
         let metric: Vec<Option<TimeseriesValue>> = vec![];
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert!(segments.is_empty());
     }
@@ -2999,8 +3008,7 @@ mod test_duration_curve {
     fn test_split_only_none() {
         let metric = values([None, None, None]);
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert!(segments.is_empty());
     }
@@ -3009,8 +3017,7 @@ mod test_duration_curve {
     fn test_split_gap_below_threshold() {
         let metric = values([Some(1.), Some(2.), None, None, Some(3.), Some(4.)]);
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
     }
@@ -3018,11 +3025,10 @@ mod test_duration_curve {
     #[test]
     fn test_split_gap_equal_threshold() {
         let mut metric = values([Some(1.), Some(2.)]);
-        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD]);
+        metric.extend(vec![None; THRESHOLD]);
         metric.extend(values([Some(3.), Some(4.)]));
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
     }
@@ -3030,11 +3036,10 @@ mod test_duration_curve {
     #[test]
     fn test_split_gap_above_threshold() {
         let mut metric = values([Some(1.), Some(2.)]);
-        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+        metric.extend(vec![None; THRESHOLD + 1]);
         metric.extend(values([Some(3.), Some(4.)]));
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2.], &[3., 4.]]));
     }
@@ -3042,25 +3047,23 @@ mod test_duration_curve {
     #[test]
     fn test_split_multiple_gaps() {
         let mut metric = values([Some(1.)]);
-        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+        metric.extend(vec![None; THRESHOLD + 1]);
         metric.extend(values([Some(2.), Some(3.)]));
-        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 5]);
+        metric.extend(vec![None; THRESHOLD + 5]);
         metric.extend(values([Some(4.)]));
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1.], &[2., 3.], &[4.]]));
     }
 
     #[test]
     fn test_split_leading_and_trailing_none() {
-        let mut metric = vec![None; CONSECUTVE_NONE_THRESHOLD + 1];
+        let mut metric = vec![None; THRESHOLD + 1];
         metric.extend(values([Some(1.), Some(2.)]));
-        metric.extend(vec![None; CONSECUTVE_NONE_THRESHOLD + 1]);
+        metric.extend(vec![None; THRESHOLD + 1]);
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2.]]));
     }
@@ -3078,8 +3081,7 @@ mod test_duration_curve {
             Some(4.),
         ]);
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(segments, expected_segments(&[&[1., 2., 3., 4.]]));
     }
@@ -3092,13 +3094,43 @@ mod test_duration_curve {
             Some(TimeseriesValue::Int(2)),
         ];
 
-        let segments =
-            split_values_into_pseudo_continuous_segments(&metric, CONSECUTVE_NONE_THRESHOLD);
+        let segments = split_values_into_pseudo_continuous_segments(&metric, THRESHOLD);
 
         assert_eq!(
             segments,
             vec![vec![TimeseriesValue::Int(1), TimeseriesValue::Int(2)]]
         );
+    }
+
+    #[test]
+    fn test_consecutive_none_threshold_buckets() {
+        // Bucket lower bounds.
+        assert_eq!(consecutive_none_threshold(0), 1);
+        assert_eq!(consecutive_none_threshold(10), 1);
+        assert_eq!(consecutive_none_threshold(11), 3);
+        assert_eq!(consecutive_none_threshold(30), 3);
+        assert_eq!(consecutive_none_threshold(31), 15);
+        assert_eq!(consecutive_none_threshold(5 * 60), 15);
+        assert_eq!(consecutive_none_threshold(5 * 60 + 1), 30);
+        assert_eq!(consecutive_none_threshold(30 * 60), 30);
+        assert_eq!(consecutive_none_threshold(30 * 60 + 1), 60);
+        assert_eq!(consecutive_none_threshold(60 * 60), 60);
+        assert_eq!(consecutive_none_threshold(60 * 60 + 1), 5 * 60);
+        assert_eq!(consecutive_none_threshold(u64::MAX as usize), 5 * 60);
+    }
+
+    #[test]
+    fn test_split_small_threshold() {
+        // With the 5s bucket, the threshold is 1: a single None keeps the segment together
+        // (splitting is strictly above the threshold) while two Nones split it.
+        let threshold = consecutive_none_threshold(5);
+
+        let segments = split_values_into_pseudo_continuous_segments(
+            &values([Some(1.), None, Some(2.), None, None, Some(3.)]),
+            threshold,
+        );
+
+        assert_eq!(segments, expected_segments(&[&[1., 2.], &[3.]]));
     }
 
     fn activity_timeseries(
