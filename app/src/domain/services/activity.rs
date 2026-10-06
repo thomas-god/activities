@@ -73,12 +73,13 @@ where
             *req.sport(),
         );
 
+        let duration_curves = ActivityDurationCurves::from(&activity, req.timeseries());
+
         let activity_with_parsed_data = ActivityWithParsedData::new(
             activity.clone(),
             req.timeseries().clone(),
             req.statistics().clone(),
-            // TODO: actually compute duration curve
-            ActivityDurationCurves::default(),
+            duration_curves,
         );
 
         if self

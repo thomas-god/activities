@@ -1513,6 +1513,22 @@ impl ActivityDurationCurves {
     pub fn iter(&self) -> impl Iterator<Item = &ActivityDurationCurve> {
         self.0.iter()
     }
+
+    pub fn from(activity: &Activity, timeseries: &ActivityTimeseries) -> Self {
+        if activity.sport().category() == Some(SportCategory::Running) {
+            if let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Pace) {
+                return Self::new(vec![curve]);
+            }
+        }
+
+        if activity.sport().category() == Some(SportCategory::Cycling) {
+            if let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Power) {
+                return Self::new(vec![curve]);
+            }
+        }
+
+        return Self::new(vec![]);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -3313,5 +3329,111 @@ mod test_duration_curve {
         let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).unwrap();
 
         assert!(curve.values().iter().all(|value| value.is_none()));
+    }
+
+    fn activity_with_sport(sport: Sport) -> Activity {
+        Activity::new_empty(
+            ActivityId::new(),
+            UserId::test_default(),
+            ActivityStartTime::from_timestamp(1000).unwrap(),
+            ActivityDuration::default(),
+            sport,
+        )
+    }
+
+    #[test]
+    fn test_duration_curves_from_running_uses_pace() {
+        let activity = activity_with_sport(Sport::Running);
+        let timeseries = activity_timeseries(
+            TimeseriesMetric::Distance,
+            values([0., 5., 10., 15., 20., 25., 30., 35., 40., 45., 50.].map(Some)),
+        );
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert_eq!(curves.iter().count(), 1);
+        let curve = curves.iter().next().unwrap();
+        assert_eq!(curve.curve_type(), DurationCurveType::Pace);
+        assert_eq!(curve.values()[0], Some(5.)); // 5s
+    }
+
+    #[test]
+    fn test_duration_curves_from_cycling_uses_power() {
+        let activity = activity_with_sport(Sport::Cycling);
+        let timeseries = activity_timeseries(TimeseriesMetric::Power, values([Some(10.); 10]));
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert_eq!(curves.iter().count(), 1);
+        let curve = curves.iter().next().unwrap();
+        assert_eq!(curve.curve_type(), DurationCurveType::Power);
+        assert_eq!(curve.values()[0], Some(10.)); // 5s
+    }
+
+    #[test]
+    fn test_duration_curves_from_running_without_distance() {
+        // Running activities need distance to compute a pace curve; power values alone
+        // yield no curve.
+        let activity = activity_with_sport(Sport::Running);
+        let timeseries = activity_timeseries(TimeseriesMetric::Power, values([Some(10.); 10]));
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert!(curves.is_empty());
+    }
+
+    #[test]
+    fn test_duration_curves_from_cycling_without_power() {
+        // Cycling activities need power to compute a power curve; distance values alone
+        // yield no curve.
+        let activity = activity_with_sport(Sport::Cycling);
+        let timeseries = activity_timeseries(TimeseriesMetric::Distance, values([Some(10.); 10]));
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert!(curves.is_empty());
+    }
+
+    #[test]
+    fn test_duration_curves_from_unrelated_sport() {
+        // Only running and cycling activities get a duration curve.
+        let activity = activity_with_sport(Sport::Rowing);
+        let timeseries = activity_timeseries(TimeseriesMetric::Power, values([Some(10.); 10]));
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert!(curves.is_empty());
+    }
+
+    #[test]
+    fn test_duration_curves_from_running_with_both_metrics() {
+        // Even when power values are also available, a running activity only gets a pace
+        // curve.
+        let activity = activity_with_sport(Sport::Running);
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new((0..11).collect()),
+            TimeseriesActiveTime::new(vec![ActiveTime::Running(1); 11]),
+            vec![],
+            vec![
+                Timeseries::new(
+                    TimeseriesMetric::Power,
+                    vec![Some(TimeseriesValue::Float(10.)); 11],
+                ),
+                Timeseries::new(
+                    TimeseriesMetric::Distance,
+                    (0..=10)
+                        .map(|value| Some(TimeseriesValue::Float(value as f64 * 5.)))
+                        .collect(),
+                ),
+            ],
+        )
+        .unwrap();
+
+        let curves = ActivityDurationCurves::from(&activity, &timeseries);
+
+        assert_eq!(curves.iter().count(), 1);
+        let curve = curves.iter().next().unwrap();
+        assert_eq!(curve.curve_type(), DurationCurveType::Pace);
+        assert_eq!(curve.values()[0], Some(5.)); // 5s
     }
 }
