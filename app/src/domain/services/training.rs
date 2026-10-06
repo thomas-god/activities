@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::anyhow;
 use chrono::{Days, NaiveDate};
 use derive_more::Constructor;
+use tokio_util::sync::CancellationToken;
 
 use crate::domain::{
     models::{
@@ -18,8 +19,11 @@ use crate::domain::{
         },
     },
     ports::{
-        DateRange,
-        activity::{GetActivityError, IActivityService, ListActivitiesFilters},
+        DateRange, IClock,
+        activity::{
+            DurationCurveEvent, GetActivityError, IActivityService, ListActivitiesFilters,
+            NotificationsRemaining,
+        },
         search::{IDocumentsForSearch, RemainingDocuments},
         training::{
             ActivityWithTrainingContext, ActivityWithTrainingContextError,
@@ -43,25 +47,113 @@ use crate::domain::{
 };
 
 ///////////////////////////////////////////////////////////////////
-/// TRAINING SERVICE
+// TRAINING SERVICE
 ///////////////////////////////////////////////////////////////////
 
+const BATCH_SIZE: i64 = 100;
+
 #[derive(Debug, Clone, Constructor)]
-pub struct TrainingService<TR, AS>
+pub struct TrainingService<TR, AS, C>
 where
     TR: TrainingRepository,
     AS: IActivityService,
+    C: IClock,
 {
     training_repository: TR,
     activity_service: AS,
     notify_new_document: Arc<tokio::sync::Notify>,
+    duration_curve_notify: Arc<tokio::sync::Notify>,
+    shutdown: CancellationToken,
+    clock: C,
 }
 
-impl<TR, AS> TrainingService<TR, AS>
+impl<TR, AS, C> TrainingService<TR, AS, C>
 where
     TR: TrainingRepository,
     AS: IActivityService,
+    C: IClock,
 {
+    pub async fn run(&self) {
+        let _ = self.process_pending_outbox().await;
+
+        let duration_curve_notified = self.duration_curve_notify.notified();
+        let shutdown = self.shutdown.cancelled();
+        tokio::pin!(duration_curve_notified, shutdown);
+
+        loop {
+            tokio::select! {
+                _ = &mut  duration_curve_notified =>  {
+                    if let Err(err) = self.process_pending_outbox().await {
+                        tracing::error!(
+                            "Error while processing duration curve notification: {}",
+                            err
+                        );
+                    }
+                    duration_curve_notified.set(self.duration_curve_notify.notified());
+                }
+                _ = &mut shutdown => return,
+            }
+        }
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn process_pending_outbox(&self) -> Result<(), anyhow::Error> {
+        let mut notifications_remaining = NotificationsRemaining::from(true);
+        let mut page = 0;
+
+        while notifications_remaining.remaining() {
+            let (notifications, flag) = self
+                .activity_service
+                .list_pending_duration_curve_notifications(BATCH_SIZE, page)
+                .await?;
+            page += 1;
+            notifications_remaining = flag;
+
+            for notification in notifications {
+                let res = match notification.event() {
+                    DurationCurveEvent::Created => {
+                        if let (Some(curve), Some(date)) =
+                            (notification.curve(), notification.activity_date())
+                        {
+                            self.training_repository
+                                .save_duration_curve(
+                                    notification.user(),
+                                    notification.activity(),
+                                    curve,
+                                    date,
+                                )
+                                .await
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    DurationCurveEvent::Deleted => {
+                        self.training_repository
+                            .delete_duration_curve(notification.user(), notification.activity())
+                            .await
+                    }
+                };
+                if res.is_ok()
+                    && let Err(err) = self
+                        .activity_service
+                        .mark_duration_curve_notifications_as_processed(
+                            notification.activity(),
+                            notification.user(),
+                            self.clock.now(),
+                        )
+                        .await
+                {
+                    tracing::error!(
+                        "Error while marking duration curve notification as processed for activity {}: {}",
+                        notification.activity(),
+                        err,
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
     /// Compute training metric values from a [TrainingMetricDefinition] and a [DateRange] using
     /// activities within the [DateRange].
     async fn compute_training_metric_values(
@@ -150,10 +242,11 @@ where
     }
 }
 
-impl<TMR, AS> ITrainingService for TrainingService<TMR, AS>
+impl<TMR, AS, C> ITrainingService for TrainingService<TMR, AS, C>
 where
     TMR: TrainingRepository,
     AS: IActivityService,
+    C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
     async fn create_metric(
@@ -837,10 +930,11 @@ impl From<GetActivityError> for ActivityWithTrainingContextError {
     }
 }
 
-impl<TMR, AS> IDocumentsForSearch for TrainingService<TMR, AS>
+impl<TMR, AS, C> IDocumentsForSearch for TrainingService<TMR, AS, C>
 where
     TMR: TrainingRepository,
     AS: IActivityService,
+    C: IClock,
 {
     #[tracing::instrument(skip_all, err)]
     async fn snapshot_documents(
@@ -905,6 +999,7 @@ pub mod test_utils {
 
     use crate::domain::{
         models::{
+            activity::ActivityDurationCurve,
             search::SearchDocument,
             training::{
                 HooperIndex, TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
@@ -1344,6 +1439,20 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
             ) -> Result<Option<f32>, anyhow::Error>;
+
+            async fn save_duration_curve(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+                curve: &ActivityDurationCurve,
+                activity_date: &chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn delete_duration_curve(
+                &self,
+                user: &UserId,
+                activity: &ActivityId,
+            ) -> Result<(), anyhow::Error>;
         }
     }
 }
@@ -1357,6 +1466,7 @@ mod tests_training_metrics_service {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
         Sport, Unit,
@@ -1385,8 +1495,14 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service =
-            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1423,8 +1539,14 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service =
-            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1480,8 +1602,14 @@ mod tests_training_metrics_service {
             .returning(|_| Ok(()));
         let activities = MockActivityService::new();
 
-        let service =
-            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1516,8 +1644,14 @@ mod tests_training_metrics_service {
         repository.expect_save_metric().times(0);
         let activities = MockActivityService::new();
 
-        let service =
-            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1552,8 +1686,14 @@ mod tests_training_metrics_service {
             .expect_save_metric()
             .returning(|_| Err(SaveTrainingMetricError::Unknown(anyhow!("error"))));
         let activities = MockActivityService::new();
-        let service =
-            TrainingService::new(repository, activities, Arc::new(tokio::sync::Notify::new()));
+        let service = TrainingService::new(
+            repository,
+            activities,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingMetricRequest::new(
             UserId::test_default(),
@@ -1592,6 +1732,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let err = service
@@ -1649,6 +1792,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -1731,6 +1877,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -1820,6 +1969,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let date_range = DateRange::new(
@@ -1906,6 +2058,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         // Input date range: Wednesday to Thursday (mid-week)
@@ -1963,6 +2118,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -2041,6 +2199,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -2100,6 +2261,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let err = service
@@ -2189,6 +2353,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -2310,6 +2477,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -2435,6 +2605,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let res = service
@@ -2479,6 +2652,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = DeleteTrainingMetricRequest::new(
@@ -2535,6 +2711,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = DeleteTrainingMetricRequest::new(
@@ -2561,6 +2740,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricNameRequest::new(
@@ -2598,6 +2780,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricNameRequest::new(
@@ -2628,6 +2813,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricRequest::new(
@@ -2666,6 +2854,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricRequest::new(
@@ -2707,6 +2898,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricRequest::new(
@@ -2747,6 +2941,9 @@ mod tests_training_metrics_service {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingMetricRequest::new(
@@ -2778,17 +2975,21 @@ mod test_training_service_period {
     use anyhow::anyhow;
     use chrono::NaiveDate;
 
-    use crate::domain::{
-        models::{
-            activity::{ActivityDuration, ActivityMetrics},
-            training::{TrainingPeriod, TrainingPeriodSports},
-        },
-        ports::{
-            activity::ListActivitiesError,
-            training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
-        },
-        services::{
-            activity::test_utils::MockActivityService, training::test_utils::MockTrainingRepository,
+    use crate::{
+        clock::clock_test_utils::FakeClock,
+        domain::{
+            models::{
+                activity::{ActivityDuration, ActivityMetrics},
+                training::{TrainingPeriod, TrainingPeriodSports},
+            },
+            ports::{
+                activity::ListActivitiesError,
+                training::{CreateTrainingPeriodRequest, SaveTrainingPeriodError},
+            },
+            services::{
+                activity::test_utils::MockActivityService,
+                training::test_utils::MockTrainingRepository,
+            },
         },
     };
 
@@ -2806,6 +3007,9 @@ mod test_training_service_period {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CreateTrainingPeriodRequest::new(
@@ -2834,6 +3038,9 @@ mod test_training_service_period {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CreateTrainingPeriodRequest::new(
@@ -2862,6 +3069,9 @@ mod test_training_service_period {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -2965,6 +3175,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3072,6 +3285,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3188,6 +3404,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3309,6 +3528,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3408,6 +3630,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3468,6 +3693,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -3498,6 +3726,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
@@ -3527,6 +3758,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = DeleteTrainingPeriodRequest::new(user_id.clone(), period_id.clone());
@@ -3561,6 +3795,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = DeleteTrainingPeriodRequest::new(user_id, period_id);
@@ -3596,6 +3833,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
@@ -3626,6 +3866,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id.clone(), new_name);
@@ -3661,6 +3904,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNameRequest::new(user_id, period_id, new_name);
@@ -3696,6 +3942,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3725,6 +3974,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3755,6 +4007,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id.clone(), new_note);
@@ -3790,6 +4045,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodNoteRequest::new(user_id, period_id, new_note);
@@ -3830,6 +4088,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3865,6 +4126,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3887,6 +4151,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3922,6 +4189,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req =
@@ -3959,6 +4229,9 @@ mod test_training_service_period {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = UpdateTrainingPeriodDatesRequest::new(user_id, period_id, new_start, new_end);
@@ -3978,6 +4251,7 @@ mod test_training_service_training_note {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::training::TrainingNoteContent;
     use crate::domain::ports::training::{
         CreateTrainingNoteError, CreateTrainingNoteRequest, SaveTrainingNoteError,
@@ -4044,6 +4318,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
@@ -4070,6 +4347,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
@@ -4097,8 +4377,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -4122,8 +4408,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let req = CreateTrainingNoteRequest::new(user_id, title, content, date);
         let result = service.create_training_note(req).await;
@@ -4159,8 +4451,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let result = service
             .update_training_note(
@@ -4190,8 +4488,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         // A missing note is silently treated as a no-op (returns Ok).
         let result = service
@@ -4235,8 +4539,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let result = service
             .update_training_note(
@@ -4279,8 +4589,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_ok());
@@ -4302,8 +4618,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_err());
@@ -4334,8 +4656,14 @@ mod test_training_service_training_note {
 
         let activity_service = MockActivityService::default();
         let notify = Arc::new(tokio::sync::Notify::new());
-        let service =
-            TrainingService::new(training_repository, activity_service, Arc::clone(&notify));
+        let service = TrainingService::new(
+            training_repository,
+            activity_service,
+            Arc::clone(&notify),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
 
         let result = service.delete_training_note(&user_id, &note_id).await;
         assert!(result.is_err());
@@ -4394,6 +4722,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4423,6 +4754,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4478,6 +4812,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4506,6 +4843,9 @@ mod test_training_service_training_note {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let err = service
@@ -4526,6 +4866,7 @@ mod test_training_service_metric_values {
     use chrono::NaiveDate;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
         Sport, Unit,
@@ -4562,6 +4903,9 @@ mod test_training_service_metric_values {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req =
@@ -4611,6 +4955,9 @@ mod test_training_service_metric_values {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4672,6 +5019,9 @@ mod test_training_service_metric_values {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4730,6 +5080,9 @@ mod test_training_service_metric_values {
             training_repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4774,6 +5127,9 @@ mod test_training_service_metric_values {
             training_repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4836,6 +5192,9 @@ mod test_training_service_metric_values {
             training_repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4882,6 +5241,9 @@ mod test_training_service_metric_values {
             training_repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4900,6 +5262,7 @@ mod test_training_service_metrics_ordering {
     use std::sync::Arc;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::training::{
         TrainingMetricId, TrainingMetricsOrdering, TrainingPeriod, TrainingPeriodSports,
     };
@@ -4932,6 +5295,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -4984,6 +5350,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5010,6 +5379,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5045,6 +5417,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5079,6 +5454,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5122,6 +5500,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5150,6 +5531,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5187,6 +5571,9 @@ mod test_training_service_metrics_ordering {
             training_repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -5206,6 +5593,7 @@ mod test_training_service_copy_metric {
     use std::sync::Arc;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::ActivityMetric;
     use crate::domain::models::training::{
         TrainingMetricActivityFilters, TrainingMetricActivityGroupBy, TrainingMetricAggregate,
@@ -5288,6 +5676,9 @@ mod test_training_service_copy_metric {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CopyTrainingMetricRequest::new(
@@ -5317,6 +5708,9 @@ mod test_training_service_copy_metric {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req = CopyTrainingMetricRequest::new(
@@ -5350,6 +5744,9 @@ mod test_training_service_copy_metric {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req =
@@ -5385,6 +5782,9 @@ mod test_training_service_copy_metric {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req =
@@ -5438,6 +5838,9 @@ mod test_training_service_copy_metric {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let req =
@@ -5459,6 +5862,7 @@ mod test_training_service_hooper_index {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::training::{HooperIndex, HooperIndexPatch, SubjectiveScale};
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
@@ -5474,11 +5878,14 @@ mod test_training_service_hooper_index {
 
     fn build_service(
         repository: MockTrainingRepository,
-    ) -> TrainingService<MockTrainingRepository, MockActivityService> {
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
         TrainingService::new(
             repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         )
     }
 
@@ -5699,6 +6106,7 @@ mod test_training_service_weight_and_nutrition {
     use anyhow::anyhow;
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::training::{WeightAndNutrition, WeightAndNutritionPatch};
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
@@ -5710,11 +6118,14 @@ mod test_training_service_weight_and_nutrition {
 
     fn build_service(
         repository: MockTrainingRepository,
-    ) -> TrainingService<MockTrainingRepository, MockActivityService> {
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
         TrainingService::new(
             repository,
             MockActivityService::default(),
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         )
     }
 
@@ -6229,6 +6640,7 @@ mod test_training_service_activity_with_training_context {
     use chrono::{DateTime, FixedOffset};
 
     use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityDurationCurves, ActivityId, ActivityMetrics,
         ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
@@ -6281,6 +6693,9 @@ mod test_training_service_activity_with_training_context {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -6318,6 +6733,9 @@ mod test_training_service_activity_with_training_context {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -6353,6 +6771,9 @@ mod test_training_service_activity_with_training_context {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let err = service
@@ -6393,6 +6814,9 @@ mod test_training_service_activity_with_training_context {
             repository,
             activity_service,
             Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
         );
 
         let result = service
@@ -6403,5 +6827,447 @@ mod test_training_service_activity_with_training_context {
             result,
             Err(ActivityWithTrainingContextError::Unknown(_))
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests_duration_curve_outbox {
+    //! Tests for `TrainingService::run` and `process_pending_outbox`.
+    //!
+    //! Modeled after the `SearchService` outbox tests:
+    //!
+    //! - `run()` is an infinite `tokio::select!` loop and never returns on its
+    //!   own. Tests spawn it and stop it by cancelling `service.shutdown`, then
+    //!   await the spawned handle.
+    //! - A `done` `Notify` is used purely as a synchronization probe: mock
+    //!   methods notify it, and the test awaits it to know processing finished
+    //!   before cancelling shutdown. This avoids sleeps and races.
+
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::clock::clock_test_utils::FakeClock;
+    use crate::domain::{
+        models::activity::{ActivityDurationCurve, DurationCurveType},
+        ports::activity::DurationCurveNotification,
+        services::{
+            activity::test_utils::MockActivityService, training::test_utils::MockTrainingRepository,
+        },
+    };
+
+    fn processed_at() -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::<chrono::Utc>::from_timestamp(1_700_000_000, 0).unwrap()
+    }
+
+    fn curve() -> ActivityDurationCurve {
+        ActivityDurationCurve::new(DurationCurveType::Power, [Some(1.0); 12])
+    }
+
+    fn notification(event: DurationCurveEvent) -> DurationCurveNotification {
+        let (curve, activity_date) = match event {
+            DurationCurveEvent::Created => (Some(curve()), Some(processed_at())),
+            DurationCurveEvent::Deleted => (None, None),
+        };
+        DurationCurveNotification::new(
+            event,
+            ActivityId::from("activity-1"),
+            UserId::test_default(),
+            curve,
+            activity_date,
+            processed_at(),
+        )
+    }
+
+    fn build_service(
+        repository: MockTrainingRepository,
+        activity_service: MockActivityService,
+    ) -> TrainingService<MockTrainingRepository, MockActivityService, FakeClock> {
+        TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::new(processed_at()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_does_nothing_without_notifications() {
+        let mut repository = MockTrainingRepository::new();
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| Ok((vec![], NotificationsRemaining::from(false))));
+
+        // Expect no side effects
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_returns_error_when_fetching_notifications_fails() {
+        let mut repository = MockTrainingRepository::new();
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| Err(anyhow!("failed to fetch notifications")));
+
+        // Expect no side effects
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        let res = service.process_pending_outbox().await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_saves_curve_and_marks_processed() {
+        let expected_user = UserId::test_default();
+        let expected_curve = curve();
+        let expected_date = processed_at();
+        let expected_processed_at = processed_at();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .withf({
+                let expected_user = expected_user.clone();
+                move |user, activity, curve, date| {
+                    user == &expected_user
+                        && activity == &ActivityId::from("activity-1")
+                        && curve == &expected_curve
+                        && date == &expected_date
+                }
+            })
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| {
+                Ok((
+                    vec![notification(DurationCurveEvent::Created)],
+                    NotificationsRemaining::from(false),
+                ))
+            });
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_deletes_curve_and_marks_processed() {
+        let expected_user = UserId::test_default();
+        let expected_processed_at = processed_at();
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(1)
+            .withf({
+                let expected_user = expected_user.clone();
+                move |user, activity| {
+                    user == &expected_user && activity == &ActivityId::from("activity-1")
+                }
+            })
+            .returning(|_, _| Ok(()));
+        repository.expect_save_duration_curve().times(0);
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| {
+                Ok((
+                    vec![notification(DurationCurveEvent::Deleted)],
+                    NotificationsRemaining::from(false),
+                ))
+            });
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_marks_processed_even_when_curve_is_missing() {
+        // A `Created` notification without a curve/activity date is skipped for saving,
+        // but is still marked as processed so it is not picked up again.
+        let expected_user = UserId::test_default();
+        let expected_processed_at = processed_at();
+        let incomplete = DurationCurveNotification::new(
+            DurationCurveEvent::Created,
+            ActivityId::from("activity-1"),
+            UserId::test_default(),
+            None,
+            None,
+            processed_at(),
+        );
+
+        let mut repository = MockTrainingRepository::new();
+        repository.expect_save_duration_curve().times(0);
+        repository.expect_delete_duration_curve().times(0);
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(move |_, _| Ok((vec![incomplete], NotificationsRemaining::from(false))));
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .withf(move |activity, user, at| {
+                activity == &ActivityId::from("activity-1")
+                    && user == &expected_user
+                    && *at == expected_processed_at
+            })
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_skips_marking_when_save_fails() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Err(anyhow!("failed to save duration curve")));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| {
+                Ok((
+                    vec![notification(DurationCurveEvent::Created)],
+                    NotificationsRemaining::from(false),
+                ))
+            });
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
+
+        let service = build_service(repository, activity_service);
+
+        // Saving failure is swallowed: the notification is retried later.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_continues_when_marking_fails() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(2)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| {
+                Ok((
+                    vec![
+                        notification(DurationCurveEvent::Deleted),
+                        notification(DurationCurveEvent::Deleted),
+                    ],
+                    NotificationsRemaining::from(false),
+                ))
+            });
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(2)
+            .returning(|_, _, _| Err(anyhow!("failed to mark notification")));
+
+        let service = build_service(repository, activity_service);
+
+        // Marking failure is swallowed: processing continues for other notifications.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_paginates_until_no_notifications_remain() {
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .times(2)
+            .withf(|_, page| *page == 0 || *page == 1)
+            .returning(|batch_size, page| {
+                assert_eq!(batch_size, BATCH_SIZE);
+                if page == 0 {
+                    Ok((
+                        vec![notification(DurationCurveEvent::Created)],
+                        NotificationsRemaining::from(true),
+                    ))
+                } else {
+                    Ok((vec![], NotificationsRemaining::from(false)))
+                }
+            });
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_run_returns_when_shutdown_is_cancelled() {
+        let mut activity_service = MockActivityService::new();
+        // Startup outbox processing finds nothing before shutdown kicks in.
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| Ok((vec![], NotificationsRemaining::from(false))));
+
+        let service = build_service(MockTrainingRepository::new(), activity_service);
+
+        let shutdown = service.shutdown.clone();
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return once shutdown is cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_run_processes_pending_outbox_on_startup() {
+        let done = Arc::new(tokio::sync::Notify::new());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .return_once(|_, _| {
+                Ok((
+                    vec![notification(DurationCurveEvent::Created)],
+                    NotificationsRemaining::from(false),
+                ))
+            });
+        let done_clone = done.clone();
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .returning(move |_, _, _| {
+                done_clone.notify_one();
+                Ok(())
+            });
+
+        let service = build_service(repository, activity_service);
+        let shutdown = service.shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        done.notified().await;
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return after shutdown is cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_run_processes_outbox_when_notified_then_stops_on_shutdown() {
+        let done = Arc::new(tokio::sync::Notify::new());
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        // The first `process_pending_outbox` call happens on startup and finds nothing;
+        // the notification is only processed once `duration_curve_notify` fires.
+        let first_call_done = Arc::new(AtomicBool::new(true));
+        let first_call_done_clone = first_call_done.clone();
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .times(2)
+            .returning(move |_, _| {
+                if first_call_done_clone.swap(false, Ordering::SeqCst) {
+                    Ok((vec![], NotificationsRemaining::from(false)))
+                } else {
+                    Ok((
+                        vec![notification(DurationCurveEvent::Created)],
+                        NotificationsRemaining::from(false),
+                    ))
+                }
+            });
+        let done_clone = done.clone();
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(1)
+            .returning(move |_, _, _| {
+                done_clone.notify_one();
+                Ok(())
+            });
+
+        let service = build_service(repository, activity_service);
+        let duration_curve_notify = service.duration_curve_notify.clone();
+        let shutdown = service.shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            service.run().await;
+        });
+
+        duration_curve_notify.notify_one();
+        done.notified().await;
+
+        shutdown.cancel();
+        handle
+            .await
+            .expect("run should return after shutdown is cancelled");
     }
 }

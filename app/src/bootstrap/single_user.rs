@@ -33,6 +33,7 @@ type ActualTrainingService = TrainingService<
         SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
         FilesystemRawDataRepository,
     >,
+    Clock,
 >;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
@@ -83,7 +84,7 @@ pub async fn bootstrap_single_user(
         activity_repository.clone(),
         raw_data_repository,
         activity_notify.clone(),
-        duration_curve_notify,
+        duration_curve_notify.clone(),
     );
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
@@ -97,6 +98,9 @@ pub async fn bootstrap_single_user(
         training_metrics_repository,
         activity_service.clone(),
         training_notify.clone(),
+        duration_curve_notify,
+        tokio_util::sync::CancellationToken::new(),
+        Clock::new(),
     ));
 
     let user_service = DisabledUserService {};

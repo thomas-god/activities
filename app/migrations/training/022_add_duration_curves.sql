@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS t_duration_curves (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    activity_id TEXT NOT NULL,
+    activity_date TEXT NOT NULL,
+    curve_type TEXT NOT NULL,
+    secs_5 REAL,
+    secs_10 REAL,
+    secs_30 REAL,
+    mins_1 REAL,
+    mins_2 REAL,
+    mins_5 REAL,
+    mins_10 REAL,
+    mins_20 REAL,
+    mins_30 REAL,
+    hours_1 REAL,
+    hours_2 REAL,
+    hours_5 REAL,
+    UNIQUE (user_id, activity_id, curve_type)
+);

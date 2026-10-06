@@ -37,6 +37,7 @@ type ActualTrainingService = TrainingService<
         SqliteActivityRepository<FilesystemRawDataRepository, Parser, Clock>,
         FilesystemRawDataRepository,
     >,
+    Clock,
 >;
 type ActualUserService = UserService<
     AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
@@ -156,12 +157,12 @@ async fn build_activity_service(
         activity_repository.clone(),
         raw_data_repository,
         activity_notify,
-        duration_curve_notify,
+        duration_curve_notify.clone(),
     );
 
-    let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
+    let training_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository = SqliteTrainingRepository::new(
-        &format!("sqlite:{}", trainin_metrics_db.to_string_lossy()),
+        &format!("sqlite:{}", training_metrics_db.to_string_lossy()),
         Clock::new(),
     )
     .await?;
@@ -170,6 +171,9 @@ async fn build_activity_service(
         training_metrics_repository,
         activity_service.clone(),
         training_notify,
+        duration_curve_notify,
+        tokio_util::sync::CancellationToken::new(),
+        Clock::new(),
     ));
 
     anyhow::Ok((activity_service, parser, training_metrics_service))

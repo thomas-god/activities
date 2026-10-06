@@ -5,7 +5,10 @@ use thiserror::Error;
 use crate::domain::{
     models::{
         UserId,
-        activity::{Activity, ActivityId, ActivityMetric, ActivityMetrics, ActivityWithParsedData},
+        activity::{
+            Activity, ActivityDurationCurve, ActivityId, ActivityMetric, ActivityMetrics,
+            ActivityWithParsedData,
+        },
         search::SearchDocument,
         training::{
             HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricDefinitionPatch,
@@ -1132,6 +1135,20 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         reference_date: chrono::NaiveDate,
     ) -> impl Future<Output = Result<Option<f32>, anyhow::Error>> + Send;
+
+    fn save_duration_curve(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+        curve: &ActivityDurationCurve,
+        activity_date: &chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    fn delete_duration_curve(
+        &self,
+        user: &UserId,
+        activity: &ActivityId,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[cfg(test)]
