@@ -68,9 +68,15 @@ pub async fn bootstrap_multi_user(
 
     let activity_notify = Arc::new(tokio::sync::Notify::new());
     let training_notify = Arc::new(tokio::sync::Notify::new());
+    let duration_curve_notify = Arc::new(tokio::sync::Notify::new());
 
-    let (activity_service, parser, training_metrics_service) =
-        build_activity_service(&config, activity_notify.clone(), training_notify.clone()).await?;
+    let (activity_service, parser, training_metrics_service) = build_activity_service(
+        &config,
+        activity_notify.clone(),
+        training_notify.clone(),
+        duration_curve_notify,
+    )
+    .await?;
 
     let user_service = build_user_service(&config, &mode_config).await?;
 
@@ -121,6 +127,7 @@ async fn build_activity_service(
     config: &BaseConfig,
     activity_notify: Arc<tokio::sync::Notify>,
     training_notify: Arc<tokio::sync::Notify>,
+    duration_curve_notify: Arc<tokio::sync::Notify>,
 ) -> anyhow::Result<(ActualActivityService, Parser, Arc<ActualTrainingService>)> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
@@ -149,6 +156,7 @@ async fn build_activity_service(
         activity_repository.clone(),
         raw_data_repository,
         activity_notify,
+        duration_curve_notify,
     );
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");

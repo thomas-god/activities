@@ -69,6 +69,7 @@ pub async fn bootstrap_single_user(
 
     let activity_notify = Arc::new(tokio::sync::Notify::new());
     let training_notify = Arc::new(tokio::sync::Notify::new());
+    let duration_curve_notify = Arc::new(tokio::sync::Notify::new());
 
     let activity_db = db_dir.clone().join("activities.db");
     let activity_repository = SqliteActivityRepository::new(
@@ -82,6 +83,7 @@ pub async fn bootstrap_single_user(
         activity_repository.clone(),
         raw_data_repository,
         activity_notify.clone(),
+        duration_curve_notify,
     );
 
     let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
