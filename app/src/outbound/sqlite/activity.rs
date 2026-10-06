@@ -1214,6 +1214,31 @@ where
         .map(|_| ())
         .map_err(|err| anyhow!(err))
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_activities_without_duration_curves(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<(ActivityId, UserId)>, anyhow::Error> {
+        sqlx::query_as::<_, (ActivityId, UserId)>(
+            "
+            WITH curves_per_activity AS (
+                SELECT ta.id, ta.user_id, COUNT(tdc.activity_id) AS nb_curves
+                FROM t_activities_v2 ta
+                LEFT JOIN t_duration_curves tdc ON ta.id = tdc.activity_id
+                GROUP BY ta.id
+            )
+            SELECT id, user_id
+            FROM curves_per_activity
+            WHERE nb_curves = 0
+            LIMIT ?1;
+            ",
+        )
+        .bind(limit)
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| anyhow!(err))
+    }
 }
 
 #[cfg(test)]
@@ -1518,11 +1543,122 @@ mod test_sqlite_activity_repository {
         assert_eq!(secs_5, 1.);
     }
 
+    type TestRepository = SqliteActivityRepository<
+        crate::domain::ports::activity::test_utils::MockRawDataRepository,
+        crate::inbound::parser::test_utils::MockFileParser,
+        Clock,
+    >;
+
+    /// Inserts an activity row without any duration curve row, as would be the case for
+    /// activities created before duration curves were introduced.
+    async fn insert_activity_without_duration_curve(
+        repository: &TestRepository,
+        id: &ActivityId,
+        user: &UserId,
+    ) {
+        sqlx::query(
+            "INSERT INTO t_activities_v2 (id, user_id, name, start_time, sport, natural_key)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
+        )
+        .bind(id)
+        .bind(user)
+        .bind("test activity")
+        .bind(ActivityStartTime::from_timestamp(1000).unwrap().datetime())
+        .bind(Sport::Cycling)
+        .bind(format!("natural-key-{id}"))
+        .execute(&repository.writer)
+        .await
+        .expect("should insert the activity");
+    }
+
+    #[tokio::test]
+    async fn test_get_activities_without_duration_curves() {
+        let (repository, _db_file) = test_repository().await;
+        let user = UserId::test_default();
+
+        // Activities saved through save_activity always get at least a NULL-type marker
+        // row in t_duration_curves, so they count as processed and are never returned.
+        let with_marker = build_activity();
+        repository
+            .save_activity(&with_marker)
+            .await
+            .expect("should save the activity");
+
+        let with_curve =
+            build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+        repository
+            .save_activity(&with_curve)
+            .await
+            .expect("should save the activity");
+
+        // Activities with no duration curve row at all are returned.
+        let missing_curves_1 = ActivityId::new();
+        let missing_curves_2 = ActivityId::new();
+        insert_activity_without_duration_curve(&repository, &missing_curves_1, &user).await;
+        insert_activity_without_duration_curve(&repository, &missing_curves_2, &user).await;
+
+        let mut result = repository
+            .get_activities_without_duration_curves(10)
+            .await
+            .expect("should get activities without duration curves");
+        result.sort();
+
+        let mut expected = vec![
+            (missing_curves_1, user.clone()),
+            (missing_curves_2, user.clone()),
+        ];
+        expected.sort();
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn test_get_activities_without_duration_curves_respects_limit() {
+        let (repository, _db_file) = test_repository().await;
+        let user = UserId::test_default();
+
+        let mut inserted = Vec::new();
+        for _ in 0..5 {
+            let id = ActivityId::new();
+            insert_activity_without_duration_curve(&repository, &id, &user).await;
+            inserted.push((id, user.clone()));
+        }
+
+        let result = repository
+            .get_activities_without_duration_curves(3)
+            .await
+            .expect("should get activities without duration curves");
+
+        assert_eq!(result.len(), 3);
+        for (id, activity_user) in &result {
+            assert_eq!(activity_user, &user);
+            assert!(inserted.iter().any(|(inserted_id, _)| inserted_id == id));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_activities_without_duration_curves_empty_db() {
+        let (repository, _db_file) = test_repository().await;
+
+        let result = repository
+            .get_activities_without_duration_curves(10)
+            .await
+            .expect("should get activities without duration curves");
+
+        assert!(result.is_empty());
+    }
+
     fn build_activity_with_curves(curves: Vec<ActivityDurationCurve>) -> ActivityWithParsedData {
+        build_activity_for_user_with_curves(UserId::test_default(), curves)
+    }
+
+    fn build_activity_for_user_with_curves(
+        user: UserId,
+        curves: Vec<ActivityDurationCurve>,
+    ) -> ActivityWithParsedData {
         ActivityWithParsedData::new(
             Activity::new_empty(
                 ActivityId::new(),
-                UserId::test_default(),
+                user,
                 ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
                 ActivityDuration::default(),
                 Sport::Cycling,
@@ -4266,6 +4402,138 @@ mod test_sqlite_activity_repository {
             .await
             .unwrap();
             assert_eq!(processed, Some(processed_at));
+        }
+
+        #[tokio::test]
+        async fn test_mark_duration_curve_notifications_as_processed_is_scoped_to_activity_and_user()
+         {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // Two activities: one for the default test user, one for another user.
+            let other_user = UserId::new();
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            let other_activity = build_activity_for_user_with_curves(
+                other_user.clone(),
+                vec![build_duration_curve(DurationCurveType::Power)],
+            );
+            for activity in [&activity, &other_activity] {
+                repo.save_activity(activity)
+                    .await
+                    .expect("Should have succeeded");
+            }
+
+            repo.mark_duration_curve_notifications_as_processed(
+                activity.id(),
+                activity.user(),
+                Utc::now(),
+            )
+            .await
+            .expect("Marking as processed should have succeeded");
+
+            // Only the marked activity's notification is processed.
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert_eq!(notifications.len(), 1);
+            assert_eq!(notifications[0].activity(), other_activity.id());
+            assert_eq!(notifications[0].user(), &other_user);
+
+            // Marking the other activity's notification processes it as well.
+            repo.mark_duration_curve_notifications_as_processed(
+                other_activity.id(),
+                other_activity.user(),
+                Utc::now(),
+            )
+            .await
+            .expect("Marking as processed should have succeeded");
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_mark_duration_curve_notifications_as_processed_marks_all_rows() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // A second, unprocessed outbox row for the same activity (e.g. a deleted
+            // event posted after the created one, both still pending).
+            sqlx::query(
+                "INSERT INTO t_outbox_duration_curve (activity_id, user_id, event, occurred_at)
+                VALUES (?1, ?2, 'deleted', ?3);",
+            )
+            .bind(activity.id())
+            .bind(activity.user())
+            .bind(now)
+            .execute(&repo.writer)
+            .await
+            .expect("Should have succeeded");
+            assert_eq!(outbox_rows(&repo).await.len(), 2);
+
+            let processed_at = Utc::now();
+            repo.mark_duration_curve_notifications_as_processed(
+                activity.id(),
+                activity.user(),
+                processed_at,
+            )
+            .await
+            .expect("Marking as processed should have succeeded");
+
+            // Both rows for the activity were marked as processed.
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+            let unprocessed = outbox_rows(&repo)
+                .await
+                .into_iter()
+                .filter(|row| row.4.is_none())
+                .count();
+            assert_eq!(unprocessed, 0);
+        }
+
+        #[tokio::test]
+        async fn test_mark_duration_curve_notifications_as_processed_unknown_ids_is_noop() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // Marking an activity/user pair that has no outbox rows succeeds and
+            // does nothing.
+            repo.mark_duration_curve_notifications_as_processed(
+                &ActivityId::new(),
+                &UserId::new(),
+                Utc::now(),
+            )
+            .await
+            .expect("Marking unknown ids should have succeeded");
+            assert!(outbox_rows(&repo).await.is_empty());
+
+            // Existing rows are untouched.
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+            repo.mark_duration_curve_notifications_as_processed(
+                &ActivityId::new(),
+                &UserId::new(),
+                Utc::now(),
+            )
+            .await
+            .expect("Marking unknown ids should have succeeded");
+            assert!(outbox_rows(&repo).await.iter().all(|row| row.4.is_none()));
         }
     }
 }

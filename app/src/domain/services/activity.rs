@@ -25,6 +25,8 @@ use crate::domain::{
     },
 };
 
+const BATCH_SIZE: u32 = 50;
+
 #[derive(Debug, Clone)]
 pub struct ActivityService<AR, RDR>
 where
@@ -54,6 +56,85 @@ where
             notify_new_document,
             notify_duration_curve,
         }
+    }
+
+    pub async fn compute_missing_duration_curves(&self) {
+        tracing::info!("Starting to compute missing duration curves");
+        let mut processed_activities = 0;
+        let mut number_of_errors = 0;
+
+        loop {
+            let activities = match self
+                .activity_repository
+                .get_activities_without_duration_curves(BATCH_SIZE)
+                .await
+            {
+                Ok(activities) => activities,
+                Err(err) => {
+                    tracing::error!("Unable to process missing duration curves: {}", err);
+                    return;
+                }
+            };
+
+            if activities.is_empty() {
+                break;
+            }
+
+            if number_of_errors > BATCH_SIZE {
+                // To avoid being stuck in an infinite loop due to unprocessable activities
+                // coming back and not allowing activities.is_empty() to break
+                tracing::error!(
+                    "Too many errors while processing missing durations curves, aborting"
+                );
+                break;
+            }
+
+            for (activity_id, user_id) in activities.iter() {
+                let activity = match self
+                    .activity_repository
+                    .get_activity_with_parsed_data(user_id, activity_id)
+                    .await
+                {
+                    Ok(Some(activity)) => activity,
+                    Ok(None) => {
+                        tracing::error!(
+                            "Result is None when trying to get activity {}",
+                            activity_id
+                        );
+                        number_of_errors += 1;
+                        continue;
+                    }
+                    Err(err) => {
+                        tracing::error!("Unable to get activity {}: {}", activity_id, err);
+                        number_of_errors += 1;
+                        continue;
+                    }
+                };
+
+                let updated_activity = activity.recompute_duration_curves();
+
+                if let Err(err) = self
+                    .activity_repository
+                    .save_activity(&updated_activity)
+                    .await
+                {
+                    tracing::error!(
+                        "Error while trying to persist updated activity {}: {}",
+                        activity_id,
+                        err
+                    );
+                    number_of_errors += 1;
+                    continue;
+                }
+
+                processed_activities += 1;
+            }
+        }
+
+        tracing::info!(
+            "Finished processing missing duration curves: {} activities processed",
+            processed_activities
+        );
     }
 }
 
@@ -576,6 +657,11 @@ pub mod test_utils {
                 user: &UserId,
                 processed_at: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), anyhow::Error>;
+
+            async fn get_activities_without_duration_curves(
+                &self,
+                limit: u32,
+            ) -> Result<Vec<(ActivityId, UserId)>, anyhow::Error>;
         }
 
     }
@@ -1872,5 +1958,324 @@ mod tests_activity_service {
                 .await;
             assert!(res.is_err());
         }
+    }
+
+    ///////////////////////////////////////////////////////////////////
+    // compute_missing_duration_curves
+    ///////////////////////////////////////////////////////////////////
+
+    use mockall::predicate::eq;
+
+    use crate::domain::models::activity::DurationCurveType;
+
+    fn running_activity(id: &ActivityId) -> Activity {
+        Activity::new_empty(
+            id.clone(),
+            UserId::test_default(),
+            ActivityStartTime::from_timestamp(3600).unwrap(),
+            ActivityDuration::default(),
+            Sport::Running,
+        )
+    }
+
+    /// A running activity timeseries with a monotonically increasing distance metric,
+    /// from which a pace duration curve can be computed.
+    fn running_timeseries_with_distance() -> ActivityTimeseries {
+        ActivityTimeseries::new(
+            TimeseriesTime::new((0..11).collect()),
+            TimeseriesActiveTime::new(vec![ActiveTime::Running(1); 11]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Distance,
+                (0..=10)
+                    .map(|value| Some(TimeseriesValue::Float(value as f64 * 5.)))
+                    .collect(),
+            )],
+        )
+        .unwrap()
+    }
+
+    /// A running activity whose stored duration curves are missing (empty), while its
+    /// timeseries would produce a pace curve when recomputed.
+    fn activity_with_missing_duration_curves(id: &ActivityId) -> ActivityWithParsedData {
+        let activity = running_activity(id);
+        let timeseries = running_timeseries_with_distance();
+        ActivityWithParsedData::new(
+            activity,
+            timeseries,
+            ActivityStatistics::default(),
+            ActivityDurationCurves::default(),
+        )
+    }
+
+    fn duration_curve_service(
+        activity_repository: MockActivityRepository,
+    ) -> ActivityService<MockActivityRepository, MockRawDataRepository> {
+        ActivityService::new(
+            activity_repository,
+            MockRawDataRepository::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_recomputes_and_saves() {
+        let activity_id = ActivityId::from("activity_1");
+        let batch_activity_id = activity_id.clone();
+
+        let mut activity_repository = MockActivityRepository::new();
+        // First batch contains the activity, the second batch is empty (loop termination).
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(move |_| Ok(vec![(batch_activity_id.clone(), UserId::test_default())]));
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| Ok(vec![]));
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(1)
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("activity_1")),
+            )
+            .returning({
+                let activity_id = activity_id.clone();
+                move |_, _| Ok(Some(activity_with_missing_duration_curves(&activity_id)))
+            });
+        let saved = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let saved_sink = Arc::clone(&saved);
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(move |activity| {
+                saved_sink.lock().unwrap().push(activity.clone());
+                Ok(())
+            });
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
+
+        let saved = saved.lock().unwrap();
+        assert_eq!(1, saved.len());
+        assert_eq!(&activity_id, saved[0].id());
+
+        // The recomputed duration curves of a running activity with a distance metric
+        // should be a pace curve with the expected best average speeds.
+        let expected = ActivityDurationCurves::from(
+            &running_activity(&activity_id),
+            &running_timeseries_with_distance(),
+        );
+        let expected: Vec<_> = expected.iter().collect();
+        let actual: Vec<_> = saved[0].duration_curves().iter().collect();
+        assert_eq!(expected, actual);
+
+        let pace_curve = actual[0];
+        assert_eq!(DurationCurveType::Pace, pace_curve.curve_type());
+        // 11 samples from 0 to 50 meters: best average speed over 5s and 10s is 5 m/s.
+        assert_eq!(Some(5.), pace_curve.values()[0]);
+        assert_eq!(Some(5.), pace_curve.values()[1]);
+        assert!(pace_curve.values()[2..].iter().all(Option::is_none));
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_repo_error_is_not_fatal() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .returning(|_| Err(anyhow!("repo error")));
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(0);
+        activity_repository.expect_save_activity().times(0);
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_skips_missing_activity() {
+        let activity_id = ActivityId::from("activity_1");
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(move |_| Ok(vec![(activity_id.clone(), UserId::test_default())]));
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| Ok(vec![]));
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(1)
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("activity_1")),
+            )
+            .returning(|_, _| Ok(None));
+        activity_repository.expect_save_activity().times(0);
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_save_error_is_not_fatal() {
+        let activity_id = ActivityId::from("activity_1");
+        let batch_activity_id = activity_id.clone();
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(move |_| Ok(vec![(batch_activity_id.clone(), UserId::test_default())]));
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| Ok(vec![]));
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(1)
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("activity_1")),
+            )
+            .returning({
+                let activity_id = activity_id.clone();
+                move |_, _| Ok(Some(activity_with_missing_duration_curves(&activity_id)))
+            });
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Err(SaveActivityError::Unknown(anyhow!("save failed"))));
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_processes_all_activities() {
+        let id_1 = ActivityId::from("activity_1");
+        let id_2 = ActivityId::from("activity_2");
+        let batch_id_1 = id_1.clone();
+        let batch_id_2 = id_2.clone();
+
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(move |_| {
+                Ok(vec![
+                    (batch_id_1.clone(), UserId::test_default()),
+                    (batch_id_2.clone(), UserId::test_default()),
+                ])
+            });
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| Ok(vec![]));
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(1)
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("activity_1")),
+            )
+            .returning({
+                let activity_id = id_1.clone();
+                move |_, _| Ok(Some(activity_with_missing_duration_curves(&activity_id)))
+            });
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(1)
+            .with(
+                eq(UserId::test_default()),
+                eq(ActivityId::from("activity_2")),
+            )
+            .returning({
+                let activity_id = id_2.clone();
+                move |_, _| Ok(Some(activity_with_missing_duration_curves(&activity_id)))
+            });
+        let saved = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let saved_sink = Arc::clone(&saved);
+        activity_repository
+            .expect_save_activity()
+            .times(2)
+            .returning(move |activity| {
+                saved_sink.lock().unwrap().push(activity.clone());
+                Ok(())
+            });
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
+
+        let saved = saved.lock().unwrap();
+        assert_eq!(2, saved.len());
+        let saved_ids: Vec<_> = saved.iter().map(|a| a.id().clone()).collect();
+        assert_eq!(
+            vec![
+                ActivityId::from("activity_1"),
+                ActivityId::from("activity_2")
+            ],
+            saved_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_missing_duration_curves_aborts_when_too_many_errors() {
+        // A first batch of 51 activities, all of which fail to be persisted: the error
+        // counter rises above BATCH_SIZE (50) and the loop must abort instead of spinning
+        // forever on the same unprocessable activities coming back batch after batch.
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| {
+                Ok((0..51)
+                    .map(|i| {
+                        (
+                            ActivityId::from(format!("activity_{i}").as_str()),
+                            UserId::test_default(),
+                        )
+                    })
+                    .collect())
+            });
+        // A second batch is fetched before the abort check happens: if the service did
+        // not abort, this activity would be processed successfully and the loop would
+        // keep going (making the mock expectations below panic).
+        activity_repository
+            .expect_get_activities_without_duration_curves()
+            .times(1)
+            .with(eq(50_u32))
+            .returning(|_| {
+                Ok(vec![(
+                    ActivityId::from("activity_51"),
+                    UserId::test_default(),
+                )])
+            });
+        activity_repository
+            .expect_get_activity_with_parsed_data()
+            .times(51)
+            .returning(|_, id| Ok(Some(activity_with_missing_duration_curves(id))));
+        activity_repository
+            .expect_save_activity()
+            .times(51)
+            .returning(|_| Err(SaveActivityError::Unknown(anyhow!("save failed"))));
+
+        let service = duration_curve_service(activity_repository);
+        service.compute_missing_duration_curves().await;
     }
 }

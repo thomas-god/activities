@@ -99,6 +99,8 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn process_pending_outbox(&self) -> Result<(), anyhow::Error> {
         let mut notifications_remaining = NotificationsRemaining::from(true);
+        // FIXME: pagination does not work here since the underlying query's results
+        // change as we process notifications and mark them as processed.
         let mut page = 0;
 
         while notifications_remaining.remaining() {

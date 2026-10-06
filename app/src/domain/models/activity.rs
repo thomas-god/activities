@@ -345,6 +345,17 @@ impl ActivityWithParsedData {
             duration_curves: self.duration_curves,
         }
     }
+
+    pub fn recompute_duration_curves(self) -> Self {
+        let curves = ActivityDurationCurves::from(&self.activity, &self.timeseries);
+
+        Self {
+            activity: self.activity,
+            timeseries: self.timeseries,
+            statistics: self.statistics,
+            duration_curves: curves,
+        }
+    }
 }
 
 /// Technical ID of an [Activity].

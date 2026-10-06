@@ -485,6 +485,11 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Option<DateTimeRange>, anyhow::Error>> + Send;
 
+    fn get_activities_without_duration_curves(
+        &self,
+        limit: u32,
+    ) -> impl Future<Output = Result<Vec<(ActivityId, UserId)>, anyhow::Error>> + Send;
+
     /////////// Search document related methods
     fn list_activity_documents(
         &self,
