@@ -45,6 +45,22 @@ type ActivityRow = (
     Option<ActivityFeedback>,
 );
 
+type DurationCurveRow = (
+    Option<DurationCurveType>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+);
+
 type SearchDocumentRow = (
     ActivityId,
     UserId,
@@ -236,12 +252,13 @@ where
             Err(err) => return Err(anyhow!(err)),
         };
 
+        let duration_curves = self.load_duration_curves(id, activity.user()).await?;
+
         Ok(ActivityWithParsedData::new(
             activity,
             parsed_content.timeseries().clone(),
             parsed_content.statistics().clone(),
-            // TODO: actually load duration curves
-            ActivityDurationCurves::default(),
+            duration_curves,
         ))
     }
 
@@ -349,6 +366,75 @@ where
                 activity
             )
         })
+    }
+
+    async fn load_duration_curves(
+        &self,
+        activity: &ActivityId,
+        user: &UserId,
+    ) -> Result<ActivityDurationCurves, anyhow::Error> {
+        let rows = sqlx::query_as::<_, DurationCurveRow>(
+            "SELECT type, secs_5, secs_10, secs_30,
+                    mins_1, mins_2, mins_5, mins_10, mins_20, mins_30,
+                    hours_1, hours_2, hours_5
+            FROM t_duration_curves
+            WHERE activity_id = ?1 AND user_id = ?2;",
+        )
+        .bind(activity)
+        .bind(user)
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| {
+            anyhow!(
+                "Unable to load duration curves for activity {}. {err}",
+                activity
+            )
+        })?;
+
+        // Rows with a NULL type mark activities that were processed but have no valid
+        // duration curve; they yield no curve.
+        let curves = rows
+            .into_iter()
+            .filter_map(
+                |(
+                    curve_type,
+                    secs_5,
+                    secs_10,
+                    secs_30,
+                    mins_1,
+                    mins_2,
+                    mins_5,
+                    mins_10,
+                    mins_20,
+                    mins_30,
+                    hours_1,
+                    hours_2,
+                    hours_5,
+                )| {
+                    curve_type.map(|curve_type| {
+                        ActivityDurationCurve::new(
+                            curve_type,
+                            [
+                                secs_5.map(|value| value as f32),
+                                secs_10.map(|value| value as f32),
+                                secs_30.map(|value| value as f32),
+                                mins_1.map(|value| value as f32),
+                                mins_2.map(|value| value as f32),
+                                mins_5.map(|value| value as f32),
+                                mins_10.map(|value| value as f32),
+                                mins_20.map(|value| value as f32),
+                                mins_30.map(|value| value as f32),
+                                hours_1.map(|value| value as f32),
+                                hours_2.map(|value| value as f32),
+                                hours_5.map(|value| value as f32),
+                            ],
+                        )
+                    })
+                },
+            )
+            .collect();
+
+        Ok(ActivityDurationCurves::new(curves))
     }
 
     async fn delete_duration_curves(
@@ -1421,6 +1507,102 @@ mod test_sqlite_activity_repository {
     }
 
     #[tokio::test]
+    async fn test_load_duration_curves() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity = build_activity_with_curves(vec![
+            build_duration_curve(DurationCurveType::Power),
+            build_duration_curve(DurationCurveType::Pace),
+        ]);
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+
+        let curves = repository
+            .load_duration_curves(activity.id(), activity.user())
+            .await
+            .expect("should load the duration curves");
+
+        assert_eq!(curves.iter().count(), 2);
+        for curve_type in [DurationCurveType::Power, DurationCurveType::Pace] {
+            let curve = curves
+                .iter()
+                .find(|curve| curve.curve_type() == curve_type)
+                .unwrap_or_else(|| panic!("missing {:?} curve", curve_type));
+            assert_eq!(curve.values(), build_duration_curve(curve_type).values());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_duration_curves_without_curves() {
+        let (repository, _db_file) = test_repository().await;
+
+        // An activity saved without curves only has a NULL-type marker row.
+        let activity = build_activity();
+        assert!(activity.duration_curves().is_empty());
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+
+        let curves = repository
+            .load_duration_curves(activity.id(), activity.user())
+            .await
+            .expect("should load the duration curves");
+        assert!(curves.is_empty());
+
+        // An activity that was never saved has no row at all, and also loads as empty.
+        let curves = repository
+            .load_duration_curves(&ActivityId::new(), activity.user())
+            .await
+            .expect("should load the duration curves");
+        assert!(curves.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_load_duration_curves_ignores_null_marker() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        repository
+            .save_null_duration_curve(&mut tx, &activity_id, &user, &date)
+            .await
+            .expect("should save the null curve");
+        repository
+            .save_duration_curve(
+                &mut tx,
+                &activity_id,
+                &user,
+                &date,
+                &build_duration_curve(DurationCurveType::Power),
+            )
+            .await
+            .expect("should save the curve");
+        tx.commit().await.unwrap();
+
+        // The NULL-type marker row yields no curve; only the real curve is loaded.
+        let curves = repository
+            .load_duration_curves(&activity_id, &user)
+            .await
+            .expect("should load the duration curves");
+
+        assert_eq!(curves.iter().count(), 1);
+        let curve = curves.iter().next().unwrap();
+        assert_eq!(curve.curve_type(), DurationCurveType::Power);
+        assert_eq!(
+            curve.values(),
+            build_duration_curve(DurationCurveType::Power).values()
+        );
+    }
+
+    #[tokio::test]
     async fn test_save_null_duration_curve() {
         let (repository, _db_file) = test_repository().await;
 
@@ -2061,6 +2243,55 @@ mod test_sqlite_activity_repository {
                 ],
             )
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_parsed_data_loads_duration_curves() {
+        let mut raw_data_repo = MockRawDataRepository::new();
+        raw_data_repo
+            .expect_get_raw_data()
+            .times(1)
+            .returning(|_| Ok(RawContent::new("fit".to_string(), vec![])));
+        let mut file_parser = MockFileParser::new();
+        file_parser
+            .expect_try_bytes_into_domain()
+            .times(1)
+            .returning(|_, __| Ok(build_parsed_file_content()));
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            raw_data_repo,
+            file_parser,
+            Clock::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        let activity = build_activity_with_curves(vec![
+            build_duration_curve(DurationCurveType::Power),
+            build_duration_curve(DurationCurveType::Pace),
+        ]);
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("Save should have succeeded");
+
+        let res = repository
+            .get_activity_with_parsed_data(activity.user(), activity.id())
+            .await
+            .expect("Should have succeeded")
+            .expect("Should not be none");
+
+        // The saved curves are loaded back, not the default empty curves.
+        let curves = res.duration_curves();
+        assert_eq!(curves.iter().count(), 2);
+        for curve_type in [DurationCurveType::Power, DurationCurveType::Pace] {
+            let curve = curves
+                .iter()
+                .find(|curve| curve.curve_type() == curve_type)
+                .unwrap_or_else(|| panic!("missing {:?} curve", curve_type));
+            assert_eq!(curve.values(), build_duration_curve(curve_type).values());
+        }
     }
 
     #[tokio::test]
