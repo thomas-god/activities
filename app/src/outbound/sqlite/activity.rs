@@ -12,10 +12,10 @@ use crate::{
         models::{
             UserId,
             activity::{
-                Activity, ActivityDuration, ActivityDurationCurves, ActivityFeedback, ActivityId,
-                ActivityMetric, ActivityMetrics, ActivityName, ActivityNaturalKey,
-                ActivityNutrition, ActivityRpe, ActivityStartTime, ActivityWithParsedData, Sport,
-                WorkoutType,
+                Activity, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves,
+                ActivityFeedback, ActivityId, ActivityMetric, ActivityMetrics, ActivityName,
+                ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
+                ActivityWithParsedData, DurationCurveType, Sport, WorkoutType,
             },
             search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
         },
@@ -270,6 +270,109 @@ where
             )
         })
     }
+
+    async fn save_duration_curve(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        activity: &ActivityId,
+        user: &UserId,
+        date: &ActivityStartTime,
+        curve: &ActivityDurationCurve,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "
+            INSERT INTO t_duration_curves
+                (
+                    activity_id, user_id, type, date,
+                    secs_5, secs_10, secs_30,
+                    mins_1, mins_2, mins_5, mins_10, mins_20, mins_30,
+                    hours_1, hours_2, hours_5
+                )
+            VALUES (
+                ?1, ?2, ?3, ?4,
+                ?5, ?6, ?7,
+                ?8, ?9, ?10, ?11, ?12, ?13,
+                ?14, ?15, ?16
+            )
+            ON CONFLICT (activity_id, user_id, type) DO NOTHING;", // reflect duration curve immutability
+        )
+        .bind(activity)
+        .bind(user)
+        .bind(curve.curve_type())
+        .bind(date.datetime())
+        .bind(curve.values()[0])
+        .bind(curve.values()[1])
+        .bind(curve.values()[2])
+        .bind(curve.values()[3])
+        .bind(curve.values()[4])
+        .bind(curve.values()[5])
+        .bind(curve.values()[6])
+        .bind(curve.values()[7])
+        .bind(curve.values()[8])
+        .bind(curve.values()[9])
+        .bind(curve.values()[10])
+        .bind(curve.values()[11])
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to save duration curve {} for activity {}. {err}",
+                curve.curve_type(),
+                activity
+            )
+        })
+    }
+
+    async fn save_null_duration_curve(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        activity: &ActivityId,
+        user: &UserId,
+        date: &ActivityStartTime,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "INSERT INTO t_duration_curves (activity_id, user_id, type, date)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT (activity_id, user_id) WHERE type IS NULL DO NOTHING;", // reflect duration curve immutability
+        )
+        .bind(activity)
+        .bind(user)
+        .bind(None::<DurationCurveType>)
+        .bind(date.datetime())
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to save null duration curve for activity {}. {err}",
+                activity
+            )
+        })
+    }
+
+    async fn delete_duration_curves(
+        &self,
+        tx: &mut Transaction<'_, Sqlite>,
+        activity: &ActivityId,
+        user: &UserId,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "DELETE FROM t_duration_curves
+             WHERE activity_id = ?1 AND user_id = ?2;",
+        )
+        .bind(activity)
+        .bind(user)
+        .execute(&mut **tx)
+        .await
+        .map(|_| ())
+        .map_err(|err| {
+            anyhow!(
+                "Unable to delete duration curves for activity {}. {err}",
+                activity
+            )
+        })
+    }
 }
 
 impl<R, FP, C> ActivityRepository for SqliteActivityRepository<R, FP, C>
@@ -327,6 +430,27 @@ where
             .to_search_document(SearchDocumentEvent::Updated, self.clock.now());
 
         self.save_search_document(&mut tx, search_document).await?;
+
+        for curve in activity.duration_curves().iter() {
+            self.save_duration_curve(
+                &mut tx,
+                activity.id(),
+                activity.user(),
+                activity.start_time(),
+                curve,
+            )
+            .await?;
+        }
+
+        if activity.duration_curves().is_empty() {
+            self.save_null_duration_curve(
+                &mut tx,
+                activity.id(),
+                activity.user(),
+                activity.start_time(),
+            )
+            .await?;
+        }
 
         tx.commit()
             .await
@@ -388,6 +512,8 @@ where
         );
 
         self.save_search_document(&mut tx, search_document).await?;
+
+        self.delete_duration_curves(&mut tx, activity, user).await?;
 
         tx.commit().await.map_err(|err| anyhow!(err))
     }
@@ -854,10 +980,10 @@ mod test_sqlite_activity_repository {
             models::{
                 UserId,
                 activity::{
-                    ActiveTime, ActivityDuration, ActivityDurationCurves, ActivityPatch,
-                    ActivityStartTime, ActivityStatistics, ActivityTimeseries, BonkStatus, Sport,
-                    Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime,
-                    TimeseriesValue,
+                    ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves,
+                    ActivityPatch, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+                    BonkStatus, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
+                    TimeseriesMetric, TimeseriesTime, TimeseriesValue,
                 },
             },
             ports::{
@@ -941,6 +1067,466 @@ mod test_sqlite_activity_repository {
                 .fetch_one(&repository.readers)
                 .await
                 .unwrap(),
+            1
+        );
+    }
+
+    fn build_duration_curve(curve_type: DurationCurveType) -> ActivityDurationCurve {
+        ActivityDurationCurve::new(
+            curve_type,
+            [
+                Some(1.),
+                Some(2.),
+                Some(3.),
+                Some(4.),
+                Some(5.),
+                Some(6.),
+                Some(7.),
+                Some(8.),
+                Some(9.),
+                Some(10.),
+                Some(11.),
+                None,
+            ],
+        )
+    }
+
+    async fn test_repository() -> (
+        SqliteActivityRepository<
+            crate::domain::ports::activity::test_utils::MockRawDataRepository,
+            crate::inbound::parser::test_utils::MockFileParser,
+            Clock,
+        >,
+        NamedTempFile,
+    ) {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteActivityRepository::new(
+            &db_file.path().to_string_lossy(),
+            MockRawDataRepository::new(),
+            MockFileParser::new(),
+            Clock::new(),
+        )
+        .await
+        .expect("repo should init");
+
+        // The db file must be kept alive for the readers pool to be able to connect.
+        (repository, db_file)
+    }
+
+    #[tokio::test]
+    async fn test_save_duration_curve() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+        let curve = build_duration_curve(DurationCurveType::Power);
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        repository
+            .save_duration_curve(&mut tx, &activity_id, &user, &date, &curve)
+            .await
+            .expect("should save the curve");
+        tx.commit().await.unwrap();
+
+        let row: (ActivityId, UserId, DurationCurveType, ActivityStartTime) =
+            sqlx::query_as("select activity_id, user_id, type, date from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap();
+        assert_eq!(row.0, activity_id);
+        assert_eq!(row.1, user);
+        assert_eq!(row.2, DurationCurveType::Power);
+        assert_eq!(row.3, date);
+
+        let values: (
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+        ) = sqlx::query_as(
+            "select secs_5, secs_10, secs_30, mins_1, mins_2, mins_5, mins_10, mins_20, mins_30, hours_1, hours_2, hours_5 from t_duration_curves;",
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .unwrap();
+
+        let actual = [
+            values.0, values.1, values.2, values.3, values.4, values.5, values.6, values.7,
+            values.8, values.9, values.10, values.11,
+        ];
+        for (actual, expected) in actual.iter().zip(curve.values().iter()) {
+            assert_eq!(*actual, expected.map(|value| value as f64));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_save_duration_curve_pace() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+        // A curve without any value: all columns should be saved as NULL.
+        let curve = ActivityDurationCurve::new(DurationCurveType::Pace, [None; 12]);
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        repository
+            .save_duration_curve(&mut tx, &activity_id, &user, &date, &curve)
+            .await
+            .expect("should save the curve");
+        tx.commit().await.unwrap();
+
+        let row: (DurationCurveType, i64) =
+            sqlx::query_as("select type, coalesce(secs_5, -1) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap();
+        assert_eq!(row.0, DurationCurveType::Pace);
+        assert_eq!(row.1, -1); // NULL marker
+    }
+
+    #[tokio::test]
+    async fn test_save_duration_curves_same_activity() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        for curve_type in [DurationCurveType::Power, DurationCurveType::Pace] {
+            repository
+                .save_duration_curve(
+                    &mut tx,
+                    &activity_id,
+                    &user,
+                    &date,
+                    &build_duration_curve(curve_type),
+                )
+                .await
+                .expect("should save the curve");
+        }
+        tx.commit().await.unwrap();
+
+        // Both curves are saved for the same activity, without conflicting on the
+        // (activity_id, user_id, type) unique constraint.
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_duration_curve_is_immutable() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+        let curve = build_duration_curve(DurationCurveType::Power);
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        repository
+            .save_duration_curve(&mut tx, &activity_id, &user, &date, &curve)
+            .await
+            .expect("should save the curve");
+
+        // Saving a different curve for the same (activity, user, type) should be ignored.
+        let other_curve = ActivityDurationCurve::new(DurationCurveType::Power, [Some(100.); 12]);
+        repository
+            .save_duration_curve(&mut tx, &activity_id, &user, &date, &other_curve)
+            .await
+            .expect("should ignore the conflicting curve");
+        tx.commit().await.unwrap();
+
+        // Only one row exists and it still holds the original curve values.
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap(),
+            1
+        );
+
+        let secs_5: f64 = sqlx::query_scalar("select secs_5 from t_duration_curves;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert_eq!(secs_5, 1.);
+    }
+
+    fn build_activity_with_curves(curves: Vec<ActivityDurationCurve>) -> ActivityWithParsedData {
+        ActivityWithParsedData::new(
+            Activity::new_empty(
+                ActivityId::new(),
+                UserId::test_default(),
+                ActivityStartTime::from_timestamp(random_range(100..1200)).unwrap(),
+                ActivityDuration::default(),
+                Sport::Cycling,
+            ),
+            ActivityTimeseries::default(),
+            ActivityStatistics::default(),
+            ActivityDurationCurves::new(curves),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_save_activity_saves_duration_curves() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity = build_activity_with_curves(vec![
+            build_duration_curve(DurationCurveType::Power),
+            build_duration_curve(DurationCurveType::Pace),
+        ]);
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+
+        // Both curves are saved, and no null marker is stored.
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is not null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            2
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_activity_without_duration_curves_saves_null_marker() {
+        let (repository, _db_file) = test_repository().await;
+
+        // An activity without any curve still gets a row, marking it as processed.
+        let activity = build_activity();
+        assert!(activity.duration_curves().is_empty());
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is not null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_activity_deletes_duration_curves() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity = build_activity_with_curves(vec![
+            build_duration_curve(DurationCurveType::Power),
+            build_duration_curve(DurationCurveType::Pace),
+        ]);
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap(),
+            2
+        );
+
+        repository
+            .delete_activity(activity.user(), activity.id())
+            .await
+            .expect("deletion should have succeeded");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_activity_deletes_null_duration_curve_marker() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity = build_activity();
+        assert!(activity.duration_curves().is_empty());
+
+        repository
+            .save_activity(&activity)
+            .await
+            .expect("should save the activity");
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            1
+        );
+
+        repository
+            .delete_activity(activity.user(), activity.id())
+            .await
+            .expect("deletion should have succeeded");
+
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_null_duration_curve() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        repository
+            .save_null_duration_curve(&mut tx, &activity_id, &user, &date)
+            .await
+            .expect("should save the null curve");
+        tx.commit().await.unwrap();
+
+        // The activity has a row, marking it as processed even though it has no curve.
+        let row: (ActivityId, UserId, ActivityStartTime) = sqlx::query_as(
+            "select activity_id, user_id, date from t_duration_curves where type is null;",
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .unwrap();
+        assert_eq!(row.0, activity_id);
+        assert_eq!(row.1, user);
+        assert_eq!(row.2, date);
+
+        // All value columns are NULL.
+        let values: (
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+        ) = sqlx::query_as(
+            "select
+                secs_5, secs_10, secs_30,
+                mins_1, mins_2, mins_5, mins_10, mins_20, mins_30,
+                hours_1, hours_2, hours_5
+            from t_duration_curves
+            where type is null;",
+        )
+        .fetch_one(&repository.readers)
+        .await
+        .unwrap();
+        assert!(
+            [
+                values.0, values.1, values.2, values.3, values.4, values.5, values.6, values.7,
+                values.8, values.9, values.10, values.11
+            ]
+            .iter()
+            .all(|value| value.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_null_duration_curve_is_idempotent() {
+        let (repository, _db_file) = test_repository().await;
+
+        let activity_id = ActivityId::new();
+        let user = UserId::test_default();
+        let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+        let mut tx = repository.writer.begin().await.unwrap();
+        for _ in 0..2 {
+            repository
+                .save_null_duration_curve(&mut tx, &activity_id, &user, &date)
+                .await
+                .expect("should save the null curve");
+        }
+
+        // A real curve can still be saved alongside the null marker.
+        repository
+            .save_duration_curve(
+                &mut tx,
+                &activity_id,
+                &user,
+                &date,
+                &build_duration_curve(DurationCurveType::Power),
+            )
+            .await
+            .expect("should save the curve");
+        tx.commit().await.unwrap();
+
+        // The null marker is stored only once, but does not conflict with real curves.
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, u64>(
+                "select count(*) from t_duration_curves where type is not null;"
+            )
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap(),
             1
         );
     }

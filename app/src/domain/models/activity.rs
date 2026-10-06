@@ -1340,7 +1340,7 @@ impl TryFrom<ActivityMetricSource> for ActivityMetric {
 // Duration-curve
 ///////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
 pub enum DurationCurveType {
     Power,
     Pace,
@@ -1369,9 +1369,6 @@ pub struct ActivityDurationCurve {
     curve_type: DurationCurveType,
     values: [Option<f32>; 12],
 }
-
-#[derive(Debug, Clone, Constructor, Default)]
-pub struct ActivityDurationCurves(Vec<ActivityDurationCurve>);
 
 impl ActivityDurationCurve {
     pub fn curve_type(&self) -> DurationCurveType {
@@ -1503,6 +1500,19 @@ fn split_values_into_pseudo_continuous_segments(
     }
 
     segments
+}
+
+#[derive(Debug, Clone, Constructor, Default)]
+pub struct ActivityDurationCurves(Vec<ActivityDurationCurve>);
+
+impl ActivityDurationCurves {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ActivityDurationCurve> {
+        self.0.iter()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////

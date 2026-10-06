@@ -8,8 +8,8 @@ use crate::domain::models::{
     activity::{
         ActivityDuration, ActivityFeedback, ActivityId, ActivityMetric, ActivityMetricSource,
         ActivityName, ActivityNaturalKey, ActivityNutrition, ActivityRpe, ActivityStartTime,
-        ActivityStatistic, ActivityStatistics, Sport, TimeseriesAggregate, TimeseriesMetric,
-        WorkoutType,
+        ActivityStatistic, ActivityStatistics, DurationCurveType, Sport, TimeseriesAggregate,
+        TimeseriesMetric, WorkoutType,
     },
     preferences::{ActivityListSummary, Preference, PreferenceKey},
     search::SearchDocumentEvent,
@@ -1148,5 +1148,36 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for SubjectiveScale {
     fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let s = <u64 as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
         Ok(Self::try_from(u8::try_from(s)?)?)
+    }
+}
+
+impl sqlx::Type<sqlx::Sqlite> for DurationCurveType {
+    fn type_info() -> <sqlx::Sqlite as sqlx::Database>::TypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for DurationCurveType {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<IsNull, BoxDynError> {
+        let s = match self {
+            Self::Pace => "pace",
+            Self::Power => "power",
+        };
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
+        Ok(IsNull::No)
+    }
+}
+
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for DurationCurveType {
+    fn decode(value: <sqlx::Sqlite as Database>::ValueRef<'r>) -> Result<Self, BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match s {
+            "pace" => Ok(Self::Pace),
+            "power" => Ok(Self::Power),
+            _ => Err(format!("Unknown DurationCurveType: {}", s).into()),
+        }
     }
 }
