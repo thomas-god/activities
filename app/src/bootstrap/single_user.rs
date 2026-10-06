@@ -50,6 +50,7 @@ pub async fn bootstrap_single_user(
         PreferencesService<SqlitePreferencesRepository>,
     >,
     ActualSearchService,
+    ActualTrainingService,
 )> {
     tracing::info!("Starting single-user app");
 
@@ -87,21 +88,21 @@ pub async fn bootstrap_single_user(
         duration_curve_notify.clone(),
     );
 
-    let trainin_metrics_db = db_dir.clone().join("training_metrics.db");
+    let training_metrics_db = db_dir.clone().join("training_metrics.db");
     let training_metrics_repository = SqliteTrainingRepository::new(
-        &format!("sqlite:{}", trainin_metrics_db.to_string_lossy()),
+        &format!("sqlite:{}", training_metrics_db.to_string_lossy()),
         Clock::new(),
     )
     .await?;
 
-    let training_metrics_service = Arc::new(TrainingService::new(
+    let training_service = TrainingService::new(
         training_metrics_repository,
         activity_service.clone(),
         training_notify.clone(),
         duration_curve_notify,
         tokio_util::sync::CancellationToken::new(),
         Clock::new(),
-    ));
+    );
 
     let user_service = DisabledUserService {};
     let preferences_service = build_preferences_service(&config).await?;
@@ -110,7 +111,7 @@ pub async fn bootstrap_single_user(
         &config,
         activity_service.clone(),
         activity_notify,
-        training_metrics_service.as_ref().clone(),
+        training_service.clone(),
         training_notify,
     )
     .await?;
@@ -119,7 +120,7 @@ pub async fn bootstrap_single_user(
         &mode,
         activity_service,
         parser,
-        training_metrics_service,
+        training_service.clone(),
         user_service,
         preferences_service,
         search_service.clone(),
@@ -127,7 +128,7 @@ pub async fn bootstrap_single_user(
     )
     .await?;
 
-    Ok((http_server, search_service))
+    Ok((http_server, search_service, training_service))
 }
 
 async fn build_preferences_service(

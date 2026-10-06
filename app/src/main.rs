@@ -5,14 +5,14 @@ async fn run() -> anyhow::Result<()> {
     let mode = AppMode::try_from_env(&StdEnvironment {}).map_err(|err| anyhow!(err))?;
     match &mode {
         AppMode::MultiUser(config) => {
-            let (server, search_service) =
+            let (server, search_service, training_service) =
                 app::bootstrap::multi_user::bootstrap_multi_user(config.clone(), mode).await?;
-            let _ = tokio::join!(server.run(), search_service.run());
+            let _ = tokio::join!(server.run(), search_service.run(), training_service.run());
         }
         AppMode::SingleUser(config) => {
-            let (server, search_service) =
+            let (server, search_service, training_service) =
                 app::bootstrap::single_user::bootstrap_single_user(config.clone(), mode).await?;
-            let _ = tokio::join!(server.run(), search_service.run());
+            let _ = tokio::join!(server.run(), search_service.run(), training_service.run());
         }
     };
     Ok(())

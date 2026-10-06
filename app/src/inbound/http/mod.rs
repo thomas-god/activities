@@ -127,7 +127,7 @@ impl<
         mode: &AppMode,
         activity_service: AS,
         file_parser: PF,
-        training_metric_service: Arc<TMS>,
+        training_metric_service: TMS,
         user_service: US,
         preferences_service: PS,
         search_service: SS,
@@ -142,7 +142,7 @@ impl<
 
         let state = AppState {
             activity_service: Arc::new(activity_service),
-            training_metrics_service: training_metric_service,
+            training_metrics_service: Arc::new(training_metric_service),
             file_parser: Arc::new(file_parser),
             preferences_service: Arc::new(preferences_service),
         };

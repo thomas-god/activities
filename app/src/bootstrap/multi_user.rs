@@ -62,6 +62,7 @@ pub async fn bootstrap_multi_user(
         PreferencesService<SqlitePreferencesRepository>,
     >,
     ActualSearchService,
+    ActualTrainingService,
 )> {
     tracing::info!("Starting multi-user app");
 
@@ -71,7 +72,7 @@ pub async fn bootstrap_multi_user(
     let training_notify = Arc::new(tokio::sync::Notify::new());
     let duration_curve_notify = Arc::new(tokio::sync::Notify::new());
 
-    let (activity_service, parser, training_metrics_service) = build_activity_service(
+    let (activity_service, parser, training_service) = build_activity_service(
         &config,
         activity_notify.clone(),
         training_notify.clone(),
@@ -87,7 +88,7 @@ pub async fn bootstrap_multi_user(
         &config,
         activity_service.clone(),
         activity_notify,
-        training_metrics_service.as_ref().clone(),
+        training_service.clone(),
         training_notify,
     )
     .await?;
@@ -96,14 +97,14 @@ pub async fn bootstrap_multi_user(
         &mode,
         activity_service,
         parser,
-        training_metrics_service,
+        training_service.clone(),
         user_service,
         preferences_service,
         search_service.clone(),
         config,
     )
     .await?;
-    Ok((http_server, search_service))
+    Ok((http_server, search_service, training_service))
 }
 
 async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {
@@ -129,7 +130,7 @@ async fn build_activity_service(
     activity_notify: Arc<tokio::sync::Notify>,
     training_notify: Arc<tokio::sync::Notify>,
     duration_curve_notify: Arc<tokio::sync::Notify>,
-) -> anyhow::Result<(ActualActivityService, Parser, Arc<ActualTrainingService>)> {
+) -> anyhow::Result<(ActualActivityService, Parser, ActualTrainingService)> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
@@ -167,16 +168,16 @@ async fn build_activity_service(
     )
     .await?;
 
-    let training_metrics_service = Arc::new(TrainingService::new(
+    let training_service = TrainingService::new(
         training_metrics_repository,
         activity_service.clone(),
         training_notify,
         duration_curve_notify,
         tokio_util::sync::CancellationToken::new(),
         Clock::new(),
-    ));
+    );
 
-    anyhow::Ok((activity_service, parser, training_metrics_service))
+    anyhow::Ok((activity_service, parser, training_service))
 }
 
 async fn build_user_service(
