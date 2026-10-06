@@ -1347,8 +1347,9 @@ pub const DURATION_CURVE_DURATIONS_SECOND: [usize; 12] = [
     5 * 60 * 60,
 ];
 
-/// Duration curve from an activity's timeseries. i.e. highest rolling average values found for a
-/// set of durations.
+/// Duration curve from an activity's timeseries: the highest rolling average values found for
+/// a set of durations, i.e. the highest average power or the highest average speed (the pace
+/// conversion is left to the consumer).
 #[derive(Debug, Clone, Constructor, PartialEq)]
 pub struct ActivityDurationCurve {
     curve_type: DurationCurveType,
@@ -1366,7 +1367,7 @@ impl ActivityDurationCurve {
 
     pub fn unit(&self) -> Unit {
         match self.curve_type {
-            DurationCurveType::Pace => Unit::SecondPerKilometer,
+            DurationCurveType::Pace => Unit::MeterPerSecond,
             DurationCurveType::Power => Unit::Watt,
         }
     }
@@ -1377,26 +1378,49 @@ impl ActivityDurationCurve {
         let mut values: [Option<f32>; 12] = [None; 12];
 
         for (idx, duration) in DURATION_CURVE_DURATIONS_SECOND.iter().enumerate() {
-            let mut max = None;
+            let mut best = None;
             let continuous_metric = split_values_into_pseudo_continuous_segments(
                 metric.values(),
                 consecutive_none_threshold(*duration),
             );
 
             for values in &continuous_metric {
-                let iter = values.windows(*duration);
-                let local_max = iter
-                    .map(|values| values.iter().fold(0.0, |acc, value| acc + value.as_f32()))
-                    .reduce(f32::max);
+                let local_best = match curve_type {
+                    // Average power can be computed as is.
+                    DurationCurveType::Power => values
+                        .windows(*duration)
+                        .map(|values| {
+                            values.iter().fold(0.0, |acc, value| acc + value.as_f32())
+                                / *duration as f32
+                        })
+                        .reduce(f32::max),
+                    // Average speed does not use the speed metric but instead uses the
+                    // monotonically increasing distance metric to compute average speed as
+                    // "total distance traveled / duration". duration + 1 samples are taken
+                    // to have duration seconds.
+                    DurationCurveType::Pace => values
+                        .windows(*duration + 1)
+                        .filter_map(|values| {
+                            let max = values
+                                .iter()
+                                .fold(f32::MIN, |acc, value| acc.max(value.as_f32()));
+                            let min = values
+                                .iter()
+                                .fold(f32::MAX, |acc, value| acc.min(value.as_f32()));
+                            let total = max - min;
+                            (total > 0.).then(|| total / *duration as f32)
+                        })
+                        .reduce(f32::max),
+                };
 
-                max = match (max, local_max) {
+                best = match (best, local_best) {
                     (None, None) => None,
-                    (Some(max), None) => Some(max),
-                    (None, Some(max)) => Some(max),
-                    (Some(max_1), Some(max_2)) => Some(max_1.max(max_2)),
+                    (Some(best), None) => Some(best),
+                    (None, Some(best)) => Some(best),
+                    (Some(best_1), Some(best_2)) => Some(best_1.max(best_2)),
                 }
             }
-            values[idx] = max.map(|max| max / (*duration as f32));
+            values[idx] = best;
         }
 
         Some(Self { curve_type, values })
@@ -1419,7 +1443,7 @@ fn get_target_metric(
     curve_type: DurationCurveType,
 ) -> Option<&Timeseries> {
     let target_metric = match curve_type {
-        DurationCurveType::Pace => TimeseriesMetric::Speed,
+        DurationCurveType::Pace => TimeseriesMetric::Distance,
         DurationCurveType::Power => TimeseriesMetric::Power,
     };
 
@@ -3200,13 +3224,55 @@ mod test_duration_curve {
     }
 
     #[test]
-    fn test_duration_curve_pace_uses_speed() {
+    fn test_duration_curve_pace_ignores_speed() {
+        // The pace curve is derived from the distance metric, not from speed.
         let timeseries = activity_timeseries(TimeseriesMetric::Speed, values([Some(5.); 10]));
+
+        assert!(ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).is_none());
+    }
+
+    #[test]
+    fn test_duration_curve_pace_uses_distance() {
+        // Distance increases by 5 m per second: a 5s window spans 6 samples, i.e. 25 m
+        // traveled, giving an average speed of 25 / 5 = 5 m/s; the 10s window spans 11
+        // samples, i.e. 50 m, giving 5 m/s too; durations longer than the timeseries have
+        // no window and yield None.
+        let timeseries = activity_timeseries(
+            TimeseriesMetric::Distance,
+            values([0., 5., 10., 15., 20., 25., 30., 35., 40., 45., 50.].map(Some)),
+        );
 
         let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).unwrap();
 
         assert_eq!(curve.curve_type(), DurationCurveType::Pace);
-        assert_eq!(curve.unit(), Unit::SecondPerKilometer);
-        assert_eq!(curve.values()[0], Some(5.));
+        assert_eq!(curve.unit(), Unit::MeterPerSecond);
+        assert_eq!(curve.values()[0], Some(5.)); // 5s
+        assert_eq!(curve.values()[1], Some(5.)); // 10s
+        assert_eq!(curve.values()[2], None); // 30s
+    }
+
+    #[test]
+    fn test_duration_curve_pace_best_window() {
+        // 5 m/s for the first 5 seconds (25 m), then a slowdown to 1 m/s: the fastest 5s
+        // window is the first one, at an average speed of 25 / 5 = 5 m/s; slower windows
+        // yield lower speeds and the maximum wins.
+        let timeseries = activity_timeseries(
+            TimeseriesMetric::Distance,
+            values([0., 5., 10., 15., 20., 25., 26., 27., 28., 29., 30.].map(Some)),
+        );
+
+        let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).unwrap();
+
+        assert_eq!(curve.values()[0], Some(5.)); // 5s
+    }
+
+    #[test]
+    fn test_duration_curve_pace_stationary() {
+        // No distance traveled: windows cover 0 m, so no pace can be computed.
+        let timeseries = activity_timeseries(TimeseriesMetric::Distance, values([Some(100.); 11]));
+
+        let curve = ActivityDurationCurve::from(&timeseries, DurationCurveType::Pace).unwrap();
+
+        assert!(curve.values().iter().all(|value| value.is_none()));
     }
 }
