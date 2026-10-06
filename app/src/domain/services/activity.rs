@@ -110,7 +110,9 @@ where
             .await
             .map_err(|err| anyhow!(err).context(format!("Failed to persist activity {}", id)))?;
         self.notify_new_document.notify_one();
-        self.notify_duration_curve.notify_one();
+        if !activity_with_parsed_data.duration_curves().is_empty() {
+            self.notify_duration_curve.notify_one();
+        }
 
         // Pre-compute base metrics for the new activity
         for ref metric in DEFAULT_METRICS {
@@ -540,8 +542,9 @@ mod tests_activity_service {
         models::{
             UserId,
             activity::{
-                ActivityDuration, ActivityName, ActivityStartTime, ActivityStatistics,
-                ActivityTimeseries, Sport,
+                ActiveTime, ActivityDuration, ActivityName, ActivityStartTime, ActivityStatistics,
+                ActivityTimeseries, Sport, Timeseries, TimeseriesActiveTime, TimeseriesMetric,
+                TimeseriesTime, TimeseriesValue,
             },
         },
         ports::activity::{
@@ -581,6 +584,38 @@ mod tests_activity_service {
         let content = RawContent::new("fit".to_string(), vec![1, 2, 3]);
         let statistics = ActivityStatistics::default();
         let timeseries = ActivityTimeseries::default();
+        CreateActivityRequest::new(
+            UserId::test_default(),
+            sport,
+            start_time,
+            duration,
+            statistics,
+            timeseries,
+            content,
+        )
+    }
+
+    /// A running activity request whose timeseries contains distance values, producing a
+    /// pace duration curve.
+    fn activity_request_with_duration_curves() -> CreateActivityRequest {
+        let timeseries = ActivityTimeseries::new(
+            TimeseriesTime::new((0..11).collect()),
+            TimeseriesActiveTime::new(vec![ActiveTime::Running(1); 11]),
+            vec![],
+            vec![Timeseries::new(
+                TimeseriesMetric::Distance,
+                (0..=10)
+                    .map(|value| Some(TimeseriesValue::Float(value as f64 * 5.)))
+                    .collect(),
+            )],
+        )
+        .unwrap();
+
+        let sport = Sport::Running;
+        let start_time = ActivityStartTime::from_timestamp(3600).unwrap();
+        let duration = ActivityDuration::default();
+        let content = RawContent::new("fit".to_string(), vec![1, 2, 3]);
+        let statistics = ActivityStatistics::default();
         CreateActivityRequest::new(
             UserId::test_default(),
             sport,
@@ -806,7 +841,7 @@ mod tests_activity_service {
     }
 
     #[tokio::test]
-    async fn test_service_create_activity_triggers_duration_curve_notify() {
+    async fn test_service_create_activity_with_duration_curves_triggers_notify() {
         let mut activity_repository = MockActivityRepository::new();
         activity_repository
             .expect_similar_activity_exists()
@@ -833,10 +868,48 @@ mod tests_activity_service {
             Arc::clone(&notify),
         );
 
-        let res = service.create_activity(default_activity_request()).await;
+        let res = service
+            .create_activity(activity_request_with_duration_curves())
+            .await;
         assert!(res.is_ok());
 
         expect_notified(&notify).await;
+    }
+
+    #[tokio::test]
+    async fn test_service_create_activity_without_duration_curves_does_not_trigger_notify() {
+        let mut activity_repository = MockActivityRepository::new();
+        activity_repository
+            .expect_similar_activity_exists()
+            .returning(|_| Ok(false));
+        activity_repository
+            .expect_save_activity()
+            .times(1)
+            .returning(|_| Ok(()));
+        activity_repository
+            .expect_update_activity_metric()
+            .times(DEFAULT_METRICS.len())
+            .returning(|_, _, _| Ok(()));
+
+        let mut raw_data_repository = MockRawDataRepository::new();
+        raw_data_repository
+            .expect_save_raw_data()
+            .returning(|_, _| Ok(()));
+
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let service = ActivityService::new(
+            activity_repository,
+            raw_data_repository,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::clone(&notify),
+        );
+
+        // The default request has an empty timeseries, so the activity gets no duration
+        // curve.
+        let res = service.create_activity(default_activity_request()).await;
+        assert!(res.is_ok());
+
+        expect_not_notified(&notify).await;
     }
 
     #[tokio::test]

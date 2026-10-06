@@ -357,7 +357,7 @@ where
         user: &UserId,
         date: &ActivityStartTime,
     ) -> Result<(), anyhow::Error> {
-        let rows_affected = sqlx::query(
+        sqlx::query(
             "INSERT INTO t_duration_curves (activity_id, user_id, type, date)
             VALUES (?1, ?2, ?3, ?4)
             ON CONFLICT (activity_id, user_id) WHERE type IS NULL DO NOTHING;", // reflect duration curve immutability
@@ -368,21 +368,14 @@ where
         .bind(date.datetime())
         .execute(&mut **tx)
         .await
-        .map(|result| result.rows_affected())
+        .map(|_| ())
         .map_err(|err| {
             anyhow!(
                 "Unable to save null duration curve for activity {}. {err}",
                 activity
             )
-        })?;
-
-        // Only notify the training service when a new marker was actually inserted.
-        if rows_affected > 0 {
-            self.duration_curve_to_outbox(tx, activity, user, DurationCurveEvent::Created)
-                .await
-        } else {
-            Ok(())
-        }
+        })
+        // For null-curves no need to write them to the duration curve outbox.
     }
 
     async fn load_duration_curves(
@@ -1756,20 +1749,6 @@ mod test_sqlite_activity_repository {
             .await
             .unwrap(),
             1
-        );
-
-        // Only the first marker save and the real curve save posted an outbox event.
-        let events: Vec<DurationCurveEvent> =
-            sqlx::query_as("select event from t_outbox_duration_curve order by rowid;")
-                .fetch_all(&repository.readers)
-                .await
-                .unwrap()
-                .into_iter()
-                .map(|(event,)| event)
-                .collect();
-        assert_eq!(
-            events,
-            vec![DurationCurveEvent::Created, DurationCurveEvent::Created]
         );
     }
 
@@ -3801,34 +3780,6 @@ mod test_sqlite_activity_repository {
             assert_eq!(rows[0].2, DurationCurveEvent::Created);
             assert_eq!(rows[0].3, now);
             assert_eq!(rows[0].4, None); // not processed yet
-        }
-
-        #[tokio::test]
-        async fn test_save_null_duration_curve_posts_created_event() {
-            let now = Utc::now();
-            let (repo, _db_file) = test_repository(now).await;
-
-            let activity_id = ActivityId::new();
-            let user = UserId::test_default();
-            let date = ActivityStartTime::from_timestamp(1000).unwrap();
-
-            // Outbox initially empty
-            assert!(outbox_rows(&repo).await.is_empty());
-
-            let mut tx = repo.writer.begin().await.unwrap();
-            repo.save_null_duration_curve(&mut tx, &activity_id, &user, &date)
-                .await
-                .expect("Should have succeeded");
-            tx.commit().await.unwrap();
-
-            // Outbox contains a single created event for the (null) curve
-            let rows = outbox_rows(&repo).await;
-            assert_eq!(rows.len(), 1);
-            assert_eq!(rows[0].0, activity_id);
-            assert_eq!(rows[0].1, user);
-            assert_eq!(rows[0].2, DurationCurveEvent::Created);
-            assert_eq!(rows[0].3, now);
-            assert_eq!(rows[0].4, None);
         }
 
         #[tokio::test]
