@@ -15,10 +15,11 @@ use crate::domain::{
     ports::{
         activity::{
             ActivityRepository, CreateActivityError, CreateActivityRequest, DeleteActivityError,
-            DeleteActivityRequest, GetActivityError, GetAllActivitiesError,
-            GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, IActivityService,
-            ListActivitiesError, ListActivitiesFilters, PatchActivityError, PatchActivityRequest,
-            RawActivity, RawDataRepository,
+            DeleteActivityRequest, DurationCurveNotification, GetActivityError,
+            GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
+            GetRawActivityRequest, IActivityService, ListActivitiesError, ListActivitiesFilters,
+            NotificationsRemaining, PatchActivityError, PatchActivityRequest, RawActivity,
+            RawDataRepository,
         },
         search::{IDocumentsForSearch, RemainingDocuments},
     },
@@ -288,6 +289,29 @@ where
             .await
             .map_err(|err| GetAllActivitiesError::Unknown(anyhow!(err)))
     }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn list_pending_duration_curve_notifications(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error> {
+        self.activity_repository
+            .list_pending_duration_curve_notifications(batch_size, page)
+            .await
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn mark_duration_curve_notifications_as_processed(
+        &self,
+        activity: &ActivityId,
+        user: &UserId,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        self.activity_repository
+            .mark_duration_curve_notifications_as_processed(activity, user, processed_at)
+            .await
+    }
 }
 
 impl<AR, RDR> IDocumentsForSearch for ActivityService<AR, RDR>
@@ -345,9 +369,10 @@ pub mod test_utils {
     };
     use crate::domain::models::search::SearchDocument;
     use crate::domain::ports::activity::{
-        DeleteActivityError, GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
-        GetRawActivityRequest, ListActivitiesError, PatchActivityError, PatchActivityRequest,
-        RawActivity, SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
+        DeleteActivityError, DurationCurveNotification, GetAllActivitiesError,
+        GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,
+        NotificationsRemaining, PatchActivityError, PatchActivityRequest, RawActivity,
+        SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
     };
     use crate::domain::ports::search::RemainingDocuments;
 
@@ -397,6 +422,19 @@ pub mod test_utils {
                 &self,
                 req: GetAllActivitiesRequest,
             ) -> Result<Vec<RawActivity>, GetAllActivitiesError>;
+
+            async fn list_pending_duration_curve_notifications(
+                &self,
+                batch_size: i64,
+                page: i64,
+             ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>;
+
+            async fn mark_duration_curve_notifications_as_processed(
+                &self,
+                activity: &ActivityId,
+                user: &UserId,
+                processed_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
         }
     }
 
@@ -523,6 +561,19 @@ pub mod test_utils {
             async fn mark_outbox_document_as_processed(
                 &self,
                 document: &SearchDocument,
+                processed_at: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), anyhow::Error>;
+
+            async fn list_pending_duration_curve_notifications(
+                &self,
+                batch_size: i64,
+                page: i64,
+            ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>;
+
+            async fn mark_duration_curve_notifications_as_processed(
+                &self,
+                activity: &ActivityId,
+                user: &UserId,
                 processed_at: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), anyhow::Error>;
         }

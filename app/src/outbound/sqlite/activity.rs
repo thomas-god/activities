@@ -22,9 +22,10 @@ use crate::{
         ports::{
             DateTimeRange, IClock,
             activity::{
-                ActivityRepository, DurationCurveEvent, GetActivityError, GetRawActivityError,
-                ListActivitiesError, ListActivitiesFilters, RawActivity, RawDataRepository,
-                SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
+                ActivityRepository, DurationCurveEvent, DurationCurveNotification,
+                GetActivityError, GetRawActivityError, ListActivitiesError, ListActivitiesFilters,
+                NotificationsRemaining, RawActivity, RawDataRepository, SaveActivityError,
+                SimilarActivityError, UpdateActivityMetricError,
             },
             search::RemainingDocuments,
         },
@@ -68,6 +69,58 @@ type SearchDocumentRow = (
     String,
     chrono::DateTime<chrono::Utc>,
 );
+
+/// Adapted from https://docs.rs/sqlx/latest/sqlx/fn.query_as.html#example-map-rows-using-derivefromrow
+#[derive(sqlx::FromRow, Debug, PartialEq)]
+struct PendingDurationCurveNotificationRow {
+    activity_id: ActivityId,
+    user_id: UserId,
+    event: DurationCurveEvent,
+    occurred_at: chrono::DateTime<chrono::Utc>,
+    date: Option<chrono::DateTime<chrono::Utc>>,
+    curve_type: Option<DurationCurveType>,
+    secs_5: Option<f32>,
+    secs_10: Option<f32>,
+    secs_30: Option<f32>,
+    mins_1: Option<f32>,
+    mins_2: Option<f32>,
+    mins_5: Option<f32>,
+    mins_10: Option<f32>,
+    mins_20: Option<f32>,
+    mins_30: Option<f32>,
+    hours_1: Option<f32>,
+    hours_2: Option<f32>,
+    hours_5: Option<f32>,
+}
+
+impl PendingDurationCurveNotificationRow {
+    /// Deleted events and None curve_type carry no curve.
+    pub fn curve(&self) -> Option<ActivityDurationCurve> {
+        if self.event != DurationCurveEvent::Created {
+            return None;
+        }
+
+        self.curve_type.map(|curve_type| {
+            ActivityDurationCurve::new(
+                curve_type,
+                [
+                    self.secs_5,
+                    self.secs_10,
+                    self.secs_30,
+                    self.mins_1,
+                    self.mins_2,
+                    self.mins_5,
+                    self.mins_10,
+                    self.mins_20,
+                    self.mins_30,
+                    self.hours_1,
+                    self.hours_2,
+                    self.hours_5,
+                ],
+            )
+        })
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SqliteActivityRepository<R, FP, C> {
@@ -1083,6 +1136,79 @@ where
         .bind(document.event())
         .bind(document.content())
         .bind(document.occurred_at())
+        .execute(&self.writer)
+        .await
+        .map(|_| ())
+        .map_err(|err| anyhow!(err))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn list_pending_duration_curve_notifications(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error> {
+        let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
+        let offset = page * batch_size;
+        let rows = sqlx::query_as::<_, PendingDurationCurveNotificationRow>(
+            "
+            WITH pending_curves AS (
+                SELECT * FROM t_outbox_duration_curve WHERE processed_at IS NULL
+            )
+            SELECT
+                pc.activity_id, pc.user_id, pc.event, pc.occurred_at,
+                dc.date, dc.type AS curve_type,
+                dc.secs_5, dc.secs_10, dc.secs_30,
+                dc.mins_1, dc.mins_2, dc.mins_5, dc.mins_10, dc.mins_20, dc.mins_30,
+                dc.hours_1, dc.hours_2, dc.hours_5
+            FROM pending_curves pc
+            LEFT JOIN t_duration_curves dc
+                ON pc.activity_id = dc.activity_id
+                AND pc.user_id = dc.user_id
+            ORDER BY pc.rowid
+            LIMIT ?1 OFFSET ?2;",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.readers)
+        .await?;
+
+        let notifications_remaining = NotificationsRemaining::from(rows.len() as i64 > batch_size);
+
+        // The extra row was only fetched to detect whether more documents remain: it is not part
+        // of this page.
+        let notifications = rows
+            .into_iter()
+            .take(batch_size as usize)
+            .map(|row| {
+                DurationCurveNotification::new(
+                    row.event,
+                    row.activity_id.clone(),
+                    row.user_id.clone(),
+                    row.curve(),
+                    row.date,
+                    row.occurred_at,
+                )
+            })
+            .collect();
+
+        Ok((notifications, notifications_remaining))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn mark_duration_curve_notifications_as_processed(
+        &self,
+        activity: &ActivityId,
+        user: &UserId,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), anyhow::Error> {
+        sqlx::query(
+            "UPDATE t_outbox_duration_curve SET processed_at = ?1
+            WHERE activity_id = ?2 AND user_id = ?3;",
+        )
+        .bind(processed_at)
+        .bind(activity)
+        .bind(user)
         .execute(&self.writer)
         .await
         .map(|_| ())
@@ -3876,6 +4002,270 @@ mod test_sqlite_activity_repository {
                 assert_eq!(row.3, now);
                 assert_eq!(row.4, None);
             }
+        }
+
+        #[tokio::test]
+        async fn test_list_pending_duration_curve_notifications() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // Outbox initially empty
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+            assert!(!remaining.remaining());
+
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+
+            assert_eq!(notifications.len(), 1);
+            assert!(!remaining.remaining());
+            let notification = &notifications[0];
+            assert_eq!(notification.event(), &DurationCurveEvent::Created);
+            assert_eq!(notification.activity(), activity.id());
+            assert_eq!(notification.user(), activity.user());
+            assert_eq!(notification.occurred_at(), &now);
+            let curve = notification.curve().as_ref().expect("should have a curve");
+            assert_eq!(
+                curve.values(),
+                build_duration_curve(DurationCurveType::Power).values()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_list_pending_duration_curve_notifications_without_curve() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // An activity without curves only gets a NULL-type marker row: the
+            // notification carries no curve.
+            let activity = build_activity();
+            assert!(activity.duration_curves().is_empty());
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            // Activities without curves get a NULL-type marker row but no outbox event,
+            // so nothing is pending.
+            assert!(outbox_rows(&repo).await.is_empty());
+
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+            assert!(!remaining.remaining());
+        }
+
+        #[tokio::test]
+        async fn test_list_pending_duration_curve_notifications_deleted_event() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+            repo.delete_activity(activity.user(), activity.id())
+                .await
+                .expect("Should have succeeded");
+
+            // The curve rows are gone after the deletion, so neither the created nor the
+            // deleted notification carries a curve.
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+
+            assert_eq!(notifications.len(), 2);
+            assert_eq!(notifications[0].event(), &DurationCurveEvent::Created);
+            assert_eq!(notifications[1].event(), &DurationCurveEvent::Deleted);
+            for notification in notifications.iter() {
+                assert_eq!(notification.activity(), activity.id());
+                assert_eq!(notification.user(), activity.user());
+                assert!(notification.curve().is_none());
+            }
+        }
+
+        #[tokio::test]
+        async fn test_list_pending_duration_curve_notifications_paging() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            // Three activities, each with a single curve, i.e. three pending
+            // notifications in insertion order.
+            let activities: Vec<_> = (0..3)
+                .map(|_| {
+                    build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)])
+                })
+                .collect();
+            for activity in activities.iter() {
+                repo.save_activity(activity)
+                    .await
+                    .expect("Should have succeeded");
+            }
+
+            // Page 0: the first two notifications, with more remaining.
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(2, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert_eq!(notifications.len(), 2);
+            assert_eq!(notifications[0].activity(), activities[0].id());
+            assert_eq!(notifications[1].activity(), activities[1].id());
+            assert!(remaining.remaining());
+
+            // Page 1: the last notification, with nothing remaining.
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(2, 1)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert_eq!(notifications.len(), 1);
+            assert_eq!(notifications[0].activity(), activities[2].id());
+            assert!(!remaining.remaining());
+
+            // Page 2: past the end.
+            let (notifications, remaining) = repo
+                .list_pending_duration_curve_notifications(2, 2)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+            assert!(!remaining.remaining());
+        }
+
+        #[tokio::test]
+        async fn test_list_pending_duration_curve_notifications_fan_out() {
+            // The pending notifications query joins the outbox with the curves on
+            // (activity_id, user_id): one outbox row for an activity with two typed curves
+            // matches both rows, so it fans out into one notification per curve, losing no
+            // notification.
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity_id = ActivityId::new();
+            let user = UserId::test_default();
+            let date = ActivityStartTime::from_timestamp(1000).unwrap();
+
+            // Manually insert two typed curves and a single outbox row for the activity.
+            sqlx::query(
+                "INSERT INTO t_duration_curves (activity_id, user_id, type, date,
+                    secs_5, secs_10, secs_30, mins_1, mins_2, mins_5, mins_10, mins_20,
+                    mins_30, hours_1, hours_2, hours_5)
+                VALUES (?1, ?2, 'power', ?3, 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., NULL),
+                       (?1, ?2, 'pace', ?3, 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., NULL);",
+            )
+            .bind(&activity_id)
+            .bind(&user)
+            .bind(date.datetime())
+            .execute(&repo.writer)
+            .await
+            .expect("Should have succeeded");
+
+            sqlx::query(
+                "INSERT INTO t_outbox_duration_curve (activity_id, user_id, event, occurred_at)
+                VALUES (?1, ?2, 'created', ?3);",
+            )
+            .bind(&activity_id)
+            .bind(&user)
+            .bind(now)
+            .execute(&repo.writer)
+            .await
+            .expect("Should have succeeded");
+
+            // One outbox row, two curve rows -> two pending notifications, one per curve.
+            assert_eq!(outbox_rows(&repo).await.len(), 1);
+            assert_eq!(
+                sqlx::query_scalar::<_, u64>("select count(*) from t_duration_curves;")
+                    .fetch_one(&repo.readers)
+                    .await
+                    .unwrap(),
+                2
+            );
+
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+
+            assert_eq!(notifications.len(), 2);
+            for curve_type in [DurationCurveType::Power, DurationCurveType::Pace] {
+                let curve = notifications
+                    .iter()
+                    .filter_map(|notification| notification.curve().clone())
+                    .find(|curve| curve.curve_type() == curve_type)
+                    .unwrap_or_else(|| panic!("missing {:?} curve", curve_type));
+                assert_eq!(curve.values(), build_duration_curve(curve_type).values());
+            }
+        }
+
+        #[tokio::test]
+        async fn test_mark_duration_curve_notifications_as_processed() {
+            let now = Utc::now();
+            let (repo, _db_file) = test_repository(now).await;
+
+            let activity =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&activity)
+                .await
+                .expect("Should have succeeded");
+
+            let processed_at = Utc::now();
+            repo.mark_duration_curve_notifications_as_processed(
+                activity.id(),
+                activity.user(),
+                processed_at,
+            )
+            .await
+            .expect("Marking as processed should have succeeded");
+
+            // The notification is no longer pending...
+            let (notifications, _) = repo
+                .list_pending_duration_curve_notifications(10, 0)
+                .await
+                .expect("Listing pending notifications should have succeeded");
+            assert!(notifications.is_empty());
+
+            // ...and the row recorded the processing time.
+            let processed: Option<DateTime<Utc>> = sqlx::query_scalar(
+                "select processed_at from t_outbox_duration_curve
+                 where activity_id = ?1 and user_id = ?2;",
+            )
+            .bind(activity.id())
+            .bind(activity.user())
+            .fetch_one(&repo.readers)
+            .await
+            .unwrap();
+            assert_eq!(processed, Some(processed_at));
+
+            // Marking again is idempotent.
+            repo.mark_duration_curve_notifications_as_processed(
+                activity.id(),
+                activity.user(),
+                processed_at,
+            )
+            .await
+            .expect("Marking as processed should be idempotent");
+            let processed: Option<DateTime<Utc>> = sqlx::query_scalar(
+                "select processed_at from t_outbox_duration_curve
+                 where activity_id = ?1 and user_id = ?2;",
+            )
+            .bind(activity.id())
+            .bind(activity.user())
+            .fetch_one(&repo.readers)
+            .await
+            .unwrap();
+            assert_eq!(processed, Some(processed_at));
         }
     }
 }

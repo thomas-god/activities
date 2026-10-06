@@ -1515,19 +1515,19 @@ impl ActivityDurationCurves {
     }
 
     pub fn from(activity: &Activity, timeseries: &ActivityTimeseries) -> Self {
-        if activity.sport().category() == Some(SportCategory::Running) {
-            if let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Pace) {
-                return Self::new(vec![curve]);
-            }
+        if activity.sport().category() == Some(SportCategory::Running)
+            && let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Pace)
+        {
+            return Self::new(vec![curve]);
         }
 
-        if activity.sport().category() == Some(SportCategory::Cycling) {
-            if let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Power) {
-                return Self::new(vec![curve]);
-            }
+        if activity.sport().category() == Some(SportCategory::Cycling)
+            && let Some(curve) = ActivityDurationCurve::from(timeseries, DurationCurveType::Power)
+        {
+            return Self::new(vec![curve]);
         }
 
-        return Self::new(vec![]);
+        Self::new(vec![])
     }
 }
 

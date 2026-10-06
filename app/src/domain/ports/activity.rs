@@ -8,9 +8,9 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics,
-            ActivityNaturalKey, ActivityPatch, ActivityStartTime, ActivityStatistics,
-            ActivityTimeseries, ActivityWithParsedData, Sport,
+            Activity, ActivityDuration, ActivityDurationCurve, ActivityId, ActivityMetric,
+            ActivityMetrics, ActivityNaturalKey, ActivityPatch, ActivityStartTime,
+            ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
         },
         search::SearchDocument,
     },
@@ -56,6 +56,22 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
         &self,
         req: GetAllActivitiesRequest,
     ) -> impl Future<Output = Result<Vec<RawActivity>, GetAllActivitiesError>> + Send;
+
+    /////////// Duration curve outbox related methods
+    fn list_pending_duration_curve_notifications(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> impl Future<
+        Output = Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>,
+    > + Send;
+
+    fn mark_duration_curve_notifications_as_processed(
+        &self,
+        activity: &ActivityId,
+        user: &UserId,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 #[derive(Debug, Clone)]
@@ -331,10 +347,61 @@ pub enum GetActivityError {
     ActivityDoesNotExist(ActivityId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DurationCurveEvent {
     Created,
     Deleted,
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct DurationCurveNotification {
+    event: DurationCurveEvent,
+    activity: ActivityId,
+    user: UserId,
+    curve: Option<ActivityDurationCurve>,
+    activity_date: Option<chrono::DateTime<chrono::Utc>>,
+    occurred_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl DurationCurveNotification {
+    pub fn event(&self) -> &DurationCurveEvent {
+        &self.event
+    }
+
+    pub fn user(&self) -> &UserId {
+        &self.user
+    }
+
+    pub fn activity(&self) -> &ActivityId {
+        &self.activity
+    }
+
+    pub fn curve(&self) -> &Option<ActivityDurationCurve> {
+        &self.curve
+    }
+
+    pub fn activity_date(&self) -> &Option<chrono::DateTime<chrono::Utc>> {
+        &self.activity_date
+    }
+
+    pub fn occurred_at(&self) -> &chrono::DateTime<chrono::Utc> {
+        &self.occurred_at
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationsRemaining(bool);
+
+impl From<bool> for NotificationsRemaining {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}
+
+impl NotificationsRemaining {
+    pub fn remaining(&self) -> bool {
+        self.0
+    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -418,6 +485,7 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
         user: &UserId,
     ) -> impl Future<Output = Result<Option<DateTimeRange>, anyhow::Error>> + Send;
 
+    /////////// Search document related methods
     fn list_activity_documents(
         &self,
         batch_size: i64,
@@ -431,6 +499,22 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     fn mark_outbox_document_as_processed(
         &self,
         document: &SearchDocument,
+        processed_at: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+
+    /////////// Duration curve outbox related methods
+    fn list_pending_duration_curve_notifications(
+        &self,
+        batch_size: i64,
+        page: i64,
+    ) -> impl Future<
+        Output = Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>,
+    > + Send;
+
+    fn mark_duration_curve_notifications_as_processed(
+        &self,
+        activity: &ActivityId,
+        user: &UserId,
         processed_at: chrono::DateTime<chrono::Utc>,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
