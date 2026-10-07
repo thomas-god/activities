@@ -12,7 +12,7 @@
 	import ActivityStatistics from '$ui/activity/internal/ActivityStatistics.svelte';
 	import ActivityLaps from '$ui/activity/internal/ActivityLaps.svelte';
 	import ActivityHeader from '$ui/activity/internal/ActivityHeader.svelte';
-	import PowerCurve from '$ui/activity/internal/PowerCurve.svelte';
+	import PowerCurve from '$ui/activity/PowerCurve.svelte';
 	import ActivityMap from '$ui/activity/internal/ActivityMap.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
