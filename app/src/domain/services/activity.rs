@@ -18,8 +18,7 @@ use crate::domain::{
             DeleteActivityRequest, DurationCurveNotification, GetActivityError,
             GetAllActivitiesError, GetAllActivitiesRequest, GetRawActivityError,
             GetRawActivityRequest, IActivityService, ListActivitiesError, ListActivitiesFilters,
-            NotificationsRemaining, PatchActivityError, PatchActivityRequest, RawActivity,
-            RawDataRepository,
+            PatchActivityError, PatchActivityRequest, RawActivity, RawDataRepository,
         },
         search::{IDocumentsForSearch, RemainingDocuments},
     },
@@ -380,11 +379,10 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn list_pending_duration_curve_notifications(
         &self,
-        batch_size: i64,
-        page: i64,
-    ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error> {
+        limit: i64,
+    ) -> Result<Vec<DurationCurveNotification>, anyhow::Error> {
         self.activity_repository
-            .list_pending_duration_curve_notifications(batch_size, page)
+            .list_pending_duration_curve_notifications(limit)
             .await
     }
 
@@ -458,8 +456,8 @@ pub mod test_utils {
     use crate::domain::ports::activity::{
         DeleteActivityError, DurationCurveNotification, GetAllActivitiesError,
         GetAllActivitiesRequest, GetRawActivityError, GetRawActivityRequest, ListActivitiesError,
-        NotificationsRemaining, PatchActivityError, PatchActivityRequest, RawActivity,
-        SaveActivityError, SimilarActivityError, UpdateActivityMetricError,
+        PatchActivityError, PatchActivityRequest, RawActivity, SaveActivityError,
+        SimilarActivityError, UpdateActivityMetricError,
     };
     use crate::domain::ports::search::RemainingDocuments;
 
@@ -512,9 +510,8 @@ pub mod test_utils {
 
             async fn list_pending_duration_curve_notifications(
                 &self,
-                batch_size: i64,
-                page: i64,
-             ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>;
+                limit: i64,
+             ) -> Result<Vec<DurationCurveNotification>, anyhow::Error>;
 
             async fn mark_duration_curve_notifications_as_processed(
                 &self,
@@ -653,9 +650,8 @@ pub mod test_utils {
 
             async fn list_pending_duration_curve_notifications(
                 &self,
-                batch_size: i64,
-                page: i64,
-            ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>;
+                limit: i64,
+            ) -> Result<Vec<DurationCurveNotification>, anyhow::Error>;
 
             async fn mark_duration_curve_notifications_as_processed(
                 &self,

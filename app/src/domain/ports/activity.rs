@@ -60,11 +60,8 @@ pub trait IActivityService: Clone + Send + Sync + 'static {
     /////////// Duration curve outbox related methods
     fn list_pending_duration_curve_notifications(
         &self,
-        batch_size: i64,
-        page: i64,
-    ) -> impl Future<
-        Output = Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>,
-    > + Send;
+        limit: i64,
+    ) -> impl Future<Output = Result<Vec<DurationCurveNotification>, anyhow::Error>> + Send;
 
     fn mark_duration_curve_notifications_as_processed(
         &self,
@@ -389,21 +386,6 @@ impl DurationCurveNotification {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NotificationsRemaining(bool);
-
-impl From<bool> for NotificationsRemaining {
-    fn from(value: bool) -> Self {
-        Self(value)
-    }
-}
-
-impl NotificationsRemaining {
-    pub fn remaining(&self) -> bool {
-        self.0
-    }
-}
-
 ///////////////////////////////////////////////////////////////////
 // ACTIVITY AND RAW DATA REPOSITORIES
 ///////////////////////////////////////////////////////////////////
@@ -510,11 +492,8 @@ pub trait ActivityRepository: Clone + Send + Sync + 'static {
     /////////// Duration curve outbox related methods
     fn list_pending_duration_curve_notifications(
         &self,
-        batch_size: i64,
-        page: i64,
-    ) -> impl Future<
-        Output = Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error>,
-    > + Send;
+        limit: i64,
+    ) -> impl Future<Output = Result<Vec<DurationCurveNotification>, anyhow::Error>> + Send;
 
     fn mark_duration_curve_notifications_as_processed(
         &self,

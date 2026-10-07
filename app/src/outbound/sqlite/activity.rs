@@ -24,8 +24,8 @@ use crate::{
             activity::{
                 ActivityRepository, DurationCurveEvent, DurationCurveNotification,
                 GetActivityError, GetRawActivityError, ListActivitiesError, ListActivitiesFilters,
-                NotificationsRemaining, RawActivity, RawDataRepository, SaveActivityError,
-                SimilarActivityError, UpdateActivityMetricError,
+                RawActivity, RawDataRepository, SaveActivityError, SimilarActivityError,
+                UpdateActivityMetricError,
             },
             search::RemainingDocuments,
         },
@@ -1145,11 +1145,8 @@ where
     #[tracing::instrument(skip_all, err)]
     async fn list_pending_duration_curve_notifications(
         &self,
-        batch_size: i64,
-        page: i64,
-    ) -> Result<(Vec<DurationCurveNotification>, NotificationsRemaining), anyhow::Error> {
-        let limit = batch_size + 1; // Extra sentinel row to detect if there is another page after
-        let offset = page * batch_size;
+        limit: i64,
+    ) -> Result<Vec<DurationCurveNotification>, anyhow::Error> {
         let rows = sqlx::query_as::<_, PendingDurationCurveNotificationRow>(
             "
             WITH pending_curves AS (
@@ -1166,20 +1163,14 @@ where
                 ON pc.activity_id = dc.activity_id
                 AND pc.user_id = dc.user_id
             ORDER BY pc.rowid
-            LIMIT ?1 OFFSET ?2;",
+            LIMIT ?1;",
         )
         .bind(limit)
-        .bind(offset)
         .fetch_all(&self.readers)
         .await?;
 
-        let notifications_remaining = NotificationsRemaining::from(rows.len() as i64 > batch_size);
-
-        // The extra row was only fetched to detect whether more documents remain: it is not part
-        // of this page.
         let notifications = rows
             .into_iter()
-            .take(batch_size as usize)
             .map(|row| {
                 DurationCurveNotification::new(
                     row.event,
@@ -1192,7 +1183,7 @@ where
             })
             .collect();
 
-        Ok((notifications, notifications_remaining))
+        Ok(notifications)
     }
 
     #[tracing::instrument(skip_all, err)]
@@ -4146,12 +4137,11 @@ mod test_sqlite_activity_repository {
             let (repo, _db_file) = test_repository(now).await;
 
             // Outbox initially empty
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert!(notifications.is_empty());
-            assert!(!remaining.remaining());
 
             let activity =
                 build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
@@ -4159,13 +4149,12 @@ mod test_sqlite_activity_repository {
                 .await
                 .expect("Should have succeeded");
 
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
 
             assert_eq!(notifications.len(), 1);
-            assert!(!remaining.remaining());
             let notification = &notifications[0];
             assert_eq!(notification.event(), &DurationCurveEvent::Created);
             assert_eq!(notification.activity(), activity.id());
@@ -4195,12 +4184,11 @@ mod test_sqlite_activity_repository {
             // so nothing is pending.
             assert!(outbox_rows(&repo).await.is_empty());
 
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert!(notifications.is_empty());
-            assert!(!remaining.remaining());
         }
 
         #[tokio::test]
@@ -4219,8 +4207,8 @@ mod test_sqlite_activity_repository {
 
             // The curve rows are gone after the deletion, so neither the created nor the
             // deleted notification carries a curve.
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
 
@@ -4235,7 +4223,7 @@ mod test_sqlite_activity_repository {
         }
 
         #[tokio::test]
-        async fn test_list_pending_duration_curve_notifications_paging() {
+        async fn test_list_pending_duration_curve_notifications_limit() {
             let now = Utc::now();
             let (repo, _db_file) = test_repository(now).await;
 
@@ -4252,32 +4240,48 @@ mod test_sqlite_activity_repository {
                     .expect("Should have succeeded");
             }
 
-            // Page 0: the first two notifications, with more remaining.
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(2, 0)
+            // The limit caps the batch size: at most two notifications, the
+            // earliest ones first.
+            let notifications = repo
+                .list_pending_duration_curve_notifications(2)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert_eq!(notifications.len(), 2);
             assert_eq!(notifications[0].activity(), activities[0].id());
             assert_eq!(notifications[1].activity(), activities[1].id());
-            assert!(remaining.remaining());
 
-            // Page 1: the last notification, with nothing remaining.
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(2, 1)
+            // Processing the returned notifications marks them as done, so the
+            // next call returns the remaining notification.
+            for notification in notifications.iter() {
+                repo.mark_duration_curve_notifications_as_processed(
+                    notification.activity(),
+                    notification.user(),
+                    Utc::now(),
+                )
+                .await
+                .expect("Marking as processed should have succeeded");
+            }
+            let notifications = repo
+                .list_pending_duration_curve_notifications(2)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert_eq!(notifications.len(), 1);
             assert_eq!(notifications[0].activity(), activities[2].id());
-            assert!(!remaining.remaining());
 
-            // Page 2: past the end.
-            let (notifications, remaining) = repo
-                .list_pending_duration_curve_notifications(2, 2)
+            // A limit larger than the number of pending notifications returns
+            // all of them.
+            let extra =
+                build_activity_with_curves(vec![build_duration_curve(DurationCurveType::Power)]);
+            repo.save_activity(&extra)
+                .await
+                .expect("Should have succeeded");
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
-            assert!(notifications.is_empty());
-            assert!(!remaining.remaining());
+            assert_eq!(notifications.len(), 2);
+            assert_eq!(notifications[0].activity(), activities[2].id());
+            assert_eq!(notifications[1].activity(), extra.id());
         }
 
         #[tokio::test]
@@ -4329,8 +4333,8 @@ mod test_sqlite_activity_repository {
                 2
             );
 
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
 
@@ -4366,8 +4370,8 @@ mod test_sqlite_activity_repository {
             .expect("Marking as processed should have succeeded");
 
             // The notification is no longer pending...
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert!(notifications.is_empty());
@@ -4433,8 +4437,8 @@ mod test_sqlite_activity_repository {
             .expect("Marking as processed should have succeeded");
 
             // Only the marked activity's notification is processed.
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert_eq!(notifications.len(), 1);
@@ -4449,8 +4453,8 @@ mod test_sqlite_activity_repository {
             )
             .await
             .expect("Marking as processed should have succeeded");
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert!(notifications.is_empty());
@@ -4491,8 +4495,8 @@ mod test_sqlite_activity_repository {
             .expect("Marking as processed should have succeeded");
 
             // Both rows for the activity were marked as processed.
-            let (notifications, _) = repo
-                .list_pending_duration_curve_notifications(10, 0)
+            let notifications = repo
+                .list_pending_duration_curve_notifications(10)
                 .await
                 .expect("Listing pending notifications should have succeeded");
             assert!(notifications.is_empty());

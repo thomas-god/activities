@@ -20,10 +20,7 @@ use crate::domain::{
     },
     ports::{
         DateRange, IClock,
-        activity::{
-            DurationCurveEvent, GetActivityError, IActivityService, ListActivitiesFilters,
-            NotificationsRemaining,
-        },
+        activity::{DurationCurveEvent, GetActivityError, IActivityService, ListActivitiesFilters},
         search::{IDocumentsForSearch, RemainingDocuments},
         training::{
             ActivityWithTrainingContext, ActivityWithTrainingContextError,
@@ -75,6 +72,7 @@ where
 {
     pub async fn run(&self) {
         let _ = self.process_pending_outbox().await;
+        tracing::info!("Initial processing of duration curves pending outbox done");
 
         let duration_curve_notified = self.duration_curve_notify.notified();
         let shutdown = self.shutdown.cancelled();
@@ -98,18 +96,24 @@ where
 
     #[tracing::instrument(skip_all, err)]
     async fn process_pending_outbox(&self) -> Result<(), anyhow::Error> {
-        let mut notifications_remaining = NotificationsRemaining::from(true);
-        // FIXME: pagination does not work here since the underlying query's results
-        // change as we process notifications and mark them as processed.
-        let mut page = 0;
+        let mut nb_errors = 0;
 
-        while notifications_remaining.remaining() {
-            let (notifications, flag) = self
+        loop {
+            let notifications = self
                 .activity_service
-                .list_pending_duration_curve_notifications(BATCH_SIZE, page)
+                .list_pending_duration_curve_notifications(BATCH_SIZE)
                 .await?;
-            page += 1;
-            notifications_remaining = flag;
+
+            if notifications.is_empty() {
+                break;
+            }
+
+            if nb_errors > BATCH_SIZE {
+                tracing::error!(
+                    "Too many errors while processing duration curves outbox, aborting further processing."
+                );
+                break;
+            }
 
             for notification in notifications {
                 let res = match notification.event() {
@@ -135,16 +139,26 @@ where
                             .await
                     }
                 };
-                if res.is_ok()
-                    && let Err(err) = self
-                        .activity_service
-                        .mark_duration_curve_notifications_as_processed(
-                            notification.activity(),
-                            notification.user(),
-                            self.clock.now(),
-                        )
-                        .await
+                if let Err(err) = res {
+                    nb_errors += 1;
+                    tracing::error!(
+                        "Error while processing duration curve notification for activity {}: {}",
+                        notification.activity(),
+                        err,
+                    );
+                    continue;
+                }
+
+                if let Err(err) = self
+                    .activity_service
+                    .mark_duration_curve_notifications_as_processed(
+                        notification.activity(),
+                        notification.user(),
+                        self.clock.now(),
+                    )
+                    .await
                 {
+                    nb_errors += 1;
                     tracing::error!(
                         "Error while marking duration curve notification as processed for activity {}: {}",
                         notification.activity(),
@@ -7036,7 +7050,7 @@ mod tests_duration_curve_outbox {
     //!   methods notify it, and the test awaits it to know processing finished
     //!   before cancelling shutdown. This avoids sleeps and races.
 
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use anyhow::anyhow;
 
@@ -7073,6 +7087,28 @@ mod tests_duration_curve_outbox {
         )
     }
 
+    /// Set up the `list_pending_duration_curve_notifications` expectation to return the
+    /// given batches in order. The last batch is typically empty to end the processing
+    /// loop.
+    fn expect_list_pending_batches(
+        activity_service: &mut MockActivityService,
+        batches: Vec<Vec<DurationCurveNotification>>,
+    ) {
+        let nb_calls = batches.len();
+        let batches = Arc::new(std::sync::Mutex::new(batches));
+        activity_service
+            .expect_list_pending_duration_curve_notifications()
+            .times(nb_calls)
+            .returning(move |limit| {
+                assert_eq!(limit, BATCH_SIZE);
+                let mut batches = batches.lock().unwrap();
+                if batches.is_empty() {
+                    panic!("unexpected extra call to list_pending_duration_curve_notifications");
+                }
+                Ok(batches.remove(0))
+            });
+    }
+
     fn build_service(
         repository: MockTrainingRepository,
         activity_service: MockActivityService,
@@ -7093,7 +7129,7 @@ mod tests_duration_curve_outbox {
         let mut activity_service = MockActivityService::new();
         activity_service
             .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| Ok((vec![], NotificationsRemaining::from(false))));
+            .return_once(|_| Ok(vec![]));
 
         // Expect no side effects
         repository.expect_save_duration_curve().times(0);
@@ -7113,7 +7149,7 @@ mod tests_duration_curve_outbox {
         let mut activity_service = MockActivityService::new();
         activity_service
             .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| Err(anyhow!("failed to fetch notifications")));
+            .return_once(|_| Err(anyhow!("failed to fetch notifications")));
 
         // Expect no side effects
         repository.expect_save_duration_curve().times(0);
@@ -7151,14 +7187,10 @@ mod tests_duration_curve_outbox {
             .returning(|_, _, _, _| Ok(()));
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| {
-                Ok((
-                    vec![notification(DurationCurveEvent::Created)],
-                    NotificationsRemaining::from(false),
-                ))
-            });
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
             .times(1)
@@ -7193,14 +7225,10 @@ mod tests_duration_curve_outbox {
         repository.expect_save_duration_curve().times(0);
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| {
-                Ok((
-                    vec![notification(DurationCurveEvent::Deleted)],
-                    NotificationsRemaining::from(false),
-                ))
-            });
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Deleted)], vec![]],
+        );
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
             .times(1)
@@ -7236,9 +7264,7 @@ mod tests_duration_curve_outbox {
         repository.expect_delete_duration_curve().times(0);
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(move |_, _| Ok((vec![incomplete], NotificationsRemaining::from(false))));
+        expect_list_pending_batches(&mut activity_service, vec![vec![incomplete], vec![]]);
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
             .times(1)
@@ -7263,14 +7289,13 @@ mod tests_duration_curve_outbox {
             .returning(|_, _, _, _| Err(anyhow!("failed to save duration curve")));
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| {
-                Ok((
-                    vec![notification(DurationCurveEvent::Created)],
-                    NotificationsRemaining::from(false),
-                ))
-            });
+        // The failed notification stays pending, so the loop refetches; drain the
+        // outbox to end the loop. The save failure is counted toward the error
+        // threshold, so a permanently failing notification cannot spin forever.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
             .times(0);
@@ -7290,17 +7315,16 @@ mod tests_duration_curve_outbox {
             .returning(|_, _| Ok(()));
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| {
-                Ok((
-                    vec![
-                        notification(DurationCurveEvent::Deleted),
-                        notification(DurationCurveEvent::Deleted),
-                    ],
-                    NotificationsRemaining::from(false),
-                ))
-            });
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                vec![
+                    notification(DurationCurveEvent::Deleted),
+                    notification(DurationCurveEvent::Deleted),
+                ],
+                vec![],
+            ],
+        );
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
             .times(2)
@@ -7313,33 +7337,95 @@ mod tests_duration_curve_outbox {
     }
 
     #[tokio::test]
-    async fn test_process_pending_outbox_paginates_until_no_notifications_remain() {
+    async fn test_process_pending_outbox_processes_until_outbox_is_empty() {
         let mut repository = MockTrainingRepository::new();
         repository
             .expect_save_duration_curve()
             .times(1)
             .returning(|_, _, _, _| Ok(()));
+        repository
+            .expect_delete_duration_curve()
+            .times(1)
+            .returning(|_, _| Ok(()));
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .times(2)
-            .withf(|_, page| *page == 0 || *page == 1)
-            .returning(|batch_size, page| {
-                assert_eq!(batch_size, BATCH_SIZE);
-                if page == 0 {
-                    Ok((
-                        vec![notification(DurationCurveEvent::Created)],
-                        NotificationsRemaining::from(true),
-                    ))
-                } else {
-                    Ok((vec![], NotificationsRemaining::from(false)))
-                }
-            });
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                vec![notification(DurationCurveEvent::Created)],
+                vec![notification(DurationCurveEvent::Deleted)],
+                vec![],
+            ],
+        );
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
-            .times(1)
+            .times(2)
             .returning(|_, _, _| Ok(()));
+
+        let service = build_service(repository, activity_service);
+
+        // Batches are processed in a loop until the repository returns an empty
+        // batch.
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_aborts_after_too_many_errors() {
+        let nb_notifications = BATCH_SIZE as usize + 2;
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_delete_duration_curve()
+            .times(nb_notifications)
+            .returning(|_, _| Ok(()));
+
+        let mut activity_service = MockActivityService::new();
+        // If the loop did not abort after too many errors, the second batch would be
+        // processed too, and the expectations below would fail.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                (0..nb_notifications)
+                    .map(|_| notification(DurationCurveEvent::Deleted))
+                    .collect(),
+                vec![notification(DurationCurveEvent::Deleted)],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(nb_notifications)
+            .returning(|_, _, _| Err(anyhow!("failed to mark notification")));
+
+        let service = build_service(repository, activity_service);
+
+        service.process_pending_outbox().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_pending_outbox_aborts_after_too_many_save_errors() {
+        let nb_notifications = BATCH_SIZE as usize + 2;
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_save_duration_curve()
+            .times(nb_notifications)
+            .returning(|_, _, _, _| Err(anyhow!("failed to save duration curve")));
+
+        let mut activity_service = MockActivityService::new();
+        // If save errors were not counted toward the error threshold, the same
+        // (unprocessed) notifications would be refetched and retried forever.
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![
+                (0..nb_notifications)
+                    .map(|_| notification(DurationCurveEvent::Created))
+                    .collect(),
+                vec![notification(DurationCurveEvent::Created)],
+            ],
+        );
+        activity_service
+            .expect_mark_duration_curve_notifications_as_processed()
+            .times(0);
 
         let service = build_service(repository, activity_service);
 
@@ -7352,7 +7438,7 @@ mod tests_duration_curve_outbox {
         // Startup outbox processing finds nothing before shutdown kicks in.
         activity_service
             .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| Ok((vec![], NotificationsRemaining::from(false))));
+            .return_once(|_| Ok(vec![]));
 
         let service = build_service(MockTrainingRepository::new(), activity_service);
 
@@ -7378,14 +7464,10 @@ mod tests_duration_curve_outbox {
             .returning(|_, _, _, _| Ok(()));
 
         let mut activity_service = MockActivityService::new();
-        activity_service
-            .expect_list_pending_duration_curve_notifications()
-            .return_once(|_, _| {
-                Ok((
-                    vec![notification(DurationCurveEvent::Created)],
-                    NotificationsRemaining::from(false),
-                ))
-            });
+        expect_list_pending_batches(
+            &mut activity_service,
+            vec![vec![notification(DurationCurveEvent::Created)], vec![]],
+        );
         let done_clone = done.clone();
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
@@ -7422,22 +7504,20 @@ mod tests_duration_curve_outbox {
 
         let mut activity_service = MockActivityService::new();
         // The first `process_pending_outbox` call happens on startup and finds nothing;
-        // the notification is only processed once `duration_curve_notify` fires.
-        let first_call_done = Arc::new(AtomicBool::new(true));
-        let first_call_done_clone = first_call_done.clone();
+        // the notification is only processed once `duration_curve_notify` fires, and the
+        // loop refetches once more before the outbox is drained.
+        let list_calls = Arc::new(AtomicUsize::new(0));
+        let list_calls_clone = list_calls.clone();
         activity_service
             .expect_list_pending_duration_curve_notifications()
-            .times(2)
-            .returning(move |_, _| {
-                if first_call_done_clone.swap(false, Ordering::SeqCst) {
-                    Ok((vec![], NotificationsRemaining::from(false)))
-                } else {
-                    Ok((
-                        vec![notification(DurationCurveEvent::Created)],
-                        NotificationsRemaining::from(false),
-                    ))
-                }
-            });
+            .times(3)
+            .returning(
+                move |_| match list_calls_clone.fetch_add(1, Ordering::SeqCst) {
+                    0 => Ok(vec![]),
+                    1 => Ok(vec![notification(DurationCurveEvent::Created)]),
+                    _ => Ok(vec![]),
+                },
+            );
         let done_clone = done.clone();
         activity_service
             .expect_mark_duration_curve_notifications_as_processed()
