@@ -915,9 +915,21 @@ where
             .get_last_weight(user, activity.start_time().naive_date())
             .await?;
 
+        // The context is built from the 12 weeks strictly before the activity: the activity is
+        // compared against its history and not against itself so that users can see for which
+        // duration the activity outperform the history.
+        let before = activity.start_time().naive_date();
+        let since = before
+            .checked_sub_days(Days::new(12 * 7))
+            .ok_or_else(|| anyhow!("invalid activity date {before}"))?;
+        let best_duration_curves = self
+            .training_repository
+            .get_best_duration_curves(user, since, before)
+            .await?;
+
         Ok(ActivityWithTrainingContext::new(
             activity,
-            TrainingContext::new(weight),
+            TrainingContext::new(weight, best_duration_curves),
             metrics,
         ))
     }
@@ -1001,11 +1013,11 @@ pub mod test_utils {
 
     use crate::domain::{
         models::{
-            activity::ActivityDurationCurve,
+            activity::{ActivityDurationCurve, ActivityId},
             search::SearchDocument,
             training::{
-                HooperIndex, TrainingMetricName, TrainingNote, TrainingNoteContent, TrainingPeriod,
-                TrainingPeriodWithActivities,
+                BestDurationCurve, HooperIndex, TrainingMetricName, TrainingNote,
+                TrainingNoteContent, TrainingPeriod, TrainingPeriodWithActivities,
             },
         },
         ports::training::{
@@ -1441,6 +1453,13 @@ pub mod test_utils {
                 user: &UserId,
                 date: chrono::NaiveDate,
             ) -> Result<Option<f32>, anyhow::Error>;
+
+            async fn get_best_duration_curves(
+                &self,
+                user: &UserId,
+                since: chrono::NaiveDate,
+                before: chrono::NaiveDate,
+            ) -> Result<Vec<BestDurationCurve>, anyhow::Error>;
 
             async fn save_duration_curve(
                 &self,
@@ -6644,9 +6663,11 @@ mod test_training_service_activity_with_training_context {
     use super::*;
     use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::{
-        Activity, ActivityDuration, ActivityDurationCurves, ActivityId, ActivityMetrics,
-        ActivityStartTime, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
+        Activity, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
+        ActivityMetrics, ActivityStartTime, ActivityStatistics, ActivityTimeseries,
+        ActivityWithParsedData, DurationCurveType, Sport,
     };
+    use crate::domain::models::training::BestDurationCurve;
     use crate::domain::services::activity::test_utils::MockActivityService;
     use crate::domain::services::training::test_utils::MockTrainingRepository;
 
@@ -6662,6 +6683,19 @@ mod test_training_service_activity_with_training_context {
             ActivityTimeseries::empty(),
             ActivityStatistics::new(HashMap::new()),
             ActivityDurationCurves::default(),
+        )
+    }
+
+    fn build_activity_with_power_curve(start_time: &str) -> ActivityWithParsedData {
+        let base = build_activity_with_parsed_data(start_time);
+        ActivityWithParsedData::new(
+            base.activity().clone(),
+            base.timeseries().clone(),
+            base.statistics().clone(),
+            ActivityDurationCurves::new(vec![ActivityDurationCurve::new(
+                DurationCurveType::Power,
+                [Some(200.0); 12],
+            )]),
         )
     }
 
@@ -6690,6 +6724,10 @@ mod test_training_service_activity_with_training_context {
             .times(1)
             .withf(move |u, d| u == &expected_user && *d == activity.start_time().naive_date())
             .returning(|_, _| Ok(Some(85.0)));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
 
         let service = TrainingService::new(
             repository,
@@ -6730,6 +6768,10 @@ mod test_training_service_activity_with_training_context {
             .expect_get_last_weight()
             .times(1)
             .returning(|_, _| Ok(None));
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
 
         let service = TrainingService::new(
             repository,
@@ -6768,6 +6810,7 @@ mod test_training_service_activity_with_training_context {
 
         let mut repository = MockTrainingRepository::new();
         repository.expect_get_last_weight().times(0);
+        repository.expect_get_best_duration_curves().times(0);
 
         let service = TrainingService::new(
             repository,
@@ -6811,6 +6854,7 @@ mod test_training_service_activity_with_training_context {
             .expect_get_last_weight()
             .times(1)
             .returning(|_, _| Err(anyhow!("db error")));
+        repository.expect_get_best_duration_curves().times(0);
 
         let service = TrainingService::new(
             repository,
@@ -6829,6 +6873,153 @@ mod test_training_service_activity_with_training_context {
             result,
             Err(ActivityWithTrainingContextError::Unknown(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_fetches_best_duration_curves() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_power_curve("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        let expected_user = user.clone();
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .withf(move |u, since, before| {
+                u == &expected_user
+                    && *since == "2025-06-11".parse::<NaiveDate>().unwrap() // - 12 weeks
+                    && *before == "2025-09-03".parse::<NaiveDate>().unwrap()
+            })
+            .returning(|_, _, _| {
+                Ok(vec![
+                    BestDurationCurve::new(
+                        DurationCurveType::Power,
+                        [
+                            Some(250.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                    BestDurationCurve::new(
+                        DurationCurveType::Pace,
+                        [
+                            None,
+                            Some(5.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                ])
+            });
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
+            .await
+            .expect("Should have succeeded");
+
+        // All curve types are returned, whatever the activity's own curve type is: the client
+        // reconciles the ones matching the activity's curves.
+        let curves = result.training_context().best_duration_12w_curves();
+        assert_eq!(curves.len(), 2);
+        let power_curve = curves
+            .iter()
+            .find(|curve| curve.curve_type() == DurationCurveType::Power)
+            .expect("Power curve should be set");
+        assert_eq!(power_curve.values()[0], Some(250.0));
+        let pace_curve = curves
+            .iter()
+            .find(|curve| curve.curve_type() == DurationCurveType::Pace)
+            .expect("Pace curve should be set");
+        assert_eq!(pace_curve.values()[1], Some(5.5));
+    }
+
+    #[tokio::test]
+    async fn test_get_activity_with_training_context_without_duration_curves_returns_empty_list() {
+        let user = UserId::from("user1");
+        let activity = build_activity_with_parsed_data("2025-09-03T08:00:00Z");
+        let activity_id = activity.id().clone();
+        let metrics = ActivityMetrics::default();
+
+        let mut activity_service = MockActivityService::new();
+        let returned_activity = activity.clone();
+        let returned_metrics = metrics.clone();
+        activity_service
+            .expect_get_activity_with_parsed_data_and_metrics()
+            .times(1)
+            .returning(move |_, _, _| Ok((returned_activity.clone(), returned_metrics.clone())));
+
+        let mut repository = MockTrainingRepository::new();
+        repository
+            .expect_get_last_weight()
+            .times(1)
+            .returning(|_, _| Ok(None));
+        // The curves are fetched regardless of the activity's own curves, since they describe
+        // the user's history over all curve types.
+        repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Ok(vec![]));
+
+        let service = TrainingService::new(
+            repository,
+            activity_service,
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .get_activity_with_training_context(&user, &activity_id, &[ActivityMetric::AvgPower])
+            .await
+            .expect("Should have succeeded");
+
+        assert!(
+            result
+                .training_context()
+                .best_duration_12w_curves()
+                .is_empty()
+        );
     }
 }
 

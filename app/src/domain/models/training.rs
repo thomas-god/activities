@@ -15,8 +15,8 @@ use crate::domain::{
     models::{
         UserId,
         activity::{
-            Activity, ActivityMetric, ActivityMetrics, ActivityRpe, BonkStatus, Sport,
-            SportCategory, Unit, WorkoutType,
+            Activity, ActivityMetric, ActivityMetrics, ActivityRpe, BonkStatus, DurationCurveType,
+            Sport, SportCategory, Unit, WorkoutType,
         },
         search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
     },
@@ -1904,6 +1904,36 @@ impl TrainingMetricsOrdering {
 
     pub fn ids(&self) -> &[TrainingMetricId] {
         &self.0
+    }
+}
+
+// =============================================================================
+// Best duration curve
+// =============================================================================
+
+/// Same shape as a `ActivityDurationCurve`, but built from an aggregation of individual duration
+/// curves over a given period, taking for each duration span the best value from all activities.
+/// Same time values as `DURATION_CURVE_DURATIONS_SECOND`.
+#[derive(Debug, Clone, Constructor, PartialEq)]
+pub struct BestDurationCurve {
+    curve_type: DurationCurveType,
+    values: [Option<f32>; 12],
+}
+
+impl BestDurationCurve {
+    pub fn curve_type(&self) -> DurationCurveType {
+        self.curve_type
+    }
+
+    pub fn unit(&self) -> Unit {
+        match self.curve_type {
+            DurationCurveType::Pace => Unit::MeterPerSecond,
+            DurationCurveType::Power => Unit::Watt,
+        }
+    }
+
+    pub fn values(&self) -> &[Option<f32>; 12] {
+        &self.values
     }
 }
 

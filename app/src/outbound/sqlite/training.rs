@@ -11,10 +11,13 @@ use crate::{
     domain::{
         models::{
             UserId,
-            activity::{ActivityDurationCurve, ActivityId, ActivityMetric, ActivityMetricSource},
+            activity::{
+                ActivityDurationCurve, ActivityId, ActivityMetric, ActivityMetricSource,
+                DurationCurveType,
+            },
             search::{SearchDocument, SearchDocumentEvent, SearchDocumentType},
             training::{
-                ActivitySource, HooperIndex, SubjectiveScale, TrainingMetric,
+                ActivitySource, BestDurationCurve, HooperIndex, SubjectiveScale, TrainingMetric,
                 TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
                 TrainingMetricAggregate, TrainingMetricDefinition, TrainingMetricGranularity,
                 TrainingMetricId, TrainingMetricName, TrainingMetricScope, TrainingMetricSource,
@@ -1388,6 +1391,82 @@ where
         .await
         .map(|_| ())
         .map_err(|err| anyhow!(err))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_best_duration_curves(
+        &self,
+        user: &UserId,
+        since: chrono::NaiveDate,
+        before: chrono::NaiveDate,
+    ) -> Result<Vec<BestDurationCurve>, anyhow::Error> {
+        let rows = sqlx::query_as::<
+            _,
+            (
+                DurationCurveType,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+                Option<f32>,
+            ),
+        >(
+            "
+            SELECT curve_type,
+                   MAX(secs_5), MAX(secs_10), MAX(secs_30),
+                   MAX(mins_1), MAX(mins_2), MAX(mins_5), MAX(mins_10),
+                   MAX(mins_20), MAX(mins_30), MAX(hours_1), MAX(hours_2), MAX(hours_5)
+            FROM t_duration_curves
+            WHERE user_id = ?1
+              AND activity_date >= ?2
+              AND activity_date < ?3
+            GROUP BY curve_type;
+            ",
+        )
+        .bind(user)
+        .bind(since)
+        .bind(before)
+        .fetch_all(&self.readers)
+        .await
+        .map_err(|err| anyhow!(err))?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(
+                |(
+                    curve_type,
+                    secs_5,
+                    secs_10,
+                    secs_30,
+                    mins_1,
+                    mins_2,
+                    mins_5,
+                    mins_10,
+                    mins_20,
+                    mins_30,
+                    hours_1,
+                    hours_2,
+                    hours_5,
+                )| {
+                    let values = [
+                        secs_5, secs_10, secs_30, mins_1, mins_2, mins_5, mins_10, mins_20,
+                        mins_30, hours_1, hours_2, hours_5,
+                    ];
+                    if values.iter().all(|value| value.is_none()) {
+                        None
+                    } else {
+                        Some(BestDurationCurve::new(curve_type, values))
+                    }
+                },
+            )
+            .collect())
     }
 }
 
@@ -7204,6 +7283,277 @@ mod test_sqlite_training_repository {
                 .delete_duration_curve(&UserId::from("user1"), &ActivityId::from("activity1"))
                 .await
                 .expect("Delete should succeed");
+        }
+
+        fn test_date(year: i32, month: u32, day: u32) -> chrono::NaiveDate {
+            chrono::NaiveDate::from_ymd_opt(year, month, day).unwrap()
+        }
+
+        fn curve_with_values(values: [Option<f32>; 12]) -> ActivityDurationCurve {
+            ActivityDurationCurve::new(DurationCurveType::Pace, values)
+        }
+
+        fn find_curve(
+            curves: &[BestDurationCurve],
+            curve_type: DurationCurveType,
+        ) -> &BestDurationCurve {
+            curves
+                .iter()
+                .find(|curve| curve.curve_type() == curve_type)
+                .unwrap_or_else(|| panic!("No {curve_type} curve in {curves:?}"))
+        }
+
+        #[tokio::test]
+        async fn test_get_best_duration_curves_returns_empty_when_no_curves() {
+            let (_db_file, repository) = setup().await;
+
+            let best = repository
+                .get_best_duration_curves(
+                    &UserId::from("user1"),
+                    test_date(2025, 12, 22),
+                    test_date(2026, 1, 15),
+                )
+                .await
+                .expect("Query should succeed");
+
+            assert!(best.is_empty());
+        }
+
+        #[tokio::test]
+        async fn test_get_best_duration_curves_takes_best_value_per_duration() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let activity_date = Utc.with_ymd_and_hms(2026, 1, 10, 8, 30, 0).unwrap();
+
+            let mut first = [None; 12];
+            first[0] = Some(5.0);
+            first[2] = Some(6.0);
+            let mut second = [None; 12];
+            second[0] = Some(4.0);
+            second[2] = Some(5.5);
+
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("activity1"),
+                    &curve_with_values(first),
+                    &activity_date,
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("activity2"),
+                    &curve_with_values(second),
+                    &activity_date,
+                )
+                .await
+                .expect("Save should succeed");
+
+            let best = repository
+                .get_best_duration_curves(&user, test_date(2025, 12, 22), test_date(2026, 1, 15))
+                .await
+                .expect("Query should succeed");
+
+            assert_eq!(best.len(), 1);
+            let best = find_curve(&best, DurationCurveType::Pace);
+            let mut expected = [None; 12];
+            expected[0] = Some(5.0);
+            expected[2] = Some(6.0);
+            assert_eq!(best.values(), &expected);
+        }
+
+        #[tokio::test]
+        async fn test_get_best_duration_curves_respects_date_range() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let since = test_date(2025, 12, 22);
+            let before = test_date(2026, 1, 15);
+
+            // Strictly before `since`: excluded.
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("old_activity"),
+                    &curve_with_values([
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                        Some(1.0),
+                    ]),
+                    &Utc.with_ymd_and_hms(2025, 12, 21, 23, 59, 59).unwrap(),
+                )
+                .await
+                .expect("Save should succeed");
+            // Same day as `since`: included (day boundaries, not timestamps).
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("since_activity"),
+                    &curve_with_values([
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                        Some(2.0),
+                    ]),
+                    &Utc.with_ymd_and_hms(2025, 12, 22, 0, 0, 0).unwrap(),
+                )
+                .await
+                .expect("Save should succeed");
+            // Same day as `before`: excluded (the activity itself).
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("before_activity"),
+                    &curve_with_values([
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                        Some(3.0),
+                    ]),
+                    &Utc.with_ymd_and_hms(2026, 1, 15, 8, 30, 0).unwrap(),
+                )
+                .await
+                .expect("Save should succeed");
+            // Strictly after `before`: excluded.
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("new_activity"),
+                    &curve_with_values([
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                        Some(4.0),
+                    ]),
+                    &Utc.with_ymd_and_hms(2026, 1, 16, 0, 0, 0).unwrap(),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let best = repository
+                .get_best_duration_curves(&user, since, before)
+                .await
+                .expect("Query should succeed");
+
+            assert_eq!(best.len(), 1);
+            let best = find_curve(&best, DurationCurveType::Pace);
+
+            let mut expected = [None; 12];
+            expected[0] = Some(2.0);
+            expected[1] = Some(2.0);
+            expected[2] = Some(2.0);
+            expected[3] = Some(2.0);
+            expected[4] = Some(2.0);
+            expected[5] = Some(2.0);
+            expected[6] = Some(2.0);
+            expected[7] = Some(2.0);
+            expected[8] = Some(2.0);
+            expected[9] = Some(2.0);
+            expected[10] = Some(2.0);
+            expected[11] = Some(2.0);
+            assert_eq!(best.values(), &expected);
+        }
+
+        #[tokio::test]
+        async fn test_get_best_duration_curves_aggregates_all_curve_types() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+            let activity_date = Utc.with_ymd_and_hms(2026, 1, 10, 8, 30, 0).unwrap();
+
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("activity1"),
+                    &pace_curve(),
+                    &activity_date,
+                )
+                .await
+                .expect("Save should succeed");
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("activity2"),
+                    &power_curve(),
+                    &activity_date,
+                )
+                .await
+                .expect("Save should succeed");
+
+            let best = repository
+                .get_best_duration_curves(&user, test_date(2025, 12, 22), test_date(2026, 1, 15))
+                .await
+                .expect("Query should succeed");
+
+            assert_eq!(best.len(), 2);
+            assert_eq!(
+                find_curve(&best, DurationCurveType::Pace).values(),
+                pace_curve().values()
+            );
+            assert_eq!(
+                find_curve(&best, DurationCurveType::Power).values(),
+                power_curve().values()
+            );
+        }
+
+        #[tokio::test]
+        async fn test_get_best_duration_curves_is_scoped_by_user() {
+            let (_db_file, repository) = setup().await;
+            let user = UserId::from("user1");
+
+            repository
+                .save_duration_curve(
+                    &user,
+                    &ActivityId::from("activity1"),
+                    &pace_curve(),
+                    &Utc.with_ymd_and_hms(2026, 1, 10, 8, 30, 0).unwrap(),
+                )
+                .await
+                .expect("Save should succeed");
+
+            let best = repository
+                .get_best_duration_curves(
+                    &UserId::from("user2"),
+                    test_date(2025, 12, 22),
+                    test_date(2026, 1, 15),
+                )
+                .await
+                .expect("Query should succeed");
+
+            assert!(best.is_empty());
         }
 
         #[tokio::test]

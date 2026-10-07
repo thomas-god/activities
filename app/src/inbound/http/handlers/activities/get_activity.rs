@@ -138,7 +138,7 @@ mod tests {
                         )])),
                         ActivityDurationCurves::default(),
                     ),
-                    TrainingContext::new(Some(70.0)),
+                    TrainingContext::new(Some(70.0), vec![]),
                     ActivityMetrics::new(HashMap::from([(ActivityMetric::Duration, Some(1200.))])),
                 ))
             });
@@ -197,7 +197,10 @@ mod tests {
                     )]),
                     laps: vec![]
                 },
-                training_context: PublicTrainingContext { weight: Some(70.0) },
+                training_context: PublicTrainingContext {
+                    weight: Some(70.0),
+                    best_duration_12w_curves: vec![]
+                },
                 duration_curves: vec![],
             }
         );

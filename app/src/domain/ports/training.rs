@@ -11,13 +11,14 @@ use crate::domain::{
         },
         search::SearchDocument,
         training::{
-            HooperIndex, HooperIndexPatch, TrainingMetric, TrainingMetricDefinitionPatch,
-            TrainingMetricId, TrainingMetricName, TrainingMetricPatch, TrainingMetricScope,
-            TrainingMetricSource, TrainingMetricSummary, TrainingMetricTarget,
-            TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
-            TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
-            TrainingPeriod, TrainingPeriodCreationError, TrainingPeriodId, TrainingPeriodSports,
-            TrainingPeriodWithActivities, WeightAndNutrition, WeightAndNutritionPatch,
+            BestDurationCurve, HooperIndex, HooperIndexPatch, TrainingMetric,
+            TrainingMetricDefinitionPatch, TrainingMetricId, TrainingMetricName,
+            TrainingMetricPatch, TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
+            TrainingMetricTarget, TrainingMetricValues, TrainingMetricWindow,
+            TrainingMetricsOrdering, TrainingNote, TrainingNoteContent, TrainingNoteDate,
+            TrainingNoteId, TrainingNoteTitle, TrainingPeriod, TrainingPeriodCreationError,
+            TrainingPeriodId, TrainingPeriodSports, TrainingPeriodWithActivities,
+            WeightAndNutrition, WeightAndNutritionPatch,
         },
     },
     ports::{DateRange, search::RemainingDocuments},
@@ -372,11 +373,16 @@ pub enum WeightAndNutritionError {
 #[derive(Clone, Debug, Constructor, Default, PartialEq)]
 pub struct TrainingContext {
     weight: Option<f32>,
+    best_duration_12w_curves: Vec<BestDurationCurve>,
 }
 
 impl TrainingContext {
     pub fn weight(&self) -> &Option<f32> {
         &self.weight
+    }
+
+    pub fn best_duration_12w_curves(&self) -> &[BestDurationCurve] {
+        &self.best_duration_12w_curves
     }
 }
 
@@ -1135,6 +1141,14 @@ pub trait TrainingRepository: Clone + Send + Sync + 'static {
         user: &UserId,
         reference_date: chrono::NaiveDate,
     ) -> impl Future<Output = Result<Option<f32>, anyhow::Error>> + Send;
+
+    /// Over `[since, before)`.
+    fn get_best_duration_curves(
+        &self,
+        user: &UserId,
+        since: chrono::NaiveDate,
+        before: chrono::NaiveDate,
+    ) -> impl Future<Output = Result<Vec<BestDurationCurve>, anyhow::Error>> + Send;
 
     fn save_duration_curve(
         &self,
