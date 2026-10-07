@@ -3,13 +3,22 @@
 	import { isSome, none, type Option } from '$lib/Options';
 
 	interface Props {
-		powerValues: (number | null)[];
+		curveValues: (number | null)[];
+		activityDuration?: number;
+		averageValue?: number | null;
 		width: number;
 		height: number;
 		weight?: Option<number>;
 	}
 
-	let { powerValues, width, height, weight = none() }: Props = $props();
+	let {
+		curveValues,
+		activityDuration = undefined,
+		averageValue = null,
+		width,
+		height,
+		weight = none()
+	}: Props = $props();
 
 	const marginTop = 20;
 	const marginRight = 20;
@@ -26,49 +35,43 @@
 	let hasWeight = $derived(isSome(weight));
 	let effectiveMode = $derived(hasWeight ? mode : 'absolute');
 
-	function computePowerCurve(values: (number | null)[]): [number, number][] {
-		// Concatenate active (non-null) seconds into a single continuous stream.
-		// Pauses are skipped so that MMP is computed over active riding time only,
-		// and the full activity duration is always represented on the curve.
-		const active = values.filter((v): v is number => v !== null);
-		if (active.length === 0) return [];
-
-		const result: [number, number][] = [];
-		for (const d of FIXED_DURATIONS) {
-			if (active.length < d) break;
-
-			let sum = 0;
-			for (let i = 0; i < d; i++) sum += active[i];
-			let maxAvg = sum / d;
-
-			for (let i = d; i < active.length; i++) {
-				sum += active[i] - active[i - d];
-				const avg = sum / d;
-				if (avg > maxAvg) maxAvg = avg;
-			}
-
-			result.push([d, maxAvg]);
-		}
-
-		// Always add an explicit point for the full active duration so that a
-		// 59-min ride doesn't stop at the 30-min marker.
-		// There's some edge cases for which the average value for the activity's duration is
-		// greater than the previous point on the power curve, making the power curve is not
-		// decreasing (e.g. [10,0,10] -> avg(2) = (10+0)/2 = 5 but avg(3) = (10+0+10)/3 = 6.66 > avg(2))
-		const lastFixed = result.length > 0 ? result[result.length - 1][0] : 0;
-		if (active.length > lastFixed) {
-			const totalSum = active.reduce((a, b) => a + b, 0);
-			result.push([active.length, totalSum / active.length]);
-		}
-
-		return result;
+	interface CurvePoint {
+		duration: number;
+		value: number;
+		fromStats: boolean;
 	}
 
-	let curveData = $derived(computePowerCurve(powerValues));
+	// Duration/value pairs from the server-computed curve (null values skipped)
+	let curveData = $derived.by(() => {
+		const points: CurvePoint[] = FIXED_DURATIONS.map((d, i): CurvePoint | null => {
+			const value = curveValues[i];
+			return value === null || value === undefined
+				? null
+				: { duration: d, value, fromStats: false };
+		}).filter((point): point is CurvePoint => point !== null);
+
+		// Always add an explicit point for the full activity duration so that a
+		// 59-min ride doesn't stop at the 30-min marker. The average value comes
+		// from the already computed activity stats.
+		// There's some edge cases for which the average value for the activity's duration is
+		// greater than the previous point on the curve, making the curve not decreasing
+		// (e.g. [10,0,10] -> avg(2) = (10+0)/2 = 5 but avg(3) = (10+0+10)/3 = 6.66 > avg(2))
+		const lastFixed = points.length > 0 ? points[points.length - 1].duration : 0;
+		if (
+			activityDuration !== undefined &&
+			averageValue !== null &&
+			averageValue !== undefined &&
+			activityDuration > lastFixed
+		) {
+			points.push({ duration: activityDuration, value: averageValue, fromStats: true });
+		}
+
+		return points;
+	});
 
 	let displayedData = $derived(
 		effectiveMode === 'relative' && isSome(weight)
-			? curveData.map(([d, p]) => [d, p / weight.value] as [number, number])
+			? curveData.map((point) => ({ ...point, value: point.value / weight.value }))
 			: curveData
 	);
 
@@ -80,17 +83,17 @@
 	);
 
 	let yScale = $derived.by(() => {
-		const maxPower = d3.max(displayedData, (d) => d[1]) ?? 100;
+		const maxPower = d3.max(displayedData, (d) => d.value) ?? 100;
 		return d3.scaleLinear([0, maxPower * 1.05], [height - marginBottom, marginTop]);
 	});
 
 	let areaPath = $derived.by(() => {
 		if (displayedData.length === 0) return '';
 		const gen = d3
-			.area<[number, number]>()
-			.x((d) => xScale(d[0]))
+			.area<CurvePoint>()
+			.x((d) => xScale(d.duration))
 			.y0(yScale(0))
-			.y1((d) => yScale(d[1]))
+			.y1((d) => yScale(d.value))
 			.curve(d3.curveCatmullRom.alpha(0.5));
 		return gen(displayedData) ?? '';
 	});
@@ -98,9 +101,9 @@
 	let linePath = $derived.by(() => {
 		if (displayedData.length === 0) return '';
 		const gen = d3
-			.line<[number, number]>()
-			.x((d) => xScale(d[0]))
-			.y((d) => yScale(d[1]))
+			.line<CurvePoint>()
+			.x((d) => xScale(d.duration))
+			.y((d) => yScale(d.value))
 			.curve(d3.curveCatmullRom.alpha(0.5));
 		return gen(displayedData) ?? '';
 	});
@@ -111,12 +114,22 @@
 		return `${s / 3600}hr`;
 	};
 
-	const formatTooltipDuration = (s: number): string => {
+	const formatTooltipDuration = (point: CurvePoint): string => {
+		// The stats-based point uses the raw (fractional) activity duration, so
+		// truncate it to whole minutes to avoid sub-second noise.
+		if (point.fromStats) {
+			const totalMinutes = Math.floor(point.duration / 60);
+			const h = Math.floor(totalMinutes / 60);
+			const m = totalMinutes % 60;
+			return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`;
+		}
+
+		const s = point.duration;
 		const h = Math.floor(s / 3600);
 		const m = Math.floor((s % 3600) / 60);
 		const sec = s % 60;
-		if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m ${sec.toString().padStart(2, '0')}s`;
-		if (m > 0) return `${m}m ${sec.toString().padStart(2, '0')}s`;
+		if (h > 0) return `${h}h`;
+		if (m > 0) return `${m}m`;
 		return `${sec}s`;
 	};
 
@@ -134,7 +147,7 @@
 
 	// Tooltip
 	let tooltipX = $state<number | undefined>(undefined);
-	const bisector = d3.bisector<[number, number], number>((d) => d[0]);
+	const bisector = d3.bisector<CurvePoint, number>((d) => d.duration);
 	let tooltipData = $derived.by(() => {
 		if (tooltipX === undefined || displayedData.length === 0) return null;
 		const duration = xScale.invert(tooltipX);
@@ -157,8 +170,8 @@
 {#if displayedData.length > 0}
 	<div class="flex flex-wrap items-center justify-center pt-2 text-xs sm:text-base">
 		{#if tooltipData}
-			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData[0])}</span>
-			<span class="text-power-chart px-1.5 font-semibold">{formatPower(tooltipData[1])}</span>
+			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData)}</span>
+			<span class="text-power-chart px-1.5 font-semibold">{formatPower(tooltipData.value)}</span>
 		{:else}
 			<span class="invisible px-1.5">Interval: –</span>
 		{/if}
@@ -273,8 +286,8 @@
 				stroke-opacity="0.5"
 			/>
 			<circle
-				cx={xScale(tooltipData[0])}
-				cy={yScale(tooltipData[1])}
+				cx={xScale(tooltipData.duration)}
+				cy={yScale(tooltipData.value)}
 				r="4"
 				fill="var(--color-power-chart)"
 			/>

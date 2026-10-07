@@ -66,10 +66,12 @@
 	let active_distance = $derived(
 		'Distance' in active_metrics.metrics ? active_metrics.metrics['Distance'].values : undefined
 	);
-	let powerValues = $derived(
-		'Power' in active_metrics.metrics ? active_metrics.metrics['Power'].values : null
+	let powerCurve = $derived(
+		activity.duration_curves.find((curve) => curve.curve_type === 'Power') ?? null
 	);
-	let hasPowerData = $derived(powerValues !== null && powerValues.some((v) => v !== null));
+	let hasPowerData = $derived(powerCurve !== null && powerCurve.values.some((v) => v !== null));
+	let activityDuration = $derived(activity.metrics['Duration']?.value ?? null);
+	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
 	let activityWeight = $derived(asOption(activity.training_context.weight));
 
 	interface MetricOption {
@@ -370,7 +372,9 @@
 				<div class="px-2 pb-2">
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<PowerCurve
-							powerValues={powerValues!}
+							curveValues={powerCurve!.values}
+							activityDuration={activityDuration ?? undefined}
+							averageValue={averagePower}
 							width={chartWidth}
 							height={chartHeight}
 							weight={activityWeight}

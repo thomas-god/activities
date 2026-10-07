@@ -198,6 +198,7 @@ mod tests {
                     laps: vec![]
                 },
                 training_context: PublicTrainingContext { weight: Some(70.0) },
+                duration_curves: vec![],
             }
         );
     }

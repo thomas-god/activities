@@ -41,7 +41,14 @@ describe('ActivityWithTimeseriesSchema', () => {
 				Power: { unit: 'W', values: [120, null, 130] }
 			},
 			laps: []
-		}
+		},
+		duration_curves: [
+			{
+				curve_type: 'Power',
+				unit: 'W',
+				values: [250, 240, 230, 220, 210, 200, 190, 180, null, null, null, null]
+			}
+		]
 	};
 
 	it('parses the training context', () => {

@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     models::activity::{
-        Activity, ActivityMetric, ActivityMetrics, ActivityNutrition, ActivityTimeseries,
-        ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric, TimeseriesValue, ToUnit, Unit,
+        Activity, ActivityDurationCurve, ActivityMetric, ActivityMetrics, ActivityNutrition,
+        ActivityTimeseries, ActivityWithParsedData, Lap, Timeseries, TimeseriesMetric,
+        TimeseriesValue, ToUnit, Unit,
     },
     ports::training::{ActivityWithTrainingContext, TrainingContext},
 };
@@ -221,6 +222,7 @@ pub struct PublicActivityWithTimeseries {
     pub activity: PublicActivity,
     pub training_context: PublicTrainingContext,
     pub timeseries: PublicActivityTimeseries,
+    pub duration_curves: Vec<PublicDurationCurve>,
 }
 
 impl From<&ActivityWithTrainingContext> for PublicActivityWithTimeseries {
@@ -229,12 +231,65 @@ impl From<&ActivityWithTrainingContext> for PublicActivityWithTimeseries {
             activity: PublicActivity::from(activity.activity().activity(), activity.metrics()),
             training_context: PublicTrainingContext::from(activity.training_context()),
             timeseries: activity.activity().timeseries().into(),
+            duration_curves: activity
+                .activity()
+                .duration_curves()
+                .iter()
+                .map(PublicDurationCurve::from)
+                .collect(),
         }
     }
 }
 
-/// Additional context used to interpret or derive statistics of an activity
-/// (e.g. the athlete weight at the time of the activity, used for W/kg).
+// =============================================================================
+// Duration curves
+// =============================================================================
+
+/// Best rolling-average values of an activity for a fixed set of durations
+/// (5s, 10s, 30s, 1min, 2min, 5min, 10min, 20min, 30min, 1h, 2h, 5h),
+/// e.g. peak power or peak speed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PublicDurationCurve {
+    pub curve_type: String,
+    pub unit: String,
+    pub values: Vec<Option<PublicTimeseriesValue>>,
+}
+
+impl From<&ActivityDurationCurve> for PublicDurationCurve {
+    fn from(curve: &ActivityDurationCurve) -> Self {
+        let (unit, values) = match curve.unit() {
+            Unit::MeterPerSecond => (
+                Unit::KilometerPerHour,
+                curve
+                    .values()
+                    .iter()
+                    .map(|value| value.map(|value| PublicTimeseriesValue::Float(value as f64 * 3.6)))
+                    .collect(),
+            ),
+            unit => (
+                unit,
+                curve
+                    .values()
+                    .iter()
+                    .map(|value| value.map(|value| PublicTimeseriesValue::Float(value as f64)))
+                    .collect(),
+            ),
+        };
+        Self {
+            curve_type: curve.curve_type().to_string(),
+            unit: unit.to_string(),
+            values,
+        }
+    }
+}
+
+// =============================================================================
+// Public representation of an Activity (without timeseries)
+// =============================================================================
+
+/// Canonical representation of an activity returned by the API.
+/// All activity statistics (duration, distance, elevation, etc.) are exposed
+/// through the `statistics` map so every endpoint returns the same shape.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicTrainingContext {
     pub weight: Option<f32>,
@@ -262,9 +317,10 @@ mod tests {
 
     use crate::domain::models::UserId;
     use crate::domain::models::activity::{
-        ActiveTime, ActivityDuration, ActivityDurationCurves, ActivityId, ActivityStartTime,
-        ActivityStatistic, ActivityStatistics, ActivityTimeseries, ActivityWithParsedData, Sport,
-        Timeseries, TimeseriesActiveTime, TimeseriesMetric, TimeseriesTime, TimeseriesValue,
+        ActiveTime, ActivityDuration, ActivityDurationCurve, ActivityDurationCurves, ActivityId,
+        ActivityStartTime, ActivityStatistic, ActivityStatistics, ActivityTimeseries,
+        ActivityWithParsedData, DurationCurveType, Sport, Timeseries, TimeseriesActiveTime,
+        TimeseriesMetric, TimeseriesTime, TimeseriesValue,
     };
 
     fn activity_id() -> ActivityId {
@@ -278,6 +334,10 @@ mod tests {
     }
 
     fn activity_with_parsed_data() -> ActivityWithParsedData {
+        activity_with_parsed_data_with_curves(ActivityDurationCurves::default())
+    }
+
+    fn activity_with_parsed_data_with_curves(curves: ActivityDurationCurves) -> ActivityWithParsedData {
         ActivityWithParsedData::new(
             Activity::new_empty(
                 activity_id(),
@@ -305,7 +365,7 @@ mod tests {
             )
             .unwrap(),
             ActivityStatistics::new(HashMap::from([(ActivityStatistic::Duration, 1200.0)])),
-            ActivityDurationCurves::default(),
+            curves,
         )
     }
 
@@ -357,5 +417,67 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
 
         assert_eq!(json["training_context"]["weight"], serde_json::json!(null));
+    }
+
+    #[test]
+    fn test_public_activity_with_timeseries_serialises_duration_curves() {
+        let curve = ActivityDurationCurve::new(
+            DurationCurveType::Power,
+            [
+                Some(120.0),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+        );
+        let activity = ActivityWithTrainingContext::new(
+            activity_with_parsed_data_with_curves(ActivityDurationCurves::new(vec![curve])),
+            TrainingContext::new(Some(70.0)),
+            metrics(),
+        );
+
+        let public = PublicActivityWithTimeseries::from(&activity);
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&public).unwrap()).unwrap();
+
+        assert_eq!(json["duration_curves"][0]["curve_type"], serde_json::json!("Power"));
+        assert_eq!(json["duration_curves"][0]["unit"], serde_json::json!("W"));
+        assert_eq!(json["duration_curves"][0]["values"][0], serde_json::json!(120.0));
+        assert_eq!(json["duration_curves"][0]["values"][1], serde_json::json!(null));
+    }
+
+    #[test]
+    fn test_public_duration_curve_converts_pace_to_kmh() {
+        let curve = ActivityDurationCurve::new(
+            DurationCurveType::Pace,
+            [
+                Some(5.0),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+        );
+
+        let public = PublicDurationCurve::from(&curve);
+
+        assert_eq!(public.curve_type, "Pace");
+        assert_eq!(public.unit, "km/h");
+        assert_eq!(public.values[0], Some(PublicTimeseriesValue::Float(18.0)));
     }
 }

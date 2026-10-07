@@ -61,12 +61,25 @@ const TrainingContextSchema = z.object({
 });
 
 /**
+ * Best rolling-average values of an activity for a fixed set of durations
+ * (5s, 10s, 30s, 1min, 2min, 5min, 10min, 20min, 30min, 1h, 2h, 5h),
+ * e.g. peak power or peak speed. A `null` value means the activity is too
+ * short for that duration.
+ */
+const DurationCurveSchema = z.object({
+	curve_type: z.string(),
+	unit: z.string(),
+	values: z.array(z.number().nullable())
+});
+
+/**
  * Activity that includes its timeseries data. Structurally a superset of
  * `Activity`, so it can be used anywhere an `Activity` is expected.
  */
 export const ActivityWithTimeseriesSchema = ActivitySchema.extend({
 	training_context: TrainingContextSchema,
-	timeseries: TimeseriesSchema
+	timeseries: TimeseriesSchema,
+	duration_curves: z.array(DurationCurveSchema)
 });
 
 // =============================================================================
@@ -78,6 +91,7 @@ export type ActivityList = z.infer<typeof ActivityListSchema>;
 export type ActivityWithTimeseries = z.infer<typeof ActivityWithTimeseriesSchema>;
 export type Timeseries = z.infer<typeof TimeseriesSchema>;
 export type TrainingContext = z.infer<typeof TrainingContextSchema>;
+export type DurationCurve = z.infer<typeof DurationCurveSchema>;
 
 // =============================================================================
 // API Functions
