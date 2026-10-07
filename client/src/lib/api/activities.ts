@@ -53,14 +53,6 @@ const TimeseriesSchema = z.object({
 });
 
 /**
- * Additional context used to interpret or derive statistics of an activity
- * (e.g. the athlete weight at the time of the activity, used for W/kg).
- */
-const TrainingContextSchema = z.object({
-	weight: z.number().nullable()
-});
-
-/**
  * Best rolling-average values of an activity for a fixed set of durations
  * (5s, 10s, 30s, 1min, 2min, 5min, 10min, 20min, 30min, 1h, 2h, 5h),
  * e.g. peak power or peak speed. A `null` value means the activity is too
@@ -70,6 +62,17 @@ const DurationCurveSchema = z.object({
 	curve_type: z.string(),
 	unit: z.string(),
 	values: z.array(z.number().nullable())
+});
+
+/**
+ * Additional context used to interpret or derive statistics of an activity
+ * (e.g. the athlete weight at the time of the activity, used for W/kg).
+ */
+const TrainingContextSchema = z.object({
+	weight: z.number().nullable(),
+	/** Best duration curves over the 12 weeks before the activity, one per curve
+	 *  type (e.g. power and pace) found in the user's history. */
+	best_duration_12w_curves: z.array(DurationCurveSchema)
 });
 
 /**

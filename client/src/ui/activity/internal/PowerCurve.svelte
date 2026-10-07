@@ -4,6 +4,9 @@
 
 	interface Props {
 		curveValues: (number | null)[];
+		/** Best values over the 12 weeks before the activity, for comparison
+		 *  (dashed line). Empty when there is no comparable curve. */
+		bestCurveValues?: (number | null)[];
 		activityDuration?: number;
 		averageValue?: number | null;
 		width: number;
@@ -13,6 +16,7 @@
 
 	let {
 		curveValues,
+		bestCurveValues = [],
 		activityDuration = undefined,
 		averageValue = null,
 		width,
@@ -39,6 +43,11 @@
 		duration: number;
 		value: number;
 		fromStats: boolean;
+	}
+
+	interface BestCurvePoint {
+		duration: number;
+		value: number;
 	}
 
 	// Duration/value pairs from the server-computed curve (null values skipped)
@@ -75,6 +84,27 @@
 			: curveData
 	);
 
+	// Best values are always defined on the fixed durations only, and the average
+	// is unknown for them, so there is no stats-based extension point.
+	let bestCurveData = $derived.by(() => {
+		const points: BestCurvePoint[] = FIXED_DURATIONS.map((d, i): BestCurvePoint | null => {
+			const value = bestCurveValues[i];
+			return value === null || value === undefined ? null : { duration: d, value };
+		}).filter((point): point is BestCurvePoint => point !== null);
+		return points;
+	});
+
+	let hasBestCurve = $derived(bestCurveData.length > 0);
+
+	// Same caveat as for the activity curve: the best curve values are divided by
+	// the athlete's current weight, while past activities might have been recorded
+	// with a different weight.
+	let displayedBestData = $derived(
+		effectiveMode === 'relative' && isSome(weight)
+			? bestCurveData.map((point) => ({ ...point, value: point.value / weight.value }))
+			: bestCurveData
+	);
+
 	let xScale = $derived(
 		d3.scaleLog(
 			[FIXED_DURATIONS.at(0)!, FIXED_DURATIONS.at(-1)!],
@@ -83,8 +113,18 @@
 	);
 
 	let yScale = $derived.by(() => {
-		const maxPower = d3.max(displayedData, (d) => d.value) ?? 100;
-		return d3.scaleLinear([0, maxPower * 1.05], [height - marginBottom, marginTop]);
+		const maxValue = d3.max([...displayedData, ...displayedBestData], (d) => d.value) ?? 100;
+		return d3.scaleLinear([0, maxValue * 1.05], [height - marginBottom, marginTop]);
+	});
+
+	let bestLinePath = $derived.by(() => {
+		if (displayedBestData.length === 0) return '';
+		const gen = d3
+			.line<BestCurvePoint>()
+			.x((d) => xScale(d.duration))
+			.y((d) => yScale(d.value))
+			.curve(d3.curveCatmullRom.alpha(0.5));
+		return gen(displayedBestData) ?? '';
 	});
 
 	let areaPath = $derived.by(() => {
@@ -158,6 +198,13 @@
 		return displayedData[idx] ?? null;
 	});
 
+	// The best curve only covers the fixed durations, so it is only shown when the
+	// hovered interval matches one of them (not the stats-based extension point).
+	let tooltipBestData = $derived.by(() => {
+		if (tooltipData === null || tooltipData.fromStats) return null;
+		return displayedBestData.find((point) => point.duration === tooltipData!.duration) ?? null;
+	});
+
 	const handleMouseMove = (e: MouseEvent) => {
 		tooltipX = Math.min(Math.max(e.offsetX, marginLeft), width - marginRight);
 	};
@@ -172,6 +219,13 @@
 		{#if tooltipData}
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData)}</span>
 			<span class="text-power-chart px-1.5 font-semibold">{formatPower(tooltipData.value)}</span>
+			{#if tooltipBestData}
+				(12-week best
+				<span class="text-best-power-chart px-1.5 font-semibold">
+					{formatPower(tooltipBestData.value)}
+				</span>
+				)
+			{/if}
 		{:else}
 			<span class="invisible px-1.5">Interval: –</span>
 		{/if}
@@ -247,6 +301,18 @@
 			clip-path="url(#power-curve-clip)"
 		/>
 
+		<!-- Best curve line (12-week comparison) -->
+		{#if hasBestCurve}
+			<path
+				d={bestLinePath}
+				fill="none"
+				stroke="var(--color-best-power-chart)"
+				stroke-width="1.5"
+				stroke-dasharray="5,3"
+				clip-path="url(#power-curve-clip)"
+			/>
+		{/if}
+
 		<!-- X axis baseline -->
 		<line
 			x1={marginLeft}
@@ -293,6 +359,29 @@
 			/>
 		{/if}
 	</svg>
+	{#if hasBestCurve}
+		<div class="flex items-center justify-center gap-4 pb-1 text-xs opacity-80">
+			<span class="flex items-center gap-1.5">
+				<span class="inline-block h-0.5 w-4 rounded" style="background: var(--color-power-chart)"
+				></span>
+				This activity
+			</span>
+			<span class="flex items-center gap-1.5">
+				<span
+					class="inline-block h-0.5 w-4"
+					style="
+						background-image: linear-gradient(
+							to right,
+							var(--color-best-power-chart) 50%,
+							transparent 50%
+						);
+						background-size: 6px 100%;
+					"
+				></span>
+				12-week best
+			</span>
+		</div>
+	{/if}
 {:else}
 	<p class="py-4 text-center text-sm opacity-50">No power data available</p>
 {/if}

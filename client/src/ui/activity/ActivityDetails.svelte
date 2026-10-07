@@ -70,6 +70,16 @@
 		activity.duration_curves.find((curve) => curve.curve_type === 'Power') ?? null
 	);
 	let hasPowerData = $derived(powerCurve !== null && powerCurve.values.some((v) => v !== null));
+	// The training context carries one best curve per curve type (e.g. power and pace):
+	// reconcile by keeping the one matching the type of the displayed curve.
+	let bestPowerCurve = $derived(
+		activity.training_context.best_duration_12w_curves.find(
+			(curve) => curve.curve_type === 'Power'
+		) ?? null
+	);
+	let hasBestPowerCurve = $derived(
+		bestPowerCurve !== null && bestPowerCurve.values.some((v) => v !== null)
+	);
 	let activityDuration = $derived(activity.metrics['Duration']?.value ?? null);
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
 	let activityWeight = $derived(asOption(activity.training_context.weight));
@@ -373,6 +383,7 @@
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
 						<PowerCurve
 							curveValues={powerCurve!.values}
+							bestCurveValues={hasBestPowerCurve ? bestPowerCurve!.values : undefined}
 							activityDuration={activityDuration ?? undefined}
 							averageValue={averagePower}
 							width={chartWidth}
