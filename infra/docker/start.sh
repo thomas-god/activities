@@ -16,12 +16,12 @@ trap cleanup SIGTERM SIGINT
 SERVER_PORT=8080 ALLOW_ORIGIN= ./app_bin &
 API_PID=$!
 
-# # Check if API started successfully
-# sleep 2
-# if ! kill -0 $API_PID 2>/dev/null; then
-#     echo "Failed to start API server"
-#     exit 1
-# fi
+# Check if API started successfully
+sleep 2
+if ! kill -0 $API_PID 2>/dev/null; then
+    echo "Failed to start API server"
+    exit 1
+fi
 
 # Start nginx in the foreground
 nginx -g 'daemon off;' &
