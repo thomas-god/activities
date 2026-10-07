@@ -39,6 +39,14 @@ to duplicate relevant duration curves (dropping null ones) on the training domai
 through an _outbox table + intra-process notification pattern_ from the activity domain to the
 training domain.
 
+In the `t_duration_curves` table we only store the curve type (pace or power), assuming there's a
+one-to-one matching with the activity's sport (running -> pace, cycling -> power). This would no
+longer hold if we were to introduce new curve types common to different sports (like heart rate) or
+break the one-to-one matching (e.g. by using running power). In that case we would probably need to
+add another column to carry the source activity sport (or other field) use for later grouping and/or
+filtering (e.g. "cycling power" metric would need to be able to filter out power curve values from
+running activities).
+
 ## Going further
 
 A natural extension to this feature would be to have weight-normalized duration curves that take
