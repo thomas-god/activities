@@ -63,6 +63,7 @@ pub async fn bootstrap_multi_user(
     >,
     ActualSearchService,
     ActualTrainingService,
+    ActualActivityService,
 )> {
     tracing::info!("Starting multi-user app");
 
@@ -95,7 +96,7 @@ pub async fn bootstrap_multi_user(
 
     let http_server = HttpServer::new(
         &mode,
-        activity_service,
+        activity_service.clone(),
         parser,
         training_service.clone(),
         user_service,
@@ -104,7 +105,12 @@ pub async fn bootstrap_multi_user(
         config,
     )
     .await?;
-    Ok((http_server, search_service, training_service))
+    Ok((
+        http_server,
+        search_service,
+        training_service,
+        activity_service,
+    ))
 }
 
 async fn build_mailer(config: &MultiUserConfig) -> anyhow::Result<SMTPEmailProvider> {

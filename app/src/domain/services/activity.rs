@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use anyhow::anyhow;
 use log::warn;
@@ -60,6 +60,7 @@ where
 
     pub async fn compute_missing_duration_curves(&self) {
         tracing::info!("Starting to compute missing duration curves");
+        let start = Instant::now();
         let mut processed_activities = 0;
         let mut number_of_errors = 0;
 
@@ -132,8 +133,9 @@ where
         }
 
         tracing::info!(
-            "Finished processing missing duration curves: {} activities processed",
-            processed_activities
+            "Finished processing missing duration curves: {} activities processed in {}s",
+            processed_activities,
+            start.elapsed().as_secs()
         );
     }
 }

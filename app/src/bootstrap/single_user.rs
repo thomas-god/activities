@@ -51,6 +51,7 @@ pub async fn bootstrap_single_user(
     >,
     ActualSearchService,
     ActualTrainingService,
+    ActualActivityService,
 )> {
     tracing::info!("Starting single-user app");
 
@@ -118,7 +119,7 @@ pub async fn bootstrap_single_user(
 
     let http_server = HttpServer::new(
         &mode,
-        activity_service,
+        activity_service.clone(),
         parser,
         training_service.clone(),
         user_service,
@@ -128,7 +129,12 @@ pub async fn bootstrap_single_user(
     )
     .await?;
 
-    Ok((http_server, search_service, training_service))
+    Ok((
+        http_server,
+        search_service,
+        training_service,
+        activity_service.clone(),
+    ))
 }
 
 async fn build_preferences_service(
