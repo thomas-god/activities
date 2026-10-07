@@ -77,7 +77,8 @@ const TrainingMetricSourceSchema = z.discriminatedUnion('type', [
 		})
 	}),
 	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
-	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() })
+	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() }),
+	z.object({ type: z.literal('durationCurve'), metric: z.string() })
 ]);
 
 // Schema for the new API response with grouped values
@@ -681,7 +682,7 @@ export interface TrainingMetricBasePayloadFilters {
 export interface TrainingMetricBasePayload {
 	source:
 		| {
-				type: 'hooperIndex' | 'weightAndNutrition';
+				type: 'hooperIndex' | 'weightAndNutrition' | 'durationCurve';
 				metric: string;
 		  }
 		| {

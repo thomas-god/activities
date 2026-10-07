@@ -7,6 +7,7 @@
 	import Polyline from './internal/charts/Polyline.svelte';
 	import { type DisplayMode } from './internal/charts';
 	import type { TimeDomain } from '$ui/training_metrics';
+	import PowerCurve from '$ui/activity/PowerCurve.svelte';
 
 	export interface ChartHandle {
 		getYMax(): number;
@@ -53,6 +54,19 @@
 		metric.target === null ? none() : some(metric.target.value)
 	);
 	let values = $derived(metric.values);
+
+	// Durations (in seconds) of the 12 bins of a duration curve, matching the
+	// server's DURATION_CURVE_DURATIONS_SECOND and PowerCurve's FIXED_DURATIONS.
+	const DURATION_CURVE_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 18000];
+
+	// Duration curve metrics are not grouped: values are keyed by duration (in
+	// seconds) under the no-group bucket. Rebuild the 12-slots array expected by
+	// the power curve component, in the fixed durations order.
+	let durationCurveValues = $derived.by(() => {
+		if (metric.source.type !== 'durationCurve') return [];
+		const granules = Object.values(metric.values).at(0) ?? {};
+		return DURATION_CURVE_DURATIONS.map((duration) => granules[String(duration)] ?? null);
+	});
 
 	let chartRef = $state<ChartHandle>();
 	export function getYMax(): number {
@@ -102,6 +116,8 @@
 				yMaxValue={yMax}
 			/>
 		{/if}
+	{:else if metric.source.type === 'durationCurve'}
+		<PowerCurve curveValues={durationCurveValues} unit={metric.unit} {width} {height} />
 	{:else if metric.granularity !== null}
 		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
 			<StackedArea

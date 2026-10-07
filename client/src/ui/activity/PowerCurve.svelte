@@ -12,6 +12,8 @@
 		width: number;
 		height: number;
 		weight?: Option<number>;
+		/** Unit of the curve values, used for formatting (defaults to power). */
+		unit?: string;
 	}
 
 	let {
@@ -21,7 +23,8 @@
 		averageValue = null,
 		width,
 		height,
-		weight = none()
+		weight = none(),
+		unit = 'W'
 	}: Props = $props();
 
 	const marginTop = 20;
@@ -175,12 +178,13 @@
 
 	const formatPower = (v: number): string => {
 		if (effectiveMode === 'relative') return `${(Math.round(v * 10) / 10).toString()} W/kg`;
-		return `${Math.round(v).toString()} W`;
+		return `${Math.round(v).toString()} ${unit}`;
 	};
 
 	const formatTickValue = (v: number): string => {
 		if (effectiveMode === 'relative') return `${+v.toFixed(1)}W/kg`;
-		return `${v}W`;
+		// Preserve the compact `250W` style for power, keep a space for other units.
+		return unit === 'W' ? `${v}W` : `${v} ${unit}`;
 	};
 
 	let yTicks = $derived(yScale.ticks(5));
