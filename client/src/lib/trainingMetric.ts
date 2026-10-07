@@ -27,6 +27,7 @@ export const trainingMetricTemplateCategories = [
 	'Feedback',
 	'Weight',
 	'Nutrition',
+	'DurationCurves',
 	'Other'
 ] as const;
 export type TrainingMetricTemplateCategory = (typeof trainingMetricTemplateCategories)[number];

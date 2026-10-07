@@ -14,8 +14,8 @@ use crate::{
         models::{
             activity::{ActivityMetric, ToUnit, Unit},
             training::{
-                HooperIndexSource, TrainingMetricAggregate, TrainingMetricSource,
-                WeightAndNutritionSource,
+                DurationCurveSource, HooperIndexSource, TrainingMetricAggregate,
+                TrainingMetricSource, WeightAndNutritionSource,
             },
         },
         ports::{
@@ -39,6 +39,7 @@ pub enum TrainingMetricTemplateSource {
     Activity(ActivityMetric),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
+    DurationCurve(DurationCurveSource),
 }
 
 impl TrainingMetricTemplateSource {
@@ -47,6 +48,7 @@ impl TrainingMetricTemplateSource {
             Self::Activity(source) => source.unit(),
             Self::HooperIndex(source) => source.unit(),
             Self::WeightAndNutrition(source) => source.unit(),
+            Self::DurationCurve(source) => source.unit(),
         }
     }
 }
@@ -83,6 +85,7 @@ pub enum TrainingMetricTemplateCategory {
     Feedback,
     Weight,
     Nutrition,
+    DurationCurves,
     Other,
 }
 
@@ -245,6 +248,17 @@ static TRAINING_METRIC_TEMPLATES: LazyLock<Vec<TrainingMetricTemplate>> = LazyLo
             category: weight_and_nutrition_category(source),
         })
     }
+
+    // Duration curves
+    for source in [DurationCurveSource::Cycling, DurationCurveSource::Running] {
+        templates.push(TrainingMetricTemplate {
+            display_name: format_duration_curve_source(&source),
+            source: TrainingMetricTemplateSource::DurationCurve(source),
+            aggregate: TrainingMetricAggregate::Average, // does not matter
+            category: TrainingMetricTemplateCategory::DurationCurves,
+        })
+    }
+
     templates
 });
 
@@ -360,4 +374,11 @@ fn format_aggregate(aggregate: &TrainingMetricAggregate) -> String {
         TrainingMetricAggregate::NumberOfActivities => "Number of activities",
     }
     .to_string()
+}
+
+fn format_duration_curve_source(source: &DurationCurveSource) -> String {
+    match source {
+        DurationCurveSource::Cycling => String::from("Cycling power curve"),
+        DurationCurveSource::Running => String::from("Running pace curve"),
+    }
 }

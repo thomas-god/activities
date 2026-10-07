@@ -113,7 +113,8 @@ const TrainingNotesListSchema = z.array(TrainingNoteSchema);
 const TemplateMetricSourceSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('activity'), metric: z.string() }),
 	z.object({ type: z.literal('hooperIndex'), metric: z.string() }),
-	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() })
+	z.object({ type: z.literal('weightAndNutrition'), metric: z.string() }),
+	z.object({ type: z.literal('durationCurve'), metric: z.string() })
 ]);
 
 const TrainingMetricTemplatesSchema = z.array(
