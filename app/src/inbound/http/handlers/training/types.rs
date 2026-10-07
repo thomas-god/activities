@@ -16,12 +16,13 @@ use crate::{
                 Sport, TimeseriesAggregate, TimeseriesMetric, Unit, WorkoutType,
             },
             training::{
-                ActivitySource, HooperIndex, HooperIndexPatch, HooperIndexSource, SportFilter,
-                SubjectiveScale, TrainingMetricActivityFilters, TrainingMetricActivityGroupBy,
-                TrainingMetricAggregate, TrainingMetricGranularity, TrainingMetricScope,
-                TrainingMetricSource, TrainingMetricSummary, TrainingMetricSummaryAverage,
-                TrainingMetricTarget, TrainingMetricWindow, TrainingPeriodId, TrainingPeriodSports,
-                WeightAndNutrition, WeightAndNutritionPatch, WeightAndNutritionSource,
+                ActivitySource, DurationCurveSource, HooperIndex, HooperIndexPatch,
+                HooperIndexSource, SportFilter, SubjectiveScale, TrainingMetricActivityFilters,
+                TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
+                TrainingMetricScope, TrainingMetricSource, TrainingMetricSummary,
+                TrainingMetricSummaryAverage, TrainingMetricTarget, TrainingMetricWindow,
+                TrainingPeriodId, TrainingPeriodSports, WeightAndNutrition,
+                WeightAndNutritionPatch, WeightAndNutritionSource,
             },
         },
         ports::training::{HooperIndexError, WeightAndNutritionError},
@@ -479,6 +480,7 @@ pub enum APITrainingMetricSource {
     Activity(APIActivitySource),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
+    DurationCurve(DurationCurveSource),
 }
 
 impl APITrainingMetricSource {
@@ -487,6 +489,7 @@ impl APITrainingMetricSource {
             Self::Activity(source) => format_activity_source_metric(source.metric.source()),
             Self::HooperIndex(source) => source.to_string(),
             Self::WeightAndNutrition(source) => source.to_string(),
+            APITrainingMetricSource::DurationCurve(source) => source.to_string(),
         }
     }
 }
@@ -497,6 +500,7 @@ impl Display for APITrainingMetricSource {
             Self::Activity(source) => f.write_str(&source.to_string()),
             Self::HooperIndex(source) => f.write_str(&source.to_string()),
             Self::WeightAndNutrition(source) => f.write_str(&source.to_string()),
+            Self::DurationCurve(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -513,6 +517,7 @@ impl TryFrom<&APITrainingMetricSource> for TrainingMetricSource {
             APITrainingMetricSource::WeightAndNutrition(source) => {
                 Self::WeightAndNutrition(*source)
             }
+            APITrainingMetricSource::DurationCurve(source) => Self::DurationCurve(*source),
         })
     }
 }
@@ -525,6 +530,7 @@ impl From<&TrainingMetricSource> for APITrainingMetricSource {
             }
             TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
             TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
+            TrainingMetricSource::DurationCurve(source) => Self::DurationCurve(*source),
         }
     }
 }
@@ -604,6 +610,7 @@ pub fn format_source_metric(source: &TrainingMetricSource) -> String {
         }
         TrainingMetricSource::HooperIndex(source) => source.to_string(),
         TrainingMetricSource::WeightAndNutrition(source) => source.to_string(),
+        TrainingMetricSource::DurationCurve(source) => source.to_string(),
     }
 }
 

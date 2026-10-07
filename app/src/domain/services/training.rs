@@ -8,11 +8,12 @@ use tokio_util::sync::CancellationToken;
 use crate::domain::{
     models::{
         UserId,
-        activity::{ActivityId, ActivityMetric},
+        activity::{ActivityId, ActivityMetric, DURATION_CURVE_DURATIONS_SECOND},
         search::{SearchDocument, SearchDocumentType},
         training::{
-            ActivitySource, HooperIndex, HooperIndexSource, TrainingMetric,
-            TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope, TrainingMetricSource,
+            ActivitySource, DurationCurveSource, HooperIndex, HooperIndexSource, TrainingMetric,
+            TrainingMetricBin, TrainingMetricDefinition, TrainingMetricId, TrainingMetricScope,
+            TrainingMetricSource, TrainingMetricSummaryValues, TrainingMetricValue,
             TrainingMetricValues, TrainingMetricWindow, TrainingMetricsOrdering, TrainingNote,
             TrainingNoteContent, TrainingNoteDate, TrainingNoteId, TrainingNoteTitle,
             TrainingPeriodId, WeightAndNutrition, WeightAndNutritionSource,
@@ -192,6 +193,12 @@ where
                 )
                 .await
             }
+            TrainingMetricSource::DurationCurve(source) => {
+                self.compute_training_metric_values_for_duration_curve(
+                    definition, source, date_range,
+                )
+                .await
+            }
         }
     }
 
@@ -255,6 +262,47 @@ where
 
         let values = source.extract_values(definition.window(), values);
         Ok(definition.compute_training_metric_values(values))
+    }
+
+    async fn compute_training_metric_values_for_duration_curve(
+        &self,
+        definition: &TrainingMetricDefinition,
+        source: &DurationCurveSource,
+        date_range: &DateRange,
+    ) -> Result<TrainingMetricValues, ComputeTrainingMetricValuesError> {
+        let curve = self
+            .training_repository
+            .get_best_duration_curves(definition.user(), *date_range.start(), *date_range.end())
+            .await
+            .map_err(|err| ComputeTrainingMetricValuesError::Unknown(anyhow!(err)))?
+            .into_iter()
+            .find_map(|curve| {
+                if curve.curve_type() == source.curve_type() {
+                    Some(curve.to_values())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        let values_by_bin = HashMap::from_iter(
+            std::iter::zip(curve.iter(), DURATION_CURVE_DURATIONS_SECOND).filter_map(
+                |(value, bin)| {
+                    value.map(|v| {
+                        (
+                            TrainingMetricBin::new_without_group(bin.to_string()),
+                            TrainingMetricValue::SingleValue(v as f64),
+                        )
+                    })
+                },
+            ),
+        );
+
+        Ok(TrainingMetricValues::new(
+            values_by_bin,
+            TrainingMetricSummaryValues::default(),
+            source.unit(),
+        ))
     }
 }
 
@@ -4904,8 +4952,9 @@ mod test_training_service_metric_values {
     use crate::clock::clock_test_utils::FakeClock;
     use crate::domain::models::activity::{
         Activity, ActivityDuration, ActivityId, ActivityMetric, ActivityMetrics, ActivityStartTime,
-        Sport, Unit,
+        DurationCurveType, Sport, Unit,
     };
+    use crate::domain::models::training::BestDurationCurve;
     use crate::domain::models::training::{
         HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
         TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricBin,
@@ -5271,6 +5320,200 @@ mod test_training_service_metric_values {
             .expect_get_weight_and_nutritions()
             .times(1)
             .returning(|_, _| Err(WeightAndNutritionError::Unknown(anyhow!("db error"))));
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(ComputeTrainingMetricValuesError::Unknown(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id.clone(),
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        let expected_user = user_id.clone();
+        let expected_range = date_range.clone();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .withf(move |user, since, before| {
+                user == &expected_user
+                    && *since == *expected_range.start()
+                    && *before == *expected_range.end()
+            })
+            .returning(|_, _, _| {
+                Ok(vec![
+                    BestDurationCurve::new(
+                        DurationCurveType::Power,
+                        [
+                            Some(250.0),
+                            Some(240.0),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                    // A curve of a different type should be ignored.
+                    BestDurationCurve::new(
+                        DurationCurveType::Pace,
+                        [
+                            None,
+                            None,
+                            Some(5.5),
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        ],
+                    ),
+                ])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        // Missing values are skipped, so only the two defined power values produce bins.
+        assert_eq!(values.len(), 2);
+        assert_eq!(values.unit(), Unit::Watt);
+        assert_eq!(
+            values.get(&TrainingMetricBin::from_granule("5")),
+            Some(&TrainingMetricValue::SingleValue(250.0))
+        );
+        assert_eq!(
+            values.get(&TrainingMetricBin::from_granule("10")),
+            Some(&TrainingMetricValue::SingleValue(240.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve_no_matching_curve() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| {
+                Ok(vec![BestDurationCurve::new(
+                    // Only a pace curve is available while the source requires power.
+                    DurationCurveType::Pace,
+                    [
+                        Some(5.5),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ],
+                )])
+            });
+
+        let service = TrainingService::new(
+            training_repository,
+            MockActivityService::default(),
+            Arc::new(tokio::sync::Notify::new()),
+            Arc::new(tokio::sync::Notify::new()),
+            tokio_util::sync::CancellationToken::new(),
+            FakeClock::default(),
+        );
+
+        let result = service
+            .compute_training_metric_values(&definition, &date_range)
+            .await;
+
+        let values = result.expect("compute should succeed");
+        assert!(values.is_empty());
+        assert_eq!(values.unit(), Unit::Watt);
+    }
+
+    #[tokio::test]
+    async fn test_compute_training_metric_values_with_duration_curve_propagates_repository_error() {
+        let user_id = UserId::from("user1");
+        let date_range = DateRange::new(
+            "2024-01-01".parse::<NaiveDate>().unwrap(),
+            "2024-01-31".parse::<NaiveDate>().unwrap(),
+        );
+
+        let definition = TrainingMetricDefinition::new(
+            user_id,
+            TrainingMetricSource::DurationCurve(DurationCurveSource::Cycling),
+            None,
+            TrainingMetricSummary::empty(),
+            None,
+        );
+
+        let mut training_repository = MockTrainingRepository::new();
+        training_repository
+            .expect_get_best_duration_curves()
+            .times(1)
+            .returning(|_, _, _| Err(anyhow!("db error")));
 
         let service = TrainingService::new(
             training_repository,

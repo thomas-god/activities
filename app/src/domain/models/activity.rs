@@ -1356,6 +1356,14 @@ pub enum DurationCurveType {
     Power,
     Pace,
 }
+impl DurationCurveType {
+    pub fn unit(&self) -> Unit {
+        match self {
+            Self::Pace => Unit::MeterPerSecond,
+            Self::Power => Unit::Watt,
+        }
+    }
+}
 
 pub const DURATION_CURVE_DURATIONS_SECOND: [usize; 12] = [
     5,
@@ -1391,10 +1399,7 @@ impl ActivityDurationCurve {
     }
 
     pub fn unit(&self) -> Unit {
-        match self.curve_type {
-            DurationCurveType::Pace => Unit::MeterPerSecond,
-            DurationCurveType::Power => Unit::Watt,
-        }
+        self.curve_type.unit()
     }
 
     #[tracing::instrument(skip_all)]

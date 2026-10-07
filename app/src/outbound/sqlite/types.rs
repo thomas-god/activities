@@ -15,7 +15,7 @@ use crate::domain::{
         preferences::{ActivityListSummary, Preference, PreferenceKey},
         search::SearchDocumentEvent,
         training::{
-            HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
+            DurationCurveSource, HooperIndexSource, SubjectiveScale, TrainingMetricActivityFilters,
             TrainingMetricActivityGroupBy, TrainingMetricAggregate, TrainingMetricGranularity,
             TrainingMetricId, TrainingMetricName, TrainingMetricSource, TrainingMetricSummary,
             TrainingMetricTarget, TrainingMetricValue, TrainingNoteContent, TrainingNoteDate,
@@ -885,6 +885,7 @@ pub enum RepositoryTrainingMetricSource {
     Activity(ActivityMetric),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
+    DurationCurve(DurationCurveSource),
 }
 
 impl From<&TrainingMetricSource> for RepositoryTrainingMetricSource {
@@ -893,6 +894,7 @@ impl From<&TrainingMetricSource> for RepositoryTrainingMetricSource {
             TrainingMetricSource::Activity(source) => Self::Activity(source.metric()),
             TrainingMetricSource::HooperIndex(source) => Self::HooperIndex(*source),
             TrainingMetricSource::WeightAndNutrition(source) => Self::WeightAndNutrition(*source),
+            TrainingMetricSource::DurationCurve(source) => Self::DurationCurve(*source),
         }
     }
 }
@@ -960,6 +962,10 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for RepositoryTrainingMetricSource {
                 WeightAndNutritionSource::Water => "wn-water",
                 WeightAndNutritionSource::Alcohol => "wn-alcohol",
             },
+            RepositoryTrainingMetricSource::DurationCurve(source) => match source {
+                DurationCurveSource::Cycling => "dc-cycling",
+                DurationCurveSource::Running => "dc-running",
+            },
         };
 
         args.push(sqlx::sqlite::SqliteArgumentValue::Text(s.into()));
@@ -1022,6 +1028,9 @@ impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for RepositoryTrainingMetricSource {
             "wn-macros" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Macros)),
             "wn-water" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Water)),
             "wn-alcohol" => Ok(Self::WeightAndNutrition(WeightAndNutritionSource::Alcohol)),
+
+            "dc-running" => Ok(Self::DurationCurve(DurationCurveSource::Running)),
+            "dc-cycling" => Ok(Self::DurationCurve(DurationCurveSource::Cycling)),
 
             _ => Err(format!("Unknown ActivityMetricV2: {}", s).into()),
         }

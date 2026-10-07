@@ -1487,6 +1487,9 @@ fn parse_definition_row_metric(
             RepositoryTrainingMetricSource::WeightAndNutrition(source) => {
                 TrainingMetricSource::WeightAndNutrition(source)
             }
+            RepositoryTrainingMetricSource::DurationCurve(source) => {
+                TrainingMetricSource::DurationCurve(source)
+            }
         }),
         (None, Some(Ok(metric))) => Some(TrainingMetricSource::Activity(ActivitySource::new(
             metric, group_by, filters,

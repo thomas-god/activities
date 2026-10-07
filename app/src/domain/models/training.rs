@@ -608,6 +608,7 @@ pub enum TrainingMetricSource {
     Activity(ActivitySource),
     HooperIndex(HooperIndexSource),
     WeightAndNutrition(WeightAndNutritionSource),
+    DurationCurve(DurationCurveSource),
 }
 
 impl TrainingMetricSource {
@@ -616,6 +617,7 @@ impl TrainingMetricSource {
             Self::Activity(source) => source.unit(),
             Self::HooperIndex(source) => source.unit(),
             Self::WeightAndNutrition(source) => source.unit(),
+            Self::DurationCurve(source) => source.unit(),
         }
     }
 
@@ -633,6 +635,7 @@ impl Display for TrainingMetricSource {
             Self::Activity(source) => f.write_str(&source.to_string()),
             Self::HooperIndex(source) => f.write_str(&source.to_string()),
             Self::WeightAndNutrition(source) => f.write_str(&source.to_string()),
+            Self::DurationCurve(source) => f.write_str(&source.to_string()),
         }
     }
 }
@@ -654,10 +657,10 @@ impl TrainingMetricDefinition {
         summary: TrainingMetricSummary,
         target: Option<TrainingMetricTarget>,
     ) -> Self {
-        // By definitions, Hooper values and Weight&Nutrition are day aligned values, so we reflect
-        // that by converting None window to be of TrainingMetricGranularity::Daily granularity.
-        // With one value per day the chosen aggregate funcion (average) is identity.
         let window = match &source {
+            // By definitions, Hooper values and Weight&Nutrition are day aligned values, so we reflect
+            // that by converting None window to be of TrainingMetricGranularity::Daily granularity.
+            // With one value per day the chosen aggregate function (average) is identity.
             TrainingMetricSource::HooperIndex(_) | TrainingMetricSource::WeightAndNutrition(_) => {
                 window.or(Some(TrainingMetricWindow::new(
                     TrainingMetricGranularity::Daily,
@@ -665,6 +668,8 @@ impl TrainingMetricDefinition {
                 )))
             }
             TrainingMetricSource::Activity(_) => window,
+            // DurationCurves have no intrinsic window as they do their own aggregation over activities
+            TrainingMetricSource::DurationCurve(_) => None,
         };
 
         Self {
@@ -701,6 +706,7 @@ impl TrainingMetricDefinition {
             TrainingMetricSource::Activity(source) => source.unit(),
             TrainingMetricSource::HooperIndex(source) => source.unit(),
             TrainingMetricSource::WeightAndNutrition(source) => source.unit(),
+            TrainingMetricSource::DurationCurve(source) => source.unit(),
         }
     }
 
@@ -1934,6 +1940,29 @@ impl BestDurationCurve {
 
     pub fn values(&self) -> &[Option<f32>; 12] {
         &self.values
+    }
+
+    pub fn to_values(self) -> [Option<f32>; 12] {
+        self.values
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Display, Serialize, Deserialize)]
+pub enum DurationCurveSource {
+    Running,
+    Cycling,
+}
+
+impl DurationCurveSource {
+    pub fn curve_type(&self) -> DurationCurveType {
+        match self {
+            Self::Cycling => DurationCurveType::Power,
+            Self::Running => DurationCurveType::Pace,
+        }
+    }
+
+    pub fn unit(&self) -> Unit {
+        self.curve_type().unit()
     }
 }
 
