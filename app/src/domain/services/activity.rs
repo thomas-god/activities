@@ -132,6 +132,10 @@ where
             }
         }
 
+        if processed_activities > 0 {
+            self.notify_duration_curve.notify_one();
+        }
+
         tracing::info!(
             "Finished processing missing duration curves: {} activities processed in {}s",
             processed_activities,
@@ -2012,13 +2016,26 @@ mod tests_activity_service {
 
     fn duration_curve_service(
         activity_repository: MockActivityRepository,
+        notify_duration_curve: Arc<tokio::sync::Notify>,
     ) -> ActivityService<MockActivityRepository, MockRawDataRepository> {
         ActivityService::new(
             activity_repository,
             MockRawDataRepository::default(),
             Arc::new(tokio::sync::Notify::new()),
-            Arc::new(tokio::sync::Notify::new()),
+            notify_duration_curve,
         )
+    }
+
+    /// Registers a `Notified` waiter on the notify channel and returns it, so tests can
+    /// observe whether the service called `notify_one()`. The waiter is enabled so it is
+    /// registered before the service runs; afterwards, `enable()` on the returned future
+    /// returns true if and only if the service sent a notification.
+    fn registered_notified(
+        notify: &Arc<tokio::sync::Notify>,
+    ) -> std::pin::Pin<Box<tokio::sync::futures::Notified<'_>>> {
+        let mut future = Box::pin(notify.notified());
+        assert!(!future.as_mut().enable());
+        future
     }
 
     #[tokio::test]
@@ -2059,8 +2076,13 @@ mod tests_activity_service {
                 Ok(())
             });
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // One activity was successfully processed, so a notification must be sent.
+        assert!(notified.as_mut().enable());
 
         let saved = saved.lock().unwrap();
         assert_eq!(1, saved.len());
@@ -2096,8 +2118,13 @@ mod tests_activity_service {
             .times(0);
         activity_repository.expect_save_activity().times(0);
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // Nothing was processed, so no notification must be sent.
+        assert!(!notified.as_mut().enable());
     }
 
     #[tokio::test]
@@ -2125,8 +2152,13 @@ mod tests_activity_service {
             .returning(|_, _| Ok(None));
         activity_repository.expect_save_activity().times(0);
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // No activity could be processed, so no notification must be sent.
+        assert!(!notified.as_mut().enable());
     }
 
     #[tokio::test]
@@ -2161,8 +2193,13 @@ mod tests_activity_service {
             .times(1)
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("save failed"))));
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // The only activity failed to be persisted, so no notification must be sent.
+        assert!(!notified.as_mut().enable());
     }
 
     #[tokio::test]
@@ -2220,8 +2257,13 @@ mod tests_activity_service {
                 Ok(())
             });
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // Both activities were successfully processed, so a notification must be sent.
+        assert!(notified.as_mut().enable());
 
         let saved = saved.lock().unwrap();
         assert_eq!(2, saved.len());
@@ -2277,7 +2319,12 @@ mod tests_activity_service {
             .times(51)
             .returning(|_| Err(SaveActivityError::Unknown(anyhow!("save failed"))));
 
-        let service = duration_curve_service(activity_repository);
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let mut notified = registered_notified(&notify);
+        let service = duration_curve_service(activity_repository, notify.clone());
         service.compute_missing_duration_curves().await;
+
+        // No activity was successfully persisted, so no notification must be sent.
+        assert!(!notified.as_mut().enable());
     }
 }
