@@ -4,24 +4,24 @@
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
-	import { dayjs } from '$lib/duration';
+	import { dayjs } from '#lib/duration.js';
 	import {
 		fetchActivityDetails,
 		fetchActivityListSummary,
 		setPreference,
 		type ActivityListSummaryItems,
 		type PreferencePayload
-	} from '$lib/api';
+	} from '#lib/api/index.js';
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
-	import type { ActivityList, ActivityWithTimeseries } from '$lib/api/activities';
+	import type { ActivityList, ActivityWithTimeseries } from '#lib/api/activities.js';
 	import Timeline from '$ui/activity/Timeline.svelte';
 	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
-	import { filtersFromSearchParams, applyFiltersToSearchParams } from '$lib/filters';
-	import type { ActivitiesFilters } from '$lib/filters';
+	import { filtersFromSearchParams, applyFiltersToSearchParams } from '#lib/filters.js';
+	import type { ActivitiesFilters } from '#lib/filters.js';
 	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, CalendarFold, List, Maximize2, Settings2, X } from '@lucide/svelte';
-	import { none, type Option } from '$lib/Options';
+	import { none, type Option } from '#lib/Options.js';
 	import type { SearchResult } from '$ui/shared/SearchField.svelte';
 	import SearchField from '$ui/shared/SearchField.svelte';
 	import Navbar from '$ui/navigation/Navbar.svelte';
@@ -97,7 +97,7 @@
 
 		// On small screens, navigate to activity page
 		if (screenWidth < 700) {
-			goto(resolve(`/activity/${activityId}`));
+			goto(resolve(`activity/${activityId}`));
 			return;
 		}
 
@@ -269,7 +269,7 @@
 				>
 					<div class="absolute top-1.5 right-3 join">
 						<button
-							onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
+							onclick={() => goto(resolve(`activity/${selectedActivityId}`))}
 							class="btn join-item btn-xs"
 						>
 							<Maximize2 class="size-3.5" />

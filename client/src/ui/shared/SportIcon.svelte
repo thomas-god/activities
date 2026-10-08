@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SportCategory } from '$lib/sport';
+	import type { SportCategory } from '#lib/sport.js';
 	import {
 		Bike,
 		Dumbbell,

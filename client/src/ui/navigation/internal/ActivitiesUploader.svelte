@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { postActivities } from '$lib/api';
+	import { postActivities } from '#lib/api/index.js';
 	import { SportShoe } from '@lucide/svelte';
 	import CreateStandaloneActivity from './CreateStandaloneActivity.svelte';
-	import { none, type Option } from '$lib/Options';
+	import { none, type Option } from '#lib/Options.js';
 	import FormTitle from '../FormTitle.svelte';
 
 	let {
@@ -71,7 +71,7 @@
 		file_upload_content = '';
 
 		if (res.type === 'authentication-error') {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		activitiesUploadedCallback();
@@ -86,7 +86,6 @@
 <div class="grid grid-cols-1 gap-4">
 	<fieldset class="fieldset rounded-box border-base-300 bg-base-100">
 		<FormTitle {previous} {next} {content} />
-
 		<legend class="fieldset-legend pt-0 text-base">Upload activity files</legend>
 		<div class="join gap-3">
 			<input

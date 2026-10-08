@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { Sport, SportCategory } from '$lib/sport';
-	import { isNone, isSome, none, type Option, some } from '$lib/Options';
-	import type { RPEValue } from '$lib/rpe';
-	import type { BonkStatus } from '$lib/nutrition';
+	import type { Sport, SportCategory } from '#lib/sport.js';
+	import { isNone, isSome, none, type Option, some } from '#lib/Options.js';
+	import type { RPEValue } from '#lib/rpe.js';
+	import type { BonkStatus } from '#lib/nutrition.js';
 	import RpeFilter from './RpeFilter.svelte';
 	import BonkStatusFilter from './BonkStatusFilter.svelte';
-	import type { WorkoutType } from '$lib/workout-type';
+	import type { WorkoutType } from '#lib/workout-type.js';
 	import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
 	import SportFilter from '$ui/shared/SportFilter.svelte';
 	import { Plus } from '@lucide/svelte';

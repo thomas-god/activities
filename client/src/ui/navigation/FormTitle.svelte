@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isSome, none, type Option } from '$lib/Options';
+	import { isSome, none, type Option } from '#lib/Options.js';
 	import { ArrowLeft, ArrowRight } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 

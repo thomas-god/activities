@@ -1,8 +1,8 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { formatDuration } from '$lib/duration';
-	import type { ActivityWithTimeseries } from '$lib/api';
-	import { paceInSecondToString } from '$lib/speed';
+	import { formatDuration } from '#lib/duration.js';
+	import type { ActivityWithTimeseries } from '#lib/api/index.js';
+	import { paceInSecondToString } from '#lib/speed.js';
 	import type { SvelteMap } from 'svelte/reactivity';
 
 	interface Props {

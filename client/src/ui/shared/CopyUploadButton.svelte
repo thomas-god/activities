@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isNone, none, some, type Option } from '$lib/Options';
+	import { isNone, none, some, type Option } from '#lib/Options.js';
 	import { Check, CopyPlus } from '@lucide/svelte';
 
 	let {

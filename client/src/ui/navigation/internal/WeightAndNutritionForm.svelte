@@ -5,9 +5,9 @@
 		saveWeightAndNutrition,
 		type UpdateWeightAndNutritionPatch,
 		type WeightAndNutrition
-	} from '$lib/api';
-	import { dayjs } from '$lib/duration';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	} from '#lib/api/index.js';
+	import { dayjs } from '#lib/duration.js';
+	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import {
 		ArchiveRestore,
 		CalendarArrowUp,

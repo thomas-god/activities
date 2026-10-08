@@ -2,12 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
+import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '#lib/api/index.js';
 import HooperIndexForm from './FeedbackForm.svelte';
 import { emptyHooperIndex, hooperMeasures } from './feedback';
-import { dayjs } from '$lib/duration';
+import { dayjs } from '#lib/duration.js';
 
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api/index.js', () => ({
 	fetchHooperIndex: vi.fn(),
 	saveHooperIndex: vi.fn()
 }));

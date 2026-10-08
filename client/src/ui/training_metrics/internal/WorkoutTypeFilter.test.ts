@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
-import { none, some } from '$lib/Options';
+import { none, some } from '#lib/Options.js';
 import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
-import type { WorkoutType } from '$lib/workout-type';
+import type { WorkoutType } from '#lib/workout-type.js';
 
 afterEach(() => {
 	cleanup();

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isNone, isSome, none, some, unwrap } from '$lib/Options';
-import type { TrainingMetric, TrainingPeriodDetails } from '$lib/api';
-import type { TrainingMetricGranularity } from '$lib/trainingMetric';
+import { isNone, isSome, none, some, unwrap } from '#lib/Options.js';
+import type { TrainingMetric, TrainingPeriodDetails } from '#lib/api/index.js';
+import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
 
 import {
 	computeExtendedTimeDomain,

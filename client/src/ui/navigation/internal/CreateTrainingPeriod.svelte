@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto, invalidate } from '$app/navigation';
 	import SportFilter from '$ui/shared/SportFilter.svelte';
-	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { type Sport, type SportCategory } from '$lib/sport';
+	import { PUBLIC_APP_URL } from '$app/env/public';
+	import { type Sport, type SportCategory } from '#lib/sport.js';
 	import DateRange from '$ui/shared/DateRange.svelte';
-	import { unwrapOr, some, none, type Option } from '$lib/Options';
+	import { unwrapOr, some, none, type Option } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 	import { CalendarFold } from '@lucide/svelte';
 	import FormTitle from '../FormTitle.svelte';
@@ -64,7 +64,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 		invalidate('app:training-metrics');
 		callback();

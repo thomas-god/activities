@@ -1,19 +1,19 @@
 <script lang="ts">
 	import * as d3 from 'd3';
 	import { X } from '@lucide/svelte';
-	import type { TrainingMetric, TrainingPeriodDetails } from '$lib/api';
-	import { asOption, isSome, none, some, type Option } from '$lib/Options';
+	import type { TrainingMetric, TrainingPeriodDetails } from '#lib/api/index.js';
+	import { asOption, isSome, none, some, type Option } from '#lib/Options.js';
 	import {
 		definitionLabel,
 		type CompareAlignment,
 		type CompareMetricDefinition
-	} from '$lib/trainingMetric';
+	} from '#lib/trainingMetric.js';
 	import TrainingMetricChart, {
 		type ChartHandle,
 		type HoveredBin
 	} from '$ui/training_metrics/TrainingMetricChart.svelte';
 	import { computeExtendedTimeDomain, computeMissingNumberOfBins } from './CompareMetricEntry';
-	import { dayjs } from '$lib/duration';
+	import { dayjs } from '#lib/duration.js';
 
 	interface ComparedSide {
 		period: TrainingPeriodDetails;

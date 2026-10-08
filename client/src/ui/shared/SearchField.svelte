@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { none, some, type Option } from '$lib/Options';
+	import { PUBLIC_APP_URL } from '$app/env/public';
+	import { none, some, type Option } from '#lib/Options.js';
 	import { Search } from '@lucide/svelte';
 	import { tick } from 'svelte';
 

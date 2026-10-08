@@ -1,7 +1,11 @@
 <script lang="ts">
-	import type { ActivityList, ActivityListSummaryItems, TrainingNotesList } from '$lib/api';
-	import { dayjs } from '$lib/duration';
-	import { isNone, type Option } from '$lib/Options';
+	import type {
+		ActivityList,
+		ActivityListSummaryItems,
+		TrainingNotesList
+	} from '#lib/api/index.js';
+	import { dayjs } from '#lib/duration.js';
+	import { isNone, type Option } from '#lib/Options.js';
 	import ActivityListComponent, {
 		type TimelineItem
 	} from '$ui/activity/internal/ActivityList.svelte';

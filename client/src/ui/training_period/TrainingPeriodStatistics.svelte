@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { TrainingPeriodDetails } from '$lib/api';
-	import { formatDurationHoursMinutes } from '$lib/duration';
-	import { formatDistance, formatElevation, periodActivitiesSummary } from '$lib/trainingPeriod';
+	import type { TrainingPeriodDetails } from '#lib/api/index.js';
+	import { formatDurationHoursMinutes } from '#lib/duration.js';
+	import { formatDistance, formatElevation, periodActivitiesSummary } from '#lib/trainingPeriod.js';
 
 	interface Props {
 		period: TrainingPeriodDetails;

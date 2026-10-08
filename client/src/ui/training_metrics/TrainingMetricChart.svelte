@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { getMetricGroupBy, type TrainingMetric } from '$lib/api';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	import { getMetricGroupBy, type TrainingMetric } from '#lib/api/index.js';
+	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import ScatterChart from './internal/charts/Scatter.svelte';
 	import BarChart from './internal/charts/Bar.svelte';
 	import StackedArea from './internal/charts/StackedArea.svelte';

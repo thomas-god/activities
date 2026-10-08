@@ -1,5 +1,5 @@
 import type { PageLoad } from '../$types';
-import { fetchTrainingPeriods } from '$lib/api';
+import { fetchTrainingPeriods } from '#lib/api/index.js';
 
 export const prerender = true;
 export const ssr = false;

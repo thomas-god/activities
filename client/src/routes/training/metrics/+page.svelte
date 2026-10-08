@@ -2,10 +2,14 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import TrainingMetricsOptions from '$ui/training_metrics/TrainingMetricsOptions.svelte';
-	import { dayjs } from '$lib/duration';
+	import { dayjs } from '#lib/duration.js';
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
-	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
-	import { isSome, some, type Option } from '$lib/Options';
+	import {
+		fetchTrainingMetrics,
+		fetchTrainingPeriods,
+		type TrainingMetricList
+	} from '#lib/api/index.js';
+	import { isSome, some, type Option } from '#lib/Options.js';
 	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
 	import Navbar from '$ui/navigation/Navbar.svelte';
 

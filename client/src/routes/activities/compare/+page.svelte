@@ -3,7 +3,11 @@
 	import CompareActivities from '$ui/activity/CompareActivities.svelte';
 	import CompareActivitiesSummary from '$ui/activity/CompareActivitiesSummary.svelte';
 	import Navbar from '$ui/navigation/Navbar.svelte';
-	import { fetchActivityDetails, type ActivityList, type ActivityWithTimeseries } from '$lib/api';
+	import {
+		fetchActivityDetails,
+		type ActivityList,
+		type ActivityWithTimeseries
+	} from '#lib/api/index.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

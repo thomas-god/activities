@@ -1,4 +1,4 @@
-import type { WeightAndNutrition } from '$lib/api';
+import type { WeightAndNutrition } from '#lib/api/index.js';
 
 /** Every measure that makes up a weight and nutrition entry. */
 export const weightAndNutritionMeasures = [

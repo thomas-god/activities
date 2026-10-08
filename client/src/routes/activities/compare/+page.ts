@@ -1,5 +1,5 @@
 import type { PageLoad } from './$types';
-import { fetchActivities } from '$lib/api';
+import { fetchActivities } from '#lib/api/index.js';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');

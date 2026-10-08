@@ -3,8 +3,8 @@
 	import MetricsMultiSelect from '$ui/activity/internal/MetricsMultiSelect.svelte';
 	import OffsetControls from './internal/OffsetControls.svelte';
 	import ActivityCompareChart from '$ui/activity/internal/ActivityCompareChart.svelte';
-	import { type ActivityWithTimeseries } from '$lib/api';
-	import type { Metric } from '$lib/colors';
+	import { type ActivityWithTimeseries } from '#lib/api/index.js';
+	import type { Metric } from '#lib/colors.js';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { Settings2 } from '@lucide/svelte';
 

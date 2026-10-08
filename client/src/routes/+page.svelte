@@ -8,10 +8,10 @@
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
-	} from '$lib/api/activities';
+	} from '#lib/api/activities.js';
 	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
-	import { dayjs } from '$lib/duration';
-	import { some } from '$lib/Options';
+	import { dayjs } from '#lib/duration.js';
+	import { some } from '#lib/Options.js';
 	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
 	import { resolve } from '$app/paths';
 	import { Maximize2, X } from '@lucide/svelte';
@@ -29,13 +29,13 @@
 	const endDate = dayjs().add(1, 'day').endOf('day').toISOString();
 
 	const moreActivitiesCallback = () => {
-		goto(resolve('/history'));
+		goto(resolve('history'));
 	};
 
 	const handleActivityClick = async (activityId: string) => {
 		// On mobile, navigate to activity page
 		if (screenWidth < 700) {
-			goto(resolve(`/activity/${activityId}`));
+			goto(resolve(`activity/${activityId}`));
 			return;
 		}
 
@@ -138,7 +138,7 @@
 					<div class="relative w-full">
 						<div class="absolute -top-1.5 right-3 join">
 							<button
-								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
+								onclick={() => goto(resolve(`activity/${selectedActivityId}`))}
 								class="btn join-item btn-xs"
 							>
 								<Maximize2 class="size-3.5" />

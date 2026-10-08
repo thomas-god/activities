@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Navbar from '$ui/navigation/Navbar.svelte';
-	import { PUBLIC_APP_URL } from '$env/static/public';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
+	import { PUBLIC_APP_URL } from '$app/env/public';
+	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
 	import z from 'zod';
 	import { resolve } from '$app/paths';
 
@@ -38,9 +38,7 @@
 		: none();
 
 	let authInfo = (await (
-		await fetch(`${PUBLIC_APP_URL}/api/auth_info`, {
-			method: 'GET'
-		})
+		await fetch(`${PUBLIC_APP_URL}/api/auth_info`, { method: 'GET' })
 	).json()) as {
 		strategy: 'NoAuth' | 'SinglePassword' | 'EmailBased';
 		registration: boolean;

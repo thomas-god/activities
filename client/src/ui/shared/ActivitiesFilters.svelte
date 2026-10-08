@@ -1,10 +1,10 @@
 <script lang="ts">
-	import type { ActivityList } from '$lib/api';
-	import { RPE_VALUES, getRpeColor } from '$lib/rpe';
-	import { WORKOUT_TYPE_LABELS, getWorkoutTypeColor, type WorkoutType } from '$lib/workout-type';
-	import { getSportCategory, sportCategoryDisplay, type SportCategory } from '$lib/sport';
-	import { emptyFilters, filterActivities, type ActivitiesFilters } from '$lib/filters';
-	import type { RangeFilter } from '$lib/filters';
+	import type { ActivityList } from '#lib/api/index.js';
+	import { RPE_VALUES, getRpeColor } from '#lib/rpe.js';
+	import { WORKOUT_TYPE_LABELS, getWorkoutTypeColor, type WorkoutType } from '#lib/workout-type.js';
+	import { getSportCategory, sportCategoryDisplay, type SportCategory } from '#lib/sport.js';
+	import { emptyFilters, filterActivities, type ActivitiesFilters } from '#lib/filters.js';
+	import type { RangeFilter } from '#lib/filters.js';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Funnel } from '@lucide/svelte';
 	import SportIcon from './SportIcon.svelte';

@@ -2,11 +2,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { logout } from '$lib/api/auth';
+	import { logout } from '#lib/api/auth.js';
 	import ThemeToggle from '$ui/shared/ThemeToggle.svelte';
-	import { getTheme, persistTheme } from '$lib/contexts/theme';
-	import { getAuthInfo } from '$lib/contexts/auth';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	import { getTheme, persistTheme } from '#lib/contexts/theme.js';
+	import { getAuthInfo } from '#lib/contexts/auth.js';
+	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import {
 		CalendarFold,
 		ChartColumn,
@@ -58,13 +58,16 @@
 
 	const handleLogout = async () => {
 		await logout();
-		goto(resolve('/login'));
+		goto(resolve('login'));
 	};
 
 	// On mobile the logout button, and the theme toggle collapse into a single menu.
 	let mobileMenuItems = $derived([
 		...(showLogout ? [{ label: 'Log out', onClick: handleLogout }] : []),
-		{ label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode', onClick: toggleTheme }
+		{
+			label: theme.variant === 'dark' ? 'Light mode' : 'Dark mode',
+			onClick: toggleTheme
+		}
 	]);
 
 	let addItemMenuBtn: HTMLButtonElement;
@@ -87,6 +90,7 @@
 			? some(page.url.pathname.replace('/training/period/', ''))
 			: none()
 	);
+
 	let trainingPeriodScope: Scope = $derived(
 		isSome(trainingPeriod) ? { kind: 'period', periodId: trainingPeriod.value } : { kind: 'global' }
 	);
@@ -124,15 +128,15 @@
 		>
 		<a
 			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classExactPath('/history')}`}
-			href={resolve('/history')}>History</a
+			href={resolve('history')}>History</a
 		>
 		<a
 			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/metrics')}`}
-			href={resolve('/training/metrics')}>Metrics</a
+			href={resolve('training/metrics')}>Metrics</a
 		>
 		<a
 			class={`btn shrink-0 btn-ghost px-1 text-[15px] font-medium xs:px-2 xs:text-[16px] sm:text-lg ${classPathStartWith('/training/period')}`}
-			href={resolve('/training/periods')}>Periods</a
+			href={resolve('training/periods')}>Periods</a
 		>
 	</div>
 
@@ -186,6 +190,7 @@
 				>Log out</button
 			>
 		{/if}
+
 		<ThemeToggle {theme} onToggle={toggleTheme} class="hidden min-[850px]:flex" />
 
 		<div class="dropdown dropdown-end min-[850px]:hidden">

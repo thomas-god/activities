@@ -1,5 +1,9 @@
 import type { PageLoad } from './$types';
-import { fetchActivityDetails, type ActivityWithTimeseries, type Timeseries } from '$lib/api';
+import {
+	fetchActivityDetails,
+	type ActivityWithTimeseries,
+	type Timeseries
+} from '#lib/api/index.js';
 
 export const load: PageLoad = async ({ fetch, depends, params }) => {
 	depends(`app:activity:${params.activity_id}`);

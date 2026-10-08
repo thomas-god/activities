@@ -1,13 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dayjs } from '$lib/duration';
+import { dayjs } from '#lib/duration.js';
 
-import { fetchWeightAndNutrition, saveWeightAndNutrition, type WeightAndNutrition } from '$lib/api';
+import {
+	fetchWeightAndNutrition,
+	saveWeightAndNutrition,
+	type WeightAndNutrition
+} from '#lib/api/index.js';
 import WeightAndNutritionForm from './WeightAndNutritionForm.svelte';
 import { emptyWeightAndNutrition } from './weightAndNutrition';
 
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api/index.js', () => ({
 	fetchWeightAndNutrition: vi.fn(),
 	saveWeightAndNutrition: vi.fn()
 }));

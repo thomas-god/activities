@@ -22,11 +22,11 @@ forgetting `$derived` on actual dynamic variables.
 The same design decision applies to other types of chart in this module.
 -->
 <script lang="ts">
-	import { formatDurationCompactWithUnits } from '$lib/duration';
-	import { paceInSecondToString } from '$lib/speed';
+	import { formatDurationCompactWithUnits } from '#lib/duration.js';
+	import { paceInSecondToString } from '#lib/speed.js';
 	import * as d3 from 'd3';
-	import { dayjs } from '$lib/duration';
-	import { isSome, map, none, unwrapOr, type Option } from '$lib/Options';
+	import { dayjs } from '#lib/duration.js';
+	import { isSome, map, none, unwrapOr, type Option } from '#lib/Options.js';
 	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
 
 	import {
@@ -35,7 +35,7 @@ The same design decision applies to other types of chart in this module.
 		parseMetricIntoPoints,
 		type DisplayMode
 	} from '.';
-	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
+	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
 	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
 
 	export interface TimeseriesChartProps {

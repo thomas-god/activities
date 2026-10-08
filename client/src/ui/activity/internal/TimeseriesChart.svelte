@@ -1,10 +1,10 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { formatDuration } from '$lib/duration';
+	import { formatDuration } from '#lib/duration.js';
 	import TimeseriesLine, { type LineOrder } from './TimeseriesLine.svelte';
-	import { formatMetricValue, matchMetric, metricClass } from '$lib/colors';
+	import { formatMetricValue, matchMetric, metricClass } from '#lib/colors.js';
 	import { untrack } from 'svelte';
-	import type { ActivityWithTimeseries } from '$lib/api';
+	import type { ActivityWithTimeseries } from '#lib/api/index.js';
 	import { RulerDimensionLine, Timer, Undo } from '@lucide/svelte';
 
 	export interface Metric {

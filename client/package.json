@@ -21,6 +21,7 @@
 		"@eslint/js": "^10.0.1",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.0.0",
+		"@sveltejs/load-config": "^0.2.2",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.3",
 		"@testing-library/jest-dom": "^7.0.1",
@@ -55,5 +56,9 @@
 		"dayjs": "^1.11.23",
 		"leaflet": "^1.9.4",
 		"zod": "^4.6.5"
+	},
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
 	}
 }

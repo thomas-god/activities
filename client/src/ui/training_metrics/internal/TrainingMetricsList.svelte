@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { none, type Option } from '$lib/Options';
-	import type { TrainingMetric } from '$lib/api/training';
+	import { none, type Option } from '#lib/Options.js';
+	import type { TrainingMetric } from '#lib/api/training.js';
 	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
 	import TrainingMetricChart from '../TrainingMetricChart.svelte';
 

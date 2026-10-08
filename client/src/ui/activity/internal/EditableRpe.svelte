@@ -2,7 +2,7 @@
 	import EditButton from '$ui/shared/EditButton.svelte';
 	import SaveButton from '$ui/shared/SaveButton.svelte';
 	import AddButton from '$ui/shared/AddButton.svelte';
-	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '$lib/rpe';
+	import { RPE_VALUES, getRpeLabelAsScale, getRpeColor } from '#lib/rpe.js';
 
 	let {
 		rpe: initialRpe,

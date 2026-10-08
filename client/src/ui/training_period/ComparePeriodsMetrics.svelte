@@ -9,8 +9,8 @@
 		type TrainingMetricBasePayload,
 		type TrainingMetricList,
 		type TrainingPeriodDetails
-	} from '$lib/api';
-	import { isSome, map, type Option } from '$lib/Options';
+	} from '#lib/api/index.js';
+	import { isSome, map, type Option } from '#lib/Options.js';
 	import {
 		definitionLabel,
 		metricPreviewPayload,
@@ -20,7 +20,7 @@
 		type CompareAlignment,
 		type CompareMetricDefinition,
 		definitionGroupBy
-	} from '$lib/trainingMetric';
+	} from '#lib/trainingMetric.js';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
 	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
 	import {

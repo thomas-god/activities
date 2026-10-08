@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { TrainingMetric } from '$lib/api';
-	import { map, none, unwrapOr, type Option } from '$lib/Options';
+	import type { TrainingMetric } from '#lib/api/index.js';
+	import { map, none, unwrapOr, type Option } from '#lib/Options.js';
 	import TrainingMetricsCarousel from './internal/TrainingMetricsCarousel.svelte';
 	import TrainingMetricsList from './internal/TrainingMetricsList.svelte';
 

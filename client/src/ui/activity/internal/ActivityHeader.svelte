@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { localiseDateTime } from '$lib/duration';
+	import { localiseDateTime } from '#lib/duration.js';
 	import EditableActivityName from '$ui/activity/internal/EditableActivityName.svelte';
-	import { sportDisplay, type SportCategory } from '$lib/sport';
-	import type { Activity } from '$lib/api/activities';
+	import { sportDisplay, type SportCategory } from '#lib/sport.js';
+	import type { Activity } from '#lib/api/activities.js';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, GitCompareArrows, Settings, Trash2 } from '@lucide/svelte';
@@ -66,22 +66,19 @@
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<ul tabindex="0" class="menu dropdown-content z-1 w-40 rounded-box bg-base-100 p-2 shadow">
 					<li>
-						<button onclick={() => goto(resolve(`/activities/compare?activities=${activity.id}`))}>
-							<GitCompareArrows class="size-5" />
-							Compare
-						</button>
+						<button onclick={() => goto(resolve(`activities/compare?activities=${activity.id}`))}
+							><GitCompareArrows class="size-5" />Compare</button
+						>
 					</li>
+
 					<li>
-						<button onclick={onDownloadCallback}>
-							<ArrowDownToLine class="size-5" />
-							Download
-						</button>
+						<button onclick={onDownloadCallback}><ArrowDownToLine class="size-5" />Download</button>
 					</li>
+
 					<li>
-						<button onclick={onDeleteClickedCallback} class="text-error">
-							<Trash2 class="size-5" />
-							Delete
-						</button>
+						<button onclick={onDeleteClickedCallback} class="text-error"
+							><Trash2 class="size-5" />Delete</button
+						>
 					</li>
 				</ul>
 			</div>

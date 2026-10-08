@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { metricAsString, type TrainingMetric } from '$lib/api';
-	import { aggregateFunctionDisplay } from '$lib/trainingMetric';
+	import { metricAsString, type TrainingMetric } from '#lib/api/index.js';
+	import { aggregateFunctionDisplay } from '#lib/trainingMetric.js';
 	import TrainingMetricMenu from './internal/TrainingMetricMenu.svelte';
 
 	let { metric, onUpdate }: { metric: TrainingMetric; onUpdate: () => void } = $props();

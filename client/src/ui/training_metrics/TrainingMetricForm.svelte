@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
-	import type { TrainingMetricTemplate } from '$lib/api';
+	import { type Sport, type SportCategory } from '#lib/sport.js';
+	import { isNone, isSome, map, none, some, unwrapOr, type Option } from '#lib/Options.js';
+	import type { TrainingMetricTemplate } from '#lib/api/index.js';
 	import TrainingMetricFilters from './internal/TrainingMetricFilters.svelte';
 	import type { TrainingMetricFields } from '.';
-	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
+	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
 
 	let {
 		templates,

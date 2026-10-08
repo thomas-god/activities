@@ -9,7 +9,7 @@
 		getBonkStatusIcon,
 		type BonkStatus,
 		type Nutrition
-	} from '$lib/nutrition';
+	} from '#lib/nutrition.js';
 
 	let {
 		nutrition: initialNutrition,

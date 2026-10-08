@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Theme } from '$lib/contexts/theme';
+	import type { Theme } from '#lib/contexts/theme.js';
 
 	let {
 		theme,

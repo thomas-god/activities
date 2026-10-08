@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
-import { none, some, type Option } from '$lib/Options';
-import type { RPEValue } from '$lib/rpe';
+import { none, some, type Option } from '#lib/Options.js';
+import type { RPEValue } from '#lib/rpe.js';
 import RpeFilter from './RpeFilter.svelte';
 
 afterEach(() => {

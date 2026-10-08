@@ -32,7 +32,7 @@ ruleTester.run('no-cross-feature-internal-import', rule, {
 		},
 		{
 			// importing from $lib: allowed
-			code: `import utils from '$lib/utils.ts';`,
+			code: `import utils from '#lib/utils.ts';`,
 			filename: '/src/ui/checkout/CheckoutForm.svelte'
 		}
 	],

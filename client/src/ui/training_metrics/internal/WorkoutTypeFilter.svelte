@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { isSome, type Option, none, some } from '$lib/Options';
-	import { WORKOUT_TYPE_VALUES, workoutTypeDisplay, type WorkoutType } from '$lib/workout-type';
+	import { isSome, type Option, none, some } from '#lib/Options.js';
+	import { WORKOUT_TYPE_VALUES, workoutTypeDisplay, type WorkoutType } from '#lib/workout-type.js';
 	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {

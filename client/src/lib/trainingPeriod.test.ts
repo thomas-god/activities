@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Activity } from '$lib/api/activities';
+import type { Activity } from '#lib/api/activities.js';
 
 import {
 	formatDistance,

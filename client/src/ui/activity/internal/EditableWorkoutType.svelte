@@ -8,7 +8,7 @@
 		getWorkoutTypeColor,
 		type WorkoutType,
 		getWorkoutTypeClass
-	} from '$lib/workout-type';
+	} from '#lib/workout-type.js';
 
 	let {
 		workoutType: initialWorkoutType,

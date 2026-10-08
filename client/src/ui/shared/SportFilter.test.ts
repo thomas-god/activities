@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
-import { none, some, type Option } from '$lib/Options';
-import type { Sport, SportCategory } from '$lib/sport';
+import { none, some, type Option } from '#lib/Options.js';
+import type { Sport, SportCategory } from '#lib/sport.js';
 import SportFilter from './SportFilter.svelte';
 
 const getSummaryText = (container: HTMLElement): string => {

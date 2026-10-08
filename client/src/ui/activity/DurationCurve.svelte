@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { isSome, none, type Option, type Some } from '$lib/Options';
+	import { isSome, none, type Option, type Some } from '#lib/Options.js';
 
 	type Kind = 'power' | 'pace';
 

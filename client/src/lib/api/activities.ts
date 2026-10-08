@@ -1,10 +1,10 @@
 import * as z from 'zod';
-import { PUBLIC_APP_URL } from '$env/static/public';
+import { PUBLIC_APP_URL } from '$app/env/public';
 import { goto } from '$app/navigation';
-import { SportCategories, sports } from '$lib/sport';
-import { WORKOUT_TYPE_VALUES } from '$lib/workout-type';
-import { BONK_STATUS_VALUES } from '$lib/nutrition';
-import { dayjs } from '$lib/duration';
+import { SportCategories, sports } from '#lib/sport.js';
+import { WORKOUT_TYPE_VALUES } from '#lib/workout-type.js';
+import { BONK_STATUS_VALUES } from '#lib/nutrition.js';
+import { dayjs } from '#lib/duration.js';
 import { resolve } from '$app/paths';
 
 // =============================================================================
@@ -134,7 +134,7 @@ export async function fetchActivities(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -162,7 +162,7 @@ export async function fetchActivityDetails(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return null;
 	}
 
@@ -243,7 +243,7 @@ export async function downloadAllActivities(): Promise<void> {
 	});
 
 	if (response.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		throw new Error('Unauthorized');
 	}
 

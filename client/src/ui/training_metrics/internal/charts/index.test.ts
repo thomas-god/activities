@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayjs } from '$lib/duration';
-import { none, some } from '$lib/Options';
+import { dayjs } from '#lib/duration.js';
+import { none, some } from '#lib/Options.js';
 
 import {
 	buildAbsoluteTimeFormatter,

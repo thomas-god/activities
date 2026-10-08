@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { metricClass, type Metric } from '$lib/colors';
+	import { metricClass, type Metric } from '#lib/colors.js';
 	import * as d3 from 'd3';
 
 	export type LineOrder = 'first' | 'second' | 'third';

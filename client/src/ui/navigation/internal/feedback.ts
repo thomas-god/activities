@@ -1,4 +1,4 @@
-import type { HooperIndex } from '$lib/api';
+import type { HooperIndex } from '#lib/api/index.js';
 
 /** The subjective measures that make up a Hooper index. */
 export const hooperMeasures = ['fatigue', 'sleep', 'pain', 'stress', 'mood'] as const;

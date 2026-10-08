@@ -4,19 +4,18 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { dayjs } from '$lib/duration';
+	import { dayjs } from '#lib/duration.js';
 	import {
 		fetchTrainingPeriodDetails,
 		type TrainingPeriodDetails,
 		type TrainingPeriodListItem
-	} from '$lib/api';
-	import { isNone, isSome, isSomeAnd, none, some, unwrapOr, type Option } from '$lib/Options';
+	} from '#lib/api/index.js';
+	import { isNone, isSome, isSomeAnd, none, some, unwrapOr, type Option } from '#lib/Options.js';
 	import { ArrowLeftRight } from '@lucide/svelte';
 	import type { PageProps } from './$types';
 	import Navbar from '$ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
-
 	let periods: TrainingPeriodListItem[] = $derived(
 		data.periods.toSorted((a, b) => (a.start < b.start ? 1 : -1))
 	);
@@ -122,7 +121,7 @@
 			<div class="mt-5 rounded-box bg-base-100 p-4 shadow-md">
 				<p class="text-sm tracking-wide italic opacity-80">
 					Failed to load training period's details.
-					<a class="link" href={resolve('/training/periods')}>Go back to periods.</a>
+					<a class="link" href={resolve('training/periods')}>Go back to periods.</a>
 				</p>
 			</div>
 		{/if}
