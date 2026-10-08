@@ -285,6 +285,36 @@ describe('matchTemplate', () => {
 		expect(matchTemplate(metric, template)).toBe(false);
 	});
 
+	it('matches durationCurve templates with the same metric', () => {
+		const template = makeTemplate({
+			source: { type: 'durationCurve', metric: 'Running' },
+			aggregate: 'Average',
+			unit: 'index',
+			category: 'DurationCurves'
+		});
+		const metric = makeMetric({
+			source: { type: 'durationCurve', metric: 'Running' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(true);
+	});
+
+	it('does not match durationCurve templates with a different metric', () => {
+		const template = makeTemplate({
+			source: { type: 'durationCurve', metric: 'Running' },
+			aggregate: 'Average',
+			unit: 'index',
+			category: 'DurationCurves'
+		});
+		const metric = makeMetric({
+			source: { type: 'durationCurve', metric: 'Cycling' },
+			aggregate: 'Average'
+		});
+
+		expect(matchTemplate(metric, template)).toBe(false);
+	});
+
 	it('does not match when the source types differ', () => {
 		const hooperTemplate = makeTemplate({
 			source: { type: 'hooperIndex', metric: 'ActiveDuration' },
@@ -298,6 +328,15 @@ describe('matchTemplate', () => {
 		});
 
 		expect(matchTemplate(metric, hooperTemplate)).toBe(false);
+
+		const durationCurveTemplate = makeTemplate({
+			source: { type: 'durationCurve', metric: 'Running' },
+			aggregate: 'Average',
+			unit: 'index',
+			category: 'DurationCurves'
+		});
+
+		expect(matchTemplate(metric, durationCurveTemplate)).toBe(false);
 	});
 });
 

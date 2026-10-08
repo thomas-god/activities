@@ -168,6 +168,8 @@ export const matchTemplate = (
 		template.source.type === 'weightAndNutrition'
 	) {
 		return metric.source.metric === template.source.metric;
+	} else if (metric.source.type === 'durationCurve' && template.source.type === 'durationCurve') {
+		return metric.source.metric === template.source.metric;
 	}
 	return false;
 };
