@@ -96,7 +96,6 @@
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
 	let averagePace = $derived(activity.metrics['AvgSpeed']?.value ?? null);
 	let activityWeight = $derived(asOption(activity.training_context.weight));
-	$inspect(activity.metrics);
 
 	interface MetricOption {
 		option: Metric;
