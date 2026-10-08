@@ -52,6 +52,13 @@
 		}
 		return existingGranularity;
 	};
+
+	let durationCurveSelected = $derived(
+		unwrapOr(
+			map(fields.selectedTemplate, (template) => template.source.type === 'durationCurve'),
+			false
+		)
+	);
 </script>
 
 <label class="label" for="metric-source"> Metric to extract from each activity </label>
@@ -88,22 +95,24 @@
 	{/each}
 </select>
 
-<label class="label" for="metric-granularity">Group activities by</label>
-<select
-	class="select w-full"
-	bind:value={
-		() => unwrapOr(fields.granularity, 'None'),
-		(g) => (fields = { ...fields, granularity: g === 'None' ? none() : some(g) })
-	}
-	id="metric-granularity"
->
-	{#if templateIsActivity}
-		<option value="None">None</option>
-	{/if}
-	<option value="Daily">Day</option>
-	<option value="Weekly">Week</option>
-	<option value="Monthly">Month</option>
-</select>
+{#if !durationCurveSelected}
+	<label class="label" for="metric-granularity">Group activities by</label>
+	<select
+		class="select w-full"
+		bind:value={
+			() => unwrapOr(fields.granularity, 'None'),
+			(g) => (fields = { ...fields, granularity: g === 'None' ? none() : some(g) })
+		}
+		id="metric-granularity"
+	>
+		{#if templateIsActivity}
+			<option value="None">None</option>
+		{/if}
+		<option value="Daily">Day</option>
+		<option value="Weekly">Week</option>
+		<option value="Monthly">Month</option>
+	</select>
+{/if}
 
 {#if isSome(fields.granularity) && metricSourceIsActivity}
 	<label class="label" for="metric-group-by">Additionally group activities by</label>
@@ -131,43 +140,47 @@
 	/>
 {/if}
 
-<label class="label" for="show-metric-average">
-	Display metric average
-	<input
-		type="checkbox"
-		class="checkbox checkbox-sm"
-		id="show-metric-average"
-		bind:checked={() => fields.showAverage, (c) => (fields = { ...fields, showAverage: c })}
-	/>
-</label>
-
-<label class="label" for="metric-target-enabled">
-	Set a target
-	<input
-		type="checkbox"
-		class="checkbox checkbox-sm"
-		id="metric-target-enabled"
-		bind:checked={() => isSome(fields.target), (c) => toggleTarget(c)}
-	/>
-</label>
-
-{#if isSome(fields.target)}
-	<label class="label" for="metric-target-value">
-		Target value
-		<span class="text-sm text-base-content/60">
-			{isSome(fields.selectedTemplate) ? fields.selectedTemplate.value.unit : ''}
-		</span>
+{#if !durationCurveSelected}
+	<label class="label" for="show-metric-average">
+		Display metric average
+		<input
+			type="checkbox"
+			class="checkbox checkbox-sm"
+			id="show-metric-average"
+			bind:checked={() => fields.showAverage, (c) => (fields = { ...fields, showAverage: c })}
+		/>
 	</label>
-	<input
-		type="number"
-		step="any"
-		class="input"
-		id="metric-target-value"
-		bind:value={
-			() => unwrapOr(fields.target, 0),
-			(v) => (fields = { ...fields, target: map(fields.target, () => Number(v)) })
-		}
-	/>
+{/if}
+
+{#if !durationCurveSelected}
+	<label class="label" for="metric-target-enabled">
+		Set a target
+		<input
+			type="checkbox"
+			class="checkbox checkbox-sm"
+			id="metric-target-enabled"
+			bind:checked={() => isSome(fields.target), (c) => toggleTarget(c)}
+		/>
+	</label>
+
+	{#if isSome(fields.target)}
+		<label class="label" for="metric-target-value">
+			Target value
+			<span class="text-sm text-base-content/60">
+				{isSome(fields.selectedTemplate) ? fields.selectedTemplate.value.unit : ''}
+			</span>
+		</label>
+		<input
+			type="number"
+			step="any"
+			class="input"
+			id="metric-target-value"
+			bind:value={
+				() => unwrapOr(fields.target, 0),
+				(v) => (fields = { ...fields, target: map(fields.target, () => Number(v)) })
+			}
+		/>
+	{/if}
 {/if}
 
 <label class="label" for="metric-name">Metric name</label>
