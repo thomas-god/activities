@@ -43,8 +43,8 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode
 	} from '.';
 	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
-	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 
 	let {

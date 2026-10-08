@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ComparePeriodsSummary from '$ui/training_period/ComparePeriodsSummary.svelte';
-	import ComparePeriodsMetrics from '$ui/training_period/ComparePeriodsMetrics.svelte';
+	import ComparePeriodsSummary from '#ui/training_period/ComparePeriodsSummary.svelte';
+	import ComparePeriodsMetrics from '#ui/training_period/ComparePeriodsMetrics.svelte';
 	import { goto, invalidate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -13,7 +13,7 @@
 	import { isNone, isSome, isSomeAnd, none, some, unwrapOr, type Option } from '#lib/Options.js';
 	import { ArrowLeftRight } from '@lucide/svelte';
 	import type { PageProps } from './$types';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 	let periods: TrainingPeriodListItem[] = $derived(
@@ -30,15 +30,15 @@
 	let secondPeriodId: Option<string> = $derived(periodIdOption(urlIds[1]));
 
 	const updateUrl = (first: Option<string>, second: Option<string>) => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		const param = isSome(second) ? `${unwrapOr(first, '')},${second.value}` : unwrapOr(first, '');
 		if (param === '') {
 			url.searchParams.delete('periods');
 		} else {
 			url.searchParams.set('periods', param);
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: false, keepFocus: true });
+		 
+		goto(url, { replaceState: false, reset: false });
 	};
 
 	const selectFirst = (periodId: string) => updateUrl(some(periodId), secondPeriodId);

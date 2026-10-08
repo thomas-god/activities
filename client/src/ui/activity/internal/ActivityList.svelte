@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Activity, ActivityListSummaryItems, TrainingNote } from '#lib/api/index.js';
 	import { toTitleCase } from '#lib/utils.js';
-	import TrainingNoteComponent from '$ui/training_note/TrainingNote.svelte';
+	import TrainingNoteComponent from '#ui/training_note/TrainingNote.svelte';
 	import type { SvelteMap } from 'svelte/reactivity';
 	import ActivityComponent from './Activity.svelte';
 

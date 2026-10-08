@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CopyUploadButton from '$ui/shared/CopyUploadButton.svelte';
+	import CopyUploadButton from '#ui/shared/CopyUploadButton.svelte';
 	import {
 		copyTrainingMetricIntoPeriod,
 		metricAsString,

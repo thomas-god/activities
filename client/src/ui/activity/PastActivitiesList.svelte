@@ -4,7 +4,7 @@
 	import type { TrainingNotesList } from '#lib/api/training.js';
 	import ActivityListComponent, {
 		type TimelineItem
-	} from '$ui/activity/internal/ActivityList.svelte';
+	} from '#ui/activity/internal/ActivityList.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let {

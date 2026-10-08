@@ -13,7 +13,7 @@ import {
 	parseMetricIntoPoints,
 	type Point
 } from './index';
-import type { TimeDomain } from '$ui/training_metrics';
+import type { TimeDomain } from '#ui/training_metrics';
 
 describe('formatTooltipValue', () => {
 	it('formats duration values with compact units', () => {

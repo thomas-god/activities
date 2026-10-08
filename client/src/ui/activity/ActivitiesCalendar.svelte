@@ -2,7 +2,7 @@
 	import type { ActivityList } from '#lib/api/index.js';
 	import { dayjs } from '#lib/duration.js';
 	import { sportDisplay, type SportCategory } from '#lib/sport.js';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let {

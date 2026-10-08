@@ -6,8 +6,8 @@
 	import StackedArea from './internal/charts/StackedArea.svelte';
 	import Polyline from './internal/charts/Polyline.svelte';
 	import { type DisplayMode } from './internal/charts';
-	import type { TimeDomain } from '$ui/training_metrics';
-	import DurationCurve from '$ui/activity/DurationCurve.svelte';
+	import type { TimeDomain } from '#ui/training_metrics';
+	import DurationCurve from '#ui/activity/DurationCurve.svelte';
 
 	export interface ChartHandle {
 		getYMax(): number;

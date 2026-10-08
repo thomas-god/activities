@@ -1,5 +1,5 @@
 <script lang="ts">
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$app/env/public';
 	import { goto } from '$app/navigation';
 	import TrainingMetricFormUpdate from '../TrainingMetricFormUpdate.svelte';

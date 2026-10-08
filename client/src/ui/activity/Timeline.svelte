@@ -8,8 +8,8 @@
 	import { isNone, type Option } from '#lib/Options.js';
 	import ActivityListComponent, {
 		type TimelineItem
-	} from '$ui/activity/internal/ActivityList.svelte';
-	import type { SearchResult } from '$ui/shared/SearchField.svelte';
+	} from '#ui/activity/internal/ActivityList.svelte';
+	import type { SearchResult } from '#ui/shared/SearchField.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let {

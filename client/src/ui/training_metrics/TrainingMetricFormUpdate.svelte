@@ -2,12 +2,12 @@
 	import { dayjs } from '#lib/duration.js';
 	import { type Sport, type SportCategory } from '#lib/sport.js';
 	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
-	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
+	import TrainingMetricForm from '#ui/training_metrics/TrainingMetricForm.svelte';
 	import {
 		fieldsAsPayload,
 		matchMetricToFormFields,
 		type TrainingMetricFields
-	} from '$ui/training_metrics';
+	} from '#ui/training_metrics';
 	import {
 		fetchTrainingMetricTemplates,
 		getTrainingMetricPreview,

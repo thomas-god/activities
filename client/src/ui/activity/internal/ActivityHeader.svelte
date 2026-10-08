@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { localiseDateTime } from '#lib/duration.js';
-	import EditableActivityName from '$ui/activity/internal/EditableActivityName.svelte';
+	import EditableActivityName from '#ui/activity/internal/EditableActivityName.svelte';
 	import { sportDisplay, type SportCategory } from '#lib/sport.js';
 	import type { Activity } from '#lib/api/activities.js';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, GitCompareArrows, Settings, Trash2 } from '@lucide/svelte';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
 
 	interface Props {
 		activity: Activity;

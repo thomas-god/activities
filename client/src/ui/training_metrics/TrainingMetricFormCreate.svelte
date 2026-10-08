@@ -14,7 +14,7 @@
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
 	import { ChartColumn } from '@lucide/svelte';
-	import FormTitle from '$ui/navigation/FormTitle.svelte';
+	import FormTitle from '#ui/navigation/FormTitle.svelte';
 
 	let {
 		callback,

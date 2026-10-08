@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ActivitiesCalendar from '$ui/activity/ActivitiesCalendar.svelte';
-	import DownloadActivitiesModal from '$ui/activity/DownloadActivitiesModal.svelte';
+	import ActivitiesCalendar from '#ui/activity/ActivitiesCalendar.svelte';
+	import DownloadActivitiesModal from '#ui/activity/DownloadActivitiesModal.svelte';
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
@@ -12,19 +12,19 @@
 		type ActivityListSummaryItems,
 		type PreferencePayload
 	} from '#lib/api/index.js';
-	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import ActivityDetails from '#ui/activity/ActivityDetails.svelte';
 	import type { ActivityList, ActivityWithTimeseries } from '#lib/api/activities.js';
-	import Timeline from '$ui/activity/Timeline.svelte';
-	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
+	import Timeline from '#ui/activity/Timeline.svelte';
+	import ActivitiesFiltersComponent from '#ui/shared/ActivitiesFilters.svelte';
 	import { filtersFromSearchParams, applyFiltersToSearchParams } from '#lib/filters.js';
 	import type { ActivitiesFilters } from '#lib/filters.js';
-	import ActivityListSummaryDialog from '$ui/activity/ActivityListSummaryDialog.svelte';
+	import ActivityListSummaryDialog from '#ui/activity/ActivityListSummaryDialog.svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowDownToLine, CalendarFold, List, Maximize2, Settings2, X } from '@lucide/svelte';
 	import { none, type Option } from '#lib/Options.js';
-	import type { SearchResult } from '$ui/shared/SearchField.svelte';
-	import SearchField from '$ui/shared/SearchField.svelte';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import type { SearchResult } from '#ui/shared/SearchField.svelte';
+	import SearchField from '#ui/shared/SearchField.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -60,32 +60,32 @@
 	});
 
 	const setViewMode = (mode: 'list' | 'calendar') => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (mode === 'list') {
 			url.searchParams.delete('view');
 		} else {
 			url.searchParams.set('view', mode);
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: true, keepFocus: true });
+		 
+		goto(url, { replaceState: true, reset: false });
 	};
 
 	const handleMonthChange = (month: ReturnType<typeof dayjs>) => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		// If going to current month, remove the parameter
 		if (month.isSame(dayjs().startOf('month'), 'month')) {
 			url.searchParams.delete('month');
 		} else {
 			url.searchParams.set('month', month.format('YYYY-MM'));
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: true, keepFocus: true });
+		 
+		goto(url, { replaceState: true, reset: false });
 	};
 
 	const handleFilterChange = (filters: ActivitiesFilters) => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		applyFiltersToSearchParams(url.searchParams, filters);
-		goto(url, { replaceState: false, keepFocus: true });
+		goto(url, { replaceState: false, reset: false });
 	};
 
 	const handleActivitySelected = (activityId: string | null) => {

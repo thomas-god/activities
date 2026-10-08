@@ -1,8 +1,8 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import MetricsMultiSelect from '$ui/activity/internal/MetricsMultiSelect.svelte';
+	import MetricsMultiSelect from '#ui/activity/internal/MetricsMultiSelect.svelte';
 	import OffsetControls from './internal/OffsetControls.svelte';
-	import ActivityCompareChart from '$ui/activity/internal/ActivityCompareChart.svelte';
+	import ActivityCompareChart from '#ui/activity/internal/ActivityCompareChart.svelte';
 	import { type ActivityWithTimeseries } from '#lib/api/index.js';
 	import type { Metric } from '#lib/colors.js';
 	import { SvelteMap } from 'svelte/reactivity';

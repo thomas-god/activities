@@ -1,6 +1,6 @@
 <script lang="ts">
-	import EditButton from '$ui/shared/EditButton.svelte';
-	import SaveButton from '$ui/shared/SaveButton.svelte';
+	import EditButton from '#ui/shared/EditButton.svelte';
+	import SaveButton from '#ui/shared/SaveButton.svelte';
 	import { X } from '@lucide/svelte';
 
 	let {

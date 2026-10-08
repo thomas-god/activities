@@ -36,7 +36,7 @@ The same design decision applies to other types of chart in this module.
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
 	import { dayjs } from '#lib/duration.js';
 
 	import {
@@ -49,7 +49,7 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode,
 		type Point
 	} from '.';
-	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 
 	let {

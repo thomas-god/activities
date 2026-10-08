@@ -27,7 +27,7 @@ The same design decision applies to other types of chart in this module.
 	import * as d3 from 'd3';
 	import { dayjs } from '#lib/duration.js';
 	import { isSome, map, none, unwrapOr, type Option } from '#lib/Options.js';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
 
 	import {
 		buildContinuousTimeRelativeFormatter,
@@ -36,7 +36,7 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode
 	} from '.';
 	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
-	import type { ChartHandle } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle } from '#ui/training_metrics/TrainingMetricChart.svelte';
 
 	export interface TimeseriesChartProps {
 		values: Record<string, Record<string, number | null>>;

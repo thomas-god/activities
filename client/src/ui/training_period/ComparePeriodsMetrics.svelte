@@ -22,13 +22,13 @@
 		definitionGroupBy
 	} from '#lib/trainingMetric.js';
 	import CompareMetricEntry from './internal/CompareMetricEntry.svelte';
-	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
+	import TrainingMetricForm from '#ui/training_metrics/TrainingMetricForm.svelte';
 	import {
 		emptyTrainingMetricFields,
 		fieldsAreEmpty,
 		fieldsAsPayload,
 		type TrainingMetricFields
-	} from '$ui/training_metrics';
+	} from '#ui/training_metrics';
 
 	let {
 		firstPeriod,

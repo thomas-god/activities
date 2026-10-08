@@ -40,7 +40,7 @@ The same design decision applies to other types of chart in this module.
 		type Option
 	} from '#lib/Options.js';
 	import { paceInSecondToString } from '#lib/speed.js';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
 	import {
 		buildAbsoluteTimeFormatter,
 		buildRelativeTimeFormatter,
@@ -50,7 +50,7 @@ The same design decision applies to other types of chart in this module.
 		parseMetricIntoPoints,
 		type DisplayMode
 	} from '.';
-	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import { untrack } from 'svelte';
 	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 

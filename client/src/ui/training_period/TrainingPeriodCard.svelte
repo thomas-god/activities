@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { dayjs } from '#lib/duration.js';
 	import { getSportCategory, SportCategories, type Sport, type SportCategory } from '#lib/sport.js';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
 	import { CalendarRange } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 

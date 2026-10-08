@@ -50,7 +50,7 @@
 	};
 
 	const updateUrl = () => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (selectedActivities.length === 0) {
 			url.searchParams.delete('activities');
 		} else {
@@ -59,8 +59,8 @@
 				selectedActivities.map((activity) => activity.id).join(',')
 			);
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: false, keepFocus: true });
+		 
+		goto(url, { replaceState: false, reset: false });
 	};
 </script>
 

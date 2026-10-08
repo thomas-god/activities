@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
-	import PastActivitiesList from '$ui/activity/PastActivitiesList.svelte';
+	import PastActivitiesList from '#ui/activity/PastActivitiesList.svelte';
 	import type { PageProps } from './$types';
-	import TrainingPeriodCard from '$ui/training_period/TrainingPeriodCard.svelte';
+	import TrainingPeriodCard from '#ui/training_period/TrainingPeriodCard.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '#lib/api/activities.js';
-	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import ActivityDetails from '#ui/activity/ActivityDetails.svelte';
 	import { dayjs } from '#lib/duration.js';
 	import { some } from '#lib/Options.js';
-	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
+	import TrainingMetrics from '#ui/training_metrics/TrainingMetrics.svelte';
 	import { resolve } from '$app/paths';
 	import { Maximize2, X } from '@lucide/svelte';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 

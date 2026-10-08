@@ -2,27 +2,27 @@
 	import { dayjs } from '#lib/duration.js';
 	import { getSportCategory, type SportCategory } from '#lib/sport.js';
 	import { goto, invalidate } from '$app/navigation';
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
 	import { PUBLIC_APP_URL } from '$app/env/public';
-	import TrainingPeriodStatistics from '$ui/training_period/TrainingPeriodStatistics.svelte';
-	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import TrainingPeriodStatistics from '#ui/training_period/TrainingPeriodStatistics.svelte';
+	import ActivityDetails from '#ui/activity/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
 	} from '#lib/api/activities.js';
-	import TrainingMetricsOrderingDialog from '$ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
-	import EditPeriodNameModal from '$ui/training_period/EditPeriodNameModal.svelte';
-	import EditPeriodDatesModal from '$ui/training_period/EditPeriodDatesModal.svelte';
-	import EditPeriodNoteModal from '$ui/training_period/EditPeriodNoteModal.svelte';
-	import Timeline from '$ui/activity/Timeline.svelte';
-	import EditButton from '$ui/shared/EditButton.svelte';
+	import TrainingMetricsOrderingDialog from '#ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
+	import EditPeriodNameModal from '#ui/training_period/EditPeriodNameModal.svelte';
+	import EditPeriodDatesModal from '#ui/training_period/EditPeriodDatesModal.svelte';
+	import EditPeriodNoteModal from '#ui/training_period/EditPeriodNoteModal.svelte';
+	import Timeline from '#ui/activity/Timeline.svelte';
+	import EditButton from '#ui/shared/EditButton.svelte';
 	import {
 		applyFiltersToSearchParams,
 		filtersFromSearchParams,
 		type ActivitiesFilters
 	} from '#lib/filters.js';
-	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
+	import ActivitiesFiltersComponent from '#ui/shared/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
 	import {
 		fetchActivityListSummary,
@@ -34,12 +34,12 @@
 		type TrainingNotesList,
 		type TrainingPeriodDetails
 	} from '#lib/api/index.js';
-	import TrainingMetricImportForm from '$ui/training_metrics/TrainingMetricFormImport.svelte';
-	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
+	import TrainingMetricImportForm from '#ui/training_metrics/TrainingMetricFormImport.svelte';
+	import TrainingMetricFormCreate from '#ui/training_metrics/TrainingMetricFormCreate.svelte';
 	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
-	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
+	import TrainingMetrics from '#ui/training_metrics/TrainingMetrics.svelte';
 	import {
 		CalendarFold,
 		GitCompareArrows,
@@ -54,9 +54,9 @@
 		X
 	} from '@lucide/svelte';
 	import { formatPeriodDuration } from '#lib/trainingPeriod.js';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
-	import SearchField, { type SearchResult } from '$ui/shared/SearchField.svelte';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
+	import SearchField, { type SearchResult } from '#ui/shared/SearchField.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -107,10 +107,10 @@
 	let searchResults: Option<SearchResult[]> = $state(none());
 
 	const handleFilterChange = (filters: ActivitiesFilters) => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		applyFiltersToSearchParams(url.searchParams, filters);
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: false, keepFocus: true });
+		 
+		goto(url, { replaceState: false, reset: false });
 	};
 
 	async function handleDelete(periodId: string) {

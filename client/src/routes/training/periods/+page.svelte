@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import TrainingPeriodCard from '$ui/training_period/TrainingPeriodCard.svelte';
+	import TrainingPeriodCard from '#ui/training_period/TrainingPeriodCard.svelte';
 	import type { PageProps } from './$types';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let { data }: PageProps = $props();
 

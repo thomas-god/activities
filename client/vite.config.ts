@@ -1,10 +1,9 @@
 import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-/// <reference types="vitest/config" />
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { svelteTesting } from '@testing-library/svelte/vite';
 
 export default defineConfig({
@@ -22,8 +21,7 @@ export default defineConfig({
 				precompress: false,
 				strict: true
 			}),
-			prerender: { handleHttpError: 'fail' },
-			alias: { $components: './src/components', $ui: './src/ui' }
+			prerender: { handleHttpError: 'fail' }
 		}),
 		svelteTesting()
 	],

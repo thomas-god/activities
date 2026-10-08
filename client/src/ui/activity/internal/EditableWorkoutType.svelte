@@ -1,7 +1,7 @@
 <script lang="ts">
-	import EditButton from '$ui/shared/EditButton.svelte';
-	import SaveButton from '$ui/shared/SaveButton.svelte';
-	import AddButton from '$ui/shared/AddButton.svelte';
+	import EditButton from '#ui/shared/EditButton.svelte';
+	import SaveButton from '#ui/shared/SaveButton.svelte';
+	import AddButton from '#ui/shared/AddButton.svelte';
 	import {
 		WORKOUT_TYPE_LABELS,
 		getWorkoutTypeLabel,

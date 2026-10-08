@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { logout } from '#lib/api/auth.js';
-	import ThemeToggle from '$ui/shared/ThemeToggle.svelte';
+	import ThemeToggle from '#ui/shared/ThemeToggle.svelte';
 	import { getTheme, persistTheme } from '#lib/contexts/theme.js';
 	import { getAuthInfo } from '#lib/contexts/auth.js';
 	import { isSome, none, some, type Option } from '#lib/Options.js';
@@ -22,8 +22,8 @@
 	import FeedbackForm from './internal/FeedbackForm.svelte';
 	import WeightAndNutritionForm from './internal/WeightAndNutritionForm.svelte';
 	import CreateTrainingPeriod from './internal/CreateTrainingPeriod.svelte';
-	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
-	import type { Scope } from '$ui/training_metrics';
+	import TrainingMetricFormCreate from '#ui/training_metrics/TrainingMetricFormCreate.svelte';
+	import type { Scope } from '#ui/training_metrics';
 
 	let {
 		invalidateActivities = () => {},

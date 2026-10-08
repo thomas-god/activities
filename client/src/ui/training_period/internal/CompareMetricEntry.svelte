@@ -11,7 +11,7 @@
 	import TrainingMetricChart, {
 		type ChartHandle,
 		type HoveredBin
-	} from '$ui/training_metrics/TrainingMetricChart.svelte';
+	} from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import { computeExtendedTimeDomain, computeMissingNumberOfBins } from './CompareMetricEntry';
 	import { dayjs } from '#lib/duration.js';
 

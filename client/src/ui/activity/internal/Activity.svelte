@@ -5,7 +5,7 @@
 	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '#lib/workout-type.js';
 	import { getRpeClass } from '#lib/rpe.js';
 	import { resolve } from '$app/paths';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
 
 	let {
 		activity,

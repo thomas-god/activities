@@ -7,7 +7,7 @@ import type {
 	TrainingMetricGranularity,
 	TrainingMetricGroupByClause
 } from '#lib/trainingMetric.js';
-import type { TimeDomain } from '$ui/training_metrics';
+import type { TimeDomain } from '#ui/training_metrics';
 
 export const formatTooltipValue = (
 	value: number,

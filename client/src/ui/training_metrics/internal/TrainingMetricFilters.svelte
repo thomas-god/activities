@@ -7,7 +7,7 @@
 	import BonkStatusFilter from './BonkStatusFilter.svelte';
 	import type { WorkoutType } from '#lib/workout-type.js';
 	import WorkoutTypeFilter from './WorkoutTypeFilter.svelte';
-	import SportFilter from '$ui/shared/SportFilter.svelte';
+	import SportFilter from '#ui/shared/SportFilter.svelte';
 	import { Plus } from '@lucide/svelte';
 
 	export interface TrainingMetricFiltersType {
