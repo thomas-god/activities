@@ -7,7 +7,6 @@ COPY client/package*.json ./
 RUN npm ci
 
 # Copy the rest of the application and build it
-COPY client/svelte.config.js ./
 COPY client/vite.config.ts ./
 COPY client/tsconfig.json ./
 COPY client/.gitignore ./
