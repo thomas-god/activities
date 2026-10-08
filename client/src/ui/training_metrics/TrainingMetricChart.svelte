@@ -7,7 +7,7 @@
 	import Polyline from './internal/charts/Polyline.svelte';
 	import { type DisplayMode } from './internal/charts';
 	import type { TimeDomain } from '$ui/training_metrics';
-	import PowerCurve from '$ui/activity/PowerCurve.svelte';
+	import DurationCurve from '$ui/activity/DurationCurve.svelte';
 
 	export interface ChartHandle {
 		getYMax(): number;
@@ -117,7 +117,8 @@
 			/>
 		{/if}
 	{:else if metric.source.type === 'durationCurve'}
-		<PowerCurve curveValues={durationCurveValues} unit={metric.unit} {width} {height} />
+		{@const curve_type = metric.source.metric === 'Running' ? 'pace' : 'power'}
+		<DurationCurve kind={curve_type} curveValues={durationCurveValues} {width} {height} />
 	{:else if metric.granularity !== null}
 		{#if metric.source.type === 'weightAndNutrition' && (metric.source.metric === 'BodyComposition' || metric.source.metric === 'Macros')}
 			<StackedArea

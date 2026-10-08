@@ -12,7 +12,7 @@
 	import ActivityStatistics from '$ui/activity/internal/ActivityStatistics.svelte';
 	import ActivityLaps from '$ui/activity/internal/ActivityLaps.svelte';
 	import ActivityHeader from '$ui/activity/internal/ActivityHeader.svelte';
-	import PowerCurve from '$ui/activity/PowerCurve.svelte';
+	import DurationCurve from '$ui/activity/DurationCurve.svelte';
 	import ActivityMap from '$ui/activity/internal/ActivityMap.svelte';
 	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
 	import type { WorkoutType } from '$lib/workout-type';
@@ -70,6 +70,10 @@
 		activity.duration_curves.find((curve) => curve.curve_type === 'Power') ?? null
 	);
 	let hasPowerData = $derived(powerCurve !== null && powerCurve.values.some((v) => v !== null));
+	let paceCurve = $derived(
+		activity.duration_curves.find((curve) => curve.curve_type === 'Pace') ?? null
+	);
+	let hasPaceData = $derived(paceCurve !== null && paceCurve.values.some((v) => v !== null));
 	// The training context carries one best curve per curve type (e.g. power and pace):
 	// reconcile by keeping the one matching the type of the displayed curve.
 	let bestPowerCurve = $derived(
@@ -80,9 +84,19 @@
 	let hasBestPowerCurve = $derived(
 		bestPowerCurve !== null && bestPowerCurve.values.some((v) => v !== null)
 	);
+	let bestPaceCurve = $derived(
+		activity.training_context.best_duration_12w_curves.find(
+			(curve) => curve.curve_type === 'Pace'
+		) ?? null
+	);
+	let hasBestPaceCurve = $derived(
+		bestPaceCurve !== null && bestPaceCurve.values.some((v) => v !== null)
+	);
 	let activityDuration = $derived(activity.metrics['Duration']?.value ?? null);
 	let averagePower = $derived(activity.metrics['AvgPower']?.value ?? null);
+	let averagePace = $derived(activity.metrics['AvgSpeed']?.value ?? null);
 	let activityWeight = $derived(asOption(activity.training_context.weight));
+	$inspect(activity.metrics);
 
 	interface MetricOption {
 		option: Metric;
@@ -375,13 +389,36 @@
 		</details>
 	{/if}
 
+	{#if hasPaceData}
+		<details class={`collapse-arrow collapse ${sectionClass}`} open>
+			<summary class="collapse-title text-lg font-semibold">Pace curve</summary>
+			<div class="collapse-content px-0">
+				<div class="px-2 pb-2">
+					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
+						<DurationCurve
+							kind="pace"
+							curveValues={paceCurve!.values}
+							bestCurveValues={hasBestPaceCurve ? bestPaceCurve!.values : undefined}
+							activityDuration={activityDuration ?? undefined}
+							averageValue={averagePace * 3.6}
+							width={chartWidth}
+							height={chartHeight}
+							weight={activityWeight}
+						/>
+					</div>
+				</div>
+			</div>
+		</details>
+	{/if}
+
 	{#if hasPowerData}
 		<details class={`collapse-arrow collapse ${sectionClass}`} open>
 			<summary class="collapse-title text-lg font-semibold">Power curve</summary>
 			<div class="collapse-content px-0">
 				<div class="px-2 pb-2">
 					<div class="w-full overflow-hidden" bind:clientWidth={chartWidth}>
-						<PowerCurve
+						<DurationCurve
+							kind="power"
 							curveValues={powerCurve!.values}
 							bestCurveValues={hasBestPowerCurve ? bestPowerCurve!.values : undefined}
 							activityDuration={activityDuration ?? undefined}

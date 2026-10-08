@@ -1,8 +1,13 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { isSome, none, type Option } from '$lib/Options';
+	import { isSome, none, type Option, type Some } from '$lib/Options';
+
+	type Kind = 'power' | 'pace';
 
 	interface Props {
+		/** Power curves take watts and can toggle W/W/kg (when a weight is
+		 *  available); pace curves take km/h and can toggle km/h ↔ min/km. */
+		kind: Kind;
 		curveValues: (number | null)[];
 		/** Best values over the 12 weeks before the activity, for comparison
 		 *  (dashed line). Empty when there is no comparable curve. */
@@ -12,20 +17,20 @@
 		width: number;
 		height: number;
 		weight?: Option<number>;
-		/** Unit of the curve values, used for formatting (defaults to power). */
-		unit?: string;
 	}
 
 	let {
+		kind,
 		curveValues,
 		bestCurveValues = [],
 		activityDuration = undefined,
 		averageValue = null,
 		width,
 		height,
-		weight = none(),
-		unit = 'W'
+		weight = none()
 	}: Props = $props();
+
+	let isPace = $derived(kind === 'pace');
 
 	const marginTop = 20;
 	const marginRight = 20;
@@ -39,8 +44,10 @@
 
 	let mode = $state<Mode>('absolute');
 
-	let hasWeight = $derived(isSome(weight));
-	let effectiveMode = $derived(hasWeight ? mode : 'absolute');
+	let hasWeight = $derived(isSome(weight) && !isPace);
+	// Pace curves always offer the km/h ↔ min/km toggle.
+	let canToggle = $derived(isPace || hasWeight);
+	let effectiveMode = $derived(canToggle ? mode : 'absolute');
 
 	interface CurvePoint {
 		duration: number;
@@ -81,9 +88,17 @@
 		return points;
 	});
 
+	// Transforms a value from its base unit (W or km/h) into the currently
+	// selected display unit (W/kg or min/km). Only called when a weight is
+	// available (power) or for pace curves, which never use the weight.
+	const transformValue = (value: number): number => {
+		if (isPace) return 60 / value; // km/h -> min/km
+		return value / (weight as Some<number>).value; // W -> W/kg
+	};
+
 	let displayedData = $derived(
-		effectiveMode === 'relative' && isSome(weight)
-			? curveData.map((point) => ({ ...point, value: point.value / weight.value }))
+		effectiveMode === 'relative' && (isPace || isSome(weight))
+			? curveData.map((point) => ({ ...point, value: transformValue(point.value) }))
 			: curveData
 	);
 
@@ -103,8 +118,8 @@
 	// the athlete's current weight, while past activities might have been recorded
 	// with a different weight.
 	let displayedBestData = $derived(
-		effectiveMode === 'relative' && isSome(weight)
-			? bestCurveData.map((point) => ({ ...point, value: point.value / weight.value }))
+		effectiveMode === 'relative' && (isPace || isSome(weight))
+			? bestCurveData.map((point) => ({ ...point, value: transformValue(point.value) }))
 			: bestCurveData
 	);
 
@@ -176,15 +191,28 @@
 		return `${sec}s`;
 	};
 
-	const formatPower = (v: number): string => {
+	/** Formats minutes per km as `m:ss /km`. */
+	const formatPace = (minutesPerKm: number): string => {
+		const totalSeconds = Math.round(minutesPerKm * 60);
+		const m = Math.floor(totalSeconds / 60);
+		const s = totalSeconds % 60;
+		return `${m}:${s.toString().padStart(2, '0')} /km`;
+	};
+
+	const formatValue = (v: number): string => {
+		if (isPace) {
+			return effectiveMode === 'relative' ? formatPace(v) : `${Math.round(v).toString()} km/h`;
+		}
 		if (effectiveMode === 'relative') return `${(Math.round(v * 10) / 10).toString()} W/kg`;
-		return `${Math.round(v).toString()} ${unit}`;
+		return `${Math.round(v).toString()} W`;
 	};
 
 	const formatTickValue = (v: number): string => {
+		if (isPace) {
+			return effectiveMode === 'relative' ? formatPace(v) : `${v} km/h`;
+		}
 		if (effectiveMode === 'relative') return `${+v.toFixed(1)}W/kg`;
-		// Preserve the compact `250W` style for power, keep a space for other units.
-		return unit === 'W' ? `${v}W` : `${v} ${unit}`;
+		return `${v}W`;
 	};
 
 	let yTicks = $derived(yScale.ticks(5));
@@ -222,31 +250,46 @@
 	<div class="flex flex-wrap items-center justify-center pt-2 text-xs sm:text-base">
 		{#if tooltipData}
 			<span class="px-1.5">Interval: {formatTooltipDuration(tooltipData)}</span>
-			<span class="text-power-chart px-1.5 font-semibold">{formatPower(tooltipData.value)}</span>
+			<span class="text-power-chart px-1.5 font-semibold">{formatValue(tooltipData.value)}</span>
 			{#if tooltipBestData}
 				(12-week best
 				<span class="text-best-power-chart px-1.5 font-semibold">
-					{formatPower(tooltipBestData.value)}
+					{formatValue(tooltipBestData.value)}
 				</span>
 				)
 			{/if}
 		{:else}
 			<span class="invisible px-1.5">Interval: –</span>
 		{/if}
-		{#if hasWeight}
-			<div class="join ml-auto" role="group" aria-label="Power curve unit">
-				<button
-					class="btn join-item btn-xs"
-					class:btn-primary={effectiveMode === 'absolute'}
-					class:btn-outline={effectiveMode === 'relative'}
-					onclick={() => (mode = 'absolute')}>W</button
-				>
-				<button
-					class="btn join-item btn-xs"
-					class:btn-primary={effectiveMode === 'relative'}
-					class:btn-outline={effectiveMode === 'absolute'}
-					onclick={() => (mode = 'relative')}>W/kg</button
-				>
+		{#if canToggle}
+			<div class="join ml-auto" role="group" aria-label="Curve unit">
+				{#if isPace}
+					<button
+						class="btn join-item btn-xs"
+						class:btn-primary={effectiveMode === 'absolute'}
+						class:btn-outline={effectiveMode === 'relative'}
+						onclick={() => (mode = 'absolute')}>km/h</button
+					>
+					<button
+						class="btn join-item btn-xs"
+						class:btn-primary={effectiveMode === 'relative'}
+						class:btn-outline={effectiveMode === 'absolute'}
+						onclick={() => (mode = 'relative')}>min/km</button
+					>
+				{:else}
+					<button
+						class="btn join-item btn-xs"
+						class:btn-primary={effectiveMode === 'absolute'}
+						class:btn-outline={effectiveMode === 'relative'}
+						onclick={() => (mode = 'absolute')}>W</button
+					>
+					<button
+						class="btn join-item btn-xs"
+						class:btn-primary={effectiveMode === 'relative'}
+						class:btn-outline={effectiveMode === 'absolute'}
+						onclick={() => (mode = 'relative')}>W/kg</button
+					>
+				{/if}
 			</div>
 		{/if}
 	</div>
