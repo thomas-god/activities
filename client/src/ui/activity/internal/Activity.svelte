@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { formatRelativeDuration, dayjs, formatDurationCompactWithUnits } from '$lib/duration';
-	import { sportDisplay, type SportCategory } from '$lib/sport';
-	import type { Activity, ActivityListSummaryItems } from '$lib/api';
-	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '$lib/workout-type';
-	import { getRpeClass } from '$lib/rpe';
+	import { formatRelativeDuration, dayjs, formatDurationCompactWithUnits } from '#lib/duration.js';
+	import { sportDisplay, type SportCategory } from '#lib/sport.js';
+	import type { Activity, ActivityListSummaryItems } from '#lib/api/index.js';
+	import { getWorkoutTypeClass, getWorkoutTypeLabel } from '#lib/workout-type.js';
+	import { getRpeClass } from '#lib/rpe.js';
 	import { resolve } from '$app/paths';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
 
 	let {
 		activity,
@@ -67,7 +67,7 @@
     py-2
     ${categoryClass(activity.sport_category)} hover:bg-base-200`}
 >
-	<a href={resolve(`/activity/${activity.id}`)} onclick={handleClick}>
+	<a href={resolve(`activity/${activity.id}`)} onclick={handleClick}>
 		<div class="flex flex-col gap-1">
 			<div class="flex shrink grow flex-row flex-wrap justify-between gap-1 overflow-hidden">
 				<!-- Sport icon, activity title and date -->

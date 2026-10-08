@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import { createTrainingNote } from '$lib/api/training';
-	import { dayjs } from '$lib/duration';
+	import { createTrainingNote } from '#lib/api/training.js';
+	import { dayjs } from '#lib/duration.js';
 	import { NotebookPen } from '@lucide/svelte';
 	import FormTitle from '../FormTitle.svelte';
-	import { none, type Option } from '$lib/Options';
+	import { none, type Option } from '#lib/Options.js';
 
 	let {
 		callback,

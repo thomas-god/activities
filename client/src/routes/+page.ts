@@ -4,9 +4,9 @@ import {
 	fetchActivityDefaultMetrics,
 	fetchActivityListSummary,
 	fetchTrainingMetrics
-} from '$lib/api';
-import { fetchActiveTrainingPeriods, fetchTrainingNotes } from '$lib/api/training';
-import { dayjs } from '$lib/duration';
+} from '#lib/api/index.js';
+import { fetchActiveTrainingPeriods, fetchTrainingNotes } from '#lib/api/training.js';
+import { dayjs } from '#lib/duration.js';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');

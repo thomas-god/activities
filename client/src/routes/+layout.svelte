@@ -1,9 +1,9 @@
 <script lang="ts">
 	import '../app.css';
-	import { loadTheme, setTheme } from '$lib/contexts/theme';
-	import { setAuthInfo } from '$lib/contexts/auth';
-	import { fetchAuthInfo, type AuthInfo } from '$lib/api';
-	import { none, setInnerValue, type Option } from '$lib/Options';
+	import { loadTheme, setTheme } from '#lib/contexts/theme.js';
+	import { setAuthInfo } from '#lib/contexts/auth.js';
+	import { fetchAuthInfo, type AuthInfo } from '#lib/api/index.js';
+	import { none, setInnerValue, type Option } from '#lib/Options.js';
 
 	let { children } = $props();
 

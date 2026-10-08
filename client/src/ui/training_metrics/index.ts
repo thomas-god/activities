@@ -6,12 +6,15 @@ import {
 	getMetricGroupBy,
 	getMetricFilters,
 	type TrainingMetricBasePayloadFilters
-} from '$lib/api/training';
-import { dayjs, granularityUnits } from '$lib/duration';
-import { asOption, isNone, isSome, none, some, unwrapOr, type Option } from '$lib/Options';
-import type { RPEValue } from '$lib/rpe';
-import type { Sport, SportCategory } from '$lib/sport';
-import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
+} from '#lib/api/training.js';
+import { dayjs, granularityUnits } from '#lib/duration.js';
+import { asOption, isNone, isSome, none, some, unwrapOr, type Option } from '#lib/Options.js';
+import type { RPEValue } from '#lib/rpe.js';
+import type { Sport, SportCategory } from '#lib/sport.js';
+import type {
+	TrainingMetricGranularity,
+	TrainingMetricGroupByClause
+} from '#lib/trainingMetric.js';
 import type { TrainingMetricFiltersType } from './internal/TrainingMetricFilters.svelte';
 
 export interface TrainingMetricFields {

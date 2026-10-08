@@ -1,3 +1,4 @@
+import type { ReadonlyURLSearchParams } from '$app/state';
 import type { Activity } from './api';
 import { getSportCategory, type SportCategory } from './sport';
 import type { WorkoutType } from './workout-type';
@@ -27,14 +28,14 @@ export const emptyFilters = (): ActivitiesFilters => {
 	};
 };
 
-const parseRangeParam = (params: URLSearchParams, key: string): number | null => {
+const parseRangeParam = (params: ReadonlyURLSearchParams, key: string): number | null => {
 	const raw = params.get(key);
 	if (raw === null) return null;
 	const n = Number(raw);
 	return isNaN(n) ? null : n;
 };
 
-export const filtersFromSearchParams = (params: URLSearchParams): ActivitiesFilters => {
+export const filtersFromSearchParams = (params: ReadonlyURLSearchParams): ActivitiesFilters => {
 	const filters: ActivitiesFilters = {
 		rpe: [],
 		workoutTypes: [],

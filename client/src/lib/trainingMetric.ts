@@ -7,7 +7,7 @@ import type {
 	TrainingMetricBasePayload,
 	PreviewTrainingMetricPayload,
 	TrainingPeriodDetails
-} from '$lib/api';
+} from '#lib/api/index.js';
 import { asOption, isNone, none, type Option } from './Options';
 
 export const trainingMetricGranularities = ['Daily', 'Weekly', 'Monthly'] as const;

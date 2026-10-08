@@ -1,28 +1,28 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
-	import { getSportCategory, type SportCategory } from '$lib/sport';
+	import { dayjs } from '#lib/duration.js';
+	import { getSportCategory, type SportCategory } from '#lib/sport.js';
 	import { goto, invalidate } from '$app/navigation';
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
-	import { PUBLIC_APP_URL } from '$env/static/public';
-	import TrainingPeriodStatistics from '$ui/training_period/TrainingPeriodStatistics.svelte';
-	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
+	import { PUBLIC_APP_URL } from '$app/env/public';
+	import TrainingPeriodStatistics from '#ui/training_period/TrainingPeriodStatistics.svelte';
+	import ActivityDetails from '#ui/activity/ActivityDetails.svelte';
 	import {
 		fetchActivityDetails,
 		type ActivityList,
 		type ActivityWithTimeseries
-	} from '$lib/api/activities';
-	import TrainingMetricsOrderingDialog from '$ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
-	import EditPeriodNameModal from '$ui/training_period/EditPeriodNameModal.svelte';
-	import EditPeriodDatesModal from '$ui/training_period/EditPeriodDatesModal.svelte';
-	import EditPeriodNoteModal from '$ui/training_period/EditPeriodNoteModal.svelte';
-	import Timeline from '$ui/activity/Timeline.svelte';
-	import EditButton from '$ui/shared/EditButton.svelte';
+	} from '#lib/api/activities.js';
+	import TrainingMetricsOrderingDialog from '#ui/training_metrics/TrainingMetricsOrderingDialog.svelte';
+	import EditPeriodNameModal from '#ui/training_period/EditPeriodNameModal.svelte';
+	import EditPeriodDatesModal from '#ui/training_period/EditPeriodDatesModal.svelte';
+	import EditPeriodNoteModal from '#ui/training_period/EditPeriodNoteModal.svelte';
+	import Timeline from '#ui/activity/Timeline.svelte';
+	import EditButton from '#ui/shared/EditButton.svelte';
 	import {
 		applyFiltersToSearchParams,
 		filtersFromSearchParams,
 		type ActivitiesFilters
-	} from '$lib/filters';
-	import ActivitiesFiltersComponent from '$ui/shared/ActivitiesFilters.svelte';
+	} from '#lib/filters.js';
+	import ActivitiesFiltersComponent from '#ui/shared/ActivitiesFilters.svelte';
 	import { page } from '$app/state';
 	import {
 		fetchActivityListSummary,
@@ -33,13 +33,13 @@
 		type TrainingMetricList,
 		type TrainingNotesList,
 		type TrainingPeriodDetails
-	} from '$lib/api';
-	import TrainingMetricImportForm from '$ui/training_metrics/TrainingMetricFormImport.svelte';
-	import TrainingMetricFormCreate from '$ui/training_metrics/TrainingMetricFormCreate.svelte';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
+	} from '#lib/api/index.js';
+	import TrainingMetricImportForm from '#ui/training_metrics/TrainingMetricFormImport.svelte';
+	import TrainingMetricFormCreate from '#ui/training_metrics/TrainingMetricFormCreate.svelte';
+	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
-	import TrainingMetrics from '$ui/training_metrics/TrainingMetrics.svelte';
+	import TrainingMetrics from '#ui/training_metrics/TrainingMetrics.svelte';
 	import {
 		CalendarFold,
 		GitCompareArrows,
@@ -53,10 +53,10 @@
 		Trash2,
 		X
 	} from '@lucide/svelte';
-	import { formatPeriodDuration } from '$lib/trainingPeriod';
-	import SportIcon from '$ui/shared/SportIcon.svelte';
-	import SearchField, { type SearchResult } from '$ui/shared/SearchField.svelte';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import { formatPeriodDuration } from '#lib/trainingPeriod.js';
+	import SportIcon from '#ui/shared/SportIcon.svelte';
+	import SearchField, { type SearchResult } from '#ui/shared/SearchField.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let period_id = $state(page.params.period_id);
 
@@ -73,11 +73,11 @@
 
 	const generateTrainingNotesPromise = (): Option<Promise<TrainingNotesList>> =>
 		period_id === undefined ? none() : some(fetchTrainingPeriodNotes(fetch, period_id));
+
 	const updateTrainingNotesPromise = () => (trainingNotesPromise = generateTrainingNotesPromise());
 	let trainingNotesPromise: Option<Promise<TrainingNotesList>> = $derived(
 		generateTrainingNotesPromise()
 	);
-
 	let showDeleteModal = $state(false);
 	let showEditModal = $state(false);
 	let showEditNoteModal = $state(false);
@@ -107,10 +107,10 @@
 	let searchResults: Option<SearchResult[]> = $state(none());
 
 	const handleFilterChange = (filters: ActivitiesFilters) => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		applyFiltersToSearchParams(url.searchParams, filters);
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: false, keepFocus: true });
+		 
+		goto(url, { replaceState: false, reset: false });
 	};
 
 	async function handleDelete(periodId: string) {
@@ -122,7 +122,7 @@
 
 		if (response.ok) {
 			await invalidate('app:training-periods');
-			await goto(resolve('/training/periods'));
+			await goto(resolve('training/periods'));
 		} else {
 			throw new Error('Failed to delete training period');
 		}
@@ -205,11 +205,7 @@
 
 		// First, seed with explicit categories (these mean "all sports")
 		for (const category of sports.categories) {
-			map.set(category, {
-				category: category,
-				sports: [],
-				showAll: true
-			});
+			map.set(category, { category, sports: [], showAll: true });
 		}
 
 		// Then, process individual sports
@@ -251,7 +247,7 @@
 
 	const selectActivityCallback = (activityId: string) => {
 		if (screenWidth < 700) {
-			goto(resolve(`/activity/${activityId}`));
+			goto(resolve(`activity/${activityId}`));
 			return;
 		}
 
@@ -331,12 +327,8 @@
 			{@render modalsAndDialogSnippet(periodDetails)}
 		{:else}
 			<p class="pt-4 pl-4 text-sm tracking-wide italic opacity-80">
-				Error while loading training period's details. <a
-					class="link"
-					href={resolve('/training/periods')}
-				>
-					Go back to periods.
-				</a>
+				Error while loading training period's details.
+				<a class="link" href={resolve('training/periods')}>Go back to periods.</a>
 			</p>
 		{/if}
 	{/await}
@@ -388,30 +380,24 @@
 							class="menu dropdown-content z-1 flex w-40 flex-col items-start rounded-box bg-base-100 p-2 shadow"
 						>
 							<li class="w-full">
-								<button onclick={openEditModal}>
-									<Pencil class="size-5" />
-									Edit name
-								</button>
+								<button onclick={openEditModal}><Pencil class="size-5" />Edit name</button>
 							</li>
 							<li class="w-full">
-								<button onclick={openEditDatesModal}>
-									<CalendarFold class="size-5" />
-									Edit dates
-								</button>
+								<button onclick={openEditDatesModal}
+									><CalendarFold class="size-5" />Edit dates</button
+								>
 							</li>
+
 							<li class="w-full">
 								<button
-									onclick={() => goto(resolve(`/training/periods/compare?periods=${period_id}`))}
+									onclick={() => goto(resolve(`training/periods/compare?periods=${period_id}`))}
+									><GitCompareArrows class="size-5" />Compare</button
 								>
-									<GitCompareArrows class="size-5" />
-									Compare
-								</button>
 							</li>
 							<li class="w-full">
-								<button onclick={() => (showDeleteModal = true)} class="text-error">
-									<Trash2 class="size-6" />
-									Delete
-								</button>
+								<button onclick={() => (showDeleteModal = true)} class="text-error"
+									><Trash2 class="size-6" />Delete</button
+								>
 							</li>
 						</ul>
 					</div>
@@ -580,14 +566,13 @@
 					<div class="relative w-full">
 						<div class="absolute -top-1.5 right-3 join">
 							<button
-								onclick={() => goto(resolve(`/activity/${selectedActivityId}`))}
-								class="btn join-item btn-xs"
+								onclick={() => goto(resolve(`activity/${selectedActivityId}`))}
+								class="btn join-item btn-xs"><Maximize2 class="size-3.5" /></button
 							>
-								<Maximize2 class="size-3.5" />
-							</button>
-							<button onclick={() => (selectedActivityId = null)} class="btn join-item btn-xs">
-								<X class="size-3.5" />
-							</button>
+
+							<button onclick={() => (selectedActivityId = null)} class="btn join-item btn-xs"
+								><X class="size-3.5" /></button
+							>
 						</div>
 						<ActivityDetails
 							activity={selectedActivity}
@@ -656,8 +641,9 @@
 				scope={{ kind: 'period', periodId: periodDetails.id }}
 				existingSportsConstraints={periodDetails.sports.sports.length === 0 &&
 				periodDetails.sports.categories.length === 0
-					? none() // All sports/categories, i.e. no constraints
-					: some(periodDetails.sports)}
+					? none()
+					: // All sports/categories, i.e. no constraints
+						some(periodDetails.sports)}
 			/>
 		</div>
 		<form method="dialog" class="modal-backdrop">

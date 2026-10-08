@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
-import { none, some, type Option } from '$lib/Options';
-import type { BonkStatus } from '$lib/nutrition';
+import { none, some, type Option } from '#lib/Options.js';
+import type { BonkStatus } from '#lib/nutrition.js';
 import BonkStatusFilter from './BonkStatusFilter.svelte';
 
 afterEach(() => {

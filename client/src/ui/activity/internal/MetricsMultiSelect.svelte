@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Metric } from '$lib/colors';
+	import { type Metric } from '#lib/colors.js';
 
 	let {
 		availableOptions,

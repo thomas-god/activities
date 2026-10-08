@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
-	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
-	import TrainingMetricForm from '$ui/training_metrics/TrainingMetricForm.svelte';
+	import { dayjs } from '#lib/duration.js';
+	import { type Sport, type SportCategory } from '#lib/sport.js';
+	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
+	import TrainingMetricForm from '#ui/training_metrics/TrainingMetricForm.svelte';
 	import {
 		fieldsAsPayload,
 		matchMetricToFormFields,
 		type TrainingMetricFields
-	} from '$ui/training_metrics';
+	} from '#ui/training_metrics';
 	import {
 		fetchTrainingMetricTemplates,
 		getTrainingMetricPreview,
@@ -15,7 +15,7 @@
 		type PreviewTrainingMetricPayload,
 		type TrainingMetric,
 		type UpdateTrainingMetricPayload
-	} from '$lib/api';
+	} from '#lib/api/index.js';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
 
 	let {

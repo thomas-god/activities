@@ -1,15 +1,15 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import type { TrainingPeriodDetails } from '$lib/api';
-	import { dayjs, formatDurationHoursMinutes } from '$lib/duration';
-	import { none, some, unwrapOr, type Option } from '$lib/Options';
+	import type { TrainingPeriodDetails } from '#lib/api/index.js';
+	import { dayjs, formatDurationHoursMinutes } from '#lib/duration.js';
+	import { none, some, unwrapOr, type Option } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 	import {
 		formatDistance,
 		formatElevation,
 		formatPeriodDuration,
 		periodActivitiesSummary
-	} from '$lib/trainingPeriod';
+	} from '#lib/trainingPeriod.js';
 
 	let { periods }: { periods: TrainingPeriodDetails[] } = $props();
 
@@ -80,9 +80,10 @@
 							class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full"
 							style="background-color: {d3.schemeTableau10[idx % d3.schemeTableau10.length]}"
 						></span>
-						<a href={resolve(`/training/period/${period.id}`)} class="link link-hover">
-							{period.name}
-						</a>
+
+						<a href={resolve(`training/period/${period.id}`)} class="link link-hover"
+							>{period.name}</a
+						>
 					</th>
 				{/each}
 			</tr>

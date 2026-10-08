@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ActivityListSummaryItems } from '$lib/api';
-	import { toTitleCase } from '$lib/utils';
+	import type { ActivityListSummaryItems } from '#lib/api/index.js';
+	import { toTitleCase } from '#lib/utils.js';
 	import { ArrowDown, ArrowUp, List, Plus, X } from '@lucide/svelte';
 
 	interface SummaryItem {

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
-	import type { ActivityList, ActivityListSummaryItems } from '$lib/api';
-	import type { TrainingNotesList } from '$lib/api/training';
+	import { dayjs } from '#lib/duration.js';
+	import type { ActivityList, ActivityListSummaryItems } from '#lib/api/index.js';
+	import type { TrainingNotesList } from '#lib/api/training.js';
 	import ActivityListComponent, {
 		type TimelineItem
-	} from '$ui/activity/internal/ActivityList.svelte';
+	} from '#ui/activity/internal/ActivityList.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
 	let {

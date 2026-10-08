@@ -1,9 +1,9 @@
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { type ActivityWithTimeseries } from '$lib/api';
-	import { formatDateTime, formatDuration } from '$lib/duration';
-	import { paceToString } from '$lib/speed';
-	import { none, some, unwrapOr, type Option } from '$lib/Options';
+	import { type ActivityWithTimeseries } from '#lib/api/index.js';
+	import { formatDateTime, formatDuration } from '#lib/duration.js';
+	import { paceToString } from '#lib/speed.js';
+	import { none, some, unwrapOr, type Option } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 
 	let { activities }: { activities: ActivityWithTimeseries[] } = $props();
@@ -143,9 +143,10 @@
 								class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full"
 								style="background-color: {d3.schemeTableau10[idx % d3.schemeTableau10.length]}"
 							></span>
-							<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
-								{activity.name ?? activity.start_time.slice(0, 10)}
-							</a>
+
+							<a href={resolve(`activity/${activity.id}`)} class="link link-hover" target="_blank"
+								>{activity.name ?? activity.start_time.slice(0, 10)}</a
+							>
 						</th>
 					{/each}
 				</tr>

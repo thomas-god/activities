@@ -1,7 +1,7 @@
 import * as z from 'zod';
-import { PUBLIC_APP_URL } from '$env/static/public';
+import { PUBLIC_APP_URL } from '$app/env/public';
 import { goto } from '$app/navigation';
-import { SportCategories, sports, type Sport, type SportCategory } from '$lib/sport';
+import { SportCategories, sports, type Sport, type SportCategory } from '#lib/sport.js';
 import {
 	trainingMetricGroupByClauses,
 	trainingMetricAggregateFunctions,
@@ -10,13 +10,13 @@ import {
 	type TrainingMetricGranularity,
 	type TrainingMetricAggregateFunction,
 	type TrainingMetricGroupByClause
-} from '$lib/trainingMetric';
-import { dayjs } from '$lib/duration';
+} from '#lib/trainingMetric.js';
+import { dayjs } from '#lib/duration.js';
 import { ActivitySchema } from './activities';
-import { none, type Option, some } from '$lib/Options';
-import { WORKOUT_TYPE_VALUES, type WorkoutType } from '$lib/workout-type';
-import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
-import { RPE_VALUES, type RPEValue } from '$lib/rpe';
+import { none, type Option, some } from '#lib/Options.js';
+import { WORKOUT_TYPE_VALUES, type WorkoutType } from '#lib/workout-type.js';
+import { BONK_STATUS_VALUES, type BonkStatus } from '#lib/nutrition.js';
+import { RPE_VALUES, type RPEValue } from '#lib/rpe.js';
 import { resolve } from '$app/paths';
 
 // =============================================================================
@@ -287,7 +287,7 @@ export async function fetchTrainingPeriods(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -318,7 +318,7 @@ export async function fetchActiveTrainingPeriods(
 	);
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -346,7 +346,7 @@ export async function fetchTrainingPeriodDetails(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return null;
 	}
 
@@ -399,7 +399,7 @@ export async function fetchTrainingMetrics(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -441,7 +441,7 @@ export async function copyTrainingMetricIntoPeriod(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return;
 	}
 
@@ -502,7 +502,7 @@ export async function fetchTrainingNotes(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -532,7 +532,7 @@ export async function fetchTrainingPeriodNotes(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -562,7 +562,7 @@ export async function fetchTrainingPeriodMetrics(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return [];
 	}
 
@@ -595,7 +595,7 @@ export async function createTrainingNote(content: string, date: string): Promise
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 	}
 
 	return;
@@ -628,7 +628,7 @@ export async function updateTrainingNote(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 
@@ -648,7 +648,7 @@ export async function deleteTrainingNote(noteId: string): Promise<boolean> {
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 
@@ -666,14 +666,7 @@ export const fetchTrainingMetricTemplates = async () => {
 };
 
 export interface TrainingMetricBasePayloadFilters {
-	sports:
-		| (
-				| {
-						Sport: Sport;
-				  }
-				| { SportCategory: SportCategory }
-		  )[]
-		| null;
+	sports: ({ Sport: Sport } | { SportCategory: SportCategory })[] | null;
 	workout_types: WorkoutType[] | null;
 	rpes: RPEValue[] | null;
 	bonked: BonkStatus | null;
@@ -693,6 +686,7 @@ export interface TrainingMetricBasePayload {
 					filters: TrainingMetricBasePayloadFilters;
 				};
 		  };
+
 	window?: {
 		granularity: TrainingMetricGranularity;
 		aggregate: TrainingMetricAggregateFunction;
@@ -712,7 +706,6 @@ export interface PreviewTrainingMetricPayload extends TrainingMetricBasePayload 
 	start: string;
 	end: string;
 }
-
 export interface UpdateTrainingMetricPayload extends TrainingMetricBasePayload {
 	name: string;
 }
@@ -732,7 +725,7 @@ export const createTrainingMetric = async (payload: CreateTrainingMetricPayload)
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 	}
 };
 
@@ -749,7 +742,7 @@ export const updateTrainingMetric = async (
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 	}
 };
 
@@ -770,7 +763,7 @@ export const getTrainingMetricPreview = async (
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 	}
 
 	if (res.status !== 200) {
@@ -802,8 +795,15 @@ export async function fetchHooperIndex(date: Date | string): Promise<HooperIndex
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
-		return { fatigue: null, sleep: null, pain: null, stress: null, mood: null };
+		goto(resolve('login'));
+
+		return {
+			fatigue: null,
+			sleep: null,
+			pain: null,
+			stress: null,
+			mood: null
+		};
 	}
 
 	if (res.status !== 200) {
@@ -835,7 +835,7 @@ export async function saveHooperIndex(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 
@@ -857,7 +857,7 @@ export async function deleteHooperIndex(date: Date | string): Promise<boolean> {
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 
@@ -886,7 +886,7 @@ export async function fetchWeightAndNutrition(date: Date | string): Promise<Weig
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return {
 			weight: null,
 			fat: null,
@@ -929,7 +929,7 @@ export async function saveWeightAndNutrition(
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 
@@ -941,7 +941,10 @@ const WeightAndNutritionHistoryResponse = z.object({
 });
 
 export type WeightAndNutritionHistoryError =
-	| { type: 'partialFailure'; files: { file: string; reason: string }[] }
+	| {
+			type: 'partialFailure';
+			files: { file: string; reason: string }[];
+	  }
 	| { type: 'totalFailure'; reason: string }
 	| { type: 'success' };
 
@@ -998,7 +1001,7 @@ export async function deleteWeightAndNutrition(date: Date | string): Promise<boo
 	});
 
 	if (res.status === 401) {
-		goto(resolve('/login'));
+		goto(resolve('login'));
 		return false;
 	}
 

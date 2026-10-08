@@ -22,6 +22,8 @@ jobs:
     defaults:
       run:
         working-directory: ./client
+    env:
+      PUBLIC_APP_URL: http://localhost:3001
     steps:
       - uses: actions/checkout@v7
       - name: Use Node.js 26.x
@@ -29,5 +31,5 @@ jobs:
         with:
           node-version: 26.x
       - run: npm ci
-      - run: PUBLIC_APP_URL=test npm run build
+      - run: npm run build
       - run: npm run test:ci

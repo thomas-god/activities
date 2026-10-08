@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { Timeseries } from '$lib/api/activities';
+	import type { Timeseries } from '#lib/api/activities.js';
 
 	interface Props {
 		timeseries: Timeseries;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatDuration } from '$lib/duration';
+	import { formatDuration } from '#lib/duration.js';
 	import type { SvelteMap } from 'svelte/reactivity';
 
 	let {

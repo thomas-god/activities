@@ -23,15 +23,24 @@ The same design decision applies to other types of chart in this module.
 -->
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { dayjs, formatDurationCompactWithUnits } from '$lib/duration';
+	import { dayjs, formatDurationCompactWithUnits } from '#lib/duration.js';
 	import {
 		displayGroupName,
 		type TrainingMetricGranularity,
 		type TrainingMetricGroupByClause
-	} from '$lib/trainingMetric';
-	import { asOption, isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
-	import { paceInSecondToString } from '$lib/speed';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+	} from '#lib/trainingMetric.js';
+	import {
+		asOption,
+		isNone,
+		isSome,
+		map,
+		none,
+		some,
+		unwrapOr,
+		type Option
+	} from '#lib/Options.js';
+	import { paceInSecondToString } from '#lib/speed.js';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
 	import {
 		buildAbsoluteTimeFormatter,
 		buildRelativeTimeFormatter,
@@ -41,7 +50,7 @@ The same design decision applies to other types of chart in this module.
 		parseMetricIntoPoints,
 		type DisplayMode
 	} from '.';
-	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import { untrack } from 'svelte';
 	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 

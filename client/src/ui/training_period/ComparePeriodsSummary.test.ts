@@ -1,8 +1,8 @@
 import { render, screen, cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Activity, ActivityList } from '$lib/api/activities';
-import type { TrainingPeriodDetails } from '$lib/api';
+import type { Activity, ActivityList } from '#lib/api/activities.js';
+import type { TrainingPeriodDetails } from '#lib/api/index.js';
 import { resolve } from '$app/paths';
 
 import ComparePeriodsSummary from './ComparePeriodsSummary.svelte';
@@ -46,11 +46,11 @@ describe('ComparePeriodsSummary', () => {
 
 		expect(screen.getByRole('link', { name: 'Base block' })).toHaveAttribute(
 			'href',
-			resolve('/training/period/period-1')
+			resolve('training/period/period-1')
 		);
 		expect(screen.getByRole('link', { name: 'Build block' })).toHaveAttribute(
 			'href',
-			resolve('/training/period/period-2')
+			resolve('training/period/period-2')
 		);
 	});
 

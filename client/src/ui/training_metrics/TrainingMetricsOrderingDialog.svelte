@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { metricAsString, type TrainingMetric } from '$lib/api';
+	import { metricAsString, type TrainingMetric } from '#lib/api/index.js';
 	import {
 		getMetricsOrdering,
 		setMetricsOrdering,
 		type MetricsOrderingScope
-	} from '$lib/api/training-metrics-ordering';
-	import { aggregateFunctionDisplay } from '$lib/trainingMetric';
+	} from '#lib/api/training-metrics-ordering.js';
+	import { aggregateFunctionDisplay } from '#lib/trainingMetric.js';
 	import { ArrowDown, ArrowUp, List } from '@lucide/svelte';
 
 	interface Props {

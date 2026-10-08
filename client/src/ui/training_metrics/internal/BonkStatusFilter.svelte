@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { BONK_STATUS_VALUES, type BonkStatus } from '$lib/nutrition';
-	import { isSome, type Option, none, some } from '$lib/Options';
+	import { BONK_STATUS_VALUES, type BonkStatus } from '#lib/nutrition.js';
+	import { isSome, type Option, none, some } from '#lib/Options.js';
 	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {

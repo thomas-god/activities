@@ -1,7 +1,7 @@
 <script lang="ts">
-	import EditButton from '$ui/shared/EditButton.svelte';
-	import SaveButton from '$ui/shared/SaveButton.svelte';
-	import AddButton from '$ui/shared/AddButton.svelte';
+	import EditButton from '#ui/shared/EditButton.svelte';
+	import SaveButton from '#ui/shared/SaveButton.svelte';
+	import AddButton from '#ui/shared/AddButton.svelte';
 	import {
 		BONK_STATUS_VALUES,
 		getBonkStatusLabel,
@@ -9,7 +9,7 @@
 		getBonkStatusIcon,
 		type BonkStatus,
 		type Nutrition
-	} from '$lib/nutrition';
+	} from '#lib/nutrition.js';
 
 	let {
 		nutrition: initialNutrition,

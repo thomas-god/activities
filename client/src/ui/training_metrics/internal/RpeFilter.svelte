@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { isSome, type Option, none, some } from '$lib/Options';
-	import { RPE_VALUES, type RPEValue } from '$lib/rpe';
+	import { isSome, type Option, none, some } from '#lib/Options.js';
+	import { RPE_VALUES, type RPEValue } from '#lib/rpe.js';
 	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {

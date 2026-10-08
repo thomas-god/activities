@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '$lib/api';
-	import { dayjs } from '$lib/duration';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	import { fetchHooperIndex, saveHooperIndex, type HooperIndex } from '#lib/api/index.js';
+	import { dayjs } from '#lib/duration.js';
+	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import { ChevronLeft, ChevronRight, MessageSquareHeart } from '@lucide/svelte';
 	import {
 		emptyHooperIndex,

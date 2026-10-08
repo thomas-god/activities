@@ -1,8 +1,8 @@
-import type { TrainingMetric, TrainingPeriodDetails } from '$lib/api';
-import { asOption, isNone, map, none, some, unwrapOr, type Option } from '$lib/Options';
-import type { CompareAlignment, TrainingMetricGranularity } from '$lib/trainingMetric';
-import { dayjs, granularityUnits } from '$lib/duration';
-import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
+import type { TrainingMetric, TrainingPeriodDetails } from '#lib/api/index.js';
+import { asOption, isNone, map, none, some, unwrapOr, type Option } from '#lib/Options.js';
+import type { CompareAlignment, TrainingMetricGranularity } from '#lib/trainingMetric.js';
+import { dayjs, granularityUnits } from '#lib/duration.js';
+import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
 
 export const numberOfDistinctBins = (
 	start: string,

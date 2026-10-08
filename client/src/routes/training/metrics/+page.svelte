@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import TrainingMetricsOptions from '$ui/training_metrics/TrainingMetricsOptions.svelte';
-	import { dayjs } from '$lib/duration';
-	import TrainingMetricTitle from '$ui/training_metrics/TrainingMetricTitle.svelte';
-	import { fetchTrainingMetrics, fetchTrainingPeriods, type TrainingMetricList } from '$lib/api';
-	import { isSome, some, type Option } from '$lib/Options';
-	import TrainingMetricChart from '$ui/training_metrics/TrainingMetricChart.svelte';
-	import Navbar from '$ui/navigation/Navbar.svelte';
+	import TrainingMetricsOptions from '#ui/training_metrics/TrainingMetricsOptions.svelte';
+	import { dayjs } from '#lib/duration.js';
+	import TrainingMetricTitle from '#ui/training_metrics/TrainingMetricTitle.svelte';
+	import {
+		fetchTrainingMetrics,
+		fetchTrainingPeriods,
+		type TrainingMetricList
+	} from '#lib/api/index.js';
+	import { isSome, some, type Option } from '#lib/Options.js';
+	import TrainingMetricChart from '#ui/training_metrics/TrainingMetricChart.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
 
 	let chartWidths: number[] = $state([]);
 
@@ -30,7 +34,7 @@
 			// For convenience, don't add end date if it's today
 			url += `&end=${encodeURIComponent(dayjs(newDates.end).format('YYYY-MM-DD'))}`;
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
+		 
 		goto(url);
 	};
 </script>

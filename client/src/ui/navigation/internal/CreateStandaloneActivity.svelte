@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { postStandaloneActivity } from '$lib/api';
+	import { postStandaloneActivity } from '#lib/api/index.js';
 	import {
 		sportCategoryDisplay,
 		sports,
 		sportsPerCategory,
 		type SportCategory,
 		sportDisplay
-	} from '$lib/sport';
-	import { dayjs } from '$lib/duration';
+	} from '#lib/sport.js';
+	import { dayjs } from '#lib/duration.js';
 	import { resolve } from '$app/paths';
 
 	let { activityCreatedCallback }: { activityCreatedCallback: () => void } = $props();
@@ -43,7 +43,7 @@
 		});
 
 		if (res.type === 'authentication-error') {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 			return;
 		}
 

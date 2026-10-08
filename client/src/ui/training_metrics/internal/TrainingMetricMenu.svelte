@@ -1,10 +1,10 @@
 <script lang="ts">
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
-	import { PUBLIC_APP_URL } from '$env/static/public';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
+	import { PUBLIC_APP_URL } from '$app/env/public';
 	import { goto } from '$app/navigation';
 	import TrainingMetricFormUpdate from '../TrainingMetricFormUpdate.svelte';
-	import type { TrainingMetric } from '$lib/api';
-	import { none } from '$lib/Options';
+	import type { TrainingMetric } from '#lib/api/index.js';
+	import { none } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 	import { Pencil, Settings, Trash2 } from '@lucide/svelte';
 
@@ -32,7 +32,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 		showDeleteModal = false;
 		onDelete();
@@ -57,10 +57,9 @@
 			</button>
 		</li>
 		<li>
-			<button onclick={() => (showDeleteModal = true)} class="text-error">
-				<Trash2 class="size-4" />
-				Delete
-			</button>
+			<button onclick={() => (showDeleteModal = true)} class="text-error"
+				><Trash2 class="size-4" />Delete</button
+			>
 		</li>
 	</ul>
 </div>

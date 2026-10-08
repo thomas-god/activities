@@ -1,10 +1,13 @@
 import { scaleOrdinal, schemeCategory10 } from 'd3';
-import type { TrainingMetric } from '$lib/api';
-import { dayjs, formatDurationHoursMinutes, formatWeekInterval } from '$lib/duration';
-import { isNone, isSome, some, type Option } from '$lib/Options';
-import { paceInSecondToString } from '$lib/speed';
-import type { TrainingMetricGranularity, TrainingMetricGroupByClause } from '$lib/trainingMetric';
-import type { TimeDomain } from '$ui/training_metrics';
+import type { TrainingMetric } from '#lib/api/index.js';
+import { dayjs, formatDurationHoursMinutes, formatWeekInterval } from '#lib/duration.js';
+import { isNone, isSome, some, type Option } from '#lib/Options.js';
+import { paceInSecondToString } from '#lib/speed.js';
+import type {
+	TrainingMetricGranularity,
+	TrainingMetricGroupByClause
+} from '#lib/trainingMetric.js';
+import type { TimeDomain } from '#ui/training_metrics';
 
 export const formatTooltipValue = (
 	value: number,

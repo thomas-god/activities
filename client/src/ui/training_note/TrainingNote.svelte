@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { dayjs, formatRelativeDuration } from '$lib/duration';
-	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '$lib/api/training';
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
+	import { dayjs, formatRelativeDuration } from '#lib/duration.js';
+	import { deleteTrainingNote, updateTrainingNote, type TrainingNote } from '#lib/api/training.js';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
 	import { NotebookPen, Pencil, Settings, Trash2 } from '@lucide/svelte';
 
 	let {

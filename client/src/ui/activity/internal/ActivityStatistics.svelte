@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { ActivityWithTimeseries } from '$lib/api';
-	import { formatDuration } from '$lib/duration';
-	import { paceToString } from '$lib/speed';
+	import type { ActivityWithTimeseries } from '#lib/api/index.js';
+	import { formatDuration } from '#lib/duration.js';
+	import { paceToString } from '#lib/speed.js';
 	import {
 		Gauge,
 		HeartPulse,

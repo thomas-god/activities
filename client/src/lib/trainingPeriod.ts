@@ -1,5 +1,5 @@
-import type { ActivityList } from '$lib/api/activities';
-import { dayjs } from '$lib/duration';
+import type { ActivityList } from '#lib/api/activities.js';
+import { dayjs } from '#lib/duration.js';
 
 export type PeriodActivitiesSummary = {
 	count: number;

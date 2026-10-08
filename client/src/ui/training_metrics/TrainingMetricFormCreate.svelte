@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { dayjs } from '$lib/duration';
-	import { type Sport, type SportCategory } from '$lib/sport';
-	import { isNone, isSome, none, some, type Option } from '$lib/Options';
+	import { dayjs } from '#lib/duration.js';
+	import { type Sport, type SportCategory } from '#lib/sport.js';
+	import { isNone, isSome, none, some, type Option } from '#lib/Options.js';
 	import {
 		createTrainingMetric,
 		fetchTrainingMetricTemplates,
@@ -9,12 +9,12 @@
 		type CreateTrainingMetricPayload,
 		type PreviewTrainingMetricPayload,
 		type TrainingMetric
-	} from '$lib/api';
+	} from '#lib/api/index.js';
 	import TrainingMetricForm from './TrainingMetricForm.svelte';
 	import { fieldsAsPayload, type Scope, type TrainingMetricFields } from '.';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
 	import { ChartColumn } from '@lucide/svelte';
-	import FormTitle from '$ui/navigation/FormTitle.svelte';
+	import FormTitle from '#ui/navigation/FormTitle.svelte';
 
 	let {
 		callback,

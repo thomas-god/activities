@@ -4,7 +4,7 @@ import {
 	fetchActivityDefaultMetrics,
 	fetchActivityListSummary,
 	fetchTrainingNotes
-} from '$lib/api';
+} from '#lib/api/index.js';
 
 export const load: PageLoad = async ({ fetch, depends }) => {
 	depends('app:activities');

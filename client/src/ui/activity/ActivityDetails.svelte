@@ -1,25 +1,25 @@
 <script lang="ts">
-	import TimeseriesChart from '$ui/activity/internal/TimeseriesChart.svelte';
-	import { PUBLIC_APP_URL } from '$env/static/public';
+	import TimeseriesChart from '#ui/activity/internal/TimeseriesChart.svelte';
+	import { PUBLIC_APP_URL } from '$app/env/public';
 	import { goto } from '$app/navigation';
-	import EditableRpe from '$ui/activity/internal/EditableRpe.svelte';
-	import EditableWorkoutType from '$ui/activity/internal/EditableWorkoutType.svelte';
-	import EditableNutrition from '$ui/activity/internal/EditableNutrition.svelte';
-	import EditableFeedback from '$ui/activity/internal/EditableFeedback.svelte';
-	import MetricsMultiSelect from '$ui/activity/internal/MetricsMultiSelect.svelte';
-	import DeleteModal from '$ui/shared/DeleteModal.svelte';
-	import type { Metric } from '$lib/colors';
-	import ActivityStatistics from '$ui/activity/internal/ActivityStatistics.svelte';
-	import ActivityLaps from '$ui/activity/internal/ActivityLaps.svelte';
-	import ActivityHeader from '$ui/activity/internal/ActivityHeader.svelte';
-	import DurationCurve from '$ui/activity/DurationCurve.svelte';
-	import ActivityMap from '$ui/activity/internal/ActivityMap.svelte';
-	import { convertTimeseriesToActiveTime } from '$lib/timeseries';
-	import type { WorkoutType } from '$lib/workout-type';
-	import type { Nutrition } from '$lib/nutrition';
-	import { sportDisplay } from '$lib/sport';
-	import type { ActivityWithTimeseries } from '$lib/api/activities';
-	import { asOption, isNone, isSome, none, some, type Option, type Some } from '$lib/Options';
+	import EditableRpe from '#ui/activity/internal/EditableRpe.svelte';
+	import EditableWorkoutType from '#ui/activity/internal/EditableWorkoutType.svelte';
+	import EditableNutrition from '#ui/activity/internal/EditableNutrition.svelte';
+	import EditableFeedback from '#ui/activity/internal/EditableFeedback.svelte';
+	import MetricsMultiSelect from '#ui/activity/internal/MetricsMultiSelect.svelte';
+	import DeleteModal from '#ui/shared/DeleteModal.svelte';
+	import type { Metric } from '#lib/colors.js';
+	import ActivityStatistics from '#ui/activity/internal/ActivityStatistics.svelte';
+	import ActivityLaps from '#ui/activity/internal/ActivityLaps.svelte';
+	import ActivityHeader from '#ui/activity/internal/ActivityHeader.svelte';
+	import DurationCurve from '#ui/activity/DurationCurve.svelte';
+	import ActivityMap from '#ui/activity/internal/ActivityMap.svelte';
+	import { convertTimeseriesToActiveTime } from '#lib/timeseries.js';
+	import type { WorkoutType } from '#lib/workout-type.js';
+	import type { Nutrition } from '#lib/nutrition.js';
+	import { sportDisplay } from '#lib/sport.js';
+	import type { ActivityWithTimeseries } from '#lib/api/activities.js';
+	import { asOption, isNone, isSome, none, some, type Option, type Some } from '#lib/Options.js';
 	import { resolve } from '$app/paths';
 
 	interface Props {
@@ -148,7 +148,7 @@
 			credentials: 'include'
 		});
 		if (response.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 			throw new Error('Unauthorized');
 		}
 
@@ -176,7 +176,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 			return;
 		}
 
@@ -200,7 +200,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		// Update local state
@@ -220,7 +220,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		// Update local state
@@ -240,7 +240,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		// Update local state
@@ -259,7 +259,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		// Update local state
@@ -282,7 +282,7 @@
 		});
 
 		if (res.status === 401) {
-			goto(resolve('/login'));
+			goto(resolve('login'));
 		}
 
 		// Update local state
@@ -330,9 +330,7 @@
 
 	<details class={`collapse-arrow collapse ${sectionClass}`} open>
 		<summary class="collapse-title text-lg font-semibold">Statistics</summary>
-		<div class="collapse-content">
-			<ActivityStatistics {activity} />
-		</div>
+		<div class="collapse-content"><ActivityStatistics {activity} /></div>
 	</details>
 
 	{#if isSome(selectedOptions)}

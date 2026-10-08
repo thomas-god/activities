@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { TrainingMetric, TrainingMetricTemplate } from '$lib/api/training';
-import { isNone, isSome, none, some } from '$lib/Options';
+import type { TrainingMetric, TrainingMetricTemplate } from '#lib/api/training.js';
+import { isNone, isSome, none, some } from '#lib/Options.js';
 
 import {
 	expectedBinsForDomain,
@@ -10,7 +10,7 @@ import {
 	matchTemplate,
 	type TrainingMetricFields
 } from './index';
-import { dayjs } from '$lib/duration';
+import { dayjs } from '#lib/duration.js';
 
 const activityMetricSource = (metric: string): TrainingMetric['source'] => ({
 	type: 'activity',

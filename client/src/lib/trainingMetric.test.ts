@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { TrainingMetric, TrainingMetricFilters } from '$lib/api';
+import type { TrainingMetric, TrainingMetricFilters } from '#lib/api/index.js';
 
 import {
 	definitionLabel,
@@ -10,7 +10,7 @@ import {
 	periodMetricRange,
 	type CompareMetricDefinition
 } from './trainingMetric';
-import { dayjs } from '$lib/duration';
+import { dayjs } from '#lib/duration.js';
 
 const metricFilters = (overrides: Partial<TrainingMetricFilters> = {}): TrainingMetricFilters => ({
 	sports: [{ Sport: 'Running' }, { SportCategory: 'Cycling' }],

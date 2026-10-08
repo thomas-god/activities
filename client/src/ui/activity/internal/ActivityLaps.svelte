@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { ActivityWithTimeseries } from '$lib/api/activities';
-	import { dayjs } from '$lib/duration';
-	import { paceToString, speedToPace } from '$lib/speed';
+	import type { ActivityWithTimeseries } from '#lib/api/activities.js';
+	import { dayjs } from '#lib/duration.js';
+	import { paceToString, speedToPace } from '#lib/speed.js';
 
 	export type LapMetric = 'distance' | 'speed' | 'power' | 'heartRate' | 'pace';
 

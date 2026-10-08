@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { dayjs } from '$lib/duration';
-import { none, some } from '$lib/Options';
+import { dayjs } from '#lib/duration.js';
+import { none, some } from '#lib/Options.js';
 
 import {
 	buildAbsoluteTimeFormatter,
@@ -13,7 +13,7 @@ import {
 	parseMetricIntoPoints,
 	type Point
 } from './index';
-import type { TimeDomain } from '$ui/training_metrics';
+import type { TimeDomain } from '#ui/training_metrics';
 
 describe('formatTooltipValue', () => {
 	it('formats duration values with compact units', () => {

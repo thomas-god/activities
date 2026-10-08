@@ -23,12 +23,21 @@ The same design decision applies to other types of chart in this module.
 -->
 <script lang="ts">
 	import * as d3 from 'd3';
-	import { asOption, isNone, isSome, map, none, some, unwrapOr, type Option } from '$lib/Options';
+	import {
+		asOption,
+		isNone,
+		isSome,
+		map,
+		none,
+		some,
+		unwrapOr,
+		type Option
+	} from '#lib/Options.js';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import type { TrainingMetricGranularity } from '$lib/trainingMetric';
-	import { expectedBinsForDomain, type TimeDomain } from '$ui/training_metrics';
-	import { dayjs } from '$lib/duration';
+	import type { TrainingMetricGranularity } from '#lib/trainingMetric.js';
+	import { expectedBinsForDomain, type TimeDomain } from '#ui/training_metrics';
+	import { dayjs } from '#lib/duration.js';
 
 	import {
 		buildAbsoluteTimeFormatter,
@@ -40,7 +49,7 @@ The same design decision applies to other types of chart in this module.
 		type DisplayMode,
 		type Point
 	} from '.';
-	import type { ChartHandle, HoveredBin } from '$ui/training_metrics/TrainingMetricChart.svelte';
+	import type { ChartHandle, HoveredBin } from '#ui/training_metrics/TrainingMetricChart.svelte';
 	import Tooltip, { type TooltipData } from './Tooltip.svelte';
 
 	let {

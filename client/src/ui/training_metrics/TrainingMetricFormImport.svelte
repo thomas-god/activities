@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CopyUploadButton from '$ui/shared/CopyUploadButton.svelte';
+	import CopyUploadButton from '#ui/shared/CopyUploadButton.svelte';
 	import {
 		copyTrainingMetricIntoPeriod,
 		metricAsString,
@@ -7,9 +7,9 @@
 		metricSportsRepr,
 		type TrainingMetric,
 		type TrainingMetricList
-	} from '$lib/api';
-	import { aggregateFunctionDisplay, groupByClauseDisplay } from '$lib/trainingMetric';
-	import { isSome, none, some, type Option } from '$lib/Options';
+	} from '#lib/api/index.js';
+	import { aggregateFunctionDisplay, groupByClauseDisplay } from '#lib/trainingMetric.js';
+	import { isSome, none, some, type Option } from '#lib/Options.js';
 	import TrainingMetricChart from './TrainingMetricChart.svelte';
 	import { Eye, Info } from '@lucide/svelte';
 

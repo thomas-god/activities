@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { createContext } from 'svelte';
 
 // Make sure corresponding themes are enable in `app.css` daisyui's plugin

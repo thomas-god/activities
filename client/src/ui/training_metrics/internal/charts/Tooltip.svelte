@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isSome, type Option } from '$lib/Options';
+	import { isSome, type Option } from '#lib/Options.js';
 	import { formatTooltipValue } from '.';
 
 	export interface TooltipData {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { downloadAllActivities } from '$lib/api';
+	import { downloadAllActivities } from '#lib/api/index.js';
 	import { ArrowDownToLine } from '@lucide/svelte';
 
 	interface Props {

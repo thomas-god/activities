@@ -3,7 +3,8 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-import { build, files, version } from '$service-worker';
+import { immutable, assets } from '$app/manifest';
+import { version } from '$app/env';
 
 // This gives `self` the correct types.
 const self = globalThis.self as unknown as ServiceWorkerGlobalScope;
@@ -11,9 +12,9 @@ const self = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
 
 const ASSETS = [
-	...build, // the app itself
-	...files // everything in `static`
-];
+	...immutable, // the app itself
+	...assets // everything in `static`
+].map((asset) => asset.path);
 
 self.addEventListener('install', (event) => {
 	async function addFilesToCache() {

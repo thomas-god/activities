@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isSome, type Option, none, isNone, map, some, unwrapOr } from '$lib/Options';
+	import { isSome, type Option, none, isNone, map, some, unwrapOr } from '#lib/Options.js';
 	import {
 		SportCategories,
 		sportCategoryDisplay,
@@ -7,7 +7,7 @@
 		sportsPerCategory,
 		type Sport,
 		type SportCategory
-	} from '$lib/sport';
+	} from '#lib/sport.js';
 	import { Pencil, Trash2 } from '@lucide/svelte';
 
 	let {

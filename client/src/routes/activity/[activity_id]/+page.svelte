@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import Navbar from '$ui/navigation/Navbar.svelte';
-	import ActivityDetails from '$ui/activity/ActivityDetails.svelte';
+	import Navbar from '#ui/navigation/Navbar.svelte';
+	import ActivityDetails from '#ui/activity/ActivityDetails.svelte';
 	import type { PageProps } from './$types';
 	import { resolve } from '$app/paths';
 	import { MoveLeft } from '@lucide/svelte';

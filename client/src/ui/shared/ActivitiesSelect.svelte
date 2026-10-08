@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { type Activity, type ActivityList } from '$lib/api';
-	import { dayjs, formatRelativeDuration } from '$lib/duration';
+	import { type Activity, type ActivityList } from '#lib/api/index.js';
+	import { dayjs, formatRelativeDuration } from '#lib/duration.js';
 	import { onMount } from 'svelte';
 	import ActivitiesFilters from './ActivitiesFilters.svelte';
-	import { emptyFilters } from '$lib/filters';
+	import { emptyFilters } from '#lib/filters.js';
 	import { resolve } from '$app/paths';
 	import SportIcon from './SportIcon.svelte';
 	import { Minus, Plus } from '@lucide/svelte';
@@ -50,7 +50,7 @@
 	};
 
 	const updateUrl = () => {
-		const url = new URL(page.url);
+		const url = new URL(page.url.href);
 		if (selectedActivities.length === 0) {
 			url.searchParams.delete('activities');
 		} else {
@@ -59,8 +59,8 @@
 				selectedActivities.map((activity) => activity.id).join(',')
 			);
 		}
-		/* eslint-disable svelte/no-navigation-without-resolve */
-		goto(url, { replaceState: false, keepFocus: true });
+		 
+		goto(url, { replaceState: false, reset: false });
 	};
 </script>
 
@@ -80,9 +80,9 @@
 				<Minus class="size-3" />
 			</button>
 			<div class="shrink-0">
-				<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
-					{activity.name || activity.sport}
-				</a>
+				<a href={resolve(`activity/${activity.id}`)} class="link link-hover" target="_blank"
+					>{activity.name || activity.sport}</a
+				>
 			</div>
 			<div class="shrink-0 text-sm tracking-wide italic opacity-70">
 				{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
@@ -112,6 +112,7 @@
 					</svg>
 					<input type="search" class="grow" placeholder="Search" bind:value={searchText} />
 				</label>
+
 				<ActivitiesFilters {activities} bind:filters bind:filteredActivities showLabel={false} />
 			</div>
 		</div>
@@ -132,9 +133,9 @@
 						<Plus class="size-3" />
 					</button>
 					<div class="shrink-0">
-						<a href={resolve(`/activity/${activity.id}`)} class="link link-hover" target="_blank">
-							{activity.name || activity.sport}
-						</a>
+						<a href={resolve(`activity/${activity.id}`)} class="link link-hover" target="_blank"
+							>{activity.name || activity.sport}</a
+						>
 					</div>
 					<div class="shrink-0 text-sm tracking-wide italic opacity-70">
 						{formatRelativeDuration(dayjs(activity.start_time), dayjs())}
