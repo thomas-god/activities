@@ -60,20 +60,45 @@ impl SqliteUsersRepository {
 impl UserRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err(Debug))]
     async fn store_user_with_mail(&self, user: &UserId, email: &EmailAddress) -> Result<(), ()> {
-        match sqlx::query(
+        let mut tx = match self.writer.begin().await {
+            Ok(tx) => tx,
+            Err(err) => {
+                tracing::warn!("Unable to start transaction to store user");
+                tracing::warn!("{}", err);
+                return Err(());
+            }
+        };
+
+        if let Err(err) = sqlx::query("INSERT INTO t_users (user_id) VALUES (?1);")
+            .bind(user.to_string())
+            .execute(&mut *tx)
+            .await
+        {
+            tracing::warn!("Unable to insert user into database");
+            tracing::warn!("{}", err);
+            return Err(());
+        }
+
+        if let Err(err) = sqlx::query(
             r#"
-        INSERT INTO t_users (email, user_id) VALUES (
-            ?1, ?2
+        INSERT INTO t_emails (email, user) VALUES (
+            ?1, (SELECT rowid FROM t_users WHERE user_id = ?2)
         );"#,
         )
         .bind(email.to_string())
         .bind(user.to_string())
-        .execute(&self.writer)
+        .execute(&mut *tx)
         .await
         {
+            tracing::warn!("Unable to insert user email into database");
+            tracing::warn!("{}", err);
+            return Err(());
+        }
+
+        match tx.commit().await {
             Ok(_) => Ok(()),
             Err(err) => {
-                tracing::warn!("Unable to insert user into database");
+                tracing::warn!("Unable to commit user storing transaction");
                 tracing::warn!("{}", err);
                 Err(())
             }
@@ -82,11 +107,17 @@ impl UserRepository for SqliteUsersRepository {
 
     #[tracing::instrument(skip_all, err(Debug))]
     async fn get_user_by_email(&self, email: &EmailAddress) -> Result<Option<UserId>, ()> {
-        let res: Result<String, sqlx::Error> =
-            sqlx::query_scalar("SELECT user_id FROM t_users WHERE email = ?1")
-                .bind(email.to_string())
-                .fetch_one(&self.readers)
-                .await;
+        let res: Result<String, sqlx::Error> = sqlx::query_scalar(
+            r#"
+        SELECT u.user_id
+        FROM t_users u
+        JOIN t_emails e ON e.user = u.rowid
+        WHERE e.email = ?1
+        ;"#,
+        )
+        .bind(email.to_string())
+        .fetch_one(&self.readers)
+        .await;
         match res {
             Ok(res) => Ok(Some(UserId::from(res))),
             Err(sqlx::Error::RowNotFound) => Ok(None),
@@ -315,6 +346,10 @@ mod test_sqlite_users_repository {
             .fetch_one(&repository.readers)
             .await
             .unwrap();
+        sqlx::query("select count(*) from t_emails;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -395,6 +430,55 @@ mod test_sqlite_users_repository {
                 .expect("Should not have err"),
             Some(UserId::test_default())
         );
+    }
+
+    #[tokio::test]
+    async fn test_stored_email_is_unverified() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let verified: i64 = sqlx::query_scalar("select verified from t_emails;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        assert_eq!(verified, 0);
+    }
+
+    #[tokio::test]
+    async fn test_user_has_no_password_hash_by_default() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let password_hash: Option<String> =
+            sqlx::query_scalar("select password_hash from t_users;")
+                .fetch_one(&repository.readers)
+                .await
+                .unwrap();
+        assert_eq!(password_hash, None);
+    }
+
+    #[tokio::test]
+    async fn test_user_can_have_multiple_emails() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        sqlx::query(
+            r#"
+            INSERT INTO t_emails (email, user) VALUES (
+                'other@mail.test', (SELECT rowid FROM t_users WHERE user_id = ?1)
+            );"#,
+        )
+        .bind(UserId::test_default().to_string())
+        .execute(&repository.writer)
+        .await
+        .unwrap();
+
+        for mail in ["test@mail.test", "other@mail.test"] {
+            assert_eq!(
+                repository
+                    .get_user_by_email(&EmailAddress::try_from(mail).unwrap())
+                    .await
+                    .expect("should not have err"),
+                Some(UserId::test_default())
+            );
+        }
     }
 
     #[tokio::test]
@@ -927,5 +1011,138 @@ mod test_sqlite_users_repository {
                 .await
                 .is_none()
         );
+    }
+
+    /// Builds a pre-004 schema (migrations 001 to 003 applied by hand), seeds
+    /// it with users, an auth link and a session, marks those migrations as
+    /// applied so that initializing the repository only runs 004, and checks
+    /// that the data survives the table rebuild with its foreign keys intact.
+    #[tokio::test]
+    async fn test_email_split_migration_preserves_data() {
+        let db_file = NamedTempFile::new().unwrap();
+        let migrator = sqlx::migrate!("migrations/users");
+
+        // Apply migrations 001-003 manually to build the pre-004 schema.
+        let options = SqliteConnectOptions::from_str(&db_file.path().to_string_lossy())
+            .unwrap()
+            .create_if_missing(true)
+            .foreign_keys(true);
+        let pool = SqlitePool::connect_with(options).await.unwrap();
+
+        {
+            let mut conn = pool.acquire().await.unwrap();
+            for migration in migrator.migrations.iter().take(3) {
+                sqlx::raw_sql(migration.sql.as_ref())
+                    .execute(&mut *conn)
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // Seed pre-004 data: two users, an auth link for the first one and a
+        // session for the second one (rowids are auto-assigned in order).
+        sqlx::query("INSERT INTO t_users (email, user_id) VALUES ('a@mail.test', 'user_a');")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO t_users (email, user_id) VALUES ('b@mail.test', 'user_b');")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO t_auth_links (user, token_hash, expire_at) 
+             VALUES (1, 'link_hash', '2030-01-01T00:00:00+00:00');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO t_sessions (user, token_hash, expire_at) 
+             VALUES (2, 'session_hash', '2030-01-01T00:00:00+00:00');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Mark migrations 001-003 as applied so that the migrator run below
+        // only applies 004.
+        sqlx::raw_sql(
+            "CREATE TABLE _sqlx_migrations (
+                version BIGINT PRIMARY KEY,
+                description TEXT NOT NULL,
+                installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                success BOOLEAN NOT NULL,
+                checksum BLOB NOT NULL,
+                execution_time BIGINT NOT NULL
+            );",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        for migration in migrator.migrations.iter().take(3) {
+            sqlx::query(
+                "INSERT INTO _sqlx_migrations (version, description, success, checksum, 
+                 execution_time) VALUES (?1, ?2, TRUE, ?3, 0);",
+            )
+            .bind(migration.version)
+            .bind(migration.description.as_ref())
+            .bind(migration.checksum.as_ref())
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        pool.close().await;
+
+        // Initializing the repository applies 004 on the seeded data.
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Users are preserved and resolvable through their migrated emails.
+        assert_eq!(
+            repository
+                .get_user_by_email(&EmailAddress::try_from("a@mail.test").unwrap())
+                .await
+                .expect("should not have err"),
+            Some(UserId::from("user_a".to_string()))
+        );
+        assert_eq!(
+            repository
+                .get_user_by_email(&EmailAddress::try_from("b@mail.test").unwrap())
+                .await
+                .expect("should not have err"),
+            Some(UserId::from("user_b".to_string()))
+        );
+
+        // Emails of existing users are migrated as verified.
+        let emails: Vec<(String, i64)> =
+            sqlx::query_as("SELECT email, verified FROM t_emails ORDER BY email;")
+                .fetch_all(&repository.readers)
+                .await
+                .unwrap();
+        assert_eq!(
+            emails,
+            [
+                ("a@mail.test".to_string(), 1),
+                ("b@mail.test".to_string(), 1)
+            ]
+        );
+
+        // Auth links and sessions are ephemeral: the migration drops them.
+        assert!(repository.get_all_auth_links().await.is_empty());
+        assert!(
+            repository
+                .get_session_by_hash(&HashedSessionToken::new("session_hash".to_string()))
+                .await
+                .is_none()
+        );
+
+        // Existing users are migrated without a password hash.
+        let password_hashes: Vec<Option<String>> =
+            sqlx::query_scalar("SELECT password_hash FROM t_users ORDER BY rowid;")
+                .fetch_all(&repository.readers)
+                .await
+                .unwrap();
+        assert_eq!(password_hashes, [None, None]);
     }
 }
