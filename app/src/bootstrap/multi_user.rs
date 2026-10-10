@@ -13,7 +13,7 @@ use crate::{
     inbound::{
         http::{
             AuthLinkService, HttpServer, SMTPEmailProvider, SessionService,
-            SqliteAuthLinkRepository, SqliteSessionRepository, SqliteUserRepository, UserService,
+            SqliteSessionRepository, SqliteUsersRepository, UserService,
             spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
         },
         parser::Parser,
@@ -40,8 +40,8 @@ type ActualTrainingService = TrainingService<
     Clock,
 >;
 type ActualUserService = UserService<
-    AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
-    SqliteUserRepository,
+    AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
+    SqliteUsersRepository,
     SessionService<SqliteSessionRepository>,
 >;
 type ActualSearchService =
@@ -191,8 +191,8 @@ async fn build_user_service(
     mode_config: &MultiUserConfig,
 ) -> anyhow::Result<
     UserService<
-        AuthLinkService<SqliteAuthLinkRepository, SMTPEmailProvider>,
-        SqliteUserRepository,
+        AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
+        SqliteUsersRepository,
         SessionService<SqliteSessionRepository>,
     >,
 > {
@@ -202,24 +202,20 @@ async fn build_user_service(
         tokio::fs::create_dir_all(&db_dir).await?;
     }
 
-    let auth_db = db_dir.clone().join("auth_link.db");
-    let auth_link_repository = Arc::new(Mutex::new(
-        SqliteAuthLinkRepository::new(&format!("sqlite:{}", auth_db.to_string_lossy())).await?,
+    let user_db = db_dir.clone().join("user.db");
+    let users_repository = Arc::new(Mutex::new(
+        SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
     ));
+
     spawn_expired_auth_links_cleanup(
-        auth_link_repository.clone(),
+        users_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
     let mail_provider = Arc::new(build_mailer(mode_config).await?);
     let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
-        auth_link_repository,
+        users_repository.clone(),
         mail_provider,
     )));
-
-    let user_db = db_dir.clone().join("user.db");
-    let user_repository = Arc::new(Mutex::new(
-        SqliteUserRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
-    ));
 
     let session_db = db_dir.clone().join("session.db");
     let session_repository =
@@ -229,7 +225,8 @@ async fn build_user_service(
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
     let session_service = SessionService::new(session_repository);
-    let user_service = UserService::new(auth_link_service, user_repository, session_service);
+    let user_service =
+        UserService::new(auth_link_service, users_repository.clone(), session_service);
 
     Ok(user_service)
 }
