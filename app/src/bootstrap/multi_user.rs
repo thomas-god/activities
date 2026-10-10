@@ -12,9 +12,8 @@ use crate::{
     },
     inbound::{
         http::{
-            AuthLinkService, HttpServer, SMTPEmailProvider, SessionService,
-            SqliteSessionRepository, SqliteUsersRepository, UserService,
-            spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
+            AuthLinkService, HttpServer, SMTPEmailProvider, SessionService, SqliteUsersRepository,
+            UserService, spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -42,7 +41,7 @@ type ActualTrainingService = TrainingService<
 type ActualUserService = UserService<
     AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
     SqliteUsersRepository,
-    SessionService<SqliteSessionRepository>,
+    SessionService<SqliteUsersRepository>,
 >;
 type ActualSearchService =
     SearchService<SearchRepository<Clock>, ActualActivityService, ActualTrainingService, Clock>;
@@ -193,7 +192,7 @@ async fn build_user_service(
     UserService<
         AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
         SqliteUsersRepository,
-        SessionService<SqliteSessionRepository>,
+        SessionService<SqliteUsersRepository>,
     >,
 > {
     let root_path = PathBuf::from(config.activities_data_path.clone());
@@ -217,9 +216,7 @@ async fn build_user_service(
         mail_provider,
     )));
 
-    let session_db = db_dir.clone().join("session.db");
-    let session_repository =
-        SqliteSessionRepository::new(&format!("sqlite:{}", session_db.to_string_lossy())).await?;
+    let session_repository = users_repository.lock().await.clone();
     spawn_expired_sessions_cleanup(
         session_repository.clone(),
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,

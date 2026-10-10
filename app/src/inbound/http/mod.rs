@@ -45,10 +45,7 @@ pub use crate::inbound::auth::email_based::infra::mailer::smtp::SMTPEmailProvide
 
 pub use crate::inbound::auth::email_based::{
     AuthLinkService, DisabledUserService, SessionService, UserService,
-    infra::{
-        mailer::DoNothingMailProvider,
-        sqlite::{session::SqliteSessionRepository, users::SqliteUsersRepository},
-    },
+    infra::{mailer::DoNothingMailProvider, sqlite::users::SqliteUsersRepository},
     spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
 };
 

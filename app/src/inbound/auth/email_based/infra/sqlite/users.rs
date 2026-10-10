@@ -1,37 +1,59 @@
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
+use sqlx::{
+    ConnectOptions, SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+};
 
 use crate::{
     domain::models::UserId,
     inbound::auth::email_based::{
-        EmailAddress, HashedAuthLink, HashedAuthToken,
+        EmailAddress, HashedAuthLink, HashedAuthToken, HashedSession, HashedSessionToken,
         auth_link::{AuthLinkRepository, AuthLinkRepositoryError},
+        session::SessionRepository,
         user::UserRepository,
     },
 };
 
 /// SQLite repository backed by the user database (`user.db`).
 ///
-/// It implements both [`UserRepository`] and [`AuthLinkRepository`] domain traits.
+/// It implements the [`UserRepository`], [`AuthLinkRepository`] and
+/// [`SessionRepository`] domain traits.
 #[derive(Debug, Clone)]
 pub struct SqliteUsersRepository {
-    pool: SqlitePool,
+    writer: SqlitePool,
+    readers: SqlitePool,
 }
 
 impl SqliteUsersRepository {
     pub async fn new(url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(url)?
+        let writer_options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
-            .foreign_keys(true);
+            .foreign_keys(true)
+            .log_slow_statements(
+                log::LevelFilter::Warn,
+                std::time::Duration::from_millis(100),
+            )
+            .journal_mode(SqliteJournalMode::Wal);
 
-        let pool = SqlitePool::connect_with(options).await?;
+        let writer = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(writer_options)
+            .await?;
 
         // Run migrations
-        sqlx::migrate!("migrations/auth/users").run(&pool).await?;
+        sqlx::migrate!("migrations/users").run(&writer).await?;
 
-        Ok(Self { pool })
+        let readers_options = SqliteConnectOptions::from_str(url)?
+            .journal_mode(SqliteJournalMode::Wal)
+            .read_only(true);
+        let readers = SqlitePoolOptions::new()
+            .max_connections(10)
+            .connect_with(readers_options)
+            .await?;
+
+        Ok(Self { writer, readers })
     }
 }
 
@@ -46,7 +68,7 @@ impl UserRepository for SqliteUsersRepository {
         )
         .bind(email.to_string())
         .bind(user.to_string())
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         {
             Ok(_) => Ok(()),
@@ -63,7 +85,7 @@ impl UserRepository for SqliteUsersRepository {
         let res: Result<String, sqlx::Error> =
             sqlx::query_scalar("SELECT user_id FROM t_users WHERE email = ?1")
                 .bind(email.to_string())
-                .fetch_one(&self.pool)
+                .fetch_one(&self.readers)
                 .await;
         match res {
             Ok(res) => Ok(Some(UserId::from(res))),
@@ -89,7 +111,7 @@ impl AuthLinkRepository for SqliteUsersRepository {
         .bind(link.user().to_string())
         .bind(link.hash().to_string())
         .bind(link.expire_at())
-        .execute(&self.pool)
+        .execute(&self.writer)
         .await
         .map_err(|err| {
             tracing::warn!("Unable to insert auth link into database");
@@ -114,7 +136,7 @@ impl AuthLinkRepository for SqliteUsersRepository {
         JOIN t_users u ON u.rowid = a.user
         ;"#,
         )
-        .fetch_all(&self.pool)
+        .fetch_all(&self.readers)
         .await
         {
             Ok(res) => res,
@@ -142,7 +164,7 @@ impl AuthLinkRepository for SqliteUsersRepository {
     ) -> Result<(), AuthLinkRepositoryError> {
         sqlx::query("DELETE FROM t_auth_links WHERE token_hash = ?1;")
             .bind(hash.to_string())
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map(|_| ())
             .map_err(|_| AuthLinkRepositoryError::Error)
@@ -155,10 +177,88 @@ impl AuthLinkRepository for SqliteUsersRepository {
     ) -> Result<(), AuthLinkRepositoryError> {
         sqlx::query("DELETE FROM t_auth_links WHERE expire_at <= ?1;")
             .bind(reference)
-            .execute(&self.pool)
+            .execute(&self.writer)
             .await
             .map(|_| ())
             .map_err(|_| AuthLinkRepositoryError::Error)
+    }
+}
+
+impl SessionRepository for SqliteUsersRepository {
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn store_session(&self, session: &HashedSession) -> Result<(), ()> {
+        let res = sqlx::query(
+            r#"
+        INSERT INTO t_sessions (user, token_hash, expire_at)
+        SELECT rowid, ?2, ?3 FROM t_users WHERE user_id = ?1
+        ;"#,
+        )
+        .bind(session.user().to_string())
+        .bind(session.hash().to_string())
+        .bind(session.expire_at())
+        .execute(&self.writer)
+        .await
+        .map_err(|err| {
+            tracing::warn!("Unable to insert session into database");
+            tracing::warn!("{}", err);
+        })?;
+
+        if res.rows_affected() == 0 {
+            tracing::warn!("Unable to insert session into database: unknown user");
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn get_session_by_hash(&self, hash: &HashedSessionToken) -> Option<HashedSession> {
+        let res: Option<(String, String, DateTime<Utc>)> = match sqlx::query_as(
+            r#"
+        SELECT u.user_id, s.token_hash, s.expire_at
+        FROM t_sessions s
+        JOIN t_users u ON u.rowid = s.user
+        WHERE s.token_hash = ?1
+        ;"#,
+        )
+        .bind(hash.to_string())
+        .fetch_optional(&self.readers)
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                tracing::warn!("Cannot fetch session from database");
+                tracing::warn!("{}", err);
+                return None;
+            }
+        };
+        res.map(|(user, token, expire_at)| {
+            HashedSession::new(
+                UserId::from(user),
+                HashedSessionToken::new(token),
+                expire_at,
+            )
+        })
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_session_by_hash(&self, hash: &HashedSessionToken) -> Result<(), ()> {
+        sqlx::query("DELETE FROM t_sessions WHERE token_hash = ?1;")
+            .bind(hash.to_string())
+            .execute(&self.writer)
+            .await
+            .map(|_| ())
+            .map_err(|_| ())
+    }
+
+    #[tracing::instrument(skip_all, err(Debug))]
+    async fn delete_expired_sessions(&self, reference: DateTime<Utc>) -> Result<(), ()> {
+        sqlx::query("DELETE FROM t_sessions WHERE expire_at <= ?1;")
+            .bind(reference)
+            .execute(&self.writer)
+            .await
+            .map(|_| ())
+            .map_err(|_| ())
     }
 }
 
@@ -170,7 +270,8 @@ mod test_sqlite_users_repository {
     use crate::{
         domain::models::UserId,
         inbound::auth::email_based::{
-            AuthLink, AuthToken, EmailAddress, auth_link::AuthLinkRepository, user::UserRepository,
+            AuthLink, AuthToken, EmailAddress, HashedSessionToken, Session, SessionToken,
+            auth_link::AuthLinkRepository, session::SessionRepository, user::UserRepository,
         },
     };
 
@@ -203,11 +304,15 @@ mod test_sqlite_users_repository {
             .expect("repo should init");
 
         sqlx::query("select count(*) from t_users;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
         sqlx::query("select count(*) from t_auth_links;")
-            .fetch_one(&repository.pool)
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        sqlx::query("select count(*) from t_sessions;")
+            .fetch_one(&repository.readers)
             .await
             .unwrap();
     }
@@ -434,7 +539,7 @@ mod test_sqlite_users_repository {
 
         sqlx::query("DELETE FROM t_users WHERE user_id = ?1;")
             .bind(UserId::test_default().to_string())
-            .execute(&repository.pool)
+            .execute(&repository.writer)
             .await
             .unwrap();
 
@@ -569,5 +674,258 @@ mod test_sqlite_users_repository {
             .unwrap();
 
         assert!(repository.get_all_auth_links().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_store_session() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let expire_at = Utc::now() + TimeDelta::minutes(5);
+        let hashed_session = Session::new(
+            UserId::test_default(),
+            SessionToken::from("test_token".to_string()),
+            expire_at,
+        )
+        .as_hash();
+
+        repository
+            .store_session(&hashed_session)
+            .await
+            .expect("store_session should have succeeded");
+
+        let session = repository
+            .get_session_by_hash(hashed_session.hash())
+            .await
+            .expect("session should be found");
+
+        assert_eq!(session.user(), &UserId::test_default());
+        assert_eq!(session.hash(), hashed_session.hash());
+        assert_eq!(session.expire_at(), &expire_at);
+    }
+
+    #[tokio::test]
+    async fn test_store_session_token_for_that_user_already_exists() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let expire_at = Utc::now() + TimeDelta::minutes(5);
+
+        // Store a first session
+        repository
+            .store_session(
+                &Session::new(
+                    UserId::test_default(),
+                    SessionToken::from("test_token".to_string()),
+                    expire_at,
+                )
+                .as_hash(),
+            )
+            .await
+            .expect("store_session should have succeeded");
+
+        // Store a second session, for the same user, different token
+        repository
+            .store_session(
+                &Session::new(
+                    UserId::test_default(),
+                    SessionToken::from("another_test_token".to_string()),
+                    expire_at,
+                )
+                .as_hash(),
+            )
+            .await
+            .expect("store_session should have succeeded");
+
+        let session = repository
+            .get_session_by_hash(&SessionToken::from("another_test_token".to_string()).as_hash())
+            .await
+            .expect("session should be found");
+        assert_eq!(session.user(), &UserId::test_default());
+    }
+
+    #[tokio::test]
+    async fn test_store_session_reject_if_token_already_exists() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let hashed_session = Session::new(
+            UserId::test_default(),
+            SessionToken::from("test_token".to_string()),
+            Utc::now(),
+        )
+        .as_hash();
+
+        repository
+            .store_session(&hashed_session)
+            .await
+            .expect("store_session should have succeeded");
+
+        // Store operation should fail for same hash
+        repository
+            .store_session(&hashed_session)
+            .await
+            .expect_err("Should have returned an err");
+
+        // Existing token should not be changed
+        let session = repository
+            .get_session_by_hash(hashed_session.hash())
+            .await
+            .expect("session should be found");
+        assert_eq!(session.hash(), hashed_session.hash());
+    }
+
+    #[tokio::test]
+    async fn test_store_session_reject_if_user_does_not_exist() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let hashed_session = Session::new(
+            UserId::test_default(),
+            SessionToken::from("test_token".to_string()),
+            Utc::now(),
+        )
+        .as_hash();
+
+        repository
+            .store_session(&hashed_session)
+            .await
+            .expect_err("Should have rejected session for unknown user");
+
+        assert!(
+            repository
+                .get_session_by_hash(hashed_session.hash())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deleting_user_cascades_to_sessions() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let hashed_session = Session::new(
+            UserId::test_default(),
+            SessionToken::from("test_token".to_string()),
+            Utc::now(),
+        )
+        .as_hash();
+        repository.store_session(&hashed_session).await.unwrap();
+
+        sqlx::query("DELETE FROM t_users WHERE user_id = ?1;")
+            .bind(UserId::test_default().to_string())
+            .execute(&repository.writer)
+            .await
+            .unwrap();
+
+        assert!(
+            repository
+                .get_session_by_hash(hashed_session.hash())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_session_by_hash_not_found() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        assert!(
+            repository
+                .get_session_by_hash(&HashedSessionToken::new("test_token".to_string()))
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_session_ok() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let hashed_session = Session::new(
+            UserId::test_default(),
+            SessionToken::from("test_token".to_string()),
+            Utc::now(),
+        )
+        .as_hash();
+
+        repository
+            .store_session(&hashed_session)
+            .await
+            .expect("store_session should have succeeded");
+
+        // Delete operation
+        repository
+            .delete_session_by_hash(hashed_session.hash())
+            .await
+            .unwrap();
+
+        assert!(
+            repository
+                .get_session_by_hash(hashed_session.hash())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_expired_sessions_only_deletes_expired_ones() {
+        let (_db_file, repository) = repository_with_test_user().await;
+
+        let expired = Session::new(
+            UserId::test_default(),
+            SessionToken::from("expired_token".to_string()),
+            Utc::now() - TimeDelta::minutes(5),
+        )
+        .as_hash();
+        let still_valid = Session::new(
+            UserId::test_default(),
+            SessionToken::from("valid_token".to_string()),
+            Utc::now() + TimeDelta::minutes(5),
+        )
+        .as_hash();
+        repository.store_session(&expired).await.unwrap();
+        repository.store_session(&still_valid).await.unwrap();
+
+        repository
+            .delete_expired_sessions(Utc::now())
+            .await
+            .unwrap();
+
+        assert!(
+            repository
+                .get_session_by_hash(expired.hash())
+                .await
+                .is_none()
+        );
+        assert!(
+            repository
+                .get_session_by_hash(still_valid.hash())
+                .await
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_session_ok_when_token_does_not_exist() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        // Delete operation
+        repository
+            .delete_session_by_hash(&HashedSessionToken::new("test_token".to_string()))
+            .await
+            .unwrap();
+
+        assert!(
+            repository
+                .get_session_by_hash(&HashedSessionToken::new("test_token".to_string()))
+                .await
+                .is_none()
+        );
     }
 }
