@@ -13,3 +13,4 @@ alternative options considered and the resulting trade-offs.
 - [Search feature](20260906-search.md)
 - [Feedback, weight and nutrition training contexts](20260914-training-contexts.md)
 - [Duration curves](20261005-power-curves.md)
+- [User authentication refactor](20261010-authentication-refactor.md) (draft)
