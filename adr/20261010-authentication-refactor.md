@@ -55,9 +55,9 @@ group:
   `false`), parsed into `PasswordAuthConfig` (an empty struct for now: it only models "enabled").
 
 At least one method must be configured, otherwise the application fails to start. `MultiUserConfig`
-holds each method as an `Option<...>`, from which the user service derives an `AuthMethods { email,
-password }` value; the service branches on which methods are enabled and never sees SMTP
-credentials or other mailer details. Multi-user mode itself is selected when any of these
+holds each method as an `Option<...>`, from which the user service derives an
+`AuthMethods { email, password }` value; the service branches on which methods are enabled and never
+sees SMTP credentials or other mailer details. Multi-user mode itself is selected when any of these
 authentication variables is set — previously the mode was implicitly selected by the mailer
 variables, which were mandatory in multi-user mode. This lifts that requirement, so a multi-user
 deployment can run password-only without any SMTP relay (not yet implemented at the service level).
@@ -79,8 +79,8 @@ password:
 
 Password verification is uniform across all failing cases: unknown address, wrong password, and an
 account without a stored password (e.g. registered through the mail-only fallback in mail+password
-mode) all perform the same Argon2 verification — against a dummy hash for the first and third
-cases — and collapse into a single `Invalid` outcome that the HTTP layer renders as a generic
+mode) all perform the same Argon2 verification — against a dummy hash for the first and third cases
+— and collapse into a single `Invalid` outcome that the HTTP layer renders as a generic
 `401 Unauthorized`. The result value, response and timing are therefore indistinguishable, so the
 endpoint leaks neither account existence nor password presence.
 
@@ -129,4 +129,68 @@ verification flow exists, and email-only setups silently ignore a password suppl
 Handling every combination also means password verification must not reveal which combination a
 given account is in: collapsing unknown users, wrong passwords and accounts without a password into
 a single `Invalid` outcome (with a dummy Argon2 verification to equalize timing) keeps the endpoint
-uniform, at the cost of not being able to tell the user *why* a login failed.
+uniform, at the cost of not being able to tell the user _why_ a login failed.
+
+## Addendum: user account settings (2026-11-08)
+
+Building on the flows and schema above, logged-in users can now manage their own account: change
+their email address, and set or change their password, depending on which authentication methods the
+instance enables.
+
+### Email change
+
+- A logged-in user requests a change to a new address.
+- **Email-based auth enabled**: a single-use authentication link (15 minutes expiry, same machinery
+  as login links) is generated and sent **to the new address only**, to confirm it is valid and
+  reachable. The link carries the target email as a payload (`t_auth_links.new_email`, `NULL` for
+  login links). On validation the user's address is swapped transactionally and marked verified; the
+  old address stops working at that point. Until then, the old address keeps working.
+- **Email-based auth disabled** (password-only instance): no mailer is configured, so the change
+  applies instantly and the new address is marked verified.
+- The new address must not already belong to another account (`409 Conflict`).
+
+### Password management
+
+Password management is split in two operations, each with a crisp invariant:
+
+- **Update password** (`POST /api/user/password`): requires the current password; works only if the
+  user already has one. A wrong current password collapses into the same uniform `Invalid` outcome
+  as login, with the same dummy-hash timing equalization.
+- **Register password** (`POST /api/user/password/register`): takes only a new password; works only
+  if the user has **no** password yet.
+
+The register path exists for accounts created before password auth was enabled (they have no stored
+password), so that migrating an instance email-only → email+pwd → pwd-only does not lock those users
+out once password mode activates. Both endpoints require a valid session, so an anonymous attacker
+cannot register a password on someone else's account. Registration in pwd-only mode already requires
+a password, so accounts created after the migration are unaffected.
+
+**Residual risk**: registering a password only helps users who still have a valid session. A user
+whose session expired after the instance dropped email auth cannot be rescued (pwd-only mode has no
+mailer, hence no login link). Operators migrating away from email auth should always run an
+email+pwd phase long enough for users to log in via an email link and register a password. A future
+admin role may provide a stronger remedy.
+
+### Sessions
+
+Neither an email change nor a password change invalidates existing sessions; they remain valid until
+their normal expiry. A separate feature will later allow closing existing sessions.
+
+### Client surface
+
+A `/settings` page (password section, switching between "set" and "change" based on a
+`GET /api/user/password` status endpoint, hidden when password auth is disabled) and a dedicated
+`/settings/email` page hosting both the change form and the auth-link token validation (token in the
+URL fragment, same pattern as `/login#token`).
+
+### Alternatives considered (account settings)
+
+- **A single "change password" endpoint with an optional current-password field.** Rejected: fuzzy
+  semantics (what does an absent current password mean?) and a bypass risk; the split keeps each
+  endpoint's precondition explicit.
+- **Asking both the old and the new address to confirm an email change.** Rejected for now: the old
+  address demonstrably works (the user is logged in with a live session); requiring two
+  confirmations adds friction without a security benefit in this threat model.
+- **A dedicated table for email-change links** instead of a payload column on `t_auth_links`.
+  Rejected: links are single-use, short-lived and already carry the user reference; a nullable
+  column reuses validation, expiry and cleanup unchanged.
