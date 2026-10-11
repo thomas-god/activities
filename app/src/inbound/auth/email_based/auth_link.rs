@@ -95,9 +95,63 @@ where
     }
 }
 
+/// A no-op [`IAuthLinkService`] used when email-based authentication is disabled.
+///
+/// It exists so that [`crate::inbound::auth::email_based::UserService`] can be built in
+/// password-only mode, where there is no SMTP provider. The mail flow is unreachable in that mode
+/// (the service returns early before generating an auth link); should it be reached anyway, the
+/// method reports [`GenerateAuthLinkResult::Retry`] rather than silently pretending an email was
+/// sent.
+#[derive(Debug, Clone, Default)]
+pub struct DisabledAuthLinkService {}
+
+impl IAuthLinkService for DisabledAuthLinkService {
+    async fn generate_auth_link(&self, _req: GenerateAuthLinkRequest) -> GenerateAuthLinkResult {
+        tracing::warn!("Trying to call `generate_auth_link` on `DisabledAuthLinkService`");
+        GenerateAuthLinkResult::Retry
+    }
+
+    async fn validate_auth_token(
+        &self,
+        _token: &AuthToken,
+    ) -> Result<Option<crate::domain::models::UserId>, ()> {
+        tracing::warn!("Trying to call `validate_auth_token` on `DisabledAuthLinkService`");
+        Ok(None)
+    }
+}
+
+/// Runtime choice between an enabled and a disabled [`IAuthLinkService`].
+#[derive(Debug, Clone)]
+pub enum MaybeAuthLinkService<Enabled> {
+    Enabled(Enabled),
+    Disabled(DisabledAuthLinkService),
+}
+
+impl<Enabled> IAuthLinkService for MaybeAuthLinkService<Enabled>
+where
+    Enabled: IAuthLinkService,
+{
+    async fn generate_auth_link(&self, req: GenerateAuthLinkRequest) -> GenerateAuthLinkResult {
+        match self {
+            Self::Enabled(service) => service.generate_auth_link(req).await,
+            Self::Disabled(service) => service.generate_auth_link(req).await,
+        }
+    }
+
+    async fn validate_auth_token(
+        &self,
+        token: &AuthToken,
+    ) -> Result<Option<crate::domain::models::UserId>, ()> {
+        match self {
+            Self::Enabled(service) => service.validate_auth_token(token).await,
+            Self::Disabled(service) => service.validate_auth_token(token).await,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum AuthLinkRepositoryError {
-    #[error("An error occured with the session repository")]
+    #[error("An error occurred with the session repository")]
     Error,
 }
 

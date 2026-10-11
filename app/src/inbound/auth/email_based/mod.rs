@@ -17,7 +17,10 @@ pub mod infra;
 pub mod session;
 pub mod user;
 
-pub use auth_link::{AuthLinkService, spawn_expired_auth_links_cleanup};
+pub use auth_link::{
+    AuthLinkService, DisabledAuthLinkService, MaybeAuthLinkService,
+    spawn_expired_auth_links_cleanup,
+};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 pub use user::{DisabledUserService, UserService};
 

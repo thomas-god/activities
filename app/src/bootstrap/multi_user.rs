@@ -12,9 +12,9 @@ use crate::{
     },
     inbound::{
         http::{
-            AuthLinkService, AuthMethods, HttpServer, SMTPEmailProvider, SessionService,
-            SqliteUsersRepository, UserService, spawn_expired_auth_links_cleanup,
-            spawn_expired_sessions_cleanup,
+            AuthLinkService, AuthMethods, DisabledAuthLinkService, HttpServer,
+            MaybeAuthLinkService, SMTPEmailProvider, SessionService, SqliteUsersRepository,
+            UserService, spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -40,7 +40,7 @@ type ActualTrainingService = TrainingService<
     Clock,
 >;
 type ActualUserService = UserService<
-    AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
+    MaybeAuthLinkService<AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>>,
     SqliteUsersRepository,
     SessionService<SqliteUsersRepository>,
 >;
@@ -189,13 +189,7 @@ async fn build_activity_service(
 async fn build_user_service(
     config: &BaseConfig,
     mode_config: &MultiUserConfig,
-) -> anyhow::Result<
-    UserService<
-        AuthLinkService<SqliteUsersRepository, SMTPEmailProvider>,
-        SqliteUsersRepository,
-        SessionService<SqliteUsersRepository>,
-    >,
-> {
+) -> anyhow::Result<ActualUserService> {
     let root_path = PathBuf::from(config.activities_data_path.clone());
     let db_dir = root_path.clone().join("db/");
     if !db_dir.exists() {
@@ -207,18 +201,24 @@ async fn build_user_service(
         SqliteUsersRepository::new(&format!("sqlite:{}", user_db.to_string_lossy())).await?,
     ));
 
-    spawn_expired_auth_links_cleanup(
-        users_repository.clone(),
-        EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
-    );
-    let email_config = mode_config.email.as_ref().ok_or_else(|| {
-        anyhow!("Password-based multi-user authentication is not implemented yet; configure the mailer environment variables")
-    })?;
-    let mail_provider = Arc::new(build_mailer(email_config).await?);
-    let auth_link_service = Arc::new(Mutex::new(AuthLinkService::new(
-        users_repository.clone(),
-        mail_provider,
-    )));
+    // The auth-link service is only meaningful when email-based auth is enabled: password-only
+    // mode has no mailer and never sends an email. Disabling it lets the application start without
+    // any SMTP configuration while keeping a single concrete `UserService` type.
+    let auth_link_service = match mode_config.email.as_ref() {
+        Some(email_config) => {
+            spawn_expired_auth_links_cleanup(
+                users_repository.clone(),
+                EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
+            );
+            let mail_provider = Arc::new(build_mailer(email_config).await?);
+            MaybeAuthLinkService::Enabled(AuthLinkService::new(
+                users_repository.clone(),
+                mail_provider,
+            ))
+        }
+        None => MaybeAuthLinkService::Disabled(DisabledAuthLinkService::default()),
+    };
+    let auth_link_service = Arc::new(Mutex::new(auth_link_service));
 
     let session_repository = users_repository.lock().await.clone();
     spawn_expired_sessions_cleanup(
@@ -283,4 +283,36 @@ async fn build_search_service(
         tokio_util::sync::CancellationToken::new(),
         Clock::new(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::PasswordAuthConfig;
+
+    fn base_config(path: &std::path::Path) -> BaseConfig {
+        BaseConfig {
+            server_port: "0".to_string(),
+            allow_origin: "http://localhost".to_string(),
+            activities_data_path: path.to_string_lossy().to_string(),
+        }
+    }
+
+    fn password_only_config() -> MultiUserConfig {
+        MultiUserConfig {
+            email: None,
+            password: Some(PasswordAuthConfig::default()),
+            allow_registration: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_password_only_config_builds_user_service_without_mailer() {
+        let tmp = tempfile::TempDir::new().expect("temp dir should be created");
+        let config = base_config(tmp.path());
+
+        let _ = build_user_service(&config, &password_only_config())
+            .await
+            .expect("password-only config should start without SMTP credentials");
+    }
 }
