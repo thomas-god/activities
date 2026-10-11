@@ -43,6 +43,25 @@ verification status:
 `password_hash` is added to `t_users` as a nullable column: a user may not have a password. It only
 ever stores a password hash, never a plaintext password.
 
+### Authentication method configuration
+
+The two authentication methods are configured and parsed independently, each as an all-or-nothing
+group:
+
+- **Email-based auth** — the five `ACTIVITIES_MAILER_*` variables (from, username, password, relay,
+  domain) are grouped in `EmailAuthConfig`; setting any of them requires setting all of them, and
+  partial mailer configurations are rejected at startup.
+- **Password-based auth** — `ACTIVITIES_PASSWORD_AUTH_ENABLED` (`true`/`false`, defaults to
+  `false`), parsed into `PasswordAuthConfig` (an empty struct for now: it only models "enabled").
+
+At least one method must be configured, otherwise the application fails to start. `MultiUserConfig`
+holds each method as an `Option<...>`, from which the user service derives an `AuthMethods { email,
+password }` value; the service branches on which methods are enabled and never sees SMTP
+credentials or other mailer details. Multi-user mode itself is selected when any of these
+authentication variables is set — previously the mode was implicitly selected by the mailer
+variables, which were mandatory in multi-user mode. This lifts that requirement, so a multi-user
+deployment can run password-only without any SMTP relay (not yet implemented at the service level).
+
 ## Alternatives considered
 
 - **A `verified` column on `t_users` instead of a dedicated table.** Rejected: it would keep the
@@ -54,6 +73,17 @@ ever stores a password hash, never a plaintext password.
 - **Keeping `password_hash` in a dedicated table.** Rejected for now: a user has at most one
   password, so a nullable column on `t_users` is simpler; it can be extracted later if credentials
   ever multiply (e.g. passkeys).
+- **Keeping the mailer fields flat on `MultiUserConfig`.** Rejected: the enabled authentication
+  methods were only implicit (the config existed iff the mailer was configured), and password-based
+  auth had nowhere to live. Grouping each method in its own struct makes "email auth configured"
+  explicit and keeps partial configurations invalid.
+- **A boolean toggle for email auth too** (e.g. `ACTIVITIES_EMAIL_AUTH_ENABLED`) for symmetry with
+  `ACTIVITIES_PASSWORD_AUTH_ENABLED`. Rejected for now: mailer credentials are already required to
+  operate email auth, so an explicit enable flag would be redundant; password auth needs one only
+  because its configuration is currently empty.
+- **Requiring both methods to be configured**, letting operators disable one via its toggle.
+  Rejected: it would force every multi-user deployment to supply SMTP credentials even when only
+  password auth is used.
 - **Migrating the auth link and session content** during the merge. Rejected: it only holds
   ephemeral data, so users get logged out instead, which keeps the migrations simple.
 
@@ -66,3 +96,11 @@ auth state on user deletion.
 **Trade-offs**: users have to log in again after the upgrade; email uniqueness now lives on
 `t_emails` and user-by-email lookups require a join. New registrations produce unverified emails
 until a verification flow is implemented.
+
+Supporting the authentication methods independently adds its own trade-offs: multi-user mode
+selection is based on environment-variable presence, so even explicitly disabling password auth
+(e.g. `ACTIVITIES_PASSWORD_AUTH_ENABLED=false` while configuring the mailer) keeps the application
+in multi-user mode rather than falling back to single-user. With both methods optional, the service
+must handle every combination (email-only, password-only, both): password-only registration cannot
+verify the email through a link, so accounts register with unverified email addresses until a
+verification flow exists, and email-only setups silently ignore a password supplied at registration.

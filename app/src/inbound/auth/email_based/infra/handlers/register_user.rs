@@ -2,13 +2,14 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
 use crate::inbound::auth::email_based::{
-    EmailAddress, IUserService, UserRegistrationResult,
+    EmailAddress, IUserService, Password, UserRegistrationRequest, UserRegistrationResult,
     infra::handlers::{AuthAppState, UserRegistration},
 };
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterUserBody {
     email: String,
+    password: Option<String>,
 }
 
 #[tracing::instrument(skip_all)]
@@ -24,9 +25,18 @@ pub async fn register_user<UR: IUserService>(
         return StatusCode::BAD_REQUEST;
     };
 
-    match state.user_service.register_user(email).await {
+    let password = body
+        .password
+        .and_then(|password| Password::try_from(password).ok());
+
+    match state
+        .user_service
+        .register_user(UserRegistrationRequest::new(email, password))
+        .await
+    {
         UserRegistrationResult::Success => StatusCode::OK,
         UserRegistrationResult::Retry => StatusCode::SERVICE_UNAVAILABLE,
+        UserRegistrationResult::PasswordRequired => StatusCode::BAD_REQUEST,
     }
 }
 
@@ -37,7 +47,7 @@ mod test {
     use serde_json::json;
 
     use crate::inbound::auth::email_based::{
-        EmailAddress, UserRegistrationResult, infra::handlers::UserRegistration,
+        EmailAddress, Password, UserRegistrationResult, infra::handlers::UserRegistration,
         test_utils::MockUserService,
     };
 
@@ -65,7 +75,10 @@ mod test {
         user_service
             .expect_register_user()
             .times(1)
-            .withf(|email| email == &EmailAddress::try_from("test@mail.test").unwrap())
+            .withf(|req| {
+                req.email() == &EmailAddress::try_from("test@mail.test").unwrap()
+                    && req.password().is_none()
+            })
             .returning(|_| UserRegistrationResult::Success);
         let server = build_test_server(user_service, UserRegistration::Allowed);
 
@@ -75,6 +88,60 @@ mod test {
             .await;
 
         response.assert_status(StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_register_allowed_forwards_provided_password() {
+        let mut user_service = MockUserService::new();
+        user_service
+            .expect_register_user()
+            .times(1)
+            .withf(|req| req.password() == &Some(Password::try_from("secret".to_string()).unwrap()))
+            .returning(|_| UserRegistrationResult::Success);
+        let server = build_test_server(user_service, UserRegistration::Allowed);
+
+        let response = server
+            .post("/register")
+            .json(&json!({"email": "test@mail.test", "password": "secret"}))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_register_treats_invalid_password_as_not_provided() {
+        let mut user_service = MockUserService::new();
+        user_service
+            .expect_register_user()
+            .times(1)
+            .withf(|req| req.password().is_none())
+            .returning(|_| UserRegistrationResult::Success);
+        let server = build_test_server(user_service, UserRegistration::Allowed);
+
+        let response = server
+            .post("/register")
+            .json(&json!({"email": "test@mail.test", "password": ""}))
+            .await;
+
+        response.assert_status(StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_register_maps_password_required_to_bad_request() {
+        let mut user_service = MockUserService::new();
+        user_service
+            .expect_register_user()
+            .times(1)
+            .withf(|req| req.email().value() == "test@mail.test")
+            .returning(|_| UserRegistrationResult::PasswordRequired);
+        let server = build_test_server(user_service, UserRegistration::Allowed);
+
+        let response = server
+            .post("/register")
+            .json(&json!({"email": "test@mail.test"}))
+            .await;
+
+        response.assert_status(StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

@@ -19,7 +19,7 @@ pub use auth_link::{AuthLinkService, spawn_expired_auth_links_cleanup};
 pub use session::{SessionService, spawn_expired_sessions_cleanup};
 pub use user::{DisabledUserService, UserService};
 
-use crate::domain::models::UserId;
+use crate::{config::MultiUserConfig, domain::models::UserId};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Display)]
 pub struct EmailAddress(String);
@@ -50,6 +50,15 @@ impl TryFrom<String> for EmailAddress {
     }
 }
 
+fn argon2_hash(data: &[u8]) -> Option<String> {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    argon2
+        .hash_password(data, &salt)
+        .ok()
+        .map(|hash| hash.to_string())
+}
+
 #[derive(Clone, Debug)]
 pub struct AuthToken(String);
 
@@ -68,12 +77,7 @@ impl AuthToken {
     }
 
     pub fn as_hash(&self) -> Option<HashedAuthToken> {
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        match argon2.hash_password(self.0.as_bytes(), &salt) {
-            Ok(hash) => Some(HashedAuthToken::new(hash.to_string())),
-            Err(_err) => None,
-        }
+        argon2_hash(self.0.as_bytes()).map(HashedAuthToken::new)
     }
 }
 
@@ -271,6 +275,85 @@ impl std::fmt::Display for HashedSessionToken {
 pub enum UserRegistrationResult {
     Success,
     Retry,
+    /// Password-based authentication is active but no password was provided.
+    PasswordRequired,
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Password(String);
+
+impl Password {
+    pub fn as_hash(&self) -> Option<HashedPassword> {
+        argon2_hash(self.0.as_bytes()).map(HashedPassword::new)
+    }
+}
+
+impl TryFrom<String> for Password {
+    type Error = ();
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Err(());
+        }
+        Ok(Self(value))
+    }
+}
+
+// Never leak the password content through debug output.
+impl std::fmt::Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Password([redacted])")
+    }
+}
+
+#[derive(Clone, Debug, Constructor, PartialEq)]
+pub struct HashedPassword(String);
+
+impl std::fmt::Display for HashedPassword {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, Constructor)]
+pub struct UserRegistrationRequest {
+    email: EmailAddress,
+    password: Option<Password>,
+}
+
+impl UserRegistrationRequest {
+    pub fn email(&self) -> &EmailAddress {
+        &self.email
+    }
+
+    pub fn password(&self) -> &Option<Password> {
+        &self.password
+    }
+}
+
+#[derive(Debug, Clone, Copy, Constructor)]
+pub struct AuthMethods {
+    email: bool,
+    password: bool,
+}
+
+impl From<&MultiUserConfig> for AuthMethods {
+    fn from(value: &MultiUserConfig) -> Self {
+        Self {
+            email: value.email.is_some(),
+            password: value.password.is_some(),
+        }
+    }
+}
+
+impl AuthMethods {
+    pub fn email(&self) -> bool {
+        self.email
+    }
+
+    pub fn password(&self) -> bool {
+        self.password
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -288,7 +371,7 @@ pub enum AuthLinkValidationResult {
 pub trait IUserService: Clone + Send + Sync + 'static {
     fn register_user(
         &self,
-        email: EmailAddress,
+        req: UserRegistrationRequest,
     ) -> impl Future<Output = UserRegistrationResult> + Send;
 
     fn login_user(&self, email: EmailAddress) -> impl Future<Output = UserLoginResult> + Send;
@@ -408,7 +491,7 @@ pub mod test_utils {
         impl IUserService for UserService {
             async fn register_user(
                 &self,
-                email: EmailAddress,
+                req: UserRegistrationRequest,
             ) -> UserRegistrationResult;
 
             async fn login_user(

@@ -9,7 +9,8 @@ use sqlx::{
 use crate::{
     domain::models::UserId,
     inbound::auth::email_based::{
-        EmailAddress, HashedAuthLink, HashedAuthToken, HashedSession, HashedSessionToken,
+        EmailAddress, HashedAuthLink, HashedAuthToken, HashedPassword, HashedSession,
+        HashedSessionToken,
         auth_link::{AuthLinkRepository, AuthLinkRepositoryError},
         session::SessionRepository,
         user::UserRepository,
@@ -59,7 +60,12 @@ impl SqliteUsersRepository {
 
 impl UserRepository for SqliteUsersRepository {
     #[tracing::instrument(skip_all, err(Debug))]
-    async fn store_user_with_mail(&self, user: &UserId, email: &EmailAddress) -> Result<(), ()> {
+    async fn store_user(
+        &self,
+        user: &UserId,
+        email: &EmailAddress,
+        password_hash: Option<HashedPassword>,
+    ) -> Result<(), ()> {
         let mut tx = match self.writer.begin().await {
             Ok(tx) => tx,
             Err(err) => {
@@ -69,10 +75,12 @@ impl UserRepository for SqliteUsersRepository {
             }
         };
 
-        if let Err(err) = sqlx::query("INSERT INTO t_users (user_id) VALUES (?1);")
-            .bind(user.to_string())
-            .execute(&mut *tx)
-            .await
+        if let Err(err) =
+            sqlx::query("INSERT INTO t_users (user_id, password_hash) VALUES (?1, ?2);")
+                .bind(user.to_string())
+                .bind(password_hash.map(|hash| hash.to_string()))
+                .execute(&mut *tx)
+                .await
         {
             tracing::warn!("Unable to insert user into database");
             tracing::warn!("{}", err);
@@ -295,13 +303,14 @@ impl SessionRepository for SqliteUsersRepository {
 
 #[cfg(test)]
 mod test_sqlite_users_repository {
+    use argon2::{Argon2, PasswordHash, PasswordVerifier};
     use chrono::{TimeDelta, Utc};
     use tempfile::NamedTempFile;
 
     use crate::{
         domain::models::UserId,
         inbound::auth::email_based::{
-            AuthLink, AuthToken, EmailAddress, HashedSessionToken, Session, SessionToken,
+            AuthLink, AuthToken, EmailAddress, HashedSessionToken, Password, Session, SessionToken,
             auth_link::AuthLinkRepository, session::SessionRepository, user::UserRepository,
         },
     };
@@ -320,7 +329,7 @@ mod test_sqlite_users_repository {
             .expect("repo should init");
 
         repository
-            .store_user_with_mail(&UserId::test_default(), &test_email())
+            .store_user(&UserId::test_default(), &test_email(), None)
             .await
             .expect("should have stored user with email");
 
@@ -360,9 +369,10 @@ mod test_sqlite_users_repository {
             .expect("repo should init");
 
         repository
-            .store_user_with_mail(
+            .store_user(
                 &UserId::test_default(),
                 &EmailAddress::try_from("test@mail.test").unwrap(),
+                None,
             )
             .await
             .expect("should have store user with email");
@@ -376,17 +386,19 @@ mod test_sqlite_users_repository {
             .expect("repo should init");
 
         repository
-            .store_user_with_mail(
+            .store_user(
                 &UserId::test_default(),
                 &EmailAddress::try_from("test@mail.test").unwrap(),
+                None,
             )
             .await
             .unwrap();
 
         repository
-            .store_user_with_mail(
+            .store_user(
                 &UserId::from("another_user".to_string()),
                 &EmailAddress::try_from("test@mail.test").unwrap(),
+                None,
             )
             .await
             .expect_err("Should have rejected duplicated email");
@@ -416,9 +428,10 @@ mod test_sqlite_users_repository {
             .expect("repo should init");
 
         repository
-            .store_user_with_mail(
+            .store_user(
                 &UserId::test_default(),
                 &EmailAddress::try_from("test@mail.test").unwrap(),
+                None,
             )
             .await
             .unwrap();
@@ -453,6 +466,32 @@ mod test_sqlite_users_repository {
                 .await
                 .unwrap();
         assert_eq!(password_hash, None);
+    }
+
+    #[tokio::test]
+    async fn test_stored_password_hash_can_be_verified_against_password() {
+        let db_file = NamedTempFile::new().unwrap();
+        let repository = SqliteUsersRepository::new(&db_file.path().to_string_lossy())
+            .await
+            .expect("repo should init");
+
+        let password = Password::try_from("secret-password".to_string()).unwrap();
+        let password_hash = password.as_hash().expect("hashing should succeed");
+        repository
+            .store_user(&UserId::test_default(), &test_email(), Some(password_hash))
+            .await
+            .expect("should have stored user with password hash");
+
+        let stored_hash: Option<String> = sqlx::query_scalar("select password_hash from t_users;")
+            .fetch_one(&repository.readers)
+            .await
+            .unwrap();
+        let stored_hash = stored_hash.expect("password hash should be stored");
+        let parsed =
+            PasswordHash::new(&stored_hash).expect("stored hash should be a valid PHC string");
+        Argon2::default()
+            .verify_password("secret-password".as_bytes(), &parsed)
+            .expect("stored hash should verify against the original password");
     }
 
     #[tokio::test]

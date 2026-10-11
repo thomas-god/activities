@@ -12,8 +12,9 @@ use crate::{
     },
     inbound::{
         http::{
-            AuthLinkService, HttpServer, SMTPEmailProvider, SessionService, SqliteUsersRepository,
-            UserService, spawn_expired_auth_links_cleanup, spawn_expired_sessions_cleanup,
+            AuthLinkService, AuthMethods, HttpServer, SMTPEmailProvider, SessionService,
+            SqliteUsersRepository, UserService, spawn_expired_auth_links_cleanup,
+            spawn_expired_sessions_cleanup,
         },
         parser::Parser,
     },
@@ -225,8 +226,13 @@ async fn build_user_service(
         EXPIRED_AUTH_STATE_CLEANUP_INTERVAL,
     );
     let session_service = SessionService::new(session_repository);
-    let user_service =
-        UserService::new(auth_link_service, users_repository.clone(), session_service);
+    let auth_methods = AuthMethods::from(mode_config);
+    let user_service = UserService::new(
+        auth_link_service,
+        users_repository.clone(),
+        session_service,
+        auth_methods,
+    );
 
     Ok(user_service)
 }
